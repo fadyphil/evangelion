@@ -16,10 +16,12 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Bilingual (ar / en) localization for the reading sanctuary.
-  # `intl` is a hard requirement of flutter_localizations.
+  # `intl` is a hard requirement of flutter_localizations, which pins it to
+  # 0.20.x; `^0.20.3` matches that pin exactly. This was the only unconstrained
+  # dependency, so it floated to whatever was newest on any given pub get.
   flutter_localizations:
     sdk: flutter
-  intl: any
+  intl: ^0.20.3
 
   # Transport, state, DI and routing.
   dio: ^5.11.1

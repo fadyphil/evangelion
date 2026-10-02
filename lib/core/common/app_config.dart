@@ -30,6 +30,7 @@ abstract final class AppConfig {
   static const int seedGroupId = 3;
 
   /// `X-User-Role`. The backend parses this but never enforces it; it is
-  /// decorative and must never gate the UI.
-  static const String userRole = 'kid';
+  /// decorative and must never gate the UI. Named `seed*` to group it with the
+  /// other in-memory-backend fixtures above — it is not a production identity.
+  static const String seedUserRole = 'kid';
 }

@@ -270,6 +270,27 @@ widget tests, and golden tests** written alongside or after the widget, never a
 test-first ceremony. Domain logic must **not** be buried inside a widget — if a widget
 needs a conditional or calculation, extract it to a cubit or a pure function and TDD that.
 
+### Recorded decisions — Phase 0a review
+
+Two decisions recorded so later phases do not undo them by accident.
+
+**1. The Dio client takes `baseUrl` as a constructor parameter.** It MUST NOT read
+`AppConfig.apiBaseUrl` inline inside a DI module. `String.fromEnvironment` is resolved by
+the compiler, so the override path cannot be varied at runtime from a unit test. If the
+client reaches for the global, the seam needed to test malformed overrides — empty,
+trailing slash, scheme-less — disappears, and the override path stays permanently
+untestable. `AppConfig` supplies the value at the composition root only.
+
+**2. The `AppConfig` SRP split is deferred to Phase 5.** Do not split it now. It currently
+holds exactly two reasons to change, and both are recorded here so the split is not
+forgotten rather than rediscovered:
+
+- **Transport tuning** — timeouts and base URL want their own reason to change.
+- **In-memory-backend seed fixtures** — `seedUserId` / `seedGroupId` / `seedUserRole` are
+  not configuration. They move next to `FakeAuthRepository` when that exists.
+
+This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
+
 ---
 
 ## 7. Verification — run before reporting done
