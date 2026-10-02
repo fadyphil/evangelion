@@ -398,6 +398,38 @@ another token. One of them — `ember` as the snack-bar *action* colour on `rais
 at **2.30:1** — is below even AA-large, so it is not "large text only" and Phase 3
 owns the fix when it builds the snack bar.
 
+### Recorded decisions — Phase 3 review
+
+**8. Nothing in this suite compares a golden to the React prototype.** This is the
+phase's largest structural gap and it is recorded here rather than left to be
+discovered in Phase 9.
+
+A golden captures **whatever the widget currently renders**. Every transcription
+claim in Phase 3 is therefore checked against the *token* (`EvaColors.ember`,
+`kEvaButtonHeight = 52`, `EvaSpacing.sm`) and against the *assertion in the widget's
+doc comment* (`ds.tsx:240`, `SettingsScreen.tsx:39`) — never against `eva/` itself.
+So a systematic transcription error present in **both** the widget and its golden is
+invisible to this suite by construction: the golden ratifies the mistake, the token
+assertion confirms the mistake was applied consistently, and the doc comment quoting
+the prototype is prose rather than a test input. Phase 3's review found one instance
+of the adjacent failure — `TextLink`'s chevron inked `ink` where `ds.tsx:283` writes
+`hex.ember` and `EvaButton` inked it `ember`, one prototype glyph in two colours — by
+reading the prototype, not by any test failing.
+
+`test/golden_pairs_test.dart` closes the *narrower* half of this: a `*_dark.png` /
+`*_light.png` pair that is byte-identical cannot detect a theming regression, which
+is the only thing its test name claims, and two of Phase 3's pairs were. It cannot
+compare against `eva/`, and it is not a substitute.
+
+**Owner: the phase that first transcribes a screen.** Phase 4 builds Login, the first
+real screen, and a screen is where a wrong number becomes a user's day. The owner
+builds a prototype-comparison harness — a `ds.tsx` line map plus a test that renders
+the React component and the Flutter widget over the same inputs and compares
+geometry — or records here again why not. Until then, **every transcription claim in
+this repository is a claim a human verified by reading `eva/`, not a claim a test
+enforces.** A reviewer reading a `ds.tsx:NNN` citation should treat it as an
+unverified assertion unless a test names it.
+
 ---
 
 ## 7. Verification — run before reporting done
