@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/design_system_harness.dart';
@@ -61,23 +62,34 @@ Future<List<int>> _pixels(WidgetTester tester) async {
       .renderObject<RenderRepaintBoundary>(find.byKey(_layerKey));
   final List<int>? bytes = await tester.runAsync<List<int>>(() async {
     final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData data = (await image.toByteData(
+    final ByteData? data = (await image.toByteData(
       format: ui.ImageByteFormat.rawRgba,
-    ))!;
+    ));
     image.dispose();
+    if (data == null) {
+      throw StateError('the flecks layer produced no byte data');
+    }
     return <int>[for (int i = 0; i < data.lengthInBytes; i++) data.getUint8(i)];
   });
-  if ((bytes?.length ?? 0) == 0) {
-    debugPrint('DEBUG: no bytes captured');
-  } else {
-    final int nonZero = bytes!.where((int b) => b != 0).length;
-    debugPrint(
-      'DEBUG: ${bytes.length} bytes, $nonZero non-zero, '
-      'max=${bytes.reduce((int a, int b) => a > b ? a : b)}',
+  // Failing closed rather than returning an empty list: an empty buffer
+  // satisfies every "the pixels differ" comparison in this file vacuously, and
+  // reads as "the painter drew nothing" — which is indistinguishable from a real
+  // regression until you know the capture failed.
+  if (bytes == null || bytes.isEmpty) {
+    throw StateError(
+      'the flecks layer produced ${bytes?.length ?? 0} bytes; a capture that '
+      'returned nothing cannot support any assertion in this file',
     );
   }
-  return bytes ?? const <int>[];
+  return bytes;
 }
+
+/// The alpha channel at ([x], [y]) in a [_pixels] buffer of [width] columns.
+///
+/// Alpha and not colour: the fleck's glow fades to fully transparent, and a
+/// fleck off the edge of the box is still drawn — only its alpha tells us so.
+int _alphaAt(List<int> rgba, int width, int x, int y) =>
+    rgba[((y * width) + x) * 4 + 3];
 
 void main() {
   group('the fleck constants are the prototype\'s', () {
@@ -89,7 +101,7 @@ void main() {
     });
 
     test('travel 9px and opacity 0.85 to 0.35', () {
-      // index.css:86-88.
+      // index.css:86-87.
       expect(kFleckTravel, 9.0);
       expect(kFleckOpacityHigh, 0.85);
       expect(kFleckOpacityLow, 0.35);
@@ -99,6 +111,46 @@ void main() {
       expect(EvaMotion.fleck, const Duration(seconds: 2));
       expect(kFloatPeriod, const Duration(seconds: 20));
       expect(GoldFlecks.flecksPerFloatCycle, 10);
+    });
+
+    test('and the count is DERIVED from those two, not a third literal', () {
+      // The hole this closes. `flecksPerFloatCycle` is the multiplier
+      // `goldFleckPhase` applies to the float clock, so the fleck rate is
+      // `float rate × that number`. Asserting the three numbers side by side
+      // leaves the multiplication unchecked: `EvaMotion.fleck` 2s → 4s,
+      // `kFloatPeriod` 20s → 40s and `flecksPerFloatCycle` 10 → 20 all at once
+      // leaves the whole Phase 2 suite green, goldens included, because
+      // `clock × 20` over a 40s clock is the same phase as `clock × 10` over a
+      // 20s one. Only a derived assertion can see that.
+      expect(
+        GoldFlecks.flecksPerFloatCycle,
+        kFloatPeriod.inMicroseconds ~/ EvaMotion.fleck.inMicroseconds,
+      );
+    });
+
+    test('so retiming one of the three is a failure, not a silent no-op', () {
+      // The same derivation, phrased as the change it forbids: any one of the
+      // three moving alone leaves the fleck period wrong, which is exactly the
+      // state three independent literals cannot distinguish from correct.
+      final int derived =
+          kFloatPeriod.inMicroseconds ~/ EvaMotion.fleck.inMicroseconds;
+      expect(
+        GoldFlecks.flecksPerFloatCycle,
+        derived,
+        reason:
+            'the fleck cycle is kFloatPeriod / flecksPerFloatCycle seconds, so '
+            'it must equal EvaMotion.fleck — retiming the fleck without '
+            'retiming the float clock (or the reverse) leaves the two '
+            'disagreeing and no golden moves, because the product is what the '
+            'pixels see',
+      );
+      expect(
+        Duration(
+          microseconds:
+              kFloatPeriod.inMicroseconds ~/ GoldFlecks.flecksPerFloatCycle,
+        ),
+        EvaMotion.fleck,
+      );
     });
   });
 
@@ -144,18 +196,32 @@ void main() {
       expect(goldFleckPhase(clock: 0.5, index: 0, count: 0), 0.0);
     });
 
-    test('ten cycles of the float clock is one fleck cycle', () {
+    test('one FLOAT cycle is ten fleck cycles — `flecksPerFloatCycle`', () {
+      // Retitled. The old name said "ten cycles of the float clock is one fleck
+      // cycle", which is inverted by a factor of ten in each direction: ten
+      // float cycles is *one hundred* fleck cycles, and what the code actually
+      // does is the other way round — one float cycle contains ten fleck cycles,
+      // because the fleck cycle is a tenth of the float clock.
       expect(
         goldFleckPhase(clock: 0.1, index: 0, count: 1),
         closeTo(0.0, 1e-9),
+        reason:
+            'a tenth of the float clock is one whole fleck cycle, so phase 0',
       );
       expect(
         goldFleckPhase(clock: 0.2, index: 0, count: 1),
         closeTo(0.0, 1e-9),
+        reason: 'two whole fleck cycles, so phase 0 again',
       );
       expect(
         goldFleckPhase(clock: 0.15, index: 0, count: 1),
         closeTo(0.5, 1e-9),
+        reason: 'half a fleck cycle from the start of the second one',
+      );
+      expect(
+        goldFleckPhase(clock: 1.0, index: 0, count: 1),
+        closeTo(0.0, 1e-9),
+        reason: 'ten fleck cycles in one float cycle — back to the start',
       );
     });
   });
@@ -166,14 +232,34 @@ void main() {
       expect(tester.widget(find.byType(GoldFlecks)), isA<StatelessWidget>());
     });
 
-    testWidgets('and the app still runs only three tickers', (
+    testWidgets('and adds no fourth ticker to the app\'s three', (
       WidgetTester tester,
     ) async {
-      // The whole point of borrowing the float clock: no fourth `Ticker` for the
-      // flecks. `tearDownAllTickersVerified` (implicit in testWidgets) would fail
-      // this test if the painter or the widget started one.
+      // The whole point of borrowing the float clock. The old version of this
+      // test was `expect(tester.takeException(), isNull)` under the name "the app
+      // still runs only three tickers" — vacuous, because a fourth ticker that
+      // ran cleanly would also throw nothing.
+      //
+      // `SchedulerBinding.transientCallbackCount` is the witness: a running
+      // `Ticker` registers exactly one transient callback per frame for itself,
+      // so three running clocks read `3`. That makes the claim falsifiable in the
+      // way the name promises — a `GoldFlecks` that spun up its own
+      // `AnimationController` would push this to 4.
+      tester.view.physicalSize = const Size(380, 120);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(_flecks());
       await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        SchedulerBinding.instance.transientCallbackCount,
+        3,
+        reason:
+            'the three shared ambient clocks and nothing else — a fourth would '
+            'be a per-fleck controller, which is what §13.2 collapses away',
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -268,13 +354,24 @@ void main() {
       );
     });
 
-    testWidgets('the flecks rest exactly where they were told to', (
+    testWidgets('the ink is exactly the prototype\'s 5px dot', (
       WidgetTester tester,
     ) async {
-      // One fleck, one offset, no animation: the painted bounds are the fleck's
-      // radius plus its 10px glow, centred on the offset. This is what pins
-      // `kFleckRadius` and `kFleckGlow` to the prototype's 5px dot and 10px
-      // halo rather than to a plausible-looking number.
+      // Renamed and tightened. The old name claimed this pinned both
+      // `kFleckRadius` and `kFleckGlow`, and asserted only the bracket
+      // `5 ≤ maxX - minX < 20` — which admits any glow radius from 2.5px to
+      // 10px, i.e. anything.
+      //
+      // What is actually true, and measured: the painted bounds are **exactly
+      // 6x6** with `kFleckGlow` at 10 and at 40, because the glow's shader is
+      // sampled inside `drawCircle(centre, kFleckRadius, …)` and so never reaches
+      // a pixel outside the dot — `createShader`'s rectangle is a coordinate
+      // space, not a clip. The 6 is the 5px dot plus one column of antialiasing
+      // on each side, and that pins `kFleckRadius` to 2.5 within half a pixel.
+      //
+      // `kFleckGlow` is pinned as a constant by the constants test and has no
+      // design-visible effect as the painter is written; `gold_flecks.dart` says
+      // so where the shader is built.
       tester.view.physicalSize = const Size(380, 120);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -290,28 +387,32 @@ void main() {
       final List<int> rgba = await _pixels(tester);
       const int width = 380;
       const int height = 120;
-      int minX = width, maxX = -1, minY = height, maxY = -1;
+      int minX = width, maxX = -1, minY = height, maxY = -1, inked = 0;
       for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-          if (rgba[(y * width + x) * 4 + 3] <= 8) continue;
+          if (_alphaAt(rgba, width, x, y) == 0) continue;
+          inked++;
           minX = minX > x ? x : minX;
           maxX = maxX < x ? x : maxX;
           minY = minY > y ? y : minY;
           maxY = maxY < y ? y : maxY;
         }
       }
-      expect(maxX, greaterThan(minX));
-      expect((minX + maxX) / 2, closeTo(190, 1.0));
-      expect((minY + maxY) / 2, closeTo(60, 1.0));
-      // 2 * 10px of glow reach, and the glow's outer ring is below alpha 8 so the
-      // measured extent is a little less than the full 20px.
-      expect(maxX - minX, lessThan(20));
-      expect(maxY - minY, lessThan(20));
+      expect(inked, greaterThan(0), reason: 'nothing was painted at all');
       expect(
-        maxX - minX,
-        greaterThanOrEqualTo(5),
-        reason: 'the solid 5px dot is always inside the halo',
+        maxX - minX + 1,
+        6,
+        reason:
+            'the 5px dot plus one antialiased column each side — a radius of 5 '
+            'would measure 12 here and a radius of 1.25 would measure 4',
       );
+      expect(maxY - minY + 1, 6, reason: 'a circle, so as tall as it is wide');
+      expect(
+        (minX + maxX) / 2,
+        closeTo(190, 0.5),
+        reason: 'centred on the offset',
+      );
+      expect((minY + maxY) / 2, closeTo(60, 0.5));
     });
 
     testWidgets('an empty fleck list paints nothing and does not divide', (
@@ -328,10 +429,74 @@ void main() {
       // `QuizScreen.tsx:94` puts two at x = 356…362 inside a card that is ~350
       // wide, i.e. deliberately off the right edge. Clipping them would lose two
       // of the prototype's four.
-      await tester.pumpWidget(_flecks());
+      //
+      // The old version asserted `find.byType(CustomPaint) findsWidgets` plus
+      // `takeException() == null`, which cannot fail on that: `CustomPaint` is
+      // in the tree whether or not anything is drawn, and clipping raises
+      // nothing. Measured: clipping the painter to the card width left it green.
+      //
+      // What is observable is ink at the off-card coordinates, so this reads the
+      // pixels there.
+      tester.view.physicalSize = const Size(380, 120);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _flecks(
+          // One extra fleck in the middle, purely as the control below: all four
+          // of the prototype's own offsets sit outside a 380px box on one axis
+          // (`x = -10, -15` are past the left edge entirely, `356, 362` are past
+          // the ~350px card), so there is no in-card fleck to compare against.
+          offsets: const <Offset>[
+            Offset(-10, 12),
+            Offset(-15, 36),
+            Offset(356, 8),
+            Offset(362, 30),
+            Offset(190, 60),
+          ],
+          animationsEnabled: false,
+        ),
+      );
       await tester.pump();
-      expect(find.byType(CustomPaint), findsWidgets);
-      expect(tester.takeException(), isNull);
+      final List<int> rgba = await _pixels(tester);
+
+      for (final Offset offCard in const <Offset>[
+        Offset(356, 8),
+        Offset(362, 30),
+      ]) {
+        // A 5px dot centred here covers roughly x ± 2, y ± 2; sample the column
+        // at the fleck's own x so a fleck parked exactly on it cannot miss.
+        final int x = offCard.dx.round();
+        final int y = offCard.dy.round();
+        int inked = 0;
+        for (int dy = -2; dy <= 2; dy++) {
+          for (int dx = -2; dx <= 2; dx++) {
+            if (_alphaAt(rgba, 380, x + dx, y + dy) > 0) inked++;
+          }
+        }
+        expect(
+          inked,
+          greaterThan(0),
+          reason:
+              'no ink within 2px of the fleck at ($x, $y) — a clip to the ~350px '
+              'option card would drop it, and that is the bug this names',
+        );
+      }
+
+      // The control: a fleck in the middle of the box, so the loop above cannot
+      // pass on a painter that drew nothing anywhere.
+      int insideInk = 0;
+      for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+          if (_alphaAt(rgba, 380, 190 + dx, 60 + dy) > 0) insideInk++;
+        }
+      }
+      expect(
+        insideInk,
+        greaterThan(0),
+        reason: 'the control fleck at (190, 60)',
+      );
     });
   });
 
@@ -440,8 +605,13 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
 
-        // `animationsEnabled: false` so the capture is of a settled state — a
-        // golden taken at a moving phase is only reproducible by accident.
+        // NOT settled, and the comment used to claim it was. It passed
+        // `animationsEnabled: false` — the default `true` — while saying "so the
+        // capture is of a settled state". The golden is captured at a *moving*
+        // phase and is still reproducible, because `AnimationController.value`
+        // is a pure function of elapsed time and `pump(400ms)` puts the clock at
+        // exactly one value. What would not be reproducible is a capture with no
+        // fixed duration at all.
         await tester.pumpWidget(_flecks(theme: theme));
         await tester.pump(const Duration(milliseconds: 400));
         await expectLater(

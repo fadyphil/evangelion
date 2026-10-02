@@ -1,5 +1,6 @@
 import 'package:evangelion/core/design_system/effects/neural_background.dart';
 import 'package:evangelion/core/design_system/effects/neural_motion.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,9 +9,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// The bundle is captured through a [Builder] rather than constructed, so the
 /// test observes the object the tree publishes — which is the only one that
 /// matters, since §13.2 forbids the caller from supplying its own.
+///
+/// [animationsEnabled] is `bool?` here for the same reason it is on the widget:
+/// `null` means "let the platform decide", which is the default every test in
+/// this file was relying on before H4 and must keep getting.
 Future<EvaNeuralMotion> pumpScope(
   WidgetTester tester, {
-  bool animationsEnabled = true,
+  bool? animationsEnabled = true,
   Widget child = const SizedBox.expand(),
 }) async {
   late EvaNeuralMotion captured;
@@ -27,6 +32,20 @@ Future<EvaNeuralMotion> pumpScope(
   );
   return captured;
 }
+
+/// The number of tickers the scheduler currently has callbacks registered for.
+///
+/// `SchedulerBinding.transientCallbackCount` is the closest thing the framework
+/// exposes to "how many animations are running", and it is exact: a running
+/// `Ticker` registers one transient callback per frame for itself, so three
+/// running clocks read `3` and three stopped clocks read `0`. Measured in this
+/// suite, and the negative controls are the tests either side of the reduced-
+/// motion group.
+///
+/// This is a stronger witness than `isAnimating`, which only says what one
+/// controller was told — a ticker can be scheduled without the controller
+/// reporting it, and a leaked fourth ticker has no controller to ask about.
+int get _tickers => SchedulerBinding.instance.transientCallbackCount;
 
 void main() {
   group('the bundle is three controllers and a pointer', () {
@@ -45,6 +64,15 @@ void main() {
       expect(motion.float.isAnimating, isTrue);
       expect(motion.hue.isAnimating, isTrue);
       expect(motion.aurora.isAnimating, isTrue);
+      await tester.pump();
+      expect(
+        _tickers,
+        3,
+        reason:
+            'the control for the reduced-motion group below: three running '
+            'clocks register three transient callbacks, and this is the number '
+            'that goes to zero when the platform asks for reduced motion',
+      );
     });
 
     testWidgets('the aurora clock reverses, the others do not', (
@@ -133,10 +161,197 @@ void main() {
     });
   });
 
-  group('D1 — the listenable actually fires', () {
-    testWidgets('repaint notifies on every pumped frame', (
+  group('H4 — the platform\'s own reduced-motion signal reaches the clock', () {
+    // THE DEFECT. `NeuralMotionScope` sat above `MaterialApp`, its doc claimed
+    // `AccessibilityFeatures.disableAnimations` "cannot reach it either", and it
+    // was right about the `MediaQuery` and wrong about the platform signal —
+    // `platformDispatcher` is not part of the widget tree and is reachable from
+    // anywhere. Measured before the fix, with `disableAnimations: true` set on
+    // the dispatcher: float 0.05 → 0.1, hue 0.0833 → 0.1667, aurora 0.0714 →
+    // 0.1429 after one second, and all three still `isAnimating == true`. The
+    // *painted* result honoured reduced motion, because `NeuralBackground`
+    // collapses the layer to the canvas via `MediaQuery`; the *clock* did not.
+
+    void useReducedMotionPlatform(WidgetTester tester) {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+    }
+
+    testWidgets('the signal is genuinely reachable outside any widget tree', (
       WidgetTester tester,
     ) async {
+      // The premise of the whole fix, asserted on its own: no `pumpWidget`, no
+      // tree at all. If this ever stops being true the honest fix is a
+      // composition-root parameter, not this scope's default.
+      useReducedMotionPlatform(tester);
+      expect(
+        tester.platformDispatcher.accessibilityFeatures.disableAnimations,
+        isTrue,
+      );
+    });
+
+    testWidgets('and NO ticker is running under it', (
+      WidgetTester tester,
+    ) async {
+      useReducedMotionPlatform(tester);
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: null,
+      );
+      await tester.pump();
+
+      expect(motion.float.isAnimating, isFalse);
+      expect(motion.hue.isAnimating, isFalse);
+      expect(motion.aurora.isAnimating, isFalse);
+      expect(
+        _tickers,
+        0,
+        reason:
+            'three tickers burning frames under a background that paints none '
+            'of them is the exact cost §13 exists to remove, and '
+            'isAnimating alone would not catch a ticker the controllers lost '
+            'track of',
+      );
+      expect(
+        SchedulerBinding.instance.hasScheduledFrame,
+        isFalse,
+        reason: 'nothing at all is asking for another frame',
+      );
+    });
+
+    testWidgets('the clocks are frozen, not merely stopped-and-waiting', (
+      WidgetTester tester,
+    ) async {
+      useReducedMotionPlatform(tester);
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: null,
+      );
+      await tester.pump();
+      final double float0 = motion.floatValue;
+      final double hue0 = motion.hueValue;
+      final double aurora0 = motion.auroraValue;
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(motion.floatValue, float0);
+      expect(motion.hueValue, hue0);
+      expect(motion.auroraValue, aurora0);
+    });
+
+    testWidgets('with the signal off, all three run — the negative control', (
+      WidgetTester tester,
+    ) async {
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: null,
+      );
+      await tester.pump();
+      expect(motion.float.isAnimating, isTrue);
+      expect(_tickers, 3);
+    });
+
+    testWidgets('an explicit true overrides the platform', (
+      WidgetTester tester,
+    ) async {
+      // `animationsEnabled` is a parameter and the composition root owns it; the
+      // default resolves the signal, the parameter states an answer. Saying so
+      // matters because Phase 5 replaces the default with `UserSettings` and a
+      // reader's stored choice has to beat the OS.
+      useReducedMotionPlatform(tester);
+      final EvaNeuralMotion motion = await pumpScope(tester);
+      await tester.pump();
+      expect(motion.float.isAnimating, isTrue);
+      expect(_tickers, 3);
+    });
+
+    testWidgets('an OS toggle mid-session stops the clocks', (
+      WidgetTester tester,
+    ) async {
+      // Without the `WidgetsBindingObserver` the signal would be honoured at
+      // first mount only — half a fix wearing a whole fix's name.
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: null,
+      );
+      await tester.pump();
+      expect(motion.float.isAnimating, isTrue);
+      expect(_tickers, 3);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+
+      expect(motion.float.isAnimating, isFalse);
+      expect(_tickers, 0, reason: 'and the tickers go with them');
+    });
+
+    testWidgets('and toggling it back restarts them', (
+      WidgetTester tester,
+    ) async {
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: null,
+      );
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+      expect(motion.float.isAnimating, isFalse);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures();
+      await tester.pump();
+      expect(motion.float.isAnimating, isTrue);
+      expect(motion.hue.isAnimating, isTrue);
+      expect(motion.aurora.isAnimating, isTrue);
+    });
+
+    testWidgets('an explicit value opts out of the observer entirely', (
+      WidgetTester tester,
+    ) async {
+      // Symmetry with `initState`: an app that states its own answer is not
+      // asking the OS, so an OS toggle must not push into clocks the composition
+      // root deliberately holds still.
+      final EvaNeuralMotion motion = await pumpScope(
+        tester,
+        animationsEnabled: false,
+      );
+      await tester.pump();
+      expect(motion.float.isAnimating, isFalse);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures();
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await tester.pump();
+      expect(
+        motion.float.isAnimating,
+        isFalse,
+        reason: 'the explicit `false` still wins after the OS says "animate"',
+      );
+    });
+  });
+
+  group('D1 — the listenable actually fires', () {
+    testWidgets('repaint notifies at least once across three pumped frames', (
+      WidgetTester tester,
+    ) async {
+      // Retitled. The old name — "notifies on every pumped frame" — was not what
+      // it checked: `greaterThan(0)` is satisfied by a listener that fires once
+      // and then never again, which is the D1 defect it exists to catch. The
+      // per-frame property is asserted exactly, by the next test; this one says
+      // only "the thing fires at all", which is the claim `greaterThan(0)`
+      // actually supports.
       final EvaNeuralMotion motion = await pumpScope(tester);
       int notifications = 0;
       void bump() {
@@ -156,6 +371,36 @@ void main() {
         reason:
             '§13.1 listens to this and the reference implementation never '
             'notified, so the background painted once and never again',
+      );
+    });
+
+    testWidgets('so a listener that fires once is caught here, not above', (
+      WidgetTester tester,
+    ) async {
+      // The tightened form: three pumped frames must produce three
+      // notifications, not one. A "notify only on the first frame ever"
+      // mutation — which leaves `greaterThan(0)` green — fails this.
+      final EvaNeuralMotion motion = await pumpScope(tester);
+      int notifications = 0;
+      void bump() {
+        notifications++;
+      }
+
+      motion.repaint.addListener(bump);
+
+      await tester.pump();
+      notifications = 0;
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(notifications, 1, reason: 'frame 1 of 3');
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(notifications, 2, reason: 'frame 2 of 3');
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(
+        notifications,
+        3,
+        reason:
+            'frame 3 of 3 — a listener that stops after the first frame is the '
+            'defect this whole group is about, and it has to be a failure here',
       );
     });
 

@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The eight accent colours of `ORB_CONFIGS`, by name.
 ///
-/// `eva/src/components/ds.tsx:68-112`. These are NOT design-system tokens —
+/// `eva/src/components/ds.tsx:68-114`. These are NOT design-system tokens —
 /// `03-design-system.md` §5.1 publishes fourteen colour tokens and none of them
 /// is an orb accent, and the sticker palette is a different seven-colour
 /// vocabulary. So the values live here, once, as a transcription of the
@@ -33,6 +33,31 @@ const Map<NeuralVariant, OrbGroup> _expected = <NeuralVariant, OrbGroup>{
   NeuralVariant.result: OrbGroup.result,
   NeuralVariant.settings: OrbGroup.settings,
 };
+
+/// Every orb of every group, flattened in `OrbGroup.values` order.
+///
+/// The reason the field-by-field tables below read as one flat list per field:
+/// a per-group nested literal would silently accept a group that gained or lost
+/// an orb, because the assertion would be comparing one group against itself.
+/// ['the table still holds twenty-one orbs'] is what closes that.
+List<OrbSpec> get _allOrbSpecs => <OrbSpec>[
+  for (final OrbGroup group in OrbGroup.values) ...orbGroups[group]!,
+];
+
+/// [read] applied to every orb, in group order.
+List<T> _allOrbs<T>(T Function(OrbSpec orb) read) => <T>[
+  for (final OrbSpec orb in _allOrbSpecs) read(orb),
+];
+
+/// The hex of [color], uppercase, without a leading `#`.
+///
+/// Matches the spelling `ORB_CONFIGS` uses (`'#6C3FE8'`), so a transcribed value
+/// can be compared against the prototype as it is written rather than as a
+/// packed `int` — which is the whole point of the table.
+String _hexOf(Color color) => (color.toARGB32() & 0xFFFFFF)
+    .toRadixString(16)
+    .toUpperCase()
+    .padLeft(6, '0');
 
 void main() {
   group('the orb table is a verbatim transcription of ORB_CONFIGS', () {
@@ -64,6 +89,17 @@ void main() {
         _prototypeOrbColours['14B8A6']!,
         _prototypeOrbColours['3B5BDB']!,
       ]);
+    });
+
+    test('the table still holds twenty-one orbs', () {
+      // The guard the flat per-field tables below depend on. They read one list
+      // per field across every group, which is what makes a field edit in any
+      // group fail — but a group that *gained* an orb would push every later
+      // field's list out of alignment and only surface as a confusing diff. This
+      // names the total so that failure is impossible to misread.
+      //
+      // ds.tsx: 3 + 4 + 2 + 2 + 3 + 3 + 2 + 2.
+      expect(_allOrbSpecs, hasLength(21));
     });
   });
 
@@ -152,7 +188,7 @@ void main() {
 
   group('D3 — per-orb floats', () {
     test('a float path starts and ends at rest, unscaled', () {
-      // All three keyframe sets in index.css:36-56 close the loop on
+      // All three keyframe sets in index.css:49-65 close the loop on
       // `translate(0,0) scale(1)`. If the painter did not return to rest the
       // orb would jump once per cycle.
       for (final OrbFloatPath path in OrbFloatPath.values) {
@@ -164,7 +200,7 @@ void main() {
     });
 
     test('orb-float-a hits its documented keyframes', () {
-      // index.css:37-42 — 30% => (28,-22) 1.07 · 60% => (-18,30) 0.94.
+      // index.css:50-53 — 30% => (28,-22) 1.07 · 60% => (-18,30) 0.94.
       expect(orbFloatOffset(OrbFloatPath.a, 0.3), const Offset(28, -22));
       expect(orbFloatOffset(OrbFloatPath.a, 0.6), const Offset(-18, 30));
       expect(orbFloatScale(OrbFloatPath.a, 0.3), 1.07);
@@ -172,7 +208,7 @@ void main() {
     });
 
     test('orb-float-b hits its documented keyframes', () {
-      // index.css:43-48 — 40% => (-30,18) 1.05 · 75% => (22,-28) 0.92.
+      // index.css:56-59 — 40% => (-30,18) 1.05 · 75% => (22,-28) 0.92.
       expect(orbFloatOffset(OrbFloatPath.b, 0.4), const Offset(-30, 18));
       expect(orbFloatOffset(OrbFloatPath.b, 0.75), const Offset(22, -28));
       expect(orbFloatScale(OrbFloatPath.b, 0.4), 1.05);
@@ -180,7 +216,7 @@ void main() {
     });
 
     test('orb-float-c hits its documented keyframe', () {
-      // index.css:49-54 — 50% => (12,36) 1.1.
+      // index.css:62-64 — 50% => (12,36) 1.1.
       expect(orbFloatOffset(OrbFloatPath.c, 0.5), const Offset(12, 36));
       expect(orbFloatScale(OrbFloatPath.c, 0.5), 1.1);
     });
@@ -241,7 +277,7 @@ void main() {
     });
 
     test('the home group keeps the prototype\'s a / b / a / b alternation', () {
-      // ds.tsx:73-76 — float a, b, c, a; hue-cycle, hue-cycle-rev,
+      // ds.tsx:77-80 — float a, b, c, a; hue-cycle, hue-cycle-rev,
       // hue-cycle, hue-cycle-rev.
       expect(
         orbsFor(NeuralVariant.home).map((OrbSpec o) => o.hueDirection),
@@ -267,7 +303,7 @@ void main() {
     });
 
     test('the reading EN group is 2 orbs, forward then reverse', () {
-      // ds.tsx:82-83.
+      // ds.tsx:84-85.
       expect(
         orbsFor(NeuralVariant.readingEn).map((OrbSpec o) => o.hueDirection),
         <OrbHueDirection>[OrbHueDirection.forward, OrbHueDirection.reverse],
@@ -275,7 +311,7 @@ void main() {
     });
 
     test('the profile group is the only one that opens with a reverse cycle', () {
-      // ds.tsx:98 — Profile's first orb is `hue-cycle-rev` where every other
+      // ds.tsx:106 — Profile's first orb is `hue-cycle-rev` where every other
       // group's first orb is `hue-cycle`. It is the cut screen, so this is the
       // one place the odd one out is still provable.
       expect(
@@ -327,7 +363,7 @@ void main() {
 
   group('parallax', () {
     test('the pointer offset spans the prototype\'s 32 x 24 range', () {
-      // ds.tsx:128-133 — `((clientX / innerWidth - 0.5) * 32, (clientY /
+      // ds.tsx:126-129 — `((clientX / innerWidth - 0.5) * 32, (clientY /
       // innerHeight - 0.5) * 24)`.
       expect(
         pointerOffsetFor(size: const Size(400, 800), local: const Offset(0, 0)),
@@ -350,7 +386,7 @@ void main() {
     });
 
     test('parallaxScale is the prototype\'s own `parallax / 14`', () {
-      expect(kMaxParallax, 14.0, reason: 'ds.tsx:196 — the largest parallax');
+      expect(kMaxParallax, 14.0, reason: 'ds.tsx:71 — the largest parallax');
       for (final OrbSpec orb in orbsFor(NeuralVariant.login)) {
         expect(orb.parallaxScale, closeTo(orb.parallax / 14, 1e-12));
       }
@@ -431,6 +467,72 @@ void main() {
       ]);
     });
 
+    // THE SEVEN, BY NAME. Five of the seven colour sequences were asserted
+    // (profile, settings, readingAr, readingEn's cyan-absence, result) and login,
+    // home and quiz were not — so swapping login's first orb for the teal accent,
+    // home's fourth for the rose accent or quiz's first for the indigo one left
+    // the unit suite green and only the goldens noticed.
+    //
+    // `neural_background.dart`'s D2 doc claimed all seven; these three are what
+    // makes that true, and the doc now says what is asserted rather than what is
+    // hoped for.
+    test('login is violet, indigo, magenta — in that order', () {
+      // ds.tsx:71-73.
+      expect(orbsFor(NeuralVariant.login).map((OrbSpec o) => o.color), <Color>[
+        _prototypeOrbColours['6C3FE8']!,
+        _prototypeOrbColours['3B5BDB']!,
+        _prototypeOrbColours['C026D3']!,
+      ]);
+    });
+
+    test('home is indigo, teal, violet, amber — the only four-orb group', () {
+      // ds.tsx:77-80.
+      expect(orbsFor(NeuralVariant.home).map((OrbSpec o) => o.color), <Color>[
+        _prototypeOrbColours['3B5BDB']!,
+        _prototypeOrbColours['14B8A6']!,
+        _prototypeOrbColours['6C3FE8']!,
+        _prototypeOrbColours['F59E0B']!,
+      ]);
+    });
+
+    test('quiz is magenta, indigo, teal', () {
+      // ds.tsx:94-96.
+      expect(orbsFor(NeuralVariant.quiz).map((OrbSpec o) => o.color), <Color>[
+        _prototypeOrbColours['C026D3']!,
+        _prototypeOrbColours['3B5BDB']!,
+        _prototypeOrbColours['14B8A6']!,
+      ]);
+    });
+
+    test('and all seven sequences are named here, so none can be dropped', () {
+      // The count, not the values: a sixth assertion added and a seventh deleted
+      // would leave every other test in this file green. `length` on the map of
+      // variant → group is the machine-checkable form of "all seven".
+      const Map<NeuralVariant, List<String>> named =
+          <NeuralVariant, List<String>>{
+            NeuralVariant.login: <String>['6C3FE8', '3B5BDB', 'C026D3'],
+            NeuralVariant.home: <String>[
+              '3B5BDB',
+              '14B8A6',
+              '6C3FE8',
+              'F59E0B',
+            ],
+            NeuralVariant.readingEn: <String>['3B5BDB', '14B8A6'],
+            NeuralVariant.readingAr: <String>['6C3FE8', '06B6D4'],
+            NeuralVariant.quiz: <String>['C026D3', '3B5BDB', '14B8A6'],
+            NeuralVariant.result: <String>['F59E0B', 'F43F5E', '6C3FE8'],
+            NeuralVariant.settings: <String>['6C3FE8', '06B6D4'],
+          };
+      expect(named, hasLength(NeuralVariant.values.length));
+      for (final MapEntry<NeuralVariant, List<String>> entry in named.entries) {
+        expect(
+          orbsFor(entry.key).map((OrbSpec o) => _hexOf(o.color)),
+          entry.value,
+          reason: entry.key.name,
+        );
+      }
+    });
+
     test('every orb size is the prototype\'s, and none is zero', () {
       for (final OrbGroup group in OrbGroup.values) {
         for (final OrbSpec orb in orbGroups[group]!) {
@@ -440,12 +542,193 @@ void main() {
       }
     });
 
+    // ─────────────────────────────────────────────────────────────────────
+    // THE WHOLE TABLE, FIELD BY FIELD.
+    //
+    // `every declared parallax is the prototype's` above pins one field across
+    // all twenty-one orbs. These six do the same for the fields that had **no**
+    // exact assertion anywhere, which is why four single-field mutations
+    // (`y: 640 → 460`, `hueSeconds: 11 → 13`, `hueDelaySeconds: -5 → -7`,
+    // `floatPath: b → c`) and every within-range `size` swap left the unit suite
+    // green and were caught only by the fourteen goldens. One table per field,
+    // in group order, exactly like the parallax list.
+    // ─────────────────────────────────────────────────────────────────────
+
+    test('every declared x offset is the prototype\'s', () {
+      const List<double> all = <double>[
+        -100, 180, 60, // login
+        -160, 200, -70, 250, // home
+        -110, 160, // reading en
+        40, -80, // reading ar
+        110, -110, 180, // quiz
+        -70, 150, -50, // result
+        -110, 190, // profile
+        70, -70, // settings
+      ];
+      expect(_allOrbs((OrbSpec o) => o.x), all);
+    });
+
+    test('every declared y offset is the prototype\'s', () {
+      const List<double> all = <double>[
+        -80, 260, 540, // login
+        -120, 200, 520, 640, // home
+        40, 380, // reading en
+        -90, 360, // reading ar
+        -130, 280, 580, // quiz
+        -90, 240, 560, // result
+        -80, 380, // profile
+        -110, 440, // settings
+      ];
+      expect(_allOrbs((OrbSpec o) => o.y), all);
+    });
+
+    test('every declared size is the prototype\'s, not merely in range', () {
+      // The range check above admits any value in 200…500, so a within-range
+      // swap — home's 500 and 320 exchanging places, say — was invisible to it.
+      const List<double> all = <double>[
+        420, 360, 280, // login
+        500, 320, 260, 200, // home
+        380, 300, // reading en
+        420, 300, // reading ar
+        380, 320, 220, // quiz
+        380, 300, 250, // result
+        440, 280, // profile
+        400, 260, // settings
+      ];
+      expect(_allOrbs((OrbSpec o) => o.size), all);
+    });
+
+    test('every declared float path is the prototype\'s, per group', () {
+      // Previously asserted for `home` alone, so the other twenty orbs could be
+      // on the wrong keyframe set — three *shapes* rather than three durations,
+      // and the shape is what makes the orbs look like different orbs.
+      const Map<OrbGroup, List<OrbFloatPath>> all =
+          <OrbGroup, List<OrbFloatPath>>{
+            OrbGroup.login: <OrbFloatPath>[
+              OrbFloatPath.a,
+              OrbFloatPath.b,
+              OrbFloatPath.c,
+            ],
+            OrbGroup.home: <OrbFloatPath>[
+              OrbFloatPath.a,
+              OrbFloatPath.b,
+              OrbFloatPath.c,
+              OrbFloatPath.a,
+            ],
+            OrbGroup.readingEn: <OrbFloatPath>[OrbFloatPath.a, OrbFloatPath.b],
+            OrbGroup.readingAr: <OrbFloatPath>[OrbFloatPath.b, OrbFloatPath.c],
+            OrbGroup.quiz: <OrbFloatPath>[
+              OrbFloatPath.a,
+              OrbFloatPath.b,
+              OrbFloatPath.c,
+            ],
+            OrbGroup.result: <OrbFloatPath>[
+              OrbFloatPath.a,
+              OrbFloatPath.b,
+              OrbFloatPath.c,
+            ],
+            OrbGroup.profile: <OrbFloatPath>[OrbFloatPath.a, OrbFloatPath.b],
+            OrbGroup.settings: <OrbFloatPath>[OrbFloatPath.b, OrbFloatPath.a],
+          };
+      for (final OrbGroup group in OrbGroup.values) {
+        expect(
+          orbGroups[group]!.map((OrbSpec o) => o.floatPath),
+          all[group],
+          reason: group.name,
+        );
+      }
+    });
+
+    test('every declared hueSeconds is the prototype\'s, per group', () {
+      // The denominator of `hueDelayPhase`, so it is the field that decides
+      // where in the wheel each orb starts. A range check existed for `home`
+      // only; `11 → 13` on any orb was green.
+      const Map<OrbGroup, List<double>> all = <OrbGroup, List<double>>{
+        OrbGroup.login: <double>[8, 11, 9],
+        OrbGroup.home: <double>[10, 7, 12, 9],
+        OrbGroup.readingEn: <double>[14, 10],
+        OrbGroup.readingAr: <double>[9, 13],
+        OrbGroup.quiz: <double>[7, 10, 13],
+        OrbGroup.result: <double>[8, 11, 9],
+        OrbGroup.profile: <double>[11, 8],
+        OrbGroup.settings: <double>[9, 12],
+      };
+      for (final OrbGroup group in OrbGroup.values) {
+        expect(
+          orbGroups[group]!.map((OrbSpec o) => o.hueSeconds),
+          all[group],
+          reason: group.name,
+        );
+      }
+    });
+
+    test('every declared hueDelaySeconds is the prototype\'s, per group', () {
+      // CSS animation delays are negative here, which on an infinite positive
+      // animation is a phase *advance*. `-5 → -7` moves every orb further round
+      // the wheel and was green.
+      const Map<OrbGroup, List<double>> all = <OrbGroup, List<double>>{
+        OrbGroup.login: <double>[0, -3, -5],
+        OrbGroup.home: <double>[0, -2, -4, -6],
+        OrbGroup.readingEn: <double>[0, -4],
+        OrbGroup.readingAr: <double>[0, -5],
+        OrbGroup.quiz: <double>[0, -2, -5],
+        OrbGroup.result: <double>[0, -3, -6],
+        OrbGroup.profile: <double>[0, -4],
+        OrbGroup.settings: <double>[0, -3],
+      };
+      for (final OrbGroup group in OrbGroup.values) {
+        expect(
+          orbGroups[group]!.map((OrbSpec o) => o.hueDelaySeconds),
+          all[group],
+          reason: group.name,
+        );
+      }
+    });
+
+    test(
+      'every group opens with hueDelay 0, as every group does in the prototype',
+      () {
+        // The prototype's first orb in every one of the eight groups is the one
+        // with no delay; the rest are the staggered ones. Cheap, and it is the one
+        // invariant across the whole table that a single-field edit breaks loudly.
+        for (final OrbGroup group in OrbGroup.values) {
+          expect(
+            orbGroups[group]!.first.hueDelaySeconds,
+            0.0,
+            reason: '${group.name} opens on the shared clock',
+          );
+        }
+      },
+    );
+
     test('the radial gradient centre is the prototype\'s 38% 38%', () {
-      // ds.tsx:200 — `radial-gradient(circle at 38% 38%, color, transparent 68%)`.
-      // CSS measures the centre from the top-left; Flutter's Alignment measures
-      // y from the bottom, so 38% from the top is `0.38 * 2 - 1 = -0.24`.
+      // ds.tsx:202 — `radial-gradient(circle at 38% 38%, color, transparent 68%)`.
+      // CSS measures the centre from the top-left, and Flutter's `Alignment`
+      // measures *both* axes from the top — `Alignment(-1, -1)` is `topLeft` — so
+      // the conversion is fraction-from-the-top = `(v + 1) / 2` and `0.38` gives
+      // `-0.24`. This comment used to say `y` was measured "from the bottom",
+      // which contradicts the `-0.24` below it; the measured assertion under this
+      // one is what makes the value, rather than the prose, the authority.
       expect(kOrbGradientCentre, 0.38);
       expect(kOrbGradientCenter, const Alignment(-0.24, -0.24));
+    });
+
+    test('and the measured offset really is 38% from the top-left', () {
+      // The prose above, executed. `Alignment(-1, -1)` is `topLeft`, so a
+      // negative `y` is *up*, and `withinRect` is the framework's own conversion.
+      // A reader who trusts `Alignment`'s docs over ours gets this for free.
+      const Rect box = Rect.fromLTWH(0, 0, 100, 100);
+      expect(kOrbGradientCenter.withinRect(box), const Offset(38.0, 38.0));
+      expect(
+        kOrbGradientCenter.withinRect(box).dy / box.height,
+        closeTo(kOrbGradientCentre, 1e-9),
+        reason: 'fraction from the TOP, not the bottom',
+      );
+      expect(
+        const Alignment(-1, -1).withinRect(box),
+        box.topLeft,
+        reason: 'the sign convention this arithmetic rests on',
+      );
     });
 
     test('the outer stop is converted out of CSS\'s units, not copied', () {

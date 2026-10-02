@@ -14,7 +14,7 @@ const double _kBlue = 0.072;
 ///
 /// [turns] is in **turns**, not degrees: 1.0 is a full 360° rotation, which is
 /// the unit `hue-cycle`'s keyframes speak (`hue-rotate(0deg) →
-/// hue-rotate(360deg)`, `eva/src/index.css:61-63`). Degrees would put a `360`
+/// hue-rotate(360deg)`, `eva/src/index.css:68-71`). Degrees would put a `360`
 /// where every call site naturally has a 0..1 clock.
 ///
 /// This is the textbook Rec.709 hue-rotation matrix, transcribed verbatim from
@@ -66,7 +66,7 @@ List<double> hueRotateMatrix(double turns) {
 /// filter move it around the wheel.
 ///
 /// Takes a signed [turns]. Negative is the `hue-cycle-rev` direction
-/// (`hue-rotate(360deg) → hue-rotate(0deg)`, `index.css:64-67`), and it is a
+/// (`hue-rotate(360deg) → hue-rotate(0deg)`, `index.css:72-75`), and it is a
 /// sign flip rather than a second matrix because `hue-rotate(-θ)` and
 /// `hue-rotate(360° - θ)` are the same matrix: the coefficients depend on
 /// `cos` and `sin` alone, and those satisfy `cos(2π - θ) = cos θ` and

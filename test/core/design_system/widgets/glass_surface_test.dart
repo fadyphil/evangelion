@@ -179,7 +179,14 @@ void main() {
       );
     });
 
-    testWidgets('uses the published sigma', (WidgetTester tester) async {
+    testWidgets('publishes the sigma, as far as the SDK can be asked', (
+      WidgetTester tester,
+    ) async {
+      // `ImageFilter.blur` exposes no getter for its sigma, so the *number*
+      // cannot be read back off the filter: `kGlassBlurSigma` is asserted here as
+      // a constant and the filter as an `ImageFilter`, and the sigma itself is
+      // pinned by the golden pair below. The name says so rather than claiming a
+      // round trip that does not exist.
       await tester.pumpWidget(
         _onSurface(
           const GlassSurface(tier: GlassTier.blur, child: SizedBox.shrink()),
@@ -195,9 +202,13 @@ void main() {
       expect(filter.filter, isA<ui.ImageFilter>());
     });
 
-    testWidgets('and the tint and blur goldens DIFFER over a busy backdrop', (
+    testWidgets('the tint and blur goldens DIFFER over a busy backdrop', (
       WidgetTester tester,
     ) async {
+      // Two captures in one body, and that is safe **here**: swapping a
+      // `GlassTier` is not a theme change, so there is no `AnimatedTheme` lerp
+      // to out-run. `streak_flame_test.dart` documents the mechanism and the
+      // case where the same arrangement is not safe.
       tester.view.physicalSize = const Size(240, 240);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -382,15 +393,23 @@ void main() {
       expect(decoration.boxShadow!.single.color, colors.glassShadow);
     });
 
-    testWidgets('a golden per theme', (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(280, 180);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      for (final (String label, ThemeData theme) in <(String, ThemeData)>[
-        ('dark', EvaThemeDark.theme),
-        ('light', EvaThemeLight.theme),
-      ]) {
+    // The theme loop is deliberately OUTSIDE `testWidgets`, one test per theme:
+    // `MaterialApp` installs an `AnimatedTheme` that lerps a theme change over
+    // `kThemeAnimationDuration`, and the single zero-duration `pump()` after
+    // `pumpWidget` does not advance it — so two captures in one body wrote the
+    // first palette into the second file and
+    // `goldens/glass_surface_tint_light.png` was a byte-identical copy of the
+    // dark one. See `streak_flame_test.dart`'s "why the goldens are one test per
+    // theme" group, which pins the mechanism.
+    for (final (String label, ThemeData theme) in <(String, ThemeData)>[
+      ('dark', EvaThemeDark.theme),
+      ('light', EvaThemeLight.theme),
+    ]) {
+      testWidgets('a golden per theme — $label', (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(280, 180);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
         await tester.pumpWidget(
           _onSurface(
             const GlassSurface(child: SizedBox(width: 40, height: 20)),
@@ -403,8 +422,8 @@ void main() {
           find.byType(GlassSurface),
           matchesGoldenFile('goldens/glass_surface_tint_$label.png'),
         );
-      }
-    });
+      });
+    }
   });
 }
 

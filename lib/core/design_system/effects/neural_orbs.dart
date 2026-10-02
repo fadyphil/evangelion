@@ -15,52 +15,52 @@ import 'package:flutter/painting.dart';
 ///
 /// [AGENT_CONTEXT]: https://example.invalid/agent-context
 enum OrbGroup {
-  /// `ORB_CONFIGS[0]` — the Login screen. `ds.tsx:69-72`.
+  /// `ORB_CONFIGS[0]` — the Login screen. `ds.tsx:69-73`.
   login,
 
-  /// `ORB_CONFIGS[1]` — Home. `ds.tsx:73-77`. The only four-orb group.
+  /// `ORB_CONFIGS[1]` — Home. `ds.tsx:75-80`. The only four-orb group.
   home,
 
-  /// `ORB_CONFIGS[2]` — the English reading screen. `ds.tsx:78-81`.
+  /// `ORB_CONFIGS[2]` — the English reading screen. `ds.tsx:82-85`.
   readingEn,
 
-  /// `ORB_CONFIGS[3]` — the Arabic reading screen. `ds.tsx:82-85`.
+  /// `ORB_CONFIGS[3]` — the Arabic reading screen. `ds.tsx:87-90`.
   readingAr,
 
-  /// `ORB_CONFIGS[4]` — Quiz. `ds.tsx:86-90`.
+  /// `ORB_CONFIGS[4]` — Quiz. `ds.tsx:92-96`.
   quiz,
 
-  /// `ORB_CONFIGS[5]` — Result. `ds.tsx:91-95`. The only warm group.
+  /// `ORB_CONFIGS[5]` — Result. `ds.tsx:98-102`. The only warm group.
   result,
 
-  /// `ORB_CONFIGS[6]` — Profile. `ds.tsx:96-99`. **Cut**; kept for index
+  /// `ORB_CONFIGS[6]` — Profile. `ds.tsx:104-107`. **Cut**; kept for index
   /// alignment. See the enum doc.
   profile,
 
-  /// `ORB_CONFIGS[7]` — Settings. `ds.tsx:100-103`.
+  /// `ORB_CONFIGS[7]` — Settings. `ds.tsx:109-112`.
   settings,
 }
 
 /// Which of the three float keyframe sets an orb runs.
 ///
-/// `orb-float-a` / `-b` / `-c`, `eva/src/index.css:36-56`. Three *shapes* rather
+/// `orb-float-a` / `-b` / `-c`, `eva/src/index.css:49-65`. Three *shapes* rather
 /// than three *durations*, which is how they survive the collapse to one shared
 /// controller (§13.2, mitigation 2) — see [OrbSpec.floatSeconds].
 enum OrbFloatPath {
-  /// `index.css:37-42` — `30% => (28,-22) 1.07` · `60% => (-18,30) 0.94`.
+  /// `index.css:50-53` — `30% => (28,-22) 1.07` · `60% => (-18,30) 0.94`.
   a,
 
-  /// `index.css:43-48` — `40% => (-30,18) 1.05` · `75% => (22,-28) 0.92`.
+  /// `index.css:56-59` — `40% => (-30,18) 1.05` · `75% => (22,-28) 0.92`.
   b,
 
-  /// `index.css:49-54` — `50% => (12,36) 1.1`. The strongest vertical mover.
+  /// `index.css:62-64` — `50% => (12,36) 1.1`. The strongest vertical mover.
   c,
 }
 
 /// The direction of an orb's hue cycle.
 ///
 /// `hue-cycle` is `hue-rotate(0deg) → hue-rotate(360deg)`; `hue-cycle-rev` is
-/// the mirror (`index.css:61-67`). Preserved as a **direction sign**, not as a
+/// the mirror (`index.css:72-75`). Preserved as a **direction sign**, not as a
 /// second animation, because one shared hue controller reversed for half the
 /// orbs is a sign on the turns fed to `hueRotateFilter`.
 enum OrbHueDirection {
@@ -109,7 +109,7 @@ class OrbSpec {
 
   /// The orb's declared fill, `rgba(…)`-free because the prototype's orbs are
   /// opaque and the opacity is applied to the whole orb by
-  /// [EvaColors.orbOpacity] (`ds.tsx:160`: `const orbOpacity = isDark ? 0.55 :
+  /// [EvaColors.orbOpacity] (`ds.tsx:159`: `const orbOpacity = isDark ? 0.55 :
   /// 0.16`).
   final Color color;
 
@@ -118,7 +118,7 @@ class OrbSpec {
 
   /// Absolute left offset from the background's top-left, in logical px.
   ///
-  /// Absolute rather than proportional, faithfully: `ds.tsx:196` positions each
+  /// Absolute rather than proportional, faithfully: `ds.tsx:197-198` positions each
   /// orb with `left`/`top` in px against a `position: absolute` container, so
   /// an orb at `y: 640` is off the bottom of a 600px-tall window and on a
   /// 844px phone, which is where the prototype puts it.
@@ -145,7 +145,7 @@ class OrbSpec {
   /// `hue-cycle` or `hue-cycle-rev`.
   final OrbHueDirection hueDirection;
 
-  /// Mouse-response amplitude, 3–14. `ds.tsx:196` scales the pointer offset by
+  /// Mouse-response amplitude, 3–14. `ds.tsx:206` scales the pointer offset by
   /// `orb.parallax / 14`; the 14 is [kMaxParallax] and the division is
   /// [parallaxScale].
   final double parallax;
@@ -177,24 +177,34 @@ class OrbSpec {
   double get parallaxScale => parallax / kMaxParallax;
 }
 
-/// The largest `parallax` any orb declares — Login's first, `ds.tsx:69`.
+/// The largest `parallax` any orb declares — Login's first, `ds.tsx:71`.
 ///
-/// The prototype divides by the literal `14` (`ds.tsx:203`), so this constant is
+/// The prototype divides by the literal `14` (`ds.tsx:206`), so this constant is
 /// that literal, named.
 const double kMaxParallax = 14;
 
-/// The pointer's horizontal reach, `ds.tsx:129` — `(x / width - 0.5) * 32`.
+/// The pointer's horizontal reach, `ds.tsx:127` — `(x / width - 0.5) * 32`.
 const double kPointerSpanX = 32;
 
-/// The pointer's vertical reach, `ds.tsx:130` — `(y / height - 0.5) * 24`.
+/// The pointer's vertical reach, `ds.tsx:128` — `(y / height - 0.5) * 24`.
 const double kPointerSpanY = 24;
 
-/// Where each orb's radial gradient starts, `ds.tsx:200`.
+/// Where each orb's radial gradient starts, `ds.tsx:202`.
 ///
 /// `radial-gradient(circle at 38% 38%, color, transparent 68%)`. CSS measures
-/// the centre from the top-left; Flutter's [Alignment] measures `x` from the
-/// left and `y` from the **bottom**, so 38% from the top is `0.38 * 2 - 1 =
-/// -0.24`. Both components are therefore negative.
+/// the centre as a fraction of the box **from the top-left**. Flutter's
+/// [Alignment] measures `x` from the left and `y` from the **top** as well —
+/// `Alignment(-1, -1)` is `topLeft`, `Alignment(1, 1)` is `bottomRight` — so the
+/// conversion is the same on both axes: fraction-from-the-top = `(v + 1) / 2`, and
+/// `0.38` therefore gives `(0.38 + 1) / 2 - 1 = -0.24`.
+///
+/// Measured to settle it, because this constant has been documented wrongly
+/// twice: `Alignment(-0.24, -0.24).withinRect(Rect.fromLTWH(0, 0, 100, 100))` is
+/// `(38, 38)` — exactly 38% from the top, as the prototype asks. The earlier version
+/// of this comment said `y` is measured "from the bottom", which contradicts the
+/// `-0.24` in the very next line: from the bottom, 38% from the top would be
+/// `+0.24`, and a maintainer trusting the prose would flip the sign and move
+/// every orb's highlight to the bottom-right.
 const Alignment kOrbGradientCenter = Alignment(-0.24, -0.24);
 
 /// The centre as a fraction of the orb's own box, `at 38% 38%`.
@@ -208,7 +218,7 @@ const double kOrbGradientStop = 0.68;
 ///
 /// ## THE TWO RADII ARE NOT THE SAME NUMBER, AND GETTING IT WRONG IS VISIBLE
 ///
-/// `ds.tsx:200` is `radial-gradient(circle at 38% 38%, color, transparent 68%)`.
+/// `ds.tsx:202` is `radial-gradient(circle at 38% 38%, color, transparent 68%)`.
 /// In CSS a radial-gradient's colour stops are a fraction of the gradient **ray**,
 /// and with the default `farthest-corner` ending shape that ray runs from the
 /// `at 38% 38%` centre to the `(100%, 100%)` corner — `0.62 * sqrt(2) = 0.877`
@@ -229,7 +239,7 @@ const double kOrbGradientStop = 0.68;
 const double kOrbGradientRadius =
     kOrbGradientStop * (1 - kOrbGradientCentre) * 1.4142135623730951; // sqrt(2)
 
-/// Every `ORB_CONFIGS` group, transcribed from `eva/src/components/ds.tsx:68-112`.
+/// Every `ORB_CONFIGS` group, transcribed from `eva/src/components/ds.tsx:68-114`.
 ///
 /// Unmodifiable. `dart format` will not stop a caller reassigning a `const`
 /// map's variable, and this table is read once per frame by the painter; a
@@ -517,7 +527,7 @@ const Map<OrbGroup, List<OrbSpec>> orbGroups = <OrbGroup, List<OrbSpec>>{
 
 /// The four keyframes of `orb-float-a`, as `(phase, dx, dy, scale)`.
 ///
-/// `index.css:37-42`. Each entry is one line of the `@keyframes` block, in
+/// `index.css:50-53`. Each entry is one line of the `@keyframes` block, in
 /// order; [orbFloatOffset] and [orbFloatScale] interpolate between them.
 const List<List<double>> _floatA = <List<double>>[
   <double>[0, 0, 0, 1],
@@ -526,7 +536,7 @@ const List<List<double>> _floatA = <List<double>>[
   <double>[1, 0, 0, 1],
 ];
 
-/// The four keyframes of `orb-float-b`. `index.css:43-48`.
+/// The four keyframes of `orb-float-b`. `index.css:56-59`.
 const List<List<double>> _floatB = <List<double>>[
   <double>[0, 0, 0, 1],
   <double>[0.40, -30, 18, 1.05],
@@ -534,7 +544,7 @@ const List<List<double>> _floatB = <List<double>>[
   <double>[1, 0, 0, 1],
 ];
 
-/// The three keyframes of `orb-float-c`. `index.css:49-54`.
+/// The three keyframes of `orb-float-c`. `index.css:62-64`.
 const List<List<double>> _floatC = <List<double>>[
   <double>[0, 0, 0, 1],
   <double>[0.50, 12, 36, 1.1],
@@ -613,7 +623,7 @@ double huePhaseFor({required double clock, required double phaseOffset}) =>
 
 /// Where a pointer at [local] maps to, inside a [size] background.
 ///
-/// `ds.tsx:128-133`: `targetRef.current = { x: (clientX / innerWidth - 0.5) *
+/// `ds.tsx:126-129`: `targetRef.current = { x: (clientX / innerWidth - 0.5) *
 /// 32, y: (clientY / innerHeight - 0.5) * 24 }`. Preserved verbatim, including
 /// the 32/24 asymmetry — the prototype's orbs drift further horizontally than
 /// vertically, and rounding that to a square would be a change nobody asked for.
@@ -627,7 +637,7 @@ Offset pointerOffsetFor({required Size size, required Offset local}) => Offset(
 
 /// The aurora band's gradient stops, per brightness.
 ///
-/// Two layers, transcribed from `ds.tsx:170-190`.
+/// Two layers, transcribed from `ds.tsx:165-191`.
 ///
 /// ## WHY THESE LIVE HERE AND NOT IN `EvaColors`
 ///
@@ -641,7 +651,7 @@ Offset pointerOffsetFor({required Size size, required Offset local}) => Offset(
 abstract final class NeuralAurora {
   /// The two vertical gradients of the dark palette, top to bottom.
   ///
-  /// `ds.tsx:171-181`. Layer 1 stops at 0/20/40/65/100%, layer 2 at
+  /// `ds.tsx:169-177`. Layer 1 stops at 0/20/40/65/100%, layer 2 at
   /// 0/50/100%.
   static const List<List<Color>> dark = <List<Color>>[
     <Color>[
@@ -658,7 +668,7 @@ abstract final class NeuralAurora {
     ],
   ];
 
-  /// The same two layers in the light palette. `ds.tsx:182-190`.
+  /// The same two layers in the light palette. `ds.tsx:178-187`.
   static const List<List<Color>> light = <List<Color>>[
     <Color>[
       Color.fromARGB(0x1A, 0x6C, 0x3F, 0xE8), // rgba(108,63,232,0.10) 0%

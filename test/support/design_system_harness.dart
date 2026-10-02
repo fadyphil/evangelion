@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Fixed, because a golden is only reproducible if the surface is. The default
 /// test surface is 800x600 logical at devicePixelRatio 3, which is neither a
 /// phone nor anything the orb offsets were authored for; 390x844 is the window
-/// `ORB_CONFIGS` positions its orbs for (`x: -160, y: 640`, `ds.tsx:73-77`), so
+/// `ORB_CONFIGS` positions its orbs for (`x: -160, y: 640`, `ds.tsx:77-80`), so
 /// the goldens show what the prototype showed.
 const Size kAmbientSurface = Size(390, 844);
 
@@ -33,6 +33,13 @@ void useAmbientSurface(WidgetTester tester, {Size size = kAmbientSurface}) {
 /// `lib/app/app.dart` now installs. It is reproduced here rather than reached
 /// for through `EvangelionApp` so a test can pass a tier and a theme without the
 /// app's own opinions getting in the way.
+///
+/// [animationsEnabled] is passed through **explicitly**, so the scope never
+/// falls back to its default. The default now reads the platform's
+/// `disableAnimations`, which would make every ambient test in the suite
+/// depend on the host's accessibility setting — a test that passes on one
+/// machine and paints nothing on another, which reads exactly like a broken
+/// golden. `neural_motion_test.dart` drives the default directly.
 Widget evaAmbientHarness({
   required Widget child,
   ThemeData? theme,

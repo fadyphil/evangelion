@@ -139,7 +139,7 @@ class EvaNeuralMotion extends ChangeNotifier {
   ///
   /// A [ValueNotifier] rather than a fourth controller: it is not a clock, it is
   /// a position, and it settles. The prototype lerps it towards the target at
-  /// 0.05 per frame (`ds.tsx:139-143`); Flutter's [Listener] reports a pointer
+  /// 0.05 per frame (`ds.tsx:143-144`); Flutter's [Listener] reports a pointer
   /// position directly, so the smoothing would be the *only* thing missing and
   /// it is deliberately not added — see the D3 note in this class's doc for the
   /// same reason the durations are not honoured.
@@ -242,7 +242,7 @@ class NeuralMotionScope extends StatefulWidget {
   /// Publishes one [EvaNeuralMotion] to [child] and its descendants.
   const NeuralMotionScope({
     required this.child,
-    this.animationsEnabled = true,
+    this.animationsEnabled,
     super.key,
   });
 
@@ -251,17 +251,41 @@ class NeuralMotionScope extends StatefulWidget {
 
   /// Whether the three clocks run at all.
   ///
-  /// A constructor parameter rather than a `MediaQuery` lookup because this
-  /// widget sits **above** `MaterialApp` — there is no `MediaQuery` above it to
-  /// read, and the platform's own `AccessibilityFeatures.disableAnimations`
-  /// cannot reach it either. The composition root owns the value (from the
-  /// persisted settings in Phase 5); today it defaults to true and the
-  /// *per-widget* honouring of `MediaQuery.disableAnimationsOf` happens in
-  /// [NeuralBackground], which is below `MaterialApp` and can read it.
+  /// `null` — the default — resolves to the **platform's** reduced-motion
+  /// preference, read from
+  /// `WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations`.
+  /// `true` or `false` overrides it outright.
   ///
-  /// Changing it re-evaluates: [didUpdateWidget] stops or restarts the clocks
-  /// rather than leaving a running ticker under a stopped background.
-  final bool animationsEnabled;
+  /// ## WHY A PARAMETER RATHER THAN A `MediaQuery` LOOKUP
+  ///
+  /// Only because this widget sits **above** `MaterialApp`: there is no
+  /// `MediaQuery` above the scope, so `MediaQuery.disableAnimationsOf` is not
+  /// reachable from here. That is the whole reason, and it used to be stated
+  /// wrongly — the doc also claimed the platform's own signal "cannot reach it
+  /// either", which is false. `platformDispatcher` is not part of the widget
+  /// tree, so it is reachable from anywhere, including above `MaterialApp`. A
+  /// comment asserting otherwise is worse than no comment, because it reads as a
+  /// settled reason not to fix the clock.
+  ///
+  /// ## WHAT THE PLATFORM SIGNAL DOES *NOT* REACH
+  ///
+  /// Nothing, as of this revision: [NeuralMotionScope] registers a
+  /// [WidgetsBindingObserver], so a reader toggling the OS setting mid-session is
+  /// honoured without a restart, and an explicit `animationsEnabled` still wins
+  /// over it. Phase 5 replaces the default with the persisted `UserSettings`
+  /// value, and the observer has to survive that.
+  ///
+  /// The *per-widget* reduced-motion checks are a separate mechanism and are not
+  /// affected by anything here: [NeuralBackground] and `GoldFlecks` read
+  /// `MediaQuery.maybeDisableAnimationsOf`, which a device fills from the same
+  /// `accessibilityFeatures` (and a test can fill directly). So a reader who has
+  /// asked for reduced motion gets both halves: no tickers, and no painted
+  /// motion even if a caller re-enables the clocks.
+  ///
+  /// Changing it re-evaluates: [didUpdateWidget] and
+  /// [didChangeAccessibilityFeatures] both stop or restart the clocks rather
+  /// than leaving a running ticker under a stopped background.
+  final bool? animationsEnabled;
 
   /// The motion bundle published to [context]'s descendants.
   ///
@@ -285,8 +309,22 @@ class NeuralMotionScope extends StatefulWidget {
 }
 
 class _NeuralMotionScopeState extends State<NeuralMotionScope>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final EvaNeuralMotion _motion = _buildMotion();
+
+  /// Whether the clocks should be running, resolving the platform's own signal.
+  ///
+  /// One place, so the constructor path and [didUpdateWidget] cannot disagree
+  /// about what "enabled" means — and so an explicit `true` really does override
+  /// the platform, which is what the parameter is for.
+  bool get _enabled =>
+      widget.animationsEnabled ??
+      WidgetsBinding
+              .instance
+              .platformDispatcher
+              .accessibilityFeatures
+              .disableAnimations ==
+          false;
 
   EvaNeuralMotion _buildMotion() {
     final AnimationController float = AnimationController(
@@ -315,22 +353,50 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       aurora: aurora,
       pointer: ValueNotifier<Offset>(Offset.zero),
     );
-    if (widget.animationsEnabled) {
+    if (_enabled) {
       motion.setAnimationsEnabled(enabled: true);
     }
     return motion;
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Only when the platform owns the answer. A caller that passed an explicit
+    // `animationsEnabled` is not asking the OS anything, and registering would
+    // mean an OS toggle could restart clocks the app explicitly holds still.
+    if (widget.animationsEnabled == null) {
+      WidgetsBinding.instance.addObserver(this);
+    }
+  }
+
+  @override
   void didUpdateWidget(NeuralMotionScope oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.animationsEnabled != widget.animationsEnabled) {
-      _motion.setAnimationsEnabled(enabled: widget.animationsEnabled);
+      _motion.setAnimationsEnabled(enabled: _enabled);
+    }
+  }
+
+  @override
+  void didChangeAccessibilityFeatures() {
+    super.didChangeAccessibilityFeatures();
+    // A reader who toggles "reduce motion" in the OS mid-session gets the answer
+    // here. Without this the signal would be honoured at first mount only, which
+    // is half a fix wearing a whole fix's name.
+    if (widget.animationsEnabled == null) {
+      _motion.setAnimationsEnabled(enabled: _enabled);
     }
   }
 
   @override
   void dispose() {
+    // Symmetrical with `initState`: observing unconditionally would let an OS
+    // toggle push into a bundle whose clocks the composition root deliberately
+    // holds still.
+    if (widget.animationsEnabled == null) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     // The three controllers are disposed **here**, by the host that owns the
     // `TickerProvider`. `TickerProviderStateMixin.dispose` throws if any ticker
     // it created is still alive, so this is not merely tidy-up: leaving it out

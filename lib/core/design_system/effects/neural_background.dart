@@ -16,11 +16,11 @@ enum NeuralVariant {
   home,
 
   /// `/reading` in English. Different from the Arabic arm because the prototype
-  /// draws a different orb group for each: English opens blue (`ds.tsx:79`) and
+  /// draws a different orb group for each: English opens blue (`ds.tsx:84`) and
   /// has no cyan orb at all.
   readingEn,
 
-  /// `/reading` in Arabic. Opens violet and pairs it with cyan (`ds.tsx:83-84`).
+  /// `/reading` in Arabic. Opens violet and pairs it with cyan (`ds.tsx:89-90`).
   readingAr,
 
   /// `/quiz`.
@@ -73,7 +73,7 @@ const double kNarrowViewport = 360;
 /// The shortest viewport side at or above which the tier is [NeuralTier.high].
 ///
 /// The largest orb is 500px across and the furthest offset is `y: 640`
-/// (`ds.tsx:74`, `:77`), so a viewport shorter than 640 cannot show a Home orb
+/// (`ds.tsx:80`), so a viewport shorter than 640 cannot show a Home orb
 /// whole. Above it, the absolute offsets were authored to be seen.
 const double kWideViewport = 640;
 
@@ -150,6 +150,26 @@ abstract final class NeuralTiers {
 /// until it names a group — and why `neural_orbs_test.dart` asserts all seven
 /// colour sequences by name.
 ///
+/// ## WHAT IS ACTUALLY ASSERTED, AND WHAT IS NOT
+///
+/// Recorded because the first version of this doc said "all seven colour
+/// sequences" when the suite named five. The distinction is worth keeping now
+/// that it is true, because it is what says where the guarantee stops:
+///
+/// - **Asserted by name** — all seven of `NeuralVariant`'s colour sequences
+///   (`login`, `home`, `readingEn`, `readingAr`, `quiz`, `result`, `settings`),
+///   plus `profile`'s, plus the mapping itself for all seven, plus "no two
+///   variants share a sequence".
+/// - **Asserted exactly, per orb** — `parallax`, `x`, `y`, `size`, `floatPath`,
+///   `hueSeconds` and `hueDelaySeconds`, all twenty-one of them.
+/// - **Asserted only in part** — `floatSeconds` is range-checked
+///   (`14…28s`, and only for `home`); `hueDirection` is asserted for `home`,
+///   `readingEn` and the `profile` opener, plus "every group opens forward".
+///   `floatSeconds` is recorded-but-not-driven (§13.2), so its exact value is
+///   transcribed for audit rather than pinned for behaviour; `hueDirection` is
+///   driven, and its three partial assertions are the gap.
+/// - **Not asserted** — nothing else. `OrbSpec` has no other field.
+///
 /// There is no cast and no ordinal arithmetic here at all. `OrbGroup` and
 /// `NeuralVariant` are deliberately different enumerations: collapsing them
 /// would make `variant.index` *compile*, and a compiling wrong answer is the
@@ -182,6 +202,18 @@ List<OrbSpec> orbsFor(NeuralVariant variant) =>
 ///    [ListenableBuilder] and via `CustomPainter.repaint`.
 ///    `neural_background_test.dart` proves it by comparing widget-instance
 ///    identity across pumped frames rather than by checking that nothing threw.
+///    ## WHAT THAT PROOF ACTUALLY MEASURES — READ THIS BEFORE RELYING ON IT
+///
+///    It measures **widget-identity propagation**, not a rebuild *count*, and the
+///    two are not the same claim. An ancestor that rebuilds on every frame while
+///    handing down **identical child widget instances** leaves this test green,
+///    because `Element.update` compares the new widget to the old one with
+///    `identical()` and skips the subtree when they match. So the guarantee is
+///    precisely: *nothing marks this subtree dirty per frame, and no new widget
+///    instance arrives from above.* An ancestor that rebuilds per frame and
+///    constructs a new `NeuralBackground(...)` each time would re-enter
+///    `build` on every frame and this test would go red — correctly, because that
+///    **is** per-frame work for this subtree.
 /// 2. **Shared controllers, not per-orb.** [NeuralMotionScope]. See that class's
 ///    doc, and its D3 note for what happened to `floatDur` / `hueDur`.
 /// 3. **`hue-rotate` without `ImageFilter`.** [hueRotateFilter] over a radial
@@ -242,7 +274,7 @@ class NeuralBackground extends StatelessWidget {
       // than merely intended: the background's per-frame damage stops here
       // instead of dirtying whatever is painted over it.
       child: Listener(
-        // `parallax` made live. `ds.tsx:126-137` registers **two** window
+        // `parallax` made live. `ds.tsx:149-150` registers **two** window
         // listeners — `mousemove` and `touchmove` — and both have to be here.
         //
         // `onPointerMove` alone is not enough, and the difference is invisible
@@ -313,7 +345,7 @@ class _NeuralPainter extends CustomPainter {
     //
     // The prototype gets its backdrop from the screen root's
     // `background: T.canvas` and leaves the background layer transparent
-    // (`ds.tsx:168` — the container has no background of its own). A Flutter
+    // (`ds.tsx:162` — the container has no background of its own). A Flutter
     // `CustomPaint` has no such backdrop, so an unfilled painter is transparent
     // and the layer composites over whatever the caller happens to have put
     // underneath. Two consequences, and the second is the one that bit:
@@ -336,7 +368,7 @@ class _NeuralPainter extends CustomPainter {
     _paintOrbs(canvas, size);
   }
 
-  /// The two drifting vertical bands. `ds.tsx:170-190`, `index.css:78-82`.
+  /// The two drifting vertical bands. `ds.tsx:165-191`, `index.css:78-82`.
   ///
   /// ## WHAT IS DROPPED, AND WHY
   ///
@@ -399,7 +431,7 @@ class _NeuralPainter extends CustomPainter {
     for (int i = 0; i < count; i++) i / (count - 1),
   ];
 
-  /// The floating orbs. `ds.tsx:194-206`, `index.css:36-67`.
+  /// The floating orbs. `ds.tsx:194-208`, `index.css:49-75`.
   ///
   /// ## THE 72px BLUR
   ///
@@ -412,7 +444,7 @@ class _NeuralPainter extends CustomPainter {
   ///
   /// ## THE OPACITY
   ///
-  /// `colors.orbOpacity`, not a literal. The prototype's `ds.tsx:160` is
+  /// `colors.orbOpacity`, not a literal. The prototype's `ds.tsx:159` is
   /// `isDark ? 0.55 : 0.16`; `EvaColors` publishes `0.55 / 0.18`
   /// (`03-design-system.md` §5.1). Dark agrees exactly; **light is 0.18 here and
   /// 0.16 in the prototype**, and the token wins — a design-system token is not
@@ -448,7 +480,7 @@ class _NeuralPainter extends CustomPainter {
         width: side,
         height: side,
       );
-      // A **circle**, not the rectangle the shader was built for. `ds.tsx:197-198`
+      // A **circle**, not the rectangle the shader was built for. `ds.tsx:201`
       // gives each orb `borderRadius: '50%'` on a square box, so the prototype's
       // orb is a disc and the gradient fades out inside it. Drawing the rect
       // would leave the box's own corners tinted wherever the fade has not
