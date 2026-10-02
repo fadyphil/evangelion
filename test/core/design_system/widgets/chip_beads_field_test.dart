@@ -144,6 +144,66 @@ void main() {
       expect(label.style!.fontWeight, FontWeight.w700);
     });
 
+    testWidgets('a sticker colour reaches the unselected filter style', (
+      WidgetTester tester,
+    ) async {
+      // The property the `filter` golden used to carry and now cannot: an
+      // unselected `filter` chip with a `color:` reads no `colors.*` at all, so it
+      // is genuinely theme-invariant and no golden pair can separate it. Asserted
+      // on the **resolved style** instead, which is where a regression would
+      // actually be visible — `EvaChip` ignoring `color`, or preferring
+      // `colors.ember` over the sticker, is caught here rather than by a picture.
+      await pumpAt(
+        tester,
+        EvaChip(
+          label: 'Gospels',
+          variant: EvaChipVariant.filter,
+          color: EvaStickerPalette.of(StickerSlot.sun),
+          onSelected: (bool _) {},
+        ),
+      );
+      final BoxDecoration decoration =
+          tester
+                  .widget<Container>(
+                    find
+                        .descendant(
+                          of: find.byType(EvaChip),
+                          matching: find.byType(Container),
+                        )
+                        .first,
+                  )
+                  .decoration!
+              as BoxDecoration;
+
+      final Color sticker = EvaStickerPalette.of(StickerSlot.sun);
+      expect(decoration.color, sticker.withValues(alpha: 0.12));
+      expect(
+        (decoration.border! as Border).top.color,
+        sticker.withValues(alpha: 0.28),
+      );
+      expect(
+        decoration.border! as Border,
+        isNot(Border.all(color: const EvaColors.dark().ember)),
+      );
+
+      // And the same chip **selected** ignores the sticker and reads `ember` —
+      // which is what makes the golden pair theme-derived.
+      final EvaChipStyle selected = resolveChipStyle(
+        variant: EvaChipVariant.filter,
+        colors: const EvaColors.dark(),
+        selected: true,
+        sticker: sticker,
+      );
+      final EvaChipStyle light = resolveChipStyle(
+        variant: EvaChipVariant.filter,
+        colors: const EvaColors.light(),
+        selected: true,
+        sticker: sticker,
+      );
+      expect(selected.background, isNot(light.background));
+      expect(selected.foreground, isNot(light.foreground));
+    });
+
     for (final (String theme, ThemeData data) in kEvaThemes) {
       testWidgets('a golden per theme — toggle $theme', (
         WidgetTester tester,
@@ -163,13 +223,32 @@ void main() {
       testWidgets('a golden per theme — filter $theme', (
         WidgetTester tester,
       ) async {
+        // ## WHY `selected: true` AND NO `color`
+        //
+        // This pair used to be two byte-identical files, and unlike
+        // `text_link`'s the cause was legitimate rather than a stray literal: an
+        // **unselected** `filter` chip with a sticker colour reads *no*
+        // `colors.*` at all. `_filter` resolves `hue` to `sticker`, and every
+        // channel — background, border, foreground, dot, glow — is that one hue at
+        // a fixed alpha. The sticker palette is a **static** map shared by both
+        // palettes (`eva_colors.dart:78,119`), so such a chip is genuinely
+        // theme-invariant and no amount of re-pumping would separate the captures.
+        //
+        // `selected: true` is the form that *is* theme-derived: `hue` becomes
+        // `colors.ember`, so background, rim, ink, dot and glow all come from the
+        // palette and the two captures differ for a reason.
+        //
+        // `color` is dropped because in the selected state it is ignored
+        // (`hue = selected ? colors.ember : sticker`), and leaving it in would
+        // make the golden *look* as though it pinned the sticker colour when it
+        // pins nothing of the sort. The sticker path is pinned by the test below
+        // instead, on the resolved style, which is legible where a picture is not.
         await pumpAt(
           tester,
           EvaChip(
             label: 'Gospels',
             variant: EvaChipVariant.filter,
-            color: EvaStickerPalette.of(StickerSlot.sun),
-            selected: false,
+            selected: true,
             onSelected: (bool _) {},
           ),
           theme: data,

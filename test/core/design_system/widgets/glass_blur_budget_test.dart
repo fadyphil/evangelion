@@ -1,9 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter_test/flutter_test.dart';
-
-import '../../../support/project_import_graph.dart';
-
 /// §13.4's blur budget, enforced rather than documented.
 ///
 /// `09-quality-gates.md` §13.4 counts **eight** `backdrop-filter: blur(Npx)` sites
@@ -21,8 +15,8 @@ import '../../../support/project_import_graph.dart';
 /// source, not state.
 ///
 /// A diff is review, not a gate either. `GlassTier`'s own doc used to justify the
-/// enum with "this type exists so that adding one is visible in a diff" — which
-/// is true and is also the thing that is not a gate: a reviewer has to notice,
+/// enum with "this type exists so that adding one is visible in a diff" — which is
+/// true and is also the thing that is not a gate: a reviewer has to notice,
 /// count, and remember the number. This walks the files instead.
 ///
 /// ## THE TWO ALLOWED SITES
@@ -39,50 +33,84 @@ import '../../../support/project_import_graph.dart';
 /// Everything else is `GlassTier.tint`: a translucent fill, a hairline rim and
 /// the ambient shadow, with no `saveLayer` at all.
 ///
+/// ## TWO DIRECTORIES, TWO ALLOWANCES, ONE CEILING
+///
+/// The first version walked `lib/features/` only. That was a **structural blind
+/// spot**, and Phase 3 is what opened it: three of the eight prototype blur sites
+/// — `Input` (now [EvaTextField]), `StatTile` and `SettingsTile` — became
+/// *primitives in `lib/core/design_system/widgets/`*, outside the walk's reach.
+/// A planted `StatTile(tier: GlassTier.blur)` kept the gate at 2/2 green while
+/// adding a third `saveLayer` over content, so the gate's own doc claim ("fails
+/// above two occurrences") was only half-delivered.
+///
+/// So the walk covers both directories, each with its own allowance, and the
+/// **global** ceiling is what the rule actually says:
+///
+/// | directory | `GlassTier.blur` allowance | direct `BackdropFilter` allowance |
+/// | --- | --- | --- |
+/// | `lib/features/` | 2 — the two allowed sites | 0 |
+/// | `lib/core/design_system/widgets/` | 1 — `GlassSurface`'s own tier test | 0 outside `glass_surface.dart` |
+///
+/// The design-system allowance is 1 and not 0 because `GlassSurface` is the widget
+/// that *owns* the blur: `final Widget body = tier == GlassTier.blur ? …` is the
+/// one line in the whole tree that decides whether a `BackdropFilter` exists. A
+/// primitive cannot spend the budget — it can only pass the tier through — and
+/// pinning that at 1 is what keeps a second `GlassTier.blur` comparison inside
+/// `lib/core/design_system/widgets/` from being possible.
+///
 /// ## FAIL-CLOSED, DELIBERATELY
 ///
 /// `AGENT_CONTEXT` §7, "a gate that cannot fail is worse than no gate":
 ///
-/// - `lib/features/` missing → **fail**, naming the path. A phase that has not
+/// - a scanned directory missing → **fail**, naming the path. A phase that has not
 ///   created it yet is not a reason to pass.
 /// - a file that cannot be read → **fail**, naming the file. A permissions error
 ///   must not read as "no violations found".
-/// - an empty walk → **fail**. `lib/features/` with no `.dart` files under it is
-///   a walk that found nothing, and a count of zero over nothing is not a pass.
-/// Every `.dart` file under `lib/features/`, failing closed.
-///
-/// The one walk both tests use, so there is a single place where "the scan could
-/// not run" is turned into a failure rather than a pass.
-List<File> _featureDartFiles() {
-  final Directory features = Directory.fromUri(
-    packageRoot.uri.resolve('lib/features/'),
-  );
+/// - an empty walk → **fail**. A directory with no `.dart` files under it is a walk
+///   that found nothing, and a count of zero over nothing is not a pass.
+library;
+
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/project_import_graph.dart';
+
+/// The screens, where §13.4's two allowed sites will be.
+const String _features = 'lib/features/';
+
+/// The primitives, which may pass a tier through but never spend one.
+const String _widgets = 'lib/core/design_system/widgets/';
+
+/// Every `.dart` file under [root], failing closed.
+List<File> _dartFilesUnder(String root) {
+  final Directory dir = Directory.fromUri(packageRoot.uri.resolve(root));
   expect(
-    features.existsSync(),
+    dir.existsSync(),
     isTrue,
     reason:
-        'lib/features/ does not exist. The gate cannot run, so it does not '
-        'pass — a missing target is reported, never assumed clean.',
+        '$root does not exist. The gate cannot run, so it does not pass — a '
+        'missing target is reported, never assumed clean.',
   );
 
   final List<File> files = <File>[];
   try {
     files.addAll(<File>[
-      for (final FileSystemEntity entity in features.listSync(
+      for (final FileSystemEntity entity in dir.listSync(
         recursive: true,
         followLinks: false,
       ))
         if (entity is File && entity.path.endsWith('.dart')) entity,
     ]);
   } on FileSystemException catch (error) {
-    fail('lib/features/ could not be walked: ${error.message}');
+    fail('$root could not be walked: ${error.message}');
   }
   expect(
     files,
     isNotEmpty,
     reason:
-        'the walk found no .dart file under lib/features/. That is a walk that '
-        'proved nothing, not a clean tree.',
+        'the walk found no .dart file under $root. That is a walk that proved '
+        'nothing, not a clean tree.',
   );
   return files;
 }
@@ -108,18 +136,64 @@ List<String> _sitesMentioning(List<File> files, String marker) {
 }
 
 void main() {
-  test('at most two features blur — §13.4 spends two of eight', () {
-    final List<File> files = _featureDartFiles();
-    final List<String> hits = _sitesMentioning(files, 'GlassTier.blur');
+  test('at most two sites blur anywhere — §13.4 spends two of eight', () {
+    final List<String> features = _sitesMentioning(
+      _dartFilesUnder(_features),
+      'GlassTier.blur',
+    );
+    final List<String> widgets = _sitesMentioning(
+      _dartFilesUnder(_widgets),
+      'GlassTier.blur',
+    );
 
     expect(
-      hits,
+      features,
       hasLength(lessThanOrEqualTo(2)),
       reason:
-          '§13.4 budgets two blur sites across the six screens — Home\'s '
+          "§13.4 budgets two blur sites across the six screens — Home's "
           "today's-reading panel and Home's top bar — and lists eight prototype "
           'sites that would each be a per-frame saveLayer. The over-budget '
-          'sites are:\n${hits.join('\n')}',
+          'sites:\n${features.join('\n')}',
+    );
+    expect(
+      widgets,
+      hasLength(lessThanOrEqualTo(1)),
+      reason:
+          'a design-system primitive cannot spend the budget: `GlassSurface` owns '
+          'the blur and every primitive passes a `tier` through. One occurrence is '
+          "GlassSurface's own `tier == GlassTier.blur` test; a second means a "
+          'primitive is deciding for itself:\n${widgets.join('\n')}',
+    );
+    // The ceiling the rule states, over both directories together. Two separate
+    // per-directory bounds would let a fourth site through by arithmetic — 2 in
+    // features plus 1 in the design system is 3 — so the global figure is asserted
+    // as well as the two that make it up.
+    expect(
+      features.length + widgets.length,
+      lessThanOrEqualTo(2 + 1),
+      reason:
+          '§13.4 budgets two screen sites. The one design-system occurrence is '
+          "GlassSurface's own decision, not a site, and the two together are the "
+          'whole of what exists:\n${[...features, ...widgets].join('\n')}',
+    );
+  });
+
+  test('a primitive cannot become a blur site', () {
+    // The blind spot the two-directory walk exists to close, asserted directly so
+    // the reason it was widened cannot be quietly forgotten: `StatTile` is a
+    // primitive, `tier: GlassTier.blur` is the exact line that would have gone
+    // unnoticed, and it is in `lib/core/design_system/widgets/`.
+    final List<String> hits = _sitesMentioning(
+      _dartFilesUnder(_widgets),
+      'tier: GlassTier.blur',
+    );
+    expect(
+      hits,
+      isEmpty,
+      reason:
+          '§13.4 — a `GlassTier.blur` in the design system is a per-frame '
+          "saveLayer with no screen behind it to justify the budget. Only Home's "
+          "today's-reading panel and Home's top bar may blur:\n${hits.join('\n')}",
     );
   });
 
@@ -130,17 +204,43 @@ void main() {
     // spelling is absent too, so the scan has to be honoured rather than worked
     // around. A hand-built `BackdropFilter` is the same per-frame `saveLayer`
     // with no budget attached to it.
-    final List<File> files = _featureDartFiles();
-    final List<String> direct = <String>[
-      ..._sitesMentioning(files, 'BackdropFilter'),
-      ..._sitesMentioning(files, 'ImageFilter.blur'),
+    final List<String> featureDirect = <String>[
+      ..._sitesMentioning(_dartFilesUnder(_features), 'BackdropFilter'),
+      ..._sitesMentioning(_dartFilesUnder(_features), 'ImageFilter.blur'),
     ]..sort();
     expect(
-      direct,
+      featureDirect,
       isEmpty,
       reason:
           'a feature must reach the blur through GlassTier.blur, which is what '
-          'the budget above counts:\n${direct.join('\n')}',
+          'the budget above counts:\n${featureDirect.join('\n')}',
+    );
+
+    // And in the design system, the one `BackdropFilter` in the tree is inside
+    // `glass_surface.dart` — the widget that owns it. Named rather than counted,
+    // so a second `BackdropFilter` in a *different* primitive is an offender even
+    // though the total would still be two.
+    final List<String> widgetDirect = <String>[
+      ..._sitesMentioning(_dartFilesUnder(_widgets), 'BackdropFilter'),
+      ..._sitesMentioning(_dartFilesUnder(_widgets), 'ImageFilter.blur'),
+    ]..sort();
+    expect(
+      widgetDirect,
+      isNotEmpty,
+      reason:
+          'glass_surface.dart still builds its own BackdropFilter; if this is '
+          'empty the widget has been restructured and this allowance needs '
+          'rewriting rather than passing silently',
+    );
+    expect(
+      widgetDirect,
+      everyElement(
+        startsWith('lib/core/design_system/widgets/glass_surface.dart:'),
+      ),
+      reason:
+          'only GlassSurface may build a BackdropFilter. Every other primitive '
+          'must go through the tier, which is what carries the budget:\n'
+          '${widgetDirect.join('\n')}',
     );
   });
 }

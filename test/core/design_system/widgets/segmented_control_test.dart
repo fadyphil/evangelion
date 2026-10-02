@@ -252,6 +252,106 @@ void main() {
       final idle = semanticsOf(tester, find.text('LIGHT'));
       expect(idle.flagsCollection.isSelected.toBoolOrNull(), isFalse);
     });
+
+    testWidgets('every node the reader can activate is also nameable', (
+      WidgetTester tester,
+    ) async {
+      // The defect this covers: the **track** is a button. `EvaInk` publishes a
+      // tap action on the node above the three segments, and the node carried no
+      // label at all — so `/settings`, which renders this control twice (the
+      // theme picker and the language pills), shipped two buttons a screen reader
+      // could land on and could not name. That is §14's first row applied to a
+      // widget the row does not name.
+      //
+      // Asserted over the whole tree and filtered on the **action**, because the
+      // question is about what a reader can press; the harness's own nodes come
+      // back with no actions at all, so nothing else is in the list.
+      await pump(tester, selected: 'Dark');
+      final List<SemanticsData> actionable = nodesOffering(
+        tester,
+        SemanticsAction.tap,
+      );
+
+      expect(
+        actionable,
+        isNotEmpty,
+        reason: 'the control is tappable — nothing else would make this a test',
+      );
+      for (final SemanticsData data in actionable) {
+        expect(
+          data.label.trim(),
+          isNotEmpty,
+          reason:
+              'a node a reader can activate with nothing to name it. The track '
+              'is one of these, and so are the three segments.',
+        );
+      }
+      // And specifically: the track is named after the **selected** option, which
+      // is the one fact about the control that is true at every moment and the
+      // fact the arrow keys are about to replace.
+      expect(
+        actionable.expand((SemanticsData d) => d.label.split('\n')),
+        contains('Dark'),
+      );
+    });
+
+    testWidgets('the track contributes one of the four, and it is named', (
+      WidgetTester tester,
+    ) async {
+      // Why the track keeps its tap action at all, asserted rather than argued:
+      // `EvaFocusRing` owns the control's single `FocusNode` but inserts no
+      // `Focus` (a second one would make the node its own parent — see that
+      // widget's doc), and the `EvaInk` is the only thing binding that node into
+      // the focus tree. A track with no `onPressed` would therefore be a control
+      // **Tab cannot reach at all**, which is a worse §14 defect than an unnamed
+      // one. Reachability itself is `focus_ring_gate_test.dart`'s assertion; this
+      // is the naming half.
+      await pump(tester, selected: 'Dark');
+      final List<SemanticsData> actionable = nodesOffering(
+        tester,
+        SemanticsAction.tap,
+      );
+
+      expect(
+        actionable.map((SemanticsData d) => d.label),
+        <String>['Dark', 'Light', 'Dark', 'System'],
+        reason:
+            'the track plus the three segments, in paint order — the track is '
+            'named after the selected option because that is the one fact about '
+            'the control that is true at every moment',
+      );
+    });
+
+    testWidgets('an out-of-list `selected` still names the control', (
+      WidgetTester tester,
+    ) async {
+      // `nextSelection`'s doc records that a persisted setting naming a value a
+      // rebuilt enum no longer has is reachable. The track's label is built by the
+      // caller's `labelOf`, which is a function over `values` — so calling it with
+      // a value the list does not contain would be a crash in `build`, taking the
+      // screen down. Guarded, and the guard is observable here.
+      await pumpPrimitive(
+        tester,
+        const Align(
+          alignment: Alignment.topCenter,
+          child: SegmentedControl<String>(
+            values: <String>['Light', 'Dark', 'System'],
+            selected: 'Sepia',
+            labelOf: _identity,
+            onChanged: _ignore,
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(
+        nodesOffering(
+          tester,
+          SemanticsAction.tap,
+        ).map((SemanticsData d) => d.label),
+        contains('Light'),
+        reason: 'the first option, which is also where a forward step snaps to',
+      );
+    });
   });
 
   group('shape', () {
@@ -359,3 +459,7 @@ class _LiveState extends State<_Live> {
     },
   );
 }
+
+String _identity(String value) => value;
+
+void _ignore(String value) {}

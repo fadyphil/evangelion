@@ -297,6 +297,13 @@ class EvaChip extends StatelessWidget {
       sticker: color,
     );
     final bool interactive = onSelected != null;
+    // One closure, two consumers. The tap action is published on the semantics
+    // node *and* handed to the ink, and writing it twice is how the two drift —
+    // and when they drift, the half a screen reader uses is the half that is
+    // missing.
+    final VoidCallback? activate = interactive
+        ? () => onSelected!(!selected)
+        : null;
 
     final Widget pill = Container(
       padding: kEvaChipPadding,
@@ -370,6 +377,13 @@ class EvaChip extends StatelessWidget {
       selected: selected,
       label: label,
       excludeSemantics: true,
+      // Load-bearing, and easy to lose: `excludeSemantics: true` drops the
+      // `InkWell`'s tap action with the label, so without this the chip announces
+      // as a button — and announces *which* one it is, via `selected:` — and a
+      // TalkBack double-tap does nothing. [SemanticsAction.tap] is
+      // `ACTION_CLICK`. `null` for an inert chip, so a chip that is not a control
+      // cannot be activated by one.
+      onTap: activate,
       child: EvaFocusRing(
         enabled: interactive,
         idleBorder: style.border,
@@ -378,7 +392,7 @@ class EvaChip extends StatelessWidget {
         // around a stadium.
         radius: EvaRadii.chip,
         child: EvaInk(
-          onPressed: interactive ? () => onSelected!(!selected) : null,
+          onPressed: activate,
           borderRadius: BorderRadius.circular(EvaRadii.chip),
           child: pill,
         ),

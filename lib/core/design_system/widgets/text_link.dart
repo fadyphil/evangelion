@@ -50,6 +50,23 @@ class TextLink extends StatelessWidget {
   /// chevron belongs to the neutral variant. Here the flag is explicit for the
   /// same reason the colour is: a rule that fires from a *different* parameter
   /// than the one it controls is a rule nobody can predict.
+  ///
+  /// ## THE CHEVRON'S COLOUR IS `ember`, NOT THE LINK'S INK
+  ///
+  /// `ds.tsx:283` writes `color: hex.ember` on the `›`, and [EvaButton]'s
+  /// transcription of the same glyph reads [EvaColors.ember] too. This one read
+  /// [ink] — the link's own colour — which is not one of the eight declared
+  /// divergences and therefore was simply a transcription error: one prototype
+  /// glyph, two colours, one phase.
+  ///
+  /// What is *not* changed is the coupling the prototype had, because this widget
+  /// replaced it: the prototype gates the chevron's **presence** on the absence
+  /// of an explicit colour, which no Flutter parameter spelling can express, so
+  /// `chevron` is its own flag here. The colour is the prototype's.
+  ///
+  /// No shipped screen changes: the one call site with a chevron is the neutral
+  /// variant (`ButtonText`), whose ink is `ink` and whose chevron is `ember`
+  /// either way.
   final bool chevron;
 
   @override
@@ -79,7 +96,11 @@ class TextLink extends StatelessWidget {
         if (chevron)
           Padding(
             padding: const EdgeInsets.only(left: EvaSpacing.xs),
-            child: Icon(Icons.chevron_right, size: EvaSpacing.lg, color: ink),
+            child: Icon(
+              Icons.chevron_right,
+              size: EvaSpacing.lg,
+              color: colors.ember,
+            ),
           ),
       ],
     );
@@ -92,6 +113,13 @@ class TextLink extends StatelessWidget {
       // prototype's button rule (`ds.tsx:245`) and it fails contrast where the
       // ink is already `ink2`; the semantics flag and the absent ink carry it.
       excludeSemantics: true,
+      // Load-bearing, and easy to lose: `excludeSemantics: true` drops the
+      // `InkWell`'s tap action along with the label, so without this the link is
+      // announced and cannot be activated — a TalkBack double-tap is
+      // `ACTION_CLICK` = [SemanticsAction.tap]. `null` when disabled, because a
+      // disabled control's action must be genuinely absent rather than present
+      // and flagged.
+      onTap: enabled ? onPressed : null,
       child: EvaFocusRing(
         enabled: enabled,
         radius: EvaSpacing.xs,
