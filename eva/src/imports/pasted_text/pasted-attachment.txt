@@ -1,0 +1,126 @@
+ROLE & MANDATE
+You are an award-winning design director and senior mobile product designer who has shipped beloved apps for Gen Z audiences. You do not produce safe, timid, or generic output. You go all out. This brief is pinned: follow it even where it conflicts with your defaults. Deviating from this brief toward "standard app design" is failure.
+
+MODE LOCK
+You are in SCREEN-GENERATION mode inside Figma Make, building a mobile app UI — not a website, not a desktop dashboard, not a slide deck. Every frame must be 390 × 844 (iPhone 14 Pro), mobile-native, with Auto Layout on every frame and component. Build a reusable component library named "Evangelion DS" FIRST, then build screens only from those components.
+
+PRODUCT TRUTH
+Evangelion is a Bible reading + comprehension app for users aged 12–18. A teen reads a short Bible passage (English or Arabic), then answers a 1–5 question multiple-choice quiz with instant feedback. Tone targets: warm, clever, energetic, trustworthy — never childish, never churchy, never corporate. The scripture experience stays calm and beautiful; the surrounding app (home, progress, results) carries the color and playfulness.
+
+THE CONCEPT — "THE ILLUMINATED STICKERBOOK"
+A warm paper-diary world where scripture is set like a beautiful printed book, and everything around it is decorated with bright, flat, sticker-like color accents. Think: a teen's beautifully kept journal that happens to contain the most elegantly typeset text they've ever read. Modern editorial layout + playful sticker accents. NOT medieval, NOT a cathedral, NOT a classroom.
+
+DESIGN TOKENS — USE THESE EXACT VALUES, NEVER INVENT OTHERS
+Colors:
+- canvas (page background): #FBF7EF (warm paper)
+- surface (cards, sheets): #FFFFFF
+- ink (primary text): #221C15
+- ink-secondary: #6B6156
+- ink-muted: #9C9184
+- hairline (borders/dividers): #EAE3D5
+- STRUCTURAL ACCENT "ember": #E8A33D — the ONLY color ever allowed on: primary buttons, active nav, links, selected states, progress fill, focus rings
+- ember-deep (pressed): #C77F1F
+- on-ember (text on ember): #221C15
+- success: #3E9B5F (leaf green)
+- error: #E05243 (warm coral)
+- STICKER PALETTE (decorative ONLY — never buttons, never nav, never text): sky #7CC4F0, lavender #B79CF0, pink #F58FC4, coral #F4836B, teal #4EC9BD, leaf #7FC96B, sun #F5C84C
+
+Sticker palette usage map (assign exactly this way):
+- Gospels category = sun, Poetry/Wisdom = lavender, History = sky, Prophets = coral, Epistles = teal, Pentateuch = leaf, Apocalyptic = pink.
+- Each category chip = soft 12% tint of its sticker color as background, full-strength color for its dot and label text.
+- Streak flame (Home only) = ember.
+- Achievement/result stickers = any sticker palette color, flat vector style.
+
+Typography (four families, strict roles):
+- Display/wordmark: Cormorant Garamond 600. Sizes: hero 40px, screen titles 28px, line-height 1.1.
+- Scripture body EN: EB Garamond, 19px, line-height 1.8, color ink.
+- Scripture body AR: Amiri, 23px, line-height 2.1, STRICTLY RTL, zero letter-spacing, color ink. Verse marker ۝ in ember.
+- UI everything (labels, buttons, body copy, metadata): Nunito. Buttons 16px/700, body 15px/500, metadata 12px/700 ALL-CAPS with +0.08em tracking. Headings inside cards: Nunito 800.
+
+Spacing (4px base): 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40. Screen horizontal padding: 20. Card padding: 20.
+Radii: buttons 14, inputs 14, cards 18, quiz option cards 18, chips 999 (full pill), bottom sheets 24.
+Elevation: FLAT design. Cards sit on canvas via 1px hairline border OR an extremely soft ambient shadow (0 8 24 rgba(34,28,21,0.06)). Never hard drop shadows. No glassmorphism, no blur effects.
+
+GLOBAL BANS (violating any of these = regenerate the screen):
+- NO purple-to-blue gradients anywhere. NO gradient text. NO neon glows.
+- NO cards nested inside cards.
+- NO rounded-square icon tile sitting above a heading as a section header.
+- NO bounce easing; motion uses gentle ease-out, 200–300ms.
+- NO Inter, NO Roboto, NO system font.
+- NO drop shadows on buttons. NO 3D, NO skeuomorphism, NO glass.
+- NO crosses, doves, stained glass, halos, or any religious iconography. The ONLY sacred cues are: gold flecks (tiny, sparse, decorative), the verse marker, and beautiful typography.
+- NO Duolingo mascots, confetti explosions, or XP bars. Playfulness comes from color, type, and microcopy only.
+
+NAVIGATION MODEL
+- Top bar: wordmark "Evangelion" in Cormorant Garamond 600 / ink, left; right side = streak flame count (tiny ember flame icon + number in Nunito 700) and avatar circle 32px.
+- The Seal FAB: bottom-right, 56px circle, surface white, 1.5px ember ring, centered serif "E" in ink. Tapped → expands vertically upward into a small dock: three pill items ("Profile", "Settings", "Language") with 200ms staggered ease-out. Dock closes after selection.
+- Seal FAB is completely HIDDEN on Reading and Quiz screens.
+- Bottom of Home shows nothing else; the FAB is the only floating element.
+
+COMPONENT SPECS (build these in "Evangelion DS" first)
+1. button-primary: ember fill, on-ember text, Nunito 700 16px, height 52, radius 14, no shadow. Pressed state = ember-deep fill.
+2. button-secondary: surface fill, 1.5px ink border, ink text, same metrics.
+3. button-text: ink text, ember chevron, no fill.
+4. input: surface fill, 1.5px hairline border (ember border on focus, no glow), height 52, radius 14, Nunito 500 15px, label in Nunito 700 12px caps above the field.
+5. passage-card: surface, radius 18, hairline border, padding 20. Layout: category chip (pill, sticker-tint bg, colored dot + label in Nunito 700 11px caps) → book reference in Cormorant 600 22px ("Genesis 1") → one-line preview in ink-secondary → bottom row: progress bar (track hairline, fill ember, 4px tall, radius 999) + "3 of 5 reflected" in metadata style.
+6. quiz-option: surface, radius 18, 1.5px hairline border, min-height 64, padding 16. Left: 28px letter badge circle (hairline border, ink letter "A"–"D" in Nunito 700). States: default; selected (1.5px ember border, 8% ember tint bg); correct (1.5px success border, 10% success tint bg, letter badge turns success); incorrect (1.5px error border, 10% error tint, letter badge error, 60% opacity).
+7. progress-beads: row of 5 circles 10px; completed = ember fill, current = ember ring, upcoming = hairline fill.
+8. streak-flame: small flat flame in ember with tiny gold flecks, paired with number in Nunito 800. Appears on Home top bar only.
+9. settings-tile: surface, radius 16, hairline border, 56px tall, title Nunito 600 15px + trailing control, grouped with 12px gaps.
+
+SCREEN BLUEPRINTS (build in this order; use real-feeling sample content)
+
+S1 — LOGIN
+Canvas background. Centered layout, generous whitespace. Small ember "E" monogram seal at top (48px circle, serif E). Wordmark "Evangelion" Cormorant 600 32px. Subtitle in Nunito 500 15px ink-secondary: "Read. Reflect. Remember." Inputs: Email, Password (with visible eye toggle). Primary button "Sign in". Text button "Forgot password?" and row: "New here? Create account" (ember link). A thin hairline divider with "or" in metadata style sits above two social buttons (Google, Apple) as surface pills with hairline borders. Include the focused state of Email input and an error state on Password ("That password's too short") with error color helper text.
+
+S2 — HOME (THE LIBRARY)
+Top bar as specified (wordmark, streak flame "12", avatar). Greeting block: "Good evening, Miriam" — "Good evening" in Cormorant 600 28px ink, name in ember; below, one playful line in Nunito 500 15px ink-secondary: "Your streak is glowing. Keep it alive."
+"Continue reading" hero block: NOT a card — a full-bleed surface panel radius 24 with an oversized Cormorant drop-cap "I" opening "In the beginning…", book reference "Genesis 1:1–31", progress beads partially filled, primary button "Continue" (ember) + text button "Start reflection".
+Section header: "Explore the library" in Nunito 800 18px + category filter chips row (scrollable pills, active chip = ember tint bg + ember text).
+Passage grid: 2-column cards using passage-card, each with a different category chip color per the usage map (show at least sun, lavender, teal, coral). One card shows a completed state (progress full, tiny "Reflected ✓" in success).
+Seal FAB visible bottom-right.
+
+S3 — READING SANCTUARY (ENGLISH)
+Zero chrome: no top bar, no FAB. Full canvas. Top-left: minimal back chevron (ink, 44px touch target). Top-right: text-size "Aa" control and bookmark icon.
+Content column with 20px side margins: metadata row centered (metadata style): "GENESIS · CHAPTER 1 · 4 MIN" with tiny gold flecks on either side. Cormorant title "The Beginning" 32px centered. Hairline divider 40px wide centered.
+Scripture body in EB Garamond 19px/1.8, left-aligned, verse numbers as tiny superscript ember numerals. First verse opens with a 3-line Cormorant ember drop-cap "I". Several paragraphs, realistic Genesis 1 text.
+Sticky bottom CTA: full-width padding 20, primary button "Begin reflection" + tiny caption under it in metadata style: "5 questions · about a minute".
+
+S4 — READING SANCTUARY (ARABIC — STRICT RTL)
+Same structure as S3 but mirrored natively: back chevron top-RIGHT, pointing right. ALL text RTL, right-aligned. Metadata row: "التكوين · الإصحاح ١ · ٤ دقائق" in Nunito (or a clean Arabic-capable UI face), scripture in Amiri 23px/2.1, verse markers ۝ in ember. Decorative frame: an extremely subtle, thin geometric Arabic pattern band (ink at 6% opacity) across the top of the scripture area — elegant, not ornate. CTA button: "ابدأ التأمل" in ember, full width. This screen must feel like a first-class experience, not a translation.
+
+S5 — REFLECTION (QUIZ) — SHOW TWO STATES AS SEPARATE FRAMES
+Top: exit X (44px) + progress beads (question 2 of 5: bead 1 ember filled, bead 2 ember ring, rest hairline).
+Question block, generous top spacing: metadata label "QUESTION 2 OF 5" in ember, then the question in Cormorant 600 24px centered: "What did God create on the first day?"
+Four quiz-option cards (A–D), 12px vertical gaps, full-width, 64px min height.
+Frame A — answering state: option B selected (ember border + tint), primary button at bottom "Check answer".
+Frame B — instant-feedback state (the money shot): option B revealed correct (success border + tint + tiny gold flecks floating near it — sparse, 3–4 max), options A, C, D dimmed to 60% opacity. A slim feedback banner above the button: correct side = soft success tint pill with "Exactly. Light — before anything else." in Nunito 600 14px, success dot. Button now reads "Next question" (ember).
+Ban enforcement: no confetti, no bouncing, no giant animations — the reward is the gold flecks + color shift + satisfying copy.
+
+S6 — RESULT SCREEN
+Canvas. Centered composition, large whitespace. A 96px celebration sticker at top: flat vector, sun-colored burst/star shape with tiny gold flecks (sticker-palette decorative, allowed here). Score in Cormorant 600 64px: "4/5" with "/5" in ink-muted. One warm line in Nunito 600 16px: "So close. One more read and you've got it." Streak update row: ember flame icon + "Day 12 — your longest yet" in Nunito 700 14px. Two buttons: primary "Reflect again", secondary "Back to library". Three mini stat tiles in a row (surface, radius 16, hairline border): "Read 14" / "Reflected 9" / "Best 5/5", number Nunito 800 20px, label metadata style.
+
+S7 — PROFILE
+Top: avatar 72px (leaf-tint circle with initials "MK" in Nunito 800), name Cormorant 600 26px, handle in metadata style, small ember "Edit" text button.
+Stats row: same mini-tile component ×3 ("Streak 12", "Passages 14", "Avg score 82%").
+"Journey" section header Nunito 800 18px: vertical timeline of recent reflections — each row: sticker-colored category dot, book reference Cormorant 600 18px, score right-aligned (success if 5/5), hairline separators.
+Settings entries list using settings-tile: "Theme" (Light/Dark/System segmented), "Font size" (slider), "Language" (English / العربية row showing both scripts), "Notifications" toggle, hairline-divided group, then text-button "Sign out" in error color.
+
+S8 — SETTINGS
+Compact single screen: grouped settings-tiles: Appearance (theme segmented control, font size stepper), Reading (default language row with EN/AR flags-as-text, verse numbers toggle), Account (edit profile, change password), About (version metadata). Every control uses the tokens above; nothing custom-invented.
+
+MOTION & FEEDBACK SPECS
+- Seal FAB expansion: 200ms ease-out, items stagger 40ms upward.
+- Quiz check → feedback: 250ms ease-out; correct option border color transition; gold flecks fade in with 150ms delay, gentle 6px float loop.
+- Screen transitions: fade + 8px vertical slide, 250ms. No bounce, no springs, no parallax.
+
+PRE-FLIGHT CHECKLIST — VERIFY BEFORE CONSIDERING THE WORK DONE
+1. Is every frame 390×844, mobile-native, Auto Layout, built from "Evangelion DS" components?
+2. Is ember (#E8A33D) the ONLY color on any button, active state, link, or progress fill?
+3. Do sticker colors appear ONLY as decoration (chips, dots, streak, result sticker)?
+4. Is the Arabic frame genuinely RTL — right-aligned, Amiri, no letter-spacing — not just a mirrored English frame?
+5. Is scripture typography intact (EB Garamond EN / Amiri AR, generous line heights) on every reading surface?
+6. Zero banned patterns: no gradients, no nested cards, no icon-tile headers, no glow, no shadows on buttons?
+7. Does it feel like a beautiful journal a 16-year-old would proudly keep — not a church app, not a game, not a SaaS dashboard?
+
+If any check fails, fix the screen before presenting. Present all 8 screens as labeled frames in a single Figma page, in build order, with component variants (quiz-option states, button states, input states) visible in the library.
