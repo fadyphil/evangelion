@@ -186,6 +186,6 @@ extension EvaColorsX on BuildContext {
 
 The light shadow colour is `#120E28` — the built code's light `ink`. Do **not** substitute the brief's `#221C15`; that value belongs to the discarded warm-paper palette ([01-source-analysis.md](01-source-analysis.md) [01-source-analysis.md](01-source-analysis.md) §1.2).
 
-`sticker` is a `Map<StickerSlot, Color>` rather than free-floating hex so `PassageCategory` → colour becomes a type-checked lookup.
+`sticker` is a `Map<StickerSlot, Color>` rather than free-floating hex so a slot → colour lookup is a type-checked read. `StickerSlot` is **decorative only** — the category enum it was keyed to was cut with the library ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §2, decision 1), and nothing in `domain/` refers to it. Its seven slots serve chips, dots, and the celebration burst.
 
 ---
