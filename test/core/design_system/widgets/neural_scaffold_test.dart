@@ -53,10 +53,32 @@ void main() {
     ) async {
       // The nine occurrences across the prototype's eight screens are the whole
       // of the defect; this asserts the transcription carries none of them.
+      //
+      // **The source scan is the assertion**, and it is here rather than in a
+      // comment because this test used to *be* the comment: it pumped the widget,
+      // asserted `takeException()` was null, and left the promise its name made to
+      // a reader. The real coverage was the viewport sweep below, which is a
+      // behavioural check and cannot see a `minHeight` written into a padding or a
+      // `ConstrainedBox` — defect #9 is about a **number**, and a number is a
+      // source fact.
+      //
+      // The scan strips comments first, which is not optional here:
+      // `neural_scaffold.dart`'s own doc quotes `minHeight: 844` three times while
+      // explaining that the transcription carries none of them, so a raw substring
+      // search over the file would fail on the documentation. That is exactly why
+      // the stripper is shared (`project_import_graph.dart`'s `withoutDartComments`)
+      // rather than written a third time.
+      final String code = withoutDartComments(
+        File.fromUri(
+          packageRoot.uri.resolve(
+            'lib/core/design_system/widgets/neural_scaffold.dart',
+          ),
+        ).readAsStringSync(),
+      );
+      expect(code, isNot(contains('minHeight')), reason: 'defect #9, in full');
+      expect(code, isNot(contains('844')), reason: 'and its number');
+
       await pumpAt(tester, scaffold());
-      // The nine `minHeight: 844` occurrences across the prototype's eight screens
-      // are the whole of defect #9, and the transcription's answer is that there
-      // is no number here to find. Asserted by the viewport sweep below.
       expect(tester.takeException(), isNull);
     });
 
@@ -197,14 +219,53 @@ void main() {
       // Read from the widget's own source, because Dart has no reflection and a
       // hand-written list of parameter names would only assert that the list still
       // compiles.
+      //
+      // ## THE EXACT SET, NOT A SUBSTRING
+      //
+      // The first version asserted `isNot(contains(contains('lang')))` — a
+      // case-sensitive four-character substring on the parameter *name*. That kills
+      // `language` and leaves `scriptureLanguage` (capital L), `Locale? locale`,
+      // `readingLanguage`, `script`, `direction` and `textDirection` all green. The
+      // requirement is about a **concept**; the check was about a **spelling**, and
+      // a spelling is the easiest thing in the world to route around.
+      //
+      // So the assertion is the **whole set**, lower-cased. Adding any parameter at
+      // all now fails, which is the point: `NeuralScaffold` is the screen root, and
+      // a new parameter on it is a decision every screen inherits, not a default.
+      // The two spelling checks are kept as well, because they are what makes a
+      // failure *legible*: "the set grew" says what happened, "this one parameter
+      // looks like a language" says why it matters.
+      expect(
+        _scaffoldConstructorParameters(),
+        <String>{
+          'variant',
+          'child',
+          'scrollable',
+          'padding',
+          'bottomfade',
+          'tier',
+          'key',
+        },
+        reason:
+            'D2 — the language arrives inside `variant`, not beside it, and every '
+            'parameter this widget accepts is listed. A new one is a deliberate '
+            'act on the screen root: add it here with the reason it is allowed.',
+      );
       expect(
         _scaffoldConstructorParameters(),
         isNot(contains(contains('lang'))),
-        reason:
-            'D2 — the language arrives inside `variant`, not beside it. A source '
-            'check, so it cannot see a positional parameter; there are none, and '
-            'the whole suite constructs this widget with named arguments.',
+        reason: 'and no parameter may be named for a language',
       );
+      expect(
+        _scaffoldConstructorParameters(),
+        isNot(contains(contains('locale'))),
+        reason: 'nor for a locale',
+      );
+      // `variant` and `child` are the two the constructor requires, so they are
+      // the two whose disappearance would break every call site in the suite
+      // loudly. Named explicitly anyway: they are what the D2 argument above is
+      // actually about, and a set assertion alone says nothing about which entries
+      // are load-bearing.
       expect(_scaffoldConstructorParameters(), contains('variant'));
       expect(_scaffoldConstructorParameters(), contains('child'));
       expect(tester.takeException(), isNull);
@@ -356,7 +417,8 @@ void main() {
 
 void _noop() {}
 
-/// The constructor's parameter names, read off the widget's own source.
+/// The constructor's parameter names, read off the widget's own source, **lower
+/// cased**.
 ///
 /// `dart:io` in a test is not a shortcut: Dart has no reflection, so a test
 /// *cannot* enumerate a constructor's parameters at run time, and the honest
@@ -364,6 +426,29 @@ void _noop() {}
 /// not an assertion about the widget at all. Reading the source is the technique
 /// `no_colour_literals_test.dart` and `barrel_test.dart` already use in this
 /// repository, and it fails closed on a missing file.
+///
+/// Comments are stripped first: a doc comment that *shows* a constructor would
+/// otherwise be read as one, and this file's whole subject is a number that only
+/// appears in prose.
+///
+/// ## WHY THE SPLITTER IS A DEPTH COUNTER
+///
+/// The first version did `constructor.group(1)!.split(',')` and then took the last
+/// `Identifier` after splitting each fragment on `[.=]`. That silently produced
+/// garbage for every parameter **with a default value**, because a default is where
+/// both the `,` and the `.` live:
+///
+/// ```
+/// this.scrollable = false   →  'false'
+/// this.padding = const EdgeInsets.symmetric(horizontal: EvaSpacing.lg)  →  'lg)'
+/// ```
+///
+/// Four of this constructor's seven parameters have defaults, so the old reader
+/// returned `['variant', 'child', 'false', 'lg)', 'false', 'tier', 'key']`. Nothing
+/// noticed, because the only assertions over it were `contains('variant')`,
+/// `contains('child')` — the two parameters without defaults — and a `lang`
+/// substring that garbage does not contain. A reading that is wrong about four
+/// entries out of seven still satisfies every question that was asked of it.
 List<String> _scaffoldConstructorParameters() {
   final File file = File.fromUri(
     packageRoot.uri.resolve(
@@ -378,22 +463,57 @@ List<String> _scaffoldConstructorParameters() {
 
   final RegExpMatch? constructor = RegExp(
     r'const NeuralScaffold\(\{([^}]*)\}\)',
-  ).firstMatch(file.readAsStringSync());
+  ).firstMatch(withoutDartComments(file.readAsStringSync()));
   expect(
     constructor,
     isNotNull,
     reason: 'the constructor declaration must be found',
   );
 
-  // Each parameter is one of `required this.x`, `this.x`, `super.x`, `x` or
-  // `x = default`; the interesting name is always the **last** identifier in the
-  // fragment, which is why this takes `last` rather than `first` — taking first
-  // yielded `['required', 'this', …]`, which matches nothing and asserts nothing.
   return <String>[
-    for (final String part in constructor!.group(1)!.split(','))
-      if (part.trim().isNotEmpty)
-        part.trim().split(RegExp(r'[.=]')).last.trim().split(' ').last,
+    for (final String fragment in _splitTopLevel(constructor!.group(1)!))
+      if (_parameterName(fragment).isNotEmpty) _parameterName(fragment),
   ];
+}
+
+/// [body] split on the commas that separate parameters — and only those.
+///
+/// `(` , `[` and `{` are counted, `)` , `]` and `}` close them, and `<` / `>` are
+/// **not**: a generic argument list in a default value (`const <BoxShadow>[…]`)
+/// always arrives inside one of the three counted brackets, whereas `>` also appears
+/// in an arrow (`=>`) and in a comparison, and counting those would corrupt the
+/// split in exactly the cases a parameter default can contain.
+List<String> _splitTopLevel(String body) {
+  final List<String> parts = <String>[];
+  final StringBuffer current = StringBuffer();
+  int depth = 0;
+  for (int i = 0; i < body.length; i++) {
+    final String ch = body[i];
+    if (ch == '(' || ch == '[' || ch == '{') depth++;
+    if (ch == ')' || ch == ']' || ch == '}') depth--;
+    if (ch == ',' && depth == 0) {
+      parts.add(current.toString());
+      current.clear();
+      continue;
+    }
+    current.write(ch);
+  }
+  if (current.isNotEmpty) parts.add(current.toString());
+  return parts;
+}
+
+/// The parameter's own name out of one constructor fragment.
+///
+/// Each parameter is one of `required this.x`, `this.x`, `super.x`, `x`,
+/// `x = default` or `required this.x = default`. The name is the **last**
+/// identifier before any default value — taking the first yielded
+/// `['required', 'this', …]`, which matches nothing and asserts nothing.
+String _parameterName(String fragment) {
+  String head = fragment.trim();
+  final int equals = head.indexOf('=');
+  if (equals >= 0) head = head.substring(0, equals).trim();
+  if (head.isEmpty) return '';
+  return head.split(RegExp(r'[.\s]')).last.trim().toLowerCase();
 }
 
 /// The scaffold's sticky-CTA scrims, identified by their gradient.

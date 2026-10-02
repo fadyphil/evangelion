@@ -36,9 +36,11 @@ import '../../../support/project_import_graph.dart';
 /// `lib/` resolves through a named source, and fails anything that does not.** A
 /// resolution looks like `EvaColors.…`, `EvaStickerPalette.of(StickerSlot.…)`,
 /// or `context.colors.…`; everything else — every spelling, computed or literal
-/// — is an offender. The two token files and the one transcribed prototype table
-/// are exempt as a whole, because that is where a colour is *supposed* to be
-/// introduced.
+/// — is an offender. `Colors.transparent` is admitted as a **(value, value)**
+/// pair rather than as a substring, so it cannot carry a Material palette colour
+/// along on the same line. The two token files and the one transcribed prototype
+/// table are exempt as a whole, because that is where a colour is *supposed* to
+/// be introduced.
 ///
 /// The cost of inverting is that the exemptions are now file-scoped rather than
 /// value-scoped, and that is deliberate: "which file is allowed to introduce
@@ -113,131 +115,71 @@ const List<String> _resolutions = <String>[
   'EvaStickerPalette.of(StickerSlot.',
   'context.colors.',
   'colors.',
-  // `Colors.transparent` — and ONLY that entry, which is why it is spelled out in
-  // full rather than covered by the `Colors.` prefix the marker list uses.
-  //
-  // `Colors.` is a marker because the Material palette is where an un-tokenable
-  // colour sneaks in (`Colors.deepOrange`, `Colors.pinkAccent`). `transparent` is
-  // the one entry in that namespace that is not a palette choice at all: it is
-  // the *absence* of a fill, which is what `ds.tsx` writes as the bare string
-  // `'transparent'` in eight places — the unselected chip, the secondary button,
-  // the current bead. Admitting the prefix would admit the palette with it;
-  // admitting this exact token admits nothing else.
-  'Colors.transparent',
 ];
+
+/// The one entry in Material's palette this design system admits, as a
+/// `(marker, allowed value)` **pair** rather than a substring.
+///
+/// ## WHY A SUBSTRING WAS NOT ENOUGH
+///
+/// The first version put `'Colors.transparent'` in [_resolutions] and tested it
+/// with `line.contains`. That admits the whole **line**, so any Material palette
+/// colour riding along on the same line was legal too — and
+/// `Color.alphaBlend(Colors.deepOrange, Colors.transparent)` is not a contrived
+/// line, it is *the* idiomatic way to fade one colour into nothing. So the
+/// rule is now per-**value**: every `Colors.<name>` on the line must be
+/// `Colors.transparent` itself.
+///
+/// `Colors.` is a marker because the Material palette is where an un-tokenable
+/// colour sneaks in (`Colors.deepOrange`, `Colors.pinkAccent`). `transparent`
+/// is the one entry in that namespace that is not a palette choice at all: it is
+/// the *absence* of a fill, which is what `ds.tsx` writes as the bare string
+/// `'transparent'` in eight places — the unselected chip, the secondary button,
+/// the current bead. Admitting the prefix would admit the palette with it;
+/// admitting this exact token admits nothing else.
+const String _onlyTransparent = 'Colors.transparent';
+
+/// Every `Colors.<name>` on [line].
+///
+/// `Colors.` is the marker that produces a colour without a token table, so it
+/// is the one that has to be resolved **per occurrence** rather than per line.
+final RegExp _materialPaletteValue = RegExp(r'\bColors\.[A-Za-z0-9_]+');
+
+/// The `Color` **constructors** — as opposed to the `Colors.` palette.
+///
+/// Deliberately excludes `Colors.`: `Colors.transparent` has an `s` after
+/// `Color`, so it contains neither `Color(` nor `Color.`, and the distinction
+/// the rule below turns on is exactly that one.
+const List<String> _colourConstructors = <String>['Color(', 'Color.'];
 
 /// Whether [line] mentions a colour value at all.
 bool _producesAColour(String line) => _colourValueMarkers.any(line.contains);
 
 /// Whether the colour on [line] resolved through a published table.
-bool _resolvesToAToken(String line) => _resolutions.any(line.contains);
-
-/// Strips `/* … */` block comments from [source], newlines preserved.
 ///
-/// Line comments are filtered separately, per line, because they start at column
-/// zero often enough that stripping them needs no parsing. Block comments cannot
+/// Two questions, in order:
+///
+/// 1. does the line carry a `Colors.<name>` that is **not** `Colors.transparent`?
+///    If so it is an offender whatever else the line says — this is the check
+///    that replaced the whole-line substring test.
+/// 2. failing that, does the line resolve through a token table, or is
+///    `Colors.transparent` the *whole* of its colour content (no constructor,
+///    no palette entry)?
+bool _resolvesToAToken(String line) {
+  for (final RegExpMatch match in _materialPaletteValue.allMatches(line)) {
+    if (match.group(0) != _onlyTransparent) return false;
+  }
+  if (_resolutions.any(line.contains)) return true;
+  return line.contains(_onlyTransparent) &&
+      !_colourConstructors.any(line.contains);
+}
+
 /// Strips every comment from [source], newlines preserved.
 ///
-/// Line numbers in a failure message have to line up with the file on disk, so
-/// both comment forms are replaced by nothing rather than by a placeholder, and
-/// every newline inside one is still written.
-///
-/// A hand-rolled scanner rather than a regular expression, for three reasons
-/// that each cost a real bug when this was simpler:
-///
-/// - Dart nests block comments, so `/* a /* b */ c */` needs a depth counter;
-///   a regex ends at the inner `*/` and leaves `c */` looking like code.
-/// - **An apostrophe inside a line comment desynchronises a scanner that only
-///   handles block comments.** `/// … the prototype's hexes` opens what the
-///   scanner thinks is a string literal, and the `'` in the next comment closes
-///   it, so the block comment between them is emitted verbatim and the gate
-///   flags its own documentation. That is exactly what happened; the negative
-///   control is kept as a test below.
-/// - `//` has to be recognised *before* `/*`, or `///` opens a block comment.
-///
-/// Triple-quoted strings are tracked, because a `'''` block is a string and
-/// its contents must not be mistaken for code.
-///
-/// Fails closed on an unbalanced scan: a comment parser that has lost track must
-/// say so rather than report a clean tree.
-String _withoutComments(String source) {
-  final StringBuffer out = StringBuffer();
-  final int n = source.length;
-  int blockDepth = 0;
-  String terminator = '';
-  int i = 0;
-
-  while (i < n) {
-    final String ch = source[i];
-    final String next = i + 1 < n ? source[i + 1] : '';
-
-    if (blockDepth > 0) {
-      if (ch == '\n') {
-        out.write(ch);
-      } else if (ch == '/' && next == '*') {
-        blockDepth++;
-        i += 2;
-        continue;
-      } else if (ch == '*' && next == '/') {
-        blockDepth--;
-        i += 2;
-        continue;
-      }
-      i++;
-      continue;
-    }
-
-    if (terminator.isNotEmpty) {
-      if (ch == r'\' && terminator.length == 1 && i + 1 < n) {
-        out.write(ch);
-        out.write(source[i + 1]);
-        i += 2;
-        continue;
-      }
-      if (source.startsWith(terminator, i)) {
-        out.write(terminator);
-        i += terminator.length;
-        terminator = '';
-        continue;
-      }
-      out.write(ch);
-      i++;
-      continue;
-    }
-
-    if (ch == '/' && next == '/') {
-      while (i < n && source[i] != '\n') {
-        i++;
-      }
-      continue;
-    }
-    if (ch == '/' && next == '*') {
-      blockDepth++;
-      i += 2;
-      continue;
-    }
-    if (ch == "'" || ch == '"') {
-      // `'''` is one delimiter of three, not an empty string followed by a
-      // stray quote — so the length has to be decided before the scan starts.
-      final String term = source.startsWith(ch * 3, i) ? ch * 3 : ch;
-      out.write(term);
-      i += term.length;
-      terminator = term;
-      continue;
-    }
-    out.write(ch);
-    i++;
-  }
-
-  if (blockDepth != 0 || terminator.isNotEmpty) {
-    throw StateError(
-      'the comment scan finished unbalanced (blockDepth=$blockDepth, '
-      'terminator="$terminator"). A gate that cannot parse the file must say so '
-      'rather than report a clean tree.',
-    );
-  }
-  return out.toString();
-}
+/// **Lives in `test/support/project_import_graph.dart`** — see [withoutDartComments]
+/// for why, and for the three inputs that cost a real bug each. It is aliased
+/// here so the behavioural tests below read the same as they always did.
+String _withoutComments(String source) => withoutDartComments(source);
 
 void main() {
   test('every colour under lib/ resolves through a published token table', () {
@@ -387,6 +329,34 @@ void main() {
           reason: '$spelling is a palette choice, not an absence of one',
         );
       }
+    });
+
+    test('and it is not a hall pass for a palette colour on the same line', () {
+      // The planted evasion, kept as the negative control for the per-value rule
+      // above. `_resolutions` used to be tested with `line.contains`, so a line
+      // mentioning `Colors.transparent` anywhere was legal **in full** — and this
+      // is the idiomatic way to fade a colour into nothing, so it is a realistic
+      // edit rather than a contrived one. `Colors.deepOrange` is the Material
+      // palette and resolves through nothing.
+      expect(
+        _resolvesToAToken(
+          'final c = Color.alphaBlend(Colors.deepOrange, Colors.transparent);',
+        ),
+        isFalse,
+      );
+      expect(
+        _resolvesToAToken('dot: Colors.transparent, glow: Colors.pinkAccent,'),
+        isFalse,
+        reason: 'the second `Colors.` on the line is what fails it',
+      );
+      // The control: the same call with both ends legal resolves.
+      expect(
+        _resolvesToAToken(
+          'final c = Color.alphaBlend(colors.ink, Colors.transparent);',
+        ),
+        isTrue,
+        reason: 'the token end is admitted; the palette end is not',
+      );
     });
   });
 

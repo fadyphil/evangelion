@@ -138,16 +138,30 @@ class ProgressBeads extends StatelessWidget {
 
     return Semantics(
       container: true,
-      label: '$semanticLabel: $completed of $total complete',
+      // Clamped, like [beadStates] clamps before it shades. An unclamped label
+      // announces the *caller's* number while the beads show the clamped one, so
+      // `completed: 99, total: 5` read "Progress: 99 of 5 complete" beside a row
+      // of five finished beads — a screen reader contradicting the picture, and
+      // on a progress row the one number a reader is most likely to repeat back.
+      label: '$semanticLabel: ${completed.clamp(0, total)} of $total complete',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          for (final ProgressBeadState state in states)
-            Padding(
-              padding: const EdgeInsets.only(right: kProgressBeadGap),
-              child: _Bead(state: state, colors: colors),
-            ),
+          // ## THE GAP GOES **BETWEEN** THE BEADS, NOT AFTER EVERY ONE OF THEM
+          //
+          // `ds.tsx:355` is `gap: 8`, and a CSS `gap` is the space *between*
+          // adjacent items — there is no trailing gap after the last child. The
+          // first version padded every bead, so a row was `10n + 8n` instead of
+          // `10n + 8(n − 1)`: `total: 1` rendered 18 against the prototype's 10,
+          // `total: 3` rendered 54 against 46, `total: 5` rendered 90 against 82.
+          // Eight pixels of dead space at the end of the row, which is invisible
+          // left-aligned and visible the moment the row is centred or sits in a
+          // `space-between` `Row` — the row no longer ends where the beads do.
+          for (int i = 0; i < states.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(width: kProgressBeadGap),
+            _Bead(state: states[i], colors: colors),
+          ],
         ],
       ),
     );

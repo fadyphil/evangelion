@@ -375,6 +375,16 @@ class _EvaButtonState extends State<EvaButton> {
       // The label text is already the accessible name; leaving it in the tree
       // as well makes a screen reader read "Sign in, Sign in".
       excludeSemantics: true,
+      // `excludeSemantics: true` also drops the `InkWell`'s own tap action — so
+      // this line is load-bearing, not decoration. §14's second row is "every
+      // interactive widget is keyboard **and** screen-reader activatable", and a
+      // TalkBack double-tap maps to `ACTION_CLICK` = [SemanticsAction.tap], which
+      // only this node carries: without it the button reads out as a button and
+      // does nothing when the reader activates it. `enabled ? … : null` because
+      // a disabled control's action must be genuinely **absent** — the
+      // `enabled: false` flag above is what announces it, and a flag plus an
+      // action is a control that announces itself as unusable and then works.
+      onTap: enabled ? widget.onPressed : null,
       child: EvaFocusRing(
         // `EvaInk` is disabled below when `onPressed` is null, and the two must
         // agree or Tab would stop on a control that cannot be activated.

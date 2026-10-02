@@ -55,6 +55,12 @@ class EvaToggle extends StatelessWidget {
       toggled: value,
       label: value ? 'On' : 'Off',
       excludeSemantics: true,
+      // Load-bearing, and easy to lose: `excludeSemantics: true` drops the
+      // `InkWell`'s tap action with the label, so without it the switch
+      // announces "On, switch" and a TalkBack double-tap does nothing.
+      // [SemanticsAction.tap] is `ACTION_CLICK`, and on a switch that is how a
+      // reader flips it. A toggle has no disabled state, so this is never null.
+      onTap: () => onChanged(!value),
       child: EvaFocusRing(
         enabled: true,
         // A switch is a stadium, so the ring has to be too.

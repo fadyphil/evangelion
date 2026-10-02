@@ -1,5 +1,8 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/design_system_harness.dart';
 
 /// RED-FIRST — `ProgressBeads`' three bead states, extracted from the widget.
 ///
@@ -157,6 +160,127 @@ void main() {
         }
       }
     });
+  });
+
+  group('the row', () {
+    // ## `gap: 8` IS THE SPACE **BETWEEN** BEADS
+    //
+    // `ds.tsx:355` is a CSS `gap`, and a CSS gap is the space between adjacent
+    // items — never after the last one. The widget padded **every** bead, so a row
+    // measured `10n + 8n` where the prototype's arithmetic is `10n + 8(n − 1)`:
+    // `total: 1` rendered 18 against 10, `total: 3` rendered 54 against 46,
+    // `total: 5` rendered 90 against 82. Eight pixels of dead space at the end of
+    // the row, invisible left-aligned and visible the moment the row is centred or
+    // sits in a `space-between` `Row` — which is exactly where it is going, in a
+    // quiz header between a title and a counter.
+    Future<double> rowWidth(
+      WidgetTester tester, {
+      required int total,
+      int completed = 0,
+      int current = -1,
+    }) async {
+      await pumpPrimitive(
+        tester,
+        Align(
+          alignment: Alignment.topCenter,
+          child: ProgressBeads(
+            total: total,
+            completed: completed,
+            current: current,
+          ),
+        ),
+        size: kNarrowSurface,
+      );
+      await tester.pump();
+      return tester.getSize(find.byType(ProgressBeads)).width;
+    }
+
+    /// The prototype's own arithmetic, written out rather than re-derived from the
+    /// widget: `n` beads of [kProgressBeadSize] with `n − 1` gaps between them.
+    double prototypeWidth(int total) =>
+        kProgressBeadSize * total + kProgressBeadGap * (total - 1);
+
+    testWidgets('renders `total` beads and `total - 1` gaps', (
+      WidgetTester tester,
+    ) async {
+      for (final int total in <int>[1, 2, 3, 5, 8]) {
+        expect(
+          await rowWidth(tester, total: total),
+          prototypeWidth(total),
+          reason:
+              'total: $total — ${kProgressBeadSize * total}px of beads plus '
+              '${kProgressBeadGap * (total - 1)}px of gaps. A trailing gap after '
+              'the last bead is ${kProgressBeadGap}px the prototype never draws.',
+        );
+      }
+      expect(kProgressBeadSize, 10.0, reason: 'ds.tsx:361 — `width: 10`');
+      expect(kProgressBeadGap, 8.0, reason: 'ds.tsx:355 — `gap: 8`');
+    });
+
+    testWidgets('a single bead is 10px wide, not 18', (
+      WidgetTester tester,
+    ) async {
+      // The case that makes the arithmetic unarguable: at `total: 1` the old
+      // padding was half the row's width.
+      expect(
+        await rowWidth(tester, total: 1),
+        kProgressBeadSize,
+        reason: 'there is nothing for a gap to sit between',
+      );
+    });
+
+    testWidgets(
+      'the label counts the beads that exist, not the caller\'s number',
+      (WidgetTester tester) async {
+        // L4. `beadStates` clamps `completed` into `0…total` before it shades, and
+        // the label did not — so `completed: 99, total: 5` announced "Progress: 99 of
+        // 5 complete" beside a row of five finished beads. On a progress row that is
+        // the one number a reader is most likely to read back, so a screen reader
+        // contradicting the picture directly in front of it is worse than a slightly
+        // conservative count.
+        await pumpPrimitive(
+          tester,
+          const Align(
+            alignment: Alignment.topCenter,
+            child: ProgressBeads(total: 5, completed: 99, current: 1),
+          ),
+          size: kNarrowSurface,
+        );
+        await tester.pump();
+        expect(
+          find.bySemanticsLabel('Progress: 5 of 5 complete'),
+          findsOneWidget,
+        );
+
+        // And the negative control, so the clamp is not "always say total".
+        await pumpPrimitive(
+          tester,
+          const Align(
+            alignment: Alignment.topCenter,
+            child: ProgressBeads(total: 5, completed: 2, current: 2),
+          ),
+          size: kNarrowSurface,
+        );
+        await tester.pump();
+        expect(
+          find.bySemanticsLabel('Progress: 2 of 5 complete'),
+          findsOneWidget,
+        );
+        await pumpPrimitive(
+          tester,
+          const Align(
+            alignment: Alignment.topCenter,
+            child: ProgressBeads(total: 5, completed: -4, current: -1),
+          ),
+          size: kNarrowSurface,
+        );
+        await tester.pump();
+        expect(
+          find.bySemanticsLabel('Progress: 0 of 5 complete'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 
   group('the enum', () {

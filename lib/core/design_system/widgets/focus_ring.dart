@@ -182,9 +182,17 @@ class _EvaFocusRingState extends State<EvaFocusRing> {
   @override
   Widget build(BuildContext context) {
     final BorderRadius radius = BorderRadius.circular(widget.radius);
-    // Set in `initState` rather than `build` because the node is the one thing
-    // here that outlives a rebuild; writing it in `build` would reset the handler
-    // on every frame for no reason. `didUpdateWidget` above owns the changes.
+    // Assigned in `build`, and it has to be. `onKeyEvent` is a *parameter* of
+    // this widget, so it can change without the node changing identity — and
+    // `didUpdateWidget` above only sees a change if the old and new closures are
+    // different objects. A `StatefulWidget` rebuilt from scratch — a hot reload,
+    // or any subtree that was swapped rather than updated — never runs
+    // `didUpdateWidget` at all, and a handler assigned only there is `null` until
+    // the first *update*. `SegmentedControl`'s arrow keys would be dead in
+    // exactly that case, with nothing to indicate why. Assigning in `build` costs
+    // one closure write per rebuild and removes the ordering requirement
+    // entirely; the `didUpdateWidget` branch is kept so the node is correct even
+    // between a change and the next frame.
     _node.onKeyEvent = widget.onKeyEvent;
     return ListenableBuilder(
       listenable: _node,

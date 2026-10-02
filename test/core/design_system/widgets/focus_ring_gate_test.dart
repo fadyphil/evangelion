@@ -11,33 +11,45 @@ import '../../../support/project_import_graph.dart';
 ///
 /// `09-quality-gates.md` §14 lists "No focus indicators" as a mandatory fix:
 /// "`Focus` + a 2px `ember` ring at 40% alpha on **every** interactive widget".
-/// It gave the rule and no owner. Phase 3 has ten interactive widgets, which is
-/// ten chances to forget one — and a convention with ten chances is the same
-/// defect as the documented-but-unenforced `BackdropFilter` budget that Phase 2
-/// had to fix by writing `glass_blur_budget_test.dart`.
+/// It gave the rule and no owner. Phase 3 has eleven interactive widgets, which is
+/// eleven chances to forget one — and a convention with eleven chances is the
+/// same defect as the documented-but-unenforced `BackdropFilter` budget that Phase
+/// 2 had to fix by writing `glass_blur_budget_test.dart`.
 ///
 /// So there are **three** checks here, and they fail for three different reasons:
 ///
-/// 1. **The source gate** walks every `lib/core/design_system/widgets/*.dart` and
-///    asks a question no test can ask at runtime: *does this file declare a
+/// 1. **The source gate** walks every `lib/core/design_system/widgets/**/*.dart`
+///    and asks a question no test can ask at runtime: *does this file declare a
 ///    callback in its public constructor?* If it does, it must reference
 ///    `EvaFocusRing` or `evaFocusRingSpec`, or appear in [_delegatesFocusRingTo]
-///    with a reason. A **new** interactive widget is covered the day it lands,
-///    with no edit to this file — which is the whole point, because a hand-listed
-///    inventory of ten names is the convention this gate replaces.
-/// 2. **The behavioural gate** pumps each widget, tabs to it, and reads the
-///    **rendered** [Border]s out of its tree, comparing them against
-///    [evaFocusRingBorder]. This is what catches a ring that is present but
-///    wrong — transparent, 1px, the wrong hue, or a widget that takes focus and
-///    draws nothing.
+///    with its interactive surfaces enumerated. A **new** interactive widget is
+///    covered the day it lands, with no edit to this file — which is the whole
+///    point, because a hand-listed inventory of eleven names is the convention
+///    this gate replaces.
+/// 2. **The behavioural gate** pumps each widget in [kInteractiveWidgets], tabs to
+///    it, and reads the **rendered** [Border]s out of its tree, comparing them
+///    against [evaFocusRingBorder]. This is what catches a ring that is present
+///    but wrong — transparent, 1px, the wrong hue, or a widget that takes focus
+///    and draws nothing.
 /// 3. **The negative control** proves gate 2 can fail at all, by building a
 ///    widget that has the *shape* of a compliant one and none of the behaviour.
 ///
 /// The numbers themselves are pinned in `focus_ring_resolver_test.dart`; this
 /// file is about presence, which is a different question from value.
+///
+/// ## WHAT THE SOURCE GATE STILL CANNOT SEE — STATED, NOT DISCOVERED LATER
+///
+/// The ring check is per **file**, so a file that wraps one control in
+/// [EvaFocusRing] and leaves a second one on a bare `InkWell` still passes. That
+/// is not a gap this file can close from source without a Dart parser, and
+/// `EvaInk`'s doc already records the same limit for the same reason. The
+/// behavioural gate is the other half of the answer — it pumps each widget — and
+/// that is why [kInteractiveWidgets] lives in the harness and is shared with the
+/// activatable gate in `controls_test.dart`: one inventory, two §14 rows, and a
+/// widget added without a row is a row the other gate cannot check either.
 void main() {
   group('§14 — the focus ring, on every interactive widget', () {
-    for (final _InteractiveWidget entry in _interactiveWidgets) {
+    for (final InteractiveWidget entry in kInteractiveWidgets) {
       testWidgets('${entry.widget} draws §14\'s ring when focused', (
         WidgetTester tester,
       ) async {
@@ -122,7 +134,7 @@ void main() {
         throwsA(isA<TestFailure>()),
         reason:
             'and so the assertion the gate makes about it fails — which is the '
-            'only reason the nine passes above are worth anything',
+            'only reason the eleven passes above are worth anything',
       );
     });
 
@@ -184,19 +196,7 @@ void main() {
 
   group('the source gate — a new interactive widget is covered without an edit', () {
     test('every widget file that declares a callback carries the ring', () {
-      final Directory dir = Directory.fromUri(
-        packageRoot.uri.resolve('lib/core/design_system/widgets/'),
-      );
-      expect(
-        dir.existsSync(),
-        isTrue,
-        reason: 'the widgets directory must exist',
-      );
-
-      final List<File> files = <File>[
-        for (final FileSystemEntity entity in dir.listSync())
-          if (entity is File && entity.path.endsWith('.dart')) entity,
-      ];
+      final List<File> files = _widgetDartFiles();
       expect(
         files.length,
         greaterThan(10),
@@ -206,10 +206,14 @@ void main() {
       final List<String> offenders = <String>[];
       for (final File file in files) {
         final String relative = packageRelative(file.uri);
-        if (!_declaresACallback(file.readAsStringSync())) continue;
-        if (_delegatesFocusRingTo.containsKey(relative)) continue;
-        if (_mentionsTheRing(file.readAsStringSync())) continue;
-        offenders.add(relative);
+        // Comments stripped **before** either check. See [_mentionsTheRing].
+        final String code = withoutDartComments(file.readAsStringSync());
+        if (!_declaresACallback(code)) continue;
+        if (_delegatesFocusRingTo.containsKey(relative)) {
+          offenders.addAll(_unattributedSurfaces(relative, code));
+          continue;
+        }
+        if (!_mentionsTheRing(code)) offenders.add(relative);
       }
 
       expect(
@@ -217,10 +221,39 @@ void main() {
         isEmpty,
         reason:
             'every widget with a callback in its public constructor has to carry '
-            '§14\'s focus ring, either by using EvaFocusRing / evaFocusRingSpec '
-            'or by being listed in _delegatesFocusRingTo with a reason. These '
-            'files do neither:\n${offenders.join('\n')}',
+            "§14's focus ring, either by using EvaFocusRing / evaFocusRingSpec "
+            'or by being listed in _delegatesFocusRingTo with its interactive '
+            'surfaces enumerated. These files do neither:\n'
+            '${offenders.join('\n')}',
       );
+    });
+
+    test('the walk is recursive, and a planted subtree proves it', () {
+      // The negative control for the one line above a reader cannot check by
+      // reading it: `listSync()` without `recursive: true` reads a single level,
+      // so `widgets/sub/zz.dart` was invisible and a whole new subtree of widgets
+      // could ship with no ring on any of them while the gate reported a clean
+      // tree. Planted under the real directory and removed in `finally`, so the
+      // control is about the walk and not about a committed fixture.
+      final Directory sub = Directory.fromUri(
+        packageRoot.uri.resolve(
+          'lib/core/design_system/widgets/zz_walk_probe/',
+        ),
+      );
+      final File planted = File.fromUri(sub.uri.resolve('zz.dart'));
+      try {
+        sub.createSync(recursive: true);
+        planted.writeAsStringSync(_ringlessWidgetSource);
+        expect(
+          _widgetDartFiles().map((File f) => packageRelative(f.uri)),
+          contains(packageRelative(planted.uri)),
+          reason:
+              'a one-level walk cannot see widgets/sub/zz.dart, which is exactly '
+              'the evasion it used to permit',
+        );
+      } finally {
+        if (sub.existsSync()) sub.deleteSync(recursive: true);
+      }
     });
 
     test('the callback detector is not a hollow search', () {
@@ -249,13 +282,157 @@ class Demo extends StatelessWidget {
       expect(_mentionsTheRing('class A extends StatelessWidget {}'), isFalse);
     });
 
-    test('the delegation list is empty or justified per entry', () {
-      for (final MapEntry<String, String> entry
-          in _delegatesFocusRingTo.entries) {
+    group('and it detects the callback TYPE, not a spelling', () {
+      // Four planted evasions, each of which walked straight through the first
+      // version of this gate — which matched eight literal substrings
+      // (`VoidCallback`, `onPressed,`, …). None of those eight appears below.
+      const String inlineFunctionType = '''
+class Demo extends StatelessWidget {
+  const Demo({super.key});
+  final void Function(Offset) onPanUpdate;
+  final bool Function() onSelected;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+      const String namedDragCallback = '''
+class Demo extends StatelessWidget {
+  const Demo({super.key});
+  final GestureDragUpdateCallback? onSwipe;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+      const String genericallyTyped = '''
+class Demo extends StatelessWidget {
+  const Demo({super.key});
+  final void Function(FocusNode, KeyEvent)? onKeyEvent;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+      const String getterTyped = '''
+class Demo extends StatelessWidget {
+  const Demo({super.key});
+  final VoidCallback get onPressed => () {};
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+
+      for (final (String label, String source) in <(String, String)>[
+        ('an inline `void Function(Offset)`', inlineFunctionType),
+        ('a named drag callback type', namedDragCallback),
+        ('a nullable inline function type', genericallyTyped),
+        ('a callback-typed getter', getterTyped),
+      ]) {
+        test('catches $label', () {
+          expect(
+            _declaresACallback(source),
+            isTrue,
+            reason:
+                '$label is a callback in the public surface however it is '
+                'spelled, and the whole rule is about the type',
+          );
+        });
+      }
+    });
+
+    group('and a doc comment cannot answer the ring question', () {
+      // The evasion this fix exists for. The ring check was a bare
+      // `source.contains`, so a doc comment explaining that a control is
+      // *deliberately not* focusable satisfied the gate **and** shipped an
+      // unringed drag surface. Comments are stripped first now, with the shared
+      // stripper — the three inputs that broke the first copy (nesting, an
+      // apostrophe in a `///` line, a triple-quoted block) cannot be re-broken
+      // here because there is now only one implementation to break.
+      const String ringInAComment = '''
+/// Deliberately not an [EvaFocusRing]: this is reachable through
+/// Semantics(onIncrease / onDecrease) instead, and a tab stop here would be a
+/// third stop for one value.
+class Demo extends StatelessWidget {
+  const Demo({super.key});
+  final GestureDragUpdateCallback? onSwipe;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+
+      test('a comment naming the ring is not the ring', () {
+        expect(_mentionsTheRing(ringInAComment), isFalse);
         expect(
-          entry.value,
+          _mentionsTheRing(withoutDartComments(ringInAComment)),
+          isFalse,
+          reason:
+              'and stripping the comments changes nothing — that is the point',
+        );
+      });
+
+      test('but a real call still is', () {
+        expect(
+          _mentionsTheRing(
+            'class A extends EvaFocusRing {}\n// and [EvaFocusRing] is named too',
+          ),
+          isTrue,
+        );
+      });
+    });
+
+    test('the delegation list is a decision, and its claims are checked', () {
+      // The first version of this test asserted only `entry.reason.isNotEmpty`, so
+      // a reason could be any string at all — including one that had quietly
+      // stopped being true. Both current reasons happen to be accurate; nothing
+      // enforced that.
+      //
+      // "Accurate" is mechanical here, not a matter of taste. A delegation says:
+      // *every interactive surface in this file is one of these, and that widget
+      // carries the ring.* So the claims are checked against the code — each named
+      // surface is present, the symbol exists, the file builds nothing else
+      // interactive, and the reason names what it delegates to.
+      for (final _RingDelegation entry in _delegatesFocusRingTo.values) {
+        final File file = File.fromUri(packageRoot.uri.resolve(entry.path));
+        expect(
+          file.existsSync(),
+          isTrue,
+          reason:
+              '${entry.path} is listed as delegating but does not exist — an '
+              'exemption pointing at nothing is worse than no exemption',
+        );
+        final String code = withoutDartComments(file.readAsStringSync());
+        expect(
+          code.contains('class ${entry.symbol}'),
+          isTrue,
+          reason:
+              '${entry.path} is listed as delegating for ${entry.symbol}, and '
+              'that class is not in it',
+        );
+        expect(
+          entry.reason,
           isNotEmpty,
-          reason: '${entry.key} delegates with no reason given',
+          reason: '${entry.path} delegates with no reason given',
+        );
+        for (final String surface in entry.surfaces) {
+          expect(
+            code.contains('$surface('),
+            isTrue,
+            reason:
+                'the reason for ${entry.path} claims the ring is delegated to '
+                '$surface, and the file no longer builds one. Either the '
+                'delegation has become true — delete the entry — or false: carry '
+                'the ring.',
+          );
+          expect(
+            entry.reason,
+            contains(surface),
+            reason:
+                'the reason must name what it delegates to, so it cannot drift '
+                'away from ${entry.surfaces.join(', ')} unnoticed',
+          );
+        }
+        expect(
+          _unattributedSurfaces(entry.path, code),
+          isEmpty,
+          reason:
+              '${entry.path} builds an interactive surface that '
+              '${entry.surfaces.join(', ')} does not cover. A file-keyed '
+              'exemption covers every surface ever added to it, which is the '
+              'fourth evasion; the surfaces are enumerated instead, so adding one '
+              'is a deliberate edit to this test.',
         );
       }
     });
@@ -273,163 +450,230 @@ void _expectRing(WidgetTester tester, Finder target) {
 
 void _noop() {}
 
-/// One interactive design-system widget and how to build it focused.
-typedef _InteractiveWidget = ({
-  Type widget,
-  String name,
-  Widget Function() build,
-});
-
-/// Every interactive widget in the design system.
+/// A widget whose **only** callback is an inline function type, with no ring and
+/// no mention of one outside this sentence.
 ///
-/// Named rather than discovered, because discovering them means pumping every
-/// widget through every constructor — some of which are illegal without
-/// arguments the real call sites supply. The *source* gate above is what makes
-/// this list self-extending for the case that matters (a widget landing that
-/// declares a callback and carries no ring). This list is the behavioural half:
-/// it proves the widgets that exist **actually render** the ring, which a source
-/// scan cannot do.
-final List<_InteractiveWidget> _interactiveWidgets = <_InteractiveWidget>[
-  (
-    widget: EvaButton,
-    name: 'ds.tsx ButtonPrimary / ButtonSecondary / ButtonText',
-    build: () => const EvaButton(label: 'Sign in', onPressed: _noop),
-  ),
-  (
-    widget: EvaTextField,
-    name: 'ds.tsx Input — defect #8 made this readOnly',
-    // The `Material` is a `TextField` requirement, not decoration: its
-    // `InputDecorator` asserts on one. A real screen gets it from `Scaffold`,
-    // and this harness has no `Scaffold`.
-    build: () => Material(
-      type: MaterialType.transparency,
-      child: EvaTextField(label: 'Email', controller: TextEditingController()),
-    ),
-  ),
-  (
-    widget: EvaChip,
-    name: 'ds.tsx CategoryChip + App.tsx chips, §14 "mono-caps chips"',
-    build: () => const EvaChip(label: 'Dark', onSelected: _toggle),
-  ),
-  (
-    widget: SegmentedControl<String>,
-    name: 'SettingsScreen theme picker — Phase 3 keyboard gate',
-    build: () => SegmentedControl<String>(
-      values: const <String>['Light', 'Dark', 'System'],
-      selected: 'Dark',
-      labelOf: (String value) => value,
-      onChanged: _ignore,
-    ),
-  ),
-  (
-    widget: EvaToggle,
-    name: 'SettingsScreen.tsx:14-26 — the local Toggle component',
-    build: () => const EvaToggle(value: true, onChanged: _toggleBool),
-  ),
-  (
-    widget: FontSizeStepper,
-    name: 'SettingsScreen.tsx:63-69 — the range input row',
-    build: () => const FontSizeStepper(step: 3, onChanged: _ignoreInt),
-  ),
-  (
-    widget: IconActionButton,
-    name: '§14 "icon-only buttons have no accessible name"',
-    build: () => const IconActionButton(
-      icon: Icons.arrow_back,
-      tooltip: 'Back',
-      onPressed: _noop,
-    ),
-  ),
-  (
-    widget: TextLink,
-    name: "LoginScreen.tsx:70-72 — the 'Create account' link",
-    build: () => const TextLink(label: 'Create account', onPressed: _noop),
-  ),
-  (
-    widget: SettingsTile,
-    name: 'ds.tsx SettingsTile, when the row itself is tappable',
-    build: () => const SettingsTile(
-      title: 'Edit profile',
-      trailing: SizedBox(width: 16, height: 16),
-      onTap: _noop,
-    ),
-  ),
-  (
-    widget: ErrorView,
-    name: 'Phase 5 error mapper — the prototype has neither state view',
-    build: () => const ErrorView(
-      message: 'Could not load today\'s reading.',
-      onRetry: _noop,
-      retryLabel: 'Retry',
-    ),
-  ),
-  (
-    // Phase 2's widget, and the reason this gate is not "the nine Tier-1
-    // widgets". `GlassSurface(onTap:)` is interactive and shipped without a
-    // focus node at all, so Tab could not reach it.
-    widget: GlassSurface,
-    name: 'Phase 2 — ds.tsx had eight glass surfaces, two of them tappable',
-    build: () => const GlassSurface(
-      onTap: _noop,
-      semanticLabel: "Today's reading",
-      padding: EdgeInsets.all(EvaSpacing.sm),
-      child: SizedBox(width: 200, height: 60),
-    ),
-  ),
-];
+/// The exact shape of the planted evasion that used to survive: `dir.listSync()`
+/// read one level, so `widgets/sub/zz.dart` was never walked; and the callback
+/// detector matched spellings, so `final void Function(Offset) onPanUpdate;` was
+/// not a "callback declaration". Both halves have to hold for the gate to pass
+/// it, so both have to be exercised together.
+const String _ringlessWidgetSource = '''
+import 'package:flutter/widgets.dart';
 
-/// Widget files whose interactive surface is entirely a *child* widget that
+/// A control with no ring, for the recursive-walk negative control.
+class RinglessDrag extends StatelessWidget {
+  const RinglessDrag({super.key});
+
+  final void Function(Offset) onPanUpdate;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+''';
+
+/// Every widget file, recursively, failing closed.
+///
+/// `recursive: true` is the fix, not a default: without it the walk saw only the
+/// files sitting directly in `widgets/`, and a new subtree was invisible to it —
+/// which is a gate that cannot fail over an entire directory. Fails closed on an
+/// unreadable directory and on an empty walk, per §7.
+List<File> _widgetDartFiles() {
+  final Directory dir = Directory.fromUri(
+    packageRoot.uri.resolve('lib/core/design_system/widgets/'),
+  );
+  expect(dir.existsSync(), isTrue, reason: 'the widgets directory must exist');
+
+  final List<File> files = <File>[];
+  try {
+    files.addAll(<File>[
+      for (final FileSystemEntity entity in dir.listSync(
+        recursive: true,
+        followLinks: false,
+      ))
+        if (entity is File && entity.path.endsWith('.dart')) entity,
+    ]);
+  } on FileSystemException catch (error) {
+    fail(
+      'lib/core/design_system/widgets/ could not be walked: ${error.message}',
+    );
+  }
+  return files;
+}
+
+/// One recorded decision: this file's interactive surfaces are entirely other
+/// widgets that carry the ring themselves.
+@immutable
+class _RingDelegation {
+  const _RingDelegation({
+    required this.path,
+    required this.symbol,
+    required this.surfaces,
+    required this.reason,
+  });
+
+  /// The widget file, package-relative.
+  final String path;
+
+  /// The class the decision is about. Checked, so an exemption cannot outlive the
+  /// symbol it was written for.
+  final String symbol;
+
+  /// Every interactive surface the file is allowed to build.
+  ///
+  /// **The enumeration is the point.** A file-path exemption covers every surface
+  /// ever added to that file: a second, ringless `GestureDetector` dropped into
+  /// `error_view.dart` inherited the exemption for free. Naming the surfaces means
+  /// a new one is an offender until someone decides about it here.
+  final List<String> surfaces;
+
+  /// Why the delegation is legitimate. Must name each surface, so it cannot go on
+  /// describing something the file no longer does.
+  final String reason;
+}
+
+/// The two files whose interactive surface is entirely a *child* widget that
 /// carries the ring itself.
 ///
-/// Two entries, and the source scan genuinely cannot see through them — it reads
-/// one file at a time. So the list exists to record a **decision** rather than an
-/// omission, and the behavioural gate above is what keeps each entry honest: it
-/// pumps `ErrorView` and `FontSizeStepper` and fails if no ring appears. Delete an
+/// The source scan genuinely cannot see through them — it reads one file at a
+/// time — so this list exists to record a **decision** rather than an omission,
+/// and the behavioural gate above is what keeps each entry honest: it pumps
+/// `ErrorView` and `FontSizeStepper` and fails if no ring appears. Delete an
 /// entry's implementation of the ring and the behavioural gate goes red, which is
 /// why this is a list with reasons and not a suppression comment.
-const Map<String, String> _delegatesFocusRingTo = <String, String>{
-  'lib/core/design_system/widgets/error_view.dart':
-      'the only interactive surface is its retry action, which is an EvaButton — '
-      'and EvaButton carries the ring. The behavioural gate above proves it '
-      'renders by pumping exactly this widget.',
-  'lib/core/design_system/widgets/font_size_stepper.dart':
-      'the only interactive surfaces are the two IconActionButtons, which carry '
-      'the ring. The track is a GestureDetector that is deliberately not '
-      'focusable — it is reachable through Semantics onIncrease/onDecrease '
-      'instead, so a screen-reader user is not offered a third tab stop.',
+const Map<String, _RingDelegation>
+_delegatesFocusRingTo = <String, _RingDelegation>{
+  'lib/core/design_system/widgets/error_view.dart': _RingDelegation(
+    path: 'lib/core/design_system/widgets/error_view.dart',
+    symbol: 'ErrorView',
+    surfaces: <String>['EvaButton'],
+    reason:
+        'the only interactive surface is its retry action, which is an '
+        'EvaButton — and EvaButton carries the ring. The behavioural gate '
+        'above proves it renders by pumping exactly this widget.',
+  ),
+  'lib/core/design_system/widgets/font_size_stepper.dart': _RingDelegation(
+    path: 'lib/core/design_system/widgets/font_size_stepper.dart',
+    symbol: 'FontSizeStepper',
+    surfaces: <String>['IconActionButton', 'GestureDetector'],
+    reason:
+        'the two steppers are IconActionButtons, which carry the ring. The '
+        'track is a GestureDetector that is deliberately not focusable — it '
+        'is reachable through Semantics onIncrease / onDecrease instead, so a '
+        'screen-reader user is not offered a third tab stop.',
+  ),
 };
+
+/// The interactive-surface constructors whose callbacks §14's ring row applies to.
+///
+/// Not `InkWell` / `InkResponse`: those reach the focus tree through
+/// [EvaFocusRing]'s own node, so finding one is finding the ring. `GestureDetector`
+/// brings its own recognisers and its own absence of any focus node, which is
+/// exactly the shape the delegation list has to account for.
+const List<String> _interactiveSurfaces = <String>[
+  'GestureDetector',
+  'EvaInk',
+  'EvaFocusRing',
+];
+
+/// The interactive surfaces built by [code] that [_RingDelegation.surfaces] does
+/// not list, as readable strings.
+///
+/// Comments are already out of [code] — [withoutDartComments] ran on it — so a
+/// doc comment saying "deliberately not a GestureDetector" cannot be counted as
+/// one. That is the fourth evasion, and this is what closes it.
+List<String> _unattributedSurfaces(String path, String code) {
+  final _RingDelegation? delegation = _delegatesFocusRingTo[path];
+  if (delegation == null) return const <String>[];
+  return <String>[
+    for (final String surface in _interactiveSurfaces)
+      if (!delegation.surfaces.contains(surface) && code.contains('$surface('))
+        '$path builds $surface(, which the delegation does not list',
+  ];
+}
 
 /// Whether [source] declares a callback in its public constructor.
 ///
-/// Anchored to the declaration rather than to the whole file: `NeuraLBackground`
-/// has no callback but its painter has listeners, and a widget that stores a
-/// callback it never exposes as a parameter is not an interactive surface. The
-/// three spellings are the ones this design system and Material actually use.
-bool _declaresACallback(String source) =>
-    _callbackDeclarations.any(source.contains);
+/// ## THE TYPE, NOT THE SPELLING
+///
+/// The first version asked whether the file contained one of eight literal
+/// substrings, which is an allowlist of *names* and misses by construction.
+/// `final void Function(Offset) onPanUpdate;` is a callback in the public surface
+/// of a widget, it is the shape `EvaFocusRing`'s own `onKeyEvent` is declared
+/// with, and it was invisible.
+///
+/// So the rule is now the type: a named callback typedef, an inline function
+/// type, or a **name** that reads as one. The name rule is the last resort and the
+/// loosest, and it is why the two function-type patterns come first — for a
+/// `final bool Function() onSelected` the type already answers, and the name
+/// answer would have been luck.
+///
+/// `Function(` alone is not enough: `Iterable.map`'s `R Function(T)` and
+/// `Widget Function()` — the shape every `build` override and every
+/// `EvaFocusRingScope` constructor argument has — would make every widget in the
+/// design system "interactive". The return type has to be there too.
+final RegExp _inlineFunctionType = RegExp(
+  r'\b(?:void|bool|int|double|num|String|Object|T|Future<[^>]*>|'
+  r'KeyEventResult|SemanticsAction|Widget\?*)\s+Function\s*[<(]',
+);
 
-const List<String> _callbackDeclarations = <String>[
+/// A declared parameter whose name reads as a callback.
+///
+/// `on[A-Z]…` followed by `,`, `=` or `)`, so `onPanUpdate`, `onSwipe:` and
+/// `onPressed = null` are caught while a field called `only` is not.
+final RegExp _callbackShapedName = RegExp(r'\bon[A-Z]\w*\s*[,=)]');
+
+/// The named callback typedefs Flutter and this design system actually use.
+///
+/// A list rather than a pattern because there is no spelling of "a typedef ending
+/// in `Callback`" that does not also match `GestureDragUpdateCallback?` written
+/// *inside a doc comment* — and the list is short and stable for the same reason
+/// the colour gate's marker list is.
+const List<String> _callbackTypeNames = <String>[
   'VoidCallback',
   'GestureTapCallback',
+  'GestureTapDownCallback',
+  'GestureTapUpCallback',
+  'GestureTapCancelCallback',
+  'GestureDragStartCallback',
+  'GestureDragUpdateCallback',
+  'GestureDragEndCallback',
+  'GestureDragDownCallback',
+  'GestureDragCancelCallback',
+  'GestureLongPressCallback',
+  'GestureForcePressStartCallback',
   'ValueChanged<',
-  'onChanged,',
-  'onPressed,',
-  'onTap,',
-  'onSelected,',
-  'onSubmitted,',
+  'ValueGetter<',
+  'ValueSetter<',
+  'AsyncCallback',
+  'ReorderCallback',
+  'HoverCallback',
+  'ScaleCallback',
+  'ScrollEndNotificationCallback',
 ];
 
+/// Whether [source] declares a callback in its public constructor.
+///
+/// [source] must already have its comments stripped — see [_mentionsTheRing] for
+/// why that is not optional.
+bool _declaresACallback(String source) =>
+    _callbackTypeNames.any(source.contains) ||
+    _inlineFunctionType.hasMatch(source) ||
+    _callbackShapedName.hasMatch(source);
+
+/// Whether [source] reaches §14's ring.
+///
+/// The five forms are the five ways the design system spells it, and they are
+/// spelled out rather than reduced to a pattern because the reduction is what let
+/// a doc comment through: this used to be a bare `source.contains` over the whole
+/// file, comments included, so `/// Deliberately not an [EvaFocusRing]` satisfied
+/// it and the unringed control beside the comment shipped.
 bool _mentionsTheRing(String source) =>
     source.contains('extends EvaFocusRing') ||
     source.contains('EvaFocusRing(') ||
     source.contains('EvaFocusRingScope(') ||
     source.contains('evaFocusRingBorder(') ||
     source.contains('evaFocusRingSpec(');
-
-void _toggle(bool value) {}
-void _toggleBool(bool value) {}
-void _ignore(String value) {}
-void _ignoreInt(int value) {}
 
 /// A focusable box with [border] as its only rim.
 ///

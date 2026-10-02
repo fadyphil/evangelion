@@ -70,6 +70,13 @@ class IconActionButton extends StatelessWidget {
         // §14's first row, closed: the same string that names the tooltip.
         label: tooltip,
         excludeSemantics: true,
+        // Load-bearing, and easy to lose: `excludeSemantics: true` drops the
+        // `InkWell`'s tap action along with the label, so without this the
+        // button carries a name a screen reader can read and **no way to press
+        // it** — a TalkBack double-tap is `ACTION_CLICK` =
+        // [SemanticsAction.tap]. `null` when disabled, because the action must be
+        // genuinely absent rather than present and flagged.
+        onTap: enabled ? onPressed : null,
         child: EvaFocusRing(
           enabled: enabled,
           // No rim. `ds.tsx:39` — `background: 'none', border: 'none'`.

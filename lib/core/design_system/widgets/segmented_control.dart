@@ -22,10 +22,19 @@ import 'package:flutter/services.dart';
 ///   renders nothing;
 /// - a **single** value returns itself — a one-option segmented control is a
 ///   label, and ArrowRight must not be a crash;
-/// - a [selected] value **outside** the list snaps to the nearest end. That is
-///   reachable when a persisted setting names a value a rebuilt enum no longer
-///   has, and returning `null` there would leave the control drawing no
-///   selection at all;
+/// - a [selected] value **outside** the list snaps to an end. That is reachable
+///   when a persisted setting names a value a rebuilt enum no longer has, and
+///   returning `null` there would leave the control drawing no selection at all.
+///   **"Snaps to the nearest end" is a claim about `abs(step) == 1`, and only
+///   about that**: the `-1` branch is `index = values.length`, which is "one
+///   before the first", so a forward step lands on `first` and a backward step
+///   lands on `last`. It reads as a general property and is not one —
+///   `step: 5` from an out-of-list `selected` in a three-item list wraps to the
+///   **middle** (`'Dark'`), because the arithmetic below is modular and nothing
+///   clamps it. `abs(step) == 1` is the only step this widget ever produces
+///   ([selectionStepFor] returns `±1`, and [Home] / [End] are absolute rather
+///   than expressed as a step), and it is the only step the tests cover — the
+///   function is a model for this widget's keyboard, not a general list-stepper.
 /// - any other `T` works. The widget is `SegmentedControl<T>` precisely so
 ///   `AppThemeMode` and `ScriptureLanguage` share it.
 T? nextSelection<T>({
@@ -188,6 +197,21 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
     }
     final EvaColors colors = context.colors;
 
+    // The name of the whole control, for the track's own node. See the return
+    // below for why it needs one.
+    //
+    // Guarded, because `nextSelection`'s doc records that an out-of-list
+    // `selected` is reachable — a persisted setting naming a value a rebuilt enum
+    // no longer has — and `labelOf` is the caller's function over `values`, so
+    // calling it with a value the list does not contain is a crash in `build`.
+    // The first option is the fallback, and it is the same end a forward step
+    // snaps to.
+    final String controlLabel = widget.labelOf(
+      widget.values.contains(widget.selected)
+          ? widget.selected
+          : widget.values.first,
+    );
+
     final Widget track = Container(
       // `SettingsScreen.tsx:51` —
       // `background: rgba(#fff | #000, 0.06)`, `borderRadius: 8`,
@@ -219,6 +243,32 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
 
     return Semantics(
       container: true,
+      // ## WHY THE TRACK'S NODE IS NAMED
+      //
+      // This node is a **button** — the `EvaInk` below publishes a tap action on
+      // it — and it used to carry no label at all, so `/settings` shipped two
+      // buttons (the theme picker and the language pills) that a screen reader
+      // could land on and could not name. That is §14's first row applied to a
+      // widget the row does not mention by name, and it is the same shape as the
+      // unnamed `IconActionButton` the row *does* name.
+      //
+      // The obvious alternative — dropping the track's `onPressed` so only the
+      // three labelled segments are actionable — **breaks the keyboard model**,
+      // and the reason is `EvaFocusRing`'s: the ring owns the `FocusNode` but
+      // inserts no `Focus`, because `InkResponse` builds one internally and a
+      // second would make the node its own parent. The `EvaInk` below is the only
+      // thing that binds that node into the focus tree, so a track with no
+      // `onPressed` is a control Tab cannot reach at all. The node is therefore
+      // load-bearing and has to be named.
+      //
+      // `labelOf(selected)` is the name because it is the one fact about the
+      // control that is true at every moment, and it is the fact the arrow keys
+      // are about to replace. A second string meaning "advance the selection"
+      // would be more descriptive and is not available: this is a bilingual app
+      // with no string table yet, and `ErrorView.retryLabel` and
+      // `ProgressBeads.semanticLabel` both record that a design-system widget
+      // does not invent an English string.
+      label: controlLabel,
       child: EvaFocusRing(
         // No `idleBorder`: the prototype's track has none, and a rim around the
         // whole control would double the track's own edge.
