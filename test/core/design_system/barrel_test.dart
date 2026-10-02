@@ -60,14 +60,16 @@ List<String> get _exportedUris => <String>[
     match.group(1)!,
 ];
 
-/// Every `.dart` file under `tokens/` and `theme/`, as a package URI.
+/// Every `.dart` file under `theme/`, `tokens/`, `effects/` and `widgets/`, as a
+/// package URI.
 ///
-/// `effects/` and `widgets/` are Phase 2 and Phase 3 and do not exist yet, so
-/// they are excluded by *absence* rather than by an allowlist that would need
-/// editing every phase.
+/// `effects/` and `widgets/` joined the list in Phase 2. Before that they were
+/// excluded by *absence* rather than by an allowlist that would have needed
+/// editing every phase — which is exactly why a new `effects/*.dart` could land
+/// un-exported for a whole phase without a thing going red.
 List<String> get _designSystemFiles {
   final List<String> uris = <String>[
-    for (final String dir in <String>['theme', 'tokens'])
+    for (final String dir in <String>['effects', 'theme', 'tokens', 'widgets'])
       for (final FileSystemEntity entity in Directory.fromUri(
         _root.uri.resolve('lib/core/design_system/$dir/'),
       ).listSync())

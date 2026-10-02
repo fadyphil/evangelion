@@ -42,13 +42,22 @@
 ///
 /// ## SCOPE
 ///
-/// Tokens and themes only. `effects/` (NeuralBackground, GoldFlecks) is Phase 2
-/// and `widgets/` (the Tier-1 primitives) is Phase 3; they join this file when
-/// they exist, and until then the directory-listing comparison in that test covers
-/// only `tokens/` and `theme/`, which is why a missing Phase-2 export is not yet
-/// a failure.
+/// Everything under `tokens/`, `theme/`, `effects/` and `widgets/`. Phase 1 shipped
+/// the first two; Phase 2 added `effects/` and the decorative part of `widgets/`,
+/// and Phase 3 fills in the Tier-1 primitives and the Tier-3 composites.
+///
+/// The directory-listing comparison in `barrel_test.dart` walks all four
+/// directories, so every design-system file landing on disk has to be exported
+/// here in the same commit. That is the whole point: a new `widgets/*.dart` that
+/// nobody exports is invisible until a feature deep-imports it, and from then on
+/// two import styles coexist.
 library;
 
+export 'package:evangelion/core/design_system/effects/gold_flecks.dart';
+export 'package:evangelion/core/design_system/effects/hue_rotate_matrix.dart';
+export 'package:evangelion/core/design_system/effects/neural_background.dart';
+export 'package:evangelion/core/design_system/effects/neural_motion.dart';
+export 'package:evangelion/core/design_system/effects/neural_orbs.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme_light.dart';
@@ -59,3 +68,8 @@ export 'package:evangelion/core/design_system/tokens/eva_radii.dart';
 export 'package:evangelion/core/design_system/tokens/eva_spacing.dart';
 export 'package:evangelion/core/design_system/tokens/eva_typography.dart';
 export 'package:evangelion/core/design_system/tokens/sticker_palette.dart';
+export 'package:evangelion/core/design_system/widgets/glass_surface.dart';
+export 'package:evangelion/core/design_system/widgets/passage_drop_cap.dart';
+export 'package:evangelion/core/design_system/widgets/seal_monogram.dart';
+export 'package:evangelion/core/design_system/widgets/streak_flame.dart';
+export 'package:evangelion/core/design_system/widgets/sun_burst.dart';
