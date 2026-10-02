@@ -23,6 +23,13 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
+# Golden-failure artifacts. `matchesGoldenFile` writes a master image, a test
+# image, an isolated diff and a masked diff into `failures/` next to the golden
+# every time a comparison fails — 64 files and 5.9MB for one Phase-2 run, all of
+# it derived from the two images already in the repo. Committed once by accident
+# and never read again.
+**/failures/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
