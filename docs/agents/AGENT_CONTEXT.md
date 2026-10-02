@@ -289,6 +289,39 @@ forgotten rather than rediscovered:
 - **In-memory-backend seed fixtures** — `seedUserId` / `seedGroupId` / `seedUserRole` are
   not configuration. They move next to `FakeAuthRepository` when that exists.
 
+### Recorded decisions — Phase 0b review
+
+**3. `NoParamsUseCase` does NOT extend `UseCase<void, Out>`.** The obvious declaration is
+illegal Dart, and both plausible repairs are broken too:
+
+```dart
+// ILLEGAL — invalid_override: Function() is not a subtype of Function(void),
+// because a subtype must accept at least as many positional parameters.
+abstract interface class NoParamsUseCase<Out> extends UseCase<void, Out> {
+  Future<Result<Out>> call();          // error
+}
+
+// ALSO BROKEN — satisfies the override check, but then callers fail:
+// "1 positional argument expected by 'call', but 0 found", because a `void`
+// parameter is still a required positional at the call site.
+abstract interface class NoParamsUseCase<Out> extends UseCase<void, Out> {
+  Future<Result<Out>> call([void params]);   // error moves to the call site
+}
+```
+
+So `NoParamsUseCase<Out>` is declared as a **standalone** interface. The cost, accepted
+deliberately: it is not a subtype of `UseCase<void, Out>`, so nothing can hold both shapes
+polymorphically. Code needing that must accept a
+`Future<Result<Out>> Function()` closure, which both satisfy. See
+`lib/core/domain/usecase/usecase.dart` for the documented reasoning.
+
+**4. `configureDependencies()` is `Future<void>`; `getIt.init()` is synchronous today.**
+The call site `await configureDependencies()` is therefore stable forever. `unawaited_futures`
+will turn this into a compile error the day a module registers an async dependency and
+`init()` becomes `Future<GetIt>` — which is the intended behaviour, not a lint to suppress.
+The composition root MUST NOT import `package:flutter/`; a test walks the transitive
+project-local import graph to prove it.
+
 This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
 
 ---
@@ -299,20 +332,31 @@ This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
 dart format --output=none --set-exit-if-changed lib test   # formatting
 dart analyze --fatal-infos --fatal-warnings                # types + lint + DEPRECATION
 flutter test                                               # full suite
+tool/verify_purity.sh                                      # architecture gates
 ```
 
-Layer-purity gates (dependency inversion, mechanically):
+### Architecture gates — use the script, not an inline command
 
-```bash
-# domain must not import Flutter, Dio, or http -> must produce NO matches
-# (covers the shared kernel AND every feature domain)
-rg "package:(flutter|dio|http)/" lib/core/domain/ lib/features/*/domain/
+`tool/verify_purity.sh` enforces all three architecture rules mechanically:
 
-# no cross-feature imports -> must produce NO matches
-rg "package:evangelion/features/" lib/features/ lib/core/ | rg -v "features/(\w+)/\1"
-```
+1. **Domain purity** — `core/domain/` and every `features/*/domain/` import no
+   `package:flutter/`, `package:dio/`, or `package:http/`. Matched on import
+   *directives*, so a doc comment mentioning the package name does not false-positive.
+2. **Feature independence** — no feature imports another feature.
+3. **Generated files stay lint-silent** — every `*.gr.dart` / `*.config.dart` keeps its
+   `// ignore_for_file: type=lint` header, so hand-edits are detectable.
 
-`rg` finding matches means the gate **fails**. Report zero matches.
+Exit `0` clean, `1` violations found, `2` a gate could not run. A gate whose target
+directory does not exist yet reports **vacuous** and says so — report that honestly rather
+than calling it a pass.
+
+> **Why a script and not a one-liner.** The previous inline cross-feature check used a
+> backreference, `rg -v "features/(\w+)/\1"`. Ripgrep does not support backreferences, so the
+> pattern failed to compile — and the failure was *silent*, exiting `0` and passing every
+> line. That is strictly worse than no gate. Feature independence is inherently per-feature
+> (it compares the importing file's feature against the one it imports), so it needs a loop.
+> The script is negative-controlled: planting all three violation types makes it exit `1`
+> and print each one.
 
 **Backend must not be modified.** It is read-only reference material at
 `/home/fady/Projects/EvangelionBackend`. Never write there. Never run migrations or
