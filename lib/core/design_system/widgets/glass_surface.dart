@@ -197,10 +197,22 @@ class GlassSurface extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: Material(
-        type: MaterialType.transparency,
-        borderRadius: borderRadius,
-        child: InkWell(onTap: onTap, borderRadius: borderRadius, child: body),
+      child: EvaFocusRing(
+        // §14's focus row applies to this surface like any other interactive
+        // widget, and Phase 2 shipped it without one — the `InkWell` below had no
+        // focus node of its own, so Tab never reached the surface at all. Phase 3
+        // owns the ring; this is its first application to an already-shipped
+        // widget, and `focus_ring_gate_test.dart` counts it.
+        enabled: true,
+        idleBorder: border
+            ? Border.all(color: colors.glassBorder, width: 1)
+            : null,
+        radius: radius,
+        child: EvaInk(
+          onPressed: onTap,
+          borderRadius: borderRadius,
+          child: body,
+        ),
       ),
     );
   }

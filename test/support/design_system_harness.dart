@@ -1,9 +1,9 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The viewport every ambient golden and pixel test is captured at.
@@ -163,3 +163,200 @@ Widget backgroundBoundaryInstance(WidgetTester tester) =>
 /// each time the closure runs.
 CustomPaint backgroundPaintInstance(WidgetTester tester) =>
     tester.widget<CustomPaint>(find.byType(CustomPaint));
+
+/// The viewport §14's text-scaling requirement is stated at: 320px wide.
+///
+/// `09-quality-gates.md` §14 — "text scales to 1.22× without overflow at 320px
+/// width". Both numbers come from there and neither is negotiated.
+const Size kNarrowSurface = Size(320, 568);
+
+/// The text scale §14 names, as a plain double for readability at call sites.
+const double kEvaRequiredTextScale = 1.22;
+
+/// Wraps [child] in the composition a Phase-3 primitive is pumped inside.
+///
+/// Narrower than [kAmbientSurface] and deliberately so: the ambient goldens want
+/// a phone at 390 so the orb offsets land where the prototype put them, while
+/// §14's overflow requirement is at **320**. Using the ambient surface for a
+/// primitive golden would test the wrong width and every overflow test would be
+/// passing for the wrong reason.
+///
+/// [textScale] is injected through [MediaQuery.textScalerOf], which is where a
+/// device puts it — not through `MaterialApp.builder`, which is where Phase 5
+/// will install `evaScalerFor`. That distinction matters: a test that installed
+/// the reader's *preference* here would be testing the wrong scaler, and the
+/// §14 requirement is about the platform's accessibility scaling.
+Widget evaPrimitiveHarness({
+  required Widget child,
+  ThemeData? theme,
+  double textScale = 1.0,
+  bool disableAnimations = false,
+  Locale locale = const Locale('en'),
+  TextDirection textDirection = TextDirection.ltr,
+  // Retained so a caller can pass it, but the surface is fixed by
+  // [pumpPrimitive] instead — see that function for why a `SizedBox` in here
+  // does not work.
+  Size? size,
+  bool ambientAnimations = false,
+}) => NeuralMotionScope(
+  // OFF by default, and that is not a shortcut. A primitive test never paints a
+  // [NeuralBackground], so the three shared clocks tick forever over nothing —
+  // and a forever-ticking ticker makes `pumpAndSettle` time out, which silently
+  // costs every test that wanted to settle a press animation. This is a
+  // *different* switch from [disableAnimations]: that one is §14's reduced-motion
+  // requirement and is passed through untouched.
+  animationsEnabled: ambientAnimations,
+  child: MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: theme ?? EvaThemeDark.theme,
+    locale: locale,
+    localizationsDelegates: const <LocalizationsDelegate<Object>>[
+      DefaultMaterialLocalizations.delegate,
+      DefaultWidgetsLocalizations.delegate,
+    ],
+    home: Builder(
+      builder: (BuildContext context) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations: disableAnimations,
+          textScaler: TextScaler.linear(textScale),
+        ),
+        child: Directionality(textDirection: textDirection, child: child),
+      ),
+    ),
+  ),
+);
+
+/// Pumps [child] on a **320×568** surface at [textScale], and settles nothing.
+///
+/// ## WHY THE VIEW IS SIZED HERE AND NOT BY A `SizedBox`
+///
+/// The obvious arrangement — a `SizedBox(width: 320, …)` inside
+/// `MaterialApp.home` — does not work, and it fails *quietly*: the widget under
+/// test reports the full 800×600 test surface and every width assertion against
+/// it is measuring the wrong number. A `SizedBox` is a `RenderConstrainedBox`,
+/// and its size is its **child's** size, so a child that lays out against the
+/// incoming constraints rather than its own intrinsic size simply fills the
+/// screen. [useAmbientSurface] sets `tester.view.physicalSize`, which is the
+/// mechanism Phase 2's goldens already use and which does pin the viewport.
+///
+/// [size] and [textScale] are both parameters because §14 names both numbers and
+/// a caller should have to choose them, not inherit them by accident.
+Future<void> pumpPrimitive(
+  WidgetTester tester,
+  Widget child, {
+  ThemeData? theme,
+  Size size = kNarrowSurface,
+  double textScale = 1.0,
+  bool disableAnimations = false,
+  TextDirection textDirection = TextDirection.ltr,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: theme,
+      textScale: textScale,
+      disableAnimations: disableAnimations,
+      textDirection: textDirection,
+      child: child,
+    ),
+  );
+}
+
+/// The theme under test, one per entry so no test body ever loops over themes.
+///
+/// The loop-out rule is not a style preference. `MaterialApp` installs an
+/// `AnimatedTheme` that lerps a theme change over `kThemeAnimationDuration`,
+/// and the single zero-duration `pump()` after `pumpWidget` does not advance it
+/// — so two captures in one body wrote the first palette into the second file.
+/// Phase 2 shipped two byte-identical "light" goldens that way. A list of themes
+/// iterated by `testWidgets` gives one body per theme for free.
+final List<(String, ThemeData)> kEvaThemes = <(String, ThemeData)>[
+  ('dark', EvaThemeDark.theme),
+  ('light', EvaThemeLight.theme),
+];
+
+/// Tabs until [finder] — or something inside it — holds primary focus.
+///
+/// The mechanical way to answer "can a keyboard reach this?" without adding a
+/// test-only focus API to a production widget. Bounded rather than unbounded so a
+/// control that is *never* reachable fails in a fixed number of steps instead of
+/// hanging until the ten-minute timeout, which is what the first attempt at
+/// this helper did.
+Future<void> tabUntilFocused(
+  WidgetTester tester,
+  Finder finder, {
+  int maxTabs = 12,
+}) async {
+  for (int i = 0; i < maxTabs; i++) {
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    if (find
+        .descendant(of: finder, matching: find.byType(Focus))
+        .evaluate()
+        .isNotEmpty) {
+      final FocusNode? node = tester
+          .widgetList<Focus>(
+            find.descendant(of: finder, matching: find.byType(Focus)),
+          )
+          .map((Focus focus) => focus.focusNode)
+          .where((FocusNode? node) => node != null)
+          .firstOrNull;
+      if (node != null && node.hasFocus) return;
+    }
+    if (_primaryFocusIsInside(tester, finder)) return;
+  }
+  throw StateError(
+    'tabUntilFocused: nothing under $finder took focus after $maxTabs tabs',
+  );
+}
+
+bool _primaryFocusIsInside(WidgetTester tester, Finder finder) {
+  final FocusNode? node = FocusManager.instance.primaryFocus;
+  if (node == null) return false;
+  // `find.byWidget` needs a Widget; a `FocusNode` is not one, and a node has no
+  // `Focus` widget that can be found by value because several may share it. So
+  // the check is the node's own flag plus containment of the finder.
+  return node.hasFocus &&
+      find
+          .descendant(of: finder, matching: find.byType(Focus))
+          .evaluate()
+          .isNotEmpty;
+}
+
+/// The `Border`s currently painted anywhere under [finder].
+///
+/// The focus-ring gate compares these against [evaFocusRingBorder], so it reads
+/// what is **rendered** rather than re-deriving the number under test. A gate that
+/// re-derives the value it is checking agrees with a wrong widget whenever both
+/// are wrong the same way.
+List<Border> renderedBorders(WidgetTester tester, Finder finder) {
+  final List<Border> borders = <Border>[];
+  for (final DecoratedBox box in tester.widgetList<DecoratedBox>(
+    find.descendant(of: finder, matching: find.byType(DecoratedBox)),
+  )) {
+    final Decoration decoration = box.decoration;
+    if (decoration is! BoxDecoration) continue;
+    // `BoxDecoration.border` is a `BoxBorder`, because a decoration may also be
+    // rounded on some sides only. §14's ring is a uniform `Border.all`, so a
+    // partial border is simply not a ring and is skipped — which is why the gate
+    // also asserts the count, not just the presence of a match.
+    final BoxBorder? border = decoration.border;
+    if (border is Border) borders.add(border);
+  }
+  return borders;
+}
+
+/// The [SemanticsNode] at [finder].
+///
+/// A helper rather than `tester.getSemantics(finder)` spelled out at every call
+/// site for one reason: `SemanticsNode` lives in `package:flutter/semantics.dart`,
+/// which `material.dart` does **not** re-export, so every file that asserts on a
+/// node has to add an import that is otherwise unused. Here it is used once.
+///
+/// `finder` must resolve to exactly one node. [SemanticsNode] is not `Object`-safe
+/// across subtree rebuilds, so it is read eagerly and not held.
+SemanticsNode semanticsOf(WidgetTester tester, Finder finder) =>
+    tester.getSemantics(finder);
