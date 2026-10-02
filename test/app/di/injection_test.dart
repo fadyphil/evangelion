@@ -7,113 +7,19 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
-/// Matches an `import`, `export`, or `part` directive and captures its URI.
-///
-/// All three directives, not just `import`. `export` re-exposes another
-/// library's whole surface to whoever imports this one, and `part` pulls a file
-/// into this library's namespace, so either one makes `package:flutter/` just
-/// as reachable from the composition root as a direct import does — and neither
-/// trips a lint. A walk that only understands `import` reports "Flutter-free"
-/// over a graph that is not.
-///
-/// Both quote styles, deliberately. Single quotes are the house style and
-/// `prefer_single_quotes` is fatal under `--fatal-infos`, so a double-quoted
-/// directive cannot reach main today — but this test must not depend on an
-/// unrelated lint to stay honest, and it is the *only* check on this property.
-final RegExp _directivePattern = RegExp(
-  r"""^\s*(?:import|export|part)\s+(['"])([^'"]+)\1""",
-  multiLine: true,
-);
+import '../../support/project_import_graph.dart';
 
-const String _packagePrefix = 'package:evangelion/';
-
-const String _flutterPrefix = 'package:flutter/';
-
-/// Package root, always with a trailing separator.
-final String _rootPath = Directory.current.uri.path;
-
-/// Walks the project-local import graph from [entry] and returns every file it
-/// can reach, as a package-relative path. [entry] itself is included.
-///
-/// `import`, `export`, and `part` directives are all followed — see
-/// [_directivePattern] — in both `package:evangelion/…` and relative forms,
-/// because `@InjectableInit(preferRelativeImports: true)` makes the generated
-/// config import its sibling relatively. `dart:` and external packages are not
-/// followed: `get_it` and `injectable` are pure Dart and declare no Flutter
-/// dependency, so the project-local closure is the whole of what this needs to
-/// police.
-Set<String> reachableProjectFiles(String entry) {
-  final Set<String> seen = <String>{};
-  final List<Uri> pending = <Uri>[Directory.current.uri.resolve(entry)];
-
-  while (pending.isNotEmpty) {
-    final Uri fileUri = pending.removeLast();
-    if (!seen.add(_relativise(fileUri))) {
-      continue;
-    }
-
-    final String source = File.fromUri(fileUri).readAsStringSync();
-    for (final RegExpMatch match in _directivePattern.allMatches(source)) {
-      // Group 2 matched a URI between matched quotes, so it cannot be null.
-      final String target = match.group(2)!;
-
-      if (target.startsWith(_packagePrefix)) {
-        pending.add(
-          Directory.current.uri.resolve(
-            'lib/${target.substring(_packagePrefix.length)}',
-          ),
-        );
-      } else if (!target.contains(':')) {
-        // A relative import: no scheme, so it resolves against the importing
-        // file. Anything with a scheme (`dart:`, `package:`) is external.
-        pending.add(fileUri.resolve(target));
-      }
-    }
-  }
-
-  return seen;
-}
-
-/// Strips the package-root prefix so results compare as plain relative paths.
-String _relativise(Uri fileUri) {
-  final String path = fileUri.toFilePath();
-  return path.startsWith(_rootPath) ? path.substring(_rootPath.length) : path;
-}
-
-/// The URIs named by [path]'s `import`, `export`, and `part` directives.
-///
-/// Directive-only on purpose. A substring scan for `package:flutter/` also
-/// matches the phrase inside a doc comment that *explains* why a file is
-/// Flutter-free, which is a false positive that would force the documentation
-/// to be watered down to keep the gate green.
-Set<String> importUrisOf(String path) => _directivePattern
-    .allMatches(File(path).readAsStringSync())
-    .map((RegExpMatch match) => match.group(2)!)
-    .toSet();
-
-/// Writes a throwaway import graph whose every directive is deliberately
-/// non-default — a double-quoted `export`, a `part`, then a plain relative
-/// `import` — and returns the directory holding it.
-///
-/// Built at run time rather than committed. A committed fixture would need an
-/// `// ignore: prefer_single_quotes` header to survive `dart analyze`, and a
-/// fixture the analyzer tolerates no longer proves the walk sees double quotes.
-Directory _writeDirectiveFixture() {
-  final Directory dir = Directory.systemTemp.createTempSync(
-    'evangelion_import_graph',
-  );
-  File(
-    '${dir.path}/deepest.dart',
-  ).writeAsStringSync('export "package:flutter/material.dart" show Color;\n');
-  File('${dir.path}/middle.dart').writeAsStringSync("part 'deepest.dart';\n");
-  File('${dir.path}/entry.dart').writeAsStringSync("import 'middle.dart';\n");
-  return dir;
-}
-
-/// The file names in [paths], so an assertion about *which* files were reached
-/// does not depend on the temp directory's separator or location.
-Set<String> fileNamesOf(Iterable<String> paths) =>
-    paths.map((String path) => path.split(Platform.pathSeparator).last).toSet();
+// The graph walk itself moved to `test/support/project_import_graph.dart` during
+// the Phase 1 review. It used to be defined here, which was fine until a second
+// suite needed it: `barrel_test.dart` has to walk the design-system barrel for
+// the same reason this file walks the composition root, and a second copy of a
+// hand-rolled import-graph walker is a second thing to keep in step — the exact
+// failure mode AGENT_CONTEXT §7 documents. Every symbol this file used to own
+// (`reachableProjectFiles`, `importUrisOf`, `fileNamesOf`, `flutterPrefix`)
+// still exists; the private directive pattern is now `directivePattern` and is
+// deliberately public, because the *reason* it stops at the closing quote rather
+// than the semicolon is a finding that belongs next to the pattern, not buried in
+// whichever suite happens to run first.
 
 /// A `UseCase`-shaped use case, registered from `test/` rather than from `lib/`.
 /// The concrete use cases arrive with the features that own them; what this
@@ -346,7 +252,7 @@ void main() {
       for (final String path in reachable) {
         expect(
           importUrisOf(path)
-              .where((String uri) => uri.startsWith(_flutterPrefix)),
+              .where((String uri) => uri.startsWith(flutterPrefix)),
           isEmpty,
           reason: '$path must stay Flutter-free',
         );
@@ -362,7 +268,7 @@ void main() {
       for (final String path in reachable) {
         expect(
           importUrisOf(path)
-              .where((String uri) => uri.startsWith(_flutterPrefix)),
+              .where((String uri) => uri.startsWith(flutterPrefix)),
           isEmpty,
           reason: '$path must stay Flutter-free',
         );
@@ -377,7 +283,7 @@ void main() {
       // while every test stayed green. This fixture is built out of nothing but
       // the forms production code does not use, so it fails the moment the
       // directive pattern narrows again.
-      final Directory fixture = _writeDirectiveFixture();
+      final Directory fixture = writeDirectiveFixture();
       addTearDown(() => fixture.deleteSync(recursive: true));
 
       final Set<String> reachable = reachableProjectFiles(
@@ -396,7 +302,7 @@ void main() {
       // import that arrived through them.
       expect(
         importUrisOf('${fixture.uri.path}/deepest.dart'),
-        contains('${_flutterPrefix}material.dart'),
+        contains('${flutterPrefix}material.dart'),
       );
     });
   });
