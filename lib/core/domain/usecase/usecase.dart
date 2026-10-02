@@ -2,16 +2,22 @@ import 'package:evangelion/core/common/result.dart';
 
 /// A single unit of application behaviour, from presentation to domain.
 ///
-/// Two properties are load-bearing, and both are enforced by the type rather
-/// than by convention:
+/// Two properties are load-bearing. One is enforced by the type; the other is
+/// house style, and the difference is worth stating rather than blurring:
 ///
-/// 1. **It returns a [Result]; it never throws.** A repository implementation
-///    can hand back a [Failure] for every fault and nothing escapes across the
-///    seam (AGENT_CONTEXT §3, the LSP row).
-/// 2. **It is a callable object.** Invoke it as `usecase(params)`, not
-///    `usecase.execute(params)` — the method is named `call`, so a bare
-///    expression already reads as an action. There is deliberately no
-///    `execute` alias to drift out of sync.
+/// 1. **It returns a [Result]; it never throws — enforced by the type.** A
+///    repository implementation can hand back a [Failure] for every fault and
+///    nothing escapes across the seam (AGENT_CONTEXT §3, the LSP row).
+/// 2. **It is a callable object — convention, not enforcement.** Invoke it as
+///    `usecase(params)`, not `usecase.execute(params)`: the method is named
+///    `call`, so a bare expression already reads as an action, and there is no
+///    `execute` alias. Nothing *forbids* an implementation from also declaring
+///    one — `abstract interface class` constrains what an implementation must
+///    provide, not what it may add. What the type does enforce is the call
+///    site: `execute` does not exist through a `UseCase<In, Out>` or
+///    `NoParamsUseCase<Out>` reference. So renaming the seam breaks every fake
+///    in the tree as a **compile error**, not as a failing test — which means
+///    review the addition of an `execute`, do not expect a gate to reject it.
 ///
 /// [In] is whatever the caller must supply; [Out] is what the operation
 /// produces. [In] = `void` means "nothing", which [NoParamsUseCase] spells out

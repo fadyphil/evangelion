@@ -156,15 +156,42 @@ void main() {
     );
 
     test('registering twice without a reset fails loudly', () async {
-      // `setUp` already configured the graph. get_it rejects a duplicate type,
-      // which is the behaviour wanted here: `main` must call this exactly once,
-      // and a double call is a bug rather than a silent no-op.
-      await expectLater(configureDependencies(), throwsA(anything));
+      // `setUp` already configured the graph. get_it rejects a duplicate type
+      // with an `ArgumentError` naming the type, which is the behaviour wanted
+      // here: `main` must call this exactly once, and a double call is a bug
+      // rather than a silent no-op.
+      //
+      // Asserted concretely rather than as `throwsA(anything)`, which matches
+      // every throwable in existence — including the `StateError` a *missing*
+      // registration raises and the `TypeError` a mistyped one raises. It would
+      // have passed just as happily if `configureDependencies` were broken in a
+      // completely unrelated way, which makes it a very poor way to say "a
+      // double call is rejected here and nowhere else".
+      await expectLater(
+        configureDependencies(),
+        throwsA(
+          isA<ArgumentError>().having(
+            (ArgumentError e) => e.message.toString(),
+            'message',
+            contains('GetIt is already registered'),
+          ),
+        ),
+      );
     });
   });
 
   group('the service locator itself', () {
     test('resolves to the same instance the app uses', () {
+      // WHAT THIS PINS: the registered *value* is `getIt` itself, so a use case
+      // declaring `GetIt` as a dependency gets the app's locator.
+      //
+      // WHAT IT DOES NOT PIN: the `@lazySingleton` lifetime on
+      // `ServiceLocatorModule.serviceLocator`. The provider returns
+      // `GetIt.instance`, which is already a process-wide singleton, so
+      // rewriting the generated registration to `gh.factory` hands back the
+      // identical object and this assertion holds either way. The
+      // "what this suite cannot see" group below is the negative control for
+      // exactly that claim.
       expect(identical(getIt<GetIt>(), getIt), isTrue);
     });
 
@@ -174,6 +201,46 @@ void main() {
 
     test('nothing is registered for an unregistered type', () {
       expect(getIt.get<_NeverRegistered>, throwsA(isA<StateError>()));
+    });
+  });
+
+  group('what this suite cannot see: the registration lifetime', () {
+    // The two `identical(...)` assertions in this file read like they pin the
+    // `@lazySingleton` annotations in `service_locator_module.dart`. They do
+    // not, and the reason deserves a test rather than a comment nobody re-reads.
+    // Rewriting the generated `gh.lazySingleton<GetIt>(…)` to `gh.factory<GetIt>(…)`
+    // leaves the whole suite green, because the provider returns
+    // `GetIt.instance`; doing the same to the `apiBaseUrl` registration also
+    // leaves it green, because `AppConfig.apiBaseUrl` is a compile-time constant.
+    // Both values are the identical object under either lifetime.
+    //
+    // get_it 9.x exposes no lifetime introspection — `isRegistered` answers
+    // presence, not kind — so there is no graph-side assertion to add. What
+    // these two tests establish is the other half of the claim: that the
+    // limitation is in the *values*, not in `identical`. Without them the
+    // `identical(...)` tests above read as a lifetime gate; with them they read
+    // as what they are, a value-identity check.
+    test(
+      'a factory registration IS distinguishable, so identical() has teeth',
+      () {
+        int calls = 0;
+        getIt.registerFactory<int>(() => ++calls);
+
+        expect(getIt<int>(), isNot(getIt<int>()));
+        expect(
+          getIt<int>(),
+          3,
+          reason: 'a factory builds a new value per lookup',
+        );
+      },
+    );
+
+    test('a singleton registration yields one instance for every lookup', () {
+      int calls = 0;
+      getIt.registerLazySingleton<int>(() => ++calls);
+
+      expect(identical(getIt<int>(), getIt<int>()), isTrue);
+      expect(getIt<int>(), 1, reason: 'the factory func runs exactly once');
     });
   });
 
@@ -187,6 +254,10 @@ void main() {
     });
 
     test('two lookups are the identical instance', () {
+      // Same caveat as the `GetIt` lookup above, for the same reason:
+      // `AppConfig.apiBaseUrl` is a `static const`, so the provider returns the
+      // same canonicalised String under `@lazySingleton` or `@factory`. This
+      // pins the value, not the lifetime.
       expect(
         identical(
           getIt<String>(instanceName: 'apiBaseUrl'),
