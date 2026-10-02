@@ -1,3 +1,4 @@
+import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -44,12 +45,35 @@ class EvangelionApp extends StatelessWidget {
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
       locale: locale,
 
-      // NO theme. Phase 1 owns the dark glassmorphic design system, and
-      // inventing a `ColorScheme` here would freeze an arbitrary palette into
-      // the one file every screen and every golden test descends from. Stock
-      // Material for now; the replacement is a one-line change here.
+      // The Eva design system (AGENT_CONTEXT §2, decision 6 — a dark
+      // glassmorphic system, `docs/plans/03-design-system.md` §5).
       //
-      // And no `routerConfig` — see the class doc.
+      // WHICH THEME GOES IN WHICH SLOT. `theme:` is what Material renders in
+      // LIGHT mode and `darkTheme:` is what it renders in DARK mode; putting the
+      // light palette in `theme` and the dark palette in `darkTheme` is the only
+      // assignment under which both names mean what they say. The reversed
+      // assignment would be defensible as "the Eva dark system is the default
+      // appearance", but it would leave `darkTheme` holding a light theme, which
+      // is a lie every future reader would have to re-derive.
+      //
+      // The dark-first *product* decision therefore lives in [themeMode] below,
+      // where it belongs and where it is one line.
+      theme: EvaThemeLight.theme,
+      darkTheme: EvaThemeDark.theme,
+
+      // Dark on launch, on every host, until Phase 5 replaces this with the
+      // reader's persisted `AppThemeMode`. Not `ThemeMode.system`: this design is
+      // dark by identity (§5.1 publishes the dark palette first and the whole
+      // prototype is a dark canvas), and shipping "follow the OS" first would
+      // mean the app opened light on every light-mode machine for no reason.
+      //
+      // Set here rather than left null, because `ThemeMode.system` on a
+      // light-mode host would open the light theme — visible in the stub pages
+      // that exist today and invisible once Phase 5 lands, which is the worst
+      // time to discover it.
+      themeMode: ThemeMode.dark,
+
+      // NO `routerConfig` — see the class doc.
       home: const LoginPage(),
     );
   }
