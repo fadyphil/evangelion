@@ -158,11 +158,24 @@ void main() {
       await tester.pump(kFrame);
       expect(find.byType(CustomPaint), findsOneWidget);
       expect(backgroundPaintInstance(tester).painter, isNotNull);
-      expect(
-        backgroundPaintInstance(tester).size,
-        Size.zero,
-        reason: 'a background paints whatever box it is handed',
-      );
+    });
+
+    testWidgets('and that one CustomPaint sizes itself to nothing', (
+      WidgetTester tester,
+    ) async {
+      // Split out from the count above because it is a different claim.
+      //
+      // `CustomPaint.size` is a **non-nullable field that defaults to
+      // `Size.zero`** and that `NeuralBackground` never sets, so this asserts a
+      // framework default, not a decision this widget made. It is still worth
+      // pinning: `SizedBox(size: ...)` here would make the painter's box come
+      // from a value that nothing else in the subtree constrains, and a
+      // background that then painted at its own size instead of filling the page
+      // would leave every other assertion in this file green.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(_probe());
+      await tester.pump(kFrame);
+      expect(backgroundPaintInstance(tester).size, Size.zero);
     });
   });
 
@@ -347,15 +360,30 @@ void main() {
         await tester.pumpWidget(_probe(variant: variant, tier: NeuralTier.low));
         await tester.pump(const Duration(seconds: 1));
         final Uint8List rgba = await backgroundPixels(tester);
-        final Set<int> distinct = <int>{
-          for (int i = 0; i < rgba.length; i++) rgba[i],
-        };
+        final Color canvas = const EvaColors.dark().canvas;
+        int painted = 0;
+        for (
+          int pixel = 0;
+          pixel < kAmbientSurface.width * kAmbientSurface.height;
+          pixel++
+        ) {
+          final bool matches =
+              _channel(rgba, pixel, 0) == _red(canvas) &&
+              _channel(rgba, pixel, 1) == _green(canvas) &&
+              _channel(rgba, pixel, 2) == _blue(canvas) &&
+              _channel(rgba, pixel, 3) == 0xFF;
+          if (!matches) painted++;
+        }
         expect(
-          distinct.length,
-          lessThanOrEqualTo(4),
+          painted,
+          0,
           reason:
-              '${variant.name} at low still painted something: '
-              '${orbsFor(variant).length} orbs were skipped',
+              '${variant.name} at low painted over $painted pixels; `low` is the '
+              'canvas and nothing else. The assertion is per-pixel rather than '
+              '"at most four distinct byte values", because a buffer of nothing '
+              'but one repeated byte satisfies a distinct-count check while '
+              'painting no canvas at all — moving the `tier == low` early return '
+              'above `canvas.drawRect` left that version green.',
         );
       }
     });

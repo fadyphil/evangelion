@@ -45,7 +45,7 @@ const int sunBurstRayCount = 14;
 
 /// The prototype's ray table, rebuilt as a list of [SunBurstRay].
 ///
-/// `ResultScreen.tsx:8-17`: fourteen rays at `i * (360 / 14)` degrees, inner
+/// `ResultScreen.tsx:7-15`: fourteen rays at `i * (360 / 14)` degrees, inner
 /// radius 26 for all of them, outer 46 on even indices and 39 on odd, stroke
 /// `#F5C84C`, width 2.5 on even and 1.5 on odd, round caps.
 ///
@@ -63,24 +63,24 @@ List<SunBurstRay> sunBurstRays() => <SunBurstRay>[
     ),
 ];
 
-/// Every ray's inner radius. `ResultScreen.tsx:11` — `const inner = 26`.
+/// Every ray's inner radius. `ResultScreen.tsx:9` — `const inner = 26`.
 const double sunBurstInnerRadius = 26;
 
-/// The even-indexed rays' outer radius. `ResultScreen.tsx:11`.
+/// The even-indexed rays' outer radius. `ResultScreen.tsx:9`.
 const double sunBurstOuterRadiusEven = 46;
 
-/// The odd-indexed rays' outer radius. `ResultScreen.tsx:11`.
+/// The odd-indexed rays' outer radius. `ResultScreen.tsx:9`.
 const double sunBurstOuterRadiusOdd = 39;
 
-/// The even-indexed rays' stroke width. `ResultScreen.tsx:15`.
+/// The even-indexed rays' stroke width. `ResultScreen.tsx:13`.
 const double sunBurstWidthEven = 2.5;
 
-/// The odd-indexed rays' stroke width. `ResultScreen.tsx:15`.
+/// The odd-indexed rays' stroke width. `ResultScreen.tsx:13`.
 const double sunBurstWidthOdd = 1.5;
 
 /// One of the five ember flecks scattered over the burst.
 ///
-/// `ResultScreen.tsx:20-24`.
+/// `ResultScreen.tsx:19-24`.
 @immutable
 class SunBurstFleck {
   /// Creates a fleck at [centre] with the prototype's radius and alpha.
@@ -100,7 +100,7 @@ class SunBurstFleck {
   final double alpha;
 }
 
-/// The burst's five flecks, `ResultScreen.tsx:20-24`, in source order.
+/// The burst's five flecks, `ResultScreen.tsx:19-24`, in source order.
 const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
   SunBurstFleck(centre: Offset(28, 18), radius: 2.5, alpha: 0.9),
   SunBurstFleck(centre: Offset(72, 16), radius: 2, alpha: 0.7),
@@ -109,11 +109,37 @@ const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
   SunBurstFleck(centre: Offset(64, 82), radius: 2, alpha: 0.7),
 ];
 
-/// The three concentric discs, `ResultScreen.tsx:18-20`, in source order.
+/// The three concentric discs, `ResultScreen.tsx:16-18`, largest first.
 ///
-/// `[radius, alpha]` per disc: `r24 @0.9`, `r18 @0.6`, and an `r30` halo at
-/// `#F5C84C` at 12% — note the third is *behind* the other two in the SVG but is
-/// larger, so painting it first is what makes it a halo.
+/// `[radius, alpha]` per disc: the r30 halo at `#F5C84C` / 12%, then `r24` at
+/// 90%, then `r18` at 60%.
+///
+/// ## THE ORDER CARRIES NO COLOUR MEANING, AND THE PREVIOUS COMMENT WAS WRONG
+///
+/// This used to say "note the third is *behind* the other two in the SVG but is
+/// larger, so painting it first is what makes it a halo". Both halves of that
+/// were wrong:
+///
+/// - **The premise.** SVG has no z-index; it paints in document order. The
+///   prototype's order is `r24 @0.9`, `r18 @0.6`, `r30 @0.12`
+///   (`ResultScreen.tsx:16-18`), so the r30 halo is **last** and therefore
+///   **on top**, not behind.
+/// - **The conclusion.** All three discs are the same colour, `#F5C84C`. Alpha
+///   compositing of a single colour over itself is commutative, so the visible
+///   result does not depend on the order at all. Measured: restoring the
+///   prototype's document order changes **173 of 480,000** pixels in
+///   `sun_burst_dark.png`, and the per-channel deltas go in *both* directions
+///   (±1 to ±13 on scattered antialiased edge pixels) — the signature of 8-bit
+///   rounding, not of a different colour.
+///
+/// The same is true of the rays, which the prototype also paints before the
+/// discs (`:7-15` then `:16-18`) and this painter paints after: a 12% `#F5C84C`
+/// wash over a full-strength `#F5C84C` ray leaves the ray exactly unchanged.
+/// Painting the rays first moves 118 of 480,000 pixels, again only rounding.
+///
+/// The order is kept because largest-first is the readable one and it is free.
+/// It is **not** kept because it makes a halo, and nothing should be built on
+/// the belief that it does.
 const List<List<double>> sunBurstDiscs = <List<double>>[
   <double>[30, 0.12],
   <double>[24, 0.9],
@@ -123,7 +149,7 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// The celebration burst on the Result screen.
 ///
 /// Fourteen rays, three discs and five flecks, transcribed from
-/// `eva/src/components/ds.tsx:4-27` (`ResultScreen.tsx`'s `SunBurst`) into a
+/// `eva/src/screens/ResultScreen.tsx:4-27` into a
 /// `CustomPaint` over a `viewBox="0 0 100 100"`.
 ///
 /// ## COLOURS
@@ -131,11 +157,11 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// The rays and the discs are `#F5C84C`, which is [StickerSlot.sun] — the one
 /// prototype colour in this widget that the design system already publishes. The
 /// five flecks are `emberHex`, i.e. [EvaColors.ember], and that is why they are a
-/// different colour from the rays in the prototype (`ResultScreen.tsx:22-26`).
+/// different colour from the rays in the prototype (`ResultScreen.tsx:19-24`).
 ///
 /// ## THE GLOW IS NOT HERE
 ///
-/// `ResultScreen.tsx:34` wraps the burst in
+/// `ResultScreen.tsx:38` wraps the burst in
 /// `filter: drop-shadow(0 0 36px rgba(#F5C84C, 0.55))`. That is a property of the
 /// **container**, not of the svg — `SunBurst` is the svg, so the glow belongs to
 /// whatever places it (Phase 8's `ResultPage`) and adding it here would invent a

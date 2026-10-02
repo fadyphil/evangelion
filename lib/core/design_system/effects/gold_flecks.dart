@@ -20,7 +20,12 @@ import 'package:flutter/material.dart';
 /// by `kFloatPeriod / EvaMotion.fleck` — ten fleck cycles per float cycle.
 ///
 /// One clock, no extra ticker, and the flecks drift in step with the orbs rather
-/// than against them. [GoldFlecks.kFloatPeriod] publishes that ratio.
+/// than against them. [flecksPerFloatCycle] publishes that ratio — and the test
+/// asserts it as a **derivation** rather than as a literal, because three
+/// independent literals asserted side by side (`EvaMotion.fleck == 2s`,
+/// `kFloatPeriod == 20s`, `flecksPerFloatCycle == 10`) leave the multiplication
+/// itself unchecked: mutating all three together is green, because the derived
+/// phase is invariant.
 ///
 /// ## `dense` HAS NO PROTOTYPE
 ///
@@ -45,7 +50,13 @@ class GoldFlecks extends StatelessWidget {
   /// Adds the outer ring. See the class doc.
   final bool dense;
 
-  /// How many fleck cycles fit in one float cycle: `20s / 2s`.
+  /// How many fleck cycles fit in one float cycle.
+  ///
+  /// `kFloatPeriod / EvaMotion.fleck` = `20s / 2s` = `10`. Spelled as a literal
+  /// because that is what a `static const int` has to be, and therefore because
+  /// nothing in the type system keeps it equal to the ratio — see the derived
+  /// assertion in `gold_flecks_test.dart`, which is what stops the three numbers
+  /// drifting apart together.
   static const int flecksPerFloatCycle = 10;
 
   @override
@@ -95,7 +106,7 @@ const double kFleckGlow = 10;
 /// `fleck-float`'s travel, `index.css:87` — `translateY(0) → translateY(-9px)`.
 const double kFleckTravel = 9;
 
-/// `fleck-float`'s opacity endpoints, `index.css:86-88` — `0.85 → 0.35`.
+/// `fleck-float`'s opacity endpoints, `index.css:86-87` — `0.85 → 0.35`.
 const double kFleckOpacityHigh = 0.85;
 const double kFleckOpacityLow = 0.35;
 
@@ -161,6 +172,24 @@ class _GoldFleckPainter extends CustomPainter {
       final double alpha =
           kFleckOpacityHigh + (kFleckOpacityLow - kFleckOpacityHigh) * triangle;
 
+      // The "glow" pass. `createShader` takes a *rectangle* as its coordinate
+      // space — it does not widen what gets painted. What paints is
+      // `drawCircle(centre, kFleckRadius, …)` below it, so the gradient is only
+      // ever sampled inside a 2.5px circle and [kFleckGlow] never reaches a
+      // pixel outside the dot.
+      //
+      // Measured: one fleck at `Offset(190, 60)`, frozen clock, painted bounds
+      // `x 187…192 / y 57…62` — 6x6 — with `kFleckGlow` at 10 **and** at 40. Only
+      // 58 of 45,600 pixels move between the two, all of them antialiasing on
+      // the dot's own edge, because changing [kFleckGlow] changes how fast the
+      // gradient falls off *across* the 2.5px it covers.
+      //
+      // So [kFleckGlow] is transcribed for audit and asserted as a constant, but
+      // it has no design-visible effect as the painter is written, and the
+      // prototype's `box-shadow: 0 0 10px` halo is **not** reproduced. The
+      // bounds test in `gold_flecks_test.dart` pins [kFleckRadius] and says so.
+      // Not changed here: that is a visual decision, and it belongs with whoever
+      // builds the Quiz screen this decorates.
       canvas.drawCircle(
         centre,
         kFleckRadius,
@@ -175,9 +204,8 @@ class _GoldFleckPainter extends CustomPainter {
                 Rect.fromCircle(center: centre, radius: kFleckGlow / 2),
               ),
       );
-      // The solid core on top of the glow, so the fleck is a crisp dot with a
-      // halo rather than a soft blob — `background: '#E8A33D'` plus
-      // `box-shadow: 0 0 10px #E8A33D'`.
+      // The solid core on top of the glow pass, so the fleck is a crisp dot
+      // rather than a soft blob — `background: '#E8A33D'` in the prototype.
       canvas.drawCircle(
         centre,
         kFleckRadius,

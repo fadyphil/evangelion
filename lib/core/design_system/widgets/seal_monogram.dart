@@ -36,7 +36,7 @@ class SealMonogram extends StatelessWidget {
     super.key,
   });
 
-  /// `LoginScreen.tsx:20` — `width: 60, height: 60`.
+  /// `LoginScreen.tsx:19` — `width: 60, height: 60`.
   static const double defaultSize = 60;
 
   /// Diameter in logical px.
@@ -53,11 +53,32 @@ class SealMonogram extends StatelessWidget {
 
   /// Where the wash starts, `circle at 35% 35%`.
   ///
-  /// 35% from the left and 35% from the top, and Flutter's `Alignment` measures
-  /// y from the bottom, so both components are `0.35 * 2 - 1 = -0.3`.
+  /// 35% from the left and 35% from the top. Flutter's [Alignment] measures both
+  /// axes from the **top** — `Alignment(-1, -1)` is `topLeft` — so the
+  /// conversion is fraction-from-the-top = `(v + 1) / 2`, and `0.35` gives
+  /// `(0.35 + 1) / 2 - 1 = -0.3`.
+  ///
+  /// This used to say `y` is measured "from the bottom", which contradicts the
+  /// `-0.3` on the next line and would move the wash to the bottom-left for a
+  /// maintainer who believed it. Same arithmetic as the orbs'
+  /// [kOrbGradientCenter]; both are wrong in the same way in review comments and
+  /// right in the value.
   static const Alignment sealGlowCenter = Alignment(-0.3, -0.3);
 
   /// Where the wash ends, `transparent 70%`.
+  ///
+  /// ## THE UNITS DO NOT MATCH CSS'S, AND IT IS HARMLESS ONLY BY ACCIDENT
+  ///
+  /// A CSS radial-gradient stop is a fraction of the gradient **ray** — with the
+  /// default `farthest-corner`, `0.70` here is `0.70 × 0.65 × √2 ≈ 0.643` of the
+  /// seal's width. Flutter's `RadialGradient.radius` is a fraction of the
+  /// **shortest side** instead, so passing `0.7` straight through fades out at
+  /// 0.7 × size rather than 0.643 × size.
+  ///
+  /// [kOrbGradientRadius] is the converted value, and `neural_orbs.dart` carries
+  /// the long version of why the conversion matters: copy CSS's number across and
+  /// the fade never finishes inside the box, leaving every corner tinted. Here it
+  /// does not, and the reason is in the next sentence.
   static const double sealGlowStop = 0.7;
 
   /// The rim's alpha — the prototype's `${ember}66`.
@@ -100,7 +121,7 @@ class SealMonogram extends StatelessWidget {
         alignment: Alignment.center,
         // The prototype's `fontSize: 28` is absolute while the seal is
         // `size`-parameterised here, so the glyph scales with the seal: 28 at the
-        // default 60px, which is the 0.4667 ratio `LoginScreen.tsx:23` declares.
+        // default 60px, which is the 0.4667 ratio `LoginScreen.tsx:25` declares.
         child: Text(
           letter,
           style: TextStyle(

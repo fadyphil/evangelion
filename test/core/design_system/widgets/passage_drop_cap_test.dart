@@ -38,6 +38,28 @@ Widget _paragraph(
 Finder _capIn(Finder widget) =>
     find.descendant(of: widget, matching: find.byType(Text));
 
+/// The widget on its own — `build()`, not `paragraph()` — in a fixed box.
+///
+/// The `_paragraphKey` boundary is reused deliberately: the finder is what the
+/// RTL test addresses, and one key means one place to change if the arrangement
+/// moves.
+Widget _bare({required String letter, required TextDirection direction}) =>
+    evaAmbientHarness(
+      child: SizedBox(
+        width: 340,
+        height: 240,
+        child: Center(
+          child: RepaintBoundary(
+            key: _paragraphKey,
+            child: DefaultTextStyle(
+              style: _body,
+              child: PassageDropCap(letter: letter, direction: direction),
+            ),
+          ),
+        ),
+      ),
+    );
+
 void main() {
   group('geometry — the inventory\'s signature', () {
     test('the letter is required and there is no default', () {
@@ -121,13 +143,19 @@ void main() {
     });
   });
 
-  group('D6 — the direction, and it is not optional', () {
+  group('D6 — the direction, and which half actually does the work', () {
     // `WidgetSpan` has NO `textDirection` in this SDK. A placeholder is laid out
-    // by the PARAGRAPH's direction and by the child's own `Text.textDirection`.
-    // Getting either wrong puts the opening letter of every Arabic passage on
-    // the wrong side of the screen and nothing throws.
+    // by the PARAGRAPH's direction and by the child's own `Text.textDirection` —
+    // but the second of those cannot move a pixel for a one-character glyph, and
+    // this group says so rather than implying the two are equal.
 
-    test('the glyph takes the direction it was given', () {
+    test('the glyph is HANDED the direction — a wiring assertion, not a pixel', (
+      // This reads the field back off the constructed span. It fails if someone
+      // deletes `textDirection:` — and it would pass if the glyph were painted
+      // wrongly, because a one-character `Text` lays out identically under either
+      // direction. The observable half is asserted further down, on the
+      // paragraph's `textDirection` and on where the glyph actually lands.
+    ) {
       final WidgetSpan rtl = const PassageDropCap(
         letter: 'ا',
         direction: TextDirection.rtl,
@@ -139,21 +167,24 @@ void main() {
       expect((ltr.child as Text).textDirection, TextDirection.ltr);
     });
 
-    test('the paragraph carries the direction too', () {
-      expect(
-        const PassageDropCap(
-          letter: 'I',
-          direction: TextDirection.rtl,
-        ).paragraph(rest: 'x', bodyStyle: _body).textDirection,
-        TextDirection.rtl,
-      );
-      expect(
-        const PassageDropCap(letter: 'I')
-            .paragraph(rest: 'x', bodyStyle: _body)
-            .textDirection,
-        TextDirection.ltr,
-      );
-    });
+    test(
+      'the paragraph carries the direction too — this is the half that matters',
+      () {
+        expect(
+          const PassageDropCap(
+            letter: 'I',
+            direction: TextDirection.rtl,
+          ).paragraph(rest: 'x', bodyStyle: _body).textDirection,
+          TextDirection.rtl,
+        );
+        expect(
+          const PassageDropCap(letter: 'I')
+              .paragraph(rest: 'x', bodyStyle: _body)
+              .textDirection,
+          TextDirection.ltr,
+        );
+      },
+    );
 
     testWidgets('the cap opens the paragraph on the leading side', (
       WidgetTester tester,
@@ -242,6 +273,61 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the BARE widget is direction-INsensitive, and that is measured', (
+      WidgetTester tester,
+    ) async {
+      // M8, and the finding survives but not the fix that was proposed for it.
+      // The review asked for "a `testWidgets` pumping `PassageDropCap(letter:
+      // 'ا', direction: TextDirection.rtl)` bare and asserting the glyph lands
+      // right-aligned". That assertion cannot exist, and the reason is worth
+      // recording rather than working around.
+      //
+      // `build()` wraps the span in its own `RichText` with no `rest` after it.
+      // A `RichText` sizes itself to its content, so that content is one glyph:
+      // the boundary and the glyph occupy the *same* rect, and a box with
+      // nothing beside it has no leading or trailing edge to align to. Measured
+      // with `letter: 'ا'`, both directions give
+      // `Rect.fromLTRB(363.4, 226.5, 436.6, 373.5)` — identical to four decimal
+      // places.
+      //
+      // Consequently `build()`'s `textDirection` is unobservable in the same way
+      // the glyph's is, and hard-wiring it to `ltr` is green. Asserting the
+      // absence of that difference is the honest form: it passes today, it fails
+      // if the widget ever gains trailing content that *would* make direction
+      // matter, and it cannot pretend to be a guarantee it is not.
+      await tester.pumpWidget(_bare(letter: 'ا', direction: TextDirection.ltr));
+      await tester.pump();
+      final Rect ltrGlyph = tester.getRect(_capIn(find.byKey(_paragraphKey)));
+
+      await tester.pumpWidget(_bare(letter: 'ا', direction: TextDirection.rtl));
+      await tester.pump();
+      final Rect rtlGlyph = tester.getRect(_capIn(find.byKey(_paragraphKey)));
+
+      expect(rtlGlyph.left, closeTo(ltrGlyph.left, 0.5));
+      expect(rtlGlyph.top, closeTo(ltrGlyph.top, 0.5));
+      expect(rtlGlyph.right, closeTo(ltrGlyph.right, 0.5));
+      expect(rtlGlyph.bottom, closeTo(ltrGlyph.bottom, 0.5));
+      expect(
+        tester.getRect(find.byKey(_paragraphKey)).width,
+        closeTo(ltrGlyph.width, 0.5),
+        reason:
+            'the boundary is tight around the glyph, which is *why* there is no '
+            'axis to align against — if a `rest` span is ever added here this '
+            'goes red and the direction becomes observable',
+      );
+    });
+
+    testWidgets('and it still renders without throwing in either direction', (
+      WidgetTester tester,
+    ) async {
+      for (final TextDirection direction in TextDirection.values) {
+        await tester.pumpWidget(_bare(letter: 'I', direction: direction));
+        await tester.pump();
+        expect(tester.takeException(), isNull, reason: direction.name);
+        expect(_capIn(find.byKey(_paragraphKey)), findsOneWidget);
+      }
     });
   });
 

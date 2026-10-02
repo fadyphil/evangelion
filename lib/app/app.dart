@@ -34,9 +34,15 @@ class EvangelionApp extends StatelessWidget {
     //    to forget to dispose.
     //
     // It is above `MaterialApp` deliberately, which also means there is no
-    // `MediaQuery` to read from this far up — `animationsEnabled` is a parameter
-    // rather than a lookup. Phase 5 wires it to the persisted `UserSettings`;
-    // per-widget reduced-motion is honoured where the `MediaQuery` is, inside
+    // `MediaQuery` to read from this far up. So `animationsEnabled` is left at
+    // its default, which resolves the **platform's** own
+    // `accessibilityFeatures.disableAnimations` through
+    // `WidgetsBinding.instance.platformDispatcher` — reachable from anywhere,
+    // including above `MaterialApp`, and honoured again if the reader toggles it
+    // mid-session (`NeuralMotionScope` registers a `WidgetsBindingObserver`).
+    //
+    // Phase 5 replaces that default with the persisted `UserSettings` value, and
+    // per-widget reduced motion is honoured where the `MediaQuery` is, inside
     // `NeuralBackground` and `GoldFlecks`.
     return NeuralMotionScope(
       child: MaterialApp(

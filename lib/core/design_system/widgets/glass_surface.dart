@@ -29,7 +29,26 @@ import 'package:flutter/material.dart';
 /// plus a full read-back of everything painted behind it, **per frame**. The
 /// eight prototype sites would be eight of those; this enum is what keeps the
 /// number at two. A seventh `.blur` is not a style choice, it is a frame budget
-/// change, and this type exists so that adding one is visible in a diff.
+/// change.
+///
+/// ## AND WHAT ENFORCES THAT
+///
+/// The first version of this doc claimed the enum was enough "because this type
+/// exists so that adding one is visible in a diff". A diff is review, not a gate:
+/// somebody has to notice, count, and remember that the number is two, and
+/// `rg 'GlassTier.blur' lib/` hit this file and nothing else — Phase 3 could
+/// write it at all eight prototype sites and every test would stay green.
+///
+/// `glass_blur_budget_test.dart` is the gate. It walks `lib/features/`, fails
+/// above **two** occurrences, names the two allowed sites (Home's
+/// today's-reading panel and Home's top bar), and fails closed on a missing
+/// directory, an unreadable file or an empty walk. It also refuses a
+/// hand-built `BackdropFilter` in a feature, because that is the same
+/// `saveLayer` with no budget attached to it.
+///
+/// A runtime count cannot do this job: only the screens that exist are pumped by
+/// any suite, and Phase 3 is what writes the six real screens. The sites are
+/// source, not state.
 enum GlassTier {
   /// A translucent fill, a hairline rim and the ambient shadow. No `saveLayer`.
   ///
