@@ -18,9 +18,17 @@ final GetIt getIt = GetIt.instance;
 ///
 /// **Flutter-free by construction.** `get_it` and `injectable` are pure Dart,
 /// this file imports nothing from `package:flutter/`, and neither does anything
-/// it reaches — `injection_test.dart` walks that import graph and fails if it
-/// ever stops being true. So composition is unit-testable without
+/// it reaches. So composition is unit-testable without
 /// `WidgetsFlutterBinding.ensureInitialized()`.
+///
+/// `injection_test.dart` walks the transitive project-local import graph to keep
+/// that true. The walk follows `import`, `export` and `part` directives in both
+/// quote styles, because all three make the named library part of this file's
+/// own surface. An earlier version of that walk matched `import` only, and an
+/// `export 'package:flutter/material.dart';` planted in a reachable file left
+/// the whole suite green. The walk is now negative-controlled by a fixture built
+/// out of exactly the directive forms production code does not use, so it fails
+/// the moment the pattern narrows again.
 ///
 /// The generated `init()` is an **extension** emitted into the sibling
 /// `injection.config.dart`, which is why this file and that file cannot be the

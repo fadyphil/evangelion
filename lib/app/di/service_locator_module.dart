@@ -19,9 +19,19 @@ abstract class ServiceLocatorModule {
   /// The locator itself.
   ///
   /// Registered so a use case or adapter can declare `GetIt` as an injected
-  /// dependency instead of reaching for the global. That is what makes the
-  /// graph substitutable in a test — a fake can be handed the same locator and
-  /// resolve the same collaborators.
+  /// dependency instead of reaching for the global. That is what makes the graph
+  /// substitutable in a test — a fake can be handed the same locator through
+  /// its constructor parameter and resolve the same collaborators.
+  ///
+  /// What the *lifetime* does not buy, and what no test in the suite can check:
+  /// this provider returns `GetIt.instance`, which is itself a process-wide
+  /// singleton, so `@lazySingleton` and `@factory` yield the identical object
+  /// and `identical(getIt<GetIt>(), getIt)` holds either way. Registering it as
+  /// a singleton is still correct — it states the intent and saves a call
+  /// through the factory func — but the registration is not what makes the
+  /// locator unique. `injection_test.dart` states the limitation next to the
+  /// assertion it constrains, and carries a negative control proving the
+  /// harness would otherwise have caught a factory.
   @lazySingleton
   GetIt get serviceLocator => GetIt.instance;
 

@@ -28,8 +28,15 @@ import 'package:evangelion/core/common/failure.dart';
 /// information loss is written at the call site, and [fold] is the API a caller
 /// should reach for first.
 ///
-/// See `result_test.dart` for the guarantees, including the compile-time proof
-/// that the sealed set has exactly two members.
+/// ### Where the "exactly two members" guarantee is proved
+///
+/// In this file, not in the test suite. Every `switch` below is an exhaustive
+/// switch *expression* over a `sealed` type with no `default` arm, so adding a
+/// third subtype breaks the build of `result.dart` itself — five independent
+/// compile errors before a single test is compiled. `result_test.dart` restates
+/// the same pattern in two local functions; that is useful documentation of the
+/// property and it would catch the same change, but it adds nothing the
+/// switches here do not already enforce.
 sealed class Result<T> extends Equatable {
   const Result();
 
@@ -105,18 +112,35 @@ sealed class Result<T> extends Equatable {
   /// The success value, or [orElse] if this is a failure.
   ///
   /// **This accessor discards the [Failure].** It is named so the discard is
-  /// visible at the call site, and it exists for the one case [fold] cannot
-  /// serve: when the two arms need *different* types, which in Flutter means
-  /// `result.valueOrElse(const CircularProgressIndicator())`. When both arms
-  /// can produce the same type, use [fold] and you are forced to handle the
-  /// failure explicitly.
+  /// visible at the call site.
   ///
-  /// [R] is deliberately unconstrained, so the fallback may be a different
-  /// type from [T]; that is what requires the single `as R` below. Callers who
-  /// pass a fallback of an unrelated type are asserting they do not need the
-  /// value in that case.
-  R valueOrElse<R>(R orElse) => switch (this) {
-    Success<T>(:final value) => value as R,
+  /// [orElse] is typed as [T] on purpose, and that is the whole design. An
+  /// unconstrained `<R>` looks more capable — it is what lets
+  /// `result.valueOrElse(const CircularProgressIndicator())` compile against a
+  /// `Result<Reading>` — but it is unsound. With `R` inferred from the fallback
+  /// argument *and* the context type, `R` settles on `Widget` and the success
+  /// arm runs `value as Widget`, which throws
+  /// `type 'Reading' is not a subtype of type 'Widget'`. That conversion is only
+  /// sound when the caller already holds a `Reading`, which is exactly the case
+  /// in which they did not need a fallback.
+  ///
+  /// So the differing-arms case — a widget on one arm, a value on the other —
+  /// does not compile here, and that is the honest outcome: it is not a
+  /// conversion, it is a branch. Write the branch with [fold], whose [R] is
+  /// inferred from *both* arms and is therefore checked at both:
+  ///
+  /// ```dart
+  /// final Widget child = result.fold<Widget>(
+  ///   onSuccess: (Reading r) => ReadingView(r),
+  ///   onFailure: (Failure f) => const CircularProgressIndicator(),
+  /// );
+  /// ```
+  ///
+  /// Reach for `valueOrElse` when both arms really are the same type and the
+  /// caller has decided, in one word at the call site, that losing the failure
+  /// is acceptable.
+  T valueOrElse(T orElse) => switch (this) {
+    Success<T>(:final value) => value,
     FailureResult<T>() => orElse,
   };
 
