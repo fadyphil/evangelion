@@ -1,8 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds talk to the Evangelion API over HTTP. The debug/profile
+         manifests already declare this, so without it here every network call
+         fails in release only. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- `android:usesCleartextTraffic="true"` is REQUIRED, not cosmetic. The
+         dev backend is plain HTTP at http://localhost:3000, and since API 28
+         cleartext traffic defaults to false once targetSdk >= 28 (here
+         targetSdk = flutter.targetSdkVersion, see build.gradle.kts). Android
+         grants NO localhost exemption, so without this attribute the release
+         build fails at the first request with `SocketException: Cleartext HTTP
+         traffic to localhost not permitted` while debug still works.
+         REMOVE this attribute once the backend is served over TLS — it must
+         never ship to production. -->
     <application
         android:label="evangelion"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

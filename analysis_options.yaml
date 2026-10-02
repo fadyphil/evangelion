@@ -28,8 +28,69 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # --- AGENT_CONTEXT §4: no dynamic anywhere -----------------------------
+    - avoid_dynamic_calls
+    - avoid_returning_null_for_void
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+    # --- AGENT_CONTEXT §4: explicit types on every public API --------------
+    - always_declare_return_types
+    # NOTE: `omit_local_variable_types` is deliberately NOT enabled — this
+    # project keeps explicit local types too.
+
+    # --- AGENT_CONTEXT §4: final by default --------------------------------
+    - prefer_final_locals
+    - prefer_final_in_for_each
+    - avoid_function_literals_in_foreach_calls
+
+    # --- AGENT_CONTEXT §4: no bare dropped futures -------------------------
+    - unawaited_futures
+    - await_only_futures
+
+    # --- AGENT_CONTEXT §4: debugPrint, never print -------------------------
+    - avoid_print
+
+    # --- AGENT_CONTEXT §4: error handling discipline ------------------------
+    - only_throw_errors
+    - throw_in_finally
+    - avoid_catches_without_on_clauses
+    - avoid_catching_errors
+
+    # --- SOLID: resource lifetimes (LSP — no leaks across the seam) ---------
+    - cancel_subscriptions
+    - close_sinks
+
+    # --- AGENT_CONTEXT §4: idiomatic API shape -----------------------------
+    - use_super_parameters
+    - avoid_positional_boolean_parameters
+    - unnecessary_lambdas
+    - unnecessary_this
+    - avoid_void_async
+    - no_leading_underscores_for_local_identifiers
+    - test_types_in_equals
+    - avoid_empty_else
+    - avoid_slow_async_io
+
+    # --- Effective Dart: performance ----------------------------------------
+    - sized_box_for_whitespace
+    - sized_box_shrink_expand
+
+    # --- Effective Dart: formatting ----------------------------------------
+    - prefer_single_quotes
+    - require_trailing_commas
+
+    # --- Effective Dart: const ----------------------------------------------
+    # AGENT_CONTEXT §4 mandates `const` wherever the compiler allows, but nothing
+    # enforced it. These two make the requirement objective.
+    - prefer_const_constructors
+    - prefer_const_literals_to_create_immutables
+
+    # --- Import hygiene -----------------------------------------------------
+    # `dart format` does NOT sort imports, so an unsorted directive list never
+    # self-corrects; the analyzer is the only thing that will catch it.
+    - directives_ordering
+
+    # --- Bilingual (ar / en) safety -----------------------------------------
+    # A bilingual string table is a list of literals. Without this lint, a
+    # half-translated set (English left in the Arabic arm, or a value dropped
+    # from one language) compiles and ships silently.
+    - no_adjacent_strings_in_list
