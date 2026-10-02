@@ -7,12 +7,93 @@
 # rely on the exit code instead of reading output.
 #
 # Usage:  tool/verify_purity.sh
-# Exit:   0 = all gates clean, 1 = violations found, 2 = a gate could not run.
+# Exit:   0 = all gates clean (or degraded/vacuous, as printed),
+#         1 = violations found, 2 = a gate could not run.
+#
+# NOTE ON `set -e`: deliberately NOT used. Exit code 1 from `rg` means "no
+# matches", which is the outcome these gates *want*, and `-e` would abort the
+# script at that point instead of letting the status be read as clean. Every
+# scanning status is therefore captured explicitly and dispatched by hand.
 
 set -uo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 2
+
+# ---------------------------------------------------------------------------
+# Preflight — a gate that could not run must say so, loudly.
+#
+# `rg` writes its own failures to stderr. Discarding stderr and matching on
+# stdout alone turns a broken or missing toolchain into empty output, which an
+# unguarded `while read` loop silently swallows: no iterations, no violations,
+# a green tick. A previous version of this script did exactly that and
+# *upgraded* the failure into "PASSED — all gates exercised and clean". So the
+# tools are checked up front, and every scan below distinguishes "found
+# nothing" from "could not look".
+# ---------------------------------------------------------------------------
+command -v rg >/dev/null 2>&1 || {
+  printf 'FATAL: ripgrep (rg) is not on PATH — gates did not run\n' >&2
+  exit 2
+}
+# ...and prove it can actually MATCH. `command -v` only proves a binary exists;
+# an `rg` that reports "no matches" for everything — a wrapper, a shell alias, a
+# broken install — would turn every gate into a silent pass, and its exit 1 is
+# indistinguishable from the legitimate "found nothing". Matching a line piped
+# in on stdin needs no fixture file to keep in sync.
+printf 'purity_probe\n' | rg --quiet '^purity_probe$' - || {
+  printf 'FATAL: rg cannot match a known string — gates did not run\n' >&2
+  exit 2
+}
+[[ -d lib ]] || {
+  printf 'FATAL: no lib/ under %s — gates did not run\n' "$ROOT" >&2
+  exit 2
+}
+
+readonly TMP_CAPTURE="$(mktemp)"
+trap 'rm -f "$TMP_CAPTURE"' EXIT
+
+# Status of the last `scan`. 0 = matches, 1 = no matches (the GOOD outcome).
+_RG_RC=0
+# Why the last `scan` failed, in words, for the FATAL message.
+_SCAN_ERR=''
+
+# Runs `rg "$1" "${@:2}"` into $TMP_CAPTURE and stashes the status in $_RG_RC.
+# Returns non-zero only when the result cannot be believed, so the caller must
+# treat that as fatal rather than as "clean". The capture goes through a file
+# rather than a pipe or a process substitution because $_RG_RC has to survive
+# the command — inside `<(...)` the status would belong to a subshell that is
+# gone by the time it is read.
+scan() {
+  rg --no-heading --line-number "$1" "${@:2}" >"$TMP_CAPTURE"
+  _RG_RC=$?
+  _SCAN_ERR=''
+  case $_RG_RC in
+    0)
+      # rg exits 0 only when it matched, and a match always prints a line. Exit
+      # 0 with nothing captured is self-contradictory: this rg is claiming a
+      # match it did not report, and believing it would be a silent pass.
+      if [[ ! -s "$TMP_CAPTURE" ]]; then
+        _SCAN_ERR='rg exited 0 but captured no matching line'
+        return 1
+      fi
+      ;;
+    1) return 0 ;;
+    *)
+      _SCAN_ERR="rg exited $_RG_RC"
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+# Prints every non-empty captured line as a violation and counts them.
+report_capture() {
+  local line
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    fail "$line"
+  done <"$TMP_CAPTURE"
+}
 
 violations=0
 skipped=0
@@ -38,17 +119,29 @@ echo
 # Gate 1 — domain purity.
 #
 # core/domain/ and every features/<f>/domain/ are pure Dart. They must not
-# import Flutter, Dio, or http. Matched on import *directives* only, so a doc
-# comment that merely mentions "package:flutter/" does not trip the gate.
+# reach Flutter, Dio, or http.
 #
-# NOTE: an earlier version of this gate used a plain substring search. It had to
-# be weakened because a legitimate doc comment referencing the forbidden package
-# would have failed it. Do not "simplify" it back.
+# WHY `import|export|part` AND NOT JUST `import`: all three directives make the
+# named library part of this file's own surface. An `export` of
+# `package:flutter/material.dart` is exactly as impure as an `import` of it,
+# and it satisfies no lint, so nothing else in the toolchain catches it. Same
+# for `part`, which pulls a file into this library's namespace. DO NOT NARROW
+# THIS TO `import` — that regression was found by negative control, not by
+# reading the code.
+#
+# WHY THE MATCH IS ANCHORED TO A DIRECTIVE KEYWORD: an earlier version of this
+# gate used a plain substring search. It had to be weakened because a legitimate
+# doc comment referencing the forbidden package would have failed it. Do not
+# "simplify" it back.
+#
+# Single quotes only, because `prefer_single_quotes` is enabled in
+# analysis_options.yaml and `dart analyze --fatal-infos` makes a double-quoted
+# directive a hard error anyway. Gate 2 does not rely on that lint and so
+# matches both quote styles.
 # ---------------------------------------------------------------------------
 echo "Gate 1 — domain purity (no flutter/dio/http in domain layers)"
 
-readonly IMPORT_RE="^[[:space:]]*import[[:space:]]+'package:(flutter|dio|http)/"
-readonly FORBIDDEN_RE="package:(flutter|dio|http)/"
+readonly DIRECTIVE_RE="^[[:space:]]*(import|export|part)[[:space:]]+'package:(flutter|dio|http)/"
 
 domain_dirs=()
 for d in lib/core/domain lib/features/*/domain; do
@@ -60,13 +153,17 @@ if [[ ${#domain_dirs[@]} -eq 0 ]]; then
 else
   gate1_hits=0
   for d in "${domain_dirs[@]}"; do
-    while IFS= read -r line; do
-      [[ -z "$line" ]] && continue
-      fail "$line"
+    if ! scan "$DIRECTIVE_RE" "$d"; then
+      printf 'FATAL: gate 1 could not scan %s — %s\n' "$d" "$_SCAN_ERR" >&2
+      exit 2
+    fi
+    report_capture
+    if [[ -s "$TMP_CAPTURE" ]]; then
       gate1_hits=1
-    done < <(rg --no-heading --line-number "$IMPORT_RE" "$d" 2>/dev/null)
+    fi
   done
-  [[ $gate1_hits -eq 0 ]] && ok "${#domain_dirs[@]} domain dir(s) import no flutter/dio/http"
+  [[ $gate1_hits -eq 0 ]] &&
+    ok "${#domain_dirs[@]} domain dir(s) reach no flutter/dio/http"
 fi
 
 echo
@@ -74,31 +171,58 @@ echo
 # ---------------------------------------------------------------------------
 # Gate 2 — feature independence.
 #
-# No feature may import another feature. Shared code belongs in core/.
+# No feature may import another feature, and lib/core/ may import none. Shared
+# code belongs in core/.
 #
-# WHY THIS IS A LOOP AND NOT ONE rg CALL: the rule compares the importing
-# file's own feature against the feature it imports, so it is inherently
-# per-feature. A single-line regex cannot do that — an attempt using a
-# backreference (`features/(\w+)/\1`) does not merely fail to compile in ripgrep,
-# it silently passes every line, which is worse than having no gate at all.
+# The comparison is inherently per-file — it contrasts the importing file's own
+# feature with the feature it imports — so it cannot be one regex. An earlier
+# attempt used a backreference, `rg -v "features/(\w+)/\1"`: ripgrep has no
+# backreferences, so the pattern failed to *compile*, and the failure was silent
+# — exit 0, every line "passed". A gate that cannot fail is worse than no gate,
+# because it is believed.
+#
+# `tool/feature_import_check.dart` does the comparison. It exists as Dart
+# rather than shell because same-package imports are legal in two syntaxes
+# (`package:evangelion/features/…` and `../../…`), and resolving `../..` is
+# exactly where hand-rolled shell path arithmetic goes quietly wrong. See that
+# file for its own rationale, and run it directly if you need the detail:
+#
+#   dart run tool/feature_import_check.dart
+#
+# It exits 0 clean, 1 with violations (one `path:line: directive` line each), or
+# 2 if it could not run — and it makes ONE pass over the tree, so a `lib/core/`
+# violation is reported once rather than once per feature.
 # ---------------------------------------------------------------------------
 echo "Gate 2 — feature independence (no cross-feature imports)"
 
 if ! compgen -G "lib/features/*/" >/dev/null; then
   skip "no features exist yet — gate is vacuous, not passing"
+elif ! command -v dart >/dev/null 2>&1; then
+  printf 'FATAL: Dart SDK not on PATH — gate 2 could not run\n' >&2
+  exit 2
 else
-  gate2_hits=0
-  for dir in lib/features/*/; do
-    name="$(basename "$dir")"
-    while IFS= read -r line; do
-      [[ -z "$line" ]] && continue
-      fail "$line"
-      gate2_hits=1
-    done < <(rg --no-heading --line-number "package:evangelion/features/" \
-              "$dir" lib/core/ 2>/dev/null \
-              | rg -v "package:evangelion/features/${name}/")
-  done
-  [[ $gate2_hits -eq 0 ]] && ok "no feature imports another feature"
+  gate2_rc=0
+  dart run tool/feature_import_check.dart >"$TMP_CAPTURE" || gate2_rc=$?
+  case $gate2_rc in
+    0)
+      ok "no feature imports another feature"
+      ;;
+    1)
+      # Exit 1 means "violations found", so there must be something to report.
+      # Nothing printed would mean this gate is claiming a violation it did not
+      # show — the same silent-pass shape, one layer down.
+      if [[ ! -s "$TMP_CAPTURE" ]]; then
+        printf 'FATAL: gate 2 reported violations but printed none\n' >&2
+        exit 2
+      fi
+      report_capture
+      ;;
+    *)
+      printf 'FATAL: gate 2 could not run tool/feature_import_check.dart (dart exit %d)\n' \
+        "$gate2_rc" >&2
+      exit 2
+      ;;
+  esac
 fi
 
 echo
@@ -113,7 +237,7 @@ echo
 # ---------------------------------------------------------------------------
 echo "Gate 3 — generated files remain lint-silent"
 
-mapfile -t generated < <(find lib -name '*.gr.dart' -o -name '*.config.dart' 2>/dev/null | sort)
+mapfile -t generated < <(find lib -name '*.gr.dart' -o -name '*.config.dart' | sort)
 
 if [[ ${#generated[@]} -eq 0 ]]; then
   skip "no generated files yet"
@@ -128,7 +252,8 @@ else
       gate3_hits=1
     fi
   done
-  [[ $gate3_hits -eq 0 ]] && ok "${#generated[@]} generated file(s) carry the lint-silent header"
+  [[ $gate3_hits -eq 0 ]] &&
+    ok "${#generated[@]} generated file(s) carry the lint-silent header"
 fi
 
 echo

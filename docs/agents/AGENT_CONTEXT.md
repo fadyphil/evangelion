@@ -320,7 +320,11 @@ The call site `await configureDependencies()` is therefore stable forever. `unaw
 will turn this into a compile error the day a module registers an async dependency and
 `init()` becomes `Future<GetIt>` — which is the intended behaviour, not a lint to suppress.
 The composition root MUST NOT import `package:flutter/`; a test walks the transitive
-project-local import graph to prove it.
+project-local import graph to prove it. That walk follows `import`, `export`, and `part`
+directives in both quote styles — the graph is only Flutter-free if it is followed
+completely — and a fixture built out of exactly those non-default forms keeps the walk
+honest, because the production graph uses none of them. See §7, "A gate that cannot fail is
+worse than no gate", for why that last part is not optional.
 
 This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
 
@@ -339,10 +343,10 @@ tool/verify_purity.sh                                      # architecture gates
 
 `tool/verify_purity.sh` enforces all three architecture rules mechanically:
 
-1. **Domain purity** — `core/domain/` and every `features/*/domain/` import no
-   `package:flutter/`, `package:dio/`, or `package:http/`. Matched on import
-   *directives*, so a doc comment mentioning the package name does not false-positive.
-2. **Feature independence** — no feature imports another feature.
+1. **Domain purity** — `core/domain/` and every `features/*/domain/` reach no
+   `package:flutter/`, `package:dio/`, or `package:http/`.
+2. **Feature independence** — no feature imports another feature, and `lib/core/` imports
+   no feature at all.
 3. **Generated files stay lint-silent** — every `*.gr.dart` / `*.config.dart` keeps its
    `// ignore_for_file: type=lint` header, so hand-edits are detectable.
 
@@ -350,13 +354,51 @@ Exit `0` clean, `1` violations found, `2` a gate could not run. A gate whose tar
 directory does not exist yet reports **vacuous** and says so — report that honestly rather
 than calling it a pass.
 
-> **Why a script and not a one-liner.** The previous inline cross-feature check used a
-> backreference, `rg -v "features/(\w+)/\1"`. Ripgrep does not support backreferences, so the
-> pattern failed to compile — and the failure was *silent*, exiting `0` and passing every
-> line. That is strictly worse than no gate. Feature independence is inherently per-feature
-> (it compares the importing file's feature against the one it imports), so it needs a loop.
-> The script is negative-controlled: planting all three violation types makes it exit `1`
-> and print each one.
+#### What each gate matches — do not narrow these patterns
+
+- **Gate 1 matches `import`, `export`, *and* `part`** against
+  `package:(flutter|dio|http)/`. All three make the named library part of the file's own
+  surface: an `export` of `package:flutter/material.dart` is exactly as impure as an
+  `import` of it, and neither it nor `part` trips any lint. Both were found by negative
+  control — the gate printed `ok` while a planted `export` sat in a domain file. Do not
+  "simplify" this back to `import`.
+- **The match is anchored to a directive keyword, never a bare substring.** A doc comment
+  explaining *why* a file is dependency-free mentions the forbidden package by name; a
+  substring scan would fail the gate and force that documentation to be watered down.
+- **Gate 2 resolves paths, it does not match URIs.** `tool/feature_import_check.dart` (pure
+  Dart, `dart:io` only, no dependency, no codegen — run it directly with
+  `dart run tool/feature_import_check.dart`) resolves every `import` / `export` / `part`
+  target to a path under `lib/`, takes its feature segment, and compares it against the
+  importing file's own feature. Same-package imports are legal Dart in **two** forms —
+  `package:evangelion/features/quiz/…` and `../../quiz/…` — and a URI-substring check
+  catches only the first. It makes one pass, so a `lib/core/` violation is reported once, not
+  once per feature.
+- **Gate 2 matches both quote styles; Gate 1 matches single quotes only.** `prefer_single_quotes`
+  is enabled and `--fatal-infos` makes the other form fatal, so Gate 1 relies on the analyzer
+  for that. Gate 2 is a standalone `dart run` and must not.
+
+#### A gate that cannot fail is worse than no gate
+
+The previous inline cross-feature check used a backreference,
+`rg -v "features/(\w+)/\1"`. Ripgrep has no backreferences, so the pattern failed to
+*compile* — and the failure was silent: exit `0`, every line "passed".
+
+The same class of bug lived inside the script itself: it discarded `rg`'s stderr and read
+only stdout, so a broken or missing `rg` produced empty output, the hit counter stayed `0`,
+and it printed `PASSED — all gates exercised and clean`. A broken toolchain was reported as a
+clean run. **A gate has to be able to fail before you may believe it passes.** Concretely:
+
+- `rg` missing from `PATH` → `FATAL … exit 2`. `rg` present but unable to match a known
+  string piped in on stdin → `FATAL … exit 2`.
+- Every scan captures `rg`'s status explicitly: `1` means "no matches" (the good outcome),
+  anything `>= 2` is `FATAL … exit 2`. `0` with an empty capture is self-contradictory and
+  also `FATAL`.
+- **The script deliberately does not use `set -e`.** `rg` exits `1` on zero matches, and `-e`
+  would abort the script at exactly the moment the clean result is available to be read.
+
+Every gate above is negative-controlled: the violation is planted in a scratch copy under
+`/tmp/opencode/purity/`, and the correct non-zero exit and message are confirmed. **When you
+change a gate, plant a violation and prove it fires before reporting the gate as fixed.**
 
 **Backend must not be modified.** It is read-only reference material at
 `/home/fady/Projects/EvangelionBackend`. Never write there. Never run migrations or
