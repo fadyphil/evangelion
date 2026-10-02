@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds talk to the Evangelion API over HTTP. The debug/profile
+         manifests already declare this, so without it here every network call
+         fails in release only. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="evangelion"
         android:name="${applicationName}"

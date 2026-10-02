@@ -1,71 +1,98 @@
-# AGENTS.md
+# AGENTS.md — Evangelion Flutter client
 
-Fastify + TypeScript (ESM) backend for a bilingual (Arabic Smith & Van Dyck / English NKJV) Sunday-School daily Bible reading platform. Postgres + Redis with an **active in-memory fallback**, so it runs with zero infrastructure.
+Flutter client for **Evangelion**, a bilingual (Arabic Smith & Van Dyck / English NKJV)
+Sunday-School daily Bible reading platform. Fastify 3.47-era backend, live REST API.
+
+> **The authority for how to build this project is
+> [`docs/agents/AGENT_CONTEXT.md`](docs/agents/AGENT_CONTEXT.md).** It defines scope,
+> architecture, Dart standards, the forbidden-API table, the TDD protocol, and the
+> verification gates. Read it before writing code. It overrides any conflicting statement
+> anywhere else in this repository, including these docs and anything under `docs/plans/`.
 
 ## Commands
 
 ```bash
-npm ci                     # install (node_modules is not committed)
-npm run dev                # tsx watch, http://localhost:3000, Swagger at /docs
-npm run build              # tsc -> dist/   (the ONLY typecheck; covers src/ only)
-npm test                   # vitest run (26 tests)
-npx vitest run tests/api.test.ts          # single file
-npx vitest                 # watch mode
-npm run migrate            # SQL migrations + seeds  — REQUIRES real Postgres
-npm run import-bible       # rebuilds src/db/bible_data.json (+ optional PG insert)
-npm run tunnel             # Cloudflare quick tunnel for $PORT (untun); run `npm run dev` alongside
+flutter pub get                 # install
+flutter run -d linux            # the only device currently available
+flutter analyze                 # types + lint + DEPRECATION warnings — the main gate
+dart format lib test            # formatting
+flutter test                    # unit + widget + golden
+dart test --coverage=coverage   # coverage -> coverage/lcov.info
 ```
 
-There is **no lint, no formatter, and no `vitest.config`**. Nothing to run but `npm run build && npm test`.
+Target a different backend at build time:
 
-## Critical: the in-memory fallback is not optional
+```bash
+flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
+```
 
-`npm run dev` and `npm test` succeed with no Postgres and no Redis. `src/db/pool.ts` catches `ECONNREFUSED` and routes to `src/db/memory_db.ts`; `src/redis/client.ts` does the same with `InMemoryRedisFallback`. The warnings `⚠️ [DB Fallback]` / `⚠️ [Redis Fallback]` in normal output are expected — do not "fix" them.
+## Architecture in one paragraph
 
-Consequences when editing data access:
+Feature-first clean architecture. Dependency direction is strictly inward:
+`presentation → domain ← data`. The shared kernel `core/domain/` holds the four repository
+ports and every entity consumed by two or more features. `core/domain/` and every
+`features/*/domain/` are **pure Dart** — no `package:flutter`, no `package:dio`, no
+`package:http`. **No feature may import another feature.** If two features need the same
+type, it belongs in `core/domain/`.
 
-- `memoryDb.executeQuery()` dispatches on **`t.includes(...)` substring matches against the raw SQL text** and unpacks params **positionally** by index. A new query, or a reworded one, silently returns `{ rows: [], rowCount: 0 }` — no throw, no log. Every new or changed SQL statement needs a new branch in `memory_db.ts`, and the substring must keep matching.
-- Only `zincrby`, `zrevrange`, `zrevrank`, `zscore`, and `pipeline()` are emulated in Redis. Anything else needs adding to `InMemoryRedisFallback`.
-- `BEGIN`/`COMMIT`/`ROLLBACK` are no-ops. Multi-statement transactions are **not** atomic in fallback mode — don't rely on rollback when testing locally.
-- `memory_db.ts` auto-provisions users (`group_id: 3`, role `kid`) and a John 3:1-5 reading + MCQ for any group/date, so unknown IDs and unscheduled cohorts return 200 instead of 404. That masks "reading not scheduled" bugs during local testing.
-- `npm run migrate` and `import_bible`'s DB insert use the raw `pool` (not the fallback `query()`), so they hard-fail with `ECONNREFUSED` when Postgres is down. `import-bible` still writes `bible_data.json` before attempting the insert.
+The six screens are `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`. The
+Library and Profile screens were **cut** — the backend has no endpoints for them.
 
-## Modules & routing
+## Non-negotiables
 
-`src/app.ts:133` registers every module under the single `/api/v1` prefix. Module files export `xxxRoutes(fastify)` and declare paths *relative to that prefix* while including their own sub-path (`/readings/today/ar`, `/admin/readings/schedule`, `/streak/summary`). Add new routes in the module file; don't add the prefix twice.
+1. **`dart analyze` must report zero issues** with `--fatal-infos --fatal-warnings`. It is
+   the objective gate for types, lints, and deprecated API usage alike.
+2. **No deprecated APIs.** The forbidden list is in AGENT_CONTEXT §4. The list is a seed —
+   the analyzer is the enforcement. Fix with `dart fix --apply --code=deprecated_member_use`.
+3. **Domain purity is mechanically checked.** See AGENT_CONTEXT §7 for the `rg` commands.
+   Matches mean failure.
+4. **The backend is read-only.** Never write to `/home/fady/Projects/EvangelionBackend`.
+   It is reference material, not a workspace.
+5. **Never** add a dependency, new screen, or endpoint outside the current task's scope.
 
-Layout: `src/modules/<domain>/<domain>.routes.ts` + optional `<domain>.service.ts`, singleton service instance exported at the bottom of the service file (`export const readingsService = new ReadingsService()`).
+## Regenerating code
 
-## Auth is fake — do not assume authorization exists
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
 
-`src/middleware/identity.middleware.ts` runs on every request and populates `request.user` **only if `X-User-Id` is present**, from `X-User-Id` / `X-User-Role` / `X-Group-Id`. `X-User-Role` is parsed into `request.user.role` but is **never checked by any route** — `/api/v1/admin/*` and `/api/v1/servant/*` are unauthenticated. Real auth is explicitly deferred (`system_design_specification.md` §2). Routes often re-read raw headers instead of `request.user`.
+Two generators run: `auto_route_generator` (emits `*.gr.dart` routers) and
+`injectable_generator` (emits `*.config.dart` DI registration). Both regenerate
+**globally** across the package, so two agents must never run codegen concurrently.
 
-## Conventions
+`build.yaml` pins both injectable builders to `lib/**/*.dart`; build_runner silently
+ignores options for an unknown builder key, so a stale key leaves the file inert without
+erroring.
 
-- **ESM / NodeNext.** Every relative import needs an explicit `.js` extension, including in `tests/` (`import { buildApp } from '../src/app.js'`). There is no `__dirname`; use `fileURLToPath(import.meta.url)`.
-- **Error contract:** services throw `new Error('CODE: message')` and routes string-match with `err.message?.includes('ALREADY_SUBMITTED')` / `.includes('NOT_FOUND')` → 409 / 404. Tests assert on exact message substrings (`'x-group-id'`, `'start boundary cannot be after end boundary'`) — don't reword messages that tests or the frontend depend on.
-- **Validation is inconsistent by module:** zod `safeParse` + `parseResult.error.flatten()` in `admin`, `ai`, `submissions`; inline manual checks + JSON-schema response docs in `readings`, `streak`, `leaderboard`. Match the file you're editing.
-- Response docs use `example:` in JSON schemas, which is why `app.ts` registers the custom ajv `example` keyword. Removing that breaks startup.
-- Column names are asymmetric: DB columns are `text_en_nkjv` / `text_ar_vandyk`, always aliased to `text_en` / `text_ar` in SQL; the in-memory and JSON shapes use `text_en` / `text_ar` / `text_ar_clean`. Preserve the aliases.
+## Project layout
 
-## Testing
+```
+lib/
+  main.dart            bootstrap
+  app/                 composition root: DI, router
+  core/
+    design_system/     tokens, theme, effects, 27 widgets
+    common/            Result, Failure, AppConfig
+    domain/            SHARED KERNEL: ports + multi-consumer entities (pure Dart)
+    network/           Dio client, header interceptor, error mapper
+    navigation/        route name constants
+  features/<f>/
+    domain/            this feature's use cases only (pure Dart)
+    data/              models, mappers, data sources, repository impls
+    presentation/      bloc/cubit, pages, widgets
+assets/fonts/          20 static TTFs, 5 families (bundled, not fetched at runtime)
+docs/plans/            port plan, corrected against live-API scope
+docs/agents/           AGENT_CONTEXT.md — the authority
+eva/                   React design prototype (reference only, not built)
+```
 
-`npm test` runs the whole suite against the in-memory engine — no services, no network, no `GEMINI_API_KEY` needed (`AiQuestionService` falls back to a local generator). `tests/api.test.ts` and `tests/streak.test.ts` use `app.inject()`; `leaderboard.test.ts` asserts Redis key formats only.
+## Git
 
-`tsconfig.json` **excludes `tests/`**, and vitest does not typecheck — so type errors in tests are invisible to both `npm run build` and `npm test`. Be careful editing test files.
+One branch per phase (`feat/phase-N-<name>`), merged to `main` at each gate after review.
+Commit format: `<type>(<scope>): <subject>`.
 
-## Generated / large assets — do not hand-edit
+## Deployment note
 
-- `src/db/bible_data.json` — ~20 MB single-line JSON, the compiled bilingual dataset consumed by the in-memory fallback. Never pretty-print or hand-edit; regenerate with `npm run import-bible`.
-- `kjv.txt` (4 MB) and `arb-vd_readaloud/` (1192 chapter `.txt` files) are the committed source corpora for that build.
-
-## Deploy
-
-- `docker compose up -d` starts api + postgres + redis, but the **api container never runs migrations**. Run `npm run migrate` then `npm run import-bible` separately. The Dockerfile copies `bible_data.json` into both `dist/db/` and `src/db/` because `memory_db.ts` probes both locations.
-- `render.yaml` targets Render (web + Postgres + Redis), `buildCommand: npm install && npm run build`.
-
-## Docs drift — trust the code
-
-`README.md` is stale in places: it documents `POST /api/v1/ai/generate-questions` (actual: `POST /api/v1/admin/questions/ai-generate`), and its `DATABASE_URL` / `GEMINI_MODEL` disagree with `.env.example` and `src/config/env.ts`. `.env.example` matches the code defaults. Client-side contracts (TS models, error-code table, RTL/diacritics rules) live in `FRONTEND_INTEGRATION_GUIDE.md`; the intended design is in `system_design_specification.md`.
-
-Also useful: `postman_collection.json` + `postman_environment.json` cover all route modules end-to-end and auto-capture `readingId` / `questionId` for submission flows.
+`android/app/build.gradle.kts` still uses the placeholder application id
+`com.example.evangelion`. Same for the iOS bundle identifier. Change both before any real
+distribution.

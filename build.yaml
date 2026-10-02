@@ -1,0 +1,24 @@
+# build_runner configuration.
+#
+# `injectable_generator` would otherwise run over every Dart file in the
+# package, including `test/`. Restricting it to `lib/**` keeps DI registration
+# generation scoped to production sources.
+#
+# NOTE ON BUILDER KEYS: injectable_generator declares TWO builders in its own
+# build.yaml — `injectable_builder` (emits `.injectable.json` to the build
+# cache) and `injectable_config_builder` (emits `.config.dart` to source).
+# Both are listed here. build_runner silently IGNORES options for an unknown
+# builder key (it only prints a warning), so a stale key such as the 1.x-era
+# `injectable_generator:injective_generator` would leave this file inert.
+targets:
+  $default:
+    builders:
+      injectable_generator:injectable_builder:
+        generate_for:
+          - lib/**/*.dart
+      injectable_generator:injectable_config_builder:
+        generate_for:
+          - lib/**/*.dart
+
+# `auto_route_generator` keeps its default scope: it only emits for files
+# annotated with `@RoutePage` / `@AutoRouterConfig`, so no entry is needed here.
