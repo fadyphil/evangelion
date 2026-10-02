@@ -14,8 +14,12 @@ void main() {
       expect(find.byType(AppBar), findsOneWidget);
       // The bare route path, not a product title. The stub names the screen it
       // stands in for, so a screenshot of it is self-identifying.
+      //
+      // The constant, not the literal — `AppRoutes.login` *is* `'/login'`, so
+      // asserting both was a byte-for-byte duplicate at runtime. This pins that
+      // the title is derived from the route definition;
+      // `app_routes_test.dart` is where the literal values are pinned.
       expect(find.text(AppRoutes.login), findsOneWidget);
-      expect(find.text('/login'), findsOneWidget);
     });
 
     testWidgets('body says it is a placeholder, not the real screen', (

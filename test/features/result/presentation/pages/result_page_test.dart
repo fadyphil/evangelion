@@ -12,8 +12,11 @@ void main() {
 
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(AppBar), findsOneWidget);
+      // The constant, not the literal — `AppRoutes.result` *is*
+      // `/result`, so asserting both was a byte-for-byte duplicate at
+      // runtime. `app_routes_test.dart` is where the literal values are
+      // pinned.
       expect(find.text(AppRoutes.result), findsOneWidget);
-      expect(find.text('/result'), findsOneWidget);
     });
 
     testWidgets('body says it is a placeholder, not the real screen', (

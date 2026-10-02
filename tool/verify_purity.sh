@@ -6,6 +6,11 @@
 # Each gate exits non-zero when it finds a violation, so a CI or agent can
 # rely on the exit code instead of reading output.
 #
+# Four gates, each negative-controlled: 1 domain purity · 2 feature independence
+# · 3 generated files stay lint-silent · 4 the route inventory is readable.
+# See AGENT_CONTEXT §7 for what each one matches and why those patterns must not
+# be narrowed.
+#
 # Usage:  tool/verify_purity.sh
 # Exit:   0 = all gates clean (or degraded/vacuous, as printed),
 #         1 = violations found, 2 = a gate could not run.
@@ -118,8 +123,25 @@ echo
 # ---------------------------------------------------------------------------
 # Gate 1 — domain purity.
 #
-# core/domain/ and every features/<f>/domain/ are pure Dart. They must not
-# reach Flutter, Dio, or http.
+# Every directory that is documented as PURE DART must not reach Flutter, Dio, or
+# http. That is currently:
+#
+#   lib/core/domain        the shared kernel: entities and ports (AGENT_CONTEXT §3)
+#   lib/features/*/domain  each feature's own use cases
+#   lib/core/common        Result<T>, Failure, AppConfig
+#   lib/core/navigation    AppRoutes
+#
+# WHY core/common AND core/navigation ARE IN THIS LIST, and why that is a claim
+# rather than a preference. Both files document the property in their own words —
+# app_routes.dart: "staying Flutter-free keeps the constants readable from any
+# layer"; app_config.dart: "Pure Dart by design: no Flutter import, so this can
+# be read from core/domain/". Both are load-bearing: Phase 5 has core/domain/
+# use cases reading AppConfig, and Phase 4 makes AppRoutes the most-imported file
+# in the app. Neither was checked by anything, so adding
+# `import 'package:flutter/material.dart';` to either left every gate green.
+#
+# Do NOT narrow this list back to the domain directories without reading those
+# two doc comments and re-deciding.
 #
 # WHY `import|export|part` AND NOT JUST `import`: all three directives make the
 # named library part of this file's own surface. An `export` of
@@ -139,12 +161,12 @@ echo
 # directive a hard error anyway. Gate 2 does not rely on that lint and so
 # matches both quote styles.
 # ---------------------------------------------------------------------------
-echo "Gate 1 — domain purity (no flutter/dio/http in domain layers)"
+echo "Gate 1 — domain purity (no flutter/dio/http in pure-Dart directories)"
 
 readonly DIRECTIVE_RE="^[[:space:]]*(import|export|part)[[:space:]]+'package:(flutter|dio|http)/"
 
 domain_dirs=()
-for d in lib/core/domain lib/features/*/domain; do
+for d in lib/core/domain lib/core/common lib/core/navigation lib/features/*/domain; do
   [[ -d "$d" ]] && domain_dirs+=("$d")
 done
 
@@ -163,7 +185,7 @@ else
     fi
   done
   [[ $gate1_hits -eq 0 ]] &&
-    ok "${#domain_dirs[@]} domain dir(s) reach no flutter/dio/http"
+    ok "${#domain_dirs[@]} pure-Dart dir(s) reach no flutter/dio/http"
 fi
 
 echo
@@ -254,6 +276,60 @@ else
   done
   [[ $gate3_hits -eq 0 ]] &&
     ok "${#generated[@]} generated file(s) carry the lint-silent header"
+fi
+
+echo
+
+# ---------------------------------------------------------------------------
+# Gate 4 — the route inventory is readable.
+#
+# The six route paths are locked by AGENT_CONTEXT §2, and the structural
+# invariants over them (no collisions, no stray whitespace, no uppercase, one
+# root, one wildcard) are asserted in `test/core/navigation/app_routes_test.dart`
+# over an inventory read from the declaration site. Dart has no reflection, so
+# that inventory is parsed, and an invariant applied to the wrong or empty set of
+# routes is an invariant that asserts nothing.
+#
+# This gate checks the *mechanism* the invariants rest on, not the invariants
+# themselves — so it is not a second copy of them. It exits 1 when a
+# `static const String` declaration exists whose initialiser is not a plain
+# string literal, because that route is then invisible to the invariants: it
+# fails loudly instead of being skipped. It exits 2 when the file is missing, is
+# empty, or holds no declarations at all, because "found nothing to complain
+# about" and "found nothing" are different answers.
+#
+# `tool/route_check.dart` holds the parsing; see that file for the extraction and
+# for what it still cannot see. The two share one implementation on purpose.
+# ---------------------------------------------------------------------------
+echo "Gate 4 — route inventory is parsable (app_routes.dart)"
+
+if ! command -v dart >/dev/null 2>&1; then
+  printf 'FATAL: Dart SDK not on PATH — gate 4 could not run\n' >&2
+  exit 2
+else
+  gate4_rc=0
+  dart run tool/route_check.dart >"$TMP_CAPTURE" 2>&1 || gate4_rc=$?
+  case $gate4_rc in
+    0)
+      ok "$(tr -d '\n' <"$TMP_CAPTURE")"
+      ;;
+    1)
+      # Exit 1 means "a declaration could not be parsed". Nothing printed would
+      # mean this gate claims a violation it did not show — the silent-pass
+      # shape again, one layer down.
+      if [[ ! -s "$TMP_CAPTURE" ]]; then
+        printf 'FATAL: gate 4 reported violations but printed none\n' >&2
+        exit 2
+      fi
+      report_capture
+      ;;
+    *)
+      printf 'FATAL: gate 4 could not run tool/route_check.dart (dart exit %d)\n' \
+        "$gate4_rc" >&2
+      cat "$TMP_CAPTURE" >&2
+      exit 2
+      ;;
+  esac
 fi
 
 echo
