@@ -328,6 +328,76 @@ worse than no gate", for why that last part is not optional.
 
 This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
 
+### Recorded decisions — Phase 1 review
+
+**5. Type sizes are the Material 3 defaults, by decision.** §5.2 specifies no font
+size, weight or line height, and the user chose the SDK's `material2021().englishLike`
+geometry over an Eva-specific scale. `eva_typography.dart` therefore decides only
+*which family renders each slot and in which ink*, and restating the sizes there
+would be a second copy of the framework's scale, free to drift from it.
+
+**The consequence, stated rather than discovered later:** `displayLarge` is 57sp
+where the prototype's largest type is 34px, and at 1.22× text scaling on a 320px
+screen it wraps to four lines — which `09-quality-gates.md` §14 forbids. So Phase 3
+owns one of two things and must not skip both:
+
+- clamp the display end of the scale when it builds the first screen, **or**
+- amend §14 to state the exception.
+
+**A golden must not be allowed to freeze 57sp silently.** A golden captures the
+current behaviour; if the first golden is captured with the display end unclamped,
+the four-line wrap becomes the reference image and the §14 violation becomes
+permanent and invisible. Clamp before capturing.
+
+**6. Light `onEmber` is `#3A1E00`, deliberately diverged from the spec.**
+`03-design-system.md` §5.1 gives `#FFF8EE`. Measured against WCAG 2.x relative
+luminance, `#FFF8EE` on the light `ember` `#D4891A` is **2.69:1** — below AA-large
+(3:1), let alone AA (4.5:1), so it fails at every text size. The user ruled: keep
+the spec's ember, fix `onEmber`.
+
+`#3A1E00` measures **5.41:1** on light `ember` and **13.46:1** as text on the light
+canvas. Dark is `#0D0A04` at **9.17:1** on dark `ember`. The token is dark in *both*
+palettes because its role is the same in both: ink on the accent. The detail that
+matters if anyone revisits this — darkening the value *while it stays light* makes
+it worse, not better; the ratio falls monotonically to ~1.05:1 as the value
+approaches ember's own luminance (`#D09040`) and only recovers on the far side.
+
+**`docs/plans/03-design-system.md` is now knowingly out of date on this one token.**
+It is the *only* token in the design system that diverges from spec, and it was
+not edited: AGENT_CONTEXT §8.6 gives `docs/plans/` a dedicated owner. If that owner
+revises §5.1, this entry is the change request.
+
+**7. All elevations are `0`, by decision.** `03-design-system.md` has no elevation
+table at all, and the React prototype has no z-axis either: every `box-shadow`
+there is either a zero-offset ember glow or the single glass ambient that became
+`EvaColors.glassShadow`. Layering is carried by `line`, the glass triple, and that
+one ambient — so "no Material elevation anywhere" is the faithful reading and the
+only value that can be stated without inventing a ramp.
+
+**What "what this suite cannot see" means for elevations.** Every token is `0`, so
+`elevation: EvaElevations.card` and `elevation: 0` are the same program. No test can
+distinguish reading the token from writing the literal, and a test claiming to is
+asserting that two identical programs differ. The suite asserts what *is*
+observable — every elevation-bearing `ThemeData` field resolves to `0`, checked over
+an enumerated inventory so deleting a line (`null`) or pinning a Material default
+is a failure. `EvaElevations.none` is the token for the surfaces §5 names no role
+for: drawer, popup menu, bottom bar, navigation bar, and a modal bottom sheet.
+`modalElevation` is the one that bites hardest, because a modal sheet resolves it
+first and would otherwise sit at Material's 24.
+
+**Known gap, owned elsewhere.** `NeuralScaffold` is Phase 2 and has no elevation
+token of its own; if it needs one it must come from this class or from a spec table
+that does not exist yet.
+
+**Known sub-AA pairings, recorded so they cannot drift unnoticed.** The light
+palette's chromatic tokens were authored against the dark canvas and lose contrast
+on near-white. Seven pairings that `eva_theme.dart` wires measure below 4.5:1 in
+light; they are enumerated, floored and flagged in `eva_colors_test.dart` rather
+than fixed, because the user ruled on `onEmber` only and this phase may not move
+another token. One of them — `ember` as the snack-bar *action* colour on `raised`,
+at **2.30:1** — is below even AA-large, so it is not "large text only" and Phase 3
+owns the fix when it builds the snack bar.
+
 ---
 
 ## 7. Verification — run before reporting done
