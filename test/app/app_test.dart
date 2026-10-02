@@ -1,4 +1,5 @@
 import 'package:evangelion/app/app.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -227,32 +228,194 @@ void main() {
     });
   });
 
-  group('the theme belongs to Phase 1, not to this phase', () {
-    testWidgets('supplies neither a light nor a dark theme', (
+  group('the theme is installed, and it is the Eva one', () {
+    // THE TRIPWIRE, INVERTED. Until Phase 1 this group asserted `theme` and
+    // `darkTheme` were both null — deliberately, so that no agent could satisfy
+    // "wire up a theme" by quietly inventing a palette in `app.dart` before the
+    // token tables existed. Phase 1 has landed, so the claim is now the opposite
+    // one, and it is a STRICTER claim than the old one: not "some theme is
+    // present" but "the theme is `EvaThemeLight.theme`, carrying an `EvaColors`
+    // extension built from the documented palette".
+    //
+    // The negative controls are named in each test below, because a test that
+    // cannot fail is worse than no test.
+
+    testWidgets('hands MaterialApp a theme and a darkTheme', (
       WidgetTester tester,
     ) async {
-      // The project's actual property: `EvangelionApp` hands MaterialApp no
-      // theme at all, so the framework default applies and Phase 1 has a clean
-      // single place to install the real dark glassmorphic system.
-      //
-      // Deliberately NOT asserted: any specific colour, and `useMaterial3`.
-      // Pinning a colour here would freeze whatever accidental default this
-      // happened to produce and make Phase 1's real theme look like a
-      // regression; asserting `useMaterial3` would be testing the Flutter SDK,
-      // which is not this suite's subject. A golden test belongs in Phase 1,
-      // with the theme it is meant to protect.
       await tester.pumpWidget(const EvangelionApp());
 
       expect(
         _materialAppIn(tester).theme,
-        isNull,
-        reason: 'Phase 1 owns the theme; do not invent one here',
+        isNotNull,
+        reason: 'the design system is installed; there is no stock Material',
       );
       expect(
         _materialAppIn(tester).darkTheme,
-        isNull,
-        reason: 'the dark system is the same Phase 1 deliverable',
+        isNotNull,
+        reason: 'the light theme is not the whole system',
+      );
+    });
+
+    testWidgets('they are the two Eva instance themes, by identity', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const EvangelionApp());
+
+      // `theme:` carries the light palette and `darkTheme:` the dark one, so
+      // that neither slot name is a lie. `MaterialApp` compares both by identity,
+      // so identity is also the only check that distinguishes "the real theme"
+      // from "a theme that happens to look similar".
+      expect(_materialAppIn(tester).theme, same(EvaThemeLight.theme));
+      expect(_materialAppIn(tester).darkTheme, same(EvaThemeDark.theme));
+    });
+
+    testWidgets('the app opens dark regardless of the host platform', (
+      WidgetTester tester,
+    ) async {
+      // Not `ThemeMode.system`. This design is dark by identity, and Phase 5
+      // replaces this with the reader's persisted setting — so the assertion is
+      // on the current decision, and it is the one a stub page renders against
+      // today.
+      await tester.pumpWidget(const EvangelionApp());
+
+      expect(_materialAppIn(tester).themeMode, ThemeMode.dark);
+    });
+
+    testWidgets('the theme carries the EvaColors extension, dark and light', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const EvangelionApp());
+      final MaterialApp app = _materialAppIn(tester);
+
+      // Read off the `MaterialApp`'s own fields rather than off a pumped tree:
+      // the point is that the *widget the app constructs* carries the extension,
+      // and the next two tests prove it reaches a live `BuildContext`.
+      expect(
+        app.theme!.extension<EvaColors>()!.canvas,
+        const EvaColors.light().canvas,
+      );
+      expect(
+        app.darkTheme!.extension<EvaColors>()!.canvas,
+        const EvaColors.dark().canvas,
+      );
+    });
+
+    testWidgets(
+      'the theme is built from Eva tokens, not from Material defaults',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(const EvangelionApp());
+        final ThemeData theme = _materialAppIn(tester).darkTheme!;
+        final EvaColors colors = const EvaColors.dark();
+
+        // Spot-checks across four different token families, because a theme can be
+        // "partly" Eva — the failure mode where the accent was wired but the
+        // surfaces were left stock is exactly what a single assertion misses.
+        expect(theme.scaffoldBackgroundColor, colors.canvas, reason: 'canvas');
+        expect(theme.colorScheme.primary, colors.ember, reason: 'ember');
+        expect(theme.colorScheme.error, colors.err, reason: 'err');
+        expect(theme.dividerColor, colors.line, reason: 'line');
+        expect(
+          theme.textTheme.displayLarge!.fontFamily,
+          EvaTypography.displayFamily,
+          reason: 'the display serif',
+        );
+        expect(
+          theme.cardTheme.elevation,
+          0.0,
+          reason: 'a flat, hairline-separated system',
+        );
+      },
+    );
+
+    testWidgets('a page rendered by the app reads the Eva palette', (
+      WidgetTester tester,
+    ) async {
+      // The end-to-end proof: the extension is not merely present on the
+      // `ThemeData`, it is reachable through `Theme.of` from a widget that the
+      // app itself mounted. Anchored on the `Navigator` for the same reason
+      // `_contextBelowApp` is — see its doc comment.
+      await tester.pumpWidget(const EvangelionApp());
+
+      final EvaColors seen = _contextBelowApp(tester).colors;
+      expect(seen.canvas, const EvaColors.dark().canvas);
+      expect(seen.ink, const EvaColors.dark().ink);
+      expect(seen.ember, const EvaColors.dark().ember);
+      expect(seen.sticker.keys.toSet(), StickerSlot.values.toSet());
+    });
+
+    testWidgets('darkTheme is a genuinely different theme, not the same twice', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const EvangelionApp());
+      final MaterialApp app = _materialAppIn(tester);
+      final ThemeData light = app.theme!;
+      final ThemeData dark = app.darkTheme!;
+
+      expect(identical(light, dark), isFalse, reason: 'same object twice');
+      expect(light.brightness, Brightness.light);
+      expect(dark.brightness, Brightness.dark);
+
+      // `ThemeData` has no value equality, so "different" has to be argued field
+      // by field. Four of them, spanning a surface, an accent, a semantic and a
+      // piece of geometry-adjacent ink.
+      expect(
+        light.scaffoldBackgroundColor,
+        isNot(dark.scaffoldBackgroundColor),
+      );
+      expect(light.colorScheme.primary, isNot(dark.colorScheme.primary));
+      expect(light.colorScheme.error, isNot(dark.colorScheme.error));
+      expect(light.dividerColor, isNot(dark.dividerColor));
+      expect(
+        light.textTheme.bodyMedium!.color,
+        isNot(dark.textTheme.bodyMedium!.color),
+      );
+
+      // …while the geometry, which the spec defines once, must be shared. A
+      // difference here would mean one of the two is wrong.
+      //
+      // Compared as a RADIUS VALUE. `RoundedRectangleBorder` does not override
+      // `==`, so `expect(light.cardTheme.shape, dark.cardTheme.shape)` is an
+      // identity comparison that passes only because both shapes are `const` and
+      // therefore canonicalised — the same const-canonicalisation trap the colour
+      // assertions above avoid by going through values.
+      expect(
+        _topLeftRadiusOf(light.cardTheme.shape),
+        _topLeftRadiusOf(dark.cardTheme.shape),
+      );
+      expect(_topLeftRadiusOf(light.cardTheme.shape), EvaRadii.card);
+      expect(light.dialogTheme.elevation, dark.dialogTheme.elevation);
+    });
+
+    testWidgets('the localisation suite is unaffected by the theme', (
+      WidgetTester tester,
+    ) async {
+      // The theme is new on this widget, and `MaterialApp` localises its
+      // `TextTheme` through the same delegates the tests above exercise. A theme
+      // with hard-coded English strings — or one whose `Localizations` scope
+      // ends up below `MaterialApp` — would show up as an RTL regression rather
+      // than as a theme bug, so the two are asserted together deliberately.
+      await tester.pumpWidget(const EvangelionApp(locale: Locale('ar')));
+
+      expect(Directionality.of(_contextBelowApp(tester)), TextDirection.rtl);
+      expect(
+        _contextBelowApp(tester).colors.canvas,
+        const EvaColors.dark().canvas,
+        reason: 'the theme does not disturb the direction or the palette',
       );
     });
   });
+}
+
+/// The corner radius of a themed container's shape, or `null` for a shape that
+/// is not a rounded rectangle.
+///
+/// Reads `topLeft.x` rather than comparing `ShapeBorder`s: `RoundedRectangleBorder`
+/// does not override `==`, so `expect(a.shape, b.shape)` is an identity check
+/// that two `const` shapes pass on canonicalisation alone.
+double? _topLeftRadiusOf(ShapeBorder? shape) {
+  if (shape is! RoundedRectangleBorder) return null;
+  final BorderRadiusGeometry radius = shape.borderRadius;
+  if (radius is! BorderRadius) return null;
+  return radius.topLeft.x;
 }
