@@ -192,11 +192,15 @@ void main() {
       // identical object and this assertion holds either way. The
       // "what this suite cannot see" group below is the negative control for
       // exactly that claim.
-      expect(identical(getIt<GetIt>(), getIt), isTrue);
+      // `same(...)` rather than `identical(a, b)`: a failed `expect` on a bare
+      // `isTrue` prints "Expected: true / Actual: false" and names neither
+      // operand, which is the least diagnostic form this suite has. `same` prints
+      // both sides, so a failure says *which* two objects disagreed.
+      expect(getIt<GetIt>(), same(getIt));
     });
 
     test('two lookups are the identical instance', () {
-      expect(identical(getIt<GetIt>(), getIt<GetIt>()), isTrue);
+      expect(getIt<GetIt>(), same(getIt<GetIt>()));
     });
 
     test('nothing is registered for an unregistered type', () {
@@ -205,7 +209,7 @@ void main() {
   });
 
   group('what this suite cannot see: the registration lifetime', () {
-    // The two `identical(...)` assertions in this file read like they pin the
+    // The identity assertions in this file read like they pin the
     // `@lazySingleton` annotations in `service_locator_module.dart`. They do
     // not, and the reason deserves a test rather than a comment nobody re-reads.
     // Rewriting the generated `gh.lazySingleton<GetIt>(…)` to `gh.factory<GetIt>(…)`
@@ -217,9 +221,14 @@ void main() {
     // get_it 9.x exposes no lifetime introspection — `isRegistered` answers
     // presence, not kind — so there is no graph-side assertion to add. What
     // these two tests establish is the other half of the claim: that the
-    // limitation is in the *values*, not in `identical`. Without them the
-    // `identical(...)` tests above read as a lifetime gate; with them they read
-    // as what they are, a value-identity check.
+    // limitation is in the *values*, not in identity. Without them the identity
+    // assertions above read as a lifetime gate; with them they read as what they
+    // are, a value-identity check.
+    //
+    // They keep `identical(...)` rather than the `same(...)` used elsewhere in
+    // this file: `isNot(...)` has no `same` counterpart, and the point of the
+    // pair is to demonstrate the difference between the two registration kinds
+    // using the function the rest of the suite is measured against.
     test(
       'a factory registration IS distinguishable, so identical() has teeth',
       () {
@@ -259,11 +268,8 @@ void main() {
       // same canonicalised String under `@lazySingleton` or `@factory`. This
       // pins the value, not the lifetime.
       expect(
-        identical(
-          getIt<String>(instanceName: 'apiBaseUrl'),
-          getIt<String>(instanceName: 'apiBaseUrl'),
-        ),
-        isTrue,
+        getIt<String>(instanceName: 'apiBaseUrl'),
+        same(getIt<String>(instanceName: 'apiBaseUrl')),
       );
     });
 
@@ -285,11 +291,8 @@ void main() {
 
     test('two lookups are the identical instance', () {
       expect(
-        identical(
-          getIt<NoParamsUseCase<String>>(),
-          getIt<NoParamsUseCase<String>>(),
-        ),
-        isTrue,
+        getIt<NoParamsUseCase<String>>(),
+        same(getIt<NoParamsUseCase<String>>()),
       );
     });
 

@@ -1,33 +1,40 @@
+import 'dart:io';
+
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The complete inventory of route paths the app ships, as `name -> path`.
-///
-/// Deliberately declared *here* rather than as a `values` list on [AppRoutes].
-/// Dart has no reflection, so an invariant over "every route" needs an
-/// enumeration somewhere, and a production list would be a second source of
-/// truth for values this file already pins exactly — free to drift from the
-/// constants it claims to enumerate. Holding it in the test costs nothing at
-/// runtime and makes a seventh route an explicit edit here, which is the point:
-/// a new route should be added to the inventory deliberately, not slip past a
-/// gate that stopped looking at it.
-///
-/// THE LIMIT OF THAT CHOICE, stated plainly: adding a constant to [AppRoutes]
-/// without adding it to [_inventory] leaves this file green and stops the
-/// collision invariant from covering that route. The value assertions below
-/// still cover the six locked routes, so nothing silently changes value — but
-/// Phase 4, which adds the real router, must extend this inventory.
-const Map<String, String> _inventory = <String, String>{
-  'login': AppRoutes.login,
-  'home': AppRoutes.home,
-  'reading': AppRoutes.reading,
-  'quiz': AppRoutes.quiz,
-  'result': AppRoutes.result,
-  'settings': AppRoutes.settings,
-  'fallback': AppRoutes.fallback,
-};
+// Not a `package:` import: `tool/` is not a library, it is the gate body that
+// `verify_purity.sh` runs. Sharing it is the point — the extraction lives in one
+// place, so the gate and this suite cannot disagree about what is declared.
+import '../../../tool/route_check.dart';
 
 void main() {
+  /// The complete inventory of route paths `AppRoutes` declares, read from the
+  /// declaration site rather than listed by hand here.
+  ///
+  /// WHY A PARSER. This used to be a `Map<String, String>` written in this file
+  /// naming the seven constants it knew about. Dart has no reflection, so
+  /// nothing can enumerate a class's statics, and that hand-written list was a
+  /// second source of truth free to drift from the thing it claimed to
+  /// describe: adding four constants to `AppRoutes` — a duplicate `/login`, a
+  /// padded `' /quiz '`, an uppercase `/QUIZ`, a second spelling `/login/` —
+  /// without touching this file left the suite green, defeating five of the
+  /// seven structural invariants below, including the two whose own comments
+  /// name precisely that hazard.
+  ///
+  /// An `AppRoutes.values` list in `lib/` would only have moved the drift from
+  /// this file into production code; a constant declared outside that list
+  /// would still be missing. Parsing the declarations is what applies the
+  /// invariants to every route that exists, and `tool/route_check.dart` does the
+  /// parsing so Gate 4 and this suite read the same bytes with the same pattern.
+  ///
+  /// The honest limit: Dart cannot see a constant built from an expression
+  /// rather than a literal. Those are named and failed on below instead of being
+  /// skipped.
+  final String source = File(routesFile).readAsStringSync();
+  final Map<String, String> inventory = declaredRouteValues(source);
+  final List<String> declared = declaredRouteNames(source);
+
   group('the six locked routes', () {
     test('login is /login', () {
       expect(AppRoutes.login, '/login');
@@ -54,24 +61,53 @@ void main() {
     });
   });
 
-  group('structural invariants', () {
-    // The inventory is the test's own claim about what AppRoutes contains. If
-    // AppRoutes were emptied, every `expect` above would be comparing against
-    // null and the suite would pass while asserting nothing — the same
-    // self-comparing tautology the Phase 0b mutation audit removed from
-    // failure_test.dart. Asserting the shape of the claim first means the rest
-    // of this group has to be talking about seven real strings.
-    test('the inventory is seven entries and every path is a real string', () {
-      expect(_inventory, hasLength(7));
+  group('the inventory is the declaration site', () {
+    // `inventory` is the test's own claim about what `AppRoutes` contains. If the
+    // parser were emptied — a regex that stopped matching, a file that moved —
+    // every `expect` in the group below would be iterating nothing and the
+    // suite would pass while asserting nothing. That is the self-comparing
+    // tautology the Phase 0b mutation audit removed from `failure_test.dart`, so
+    // the shape of the claim is asserted first, and the seven names are spelled
+    // out rather than merely counted: a parser that quietly returned the wrong
+    // seven would otherwise sail through.
+    test('the parser sees every declaration, including ones it cannot read', () {
+      // Anti-vacuity for the whole group below. A declaration whose initialiser
+      // is not a plain literal is reported rather than dropped, because an
+      // invariant that silently skips a route is worse than one that admits it
+      // cannot evaluate it.
       expect(
-        _inventory.values.whereType<String>(),
-        hasLength(7),
-        reason: 'a null or non-String path would make the group below vacuous',
+        declared.toSet(),
+        inventory.keys.toSet(),
+        reason:
+            'every `static const String` must be readable as a plain literal, '
+            'or the invariants below do not apply to it',
       );
     });
 
+    test('the inventory is exactly the seven declared route names', () {
+      expect(declared, <String>[
+        'login',
+        'home',
+        'reading',
+        'quiz',
+        'result',
+        'settings',
+        'fallback',
+      ]);
+      expect(inventory, hasLength(7));
+      // `inventory.values.whereType<String>()` used to sit here, asserting that
+      // all seven entries were real strings. It could not fail: `inventory` is a
+      // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
+      // `whereType<String>()` is the identity — it returned all seven elements
+      // unconditionally. The hazard it guarded is unrepresentable too; a `null`
+      // in a `Map<String, String>` literal is a compile error, not a runtime
+      // state, and `hasLength(7)` above already implies seven strings.
+    });
+  });
+
+  group('structural invariants', () {
     test('every route except the fallback starts with a slash', () {
-      for (final MapEntry<String, String> route in _inventory.entries) {
+      for (final MapEntry<String, String> route in inventory.entries) {
         if (route.key == 'fallback') {
           continue;
         }
@@ -86,7 +122,7 @@ void main() {
     test('the fallback is the wildcard, and the only route without a slash', () {
       expect(AppRoutes.fallback, '*');
       expect(
-        _inventory.entries
+        inventory.entries
             .where((MapEntry<String, String> e) => !e.value.startsWith('/'))
             .map((MapEntry<String, String> e) => e.key),
         <String>['fallback'],
@@ -100,10 +136,10 @@ void main() {
       // Duplicate paths would make the router's match order decide which screen
       // a user reaches, which is exactly the kind of ambiguity the router
       // cannot report — it matches the first one and silently ignores the rest.
-      final Set<String> duplicates = _inventory.values
+      final Set<String> duplicates = inventory.values
           .where(
             (String path) =>
-                _inventory.values.where((String p) => p == path).length > 1,
+                inventory.values.where((String p) => p == path).length > 1,
           )
           .toSet();
 
@@ -111,7 +147,7 @@ void main() {
     });
 
     test('no path carries stray whitespace', () {
-      for (final MapEntry<String, String> route in _inventory.entries) {
+      for (final MapEntry<String, String> route in inventory.entries) {
         expect(
           route.value,
           route.value.trim(),
@@ -127,7 +163,7 @@ void main() {
       // never match each other, which is the worst kind of route bug to
       // diagnose, because navigation to one silently fails to find the other.
       expect(
-        _inventory.entries
+        inventory.entries
             .where((MapEntry<String, String> e) => e.value.endsWith('/'))
             .map((MapEntry<String, String> e) => e.key),
         <String>['home'],
@@ -142,7 +178,7 @@ void main() {
       // slash and home's own trailing slash both produce one.
       final RegExp segment = RegExp(r'^[a-z][a-z0-9]*$');
 
-      for (final MapEntry<String, String> route in _inventory.entries) {
+      for (final MapEntry<String, String> route in inventory.entries) {
         if (route.key == 'fallback') {
           continue;
         }

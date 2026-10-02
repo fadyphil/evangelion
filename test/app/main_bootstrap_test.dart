@@ -1,57 +1,48 @@
-import 'dart:io';
-
+import 'package:evangelion/app/app.dart';
+import 'package:evangelion/app/bootstrap.dart';
 import 'package:evangelion/app/di/injection.dart';
-import 'package:evangelion/core/common/app_config.dart';
+// Prefixed, because this file declares its own `main`. An unprefixed import
+// would be shadowed by it, and `unused_import` is fatal under --fatal-infos.
+import 'package:evangelion/main.dart' as entrypoint;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
-/// The source of `lib/main.dart`, read as text.
+/// The shape of a process entry point the engine awaits.
 ///
-/// WHY TEXT AND NOT A CALL. `main()` cannot be invoked from a test: it calls
-/// `runApp`, which needs a live view and a running frame pipeline, and a test
-/// that tried would bind the harness to a second root widget rather than assert
-/// anything about the bootstrap. So the two things a test *can* observe are
-/// separated: `configureDependencies()` is called for real below, and the shape
-/// of `main()` — which calls it, in what order, on what — is pinned by reading
-/// the file.
-///
-/// WHAT THAT DOES AND DOES NOT PROVE, stated plainly:
-///
-/// * It proves the three bootstrap calls appear, in order, in the code.
-/// * It does NOT prove `main()` executes them in that order, nor that it runs at
-///   all. A future `main()` that delegates to a helper would fail this test
-///   while remaining perfectly correct — so treat a failure here as "re-read
-///   main.dart and decide", not as "the app is broken".
-/// * The `await` is *not* really guarded by this test; it is guarded by the
-///   `unawaited_futures` lint, which rejects dropping this `Future<void>`
-///   (AGENT_CONTEXT §6, recorded decision 4). This assertion exists so the
-///   intent is visible to a reader, and so removing the `await` fails loudly
-///   here as well as at the analyzer.
-String _mainSource() => File('lib/main.dart').readAsStringSync();
+/// A named typedef because `isA<Future<void> Function()>()` does not parse —
+/// `void` is not accepted as a nested type argument.
+typedef _AwaitedEntryPoint = Future<void> Function();
 
-/// [_mainSource] with comments removed and runs of whitespace collapsed, so the
-/// assertions below describe the *code* rather than the indentation `dart
-/// format` chose or the prose around it.
+/// Executes the bootstrap, so these assertions are about behaviour.
 ///
-/// THE COMMENT STRIP IS NOT OPTIONAL, and its absence was a real bug found by
-/// negative control. `main.dart`'s doc comment enumerates the three bootstrap
-/// steps in the correct order, so an earlier version of this helper — which
-/// searched the raw file — matched the *documentation* while the code underneath
-/// ran the steps backwards. Every ordering assertion passed, the application was
-/// broken, and the suite was green. This is the Phase 0b lesson in a new place:
-/// a test that reads prose will happily grade the prose.
+/// WHY NOT `main()`. `main()` calls `runApp`, which needs a live view and a
+/// running frame pipeline. A test that invoked it would attach a second root
+/// widget to a binding the harness already owns, and the outcome would tell us
+/// nothing about the bootstrap. `bootstrapApp` is the same three steps with the
+/// one untestable step injected, which is what makes them observable.
 ///
-/// KNOWN LIMITATION: this is a regular expression, not a parser, so a `//` or
-/// `/*` inside a string literal would be stripped as if it were a comment.
-/// `main.dart` has no string literals today. If that ever changes, replace this
-/// with an actual parse rather than tuning the pattern — the failure mode of
-/// getting it wrong is a test that passes for the wrong reason, which is the
-/// thing this function exists to prevent.
-String _mainCode() => _mainSource()
-    .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), ' ')
-    .replaceAll(RegExp(r'//[^\n]*'), ' ')
-    .replaceAll(RegExp(r'\s+'), ' ');
-
+/// WHY THIS FILE DOES NOT READ `lib/main.dart` AS TEXT. It used to, and the
+/// suite was green while the app launched to a blank frame: an empty `main()`
+/// satisfied every assertion, and so did a `main()` carrying all three calls
+/// inside a string literal. A text scan grades a file, not an execution, and a
+/// doc comment that *enumerates* the steps in the right order reads exactly like
+/// code that runs them in the right order. Each test below is instead a mutation
+/// someone can perform and watch fail.
+///
+/// THE THREE MUTANTS THAT WERE ACTUALLY RUN against the old suite and this one,
+/// so the claim above is checkable rather than rhetorical:
+///
+/// | mutant | old suite (146) | this file (5) |
+/// |---|---|---|
+/// | `main() async {}`, calls parked in a never-called fn | 146 pass | — |
+/// | `main() { runApp(const MaterialApp()); }`, calls in a string | 146 pass | — |
+/// | `run()` and `await configureDependencies()` swapped | 146 pass | 2 fail |
+///
+/// The first two rows are why `lib/app/bootstrap.dart` exists. The third is the
+/// bug the text scan existed to catch and could not: swapping the last two lines
+/// of `bootstrapApp` leaves `dart analyze` clean and fails the two ordering tests
+/// below.
 void main() {
   setUp(() async {
     // `GetIt.instance` is a process-wide singleton; each test starts clean so a
@@ -63,9 +54,95 @@ void main() {
     await getIt.reset();
   });
 
+  // STEP 1 IS DELIBERATELY UNTESTED. `WidgetsFlutterBinding.ensureInitialized()`
+  // cannot be observed from a test: `flutter_test` installs a binding before the
+  // suite runs, so the call is a no-op and there is nothing left to assert. An
+  // "the binding exists" assertion would be unfalsifiable — and this file exists
+  // because an unfalsifiable assertion about the bootstrap was believed for two
+  // phases. It is guarded by the framework: a platform-channel call made before
+  // a binding exists throws at runtime in the real app. Steps 2 and 3 are
+  // below, and both are executable.
+  group('the bootstrap steps run in order', () {
+    test('run() is NOT called when DI throws — the order is executable', () async {
+      // The mutation to try: swap the last two lines of `bootstrapApp` so
+      // `run(const EvangelionApp())` precedes `await configureDependencies()`.
+      // That is the bug a source scan existed to catch and could not. Here the
+      // graph is already built (and so already registered `GetIt`), so the
+      // second `configureDependencies()` throws — and the only question is
+      // whether the app was already handed a first frame when it did.
+      //
+      // `injection.config.dart` registers `GetIt` unconditionally rather than
+      // behind an `isRegistered` guard, so get_it rejects the duplicate with an
+      // `ArgumentError`. Same throw `injection_test.dart` pins for a double
+      // `configureDependencies()`; asserted concretely so this cannot pass on an
+      // unrelated failure.
+      await configureDependencies();
+
+      bool ran = false;
+      await expectLater(
+        bootstrapApp(
+          run: (Widget _) {
+            ran = true;
+          },
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+
+      expect(
+        ran,
+        isFalse,
+        reason: 'runApp before DI means the first frame renders an empty graph',
+      );
+    });
+
+    test('run() sees a built object graph, not an empty locator', () async {
+      // The other half of the same ordering claim, and the half that does not
+      // need an exception to observe: the locator's state is sampled *at the
+      // moment `run` is called*. Under the mutation above this records `false`
+      // and fails, rather than passing a `run()` that happened to be called.
+      final List<bool> graphWasBuiltWhenRun = <bool>[];
+
+      await bootstrapApp(
+        run: (Widget _) {
+          graphWasBuiltWhenRun.add(getIt.isRegistered<GetIt>());
+        },
+      );
+
+      expect(
+        graphWasBuiltWhenRun,
+        hasLength(1),
+        reason: 'run() is called exactly once',
+      );
+      expect(
+        graphWasBuiltWhenRun.single,
+        isTrue,
+        reason:
+            'configureDependencies() must complete before runApp, or the first '
+            'frame renders with nothing registered',
+      );
+    });
+
+    test('run() receives the app root, not a stock MaterialApp', () async {
+      // What pins "the process ends up running *this* app" — and, since
+      // `EvangelionApp` is a distinct type, it also pins the absence of the
+      // scaffold's own `MyApp`. The previous source scan listed `MyApp` as a
+      // forbidden substring; a typed assertion is the same guard that a
+      // substring cannot accidentally satisfy by being quoted in a comment.
+      Widget? root;
+
+      await bootstrapApp(
+        run: (Widget app) {
+          root = app;
+        },
+      );
+
+      expect(root, isA<EvangelionApp>());
+    });
+  });
+
   group('DI is configured before anything resolves', () {
     // The observable half of the bootstrap contract, and the part that actually
-    // runs. It overlaps injection_test.dart on purpose but answers a different
+    // runs. It overlaps `injection_test.dart` on purpose but answers a different
     // question: that file asks "is the graph correct once built", this asks
     // "is there an ordering at all" — nothing is registered before
     // `configureDependencies()` runs, so a screen built too early fails loudly
@@ -84,98 +161,20 @@ void main() {
         expect(getIt.isRegistered<GetIt>(), isTrue);
       },
     );
-
-    test('registrations resolve to real values once DI has run', () async {
-      await configureDependencies();
-
-      expect(identical(getIt<GetIt>(), getIt), isTrue);
-      expect(getIt<String>(instanceName: 'apiBaseUrl'), AppConfig.apiBaseUrl);
-    });
   });
 
-  group('main() bootstraps in order', () {
-    test('initialises the binding, awaits DI, then runs the app', () {
-      final String source = _mainCode();
-
-      expect(
-        source,
-        contains('WidgetsFlutterBinding.ensureInitialized()'),
-        reason: 'runApp and the plugin channels need a bound engine first',
-      );
-      expect(
-        source,
-        matches(RegExp(r'await configureDependencies\(\)')),
-        reason:
-            'the await is AGENT_CONTEXT §6 decision 4 — it stays valid when '
-            'getIt.init() becomes Future<GetIt>',
-      );
-      expect(
-        source,
-        matches(RegExp(r'runApp\(\s*const\s+EvangelionApp\(\s*\)\s*\)')),
-        reason: 'the process must end up running this app, not a stock one',
-      );
-    });
-
-    test('the three bootstrap steps happen in order', () {
-      // Ordering asserted separately from presence above, because "all three
-      // calls exist somewhere in the file" is exactly what a bootstrap written
-      // backwards also satisfies. `main.dart`'s doc claims the order *is* the
-      // file, so each adjacent pair is pinned rather than just the first and
-      // last.
-      final String source = _mainCode();
-      final int binding = source.indexOf(
-        'WidgetsFlutterBinding.ensureInitialized()',
-      );
-      final int configure = source.indexOf('await configureDependencies()');
-      final int runAppCall = source.indexOf('runApp(');
-
-      expect(binding, isNot(-1));
-      expect(configure, isNot(-1));
-      expect(runAppCall, isNot(-1));
-
-      expect(
-        binding,
-        lessThan(configure),
-        reason:
-            'a plugin-backed dependency built during DI would reach a platform '
-            'channel with no binding under it',
-      );
-      expect(
-        configure,
-        lessThan(runAppCall),
-        reason: 'runApp before DI means the first frame renders an empty graph',
-      );
-    });
-  });
-
-  group('the flutter create counter is gone', () {
-    test('no stock counter code survives in main.dart', () {
-      // The counter was the last of the scaffold's own code. It is checked by
-      // name rather than by "main.dart is short" so the residue is named in the
-      // failure message instead of just being absent.
+  group('the process entry point', () {
+    test('returns a Future the engine awaits, not void', () {
+      // WHAT THIS PINS, precisely: `lib/main.dart` compiles, and its `main` is
+      // `Future<void> Function()` rather than `void Function()`.
       //
-      // Scanned through [_mainCode] like everything else here, for the same
-      // reason: a prose mention is not code. A future phase documenting "this
-      // replaced the `MyApp` counter" describes history honestly, and failing
-      // that would only teach someone to delete the comment — or to weaken this
-      // assertion, which is the worse outcome.
-      const List<String> residue = <String>[
-        'MyApp',
-        'MyHomePage',
-        '_MyHomePageState',
-        '_counter',
-        '_incrementCounter',
-        'Colors.deepPurple',
-        'Flutter Demo',
-      ];
-
-      for (final String name in residue) {
-        expect(
-          _mainCode(),
-          isNot(contains(name)),
-          reason: '$name is stock scaffold code and must not come back',
-        );
-      }
+      // WHAT IT DOES NOT PIN: that `main` *calls* `bootstrapApp`. `main`'s body
+      // cannot be executed from a test for the reason this whole file is shaped
+      // around — it hands the frame to `runApp`. What is pinned instead is the
+      // part that is observable: the entry point returns a Future the engine
+      // awaits, so a DI failure during bootstrap fails the launch instead of
+      // becoming an unhandled async error behind a blank first frame.
+      expect(entrypoint.main, isA<_AwaitedEntryPoint>());
     });
   });
 }

@@ -333,7 +333,7 @@ This is a **deliberate deferral**, not a rejection. Re-open it at Phase 5.
 ## 7. Verification — run before reporting done
 
 ```bash
-dart format --output=none --set-exit-if-changed lib test   # formatting
+dart format --output=none --set-exit-if-changed lib test tool  # formatting
 dart analyze --fatal-infos --fatal-warnings                # types + lint + DEPRECATION
 flutter test                                               # full suite
 tool/verify_purity.sh                                      # architecture gates
@@ -341,18 +341,30 @@ tool/verify_purity.sh                                      # architecture gates
 
 ### Architecture gates — use the script, not an inline command
 
-`tool/verify_purity.sh` enforces all three architecture rules mechanically:
+`tool/verify_purity.sh` enforces four rules mechanically:
 
-1. **Domain purity** — `core/domain/` and every `features/*/domain/` reach no
-   `package:flutter/`, `package:dio/`, or `package:http/`.
+1. **Domain purity** — `core/domain/`, every `features/*/domain/`, `core/common/`
+   and `core/navigation/` reach no `package:flutter/`, `package:dio/`, or
+   `package:http/`.
 2. **Feature independence** — no feature imports another feature, and `lib/core/` imports
    no feature at all.
 3. **Generated files stay lint-silent** — every `*.gr.dart` / `*.config.dart` keeps its
    `// ignore_for_file: type=lint` header, so hand-edits are detectable.
+4. **Route inventory is readable** — every `static const String` in
+   `core/navigation/app_routes.dart` has a plain-literal initialiser, so the route
+   invariants can see it.
 
 Exit `0` clean, `1` violations found, `2` a gate could not run. A gate whose target
 directory does not exist yet reports **vacuous** and says so — report that honestly rather
 than calling it a pass.
+
+`core/common/` and `core/navigation/` joined Gate 1 in Phase 0c because both files
+*document* the property — `app_routes.dart` says "staying Flutter-free keeps the
+constants readable from any layer", `app_config.dart` says "no Flutter import, so this
+can be read from `core/domain/`" — and both claims are load-bearing (Phase 5 has
+`core/domain/` use cases reading `AppConfig`; Phase 4 makes `AppRoutes` the most-imported
+file in the app). Neither was checked, so a Flutter import in either left every gate
+green. Do not narrow the list back without re-reading those two doc comments.
 
 #### What each gate matches — do not narrow these patterns
 
@@ -376,6 +388,14 @@ than calling it a pass.
 - **Gate 2 matches both quote styles; Gate 1 matches single quotes only.** `prefer_single_quotes`
   is enabled and `--fatal-infos` makes the other form fatal, so Gate 1 relies on the analyzer
   for that. Gate 2 is a standalone `dart run` and must not.
+- **Gate 4 gates the *mechanism*, not the invariants.** `tool/route_check.dart` parses
+  `app_routes.dart`, because Dart has no reflection and the route invariants in
+  `app_routes_test.dart` need an enumeration. It exits `1` when a declaration exists whose
+  initialiser is not a plain string literal — that route is then invisible to the
+  invariants, and the gate says so instead of skipping it — and `2` when the file is missing
+  or holds no declarations. It deliberately does **not** re-implement the collision,
+  whitespace, case or slash checks; the test owns those. Do not copy them in here: two
+  implementations of one invariant is two things to keep in step.
 
 #### A gate that cannot fail is worse than no gate
 
