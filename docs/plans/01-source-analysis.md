@@ -4,7 +4,11 @@ What the prototype actually is, what is broken in it, and how each defect gets f
 
 **Contains §1 §2 §12** of the original plan. Section numbers are preserved so existing cross-references keep resolving.
 
-> [Index](README.md) · [Architecture](02-architecture.md) · [Widget inventory](04-widget-inventory.md)
+> [Index](README.md) · [Architecture](02-architecture.md) · [Widget inventory](04-widget-inventory.md) · [Authority](../agents/AGENT_CONTEXT.md)
+
+---
+
+> **What this file describes, and what it does not.** The React prototype in `eva/` **still exists and is unchanged**, so every observation below is accurate and stays as written. This file describes the prototype **as built** — it is a record of what was shipped in React, not a statement of what the Flutter app should contain. Current scope is six screens with Library and Profile cut, against a live API, and that lives in [AGENT_CONTEXT](../agents/AGENT_CONTEXT.md), which overrides this file. Where a defect below was **resolved by cut** rather than by a fix, its row and its Phase cell say so.
 
 ---
 
@@ -23,7 +27,9 @@ What the prototype actually is, what is broken in it, and how each defect gets f
 
 ### 1.1 The prototype ships 13 widgets, and 6 more declared inside screens
 
-`ds.tsx` exports **13** widgets — `NeuralBackground`, `ButtonPrimary`, `ButtonSecondary`, `ButtonText`, `Input`, `CategoryChip`, `ProgressBeads`, `PassageCard`, `QuizOption`, `StatTile`, `SettingsTile`, `TopBar`, `SealFAB` — plus 5 non-widget exports: `T` (token strings), `HEX`, `useHex()`, `rgba()`, `F` (font map). `ORB_CONFIGS` is module-private.
+> **Cut.** One of the 13 — `PassageCard` — has no successor in the app. The library was cut ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §2, decision 1), and with it `PassageCard`'s grid, `CategoryFilterBar`, the 7-category chip row, `ContinueReadingPanel`, and `EvaProgressBar`. `CategoryChip` survives, but as the theme toggle, the route chips, and the FAB dock items — its category-filtering role is gone. `JourneyTimeline` and `JourneyRow` went with the profile screen. The prototype itself is unchanged, so all of them still count as duplication the port had to face; they simply never ship.
+
+`ds.tsx` exports **13** widgets — `NeuralBackground`, `ButtonPrimary`, `ButtonSecondary`, `ButtonText`, `Input`, `CategoryChip`, `ProgressBeads`, **`PassageCard` (cut)**, `QuizOption`, `StatTile`, `SettingsTile`, `TopBar`, `SealFAB` — plus 5 non-widget exports: `T` (token strings), `HEX`, `useHex()`, `rgba()`, `F` (font map). `ORB_CONFIGS` is module-private.
 
 Screens declare **6** more components locally, none of them exported:
 
@@ -61,7 +67,7 @@ Every row below was confirmed by reading the source or by grep against `eva/src`
 
 | # | Defect | Evidence | Impact | Phase | Concrete fix |
 | --- | --- | --- | --- | --- | --- |
-| 1 | **Category filter is a no-op.** `cat` state only drives chip highlight; the 4 grid cards are hardcoded literals. | `HomeScreen.tsx:12,86,93-96` | Core feature appears to work, does nothing | 6 | `LibraryBloc` holds `allPassages` + `selectedCategory`; `CategoryFilterBar` drives it; add a test that filtering changes the rendered count |
+| 1 | **Category filter is a no-op.** `cat` state only drives chip highlight; the 4 grid cards are hardcoded literals. | `HomeScreen.tsx:12,86,93-96` | Core feature appears to work, does nothing | — | **Resolved by cut, not by fix.** The filter, its chip row, and the card grid all went with the library; there is no filter left to make work. |
 | 2 | **Arabic rendered in Space Mono.** Space Mono has no Arabic glyphs → tofu boxes in the metadata row and CTA caption. | `ReadingArScreen.tsx:35,86` | Broken RTL screen | 7 | `ScriptureLanguage.ar` maps to `EvaTypography.arabic` everywhere; drop `mono` from the AR metadata row and CTA caption; add a glyph-coverage test |
 | 3 | **`NeuralBackground` calls `setMouse` every frame** via a `requestAnimationFrame` loop that never idles. | `ds.tsx:143-148` | Permanent 60fps React re-render of the whole background subtree | 2 | `NeuralBackground` is a `CustomPaint` driven by `AnimationController`s inside a `RepaintBoundary`; zero `setState` |
 | 4 | **7 of 12 design tokens are dead.** `T.surface`, `T.raised`, `T.line`, `T.ember`, `T.emberDeep`, `T.onEmber`, `T.ok` all have **0** usages; everything reads `HEX.*` instead. | grep: `T.surface:0 T.raised:0 T.line:0 T.ember:0 T.emberDeep:0 T.onEmber:0 T.ok:0` | Token drift; `T` is half-vestigial | 1 | All 12 tokens defined and every one consumed by at least one widget |
@@ -74,6 +80,8 @@ Every row below was confirmed by reading the source or by grep against `eva/src`
 | 11 | **`TopBar` hardcodes** streak `12`, avatar `MK`, wordmark `Evangelion`. | `ds.tsx:507,516,525` | Not data-driven | 6 | `AppTopBar` takes wordmark, streak, and initials as required params |
 | 12 | **Dev scaffolding ships as UI.** `App.tsx` screen switcher + `QuizScreen` "Frame A/B" toggle exist only to let the Figma agent preview states. | `App.tsx:70-84`, `QuizScreen.tsx:56-63` | Must not be ported | 8–9 | Do not port `App.tsx`'s switcher or `QuizScreen`'s Frame A/B toggle. If a debug overlay is wanted, gate it behind `kDebugMode` |
 
-**Root causes, not 12 independent bugs.** Defects 1, 8, 10, and 11 are all one cause — the prototype has no state layer, so anything with state is a literal. The BLoC layer fixes all four by construction. Defects 3, 4, 5, and 6 are likewise one cause: no design-system layer, so tokens are duplicated and derivations are ad hoc. The `ThemeExtension` fixes all four. That is why Phase 1 and Phase 5 are load-bearing, and why jumping straight to screens would reintroduce the whole list.
+**Root causes, not 12 independent bugs.** Defects 8, 10, and 11 are all one cause — the prototype has no state layer, so anything with state is a literal. (Defect 1 was a fourth member of this cluster and no longer needs fixing; it was cut.) The BLoC layer fixes the survivors by construction. Defects 3, 4, 5, and 6 are likewise one cause: no design-system layer, so tokens are duplicated and derivations are ad hoc. The `ThemeExtension` fixes all four. That is why Phase 1 and Phase 5 are load-bearing, and why jumping straight to screens would reintroduce the whole list.
+
+> **Cut.** Only defect **#1** is resolved by cut. The constructs behind it — `CategoryFilterBar`, `PassageCard`, the category chip row, `ContinueReadingPanel`, `EvaProgressBar` — and the profile screen's `JourneyTimeline` never had defect rows of their own; they were duplication, not breakage. Every other row describes something that still ships, and every other Phase number still resolves in [08-build-phases.md](08-build-phases.md): the phase numbers are pre-cut and were deliberately not renumbered.
 
 **Phase numbers** refer to [08-build-phases.md](08-build-phases.md).

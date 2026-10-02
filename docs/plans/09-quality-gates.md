@@ -4,9 +4,11 @@ Test strategy, the performance budget for the animated background, and the acces
 
 **Contains §11 §13 §14** of the original plan. Section numbers are preserved so existing cross-references keep resolving.
 
-> [Index](README.md) · [Build phases](08-build-phases.md)
+> [Index](README.md) · [Build phases](08-build-phases.md) · [Authority](../agents/AGENT_CONTEXT.md)
 
 ---
+
+> **Scope correction.** The prototype's 8 screens are now **6** ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §2, decision 1). Everything below counts call sites on the six shipped screens — `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings` — and the data layer is the **live API**, not bundled JSON, which adds three red-first targets to the matrix: the error mapper, the header interceptor, and the API mappers.
 
 ## 11. Test strategy
 
@@ -14,21 +16,23 @@ Test strategy, the performance budget for the animated background, and the acces
 | --- | --- | --- |
 | Domain usecases | plain `test` + hand-written fakes | pure logic, no Flutter |
 | Blocs/Cubits | `bloc_test 10.0.0` | every state transition |
-| Repositories | `mocktail 1.0.5` | datasource error propagation into `Result.failure` |
+| Repositories | `mocktail 1.0.5` | transport error propagation into `Result`/`Failure` — never an exception across the seam |
+| Error mapper | plain `test` | **both** backend error body shapes map to the same `Failure` |
+| Header interceptor | plain `test` | `X-User-Id` / `X-Group-Id` / `X-User-Role` present on every request |
+| API mappers | plain `test` | localized JSON → domain, including the AR-only `text_clean` |
 | Primitives | `matchesGoldenFile` | dark + light × every state |
 | `NeuralBackground` | rebuild-count assertion | **no per-frame `setState`** (fixes #3) |
 | Glyph coverage | widget tree walk | no Arabic text bound to a Latin-only family (fixes #2) |
-| Filtering | widget test | category filter actually filters (fixes #1) |
 | Navigation | router test | guard redirects and resumes |
 | Semantics | `matchesSemantics` | every icon button labelled, chips announce selection |
 
-**Font loading in goldens:** `google_fonts` fetches over HTTP at runtime, which makes goldens non-deterministic. Bundle the `.ttf` files as assets and load via `FontLoader` in `flutter_test_config.dart`. Without this, every golden is flaky on a cold cache.
+**Font loading in goldens:** `google_fonts` fetches over HTTP at runtime, which makes goldens non-deterministic. Bundle the `.ttf` files as assets and load via `FontLoader` in `flutter_test_config.dart`. The five families are already committed under `assets/fonts/`, so the remaining work is the `pubspec.yaml` declaration and the `FontLoader` hook. Without this, every golden is flaky on a cold cache.
 
 ---
 
 ## 13. Performance
 
-The prototype's `NeuralBackground` is a 60fps-re-rendering React subtree. Three mitigations, all mandatory.
+The prototype's `NeuralBackground` is a 60fps-re-rendering React subtree. Five mitigations, all mandatory.
 
 **1. No `setState` per frame.**
 
@@ -156,14 +160,15 @@ ColorFilter hueRotateFilter(double turns) {
 
 The prototype's `blur(72px)` is achieved by a soft radial gradient with a wide transparent stop — visually equivalent, effectively free.
 
-**4. `BackdropFilter` budget.** Each `.blur` surface is a `saveLayer`. Home stacks 6 (hero, 4 cards, top bar). Rules:
+**4. `BackdropFilter` budget.** Each `.blur` surface is a `saveLayer`. The six shipped screens have **8** blur sites in total — 6 in the prototype's `ds.tsx` (`Input`, `QuizOption`, `StatTile`, `SettingsTile`, FAB dock item, FAB button) plus 2 inline (the Login form and Home's today's-reading panel) — and they all collapse into one `GlassSurface`. Rules:
 
 - Reading and Quiz screens: `.tint` — the content is dense and the blur is barely perceptible.
-- Home: `.blur` on the hero panel only; `.tint` on the 4 passage cards.
-- Wrap static groups (stats row, journey list) in `RepaintBoundary`.
+- Login: `.tint` — it is a full-screen field cluster, so a blur buys nothing.
+- Home: `.blur` on the today's-reading panel and the top bar only; `.tint` on everything else.
+- Wrap static groups (the result stat rows) in `RepaintBoundary`.
 - A `NeuralTier` derived from `MediaQuery` size and platform frame budget drops to `low` on low-end devices: no orbs, aurora only, at 30% cost.
 
-**5. Lists.** `GridView.builder` for the passage grid, `ListView.builder` for the journey timeline. Never `Column` + `map` over unbounded data.
+**5. Lists.** The rule stands — never `Column` + `map` over unbounded data — but **no unbounded collection ships any more.** The passage grid and the journey timeline were both cut with the library and the profile screen. The two lists that survive are the scripture verses and the quiz options, and each is bounded by a single reading's payload, so `ListView.builder` is sufficient and a future long chapter grows no scrollable `Column`.
 
 ---
 
@@ -174,14 +179,14 @@ The prototype has no semantics at all — every interactive element is a `div on
 | Gap | Fix |
 | --- | --- |
 | Icon-only buttons (back, close, bookmark, `Aa`) have no accessible name | `IconActionButton.tooltip` feeds both the `Tooltip` and `Semantics(label:)` |
-| Category chips are non-focusable `div`s | `Semantics(button: true, selected: isSelected, label: label)` + `InkWell` |
-| The Home hero panel is a `div onClick` | `GlassSurface(onTap:)` → `InkWell` inside `Material`; keyboard-activatable |
+| Mono-caps chips (theme toggle, route chips, FAB dock items) are non-focusable `div`s | `Semantics(button: true, selected: isSelected, label: label)` + `InkWell` |
+| Home's today panel is a `div onClick` | `GlassSurface(onTap:)` → `InkWell` inside `Material`; keyboard-activatable |
 | The text field has no programmatic label | `EvaTextField` supplies `Semantics(label: label)` to the field |
 | No focus indicators | `Focus` + a 2px `ember` ring at 40% alpha on every interactive widget |
 | Animations ignore reduced-motion | every animation checks `MediaQuery.disableAnimationsOf(context)`; when disabled, jump straight to the end state |
 | Colour-only state (quiz correct/incorrect) | pair the colour with an icon and a semantics label — `correct` announces "Correct", `incorrect` announces "Incorrect answer" |
 
-Target: all 7 pages pass a semantics sweep with no unlabeled interactive node, and text scales to 1.22× without overflow at 320px width.
+Target: all 6 pages pass a semantics sweep with no unlabeled interactive node, and text scales to 1.22× without overflow at 320px width.
 
 > **Correction (post-review).** An earlier draft of this plan named a `SemanticsTester` class as the acceptance gate. **No such class exists** in `flutter_test`. The real API is `WidgetTester.ensureSemantics()`, which returns a `SemanticsHandle` (`flutter_test/src/controller.dart:2369`) and must be disposed to avoid leaking across tests. The working pattern per page:
 >
@@ -191,7 +196,7 @@ Target: all 7 pages pass a semantics sweep with no unlabeled interactive node, a
 >   final handle = tester.ensureSemantics();
 >   addTearDown(handle.dispose);
 >   await tester.pumpWidget(harness);
->   expect(find.bySemanticsLabel('Continue reading'), findsOneWidget);
+>   expect(find.bySemanticsLabel('Today’s reading'), findsOneWidget);
 >   expect(
 >     () => unawaited(tester.getSemantics(find.byType(IconActionButton))),
 >     returnsNormally,

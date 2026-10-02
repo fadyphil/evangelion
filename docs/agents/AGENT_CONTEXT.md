@@ -65,13 +65,45 @@ lib/
   app/                     composition root: DI, router, bootstrap
   core/
     design_system/         tokens, theme, effects, widgets  (imported by everyone)
-    common/                Result<T>, Failure, UseCase, AppConfig
+    common/                Result<T>, Failure, AppConfig
     network/               Dio client, interceptors, error mapper
+    domain/                SHARED KERNEL — see below. PURE DART.
   features/<f>/
-    domain/                PURE DART. entities, repository interfaces, use cases.
+    domain/                PURE DART. this feature's USE CASES only
     data/                  models, data sources, repository implementations
     presentation/          bloc/cubit, pages, widgets
 ```
+
+### Shared kernel — `core/domain/`
+
+Six screens read the same handful of types. Without a shared kernel, `home`, `reading` and
+`quiz` would each need `ReadingRepository`, which forces cross-feature imports and breaks
+the purity gate in §7. So entities and ports **consumed by two or more features** live in
+`core/domain/`, not inside any one feature.
+
+```
+core/domain/
+  entities/
+    scripture_verse.dart    Verse, ScriptureText          — home, reading
+    question.dart           Question                      — home, quiz
+    quiz_session.dart       QuizSession, QuizAnswer       — quiz, result
+    streak_summary.dart     StreakSummary, TodayStatus    — home, result
+    submit_result.dart      SubmitResult                  — quiz, result
+    auth_session.dart       AuthSession                   — auth, app
+    user_settings.dart      UserSettings, AppThemeMode    — settings, app
+  repositories/
+    reading_repository.dart  streak_repository.dart
+    auth_repository.dart     settings_repository.dart
+  usecase/
+    usecase.dart            UseCase<In, Out>, NoParamsUseCase<Out>
+```
+
+`core/domain/` is **pure Dart** — no Flutter, no Dio. It declares the four ports and the
+entities. `features/*/data/` implements the ports. `features/*/domain/` holds only that
+feature's own use cases, which depend on the ports from `core/domain`.
+
+**Placement test:** used by exactly one feature → that feature's `domain/`. Used by two or
+more → `core/domain/`. Nothing enters `core/domain/` speculatively.
 
 ### SOLID — as testable obligations, not slogans
 
@@ -81,11 +113,13 @@ lib/
 | **OCP** | A new script language or question type is added by **adding a class and registering it**, never by editing a growing `if (language == …)` ladder. Bilingual-vs-localized payload differences go behind a `ReadingParser` seam. |
 | **LSP** | Every `ReadingRepository` implementation honours the whole contract, *including the non-obvious parts*: never throws across the seam, always returns `Result`, treats HTTP 409 as a typed failure and never an exception. A `FakeReadingRepository` must be substitutable for `DioReadingRepository`. |
 | **ISP** | Four narrow ports: `ReadingRepository`, `StreakRepository`, `AuthRepository`, `SettingsRepository`. A single fat `EvangelionRepository` is **forbidden**. Clients depend on the smallest interface that satisfies them. |
-| **DIP** | `domain/` declares its own interfaces. `data/` implements them. `domain/` never names a concrete implementation, `Dio`, or `SharedPreferences`. |
+| **DIP** | `core/domain/` declares the ports. `features/*/data/` implements them. No `domain/` file ever names a concrete implementation, `Dio`, or `SharedPreferences`. |
 
 ### Feature independence
 
-No feature may import another feature. Shared UI lives in `core/design_system`.
+**No feature may import another feature — no exceptions.** Shared UI lives in
+`core/design_system`; shared domain lives in `core/domain`. If you want
+`features/reading/…` from `features/home/…`, the shared type belongs in `core/domain`.
 
 ---
 
@@ -249,11 +283,12 @@ flutter test                                               # full suite
 Layer-purity gates (dependency inversion, mechanically):
 
 ```bash
-# domain must not import Flutter, Dio, or http  -> must produce NO matches
-rg "package:(flutter|dio|http)/" lib/features/*/domain/
+# domain must not import Flutter, Dio, or http -> must produce NO matches
+# (covers the shared kernel AND every feature domain)
+rg "package:(flutter|dio|http)/" lib/core/domain/ lib/features/*/domain/
 
-# no cross-feature imports
-rg "package:evangelion/features/" lib/features/ | rg -v "features/<own-name>/"
+# no cross-feature imports -> must produce NO matches
+rg "package:evangelion/features/" lib/features/ lib/core/ | rg -v "features/(\w+)/\1"
 ```
 
 `rg` finding matches means the gate **fails**. Report zero matches.
