@@ -36,9 +36,11 @@ import '../../../support/project_import_graph.dart';
 /// `lib/` resolves through a named source, and fails anything that does not.** A
 /// resolution looks like `EvaColors.…`, `EvaStickerPalette.of(StickerSlot.…)`,
 /// or `context.colors.…`; everything else — every spelling, computed or literal
-/// — is an offender. The two token files and the one transcribed prototype table
-/// are exempt as a whole, because that is where a colour is *supposed* to be
-/// introduced.
+/// — is an offender. `Colors.transparent` is admitted as a **(value, value)**
+/// pair rather than as a substring, so it cannot carry a Material palette colour
+/// along on the same line. The two token files and the one transcribed prototype
+/// table are exempt as a whole, because that is where a colour is *supposed* to
+/// be introduced.
 ///
 /// The cost of inverting is that the exemptions are now file-scoped rather than
 /// value-scoped, and that is deliberate: "which file is allowed to introduce
@@ -48,18 +50,26 @@ import '../../../support/project_import_graph.dart';
 /// ## THE THREE FILES THAT ARE ALLOWED TO INTRODUCE COLOUR
 ///
 /// - `tokens/**` — Phase 1's published token table. That is what a token *is*.
+///
+/// The two transcription sites below are the other two, and both are exempt for
+/// the same reason: **the value is in the prototype and is not in
+/// `03-design-system.md`**, and promoting it into `EvaColors` would put a value
+/// into a file that claims to be the spec's token table.
+///
 /// - `effects/neural_orbs.dart` — the transcription of `ORB_CONFIGS`
 ///   (`eva/src/components/ds.tsx:68-114`) and of the aurora `rgba()` bands
-///   (`ds.tsx:165-191`). **Neither is a design-system token**: `03-design-system.md`
-///   §5.1 publishes fourteen colour tokens per brightness and not one of them
-///   is an orb accent or an aurora stop, and the sticker palette is a different
-///   seven-colour vocabulary. Promoting prototype data into `EvaColors` would put
-///   values into a file that claims to be the spec's token table; keeping the
-///   literals at their single transcription site means they are declared once,
-///   asserted by `neural_orbs_test.dart`, and reachable from nowhere else.
+///   (`ds.tsx:165-191`). §5.1 publishes fourteen colour tokens per brightness and
+///   not one of them is an orb accent or an aurora stop, and the sticker palette
+///   is a different seven-colour vocabulary.
+/// - `widgets/eva_toggle.dart` — `EvaToggleKnob.color`, one literal, `#FFFFFF`,
+///   from `SettingsScreen.tsx:24` (`background: '#ffffff'` on the switch knob).
+///   §5.1 publishes no white that means "the handle of a control": `surface` is
+///   white in light and near-black in dark, and `ink` is the opposite again, so a
+///   knob that followed either would stop reading as a handle on one palette.
 ///
-/// This test is why that third bullet is a decision rather than a leak: move a
-/// colour into a painter and this goes red.
+/// This test is why those bullets are decisions rather than leaks: move a colour
+/// into a painter and this goes red. And the second test below pins what each
+/// exemption holds, so one cannot quietly grow a second colour.
 ///
 /// ## FAIL-CLOSED
 ///
@@ -71,6 +81,16 @@ import '../../../support/project_import_graph.dart';
 ///   count of zero over nothing is not a pass.
 const String _exemptOrbTranscription =
     'lib/core/design_system/effects/neural_orbs.dart';
+
+/// The Phase-3 addition to the exemption list. See above.
+const String _exemptToggleKnob =
+    'lib/core/design_system/widgets/eva_toggle.dart';
+
+/// The files exempt from the rule.
+const Set<String> _colourExemptions = <String>{
+  _exemptOrbTranscription,
+  _exemptToggleKnob,
+};
 
 /// Where a colour value can *come from*, as syntax.
 ///
@@ -97,118 +117,69 @@ const List<String> _resolutions = <String>[
   'colors.',
 ];
 
+/// The one entry in Material's palette this design system admits, as a
+/// `(marker, allowed value)` **pair** rather than a substring.
+///
+/// ## WHY A SUBSTRING WAS NOT ENOUGH
+///
+/// The first version put `'Colors.transparent'` in [_resolutions] and tested it
+/// with `line.contains`. That admits the whole **line**, so any Material palette
+/// colour riding along on the same line was legal too — and
+/// `Color.alphaBlend(Colors.deepOrange, Colors.transparent)` is not a contrived
+/// line, it is *the* idiomatic way to fade one colour into nothing. So the
+/// rule is now per-**value**: every `Colors.<name>` on the line must be
+/// `Colors.transparent` itself.
+///
+/// `Colors.` is a marker because the Material palette is where an un-tokenable
+/// colour sneaks in (`Colors.deepOrange`, `Colors.pinkAccent`). `transparent`
+/// is the one entry in that namespace that is not a palette choice at all: it is
+/// the *absence* of a fill, which is what `ds.tsx` writes as the bare string
+/// `'transparent'` in eight places — the unselected chip, the secondary button,
+/// the current bead. Admitting the prefix would admit the palette with it;
+/// admitting this exact token admits nothing else.
+const String _onlyTransparent = 'Colors.transparent';
+
+/// Every `Colors.<name>` on [line].
+///
+/// `Colors.` is the marker that produces a colour without a token table, so it
+/// is the one that has to be resolved **per occurrence** rather than per line.
+final RegExp _materialPaletteValue = RegExp(r'\bColors\.[A-Za-z0-9_]+');
+
+/// The `Color` **constructors** — as opposed to the `Colors.` palette.
+///
+/// Deliberately excludes `Colors.`: `Colors.transparent` has an `s` after
+/// `Color`, so it contains neither `Color(` nor `Color.`, and the distinction
+/// the rule below turns on is exactly that one.
+const List<String> _colourConstructors = <String>['Color(', 'Color.'];
+
 /// Whether [line] mentions a colour value at all.
 bool _producesAColour(String line) => _colourValueMarkers.any(line.contains);
 
 /// Whether the colour on [line] resolved through a published table.
-bool _resolvesToAToken(String line) => _resolutions.any(line.contains);
-
-/// Strips `/* … */` block comments from [source], newlines preserved.
 ///
-/// Line comments are filtered separately, per line, because they start at column
-/// zero often enough that stripping them needs no parsing. Block comments cannot
+/// Two questions, in order:
+///
+/// 1. does the line carry a `Colors.<name>` that is **not** `Colors.transparent`?
+///    If so it is an offender whatever else the line says — this is the check
+///    that replaced the whole-line substring test.
+/// 2. failing that, does the line resolve through a token table, or is
+///    `Colors.transparent` the *whole* of its colour content (no constructor,
+///    no palette entry)?
+bool _resolvesToAToken(String line) {
+  for (final RegExpMatch match in _materialPaletteValue.allMatches(line)) {
+    if (match.group(0) != _onlyTransparent) return false;
+  }
+  if (_resolutions.any(line.contains)) return true;
+  return line.contains(_onlyTransparent) &&
+      !_colourConstructors.any(line.contains);
+}
+
 /// Strips every comment from [source], newlines preserved.
 ///
-/// Line numbers in a failure message have to line up with the file on disk, so
-/// both comment forms are replaced by nothing rather than by a placeholder, and
-/// every newline inside one is still written.
-///
-/// A hand-rolled scanner rather than a regular expression, for three reasons
-/// that each cost a real bug when this was simpler:
-///
-/// - Dart nests block comments, so `/* a /* b */ c */` needs a depth counter;
-///   a regex ends at the inner `*/` and leaves `c */` looking like code.
-/// - **An apostrophe inside a line comment desynchronises a scanner that only
-///   handles block comments.** `/// … the prototype's hexes` opens what the
-///   scanner thinks is a string literal, and the `'` in the next comment closes
-///   it, so the block comment between them is emitted verbatim and the gate
-///   flags its own documentation. That is exactly what happened; the negative
-///   control is kept as a test below.
-/// - `//` has to be recognised *before* `/*`, or `///` opens a block comment.
-///
-/// Triple-quoted strings are tracked, because a `'''` block is a string and
-/// its contents must not be mistaken for code.
-///
-/// Fails closed on an unbalanced scan: a comment parser that has lost track must
-/// say so rather than report a clean tree.
-String _withoutComments(String source) {
-  final StringBuffer out = StringBuffer();
-  final int n = source.length;
-  int blockDepth = 0;
-  String terminator = '';
-  int i = 0;
-
-  while (i < n) {
-    final String ch = source[i];
-    final String next = i + 1 < n ? source[i + 1] : '';
-
-    if (blockDepth > 0) {
-      if (ch == '\n') {
-        out.write(ch);
-      } else if (ch == '/' && next == '*') {
-        blockDepth++;
-        i += 2;
-        continue;
-      } else if (ch == '*' && next == '/') {
-        blockDepth--;
-        i += 2;
-        continue;
-      }
-      i++;
-      continue;
-    }
-
-    if (terminator.isNotEmpty) {
-      if (ch == r'\' && terminator.length == 1 && i + 1 < n) {
-        out.write(ch);
-        out.write(source[i + 1]);
-        i += 2;
-        continue;
-      }
-      if (source.startsWith(terminator, i)) {
-        out.write(terminator);
-        i += terminator.length;
-        terminator = '';
-        continue;
-      }
-      out.write(ch);
-      i++;
-      continue;
-    }
-
-    if (ch == '/' && next == '/') {
-      while (i < n && source[i] != '\n') {
-        i++;
-      }
-      continue;
-    }
-    if (ch == '/' && next == '*') {
-      blockDepth++;
-      i += 2;
-      continue;
-    }
-    if (ch == "'" || ch == '"') {
-      // `'''` is one delimiter of three, not an empty string followed by a
-      // stray quote — so the length has to be decided before the scan starts.
-      final String term = source.startsWith(ch * 3, i) ? ch * 3 : ch;
-      out.write(term);
-      i += term.length;
-      terminator = term;
-      continue;
-    }
-    out.write(ch);
-    i++;
-  }
-
-  if (blockDepth != 0 || terminator.isNotEmpty) {
-    throw StateError(
-      'the comment scan finished unbalanced (blockDepth=$blockDepth, '
-      'terminator="$terminator"). A gate that cannot parse the file must say so '
-      'rather than report a clean tree.',
-    );
-  }
-  return out.toString();
-}
+/// **Lives in `test/support/project_import_graph.dart`** — see [withoutDartComments]
+/// for why, and for the three inputs that cost a real bug each. It is aliased
+/// here so the behavioural tests below read the same as they always did.
+String _withoutComments(String source) => withoutDartComments(source);
 
 void main() {
   test('every colour under lib/ resolves through a published token table', () {
@@ -242,7 +213,7 @@ void main() {
     for (final File file in files) {
       final String relative = packageRelative(file.uri);
       if (relative.startsWith('lib/core/design_system/tokens/')) continue;
-      if (relative == _exemptOrbTranscription) continue;
+      if (_colourExemptions.contains(relative)) continue;
 
       final String source;
       try {
@@ -278,20 +249,43 @@ void main() {
     // Without this the first test could be satisfied by an exemption that grew,
     // or by a file whose tables were moved somewhere the first test does not
     // reach. Both failure modes are the same bug: two homes for one table.
-    final String source = File.fromUri(
+    final String orbs = File.fromUri(
       packageRoot.uri.resolve(_exemptOrbTranscription),
     ).readAsStringSync();
     expect(
-      'const Map<OrbGroup, List<OrbSpec>> orbGroups'.allMatches(source).length,
+      'const Map<OrbGroup, List<OrbSpec>> orbGroups'.allMatches(orbs).length,
       1,
       reason: 'the ORB_CONFIGS transcription',
     );
     expect(
-      'abstract final class NeuralAurora'.allMatches(source).length,
+      'abstract final class NeuralAurora'.allMatches(orbs).length,
       1,
       reason:
           'the aurora band transcription, kept beside the orbs so this '
           "file's exemption above is a single entry",
+    );
+
+    // The toggle exemption is a whole *widget file*, which is a much broader
+    // licence than the orbs' — so it is pinned to exactly one colour
+    // construction. Without this the exemption would silently become a hole
+    // every future widget edit could drop a hex into.
+    final String toggle = File.fromUri(
+      packageRoot.uri.resolve(_exemptToggleKnob),
+    ).readAsStringSync();
+    expect(
+      _colourValueMarkers
+          .expand((String marker) => marker.allMatches(toggle))
+          .length,
+      1,
+      reason:
+          'exactly one colour construction in eva_toggle.dart — the knob. A '
+          'second one means this file no longer needs its exemption as it is '
+          'written, or has grown a colour nobody transcribed.',
+    );
+    expect(
+      'abstract final class EvaToggleKnob'.allMatches(toggle).length,
+      1,
+      reason: 'the knob colour has one home and one name',
     );
   });
 
@@ -311,6 +305,59 @@ void main() {
       isFalse,
     );
     expect(_resolvesToAToken('final c = EvaColors.dark().ember;'), isTrue);
+  });
+
+  group('the transparent exemption is one token, not a prefix', () {
+    // The `Colors.transparent` entry above is the whole reason a widget may write
+    // a bare `Colors.` value. If it ever widened to `Colors.`, every Material
+    // palette colour in `lib/` would become legal and the gate would be inert.
+    test('admits `Colors.transparent`', () {
+      expect(_resolvesToAToken('final c = Colors.transparent;'), isTrue);
+    });
+
+    test('admits nothing else from the Material palette', () {
+      for (final String spelling in const <String>[
+        'Colors.deepOrange',
+        'Colors.pinkAccent',
+        'Colors.red',
+        'Colors.black',
+        'Colors.white',
+      ]) {
+        expect(
+          _resolvesToAToken('final c = $spelling;'),
+          isFalse,
+          reason: '$spelling is a palette choice, not an absence of one',
+        );
+      }
+    });
+
+    test('and it is not a hall pass for a palette colour on the same line', () {
+      // The planted evasion, kept as the negative control for the per-value rule
+      // above. `_resolutions` used to be tested with `line.contains`, so a line
+      // mentioning `Colors.transparent` anywhere was legal **in full** — and this
+      // is the idiomatic way to fade a colour into nothing, so it is a realistic
+      // edit rather than a contrived one. `Colors.deepOrange` is the Material
+      // palette and resolves through nothing.
+      expect(
+        _resolvesToAToken(
+          'final c = Color.alphaBlend(Colors.deepOrange, Colors.transparent);',
+        ),
+        isFalse,
+      );
+      expect(
+        _resolvesToAToken('dot: Colors.transparent, glow: Colors.pinkAccent,'),
+        isFalse,
+        reason: 'the second `Colors.` on the line is what fails it',
+      );
+      // The control: the same call with both ends legal resolves.
+      expect(
+        _resolvesToAToken(
+          'final c = Color.alphaBlend(colors.ink, Colors.transparent);',
+        ),
+        isTrue,
+        reason: 'the token end is admitted; the palette end is not',
+      );
+    });
   });
 
   group('the comment scanner', () {

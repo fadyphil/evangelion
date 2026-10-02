@@ -361,6 +361,93 @@ void main() {
       expect(taps, 1);
     });
 
+    testWidgets('the rim is the same pixel with and without `onTap`', (
+      WidgetTester tester,
+    ) async {
+      // M4. Phase 3 passed `idleBorder: Border.all(colors.glassBorder, width: 1)`
+      // to the `EvaFocusRing`, which is *the same border at the same 1px inset*
+      // the inner `DecoratedBox` already paints — so `onTap: null` → `() {}`
+      // double-drew the rim on every interactive panel. Measured over a 320-wide
+      // dark canvas: the left-edge rim read R=32 without `onTap` and **R=43** with
+      // it (43 = 32 + (255 − 32) × 0.078 — the same `glassBorder` alpha, laid down
+      // twice), and 2272 of the panel's 12000 sampled bytes differed.
+      //
+      // The golden pair could not see any of it: `goldens/glass_surface_tint_*` is
+      // captured from the **non-interactive** form, so the interactive variant had
+      // no reference image at all. Hence a pixel assertion.
+      tester.view.physicalSize = const Size(320, 240);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Future<List<int>> rim(VoidCallback? onTap) async {
+        await tester.pumpWidget(
+          evaAmbientHarness(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: RepaintBoundary(
+                child: GlassSurface(
+                  onTap: onTap,
+                  semanticLabel: "Today's reading",
+                  padding: EdgeInsets.zero,
+                  child: const SizedBox(width: 200, height: 60),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final RenderRepaintBoundary boundary = tester
+            .renderObject<RenderRepaintBoundary>(
+              find.descendant(
+                of: find.byType(Align),
+                matching: find.byType(RepaintBoundary),
+              ),
+            );
+        final List<int>? bytes = await tester.runAsync<List<int>>(() async {
+          final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
+          final ByteData data = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          image.dispose();
+          return data.buffer.asUint8List();
+        });
+        expect(bytes, isNotNull, reason: 'the panel produced no pixels at all');
+        return bytes!;
+      }
+
+      final List<int> plain = await rim(null);
+      final List<int> tappable = await rim(() {});
+
+      // Read as **R of the left-edge pixel on the middle row**, which is the rim
+      // and not the fill. `image.toByteData(format: rawRgba)` is premultiplied, so
+      // over the harness's transparent backdrop `glassFill` (`#0DFFFFFF`) reads 13
+      // and the rim over it (`#14FFFFFF`) reads 32. Both numbers are derived, not
+      // asserted as literals — a gate that pinned 32 would fail the day the token
+      // moved for a reason that has nothing to do with `onTap`.
+      int leftRim(List<int> px) => px[(30 * 200) * 4];
+      int fillR(List<int> px) => px[(30 * 200 + 1) * 4];
+      expect(fillR(plain), 13, reason: 'glassFill over a transparent backdrop');
+      expect(leftRim(plain), 32, reason: 'one glassBorder over that fill');
+
+      expect(
+        leftRim(tappable),
+        leftRim(plain),
+        reason:
+            '§14 / M4 — `onTap` must not change the resting rim by one pixel. The '
+            'ring REPLACES the idle border in the same band, and this surface '
+            'already owns its resting border in its own decoration, so the ring\'s '
+            'idle state has nothing to add.',
+      );
+      // The whole panel, not one pixel: a second draw anywhere — a corner arc, a
+      // rounded edge — is the same defect wearing a smaller hat.
+      expect(
+        tappable.toString(),
+        plain.toString(),
+        reason: 'an interactive glass panel is pixel-identical to an inert one',
+      );
+    });
+
     testWidgets('a tappable surface without a label is a programming error', (
       WidgetTester tester,
     ) async {

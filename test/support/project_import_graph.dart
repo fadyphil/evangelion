@@ -1,4 +1,5 @@
-/// The project-local import graph, as something a test can walk.
+/// The project-local import graph, as something a test can walk, plus the Dart
+/// source scanner the source gates share.
 ///
 /// ## WHY THIS IS A SHARED HELPER AND NOT A COPY IN EACH SUITE
 ///
@@ -16,6 +17,13 @@
 /// `package:evangelion/…` and relative forms — and two independent copies of it
 /// would be two things to keep in step, which is the exact failure mode §7 warns
 /// about. So the walk lives here once.
+///
+/// [withoutDartComments] is here for the same reason and arrived the same way.
+/// It began as a private copy inside `no_colour_literals_test.dart`, and
+/// `focus_ring_gate_test.dart` then needed the identical function — where a
+/// *second* copy would have been free to diverge on the three inputs that
+/// actually broke the first one (nested `/* */`, an apostrophe in a `///` line,
+/// and a `'''` block). One implementation, one set of tests.
 ///
 /// Pure `dart:io`, no `package:flutter`, no dependency, no codegen, and not a
 /// `*_test.dart` — `flutter test` collects only the latter, so this is a library
@@ -178,7 +186,7 @@ Set<String> fileNamesOf(Iterable<String> paths) =>
 /// non-default — a double-quoted `export` with a `show` combinator, a `part`,
 /// then a plain relative `import` — and returns the directory holding it.
 ///
-/// Built at run time rather than committed. A committed fixture would need an
+/// Built at run time rather than committed. A committed fixture would need a
 /// `// ignore: prefer_single_quotes` header to survive `dart analyze`, and a
 /// fixture the analyzer tolerates no longer proves the walk sees double quotes
 /// or combinators.
@@ -196,4 +204,125 @@ Directory writeDirectiveFixture() {
   File('${dir.path}/middle.dart').writeAsStringSync("part 'deepest.dart';\n");
   File('${dir.path}/entry.dart').writeAsStringSync("import 'middle.dart';\n");
   return dir;
+}
+
+/// Strips every comment from [source], newlines preserved.
+///
+/// ## WHY A SOURCE GATE NEEDS THIS
+///
+/// A source gate asks "does this file use `EvaFocusRing`?" and a doc comment
+/// explaining that a `GestureDetector` is *deliberately not* wrapped in one
+/// answers that question — with the word the gate is looking for. The gate then
+/// passes on the strength of its own documentation. That is not a hypothetical:
+/// the focus-ring gate's ring check was a bare `source.contains`, and a doc
+/// comment reading *"Deliberately not an [EvaFocusRing]"* defeated it while the
+/// file shipped an unfocusable drag surface.
+///
+/// ## WHY A HAND-ROLLED SCANNER AND NOT A REGULAR EXPRESSION
+///
+/// Three inputs, each of which cost a real bug when this was simpler:
+///
+/// - Dart **nests** block comments, so `/* a /* b */ c */` needs a depth
+///   counter; a regex ends at the inner `*/` and leaves `c */` looking like code.
+/// - **An apostrophe inside a line comment desynchronises a scanner that only
+///   handles block comments.** `/// … the prototype's hexes` opens what the
+///   scanner thinks is a string literal, and the `'` in the next comment closes
+///   it, so the block comment between them is emitted verbatim and the gate flags
+///   its own documentation.
+/// - `//` has to be recognised *before* `/*`, or `///` opens a block comment.
+///
+/// Triple-quoted strings are tracked, because a `'''` block is a string and its
+/// contents must not be mistaken for code.
+///
+/// ## FAILS CLOSED
+///
+/// An unbalanced scan throws [StateError] rather than returning a plausible
+/// answer. A comment parser that has lost track must say so; a scanner that
+/// guessed would report a clean tree over a file it never understood, which is
+/// §7's "a gate that cannot fail is worse than no gate" in its purest form.
+///
+/// Strings are **kept**, comments only: a string literal naming a colour or a
+/// widget is code-adjacent at worst, and reporting it is diagnosable where
+/// silently dropping it is not.
+///
+/// [no_colour_literals_test.dart] holds the behavioural tests for this function;
+/// they moved here with it rather than being copied, so the tests and the
+/// implementation cannot drift apart.
+String withoutDartComments(String source) {
+  final StringBuffer out = StringBuffer();
+  final int n = source.length;
+  int blockDepth = 0;
+  String terminator = '';
+  int i = 0;
+
+  while (i < n) {
+    final String ch = source[i];
+    final String next = i + 1 < n ? source[i + 1] : '';
+
+    if (blockDepth > 0) {
+      if (ch == '\n') {
+        out.write(ch);
+      } else if (ch == '/' && next == '*') {
+        blockDepth++;
+        i += 2;
+        continue;
+      } else if (ch == '*' && next == '/') {
+        blockDepth--;
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+
+    if (terminator.isNotEmpty) {
+      if (ch == r'\' && terminator.length == 1 && i + 1 < n) {
+        out.write(ch);
+        out.write(source[i + 1]);
+        i += 2;
+        continue;
+      }
+      if (source.startsWith(terminator, i)) {
+        out.write(terminator);
+        i += terminator.length;
+        terminator = '';
+        continue;
+      }
+      out.write(ch);
+      i++;
+      continue;
+    }
+
+    if (ch == '/' && next == '/') {
+      while (i < n && source[i] != '\n') {
+        i++;
+      }
+      continue;
+    }
+    if (ch == '/' && next == '*') {
+      blockDepth++;
+      i += 2;
+      continue;
+    }
+    if (ch == "'" || ch == '"') {
+      // `'''` is one delimiter of three, not an empty string followed by a
+      // stray quote — so the length has to be decided before the scan starts.
+      final String term = source.startsWith(ch * 3, i) ? ch * 3 : ch;
+      out.write(term);
+      i += term.length;
+      terminator = term;
+      continue;
+    }
+    out.write(ch);
+    i++;
+  }
+
+  if (blockDepth != 0 || terminator.isNotEmpty) {
+    throw StateError(
+      'the comment scan finished unbalanced (blockDepth=$blockDepth, '
+      'terminator="$terminator"). A gate that cannot parse the file must say so '
+      'rather than report a clean tree.',
+    );
+  }
+  return out.toString();
 }

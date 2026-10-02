@@ -197,10 +197,31 @@ class GlassSurface extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: Material(
-        type: MaterialType.transparency,
-        borderRadius: borderRadius,
-        child: InkWell(onTap: onTap, borderRadius: borderRadius, child: body),
+      child: EvaFocusRing(
+        // §14's focus row applies to this surface like any other interactive
+        // widget, and Phase 2 shipped it without one — the `InkWell` below had no
+        // focus node of its own, so Tab never reached the surface at all. Phase 3
+        // owns the ring; this is its first application to an already-shipped
+        // widget, and `focus_ring_gate_test.dart` counts it.
+        enabled: true,
+        // `null`, deliberately — and this line is the whole of M4's fix. Phase 3
+        // first passed `Border.all(colors.glassBorder, width: 1)` here, which is
+        // *the same border at the same 1px inset* that the `DecoratedBox` above
+        // already paints, so `onTap: null → () {}` double-drew the rim on every
+        // interactive panel. The focus ring is supposed to **replace** the idle
+        // border in the same band (see `EvaFocusRing`), and this surface already
+        // owns its resting border in its own decoration — so the ring's idle state
+        // has nothing to add, and [border] is honoured exactly once.
+        //
+        // Losing nothing: the 2px ember ring is *wider* than the 1px rim it
+        // covers, so a focused panel still shows it completely.
+        idleBorder: null,
+        radius: radius,
+        child: EvaInk(
+          onPressed: onTap,
+          borderRadius: borderRadius,
+          child: body,
+        ),
       ),
     );
   }
