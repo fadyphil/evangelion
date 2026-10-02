@@ -48,18 +48,26 @@ import '../../../support/project_import_graph.dart';
 /// ## THE THREE FILES THAT ARE ALLOWED TO INTRODUCE COLOUR
 ///
 /// - `tokens/**` — Phase 1's published token table. That is what a token *is*.
+///
+/// The two transcription sites below are the other two, and both are exempt for
+/// the same reason: **the value is in the prototype and is not in
+/// `03-design-system.md`**, and promoting it into `EvaColors` would put a value
+/// into a file that claims to be the spec's token table.
+///
 /// - `effects/neural_orbs.dart` — the transcription of `ORB_CONFIGS`
 ///   (`eva/src/components/ds.tsx:68-114`) and of the aurora `rgba()` bands
-///   (`ds.tsx:165-191`). **Neither is a design-system token**: `03-design-system.md`
-///   §5.1 publishes fourteen colour tokens per brightness and not one of them
-///   is an orb accent or an aurora stop, and the sticker palette is a different
-///   seven-colour vocabulary. Promoting prototype data into `EvaColors` would put
-///   values into a file that claims to be the spec's token table; keeping the
-///   literals at their single transcription site means they are declared once,
-///   asserted by `neural_orbs_test.dart`, and reachable from nowhere else.
+///   (`ds.tsx:165-191`). §5.1 publishes fourteen colour tokens per brightness and
+///   not one of them is an orb accent or an aurora stop, and the sticker palette
+///   is a different seven-colour vocabulary.
+/// - `widgets/eva_toggle.dart` — `EvaToggleKnob.color`, one literal, `#FFFFFF`,
+///   from `SettingsScreen.tsx:24` (`background: '#ffffff'` on the switch knob).
+///   §5.1 publishes no white that means "the handle of a control": `surface` is
+///   white in light and near-black in dark, and `ink` is the opposite again, so a
+///   knob that followed either would stop reading as a handle on one palette.
 ///
-/// This test is why that third bullet is a decision rather than a leak: move a
-/// colour into a painter and this goes red.
+/// This test is why those bullets are decisions rather than leaks: move a colour
+/// into a painter and this goes red. And the second test below pins what each
+/// exemption holds, so one cannot quietly grow a second colour.
 ///
 /// ## FAIL-CLOSED
 ///
@@ -71,6 +79,16 @@ import '../../../support/project_import_graph.dart';
 ///   count of zero over nothing is not a pass.
 const String _exemptOrbTranscription =
     'lib/core/design_system/effects/neural_orbs.dart';
+
+/// The Phase-3 addition to the exemption list. See above.
+const String _exemptToggleKnob =
+    'lib/core/design_system/widgets/eva_toggle.dart';
+
+/// The files exempt from the rule.
+const Set<String> _colourExemptions = <String>{
+  _exemptOrbTranscription,
+  _exemptToggleKnob,
+};
 
 /// Where a colour value can *come from*, as syntax.
 ///
@@ -95,6 +113,17 @@ const List<String> _resolutions = <String>[
   'EvaStickerPalette.of(StickerSlot.',
   'context.colors.',
   'colors.',
+  // `Colors.transparent` — and ONLY that entry, which is why it is spelled out in
+  // full rather than covered by the `Colors.` prefix the marker list uses.
+  //
+  // `Colors.` is a marker because the Material palette is where an un-tokenable
+  // colour sneaks in (`Colors.deepOrange`, `Colors.pinkAccent`). `transparent` is
+  // the one entry in that namespace that is not a palette choice at all: it is
+  // the *absence* of a fill, which is what `ds.tsx` writes as the bare string
+  // `'transparent'` in eight places — the unselected chip, the secondary button,
+  // the current bead. Admitting the prefix would admit the palette with it;
+  // admitting this exact token admits nothing else.
+  'Colors.transparent',
 ];
 
 /// Whether [line] mentions a colour value at all.
@@ -242,7 +271,7 @@ void main() {
     for (final File file in files) {
       final String relative = packageRelative(file.uri);
       if (relative.startsWith('lib/core/design_system/tokens/')) continue;
-      if (relative == _exemptOrbTranscription) continue;
+      if (_colourExemptions.contains(relative)) continue;
 
       final String source;
       try {
@@ -278,20 +307,43 @@ void main() {
     // Without this the first test could be satisfied by an exemption that grew,
     // or by a file whose tables were moved somewhere the first test does not
     // reach. Both failure modes are the same bug: two homes for one table.
-    final String source = File.fromUri(
+    final String orbs = File.fromUri(
       packageRoot.uri.resolve(_exemptOrbTranscription),
     ).readAsStringSync();
     expect(
-      'const Map<OrbGroup, List<OrbSpec>> orbGroups'.allMatches(source).length,
+      'const Map<OrbGroup, List<OrbSpec>> orbGroups'.allMatches(orbs).length,
       1,
       reason: 'the ORB_CONFIGS transcription',
     );
     expect(
-      'abstract final class NeuralAurora'.allMatches(source).length,
+      'abstract final class NeuralAurora'.allMatches(orbs).length,
       1,
       reason:
           'the aurora band transcription, kept beside the orbs so this '
           "file's exemption above is a single entry",
+    );
+
+    // The toggle exemption is a whole *widget file*, which is a much broader
+    // licence than the orbs' — so it is pinned to exactly one colour
+    // construction. Without this the exemption would silently become a hole
+    // every future widget edit could drop a hex into.
+    final String toggle = File.fromUri(
+      packageRoot.uri.resolve(_exemptToggleKnob),
+    ).readAsStringSync();
+    expect(
+      _colourValueMarkers
+          .expand((String marker) => marker.allMatches(toggle))
+          .length,
+      1,
+      reason:
+          'exactly one colour construction in eva_toggle.dart — the knob. A '
+          'second one means this file no longer needs its exemption as it is '
+          'written, or has grown a colour nobody transcribed.',
+    );
+    expect(
+      'abstract final class EvaToggleKnob'.allMatches(toggle).length,
+      1,
+      reason: 'the knob colour has one home and one name',
     );
   });
 
@@ -311,6 +363,31 @@ void main() {
       isFalse,
     );
     expect(_resolvesToAToken('final c = EvaColors.dark().ember;'), isTrue);
+  });
+
+  group('the transparent exemption is one token, not a prefix', () {
+    // The `Colors.transparent` entry above is the whole reason a widget may write
+    // a bare `Colors.` value. If it ever widened to `Colors.`, every Material
+    // palette colour in `lib/` would become legal and the gate would be inert.
+    test('admits `Colors.transparent`', () {
+      expect(_resolvesToAToken('final c = Colors.transparent;'), isTrue);
+    });
+
+    test('admits nothing else from the Material palette', () {
+      for (final String spelling in const <String>[
+        'Colors.deepOrange',
+        'Colors.pinkAccent',
+        'Colors.red',
+        'Colors.black',
+        'Colors.white',
+      ]) {
+        expect(
+          _resolvesToAToken('final c = $spelling;'),
+          isFalse,
+          reason: '$spelling is a palette choice, not an absence of one',
+        );
+      }
+    });
   });
 
   group('the comment scanner', () {
