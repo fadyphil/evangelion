@@ -12,13 +12,20 @@ Sunday-School daily Bible reading platform. Fastify 3.47-era backend, live REST 
 ## Commands
 
 ```bash
-flutter pub get                 # install
-flutter run -d linux            # the only device currently available
-flutter analyze                 # types + lint + DEPRECATION warnings — the main gate
-dart format lib test            # formatting
-flutter test                    # unit + widget + golden
-dart test --coverage=coverage   # coverage -> coverage/lcov.info
+flutter pub get                                           # install
+flutter run -d linux                                      # the only device currently available
+dart analyze --fatal-infos --fatal-warnings               # types + lint + DEPRECATION — THE gate
+dart format --output=none --set-exit-if-changed lib test  # formatting gate
+flutter test                                              # unit + widget + golden
+flutter test --coverage                                   # coverage -> coverage/lcov.info
 ```
+
+**Use `flutter test`, never `dart test`.** The plain Dart VM has no `dart:ui` and cannot
+compile Flutter SDK sources, so `dart test` fails to load *every* test file — including the
+pure-Dart ones — because each imports `flutter_test`.
+
+The analyzer command is `dart analyze`, not `flutter analyze`, so the documented gate is
+byte-identical to AGENT_CONTEXT §7.
 
 Target a different backend at build time:
 
@@ -53,8 +60,13 @@ Library and Profile screens were **cut** — the backend has no endpoints for th
 ## Regenerating code
 
 ```bash
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
+dart run build_runner clean   # only when a stale generated file needs purging
 ```
+
+In `build_runner` 2.16.x the old `--delete-conflicting-outputs` flag was **removed**. Passing
+it prints `W These options have been removed and were ignored` and still exits `0`, so an
+agent believes the outputs were purged when they were not. Run `clean` explicitly instead.
 
 Two generators run: `auto_route_generator` (emits `*.gr.dart` routers) and
 `injectable_generator` (emits `*.config.dart` DI registration). Both regenerate
