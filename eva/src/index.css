@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import 'tailwindcss';
+
+/* ── Theme tokens ─────────────────────────────────────────────────────────── */
+:root, [data-theme="dark"] {
+  --canvas:        #05081A;
+  --surface:       #0D1224;
+  --raised:        #141A2E;
+  --ink:           #EAE8F5;
+  --ink2:          #8A8FAD;
+  --ink3:          #424669;
+  --line:          #1C2238;
+  --ember:         #E8A33D;
+  --ember-deep:    #C77F1F;
+  --on-ember:      #0D0A04;
+  --ok:            #4ECCA3;
+  --err:           #FF6B6B;
+  --orb-opacity:   0.55;
+  --aurora-opacity:0.18;
+}
+
+[data-theme="light"] {
+  --canvas:        #F0EEFF;
+  --surface:       #FFFFFF;
+  --raised:        #E8E4FF;
+  --ink:           #120E28;
+  --ink2:          #5A5480;
+  --ink3:          #9B97B8;
+  --line:          #D5D0EF;
+  --ember:         #D4891A;
+  --ember-deep:    #B56C0C;
+  --on-ember:      #FFF8EE;
+  --ok:            #1A8C6A;
+  --err:           #D63B3B;
+  --orb-opacity:   0.18;
+  --aurora-opacity:0.10;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--canvas);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--ink);
+}
+
+/* ── Orb float paths ──────────────────────────────────────────────────────── */
+@keyframes orb-float-a {
+  0%   { transform: translate(0px,   0px)  scale(1);    }
+  30%  { transform: translate(28px, -22px) scale(1.07); }
+  60%  { transform: translate(-18px, 30px) scale(0.94); }
+  100% { transform: translate(0px,   0px)  scale(1);    }
+}
+@keyframes orb-float-b {
+  0%   { transform: translate(0px,   0px)  scale(1);    }
+  40%  { transform: translate(-30px, 18px) scale(1.05); }
+  75%  { transform: translate(22px, -28px) scale(0.92); }
+  100% { transform: translate(0px,   0px)  scale(1);    }
+}
+@keyframes orb-float-c {
+  0%   { transform: translate(0px,   0px)  scale(1);    }
+  50%  { transform: translate(12px,  36px) scale(1.1);  }
+  100% { transform: translate(0px,   0px)  scale(1);    }
+}
+
+/* ── Color cycling (hue-rotate keeps gradient, shifts hue) ───────────────── */
+@keyframes hue-cycle {
+  from { filter: hue-rotate(0deg)   blur(72px); }
+  to   { filter: hue-rotate(360deg) blur(72px); }
+}
+@keyframes hue-cycle-rev {
+  from { filter: hue-rotate(360deg) blur(72px); }
+  to   { filter: hue-rotate(0deg)   blur(72px); }
+}
+
+/* ── Aurora band shift ────────────────────────────────────────────────────── */
+@keyframes aurora-drift {
+  0%   { background-position: 50% 0%,   30% 100%; opacity: var(--aurora-opacity); }
+  50%  { background-position: 50% 100%, 70% 0%;   opacity: calc(var(--aurora-opacity) * 1.6); }
+  100% { background-position: 50% 0%,   30% 100%; opacity: var(--aurora-opacity); }
+}
+
+/* ── Gold fleck float ─────────────────────────────────────────────────────── */
+@keyframes fleck-float {
+  from { transform: translateY(0px);  opacity: 0.85; }
+  to   { transform: translateY(-9px); opacity: 0.35; }
+}
+
+/* ── Screen fade-slide transition ────────────────────────────────────────── */
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* scrollbar hide */
+.no-scroll::-webkit-scrollbar { display: none; }
+.no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
