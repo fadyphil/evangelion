@@ -8,7 +8,6 @@ import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
-import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
@@ -16,19 +15,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
-
-/// A session this phase does not have: the answer is whatever the test says.
-///
-/// Mutable on purpose — the guard reads the same instance on every navigation, so
-/// flipping this is how a test simulates a login or a logout without a bloc.
-final class FakeAuthStatus implements AuthStatus {
-  FakeAuthStatus({this.authenticated = true});
-
-  bool authenticated;
-
-  @override
-  bool get isAuthenticated => authenticated;
-}
 
 /// A signal nothing ever writes to.
 ///
@@ -46,17 +32,6 @@ AppRouter routerFor(
   FakeAuthStatus status, {
   ReevaluateListenable? authChanges,
 }) => AppRouter(status, authChanges ?? _SilentAuthChanges());
-
-/// The app shell these widget tests mount.
-///
-/// Deliberately not `EvangelionApp`: these tests are about the router, and
-/// `EvangelionApp` hard-codes the Eva theme, the locale plumbing and — via the
-/// locator — the router itself. A shell keeps each assertion pointing at one
-/// thing, and `app_test.dart` owns the claim that the real app uses the resolved
-/// router.
-Widget routerHost(AppRouter router) => MaterialApp.router(
-  routerConfig: router.config(reevaluateListenable: router.authChanges),
-);
 
 void main() {
   setUp(resetServiceLocator);
@@ -78,7 +53,13 @@ void main() {
       routes = router.routes;
     });
 
-    test('the wildcard is last, and it is the only one', () {
+    test('the wildcard is last', () {
+      // ONE ASSERTION, not two. This used to carry a second one — "and there is
+      // exactly one of it", `where(path == fallback).length == 1` — which the
+      // list above already implies: a duplicate entry would have to differ from
+      // the expected list. A second check on the same fact is a second thing to
+      // keep in step, and reading it as an independent guard overstates what the
+      // suite can see.
       expect(
         routes.map((AutoRoute route) => route.path),
         <String>[
@@ -93,13 +74,6 @@ void main() {
         reason:
             'declaration order IS match order; anything after `*` is '
             'unreachable',
-      );
-      expect(
-        routes
-            .where((AutoRoute route) => route.path == AppRoutes.fallback)
-            .length,
-        1,
-        reason: 'a second `*` would be dead weight at best',
       );
     });
 
@@ -128,14 +102,20 @@ void main() {
     });
 
     test('the six real routes are pages, each named by AppRoutes', () {
-      expect(routes.take(6).map((AutoRoute route) => route.page.name), <String>[
+      // Everything before the wildcard, not `take(6)`. The group above already
+      // established that the wildcard is last, so "everything but the last
+      // entry" is the same set without a second copy of the count — and a count
+      // is what goes stale when a seventh screen is ever added.
+      final List<AutoRoute> realRoutes = routes.sublist(0, routes.length - 1);
+
+      expect(realRoutes.map((AutoRoute route) => route.page.name), <String>[
         LoginRoute.name,
         HomeRoute.name,
         ReadingRoute.name,
         QuizRoute.name,
         ResultRoute.name,
         SettingsRoute.name,
-      ]);
+      ], reason: 'the six locked screens, in route-table order');
     });
 
     test('only /login is unguarded', () {
@@ -205,13 +185,27 @@ void main() {
       return matches!.single.path;
     }
 
-    test('each of the six routes resolves to itself', () {
+    // THE MUTATION THIS WHOLE GROUP EXISTS FOR, measured against the full suite:
+    // moving `RedirectRoute(path: '*')` to the front of `AppRouter.routes` turns
+    // **46 tests** red. Nothing throws, no log line appears, the list-order
+    // assertion above is the only other thing that notices, and every path here
+    // silently becomes `/`.
+    //
+    // ("nine", which is what the commit message claimed, was wrong in both
+    // direction and magnitude; `app_routes.dart` carries the measured number too,
+    // so the record is in the repository and not only in git history.)
+    test('each of the six routes resolves to itself, not to /', () {
       expect(resolve(AppRoutes.login), AppRoutes.login);
       expect(resolve(AppRoutes.home), AppRoutes.home);
       expect(resolve(AppRoutes.reading), AppRoutes.reading);
       expect(resolve(AppRoutes.quiz), AppRoutes.quiz);
       expect(resolve(AppRoutes.result), AppRoutes.result);
       expect(resolve(AppRoutes.settings), AppRoutes.settings);
+      //
+      // This used to be a second test, "the wildcard does not swallow the six
+      // real routes", which iterated the same six paths and made the same six
+      // assertions. One of the two was always redundant, and reading them
+      // together suggested two independent checks where there is one.
     });
 
     test('an unknown path resolves to / through the wildcard', () {
@@ -219,45 +213,90 @@ void main() {
       expect(resolve('/deeply/nested/nonsense'), AppRoutes.home);
     });
 
-    test('the wildcard does not swallow the six real routes', () {
-      // The mutation that turns this red is moving `RedirectRoute(path: '*')` to
-      // the front of `AppRouter.routes`: nothing throws, no log line appears, the
-      // list-order assertion above is the only other thing that notices, and
-      // every path here silently becomes `/`.
-      for (final String path in <String>[
-        AppRoutes.login,
-        AppRoutes.home,
-        AppRoutes.reading,
-        AppRoutes.quiz,
-        AppRoutes.result,
-        AppRoutes.settings,
-      ]) {
-        expect(resolve(path), path, reason: '$path must not be redirected');
-      }
+    test('so does any single unmatched segment', () {
+      // THE BEHAVIOURAL HALF OF THE WILDCARD CLAIM — it replaces a
+      // literal-equality check on `AppRoutes.fallback` that stood in
+      // `app_routes_test.dart`. That check read `'*'` is the only spelling auto_route
+      // accepts, which is false: `'/*'` is accepted too. Measured side by side
+      // through the executed matcher, the two spellings agree on **every** path
+      // this app has:
+      //
+      //   | matcher input | `fallback = '*'` | `fallback = '/*'` |
+      //   |---|---|---|
+      //   | `/x`                | `/`  | `/`  |
+      //   | `//`                | null | null |
+      //   | `''`                | null | null |
+      //   | `/not-a-route`      | `/`  | `/`  |
+      //   | `/login/x`          | `/`  | `/`  |
+      //   | `/deeply/nested/x`  | `/`  | `/`  |
+      //   | `/LOGIN`            | `/`  | `/`  |
+      //   | `*` (the literal)   | `/`  | null |
+      //
+      // So the coverage is pinned here by execution rather than by spelling, which
+      // is the only form of the claim that is worth anything: `'*'` is chosen
+      // because it is the form auto_route documents and because it leaves exactly
+      // one declared path outside the slash-prefixed set, not because `'/*'` is
+      // broken.
+      expect(resolve('/x'), AppRoutes.home);
+    });
+
+    test('a path with no segments matches nothing at all', () {
+      // The half of the same measurement that is NOT a pass, and which neither
+      // spelling changes. `RouteMatcher.match` strips the leading separator and
+      // then has no segments left, so both `''` and `'//'` come back `null` — the
+      // wildcard does not cover them, because a `*` with nothing in front of it
+      // never becomes a full match. Asserted so the table above is read as the
+      // whole truth and not as the flattering part of it: `resolve()` cannot be
+      // used here because it asserts a match exists.
+      expect(
+        router.matcher.match('//'),
+        isNull,
+        reason: 'an empty path is not a path the wildcard rescues',
+      );
+      expect(
+        router.matcher.match(''),
+        isNull,
+        reason: 'nor is the empty string',
+      );
     });
   });
 
   group('the global transition', () {
-    test(
-      'is RouteType.custom over EvaMotion.fadeSlide and EvaMotion.screen',
-      () {
-        final RouteType type = AppRouter(
-          FakeAuthStatus(),
-          _SilentAuthChanges(),
-        ).defaultRouteType;
+    test('is RouteType.custom over EvaMotion.fadeSlide and EvaMotion.screen', () {
+      final RouteType type = AppRouter(
+        FakeAuthStatus(),
+        _SilentAuthChanges(),
+      ).defaultRouteType;
 
-        expect(type, isA<CustomRouteType>());
-        final CustomRouteType custom = type as CustomRouteType;
-        expect(custom.transitionsBuilder, same(EvaMotion.fadeSlide));
-        expect(
-          custom.duration,
-          EvaMotion.screen,
-          reason:
-              'not a new `screenDuration` — the existing token IS the duration, and '
-              'two constants for one number is two things to keep in step',
-        );
-      },
-    );
+      expect(type, isA<CustomRouteType>());
+      final CustomRouteType custom = type as CustomRouteType;
+      expect(custom.transitionsBuilder, same(EvaMotion.fadeSlide));
+      expect(
+        custom.duration,
+        EvaMotion.screen,
+        reason:
+            'not a new `screenDuration` — the existing token IS the duration, and '
+            'two constants for one number is two things to keep in step',
+      );
+      // THE POP DIRECTION, WHICH IS THE ONE USERS FEEL MOST.
+      //
+      // `reverseTransitionDuration => routeType.reverseDuration ??
+      // const Duration(milliseconds: 300)` — auto_route 11.2.0,
+      // `auto_route_page.dart:231`, on `_CustomPageRouteTransitionMixin`, which
+      // is the live path for `RouteType.custom`. So leaving `reverseDuration`
+      // unset does not mean "same as the push": it means a literal `300` that
+      // appears in no motion table in `03-design-system.md` §5.3, running on
+      // every back navigation. Push would have been the §5.3 `screen` token and
+      // pop would have been a framework default — the direction nobody looks at
+      // in a design review is the one that ships.
+      expect(
+        custom.reverseDuration,
+        EvaMotion.screen,
+        reason:
+            'a back navigation must run the same §5.3 `screen` token as the '
+            'push, not auto_route\'s 300ms fallback',
+      );
+    });
 
     test("and it is not Material's default transition", () {
       // Without this, "it is custom" and "it happens to render the same" are
@@ -290,6 +329,69 @@ void main() {
       await pumpUntilFound(tester, find.byType(LoginPage));
       expect(find.byType(LoginPage), findsOneWidget);
       expect(find.byType(HomePage), findsNothing);
+    });
+
+    testWidgets('but a cold DEEP PUSH of /login carries a null onResult', (
+      WidgetTester tester,
+    ) async {
+      // THE TRAP `login_page.dart`'s doc comment used to describe wrongly. It said
+      // the null case "is only reachable by someone rendering the page outside a
+      // redirect". `/login` is the one route with no guard — a gate in front of it
+      // would redirect to itself forever — so pushing it *through the app's own
+      // route table* reaches the same page with no one to report back to. That is
+      // a deep link, not someone hand-building a widget, and it is why the trap is
+      // stated there rather than left to be rediscovered.
+      //
+      // Measured on this router: the push leaves the stack at
+      // `[LoginRoute, LoginRoute]` — the redirect from `/` plus the one the push
+      // asked for — with exactly one `LoginPage` in the tree and no `onResult`.
+      final AppRouter router = routerFor(FakeAuthStatus(authenticated: false));
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(routerHost(router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      unawaited(router.pushPath<void>(AppRoutes.login));
+      // WAITING ON THE STACK, NOT ON A FINDER, and that is the whole reason this
+      // test is written the way it is. The login page from the redirect is already
+      // on screen, so `pumpUntilFound(find.byType(LoginPage))` returns on its
+      // first check — which is how the first draft of this test passed
+      // `onResult == null` against nothing at all, reading the *redirect's* page,
+      // which has a callback. `AutoRoutePage.child` is the page the route will
+      // build, so `stack.last.child is LoginPage` says "the pushed route's page
+      // exists" without consulting the thing under test.
+      List<AutoRoutePage<Object?>> stack = <AutoRoutePage<Object?>>[];
+      for (int frame = 0; frame < 12; frame++) {
+        await tester.pump(EvaMotion.screen);
+        stack = router.stack;
+        if (stack.length > 1 && stack.last.child is LoginPage) {
+          break;
+        }
+      }
+
+      expect(
+        stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[LoginRoute.name, LoginRoute.name],
+        reason: "the redirect's login route, and the one the deep link pushed",
+      );
+      expect(router.currentPath, AppRoutes.login);
+      expect(
+        (stack.last.child as LoginPage).onResult,
+        isNull,
+        reason:
+            'nobody redirected this page, so there is no resolver to resume — and '
+            'Phase 5\'s real screen has to survive that, because it is one call '
+            'away from a deep link or a notification tap',
+      );
+      // And the trap is not merely "the callback is null". The page that HAS the
+      // resumable callback is the one underneath, unreachable behind a screen the
+      // reader cannot get past — which is what made this worth a test rather than
+      // a doc note.
+      expect(
+        (stack.first.child as LoginPage).onResult,
+        isNotNull,
+        reason: 'the guard\'s login route is still waiting for its outcome',
+      );
     });
 
     testWidgets('a cold launch with a session ends on the home route', (

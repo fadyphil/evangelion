@@ -56,9 +56,7 @@ void main() {
       // of the process, and nothing above it would notice — `app.dart` reads the
       // router, not the status. Swapping the registration and asking again is the
       // only way to see it.
-      final ControllableAuthStatus replacement = ControllableAuthStatus(
-        authenticated: false,
-      );
+      final FakeAuthStatus replacement = FakeAuthStatus(authenticated: false);
 
       expect(getIt<AuthStatus>(), isNot(same(replacement)));
 
@@ -87,16 +85,57 @@ void main() {
       expect(getIt<AuthStatus>().isAuthenticated, isFalse);
     });
 
-    test('the default change signal never fires on its own', () {
+    test('the default change signal never fires on its own', () async {
       // A `ReevaluateListenable` that fired spuriously would re-run the guard over
-      // the whole stack for no reason. Phase 4's placeholder has no stream behind
-      // it, so there is nothing to assert beyond "it is not already torn down" —
-      // which is the state `AppRouter.dispose` needs it in.
-      expect(getIt<ReevaluateListenable>(), isNotNull);
+      // the whole stack for no reason.
+      //
+      // THIS TEST USED TO BEAR THAT NAME WITHOUT OBSERVING IT. It asserted
+      // `isNotNull` and that `notifyListeners` `returnsNormally`, and both hold
+      // for a listenable that announces itself the moment it is constructed — the
+      // mutation being exactly `_NoAuthChanges`'s constructor calling
+      // `scheduleMicrotask(notifyListeners)`, which left the whole suite green.
+      // The name was the only thing asserting silence.
+      final ReevaluateListenable changes = getIt<ReevaluateListenable>();
+
       expect(
-        () => getIt<ReevaluateListenable>().notifyListeners(),
+        changes,
+        isNotNull,
+        reason: 'it is registered as its own half of the auth seam',
+      );
+      expect(
+        changes.notifyListeners,
         returnsNormally,
-        reason: 'it is live; `AppRouter.dispose()` is what tears it down',
+        reason:
+            'it is live, not already torn down — which is the state '
+            '`AppRouter.dispose()` needs it in',
+      );
+
+      // THE OBSERVATION THE NAME PROMISES: subscribe, then give the event loop
+      // room, and count what arrived.
+      //
+      // TWO TURNS, NOT ONE, and not `tester.pump()`. A signal that announced from
+      // a microtask, from a `Timer` or from a post-frame callback would all be
+      // seen here, and a single `await` observes only the first of those. This is
+      // a plain `test`, not a `testWidgets`, because the placeholder has nothing to
+      // do with the widget tree — which is also why `pump` would be theatre.
+      int notifications = 0;
+      void listener() => notifications++;
+      changes.addListener(listener);
+      addTearDown(() => changes.removeListener(listener));
+
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        notifications,
+        isZero,
+        reason:
+            'nothing may announce a session change while there is no session to '
+            'change. Phase 5 REPLACES this class with '
+            '`ReevaluateListenable.stream(authBloc.stream)`, copying its shape — '
+            'so a placeholder that fires spuriously is the wrong shape to copy, '
+            'and a test whose name claims silence while asserting only liveness is '
+            'how that would have shipped',
       );
     });
 
@@ -125,6 +164,15 @@ void main() {
       // `Navigator` is actually in the tree. If `app.dart` had constructed its
       // own router, the registered one would never be mounted and this would be
       // null — which is the whole claim.
+      //
+      // ONE assertion, where there were two. The second was
+      // `expect(registered.navigatorKey.currentContext, isNot(throwsA(anything)))`,
+      // which cannot fail: `throwsA` matches *callables that throw*, and the
+      // subject is a `BuildContext?`, so the matcher returns `false` against it
+      // unconditionally and `isNot` therefore matches everything that is not a
+      // function — `null`, `42`, `'str'`, `[]` all passed. Probed, not assumed.
+      // Sitting one line below a real assertion on the same subject, it read as a
+      // second independent check.
       expect(
         registered.navigatorKey.currentContext,
         isNotNull,
@@ -132,7 +180,6 @@ void main() {
             'the router the locator handed out is the one MaterialApp.router '
             'mounted, so there is no second router holding a stale session',
       );
-      expect(registered.navigatorKey.currentContext, isNot(throwsA(anything)));
     });
 
     testWidgets('and the mounted router exposes a live change signal', (
@@ -168,9 +215,7 @@ void main() {
       // registration. `EvangelionApp` still resolves the router from the locator,
       // so this is the production path with a different session behind it.
       await resetServiceLocator();
-      final ControllableAuthStatus status = ControllableAuthStatus(
-        authenticated: true,
-      );
+      final FakeAuthStatus status = FakeAuthStatus(authenticated: true);
       final ManualAuthChanges changes = ManualAuthChanges();
       final AppRouter router = AppRouter(status, changes);
       addTearDown(router.dispose);

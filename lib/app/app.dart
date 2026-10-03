@@ -65,6 +65,8 @@ class EvangelionApp extends StatelessWidget {
     // Phase 5 replaces that default with the persisted `UserSettings` value, and
     // per-widget reduced motion is honoured where the `MediaQuery` is, inside
     // `NeuralBackground` and `GoldFlecks`.
+    final AppRouter router = getIt<AppRouter>();
+
     return NeuralMotionScope(
       child: MaterialApp.router(
         debugShowCheckedModeBanner: false,
@@ -117,9 +119,14 @@ class EvangelionApp extends StatelessWidget {
 
         // The one place the router enters the widget tree. See the class doc
         // for why it is resolved from the locator and never constructed here.
-        routerConfig: getIt<AppRouter>().config(
-          reevaluateListenable: getIt<AppRouter>().authChanges,
-        ),
+        //
+        // `router` above is the ONE lookup, and that it is one is the point:
+        // `navigation_injection.dart` warns that this registration must stay a
+        // `lazySingleton` because a factory would hand back a second router with
+        // its own `navigatorKey` and no `Navigator` behind it. Reading the locator
+        // twice made the code depend on that lifetime silently; reading it once
+        // makes the dependency visible in the shape of the statement instead.
+        routerConfig: router.config(reevaluateListenable: router.authChanges),
       ),
     );
   }

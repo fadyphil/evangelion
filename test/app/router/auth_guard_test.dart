@@ -5,6 +5,7 @@ import 'package:evangelion/app/router/app_router.dart';
 // The generated `*Route` classes, reached the way `app_router.dart` reaches them.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
+import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
@@ -13,33 +14,24 @@ import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
 
-/// A session this phase does not have: the answer is whatever the test says.
+/// A session that throws, which [FakeAuthStatus] must never do.
 ///
-/// Mutable on purpose. The guard reads the same instance on every navigation and
-/// on every stack re-evaluation, so flipping this is how a test simulates a login
-/// or a logout without an `AuthBloc` — the seam Phase 5 fills.
-///
-/// [reads] counts how many times the guard asked. `AuthGuard` reads the status
-/// exactly once per invocation, so the counter is a measurement of how many
-/// times the guard ran — which is the only way to observe re-evaluation from
-/// outside, since `resolver.isReevaluating` is set inside auto_route.
-final class FakeAuthStatus implements AuthStatus {
-  FakeAuthStatus({this.authenticated = true});
+/// NOT A DUPLICATE of the shared fake and not a second seam: it exists to be the
+/// one thing a conforming `AuthStatus` is forbidden to be, so that
+/// `auth_status.dart`'s "a throw is undefined behaviour" paragraph has a
+/// measurement behind it. Sharing [FakeAuthStatus] here would defeat the point.
+final class ThrowingAuthStatus implements AuthStatus {
+  const ThrowingAuthStatus(this.message);
 
-  bool authenticated;
-
-  int reads = 0;
+  /// The message the failure carries, so a diagnostic names the cause.
+  final String message;
 
   @override
-  bool get isAuthenticated {
-    reads++;
-    return authenticated;
-  }
+  bool get isAuthenticated => throw StateError(message);
 }
 
 /// The session, its change signal, and the router over both — as one object,
@@ -73,27 +65,16 @@ final class AuthHarness {
   void announce() => changes.fire();
 }
 
-/// The shell these widget tests mount.
-///
-/// Deliberately not `EvangelionApp`: these tests are about the guard, and
-/// `EvangelionApp` hard-codes the Eva theme, the locale plumbing and — via the
-/// locator — the router itself. `app_test.dart` owns the claim that the real app
-/// uses the resolved router.
-Widget host(AppRouter router) => MaterialApp.router(
-  routerConfig: router.config(reevaluateListenable: router.authChanges),
-);
-
-/// Completes the login outcome the guard is waiting on, or fails naming the fact
-/// that no login page is on screen.
+/// The `onResult` the guard is waiting on, or a failure naming why there is none.
 ///
 /// Read off the *rendered* `LoginPage` rather than off the `LoginRoute` object:
 /// it is the same call the guard's closure makes, so the test drives the
-/// production seam rather than a copy of it. The outcome arrives as a NAMED
-/// parameter of this test helper — `onResult`'s own signature is positional
-/// (`LoginResultCallback`), and `avoid_positional_boolean_parameters` would fail
-/// either, so the difference is made at the boundary where the test hands a value
-/// in rather than at the production API the plan spells out.
-void completeLogin(WidgetTester tester, {required bool didLogin}) {
+/// production seam rather than a copy of it.
+///
+/// `app_router_test.dart` holds the case where the rendered page's `onResult` is
+/// null — a deep push of `/login`, the one unguarded route. So this helper's
+/// null check is a real precondition here, not a formality.
+LoginResultCallback loginOutcomeOn(WidgetTester tester) {
   final Finder login = find.byType(LoginPage);
   expect(login, findsOneWidget, reason: 'no login page is on screen to resume');
 
@@ -105,8 +86,17 @@ void completeLogin(WidgetTester tester, {required bool didLogin}) {
     isNotNull,
     reason: 'the guard supplies `onResult`; a null one would strand the user',
   );
-  onResult!(didLogin);
+  return onResult!;
 }
+
+/// Completes the login outcome the guard is waiting on.
+///
+/// [outcome] is a NAMED parameter of this test helper even though
+/// [LoginResultCallback]'s own parameter is positional — the difference is made at
+/// the boundary where the test hands a value in, and `LoginOutcome.signedIn`
+/// reads unambiguously either way.
+void completeLogin(WidgetTester tester, {required LoginOutcome outcome}) =>
+    loginOutcomeOn(tester)(outcome);
 
 void main() {
   setUp(resetServiceLocator);
@@ -128,6 +118,25 @@ void main() {
       expect(
         AuthGuard(FakeAuthStatus(authenticated: false)).decide(),
         GuardDecision.redirectToLogin,
+      );
+    });
+
+    test('and it does not swallow a throwing seam', () {
+      // `auth_status.dart` says an implementation MUST NOT throw, and says the
+      // guard does not catch it if one does. The second half of that is
+      // falsifiable without a Navigator, which is why this is here and not only in
+      // the widget group below: a `try`/`catch` added to `decide()` for any reason
+      // — "fail closed to login", "log it and carry on" — turns this red, and it is
+      // a much cheaper signal than a test that has to mount a tree to notice.
+      expect(
+        () =>
+            const AuthGuard(ThrowingAuthStatus('isAuthenticated is forbidden'))
+                .decide(),
+        throwsStateError,
+        reason:
+            'catching here would need an `// ignore:` against '
+            '`avoid_catching_errors` + `avoid_catches_without_on_clauses`, and a '
+            'silent redirect to login is indistinguishable from a logout',
       );
     });
 
@@ -157,7 +166,7 @@ void main() {
         final AuthHarness harness = AuthHarness.starting();
         addTearDown(harness.release);
 
-        await tester.pumpWidget(host(harness.router));
+        await tester.pumpWidget(routerHost(harness.router));
         await pumpUntilFound(tester, find.byType(LoginPage));
 
         // 1. The interrupted navigation: `/` never reached, `/login` did.
@@ -168,7 +177,7 @@ void main() {
         // 2. The user signs in. The page reports the outcome and navigates nothing
         //    itself — the guard resumes, which is what makes the flow re-entrant.
         harness.status.authenticated = true;
-        completeLogin(tester, didLogin: true);
+        completeLogin(tester, outcome: LoginOutcome.signedIn);
 
         await pumpUntilFound(tester, find.byType(HomePage));
         await pumpUntilGone(tester, find.byType(LoginPage));
@@ -193,21 +202,212 @@ void main() {
       final AuthHarness harness = AuthHarness.starting();
       addTearDown(harness.release);
 
-      await tester.pumpWidget(host(harness.router));
+      await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(LoginPage));
 
       harness.status.authenticated = true;
-      completeLogin(tester, didLogin: false);
+      completeLogin(tester, outcome: LoginOutcome.cancelled);
 
       await pumpUntilGone(tester, find.byType(LoginPage));
 
-      // The refusal is the whole point of the boolean: `false` must NOT resume, or
+      // The refusal is the whole point of the outcome: `cancelled` must NOT resume, or
       // a user who cancels the sign-in lands on the screen they were trying to
       // reach. `/` is what the router now reports — the redirect target of the
       // abandoned navigation, with no page built for it.
       expect(find.byType(HomePage), findsNothing);
       expect(find.byType(LoginPage), findsNothing);
       expect(harness.router.currentPath, AppRoutes.home);
+    });
+
+    testWidgets('calling onResult twice is dropped, not an error', (
+      WidgetTester tester,
+    ) async {
+      // THE REAL CRASH `LoginPage`'s "exactly once" contract did not prevent.
+      //
+      // `NavigationResolver` completes once: auto_route asserts `!isResolved`
+      // (`auto_route_guard.dart:211`, "Make sure `resolver.next()` is only called
+      // once") so the second call is an unhandled `AssertionError` in debug, and a
+      // `StateError: Future already completed` in release and profile where the
+      // assert compiles out. Either way it escapes a button handler.
+      //
+      // The trigger is ordinary, not exotic: Phase 5's sign-in control reaches for
+      // `onResult` from an `onPressed` and from the surrounding form's
+      // `onSubmitted`, and a double tap on a slow device does it twice. Nothing in
+      // the guard, the page or this suite made "exactly once" true.
+      //
+      // The assertion is `returnsNormally` on the SECOND call alone. Asserting that
+      // the flow still works afterwards would be a weaker and a different claim:
+      // the property is that nothing escapes, not that double-signing-in is
+      // supported.
+      final AuthHarness harness = AuthHarness.starting();
+      addTearDown(harness.release);
+
+      await tester.pumpWidget(routerHost(harness.router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      final LoginResultCallback onResult = loginOutcomeOn(tester);
+      harness.status.authenticated = true;
+
+      expect(() => onResult(LoginOutcome.signedIn), returnsNormally);
+      expect(() => onResult(LoginOutcome.signedIn), returnsNormally);
+      expect(() => onResult(LoginOutcome.cancelled), returnsNormally);
+
+      // And the first call was the one that took effect: the interrupted
+      // navigation resumed and the login route is gone rather than merely covered.
+      // The removal takes a transition of its own, hence the wait.
+      await pumpUntilFound(tester, find.byType(HomePage));
+      await pumpUntilGone(tester, find.byType(LoginPage));
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(LoginPage), findsNothing);
+      expect(harness.router.currentPath, AppRoutes.home);
+      // Nothing escaped into the framework either.
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a cancelled outcome after a resumed one changes nothing', (
+      WidgetTester tester,
+    ) async {
+      // The order-dependence of the latch, which the test above leaves open: the
+      // latch is one-way. A `cancelled` arriving *first* abandons the navigation
+      // and a later `signedIn` is still dropped — so a retry that double-fires
+      // with opposite answers cannot resurrect a navigation the reader gave up on.
+      final AuthHarness harness = AuthHarness.starting();
+      addTearDown(harness.release);
+
+      await tester.pumpWidget(routerHost(harness.router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      final LoginResultCallback onResult = loginOutcomeOn(tester);
+      harness.status.authenticated = true;
+
+      expect(() => onResult(LoginOutcome.cancelled), returnsNormally);
+      expect(() => onResult(LoginOutcome.signedIn), returnsNormally);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(HomePage), findsNothing);
+      expect(harness.router.currentPath, AppRoutes.home);
+      expect(tester.takeException(), isNull);
+    });
+
+    // ==========================================================================
+    // WHAT `pushAll` ACROSS THE GUARD ACTUALLY DOES, MEASURED.
+    //
+    // `auth_guard.dart`'s known-gap note records this, and before this group the
+    // note was prose: nothing executed it, and the prose was partly wrong — it
+    // claimed that resolving the first login "pops one of them and completes only
+    // that navigation", which does not reproduce. Both routes land. What is
+    // stranded is the *second* login redirect.
+    //
+    // Two scenarios, because they differ in a way that matters to whoever first
+    // writes the chained push: whether the session has been established when the
+    // login page answers.
+    // ==========================================================================
+
+    testWidgets('pushAll with a session: every route lands, and one login '
+        'redirect is stranded under them', (WidgetTester tester) async {
+      final AuthHarness harness = AuthHarness.starting();
+      addTearDown(harness.release);
+
+      await tester.pumpWidget(routerHost(harness.router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      unawaited(
+        harness.router.pushAll(<PageRouteInfo<void>>[
+          const QuizRoute(),
+          const ResultRoute(),
+        ]),
+      );
+      for (int frame = 0; frame < 12; frame++) {
+        await tester.pump(EvaMotion.screen);
+      }
+
+      expect(
+        harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[LoginRoute.name, LoginRoute.name],
+        reason: 'one pending redirect PER route in the pushAll',
+      );
+      expect(
+        find.byType(LoginPage),
+        findsOneWidget,
+        reason:
+            'only the top login route has a page built for it, which is exactly '
+            'why the lower redirect\'s `onResult` can never be reached',
+      );
+
+      harness.status.authenticated = true;
+      completeLogin(tester, outcome: LoginOutcome.signedIn);
+      for (int frame = 0; frame < 12; frame++) {
+        await tester.pump(EvaMotion.screen);
+      }
+
+      expect(
+        harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[LoginRoute.name, QuizRoute.name, ResultRoute.name],
+        reason:
+            'BOTH pushed routes land — completing the first resolver does complete '
+            'the navigation it belonged to. What is left over is the second login '
+            'redirect, underneath them',
+      );
+      expect(find.byType(ResultPage), findsOneWidget);
+      expect(harness.router.currentPath, AppRoutes.result);
+      // The stranded redirect is a route with no page: nothing on screen, and no
+      // callback in the tree that could ever resume it.
+      expect(
+        find.byType(LoginPage),
+        findsNothing,
+        reason: 'a login route on the stack that no page was ever built for',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('pushAll with no session yet: the resumed routes are guarded '
+        'again, and the stack grows', (WidgetTester tester) async {
+      // The second half of the measurement, and the more surprising one.
+      //
+      // `LoginPage` reporting "signed in" does not make a session exist — only
+      // `AuthStatus` does. So a login page that answers before the session is
+      // established resumes the pending routes straight back into the guard, which
+      // answers "redirect" a second time. `pushAll` therefore produces a stack that
+      // GROWS with each answer: `[LoginRoute, QuizRoute, LoginRoute]`, and the
+      // third entry is a fresh redirect for a page nobody can see.
+      //
+      // This is the case that makes the gap worse than "one orphan", and it is the
+      // case a Phase 6 or 7 chained push hits if the session is not updated before
+      // `onResult` fires — which, on a real sign-in, is a race against the bloc
+      // emitting.
+      final AuthHarness harness = AuthHarness.starting();
+      addTearDown(harness.release);
+
+      await tester.pumpWidget(routerHost(harness.router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      unawaited(
+        harness.router.pushAll(<PageRouteInfo<void>>[
+          const QuizRoute(),
+          const ResultRoute(),
+        ]),
+      );
+      for (int frame = 0; frame < 12; frame++) {
+        await tester.pump(EvaMotion.screen);
+      }
+
+      // The session is deliberately NOT updated here.
+      completeLogin(tester, outcome: LoginOutcome.signedIn);
+      for (int frame = 0; frame < 12; frame++) {
+        await tester.pump(EvaMotion.screen);
+      }
+
+      expect(
+        harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[LoginRoute.name, QuizRoute.name, LoginRoute.name],
+        reason:
+            'the quiz route resumed, and then bounced off the guard once more — so '
+            'the stack grew by a redirect instead of by the result page',
+      );
+      expect(find.byType(ResultPage), findsNothing);
+      expect(harness.router.currentPath, AppRoutes.login);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('every guarded route redirects, not just the initial one', (
@@ -223,7 +423,7 @@ void main() {
         AppRoutes.settings,
       ]) {
         final AuthHarness harness = AuthHarness.starting();
-        await tester.pumpWidget(host(harness.router));
+        await tester.pumpWidget(routerHost(harness.router));
         await pumpUntilFound(tester, find.byType(LoginPage));
 
         unawaited(harness.router.pushPath<void>(path));
@@ -257,7 +457,7 @@ void main() {
       final AuthHarness harness = AuthHarness.starting(authenticated: true);
       addTearDown(harness.release);
 
-      await tester.pumpWidget(host(harness.router));
+      await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(HomePage));
       unawaited(harness.router.pushPath<void>(AppRoutes.settings));
       await pumpUntilFound(tester, find.byType(SettingsPage));
@@ -289,15 +489,20 @@ void main() {
         harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
         <String>[LoginRoute.name],
       );
-      // The guard really did run again. `AuthStatus.isAuthenticated` is read
-      // exactly once per guard invocation, so a signal that never reached the
-      // router would leave this counter where it was — the check that the
-      // listenable is wired at all, as opposed to the redirect being a
-      // coincidence of the stub's absence.
+      // The guard really did run again — and exactly once. `isAuthenticated` is
+      // read once per guard invocation, so this pins the count, not merely that it
+      // moved. `greaterThan(readsBefore)` was the previous assertion here and it
+      // was satisfied by a `decide()` that read the status twice: the count claims
+      // in prose and the number in code disagreed, and only one of them was
+      // enforced. A signal that never reached the router leaves this at
+      // `readsBefore`, which is the check that the listenable is wired at all as
+      // opposed to the redirect being a coincidence of the stub's absence.
       expect(
         harness.status.reads,
-        greaterThan(readsBefore),
-        reason: 'the guard was re-entered after the signal, not before',
+        readsBefore + 1,
+        reason:
+            'the re-evaluation re-entered the guard once, and the guard read the '
+            'session once while doing it',
       );
     });
 
@@ -310,7 +515,7 @@ void main() {
       final AuthHarness harness = AuthHarness.starting(authenticated: true);
       addTearDown(harness.release);
 
-      await tester.pumpWidget(host(harness.router));
+      await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(HomePage));
       unawaited(harness.router.pushPath<void>(AppRoutes.quiz));
       await pumpUntilFound(tester, find.byType(QuizPage));
@@ -356,7 +561,7 @@ void main() {
       final AuthHarness harness = AuthHarness.starting(authenticated: true);
       addTearDown(harness.release);
 
-      await tester.pumpWidget(host(harness.router));
+      await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(HomePage));
       unawaited(harness.router.pushPath<void>(AppRoutes.reading));
       await pumpUntilFound(tester, find.byType(ReadingPage));
@@ -369,6 +574,51 @@ void main() {
       expect(find.byType(HomePage), findsOneWidget);
       expect(find.byType(LoginPage), findsNothing);
       expect(harness.router.currentPath, AppRoutes.reading);
+    });
+  });
+
+  group("a throwing AuthStatus, which is the seam's stated undefined behaviour", () {
+    // `auth_status.dart` says MUST NOT throw, and says what happens when one does.
+    // Until this group, that sentence had no counterpart in the code, so it read as
+    // a preference rather than an obligation with a known cost.
+    //
+    // These are plain `test`s, not `testWidgets`, and the reason is a measurement
+    // rather than a preference — see the note at the end. The short version: a
+    // throw escaping the guard arrives as an *uncaught zone error*, which
+    // `flutter_test` reports by failing the test outright. `tester.takeException()`
+    // returns null for it, so there is no way to assert "nothing was built AND the
+    // error escaped" from inside a widget test. Driving the router's own API puts
+    // the failure in a `Future` the test can await instead, which keeps the claim
+    // falsifiable.
+    test('and the router builds nothing at all, in a plain test for a measured '
+        'reason', () async {
+      final AppRouter router = AppRouter(
+        const ThrowingAuthStatus('isAuthenticated is undefined behaviour'),
+        ManualAuthChanges(),
+      );
+      addTearDown(router.dispose);
+
+      // The guarded push is where the guard is entered on this path — the same
+      // `onNavigation` → `checkGuard` → `_canNavigate` → guarded-push chain the
+      // cold launch walks, minus the tree.
+      await expectLater(
+        router.pushPath<void>(AppRoutes.settings),
+        throwsStateError,
+        reason:
+            'the failure propagates out of the navigation rather than being '
+            'converted into a redirect: nothing catches it anywhere between '
+            '`onNavigation` and here',
+      );
+
+      expect(
+        router.stack,
+        isEmpty,
+        reason:
+            'NOTHING was pushed. This is the whole cost of a throwing seam: no '
+            'page and no route, and on a cold launch — where this is the '
+            'initial-route resolution rather than a push — a blank first frame '
+            'with no route underneath to navigate away from',
+      );
     });
   });
 }
