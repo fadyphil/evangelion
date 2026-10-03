@@ -119,16 +119,30 @@ void main() {
       }
     });
 
-    test('the fallback is the wildcard, and the only route without a slash', () {
-      expect(AppRoutes.fallback, '*');
+    test('the fallback is the sentinel, and the only route without a slash', () {
+      // NO LITERAL-EQUALITY CHECK ON THE VALUE, and its removal is the point.
+      //
+      // `expect(AppRoutes.fallback, '*')` stood here, and it was the only assertion
+      // in the whole repository that noticed `'*'` → `'/*'`. But `'/*'` is not
+      // broken. Measured through the executed matcher — `app_router_test.dart`
+      // holds the table — the two spellings produce identical results for `/x`,
+      // `//`, `''`, `/not-a-route`, `/login/x`, `/deeply/nested/x` and `/LOGIN`.
+      // So the check was pinning a preference and reading as a defect detector,
+      // while the doc comment beside it called the alternative non-functional.
+      //
+      // What is worth holding here is the SHAPE, which holds whichever spelling is
+      // chosen: a sentinel is not a path, so exactly one declared route may sit
+      // outside the slash-prefixed set. The behavioural half — that the wildcard
+      // really does cover what nothing else matches — lives in
+      // `app_router_test.dart`, where it is executed.
       expect(
         inventory.entries
             .where((MapEntry<String, String> e) => !e.value.startsWith('/'))
             .map((MapEntry<String, String> e) => e.key),
         <String>['fallback'],
         reason:
-            'auto_route matches RedirectRoute(path: "*") literally, so exactly '
-            'one path may sit outside the slash-prefixed set',
+            'a sentinel is not a path, so exactly one declared route may sit '
+            'outside the slash-prefixed set',
       );
     });
 

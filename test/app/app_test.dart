@@ -1,9 +1,13 @@
-import 'package:evangelion/app/app.dart';
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/app_harness.dart';
 
 /// The [MaterialApp] this test is inspecting, read off the pumped tree.
 ///
@@ -54,28 +58,45 @@ BuildContext _contextBelowApp(WidgetTester tester) =>
     tester.element(find.byType(Navigator).first);
 
 void main() {
+  // `EvangelionApp` resolves `AppRouter` out of the locator, so every suite that
+  // pumps it needs the navigation graph. `pumpApp` registers it, and the locator
+  // is reset on both sides of each test because `GetIt.instance` is
+  // process-wide — `configureNavigation()` rejects a duplicate registration, so a
+  // graph left behind would fail an unrelated test with a confusing message.
+  setUp(resetServiceLocator);
+  tearDown(resetServiceLocator);
+
   group('EvangelionApp builds', () {
-    testWidgets('pumps the app and lands on the login stub', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(const EvangelionApp());
+    testWidgets('pumps the app over the resolved router and lands on the login '
+        'stub', (WidgetTester tester) async {
+      await pumpApp(tester);
 
       expect(find.byType(MaterialApp), findsOneWidget);
       expect(find.byType(LoginPage), findsOneWidget);
-      // `home:` is asserted here, and ONLY here. This is the entry-point
-      // contract: `/login` is the pre-auth entry point until Phase 5 gives login
-      // a real session to route away from. It is deliberately not asserted by
-      // the localisation tests below — anchoring those on `LoginPage` is what
-      // made six of them fail in the *finder* the moment Phase 4 swaps `home:`
-      // for the router. Asserted off the widget rather than the rendered tree so
-      // a `LoginPage` rendered by some other route cannot satisfy it.
-      expect(_materialAppIn(tester).home, isA<LoginPage>());
+      // The entry-point contract, restated for the router. `/login` is the
+      // pre-auth entry point until Phase 5 gives login a real session to route
+      // away from — and on a cold launch it is reached by the *guard* redirecting
+      // `/`, not by `home:` naming it, so what is asserted is both halves:
+      // there is no `home:` any more, and the router is what is mounted.
+      //
+      // Deliberately not asserted by the localisation tests below. Anchoring those
+      // on `LoginPage` is what would make six of them fail in the *finder* the
+      // moment a router stopped producing a `LoginPage` — which is exactly what
+      // happened when Phase 5 gives login a session and this page stops being the
+      // cold-launch destination.
+      expect(_materialAppIn(tester).home, isNull);
+      expect(
+        _materialAppIn(tester).routerConfig,
+        isNotNull,
+        reason: 'a `MaterialApp.router` with no routerConfig renders nothing',
+      );
+      expect(getIt<AppRouter>().currentPath, AppRoutes.login);
     });
 
     testWidgets('is titled Evangelion and hides the debug banner', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       final MaterialApp app = _materialAppIn(tester);
       expect(app.title, 'Evangelion');
@@ -87,7 +108,7 @@ void main() {
     });
 
     testWidgets('runs without exceptions', (WidgetTester tester) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       expect(tester.takeException(), isNull);
     });
@@ -114,7 +135,7 @@ void main() {
     testWidgets('declares all three Global localisations delegates', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       // THE STRUCTURAL CLAIM, and for Widgets it is the *only* one that works.
       // Dropping `GlobalWidgetsLocalizations.delegate` from `app.dart` fails
@@ -135,7 +156,7 @@ void main() {
     });
 
     testWidgets('supports en and ar', (WidgetTester tester) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       expect(
         _materialAppIn(tester).supportedLocales,
@@ -157,7 +178,7 @@ void main() {
       // declines the locale, the lookup goes null, and this test fails. Verified
       // by deleting `localizationsDelegates` from `app.dart`: four tests in this
       // group go red — this one, the declaration test above, and the two below.
-      await tester.pumpWidget(const EvangelionApp(locale: Locale('ar')));
+      await pumpApp(tester, locale: const Locale('ar'));
 
       expect(
         Localizations.of<MaterialLocalizations>(
@@ -190,7 +211,7 @@ void main() {
       // *English* Widgets localisations. Verified — dropping the Widgets delegate
       // fails exactly two tests in this file, that declaration test and this one,
       // and the deleted test was not among them.
-      await tester.pumpWidget(const EvangelionApp(locale: Locale('ar')));
+      await pumpApp(tester, locale: const Locale('ar'));
 
       expect(Directionality.of(_contextBelowApp(tester)), TextDirection.rtl);
     });
@@ -208,14 +229,14 @@ void main() {
       // Asserted as "differs from English" rather than as a literal Arabic
       // string: pinning `intl`'s exact Arabic wording would make this test
       // hostage to a translation change in a transitive dependency.
-      await tester.pumpWidget(const EvangelionApp(locale: Locale('ar')));
+      await pumpApp(tester, locale: const Locale('ar'));
       final MaterialLocalizations arabic =
           Localizations.of<MaterialLocalizations>(
             _contextBelowApp(tester),
             MaterialLocalizations,
           )!;
 
-      await tester.pumpWidget(const EvangelionApp(locale: Locale('en')));
+      await pumpApp(tester, locale: const Locale('en'));
       final MaterialLocalizations english =
           Localizations.of<MaterialLocalizations>(
             _contextBelowApp(tester),
@@ -243,7 +264,7 @@ void main() {
     testWidgets('hands MaterialApp a theme and a darkTheme', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       expect(
         _materialAppIn(tester).theme,
@@ -260,7 +281,7 @@ void main() {
     testWidgets('they are the two Eva instance themes, by identity', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       // `theme:` carries the light palette and `darkTheme:` the dark one, so
       // that neither slot name is a lie. `MaterialApp` compares both by identity,
@@ -277,7 +298,7 @@ void main() {
       // replaces this with the reader's persisted setting — so the assertion is
       // on the current decision, and it is the one a stub page renders against
       // today.
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       expect(_materialAppIn(tester).themeMode, ThemeMode.dark);
     });
@@ -285,7 +306,7 @@ void main() {
     testWidgets('the theme carries the EvaColors extension, dark and light', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
       final MaterialApp app = _materialAppIn(tester);
 
       // Read off the `MaterialApp`'s own fields rather than off a pumped tree:
@@ -304,7 +325,7 @@ void main() {
     testWidgets(
       'the theme is built from Eva tokens, not from Material defaults',
       (WidgetTester tester) async {
-        await tester.pumpWidget(const EvangelionApp());
+        await pumpApp(tester);
         final ThemeData theme = _materialAppIn(tester).darkTheme!;
         final EvaColors colors = const EvaColors.dark();
 
@@ -335,7 +356,7 @@ void main() {
       // `ThemeData`, it is reachable through `Theme.of` from a widget that the
       // app itself mounted. Anchored on the `Navigator` for the same reason
       // `_contextBelowApp` is — see its doc comment.
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
 
       final EvaColors seen = _contextBelowApp(tester).colors;
       expect(seen.canvas, const EvaColors.dark().canvas);
@@ -347,7 +368,7 @@ void main() {
     testWidgets('darkTheme is a genuinely different theme, not the same twice', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(const EvangelionApp());
+      await pumpApp(tester);
       final MaterialApp app = _materialAppIn(tester);
       final ThemeData light = app.theme!;
       final ThemeData dark = app.darkTheme!;
@@ -395,7 +416,7 @@ void main() {
       // with hard-coded English strings — or one whose `Localizations` scope
       // ends up below `MaterialApp` — would show up as an RTL regression rather
       // than as a theme bug, so the two are asserted together deliberately.
-      await tester.pumpWidget(const EvangelionApp(locale: Locale('ar')));
+      await pumpApp(tester, locale: const Locale('ar'));
 
       expect(Directionality.of(_contextBelowApp(tester)), TextDirection.rtl);
       expect(
