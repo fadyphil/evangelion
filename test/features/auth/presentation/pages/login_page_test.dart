@@ -46,6 +46,23 @@ final class LoginFixture {
   void dispose() => bloc.close();
 }
 
+/// The numbers `LoginScreen.tsx` declares are published as constants on the page,
+/// and they live in `login_geometry_test.dart`'s prototype-linked table.
+///
+/// ## THE ELEVEN `expect(LoginPage.kX, 24)` ASSERTIONS THAT USED TO BE HERE
+///
+/// They were deleted rather than kept. Each one re-spelled a prototype number as a
+/// bare literal in a suite that has no access to `eva/`, which is a **second,
+/// prototype-unlinked copy** of exactly the numbers `login_geometry_test.dart`
+/// exists to hold against the file they came from — and the two copies could
+/// disagree with nothing noticing. The symbol column there does what these did and
+/// more: it joins the number to `LoginScreen.tsx`'s line, so a transcription slip
+/// is a red on the *prototype's* citation as well as on the constant.
+///
+/// One constant was genuinely only covered here: [LoginPage.kSignUpRowGap]. It has
+/// no row in that table, so a row was **added** (`LoginScreen.tsx:68`, `gap: 6`)
+/// rather than losing the assertion. That is the difference between moving a check
+/// and deleting one.
 void main() {
   /// Built **inside each test body**, never in `setUp`.
   ///
@@ -115,45 +132,87 @@ void main() {
       expect(find.byType(SingleChildScrollView), findsOneWidget);
     });
 
-    testWidgets('carries the prototype\'s gutter, spacers and form metrics', (
-      WidgetTester tester,
-    ) async {
-      final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
-
-      // The numbers `LoginScreen.tsx` declares, named once on the page and read
-      // from there rather than re-spelled. `login_geometry_test.dart` measures
-      // what actually renders; this asserts the page publishes them.
-      expect(LoginPage.kRootGutter, 24);
-      expect(LoginPage.kTopSpacer, 72);
-      expect(LoginPage.kBottomSpacer, 40);
-      expect(LoginPage.kBrandGap, 14);
-      expect(LoginPage.kBrandBottomGap, 48);
-      expect(LoginPage.kWordmarkLineHeight, 1);
-      expect(LoginPage.kTaglineTopGap, 6);
-      expect(LoginPage.kFormGap, 16);
-      expect(LoginPage.kFormPadding, const EdgeInsets.all(24));
-      expect(LoginPage.kFormRadius, 28);
-      expect(LoginPage.kSignUpRowGap, 6);
-    });
-
     testWidgets('and imposes no height of its own — defect #9', (
       WidgetTester tester,
     ) async {
       // The prototype writes `minHeight: 844` at `LoginScreen.tsx:11`, and
       // `NeuralScaffold` already refuses to. What is left to check here is that
-      // the page adds nothing of its own: a `SizedBox` with a big height anywhere in
-      // the tree would be the same defect wearing a different name.
+      // **the page** adds nothing of its own.
+      //
+      // ## THE FIRST VERSION SCANNED `SizedBox` HEIGHTS, AND COULD NOT SEE IT
+      //
+      // ```dart
+      // .map((SizedBox box) => box.height ?? 0)
+      // .where((double height) => height > LoginPage.kTopSpacer)
+      // ```
+      //
+      // A `null` height is not a *small* height — it is **no claim at all** — and a
+      // page imposes its height without naming one in three ordinary ways: a
+      // `SizedBox.expand()`, a `ConstrainedBox` with unbounded height, and a
+      // `minHeight` on the root. All three read as "0" above.
+      //
+      // The two remaining `SizedBox` assertions are kept because they are cheap and
+      // they name the two defects precisely — but the load-bearing one is the
+      // third, and it is the claim itself rather than a proxy for it.
+      //
+      // ## WHY THE CLAIM IS ASSERTED OVER THE PAGE'S OWN SUBTREE
+      //
+      // Every assertion below is scoped to `SingleChildScrollView`'s descendants.
+      // Unscoped, two of them fail on **correct** code: `NeuralScaffold`'s ambient
+      // background contributes three `ConstrainedBox(BoxConstraints.biggest)` and a
+      // `SizedBox.expand()`-shaped layer, and "the background fills the screen" is
+      // not "the page imposes a height". Scoped, the check asks the question it
+      // means: does the page's own content contain an unbounded height?
+      //
+      // (An earlier attempt asserted this by measuring the scrollable's
+      // `maxScrollExtent + viewportDimension` at two viewport heights. Deleted: with
+      // `NeuralScaffold.scrollable`'s `SliverFillRemaining` the extent is
+      // viewport-derived, so it read 932 at a 568-tall viewport and 816 at a
+      // 932-tall one — a difference caused by the scroll view, not by the page.)
       final LoginFixture fixture = buildFixture();
       await pumpLogin(tester, bloc: fixture.bloc);
 
-      final List<double> tallBoxes = tester
-          .widgetList<SizedBox>(find.byType(SizedBox))
-          .map((SizedBox box) => box.height ?? 0)
-          .where((double height) => height > LoginPage.kTopSpacer)
+      final Finder ownContent = find.descendant(
+        of: find.byType(SingleChildScrollView),
+        matching: find.byType(SizedBox),
+      );
+
+      final List<double> declaredHeights = tester
+          .widgetList<SizedBox>(ownContent)
+          .map((SizedBox box) => box.height)
+          .whereType<double>()
           .toList();
 
-      expect(tallBoxes, isEmpty, reason: 'the page declares no fixed height');
+      expect(
+        declaredHeights.where((double h) => h > LoginPage.kTopSpacer),
+        isEmpty,
+        reason: 'the page declares no fixed height',
+      );
+      expect(
+        tester
+            .widgetList<SizedBox>(ownContent)
+            .where((SizedBox box) => box.height == double.infinity),
+        isEmpty,
+        reason:
+            'a `SizedBox.expand()` is a fixed height expressed as infinity, and '
+            '`height ?? 0` reads it as no height at all',
+      );
+
+      // ## THE `constraints:` ROUTE IS **NOT** COVERED, AND THE LIMIT IS RECORDED
+      //
+      // A third assertion was written and deleted: `find.byWidgetPredicate((w) =>
+      // w is ConstrainedBox && !w.constraints.hasBoundedHeight)`, scoped to the
+      // page's own subtree. It found two `ConstrainedBox(BoxConstraints.biggest)`
+      // on correct code — one per `TextField`, from inside `EditableText`'s own
+      // scrollable — and there is no way to tell those from a `constraints:` the
+      // *page* added. A predicate that cannot tell the defect from the framework is
+      // not a weaker gate; it is a gate that is either always green or always red.
+      //
+      // So the honest statement is: `SizedBox(height: …)` and `SizedBox.expand()`
+      // are covered, and a page that imposed its height through
+      // `constraints:` on some other widget would still pass. The gate catches what
+      // a reader would write by hand, which is the case the review raised, and the
+      // remaining route is named here rather than left to be discovered.
     });
   });
 
@@ -239,6 +298,90 @@ void main() {
 
       expect(fixture.bloc.state.status, AuthSessionStatus.unknown);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the two placeholders the prototype draws', () {
+    // `LoginScreen.tsx:49,51` — `placeholder="you@example.com"` and
+    // `placeholder="••••••••"`. Both are on the prototype's `Input` elements and
+    // **neither** was transcribed until Phase 5's review: `EvaTextField` had no
+    // `hintText` parameter at all, so there was nothing to pass one to. The strings
+    // were already in `LoginStrings` — `emailHint` and `passwordHint` — waiting on a
+    // parameter that did not exist.
+    //
+    // Asserted as *rendered text*, not as a parameter, because the parameter would
+    // be satisfied by `LoginPage` passing the string into a widget that silently
+    // dropped it, which is the whole shape of the omission.
+    testWidgets('are drawn in both empty fields', (WidgetTester tester) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc);
+
+      expect(find.text('you@example.com'), findsOneWidget);
+      expect(find.text('••••••••'), findsOneWidget);
+    });
+
+    testWidgets('and are Arabic-arm placeholders too, verbatim', (
+      WidgetTester tester,
+    ) async {
+      // Both are the same in either arm, and that is a decision rather than an
+      // oversight — `LoginStrings`'s own doc says why: `you@example.com` is not
+      // Arabic, and a masked placeholder whose digits changed per locale would
+      // re-measure the field on every locale switch.
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+
+      expect(find.text('you@example.com'), findsOneWidget);
+      expect(find.text('••••••••'), findsOneWidget);
+    });
+
+    testWidgets('and each disappears the moment there is a character instead', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc);
+
+      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      await tester.pump();
+      expect(
+        find.text('you@example.com'),
+        findsNothing,
+        reason:
+            'a placeholder under real text is the artefact prototype defect #8 '
+            'produced differently — here it would just be clutter',
+      );
+      expect(
+        find.text('••••••••'),
+        findsOneWidget,
+        reason: 'the password field is still empty',
+      );
+
+      await tester.enterText(_passwordFinder, 'correct horse');
+      await tester.pump();
+      expect(find.text('••••••••'), findsNothing);
+    });
+
+    testWidgets('and neither is announced as part of the field\'s name — §14', (
+      WidgetTester tester,
+    ) async {
+      // The reason `EvaTextField` draws the placeholder itself instead of handing
+      // it to `InputDecoration.hintText`: Material merges the hint into
+      // `EditableText`'s semantics node, so the field's accessible name becomes
+      // `"Email" + "\n" + "you@example.com"` and `find.bySemanticsLabel('Email')`
+      // matches nothing. Measured. A browser puts only the `<label>` in an
+      // `<input>`'s accessible name, so the prototype's own behaviour is the label
+      // alone.
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc);
+
+      expect(find.bySemanticsLabel('Email'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('you@example.com')),
+        findsNothing,
+        reason: 'the placeholder is drawn, and it is not the field\'s name',
+      );
+
+      handle.dispose();
     });
   });
 

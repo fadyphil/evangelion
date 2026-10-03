@@ -4,11 +4,17 @@
 ///
 /// This backend emits **exactly one** error body shape. Verified live against
 /// `HEAD = 4a1c834` on 2026-10-03, and independently in the backend's own
-/// source: there is **no `setErrorHandler`**, `grep -rn "statusCode" src/` finds
-/// only `res.statusCode` on its own HTTP client, and no route writes a `code`
-/// key into an error object. AGENT_CONTEXT §5 trap 1 records the same finding
-/// after correcting an earlier draft that claimed "some routes" emitted a second
-/// shape.
+/// source: there is **no `setErrorHandler`**, `grep -rn statusCode src/` finds
+/// **nothing at all** (the 18 occurrences in the repository are all
+/// `res.statusCode` in `tests/api.test.ts` and `tests/streak.test.ts`, which are
+/// the *client* asserting on responses), and no route writes a `code` key into an
+/// error object. AGENT_CONTEXT §5 trap 1 records the same finding after correcting
+/// an earlier draft that claimed "some routes" emitted a second shape.
+///
+/// This paragraph previously said the only `statusCode` occurrences "in the
+/// backend's `src/` are `res.statusCode` on its own HTTP client". `src/` has zero,
+/// so the citation was wrong about the place it claimed to have looked; the
+/// conclusion holds and is stronger.
 ///
 /// So this file separates its fixtures into three groups, and the group a
 /// fixture is in is written in its `group()` name:
@@ -28,10 +34,22 @@
 ///
 /// Every behaviour below is reachable from one entry point,
 /// [ApiErrorMapper.fromDioException]. The first run of this file failed to
-/// compile — `ApiErrorMapper` did not exist — which is a valid red only once. A
-/// compile error caused by a typo in the test is not a valid red, so the
-/// negative controls at the end mutate the *mapper* rather than the test and
-/// assert that the specific assertion which should fail does fail.
+/// compile — `ApiErrorMapper` did not exist — which is a valid red only once.
+///
+/// It used to end here: "A compile error caused by a typo in the test is not a
+/// valid red, so **the negative controls at the end mutate the *mapper* rather
+/// than the test** and assert that the specific assertion which should fail does
+/// fail." **There is no such group, and there never was.** The last group asserts
+/// `returnsNormally` and nothing else; no test in this file mutates the mapper or
+/// proves it can fail.
+///
+/// Rather than write the group or keep the promise, the promise is deleted and the
+/// half of it that *is* true is made true: the sweep below now checks the message
+/// as well as the absence of a throw, so "never throws and never returns a null
+/// message" is two claims rather than one. That is the claim this file can
+/// actually make, and the mapper's other decisions are pinned by their own rows —
+/// `FailureKind` per status bucket, `details` for the defensive shape, `message` for
+/// a body that carried nothing quotable.
 library;
 
 import 'package:dio/dio.dart';
@@ -577,33 +595,69 @@ void main() {
     });
   });
 
-  group('the mapper never throws and never returns a null message', () {
+  group('the mapper never throws and never returns an empty message', () {
     test('over every enum member crossed with every bucket', () {
       // The sweep that makes "one function, one job" checkable rather than
       // claimed: if any combination threw, or produced an empty message, this
       // is where it would show.
+      //
+      // **Two claims, two assertions.** The group used to be named for both and
+      // checked one: `returnsNormally` says the call did not throw and says
+      // nothing about what it returned, so a mapper that answered
+      // `Failure(message: '')` passed. `Failure`'s own doc makes a non-empty
+      // message an obligation of the type, which makes it worth asserting here
+      // where every input is crossed rather than in one row per case.
       for (final DioExceptionType type in DioExceptionType.values) {
         for (final int? status in <int?>[null, 400, 401, 404, 409, 500, 799]) {
-          expect(
-            () => mapper.fromDioException(
-              DioException(
-                requestOptions: RequestOptions(path: '/api/v1/probe'),
-                type: type,
-                response: status == null
-                    ? null
-                    : Response<Object?>(
-                        requestOptions: RequestOptions(path: '/api/v1/probe'),
-                        statusCode: status,
-                        data: <String, Object?>{
-                          'message': 'body must be object',
-                        },
-                      ),
-              ),
+          final Failure failure = mapper.fromDioException(
+            DioException(
+              requestOptions: RequestOptions(path: '/api/v1/probe'),
+              type: type,
+              response: status == null
+                  ? null
+                  : Response<Object?>(
+                      requestOptions: RequestOptions(path: '/api/v1/probe'),
+                      statusCode: status,
+                      data: <String, Object?>{'message': 'body must be object'},
+                    ),
             ),
-            returnsNormally,
+          );
+
+          expect(
+            failure.message,
+            isNotEmpty,
             reason: 'type=$type status=$status',
           );
+          expect(
+            failure.message.trim(),
+            isNotEmpty,
+            reason:
+                'a message of whitespace renders as an empty error banner, which '
+                'is the case `_decode` trims for — type=$type status=$status',
+          );
         }
+      }
+    });
+
+    test('and the same two claims with no response object at all', () {
+      // The bucket above reaches `status == null` by attaching a `Response` whose
+      // status is null; dio also lets a hand-built exception declare `badResponse`
+      // with no `Response` whatsoever, which is the one shape where reading through
+      // the null could throw. Both arms of the same two claims, so a null-reach
+      // regression cannot hide behind the sweep above.
+      for (final DioExceptionType type in DioExceptionType.values) {
+        final Failure failure = mapper.fromDioException(
+          DioException(
+            requestOptions: RequestOptions(path: '/api/v1/probe'),
+            type: type,
+          ),
+        );
+
+        expect(
+          failure.message.trim(),
+          isNotEmpty,
+          reason: 'type=$type with no response object attached',
+        );
       }
     });
 

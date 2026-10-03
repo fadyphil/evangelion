@@ -134,33 +134,36 @@ class AuthGuard extends AutoRouteGuard {
   /// it is an error escaping a button handler, which is the worst place for one.
   ///
   /// The trigger is a sign-in control, and Phase 5 shipped one: `LoginPage`'s
-  /// "Sign in" button and the form's `onSubmitted` both reach for it, as does a
-  /// double tap while the first call is still settling. They do not yet reach
-  /// *this* guard — `LoginPage` reports through an `onResult` callback and
-  /// navigates nowhere, deliberately, because wiring the router into the page is
-  /// not that page's job. So the latch is protecting a navigation that does not
-  /// exist yet, and this comment previously said a button's `onPressed` "both
-  /// reach for it" as though it already did. The two facts are both true and it
-  /// matters which: the guard is already correct for the case, and the case is
-  /// one line away rather than one phase away.
+  /// "Sign in" button and the form's `onSubmitted` both report through
+  /// `LoginPage.onResult`. They do **not** reach *this* guard's resolver, and the
+  /// reason is a measured property of the pinned auto_route rather than a wiring
+  /// choice — see the long paragraph at the bottom of [_redirectToLogin]. The latch
+  /// protects the callback from being *called* twice, which is what
+  /// `auth_guard_test.dart` actually does; it does not protect a navigation.
   ///
-  /// Nothing in the guard, the page or the tests makes "exactly once" true on its
-  /// own — `LoginPage` stated it as a contract for a future author, and a
-  /// contract is not a mechanism. The difference matters because the failure is
-  /// not exotic: it is the ordinary consequence of a user being in a hurry, and
-  /// it would only ever show up in the field.
+  /// So this comment previously said a button's `onPressed` "both reach for it" as
+  /// though it already did, and that the latch was protecting a navigation that
+  /// did not exist yet. Both were wrong and the second was worse than vague: it
+  /// named a mechanism that could not fire. The accurate statement is that the
+  /// resume is carried by the `ReevaluateListenable` — `navigation_injection.dart`
+  /// wires it to the bloc's stream precisely so a sign-out and a sign-in both
+  /// re-run this guard — and `navigation_injection_test.dart`'s integrated loop is
+  /// what proves it.
   ///
-  /// So it is a mechanism now, and it lives in this method because this method
-  /// owns the resolver: the latch and the thing it protects have the same
-  /// lifetime, which is *this navigation*. Latching on the [AuthGuard] instance
-  /// would not do — `AppRouter._guards` allocates a fresh guard per route per read
-  /// of `routes`, so an instance field would be forgotten immediately.
+  /// What remains true of the original reasoning, and is why nothing above was
+  /// deleted: the failure it describes is not exotic, it is the ordinary
+  /// consequence of a reader being in a hurry, and dropping the second call rather
+  /// than throwing is what makes the seam safe to call twice from a test. So:
   ///
-  /// Dropping the second call rather than throwing is also what makes the seam
-  /// safe to *call* twice from a test: `auth_guard_test.dart` calls it three times
-  /// — signed in, signed in again, then cancelled — and asserts that nothing
-  /// escapes and that the FIRST answer is the one that took effect, which is the
-  /// only form of this property that can be verified.
+  /// * the latch is a real mechanism, for a real case, in the right place — the
+  ///   method that owns the callback;
+  /// * latching on the [AuthGuard] instance would not do, because `AppRouter._guards`
+  ///   allocates a fresh guard per route per read of `routes`, so an instance field
+  ///   would be forgotten immediately;
+  /// * `auth_guard_test.dart` calls the callback three times — signed in, signed in
+  ///   again, then cancelled — and asserts nothing escapes and the FIRST answer is
+  ///   the one that took effect, which is the only form of that property which can
+  ///   be verified.
   void _redirectToLogin(NavigationResolver resolver) {
     var resumed = false;
     resolver.redirectUntil(
@@ -170,6 +173,49 @@ class AuthGuard extends AutoRouteGuard {
             return;
           }
           resumed = true;
+          // ## `redirectUntil`'s CALLBACK CONTRACT IS BROKEN IN auto_route 11.2.0,
+          // AND THIS IS THE MEASUREMENT
+          //
+          // The version this app pins resolves its own resolver as soon as the
+          // redirect lands, so a `resolveNext` from the redirect page's callback is
+          // **always** a second resolution:
+          //
+          // ```dart
+          // // auto_route_guard.dart:288-292
+          // if (!_completer.isCompleted) {
+          //   next(false);
+          // }
+          // ```
+          //
+          // and the `await _completer.future` inside `onMatch` never suspends
+          // anything, because `_push` calls `onMatch?.call(match)` **without
+          // awaiting it** (`routing_controller.dart:1362`). So the sequence is
+          // always: redirect pushed → `onMatch` parks on a future nobody will
+          // complete → `redirectUntil` sees the completer still open and calls
+          // `next(false)` itself → the page's own `onResult` arrives to an
+          // already-resolved resolver.
+          //
+          // Without this guard that is an `AssertionError` in debug and a
+          // `Bad state: Future already completed` escaping a button handler in
+          // release and profile — **on every successful sign-in**, measured, not on
+          // the path a stale `AuthStatus` would take. The reviewer attributed
+          // exactly this symptom to the caching defect; it is unconditional.
+          //
+          // So the resume is not carried by this call and has not been since the
+          // version bump. It is carried by the `ReevaluateListenable`: the bloc
+          // emits `signedIn`, the router re-runs this guard over the stack, and
+          // `decide()` now returns `allow`, which resolves the *pending*
+          // navigation. Measured on a cold launch: the stack goes
+          // `[LoginRoute]` → `[]` → `[HomeRoute]` with `HomePage` mounted, and
+          // `navigation_injection_test.dart`'s integrated loop asserts it.
+          //
+          // The latch stays above so the callback remains safe to *call* twice,
+          // which `auth_guard_test.dart` does. The comment below this one used to
+          // claim the latch protected this navigation; it does not, and this
+          // paragraph is the correction.
+          if (resolver.isResolved) {
+            return;
+          }
           resolver.resolveNext(
             outcome == LoginOutcome.signedIn,
             reevaluateNext: false,

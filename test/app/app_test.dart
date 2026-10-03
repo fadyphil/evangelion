@@ -68,22 +68,26 @@ void main() {
 
   group('EvangelionApp builds', () {
     testWidgets('pumps the app over the resolved router and lands on the login '
-        'stub', (WidgetTester tester) async {
+        'screen', (WidgetTester tester) async {
       await pumpApp(tester);
 
       expect(find.byType(MaterialApp), findsOneWidget);
       expect(find.byType(LoginPage), findsOneWidget);
-      // The entry-point contract, restated for the router. `/login` is the
-      // pre-auth entry point until Phase 5 gives login a real session to route
-      // away from — and on a cold launch it is reached by the *guard* redirecting
-      // `/`, not by `home:` naming it, so what is asserted is both halves:
-      // there is no `home:` any more, and the router is what is mounted.
+      // The entry-point contract, restated for the router. `/login` is the app's
+      // pre-auth entry point and on a cold launch it is reached by the *guard*
+      // redirecting `/`, not by `home:` naming it — so what is asserted is both
+      // halves: there is no `home:` any more, and the router is what is mounted.
+      //
+      // **"stub" is deleted from this test's name.** It said `/login` was still a
+      // placeholder until "Phase 5 gives login a real session", and Phase 5 is the
+      // commit this file belongs to: `LoginPage` now has a real `AuthBloc`, real
+      // per-keystroke validation and a real `onResult`. A test name is the one
+      // place a reader looks first, so a false forward reference there is worse
+      // than one in a comment.
       //
       // Deliberately not asserted by the localisation tests below. Anchoring those
       // on `LoginPage` is what would make six of them fail in the *finder* the
-      // moment a router stopped producing a `LoginPage` — which is exactly what
-      // happened when Phase 5 gives login a session and this page stops being the
-      // cold-launch destination.
+      // moment a router stopped producing a `LoginPage`.
       expect(_materialAppIn(tester).home, isNull);
       expect(
         _materialAppIn(tester).routerConfig,
@@ -294,10 +298,13 @@ void main() {
     testWidgets('the app opens dark regardless of the host platform', (
       WidgetTester tester,
     ) async {
-      // Not `ThemeMode.system`. This design is dark by identity, and Phase 5
-      // replaces this with the reader's persisted setting — so the assertion is
-      // on the current decision, and it is the one a stub page renders against
-      // today.
+      // Not `ThemeMode.system`. This design is dark by identity, and the reader's
+      // persisted setting — Phase 9's `settings_repository` — is what replaces
+      // this, so the assertion is on the current decision. Note the phase number is
+      // **9**, not 5: an earlier draft of this comment credited Phase 5, which
+      // delivered `core/network` and the `auth` feature and left the setting
+      // alone. The decision is right and the attribution was not; `app.dart` sets
+      // `ThemeMode.dark` explicitly and still does.
       await pumpApp(tester);
 
       expect(_materialAppIn(tester).themeMode, ThemeMode.dark);

@@ -67,10 +67,13 @@ abstract final class EvaElevations {
   /// Not a seventh tier of anything. It is the same zero, applied to the
   /// surfaces §5 names no role for — drawer, popup menu, bottom bar, navigation
   /// bar, modal bottom sheet — so that a component arriving in Phase 3 does not
-  /// begin its life casting Material's stock shadow. It had zero readers before
-  /// the Phase 1 review flagged it, which made it documentation rather than
-  /// policy; `theme/eva_theme.dart` now consults it and the inventory in
-  /// `eva_theme_test.dart` checks every field it was applied to.
+  /// begin its life casting Material's stock shadow. **That component arrived in
+  /// Phase 3**: `3804939`, "the 17 Tier-1 primitive widgets", which is why the
+  /// deferred §3.1 deletion test still cannot be re-run — see
+  /// `surfaces_test.dart`'s "the §3.1 deletion test is deferred, not passed".
+  /// It had zero readers before the Phase 1 review flagged it, which made it
+  /// documentation rather than policy; `theme/eva_theme.dart` now consults it and
+  /// the inventory in `eva_theme_test.dart` checks every field it was applied to.
   static const double none = 0;
 
   /// `0` — cards sit on the canvas behind a `line` hairline, not above it.
@@ -88,7 +91,15 @@ abstract final class EvaElevations {
 
   /// `0` — the FAB dock's buttons are tinted glass; an ember glow (see the
   /// prototype's `0 0 28px rgba(ember, .35)`) is a *border effect*, not an
-  /// elevation, and it is Phase 3's `SealFab` that draws it.
+  /// elevation.
+  ///
+  /// **This doc used to say the glow is "Phase 3's `SealFab` that draws it", and
+  /// `SealFab` does not exist.** `rg SealFab lib test` finds exactly one hit: this
+  /// line. The nearest real thing is `SunBurst` — a radial `ember` glow —
+  /// committed in **Phase 2** (`81f5034`, "effects — neural background, glass, and
+  /// the decorative tier"), along with `SealMonogram`. Nothing in the app draws a
+  /// FAB yet, so the claim is now only about what this value is for, which is the
+  /// part that does not depend on a widget arriving.
   static const double floatingActionButton = 0;
 
   /// `0` — a snack bar is a glass panel like every other raised surface.

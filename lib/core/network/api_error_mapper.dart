@@ -19,9 +19,20 @@ import 'package:evangelion/core/common/failure.dart';
 /// `{error, message}` — Fastify's default reply, plus the four hand-written 401s
 /// in `streak.routes.ts` and `submissions.routes.ts`. The second shape,
 /// `{statusCode, code, error, message}`, **appears nowhere**: there is no
-/// `setErrorHandler`, no route writes a `code` key into an error object, and the
-/// only `statusCode` occurrences in the backend's `src/` are `res.statusCode` on
-/// its own HTTP client. Verified live against `HEAD = 4a1c834`.
+/// `setErrorHandler`, no route writes a `code` key into an error object, and
+/// `grep -rn statusCode src/` returns **nothing at all** — the backend's own source
+/// never writes that key. The 18 occurrences in the repository are all
+/// `res.statusCode` in `tests/api.test.ts` and `tests/streak.test.ts`, which are the
+/// *client* asserting on the responses. Re-verified against `HEAD = 4a1c834`.
+///
+/// The previous version of this paragraph said the only `statusCode` occurrences
+/// "in the backend's `src/` are `res.statusCode` on its own HTTP client". That was
+/// **false as written** — `src/` has zero — and the conclusion it supported is
+/// *stronger* than the sentence claimed: there is no `statusCode` anywhere in the
+/// server, so the second shape cannot be produced by anything but a future change.
+/// A citation that is wrong about where it looked is worth correcting even when the
+/// conclusion survives, because the next reader repeats the search and finds
+/// nothing.
 ///
 /// The second shape is therefore **defensive**, and the branch that accepts it is
 /// labelled as such here rather than described as a thing the server does. It

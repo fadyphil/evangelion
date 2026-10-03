@@ -34,6 +34,10 @@ class MockAuthRepository extends Mock implements AuthRepository {}
 void main() {
   late MockAuthRepository repository;
 
+  /// The held-open sign-in a few tests below share. Assigned in their `setUp`, so
+  /// `build(pending:)`'s stub and the test's `complete` are the same future.
+  late Completer<Result<AuthSession>> pending;
+
   final AuthSession session = AuthSession(
     userId: '11111111-1111-1111-1111-111111111111',
     email: 'david.mina@evangelion.app',
@@ -557,6 +561,86 @@ void main() {
       build: build,
       act: (AuthBloc bloc) => bloc.add(const AuthSignedOut()),
       verify: (_) => verify(repository.signOut).called(1),
+    );
+
+    // ## SIGNING OUT **DURING** A SIGN-IN, WHICH IS A DIFFERENT QUESTION
+    //
+    // The test above signs out of a *settled* session. The one below signs out of
+    // an **in-flight** one, and it is the case this file had no answer for:
+    // `_onSubmitted` holds an `await _signIn(…)` while `_onSignedOut` runs to
+    // completion, so the awaited result lands *after* the state has already said
+    // there is no session.
+    //
+    // Reachable today only through the bloc, because `AuthSignedOut` is dispatched
+    // nowhere in `lib/` — the event exists for the sign-out control Phase 9 adds. So
+    // this is pinned now, while the answer is cheap, rather than discovered then.
+    //
+    // Without the fix, measured: `signOut` runs **once**, the bloc emits
+    // `signedOut`, and then the pending sign-in resolves and overwrites it with
+    // `signedIn` — a reader who signed out is left signed in.
+    // `verify(repository.signOut).called(1)` is still satisfied, because the
+    // repository really was asked to sign them out once; the undo happens entirely
+    // on this side of the seam.
+    blocTest<AuthBloc, AuthState>(
+      'a sign-out during an in-flight sign-in is not undone by it',
+      // A completer created here and completed in `act`, so `build(pending:)`'s
+      // stub and `act`'s completion are the **same** future. Creating it inside
+      // `act` and re-stubbing would work too, but that is two objects where one is
+      // the fact.
+      setUp: () {
+        pending = Completer<Result<AuthSession>>();
+      },
+      build: () => build(pending: pending),
+      // The ordering is the whole test and it is written out rather than raced:
+      //
+      //   1. submit reaches `await _signIn(…)` and parks;
+      //   2. the reader signs out — `_onSignedOut` runs to completion, so
+      //      `signedOut` is emitted **while the sign-in is still in flight**;
+      //   3. only then does the sign-in answer arrive.
+      //
+      // Step 3 last is what makes this a defect rather than a harmless ordering:
+      // the answer describes an attempt the reader has already abandoned.
+      act: (AuthBloc bloc) async {
+        bloc
+          ..add(const AuthEmailChanged(email))
+          ..add(const AuthPasswordChanged(goodPassword))
+          ..add(const AuthSubmitted());
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const AuthSignedOut());
+        await Future<void>.delayed(Duration.zero);
+        pending.complete(Result<AuthSession>.success(session));
+      },
+      expect: () => <AuthState>[
+        const AuthState(email: email, emailTouched: true),
+        const AuthState(
+          email: email,
+          password: goodPassword,
+          emailTouched: true,
+          passwordTouched: true,
+        ),
+        const AuthState(
+          email: email,
+          password: goodPassword,
+          emailTouched: true,
+          passwordTouched: true,
+          status: AuthSessionStatus.signingIn,
+        ),
+        const AuthState(status: AuthSessionStatus.signedOut),
+        // **NOT** `AuthState(status: signedIn, session: session)`. The reader asked
+        // to be signed out; the answer that arrived afterwards describes an attempt
+        // they have already abandoned.
+      ],
+      verify: (AuthBloc bloc) {
+        expect(
+          bloc.state.isSignedIn,
+          isFalse,
+          reason:
+              'signOut ran once and the bloc still ends signed in, so the sign-out '
+              'was silently undone by a request that was already stale',
+        );
+        expect(bloc.state.session, isNull);
+        verify(repository.signOut).called(1);
+      },
     );
   });
 
