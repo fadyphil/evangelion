@@ -1,4 +1,4 @@
-import 'package:flutter/animation.dart';
+import 'package:flutter/widgets.dart';
 
 /// The Eva motion table — durations and curves in one place.
 ///
@@ -96,6 +96,74 @@ abstract final class EvaMotion {
   /// The `alternate` column of the §5.3 table. Phase 2 reads this to choose
   /// `repeat(reverse: true)` over `repeat()`.
   static const bool fleckAlternates = true;
+
+  // --- The global screen transition -----------------------------------------
+
+  /// `8` logical pixels — how far the global screen transition slides a page.
+  ///
+  /// §8 of `06-navigation.md`: a fade plus an 8px slide, and the 8 is the
+  /// number, not a fraction of anything. Kept as its own named constant because
+  /// it is new information the §5.3 table does not carry — unlike the duration,
+  /// which already exists as [screen] and is reused verbatim.
+  static const double screenSlidePixels = 8;
+
+  /// The offset a page [height] logical pixels tall starts its slide from.
+  ///
+  /// `SlideTransition` translates by a **fraction** of the child's height, so an
+  /// 8px slide is `8 / height` — which means the fraction necessarily changes
+  /// with the viewport. `06-navigation.md` §8 spells this out and rules out the
+  /// tempting `Offset(0, 0.04)`: a fraction is right on exactly the screen it
+  /// was measured on and wrong on every other, which on this design means 33.8px
+  /// of travel on a 844px phone instead of 8.
+  ///
+  /// A height that cannot produce a usable fraction — zero, negative, or NaN —
+  /// yields [Offset.zero], because `8 / 0` is `Infinity` and
+  /// `FractionalTranslation` would then hand an infinite transform to the
+  /// matrix. An infinite height needs no arm of its own: `8 / infinity` is `0`,
+  /// i.e. no slide, which is the honest answer for an unbounded page.
+  static Offset screenSlideBeginFor(double height) =>
+      Offset(0, height > 0 ? screenSlidePixels / height : 0);
+
+  /// The global screen transition: a fade and an 8px slide up, on [screenCurve]
+  /// over [screen]. Installed app-wide by `AppRouter.defaultRouteType`.
+  ///
+  /// This is a `RouteTransitionsBuilder` — the signature Flutter's
+  /// `PageRoute`/`PageRouteBuilder` uses, and the one auto_route's
+  /// `RouteType.custom(transitionsBuilder:)` expects. The `BuildContext` is
+  /// taken because the typedef carries one; nothing here reads from it.
+  ///
+  /// [secondaryAnimation] is deliberately unused: this transition does not
+  /// cross-fade with the route it is covering, so honouring it would make the
+  /// outgoing page slide while the incoming one slides back and the two fight.
+  ///
+  /// WHY THE CURVE IS APPLIED HERE. The `animation` auto_route hands a custom
+  /// transitions builder comes from `PageRoute`, whose `curve` is
+  /// `Curves.linear`; only `MaterialPageRoute`'s own builder curves it. So a
+  /// builder that used the animation raw would animate linearly and ignore
+  /// §5.3's `easeOutCubic` for [screen].
+  static Widget fadeSlide(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        return FadeTransition(
+          opacity: animation.drive(CurveTween(curve: screenCurve)),
+          child: SlideTransition(
+            position: animation.drive(
+              Tween<Offset>(
+                begin: screenSlideBeginFor(constraints.maxHeight),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: screenCurve)),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 
   // --- Per-orb spread ------------------------------------------------------
 

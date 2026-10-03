@@ -116,7 +116,7 @@ void main() {
 
   group('what this suite cannot see: the registration lifetime', () {
     // The identity assertions in this file read like they pin the
-    // `@lazySingleton` annotations in `service_locator_module.dart`. They do
+    // `@lazySingleton` annotations in `modules/core_module.dart`. They do
     // not, and the reason deserves a test rather than a comment nobody re-reads.
     // Rewriting the generated `gh.lazySingleton<GetIt>(…)` to `gh.factory<GetIt>(…)`
     // leaves the whole suite green, because the provider returns
@@ -241,7 +241,7 @@ void main() {
         containsAll(<String>[
           'lib/app/di/injection.dart',
           'lib/app/di/injection.config.dart',
-          'lib/app/di/service_locator_module.dart',
+          'lib/app/di/modules/core_module.dart',
           'lib/core/common/app_config.dart',
         ]),
         reason:

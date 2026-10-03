@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 /// eventually chosen, which is why `EvangelionApp` already resolves `ar` and
 /// `en`: the switch has to render both directions correctly, and building that
 /// from scratch after the fact means revisiting every screen.
+@RoutePage()
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
