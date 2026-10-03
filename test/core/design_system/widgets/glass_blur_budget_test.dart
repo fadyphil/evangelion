@@ -33,6 +33,29 @@
 /// Everything else is `GlassTier.tint`: a translucent fill, a hairline rim and
 /// the ambient shadow, with no `saveLayer` at all.
 ///
+/// ### WHAT THIS GATE COUNTS, AND WHAT IT DOES NOT — CORRECTED IN PHASE 5
+///
+/// An earlier version of this comment said the gate "fails above two occurrences,
+/// **names the two allowed sites**, and fails closed on a missing directory". The
+/// first two were true; the third half was not, and the gap is worth recording
+/// because it was measured.
+///
+/// **It counts; it does not attribute.** The implementation compares a list length
+/// against 2 and prints the offending `file:line` **on failure**. Nothing ties a
+/// site to a screen. So the ceiling is satisfied by *any* two blur sites in
+/// `lib/features/`, and Phase 5 measured exactly that: changing `/login`'s form from
+/// `GlassTier.tint` to `GlassTier.blur` — which §13.4 forbids by name — left this
+/// gate **green**, because the count went from 0 to 1 and 1 ≤ 2.
+///
+/// The counter-evidence is that the mistake is caught elsewhere, and the reason the
+/// gate is still worth running is that it catches the *third*. Per-screen
+/// attribution now exists where the screen is: `login_geometry_test.dart` asserts
+/// `/login`'s form is `GlassTier.tint`, and Phase 6 owns Home's two.
+///
+/// So the honest statement is: **this gate bounds the count and refuses the
+/// hand-built `BackdropFilter`; it does not tell you which screen spent the budget.
+/// A reader must not treat a green run as "every screen used its tint".**
+///
 /// ## TWO DIRECTORIES, TWO ALLOWANCES, ONE CEILING
 ///
 /// The first version walked `lib/features/` only. That was a **structural blind

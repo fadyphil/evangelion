@@ -10,8 +10,11 @@ import 'package:flutter/material.dart';
 /// **The §3.1 deletion test is DEFERRED, not passed.** This widget is on the
 /// demotion watch list in `04-widget-inventory.md` §3.1 — one surviving call site,
 /// below the two-call-site bar — and the same note as [EvaSectionHeader]'s applies
-/// verbatim: there is no feature to demote *into* until Phase 5, so the test could
-/// not be re-run honestly and is not claimed to have been.
+/// verbatim: its only caller is the stub `SettingsPage`, and Phase 5 did not give
+/// it a second one, so the test could not be re-run honestly and is not claimed to
+/// have been. The earlier wording here cited "no feature … until Phase 5" as the
+/// reason, which stopped being true when that phase closed; the reason is the call
+/// sites, and the call sites are unchanged.
 class SettingsGroup extends StatelessWidget {
   /// A group labelled [label] containing [children].
   const SettingsGroup({required this.label, required this.children, super.key});

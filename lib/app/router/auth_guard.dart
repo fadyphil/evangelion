@@ -133,14 +133,22 @@ class AuthGuard extends AutoRouteGuard {
   /// completed` in release and profile, where the assert compiles out. Either way
   /// it is an error escaping a button handler, which is the worst place for one.
   ///
-  /// The obvious trigger is Phase 5's own sign-in control: a button's `onPressed`
-  /// and the surrounding form's `onSubmitted` both reach for it, and so does a
-  /// double tap while the first call is still settling. Nothing in the guard, the
-  /// page or the tests made "exactly once" true — `LoginPage` stated it as a
-  /// contract for a future author, and a contract is not a mechanism. The
-  /// difference matters because the failure is not exotic: it is the ordinary
-  /// consequence of a user being in a hurry, and it would only ever show up in
-  /// the field.
+  /// The trigger is a sign-in control, and Phase 5 shipped one: `LoginPage`'s
+  /// "Sign in" button and the form's `onSubmitted` both reach for it, as does a
+  /// double tap while the first call is still settling. They do not yet reach
+  /// *this* guard — `LoginPage` reports through an `onResult` callback and
+  /// navigates nowhere, deliberately, because wiring the router into the page is
+  /// not that page's job. So the latch is protecting a navigation that does not
+  /// exist yet, and this comment previously said a button's `onPressed` "both
+  /// reach for it" as though it already did. The two facts are both true and it
+  /// matters which: the guard is already correct for the case, and the case is
+  /// one line away rather than one phase away.
+  ///
+  /// Nothing in the guard, the page or the tests makes "exactly once" true on its
+  /// own — `LoginPage` stated it as a contract for a future author, and a
+  /// contract is not a mechanism. The difference matters because the failure is
+  /// not exotic: it is the ordinary consequence of a user being in a hurry, and
+  /// it would only ever show up in the field.
   ///
   /// So it is a mechanism now, and it lives in this method because this method
   /// owns the resolver: the latch and the thing it protects have the same

@@ -272,8 +272,12 @@ class NeuralMotionScope extends StatefulWidget {
   /// Nothing, as of this revision: [NeuralMotionScope] registers a
   /// [WidgetsBindingObserver], so a reader toggling the OS setting mid-session is
   /// honoured without a restart, and an explicit `animationsEnabled` still wins
-  /// over it. Phase 5 replaces the default with the persisted `UserSettings`
-  /// value, and the observer has to survive that.
+  /// over it. A later phase replaces the default with the persisted
+  /// `UserSettings` value, and the observer has to survive that — which is the one
+  /// thing to check when that lands, because a persisted default that bypasses
+  /// `didChangePlatformBrightness` would be a behaviour change disguised as a
+  /// default. Phase 5 closed without touching this: it delivered `core/network`
+  /// and the `auth` feature, so there is no `UserSettings` to read yet.
   ///
   /// The *per-widget* reduced-motion checks are a separate mechanism and are not
   /// affected by anything here: [NeuralBackground] and `GoldFlecks` read

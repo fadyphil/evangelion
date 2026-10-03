@@ -1,7 +1,32 @@
-/// Environment configuration for the Evangelion client.
+/// Transport configuration for the Evangelion client.
 ///
 /// Pure Dart by design: no Flutter import, so this can be read from
 /// `core/domain/` and from plain unit tests without dragging in a binding.
+///
+/// ## WHAT MOVED OUT, AND WHY (AGENT_CONTEXT §6, recorded decision 2)
+///
+/// The seed fixtures — `seedUserId`, `seedGroupId`, `seedUserRole` — used to
+/// live here, and decision 2 deferred the split to "the phase that first
+/// transcribes a screen", which is this one. They are now
+/// `kSeedUserId` / `kSeedGroupId` / `kSeedUserRole` in
+/// `features/auth/data/datasources/auth_local_data_source.dart`, beside the
+/// `FakeAuthRepository` that is the only thing which consumes them.
+///
+/// The reason is not tidiness. A `DIO_BASE_URL` and a hard-coded
+/// `11111111-1111-1111-1111-111111111111` are two different kinds of fact: one
+/// is chosen per deployment and the other is a fixture of the backend's
+/// in-memory fallback. A real deployment pointed at a real database would keep
+/// the first and lose the second, and a config file that mixed them would make
+/// "which of these did this build forget to override?" a question about a file
+/// that cannot answer it.
+///
+/// So the split is by **reason to change**, which is what SRP means for a
+/// constant table: transport tuning (base URL, timeouts) is one, and the
+/// in-memory-backend fixtures are another, and they now have one file each.
+///
+/// `app_config_test.dart` lost its seed group with this change, and the seed's
+/// shape assertions moved to `auth_local_data_source_test.dart` beside the code
+/// that owns them.
 abstract final class AppConfig {
   /// Base URL of the Evangelion API. Override at build time with
   /// `--dart-define=API_BASE_URL=...`. The `/api/v1` prefix belongs to the
@@ -17,20 +42,4 @@ abstract final class AppConfig {
   /// How long to wait for response bytes before giving up. Must stay greater
   /// than [connectTimeout] so a slow body is not mistaken for a dead socket.
   static const Duration receiveTimeout = Duration(seconds: 15);
-
-  // Seeded in-memory-backend identity that works end-to-end (group 3, John 3:1-5).
-
-  /// `X-User-Id` for the seeded user. The backend rejects an absent header with
-  /// 400 and an empty or malformed one with 401, so this must stay a valid UUID.
-  static const String seedUserId = '11111111-1111-1111-1111-111111111111';
-
-  /// `X-Group-Id`. Group 3 is the only cohort with a real scheduled reading in
-  /// the in-memory fallback; any other group fabricates non-UUID ids that the
-  /// submit endpoint then rejects.
-  static const int seedGroupId = 3;
-
-  /// `X-User-Role`. The backend parses this but never enforces it; it is
-  /// decorative and must never gate the UI. Named `seed*` to group it with the
-  /// other in-memory-backend fixtures above — it is not a production identity.
-  static const String seedUserRole = 'kid';
 }

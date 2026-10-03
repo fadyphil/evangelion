@@ -208,6 +208,8 @@ Widget evaPrimitiveHarness({
   // does not work.
   Size? size,
   bool ambientAnimations = false,
+  Iterable<LocalizationsDelegate<dynamic>>? localizationsDelegates,
+  List<Locale>? supportedLocales,
 }) => NeuralMotionScope(
   // OFF by default, and that is not a shortcut. A primitive test never paints a
   // [NeuralBackground], so the three shared clocks tick forever over nothing —
@@ -220,10 +222,23 @@ Widget evaPrimitiveHarness({
     debugShowCheckedModeBanner: false,
     theme: theme ?? EvaThemeDark.theme,
     locale: locale,
-    localizationsDelegates: const <LocalizationsDelegate<Object>>[
-      DefaultMaterialLocalizations.delegate,
-      DefaultWidgetsLocalizations.delegate,
-    ],
+    // The default pair supports **only** `en`, so an `ar` locale silently resolves
+    // back to English — the exact failure `app_test.dart`'s localisation group
+    // documents. A caller testing the Arabic arm therefore passes
+    // `GlobalMaterialLocalizations.delegates`; see `pumpLogin` in
+    // `login_harness.dart`, which is the one suite that does.
+    localizationsDelegates:
+        localizationsDelegates ??
+        const <LocalizationsDelegate<Object>>[
+          DefaultMaterialLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
+    // `null` leaves MaterialApp's own default, which is `[Locale('en', 'US')]` — so
+    // a caller passing `locale: Locale('ar')` without also listing `ar` gets it
+    // resolved **back to `en_US`**, and the failure reads as "the widget ignored the
+    // locale" rather than as a missing declaration. Both parameters are therefore
+    // needed together, which is exactly what `app.dart` does.
+    supportedLocales: supportedLocales ?? const <Locale>[Locale('en', 'US')],
     home: Builder(
       builder: (BuildContext context) => MediaQuery(
         data: MediaQuery.of(context).copyWith(

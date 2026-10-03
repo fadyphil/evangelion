@@ -3,11 +3,21 @@ import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/core/design_system/effects/neural_motion.dart';
+import 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
+import 'package:evangelion/core/design_system/theme/eva_theme_light.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
+import 'package:evangelion/features/auth/data/datasources/repositories/fake_auth_repository.dart';
+import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
+import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 
 /// The navigation graph plus the root widget, as one fixture.
 ///
@@ -29,6 +39,18 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
   // testing. The guard is on *presence*, not on a flag, so it cannot paper over a
   // graph that is missing the router: `isRegistered` would be false and the call
   // would happen.
+  //
+  // **The pure-Dart graph is configured first, and it is no longer optional.**
+  // Phase 4's `configureNavigation()` read nothing from the locator, so a router
+  // test could skip the whole app graph. It reads `AuthBloc` now — the bloc cannot
+  // be generated, because the only import that reaches it re-exports Flutter
+  // (AGENT_CONTEXT §9, decision 11) — so the ordering `bootstrapApp` documents
+  // ("graph first, router second") became load-bearing rather than advisory.
+  // `navigation_injection_test.dart` asserts that dependency in the failing
+  // direction, so this call is not a convenience.
+  if (!getIt.isRegistered<GetIt>()) {
+    await configureDependencies();
+  }
   if (!getIt.isRegistered<AppRouter>()) {
     configureNavigation();
   }
@@ -55,17 +77,63 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
 /// The app shell the router and guard suites mount.
 ///
 /// Deliberately not `EvangelionApp`: those suites are about the router and the
-/// guard, and `EvangelionApp` hard-codes the Eva theme, the locale plumbing and —
-/// via the locator — the router itself. A shell keeps each assertion pointing at
-/// one thing, and `app_test.dart` owns the claim that the real app uses the
-/// resolved router.
+/// guard, and `EvangelionApp` resolves the router **from the locator**, so using it
+/// would replace the substituted router under test with the injected one. A shell
+/// keeps each assertion pointing at one thing, and `app_test.dart` owns the claim
+/// that the real app uses the resolved router.
+///
+/// ## IT DOES INSTALL THE EVA THEME, BECAUSE A ROUTE MUST RENDER
+///
+/// Phase 4's shell could be a bare `MaterialApp.router`, because the six stub pages
+/// were a `Scaffold` and an `AppBar`. Phase 5's `/login` is a real screen and
+/// `context.colors` asserts that `EvaColors` is on the theme
+/// (`eva_colors.dart:294`), so a bare `MaterialApp` fails with
+/// "EvaColors is missing from this ThemeData" **inside `NeuralScaffold.build`**.
+///
+/// The same two-palette, dark-first arrangement `app.dart` uses, so what these
+/// suites render is what the app renders. That is not a change of subject: a route
+/// that cannot mount is not a route, and the alternative — stubbing `/login` back
+/// out of the router — would leave the router untested against the only screen it
+/// really has.
 ///
 /// It was `host` in `auth_guard_test.dart` and `routerHost` in
 /// `app_router_test.dart`: the same widget, the same doc comment, two names.
 /// One name, here, beside the other shared fixture.
-Widget routerHost(AppRouter router) => MaterialApp.router(
-  routerConfig: router.config(reevaluateListenable: router.authChanges),
-);
+///
+/// ## IT REGISTERS THE `AuthBloc`, AND THAT IS A SIDE EFFECT WORTH NAMING
+///
+/// Every route a router can land on includes `/login`, and `LoginPage` resolves its
+/// bloc from the locator — so mounting the real router mounts a real `LoginPage`,
+/// and a locator without an `AuthBloc` throws `StateError: AuthBloc is not
+/// registered` **inside `build`**. Registering it here rather than in each of the
+/// twelve call sites keeps the two together: a shell that cannot mount the routes
+/// it exists to route to is not a shell.
+///
+/// It is registration and not `configureNavigation()`, because these suites
+/// substitute their own `AuthStatus` and listenable and that function rejects a
+/// duplicate registration. `registerTestAuthBloc` supplies exactly the one piece
+/// they do not own, and `addTearDown`s it.
+Widget routerHost(AppRouter router) {
+  if (!getIt.isRegistered<AuthBloc>()) {
+    registerTestAuthBloc();
+  }
+  // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
+  // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
+  // `TickerProviderStateMixin` host above `MaterialApp`, so a screen never
+  // constructs one and there is nothing for it to forget to dispose.
+  //
+  // It is also **why these suites cannot use `pumpAndSettle`**: three `repeat()`ing
+  // controllers mean "settled" never arrives. They use [pumpUntilFound] instead,
+  // which is the whole reason that helper exists.
+  return NeuralMotionScope(
+    child: MaterialApp.router(
+      routerConfig: router.config(reevaluateListenable: router.authChanges),
+      theme: EvaThemeLight.theme,
+      darkTheme: EvaThemeDark.theme,
+      themeMode: ThemeMode.dark,
+    ),
+  );
+}
 
 /// Advances [tester] in screen-transition steps until [finder] matches.
 ///
@@ -175,6 +243,40 @@ final class FakeAuthStatus implements AuthStatus {
     reads++;
     return authenticated;
   }
+}
+
+/// Registers the `AuthBloc` [LoginPage] resolves, and returns it.
+///
+/// ## WHY A SEPARATE STEP
+///
+/// `LoginPage` resolves its bloc from the locator when the router builds it — a
+/// page that created its own would have one session per mount, and the navigation
+/// guard reads the *locator's*. So every test that mounts the real `LoginPage`
+/// through `AppRouter` needs an `AuthBloc` in the graph.
+///
+/// The router suites (`app_router_test.dart`, `auth_guard_test.dart`) register
+/// `AuthStatus`, `ReevaluateListenable` and `AppRouter` **by hand**, because the
+/// whole point of those suites is to substitute a controllable session — and
+/// `configureNavigation()` rejects a duplicate registration. They therefore cannot
+/// call it, and this is the one piece of the graph they have to supply themselves.
+///
+/// **Built inside the caller's zone**, which for a `testWidgets` means inside the
+/// test body: a bloc created in `setUp` does not deliver its events into the fake
+/// async zone `tester.pump()` drains. `login_page_test.dart` records the
+/// measurement.
+AuthBloc registerTestAuthBloc() {
+  final FakeAuthRepository repository = FakeAuthRepository(
+    AuthLocalDataSource(),
+  );
+  final AuthBloc bloc = AuthBloc(
+    signIn: SignIn(repository),
+    getCurrentSession: GetCurrentSession(repository),
+    signOut: SignOut(repository),
+  );
+  getIt.registerSingleton<AuthBloc>(bloc);
+  addTearDown(() => getIt.unregister<AuthBloc>());
+  addTearDown(bloc.close);
+  return bloc;
 }
 
 /// Empties the locator, so each test starts from a clean registration set.

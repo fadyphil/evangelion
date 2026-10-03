@@ -33,9 +33,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 /// [locale] exists for one reason — the localisation assertions in `app_test`
 /// need to pin the app to a specific language, and `MaterialApp.locale` left
 /// null resolves from the platform, which is whatever the test host happens to
-/// report. Phase 5 also needs it for real: settings are local-only and include
-/// an in-app language switch, so the app's locale has to be settable from Dart
-/// rather than only from the OS.
+/// report. A reader-facing language switch is also the reason it will eventually
+/// have to be settable from Dart: settings are local-only and include an in-app
+/// language switch, so the app's locale cannot stay readable only from the OS.
+///
+/// Phase 5 did **not** deliver that switch — it delivered `core/network` and the
+/// `auth` feature, and the settings repository is a later phase. This comment
+/// previously said "Phase 5 also needs it for real", which named the wrong phase
+/// and, once Phase 5 closed, would have read as a claim that the switch shipped.
+/// It did not.
 class EvangelionApp extends StatelessWidget {
   const EvangelionApp({super.key, this.locale});
 
@@ -62,9 +68,11 @@ class EvangelionApp extends StatelessWidget {
     // including above `MaterialApp`, and honoured again if the reader toggles it
     // mid-session (`NeuralMotionScope` registers a `WidgetsBindingObserver`).
     //
-    // Phase 5 replaces that default with the persisted `UserSettings` value, and
-    // per-widget reduced motion is honoured where the `MediaQuery` is, inside
-    // `NeuralBackground` and `GoldFlecks`.
+    // A later phase replaces that default with the persisted `UserSettings`
+    // value, and per-widget reduced motion is honoured where the `MediaQuery`
+    // is, inside `NeuralBackground` and `GoldFlecks`. Phase 5 closed without
+    // touching it: that phase was `core/network` plus the `auth` feature, so
+    // there is no `UserSettings` to read yet and the platform default stands.
     final AppRouter router = getIt<AppRouter>();
 
     return NeuralMotionScope(
@@ -105,7 +113,7 @@ class EvangelionApp extends StatelessWidget {
         theme: EvaThemeLight.theme,
         darkTheme: EvaThemeDark.theme,
 
-        // Dark on launch, on every host, until Phase 5 replaces this with the
+        // Dark on launch, on every host, until a later phase replaces this with the
         // reader's persisted `AppThemeMode`. Not `ThemeMode.system`: this design is
         // dark by identity (§5.1 publishes the dark palette first and the whole
         // prototype is a dark canvas), and shipping "follow the OS" first would
@@ -113,8 +121,8 @@ class EvangelionApp extends StatelessWidget {
         //
         // Set here rather than left null, because `ThemeMode.system` on a
         // light-mode host would open the light theme — visible in the stub pages
-        // that exist today and invisible once Phase 5 lands, which is the worst
-        // time to discover it.
+        // that exist today and invisible once a settings phase lands, which is
+        // the worst time to discover it.
         themeMode: ThemeMode.dark,
 
         // The one place the router enters the widget tree. See the class doc

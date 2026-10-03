@@ -4,6 +4,7 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,15 @@ import 'package:get_it/get_it.dart';
 import '../../support/app_harness.dart';
 
 void main() {
-  setUp(resetServiceLocator);
+  // The two steps, in the order `bootstrapApp` runs them. Phase 4 needed only the
+  // second — `configureNavigation` read nothing from the locator — so this was a
+  // bare `resetServiceLocator`. Phase 5's `AuthBloc` cannot be generated, so it is
+  // *built* here out of the three generated use cases, and the dependency is real.
+  // The group below asserts it in the failing direction.
+  setUp(() async {
+    await resetServiceLocator();
+    await configureDependencies();
+  });
   tearDown(resetServiceLocator);
 
   group('the navigation registrations', () {
@@ -85,44 +94,26 @@ void main() {
       expect(getIt<AuthStatus>().isAuthenticated, isFalse);
     });
 
-    test('the default change signal never fires on its own', () async {
-      // A `ReevaluateListenable` that fired spuriously would re-run the guard over
-      // the whole stack for no reason.
-      //
-      // THIS TEST USED TO BEAR THAT NAME WITHOUT OBSERVING IT. It asserted
-      // `isNotNull` and that `notifyListeners` `returnsNormally`, and both hold
-      // for a listenable that announces itself the moment it is constructed — the
-      // mutation being exactly `_NoAuthChanges`'s constructor calling
-      // `scheduleMicrotask(notifyListeners)`, which left the whole suite green.
-      // The name was the only thing asserting silence.
+    test('the change signal fires for a real state change, and nothing else', () async {
+      // Phase 4 asserted this over a **placeholder** that could not fire, and the
+      // property it was really pinning was the shape: a signal that announces
+      // nothing until something happens. Phase 5 replaces the placeholder with
+      // `ReevaluateListenable.stream(authBloc.stream)`, so the same property now
+      // has a source and can be checked in both directions — silent while the
+      // session does not change, loud when it does.
       final ReevaluateListenable changes = getIt<ReevaluateListenable>();
+      final AuthBloc bloc = getIt<AuthBloc>();
 
-      expect(
-        changes,
-        isNotNull,
-        reason: 'it is registered as its own half of the auth seam',
-      );
-      expect(
-        changes.notifyListeners,
-        returnsNormally,
-        reason:
-            'it is live, not already torn down — which is the state '
-            '`AppRouter.dispose()` needs it in',
-      );
-
-      // THE OBSERVATION THE NAME PROMISES: subscribe, then give the event loop
-      // room, and count what arrived.
-      //
-      // TWO TURNS, NOT ONE, and not `tester.pump()`. A signal that announced from
-      // a microtask, from a `Timer` or from a post-frame callback would all be
-      // seen here, and a single `await` observes only the first of those. This is
-      // a plain `test`, not a `testWidgets`, because the placeholder has nothing to
-      // do with the widget tree — which is also why `pump` would be theatre.
       int notifications = 0;
       void listener() => notifications++;
       changes.addListener(listener);
       addTearDown(() => changes.removeListener(listener));
 
+      // TWO TURNS, NOT ONE, and not `tester.pump()`. A signal that announced from
+      // a microtask, a `Timer` or a post-frame callback would all be seen here,
+      // and a single `await` observes only the first of those. A plain `test`,
+      // because nothing here touches the widget tree — which is also why `pump`
+      // would be theatre.
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -131,11 +122,23 @@ void main() {
         isZero,
         reason:
             'nothing may announce a session change while there is no session to '
-            'change. Phase 5 REPLACES this class with '
-            '`ReevaluateListenable.stream(authBloc.stream)`, copying its shape — '
-            'so a placeholder that fires spuriously is the wrong shape to copy, '
-            'and a test whose name claims silence while asserting only liveness is '
-            'how that would have shipped',
+            'change. The signal subscribes to a bloc that has not emitted, so a '
+            'notification here would mean the wiring itself is spurious',
+      );
+
+      // And the other direction, without which the assertion above is satisfied by
+      // a signal that never fires at all — which is exactly what Phase 4's
+      // placeholder did.
+      bloc.add(const AuthStarted());
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        notifications,
+        isPositive,
+        reason:
+            'a real state change must reach the router, or a sign-out would never '
+            're-evaluate the stack and the guard would never notice',
       );
     });
 
@@ -143,6 +146,15 @@ void main() {
       // `main` must call this exactly once. A silent no-op would leave two
       // different sessions in the graph depending on which call won.
       expect(configureNavigation, throwsArgumentError);
+    });
+
+    test('and the bloc is a singleton, so there is one session to read', () {
+      // `registerSingleton`, not `registerLazySingleton`, because the object is
+      // built by the hand-written provider rather than by a factory. A factory that
+      // re-ran would hand out a *second* bloc with its own stream — a
+      // `ReevaluateListenable` subscribed to a session nothing else reads, which is
+      // the stale-bloc hazard `navigation_injection.dart` records for the router.
+      expect(getIt<AuthBloc>(), same(getIt<AuthBloc>()));
     });
   });
 
@@ -219,6 +231,13 @@ void main() {
       final ManualAuthChanges changes = ManualAuthChanges();
       final AppRouter router = AppRouter(status, changes);
       addTearDown(router.dispose);
+      // Phase 5 adds a fourth thing this hand-built graph must supply: `LoginPage`
+      // resolves its `AuthBloc` from the locator, and `/login` is where every one of
+      // these navigations lands. Without it the redirect throws inside
+      // `NeuralScaffold.build`. The **session** is still the substituted
+      // `FakeAuthStatus` above — the bloc here is only what the screen reads to
+      // render, and its own state is not what the guard answers with.
+      registerTestAuthBloc();
       getIt
         ..registerLazySingleton<AuthStatus>(() => status)
         ..registerLazySingleton<ReevaluateListenable>(() => changes)
@@ -253,40 +272,81 @@ void main() {
     // the generated config cannot honour for a router. The evidence that it did
     // not *replace* the generated one is that both sets resolve in one locator.
     // `injection_test.dart` asserts the generated half in detail; this is the seam.
-    test(
-      'the generated core registrations and the navigation ones coexist',
-      () async {
-        await resetServiceLocator();
-        await configureDependencies();
-        configureNavigation();
-
-        expect(
-          getIt.isRegistered<GetIt>(),
-          isTrue,
-          reason: 'registered by the generated `injection.config.dart`',
-        );
-        expect(
-          getIt<String>(instanceName: 'apiBaseUrl'),
-          isNotNull,
-          reason: 'also registered by the generated config',
-        );
-        expect(getIt.isRegistered<AppRouter>(), isTrue);
-        expect(getIt.isRegistered<AuthStatus>(), isTrue);
-        expect(getIt.isRegistered<ReevaluateListenable>(), isTrue);
-      },
-    );
-
-    test('neither step depends on the other having run first', () async {
-      // The ordering `bootstrapApp` relies on is "graph first, router second", but
-      // this asserts the weaker and more useful property: `configureNavigation`
-      // supplies everything it reads, so a test can build the router without the
-      // pure-Dart graph. Without this, every router test in this repo would have to
-      // configure the whole app to test the guard.
+    test('the generated core registrations and the navigation ones coexist', () async {
       await resetServiceLocator();
+      await configureDependencies();
       configureNavigation();
 
-      expect(getIt<AppRouter>(), isA<AppRouter>());
-      expect(getIt.isRegistered<GetIt>(), isFalse);
+      expect(
+        getIt.isRegistered<GetIt>(),
+        isTrue,
+        reason: 'registered by the generated `injection.config.dart`',
+      );
+      expect(
+        getIt<String>(instanceName: 'apiBaseUrl'),
+        isNotNull,
+        reason: 'also registered by the generated config',
+      );
+      expect(getIt.isRegistered<AppRouter>(), isTrue);
+      expect(getIt.isRegistered<AuthStatus>(), isTrue);
+      expect(getIt.isRegistered<ReevaluateListenable>(), isTrue);
+      // Phase 5's fourth hand-written registration, and the one that is not
+      // optional: `AuthBloc` has no generated counterpart because
+      // `flutter_bloc` re-exports Flutter (AGENT_CONTEXT §9, decision 11).
+      expect(
+        getIt.isRegistered<AuthBloc>(),
+        isTrue,
+        reason:
+            'hand-registered by configureNavigation — see that file for why a '
+            'generated registration is impossible here',
+      );
+    });
+
+    test('and configureNavigation now REQUIRES the generated graph, which it did not '
+        'before Phase 5', () async {
+      // **This property was true in Phase 4 and is false now**, so the test that
+      // asserted it is replaced rather than deleted: `configureNavigation()` used
+      // to read nothing from the locator, which meant every router test could build
+      // a router without configuring the whole app. It now reads the three
+      // generated `auth` use cases to build the hand-registered `AuthBloc`, so the
+      // ordering `bootstrapApp` documents — graph first, router second — went from
+      // advisory to load-bearing.
+      //
+      // Asserted in the failing direction, because a graph that failed *quietly*
+      // here would surface as `StateError: AuthRepository is not registered` in
+      // whichever router test happened to run first, several files from the cause.
+      await resetServiceLocator();
+
+      expect(
+        configureNavigation,
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            contains('is not registered inside GetIt'),
+          ),
+        ),
+        reason:
+            'the hand-registered bloc is built from the generated use cases, so '
+            'the generated graph has to exist first',
+      );
+    });
+
+    test('and the auth registrations are reachable from the same locator', () async {
+      // The seam restated from the other side. The generated half is asserted in
+      // `injection_test.dart`; the hand-written half is here; this says one
+      // locator holds both, and that the bloc the navigation seam reads is the
+      // same object the locator holds.
+      await resetServiceLocator();
+      await configureDependencies();
+      configureNavigation();
+
+      expect(getIt<AuthBloc>(), same(getIt<AuthBloc>()));
+      expect(
+        getIt<AuthStatus>().isAuthenticated,
+        same(getIt<AuthBloc>().state.isSignedIn),
+        reason: 'the seam reads the bloc, it does not cache an answer',
+      );
     });
   });
 }
