@@ -70,6 +70,10 @@ import 'app_router.gr.dart';
 /// everything. `app_routes.dart` says the same thing about the value; this is
 /// where the ordering has to be kept, and `app_router_test.dart` asserts it on
 /// the live route list rather than on a hand-written copy of it.
+///
+/// Measured, and the number is worth having in the repository rather than only in
+/// git history: moving the wildcard to the front turns **46 tests** red. An earlier
+/// commit message claimed nine, which was wrong in both direction and magnitude.
 @AutoRouterConfig(replaceInRouteName: 'Page|Screen,Route')
 class AppRouter extends RootStackRouter {
   /// Builds the router over the current session [authStatus] and its change
@@ -101,10 +105,33 @@ class AppRouter extends RootStackRouter {
   /// `EvaMotion.screen` is already 250ms and is §5.3's `screen` token, so a
   /// second constant would be the same number twice. `EvaMotion.fadeSlide`
   /// carries the same reasoning for the curve.
+  ///
+  /// ## WHY `reverseDuration` IS STATED RATHER THAN INHERITED
+  ///
+  /// Leaving it out does not mean "the pop runs at the push's duration". auto_route
+  /// resolves it on the live path for a custom route —
+  /// `reverseTransitionDuration => routeType.reverseDuration ?? const
+  /// Duration(milliseconds: 300)` (`auto_route_page.dart:231`, on
+  /// `_CustomPageRouteTransitionMixin`) — so an unset `reverseDuration` is a
+  /// literal **300ms** that appears in no motion table in `03-design-system.md`
+  /// §5.3. The push would have been the `screen` token and the pop a framework
+  /// default, which is the shape of defect nobody catches in review because the
+  /// direction that was not looked at is the direction nobody performs.
+  ///
+  /// Back navigation is also the direction a reader feels most, because it is the
+  /// one they chose rather than the one the app did to them. §5.3 gives `screen`
+  /// as "a screen-level transition", which does not distinguish the two directions,
+  /// so the honest reading is that both run the same token.
+  ///
+  /// `06-navigation.md` §80 — §8 — omits `reverseDuration` too, so this is a plan
+  /// defect faithfully implemented rather than an oversight; the plan is not the
+  /// authority (AGENT_CONTEXT §0), and where the two disagree on a number this
+  /// file follows the motion table.
   @override
   RouteType get defaultRouteType => RouteType.custom(
     transitionsBuilder: EvaMotion.fadeSlide,
     duration: EvaMotion.screen,
+    reverseDuration: EvaMotion.screen,
   );
 
   /// The six locked routes, then the wildcard.
@@ -112,8 +139,22 @@ class AppRouter extends RootStackRouter {
   /// Paths are [AppRoutes] constants, never re-spelled: `'/login'` written here
   /// and `AppRoutes.login` written there are two names for one route, and the
   /// compiler cannot see the disagreement. `AppRoutes` also documents why [home]
-  /// is `'/'` rather than `''`, and why [AppRoutes.fallback] is `'*'` with no
-  /// leading slash — auto_route 11.2.0 special-cases that bare literal.
+  /// is `'/'` rather than `''`, and why [AppRoutes.fallback] is the bare `'*'`
+  /// sentinel with no leading slash.
+  ///
+  /// ## WHAT IS AND IS NOT TRUE ABOUT THAT SENTINEL, because both halves were
+  /// wrong here once
+  ///
+  /// TRUE, and load-bearing: **`*` must be last** (see below).
+  ///
+  /// FALSE, and deleted: "auto_route only recognises the bare asterisk, so `'/*'`
+  /// would not work". It works. `'/*'` is accepted by the matcher and behaves
+  /// identically for `/x`, `//`, `''`, `/not-a-route`, `/login/x`,
+  /// `/deeply/nested/x` and `/LOGIN` — the whole measured table is in
+  /// `app_router_test.dart`, which asserts the wildcard's coverage by executing the
+  /// matcher instead of by comparing the spelling. `'*'` is used because it is the
+  /// form auto_route documents and because it leaves exactly one declared path
+  /// outside the slash-prefixed set, not because `'/*'` is broken.
   ///
   /// Of the six, `/login` is the only unguarded one: it is the app's entry point,
   /// and a gate in front of it would redirect to itself forever. The wildcard is

@@ -29,6 +29,24 @@ const List<double> _probeHeights = <double>[568, 844];
 /// number the 8px is divided by — is whatever the framework hands the builder,
 /// and an `Align` inside the default 800×600 test window silently clamps a
 /// taller page to 600.
+///
+/// ## THIS CALL IS ALSO THE SIGNATURE CHECK `AppRouter` DEPENDS ON
+///
+/// `fadeSlide` is invoked here through the framework's own four-parameter shape,
+/// so a change to its signature stops this file compiling — the earliest and
+/// loudest form of failure available, and the one `RouteType.custom(
+/// transitionsBuilder:)` needs.
+///
+/// It replaces a standalone `test('fadeSlide fits RouteTransitionsBuilder')`
+/// whose body assigned `final RouteTransitionsBuilder builder =
+/// EvaMotion.fadeSlide;` and then asserted `same(EvaMotion.fadeSlide)` against
+/// it, under a comment claiming the compile-time check was "restated at runtime".
+/// It was not restated: `builder` had just been assigned from that expression, so
+/// the matcher compared a value with itself. Dart offers no runtime check of a
+/// static method's signature, so there was nothing for that test to assert beyond
+/// the assignment it had just performed. The observable half of the same claim —
+/// that `AppRouter.defaultRouteType` installs *this* function, read off the live
+/// `RouteType` — is in `app_router_test.dart`.
 Future<Offset> _pumpProbe(
   WidgetTester tester, {
   required double height,
@@ -276,7 +294,6 @@ void main() {
 
         expect(_renderedTravelPx(tester), foreground);
         expect(foreground, 0.0, reason: 'sanity: the page is at rest at t=1');
-        expect(foreground, 0.0, reason: 'sanity: the page is at rest at t=1');
         expect(
           tester
               .widget<FadeTransition>(find.byType(FadeTransition))
@@ -297,18 +314,6 @@ void main() {
       await _pumpProbe(tester, height: 844, value: 0);
 
       expect(find.byType(FractionalTranslation), findsOneWidget);
-    });
-  });
-
-  group('the shape auto_route depends on', () {
-    test('fadeSlide fits RouteTransitionsBuilder', () {
-      // The structural fact `AppRouter.defaultRouteType` relies on: a function
-      // of exactly the framework's four-parameter shape, assignable to the
-      // typedef. Restated at runtime so a signature change is a failing test
-      // rather than only a compile error.
-      final RouteTransitionsBuilder builder = EvaMotion.fadeSlide;
-
-      expect(builder, same(EvaMotion.fadeSlide));
     });
   });
 }

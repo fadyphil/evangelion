@@ -61,6 +61,29 @@ import 'package:evangelion/core/navigation/auth_status.dart';
 /// `ReevaluateListenable.stream(authBloc.stream)` so a sign-out re-evaluates the
 /// stack. Nothing in `app_router.dart`, `auth_guard.dart` or `app.dart` changes
 /// to do it — that is the whole point of the seam.
+///
+/// ## THE PLACEHOLDERS ARE PINNED BEHAVIOURALLY, BECAUSE THEY ARE THE TEMPLATE
+///
+/// Two properties of `_NoAuthChanges` are asserted by *executing* it rather than
+/// by reading it, and both are properties the Phase 5 replacement must keep:
+///
+///  * **it never announces anything.** `navigation_injection_test.dart` subscribes,
+///    gives the event loop two turns, and asserts the count is still zero. An
+///    earlier version of that test asserted only that the object was non-null and
+///    alive while its name claimed silence, so a placeholder that fired on
+///    construction passed. That matters because `ReevaluateListenable.stream(…)` is
+///    a different shape with the same contract, and a placeholder that fires is the
+///    wrong shape to copy.
+///  * **`AuthStatus` reports no session**, so a cold launch reaches `/login`. Phase
+///    5's replacement must not report `true` before its bloc says so, because the
+///    guard acts on that answer.
+///
+/// And one property of the seam they do NOT own, which is worth stating because it
+/// is the one that bites: `AuthGuard` latches its redirect's `onResult`, so a
+/// sign-in control that fires twice — an `onPressed` plus the form's
+/// `onSubmitted`, or a double tap — is harmless. See `auth_guard.dart`. Phase 5
+/// therefore does not have to make "exactly once" true at the call site, though it
+/// should still try.
 void configureNavigation() {
   getIt
     ..registerLazySingleton<AuthStatus>(_NoSession.new)

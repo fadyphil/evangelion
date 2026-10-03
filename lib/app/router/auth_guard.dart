@@ -4,6 +4,11 @@ import 'package:auto_route/auto_route.dart';
 // See `app_router.dart` for why that is a separate library.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+// `LoginOutcome` is not in the generated library — the generator re-exports
+// nothing, it only names the page's own types. `LoginRoute` comes from the `.gr`
+// library because the generator declares it; the enum the callback carries is
+// declared by hand in the page.
+import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 
 /// What [AuthGuard] decided about a navigation.
 enum GuardDecision {
@@ -68,15 +73,29 @@ enum GuardDecision {
 /// ## KNOWN GAP, RECORDED SO IT IS NOT REDISCOVERED
 ///
 /// A `pushAll` that crosses this guard leaves **one pending redirect per route**,
-/// and only the top one is resumable: measured, `pushAll([QuizRoute(),
-/// ResultRoute()])` while unauthenticated leaves the stack at
-/// `[LoginRoute, LoginRoute]`, and resolving the first `onResult` pops one of them
-/// and completes only that navigation — the other stays stuck with an unresolved
-/// resolver, and nothing in the app can reach its `onResult`. The difference
-/// between `reevaluateNext` false and true does not change this; both were
-/// measured. Nothing in this phase calls `pushAll` across the guard, so it is a
-/// note for the phase that first does (Phase 6 or 7, when home/reading/quiz start
-/// chaining pushes) rather than a fix invented here.
+/// and only the top one carries a page. Measured against `AppRouter` in
+/// `auth_guard_test.dart`, which is the only place any of this is asserted:
+///
+///  * `pushAll([QuizRoute(), ResultRoute()])` while unauthenticated leaves the
+///    stack at `[LoginRoute, LoginRoute]` — and exactly **one** `LoginPage` in
+///    the tree, because the lower login route never had a page built for it.
+///  * The first `onResult(LoginOutcome.signedIn)` then lands **both** routes:
+///    `[LoginRoute, QuizRoute, ResultRoute]`, with `/result` on screen. So the
+///    first resolver really is completed and the navigation it belonged to really
+///    does complete — an earlier version of this comment claimed that resolving
+///    the first "pops one of them and completes only that navigation", and that
+///    does not reproduce.
+///  * What is left over is the **second** login redirect: no page holds its
+///    `onResult`, so nothing in the app can reach it, and the only thing that
+///    still can is re-entering the first guard's seam.
+///
+/// The latch in [_redirectToLogin] does not fix that and is not meant to — it
+/// makes a second call harmless rather than making the orphan reachable.
+/// `reevaluateNext: false` versus `true` changes nothing here; both were measured.
+///
+/// Nothing in this phase calls `pushAll` across the guard, so this is a note for
+/// the phase that first does (Phase 6 or 7, when home/reading/quiz start chaining
+/// pushes) rather than a fix invented here.
 class AuthGuard extends AutoRouteGuard {
   /// Gates navigation on the current [AuthStatus].
   const AuthGuard(this._status);
@@ -99,12 +118,56 @@ class AuthGuard extends AutoRouteGuard {
       case GuardDecision.allow:
         resolver.resolveNext(true, reevaluateNext: false);
       case GuardDecision.redirectToLogin:
-        resolver.redirectUntil(
-          LoginRoute(
-            onResult: (bool didLogin) =>
-                resolver.resolveNext(didLogin, reevaluateNext: false),
-          ),
-        );
+        _redirectToLogin(resolver);
     }
+  }
+
+  /// Pushes `/login` and leaves this navigation **pending** until it answers.
+  ///
+  /// ## THE LATCH, AND WHY IT LIVES HERE
+  ///
+  /// A [NavigationResolver] may be completed exactly once. auto_route asserts
+  /// `!isResolved` — `auto_route_guard.dart:211`, the assertion text is literally
+  /// "Make sure `resolver.next()` is only called once" — so a second completion is
+  /// an unhandled `AssertionError` in debug and a `StateError: Future already
+  /// completed` in release and profile, where the assert compiles out. Either way
+  /// it is an error escaping a button handler, which is the worst place for one.
+  ///
+  /// The obvious trigger is Phase 5's own sign-in control: a button's `onPressed`
+  /// and the surrounding form's `onSubmitted` both reach for it, and so does a
+  /// double tap while the first call is still settling. Nothing in the guard, the
+  /// page or the tests made "exactly once" true — `LoginPage` stated it as a
+  /// contract for a future author, and a contract is not a mechanism. The
+  /// difference matters because the failure is not exotic: it is the ordinary
+  /// consequence of a user being in a hurry, and it would only ever show up in
+  /// the field.
+  ///
+  /// So it is a mechanism now, and it lives in this method because this method
+  /// owns the resolver: the latch and the thing it protects have the same
+  /// lifetime, which is *this navigation*. Latching on the [AuthGuard] instance
+  /// would not do — `AppRouter._guards` allocates a fresh guard per route per read
+  /// of `routes`, so an instance field would be forgotten immediately.
+  ///
+  /// Dropping the second call rather than throwing is also what makes the seam
+  /// safe to *call* twice from a test: `auth_guard_test.dart` calls it three times
+  /// — signed in, signed in again, then cancelled — and asserts that nothing
+  /// escapes and that the FIRST answer is the one that took effect, which is the
+  /// only form of this property that can be verified.
+  void _redirectToLogin(NavigationResolver resolver) {
+    var resumed = false;
+    resolver.redirectUntil(
+      LoginRoute(
+        onResult: (LoginOutcome outcome) {
+          if (resumed) {
+            return;
+          }
+          resumed = true;
+          resolver.resolveNext(
+            outcome == LoginOutcome.signedIn,
+            reevaluateNext: false,
+          );
+        },
+      ),
+    );
   }
 }

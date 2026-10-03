@@ -112,6 +112,15 @@ ok() {
   printf '  \033[32mok\033[0m       %s\n' "$1"
 }
 
+# A fact that is true and that the reader would otherwise have to derive. Printed
+# WITHOUT touching `violations` or `skipped`: those two counters decide the exit
+# code and the "PASSED (degraded)" line, and both count GATES. A scope of a gate
+# that nothing has examined yet is neither a violation nor a vacuous gate, and
+# inflating `skipped` would misname it as the latter.
+note() {
+  printf '  \033[36mnote\033[0m     %s\n' "$1"
+}
+
 skip() {
   printf '  \033[33mskip\033[0m     %s\n' "$1"
   skipped=$((skipped + 1))
@@ -166,9 +175,22 @@ echo "Gate 1 — domain purity (no flutter/dio/http in pure-Dart directories)"
 readonly DIRECTIVE_RE="^[[:space:]]*(import|export|part)[[:space:]]+'package:(flutter|dio|http)/"
 
 domain_dirs=()
-for d in lib/core/domain lib/core/common lib/core/navigation lib/features/*/domain; do
+for d in lib/core/domain lib/core/common lib/core/navigation; do
   [[ -d "$d" ]] && domain_dirs+=("$d")
 done
+
+# The glob is counted SEPARATELY from the literal directories, because a glob that
+# matches nothing vanishes without a trace: `[[ -d "$d" ]] && domain_dirs+=("$d")`
+# drops every unmatched expansion, so a missing `features/*/domain` looked exactly
+# like a clean scan of a smaller set. AGENT_CONTEXT §7 requires a target that does
+# not exist yet to report VACUOUS and say so rather than pass quietly, and this is
+# that case. Pre-existing, not a Phase 4 regression — found while reading the gate
+# during the Phase 4 review.
+feature_domain_dirs=()
+for d in lib/features/*/domain; do
+  [[ -d "$d" ]] && feature_domain_dirs+=("$d")
+done
+domain_dirs+=("${feature_domain_dirs[@]+"${feature_domain_dirs[@]}"}")
 
 if [[ ${#domain_dirs[@]} -eq 0 ]]; then
   skip "no domain directories exist yet — gate is vacuous, not passing"
@@ -186,6 +208,14 @@ else
   done
   [[ $gate1_hits -eq 0 ]] &&
     ok "${#domain_dirs[@]} pure-Dart dir(s) reach no flutter/dio/http"
+
+  if [[ ${#feature_domain_dirs[@]} -eq 0 ]]; then
+    note "no lib/features/*/domain dir exists yet — that scope of Gate 1 is"
+    note "vacuous, not passing. Every feature's domain/ is pure Dart by"
+    note "AGENT_CONTEXT §3 and none of it has been scanned."
+  else
+    ok "${#feature_domain_dirs[@]} feature domain dir(s) included above"
+  fi
 fi
 
 echo

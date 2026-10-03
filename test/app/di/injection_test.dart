@@ -34,6 +34,169 @@ final class ProbeNoParamsUseCase implements NoParamsUseCase<String> {
 /// A type nothing registers, used to assert get_it's failure mode.
 final class _NeverRegistered {}
 
+/// A `gh.<lifetime><` registration read out of `injection.config.dart`.
+///
+/// [type] is the registered type with any `_iNNN.` prefix stripped, and [member]
+/// is the module getter the generated closure calls — both are needed, because a
+/// type alone is not an identity: `@lazySingleton String get apiBaseUrl` and
+/// `@lazySingleton String get phase5Header` are the same (lifetime, type) pair, so
+/// a staleness check keyed on the pair alone cannot tell a regenerated config from
+/// a stale one.
+final class ConfiguredRegistration {
+  const ConfiguredRegistration({
+    required this.lifetime,
+    required this.type,
+    required this.member,
+  });
+
+  /// `lazySingleton`, `factory`, `singleton` — the get_it registration kind.
+  final String lifetime;
+
+  /// The registered type, e.g. `GetIt` or `String`.
+  final String type;
+
+  /// The `@module` member the generated provider body reads.
+  final String member;
+
+  /// Read off the stack frames when two of these disagree, so a failure says which
+  /// side is missing which entry rather than printing two unordered sets.
+  @override
+  String toString() => '$lifetime<$type> $member';
+
+  @override
+  bool operator ==(Object other) =>
+      other is ConfiguredRegistration &&
+      other.lifetime == lifetime &&
+      other.type == type &&
+      other.member == member;
+
+  @override
+  int get hashCode => Object.hash(lifetime, type, member);
+}
+
+/// Every `gh.<lifetime><…>` registration in `injection.config.dart`.
+///
+/// WHY A PARSER, and why the shape of the generated code is load-bearing here.
+///
+/// `injection.config.dart` is generated and committed, so it can go stale: add a
+/// provider to a `@module` and forget to re-run `build_runner`, and the file every
+/// reviewer reads to learn what the graph contains keeps describing the graph as it
+/// was. Measured before this test existed: adding
+/// `@lazySingleton @Named('phase5Header') String get phase5Header` to
+/// `core_module.dart` without regenerating left all 35 DI tests green, and the
+/// config's diff showed nothing — because there was no diff, in the file nobody
+/// looks at because nothing failed.
+///
+/// The generated shape this reads is injectable's:
+///
+/// ```dart
+/// gh.lazySingleton<GetIt>(() => coreModule.serviceLocator);
+/// gh.lazySingleton<String>(() => coreModule.apiBaseUrl, instanceName: …);
+/// ```
+///
+/// so the body is matched whole (a registration can wrap across lines) and the
+/// member comes from the `() => <moduleVar>.<member>` inside it. A change to
+/// injectable's codegen stops this parser matching, and the anti-vacuity
+/// assertions below turn that into a failure rather than into a silently empty
+/// result — which is the failure mode a parser-based gate has by default, and the
+/// one `verify_purity.sh` documents in AGENT_CONTEXT §7.
+List<ConfiguredRegistration> configuredRegistrations(String source) {
+  final List<ConfiguredRegistration> found = <ConfiguredRegistration>[];
+
+  for (final String statement in source.split(';')) {
+    final RegExpMatch? call = RegExp(r'gh\.(\w+)<([^>]+)>\(')
+        .firstMatch(statement);
+    if (call == null) {
+      continue;
+    }
+    // `()` then the arrow — NOT `(()`. The generated body reads `() => coreModule.x`
+    // when the registration fits on one line and `(\n  () => coreModule.x,` when
+    // it does not, so the two opening brackets are adjacent only in the first
+    // form. The first version of this pattern assumed they always were, and read
+    // exactly one of the two registrations the config has — silently, because a
+    // parser that matches less looks exactly like a parser that found less.
+    final RegExpMatch? body = RegExp(r'\(\)\s*=>\s*\w+\.(\w+)')
+        .firstMatch(statement);
+    if (body == null) {
+      continue;
+    }
+    found.add(
+      ConfiguredRegistration(
+        lifetime: call.group(1)!,
+        // `_i174.GetIt` is how the generated file spells a type it imported under
+        // an alias; the alias is noise, the identity is the bare type name.
+        type: call.group(2)!.split('.').last,
+        member: body.group(1)!,
+      ),
+    );
+  }
+
+  return found;
+}
+
+/// Every lifetime-annotated provider declared by a `@module` under [moduleDir].
+///
+/// The counterpart to [configuredRegistrations], and it exists because the
+/// staleness direction that matters is *this one*: a provider with no registration
+/// is the stale config. Checking only the other direction — every `gh.` line has a
+/// provider — would pass on exactly the mutation this test is for, since the stale
+/// config's existing entries all still have providers.
+List<ConfiguredRegistration> declaredProviders(String moduleDir) {
+  final List<ConfiguredRegistration> found = <ConfiguredRegistration>[];
+  final RegExp lifetime = RegExp(r'@(lazySingleton|factory|singleton)');
+  final RegExp declaration = RegExp(
+    r'^\s*(?:@\w+\s+)*([A-Z][\w<>?, ]*?)\s+(?:get\s+)?(\w+)\s*(?:\(|=>|;|=)',
+  );
+
+  for (final File module
+      in Directory(moduleDir)
+          .listSync()
+          .whereType<File>()
+          .where((File file) => file.path.endsWith('.dart'))
+          .toList()
+        ..sort((File a, File b) => a.path.compareTo(b.path))) {
+    final List<String> lines = module.readAsLinesSync();
+    for (int i = 0; i < lines.length; i++) {
+      // Comments first. `core_module.dart` discusses `@factory` and
+      // `@lazySingleton` in its own doc comment — `What the *lifetime* does not
+      // buy, and what no test in the suite can check` — and a parser that reads
+      // annotations out of prose invents a `factory` registration that does not
+      // exist. The same class of defect as Gate 1's "anchored to a directive
+      // keyword, never a bare substring", and the reason that is a rule.
+      if (lines[i].trimLeft().startsWith('//')) {
+        continue;
+      }
+      final RegExpMatch? annotation = lifetime.firstMatch(lines[i]);
+      if (annotation == null) {
+        continue;
+      }
+      // The declaration is the next non-annotation, non-comment line: injectable
+      // puts the annotations on their own lines above the member.
+      for (final String line in lines.skip(i + 1)) {
+        final String trimmed = line.trim();
+        if (trimmed.isEmpty ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('@')) {
+          continue;
+        }
+        final RegExpMatch? match = declaration.firstMatch(line);
+        if (match != null) {
+          found.add(
+            ConfiguredRegistration(
+              lifetime: annotation.group(1)!,
+              type: match.group(1)!.trim(),
+              member: match.group(2)!,
+            ),
+          );
+        }
+        break;
+      }
+    }
+  }
+
+  return found;
+}
+
 void main() {
   setUp(() async {
     // `GetIt.instance` is a process-wide singleton, so each test starts from a
@@ -304,6 +467,123 @@ void main() {
         importUrisOf('${fixture.uri.path}/deepest.dart'),
         contains('${flutterPrefix}material.dart'),
       );
+    });
+  });
+
+  group('the generated config is not stale', () {
+    // Phase 4's deliverable was seven `@module` files and one generated
+    // `injection.config.dart`, and nothing checked the relationship between them.
+    // `injection_test.dart` proved the *generated* graph works; it could not notice
+    // that the graph had moved on and the file had not.
+    //
+    // BOTH DIRECTIONS, because either alone is defeatable. "Every `gh.` line has a
+    // provider" passes on the stale config — its entries all still have providers.
+    // "Every provider has a `gh.` line" is the direction that catches it. Asserting
+    // both also keeps the first one honest as an anti-typo check rather than
+    // pretending to be a staleness detector.
+    const String configPath = 'lib/app/di/injection.config.dart';
+    const String moduleDir = 'lib/app/di/modules';
+
+    test('every registration in the config has an annotated provider', () {
+      final List<ConfiguredRegistration> configured = configuredRegistrations(
+        File(configPath).readAsStringSync(),
+      );
+      final List<ConfiguredRegistration> declared = declaredProviders(
+        moduleDir,
+      );
+
+      // Anti-vacuity, before either side is compared. A parser that stopped
+      // matching would return two empty lists and `expect(configured,
+      // containedIn(declared))` would pass on an empty comparison — the shape of
+      // bug `verify_purity.sh` documents and the reason every scan there asserts
+      // it can see something first.
+      expect(
+        configured,
+        isNotEmpty,
+        reason:
+            'the config was read and its registrations parsed; if this fails, '
+            'injectable\'s output shape changed and every comparison below is '
+            'comparing nothing',
+      );
+      expect(declared, isNotEmpty);
+
+      expect(
+        configured,
+        everyElement(isIn(declared)),
+        reason:
+            'the config registers nothing the `@module` files do not declare — a '
+            'hand-edited or half-regenerated config would name a provider that no '
+            'longer exists',
+      );
+    });
+
+    test('every annotated provider appears in the config, so the config is not '
+        'stale', () {
+      final List<ConfiguredRegistration> configured = configuredRegistrations(
+        File(configPath).readAsStringSync(),
+      );
+      final List<ConfiguredRegistration> declared = declaredProviders(
+        moduleDir,
+      );
+
+      expect(
+        configured,
+        isNotEmpty,
+        reason: 'same anti-vacuity guard as the previous test',
+      );
+      expect(
+        declared,
+        everyElement(isIn(configured)),
+        reason:
+            'a provider added to a `@module` without re-running `build_runner` is '
+            'the staleness this exists for: the runtime graph would not have it, '
+            'and the committed config — the file a reviewer reads to learn what the '
+            'graph contains — would still say it does not',
+      );
+    });
+
+    test(
+      'the two current registrations are the ones the config actually names',
+      () {
+        // Spelled out rather than counted, for the reason
+        // `app_routes_test.dart` gives: a parser that quietly returned two entries
+        // of the wrong shape would sail through a length check.
+        expect(
+          configuredRegistrations(File(configPath).readAsStringSync())
+              .map((ConfiguredRegistration r) => r.toString()),
+          <String>[
+            'lazySingleton<GetIt> serviceLocator',
+            'lazySingleton<String> apiBaseUrl',
+          ],
+        );
+      },
+    );
+
+    test('and the config names none of the hand-registered navigation types', () {
+      // The collision gap, closed by name. `configureNavigation()` registers
+      // `AuthStatus`, `ReevaluateListenable` and `AppRouter` at run time, and
+      // `navigation_injection_test.dart` proves that doing it twice fails loudly
+      // with an `ArgumentError` — but only for the *hand-written* half. If any of
+      // those three ever also appeared in the generated graph, the collision would
+      // be between two registrations that neither test can see: get_it's
+      // duplicate-type check fires on the second registration whichever it came
+      // from, so the failure would surface in whichever composition step ran
+      // second, not in the file that caused it.
+      final String config = File(configPath).readAsStringSync();
+
+      for (final String type in <String>[
+        'AppRouter',
+        'AuthStatus',
+        'ReevaluateListenable',
+      ]) {
+        expect(
+          config,
+          isNot(contains(type)),
+          reason:
+              '$type is registered by hand in `navigation_injection.dart` and '
+              'must not also be generated — see that file for why it cannot be',
+        );
+      }
     });
   });
 }
