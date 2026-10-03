@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter/material.dart';
 
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 /// constructor dependencies. In short: a home screen with a hard-coded streak
 /// and a hard-coded "today's reading" would be fake data that reads as real,
 /// and Phase 4 still needs a routable widget at `/` to point at.
+@RoutePage()
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 

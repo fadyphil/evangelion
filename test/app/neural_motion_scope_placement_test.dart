@@ -1,8 +1,9 @@
-import 'package:evangelion/app/app.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/app_harness.dart';
 
 /// §13.2's placement requirement, asserted at the composition root.
 ///
@@ -14,11 +15,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// A test in the effects directory cannot see that decision, which is why this
 /// file exists and lives under `test/app/`.
 void main() {
+  // `EvangelionApp` resolves `AppRouter` out of the locator, so the graph has to
+  // exist before any test here pumps the app. Reset on both sides: `configureNavigation()`
+  // rejects a duplicate registration, so a graph left behind by a previous test
+  // would fail the next one for an unrelated reason.
+  setUp(resetServiceLocator);
+  tearDown(resetServiceLocator);
+
   testWidgets('EvangelionApp hosts the motion scope above MaterialApp', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const EvangelionApp());
-    await tester.pump();
+    await pumpApp(tester);
 
     expect(find.byType(NeuralMotionScope), findsOneWidget);
     expect(find.byType(MaterialApp), findsOneWidget);
@@ -27,8 +34,7 @@ void main() {
   testWidgets('the scope is an ancestor of the MaterialApp, not a descendant', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const EvangelionApp());
-    await tester.pump();
+    await pumpApp(tester);
 
     // `find.ancestor` is the whole assertion: a scope nested inside the app would
     // be a descendant and this finds nothing.
@@ -65,8 +71,7 @@ void main() {
     // descendant of the real scope — the page `MaterialApp` actually puts on
     // screen. If the composition root regressed, there is no bundle here to read
     // and `NeuralMotionScope.of` asserts.
-    await tester.pumpWidget(const EvangelionApp());
-    await tester.pump();
+    await pumpApp(tester);
 
     final Finder loginPage = find.byType(LoginPage);
     expect(loginPage, findsOneWidget, reason: 'the app root builds LoginPage');
@@ -93,8 +98,7 @@ void main() {
     // Comparing one read against itself would be vacuous, which is the mistake
     // this file made before: it rebuilt its own scope instead of reading the
     // app's, so it could not fail on an app regression at all.
-    await tester.pumpWidget(const EvangelionApp());
-    await tester.pump();
+    await pumpApp(tester);
 
     final EvaNeuralMotion fromApp = NeuralMotionScope.of(
       tester.element(find.byType(MaterialApp)),
@@ -115,8 +119,7 @@ void main() {
   ) async {
     // The flip side of hosting it at the root: tearing the app down tears the
     // controllers down, and `TickerProviderStateMixin` throws if they were not.
-    await tester.pumpWidget(const EvangelionApp());
-    await tester.pump();
+    await pumpApp(tester);
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
   });

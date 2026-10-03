@@ -421,14 +421,125 @@ reading the prototype, not by any test failing.
 is the only thing its test name claims, and two of Phase 3's pairs were. It cannot
 compare against `eva/`, and it is not a substitute.
 
-**Owner: the phase that first transcribes a screen.** Phase 4 builds Login, the first
-real screen, and a screen is where a wrong number becomes a user's day. The owner
-builds a prototype-comparison harness — a `ds.tsx` line map plus a test that renders
-the React component and the Flutter widget over the same inputs and compares
-geometry — or records here again why not. Until then, **every transcription claim in
-this repository is a claim a human verified by reading `eva/`, not a claim a test
+**Owner: the phase that first transcribes a screen**, which is **Phase 5**
+(`core/network` + the `auth` feature, whose deliverable is `LoginPage`) — *not*
+Phase 4, which is routing and DI and writes no screen. A screen is where a wrong
+number becomes a user's day. The owner builds a
+prototype-comparison harness — a `ds.tsx` line map plus a test that renders the
+React component and the Flutter widget over the same inputs and compares geometry
+— or records here again why not. Until then, **every transcription claim in this
+repository is a claim a human verified by reading `eva/`, not a claim a test
 enforces.** A reviewer reading a `ds.tsx:NNN` citation should treat it as an
 unverified assertion unless a test names it.
+
+### Recorded decisions — Phase 4 review
+
+Phase 4 delivered a seam rather than the thing the plan asked for, so everything
+below lives here where a Phase 5 agent will actually read it, and not only in file
+doc comments that a following agent may never open.
+
+**9. The auth seam is `AuthStatus`, and Phase 5 inherits four contracts.**
+
+The plan's `AuthGuard` takes `AuthBloc` and redirects to `LoginRoute(onResult:)`.
+Neither exists in Phase 4, and the phase's own verification — "pushes `/`
+unauthenticated and asserts it redirects to `/login`" — is unwriteable without
+something that can be unauthenticated. So the guard depends on `AuthStatus`, one
+member, `bool get isAuthenticated`, in `core/navigation/auth_status.dart` (pure
+Dart). Phase 5 changes nothing in `app_router.dart`, `auth_guard.dart` or
+`app.dart`. The four contracts:
+
+1. **`isAuthenticated` is a pure read.** Side-effect-free, cheap, never a fetch,
+   never a validation. The guard calls it on every navigation and again on every
+   stack re-evaluation, so a value that had to be awaited turns a redirect into a
+   loading state. `AuthBloc.state` satisfies this; an async `isAuthenticated` does
+   not.
+2. **It MUST NOT throw, and the guard does not catch one.** A throw escapes
+   `onNavigation` and the router builds nothing — on a cold launch, a blank first
+   frame. `AuthGuard` deliberately does not catch it: `analysis_options.yaml`
+   enables `avoid_catching_errors` and `avoid_catches_without_on_clauses`, and
+   failing closed *silently* would be indistinguishable from a logout on a guard
+   that is explicitly not a security boundary. The error reaching
+   `FlutterError.onError` is what makes it diagnosable. Enforced by
+   `auth_guard_test.dart`, which asserts both that `decide()` throws and that
+   `router.stack` is empty afterwards.
+3. **The router's provider reads `AuthStatus` at construction.** Register the
+   bloc-backed `AuthStatus` before anything resolves `AppRouter`;
+   `bootstrapApp`'s step order already guarantees it. Re-binding it afterwards is
+   not a live update, which `navigation_injection_test.dart` asserts in the failing
+   direction.
+4. **The change signal is replaced, not extended.**
+   `ReevaluateListenable.stream(authBloc.stream)`, so a sign-out re-evaluates the
+   whole stack. The placeholder is pinned behaviourally — it must announce
+   *nothing* — because a placeholder that fires is the wrong shape to copy.
+
+**10. Two deliberate divergences from `06-navigation.md` §8.** The plan is not the
+authority; each divergence has a reason that is mechanical, not aesthetic.
+
+- **`lazySingleton`, not a factory.** The plan registers `AppRouter` as "a factory
+  that reads the session from the `getIt` instance". A get_it `@factory` guarantees
+  the exact hazard the same section warns about: every lookup hands back a new
+  router, only one of which is mounted, and any other caller gets an object with
+  its own `navigatorKey` and no `Navigator` behind it. `app.dart` reads the locator
+  once, in `build`, so the dependency on the lifetime is visible in the shape of
+  the statement rather than hidden behind it.
+- **`routerConfig(reevaluateListenable:)`, not "in `MaterialApp.router`".**
+  `MaterialApp.router` has no such parameter. It belongs on the `RouterConfig`,
+  which is what `AppRouter.config(reevaluateListenable:)` builds, and that config
+  is what `MaterialApp.router` is handed. The plan's wording describes an intent
+  that cannot be expressed as written; the intent is met, the mechanism is the one
+  auto_route offers.
+
+**11. Three navigation bindings are registered by hand, and Phase 5 will hit the
+same split.** `configureNavigation()` in `lib/app/di/navigation_injection.dart`
+registers `AuthStatus`, `ReevaluateListenable` and `AppRouter` by hand, because
+`injection.dart`'s whole transitive project-local import graph must stay
+Flutter-free (recorded decision 4) and registering the router from a `@module`
+would put `app_router.dart` — and through the generated routes, all six feature
+pages — inside that closure. Measured, not assumed: relocating the router to
+`lib/core/navigation/` makes `verify_purity.sh` report seven violations, because
+`auto_route_generator` names its output after the router's own file and emits a
+`.gr.dart` beside it.
+
+**Phase 5's `AuthBloc` will hit the identical wall**, and the fix is the one
+already taken: `flutter_bloc` re-exports the framework's widget layer alongside the
+bloc, and `bloc` itself is a transitive dependency this project may not promote to
+a direct one. So `AuthBloc` is registered from `navigation_injection.dart` (or a
+sibling file with the same permission), **not** from `auth_module.dart`. The
+`six `@module` files are committed and empty**; each says which phase fills it and
+that its provider will be a Flutter type. An empty `@module` emits no registration,
+and `injection_test.dart` asserts the generated config against them in **both**
+directions, so adding a provider without re-running `build_runner` is a failing
+test rather than a silently stale committed file.
+
+**12. "Calls `onResult` exactly once" is a mechanism, not a contract.**
+
+`NavigationResolver` completes once — auto_route asserts `!isResolved`
+(`auto_route_guard.dart:211`), so a second completion is an unhandled
+`AssertionError` in debug and a `StateError: Future already completed` in release.
+The obvious trigger is Phase 5's own sign-in control: an `onPressed` plus the
+form's `onSubmitted`, or a double tap on a slow device. Nothing made "exactly
+once" true — `LoginPage` stated it as a promise to a future author.
+
+**`AuthGuard` therefore latches, inside the method that owns the resolver.** The
+latch is a local in `_redirectToLogin`, not a field on the guard: the router
+allocates a fresh guard per route per read of `routes`, so an instance field would
+be forgotten immediately. `auth_guard_test.dart` calls `onResult` three times and
+asserts nothing escapes. Phase 5 does not have to make "exactly once" true at the
+call site, though it should try.
+
+**13. `LoginResultCallback` carries a `LoginOutcome` enum, not a `bool`, and the
+repository has no `// ignore:`.** `avoid_positional_boolean_parameters` is
+enabled, and Phase 4's first draft satisfied it with the repository's only
+suppression — justified against `06-navigation.md` §8's `onResult(true)` spelling.
+That justification does not hold: the preamble of this file makes it the authority
+over `docs/plans/` (AGENTS.md says the same), §4 makes zero analyzer issues the
+objective gate, and Dart has no `unnecessary_ignore`, so an ignore nobody needed
+could not have been detected either. A named parameter would have satisfied the
+lint and kept the boolean, and was rejected because `onResult(didLogin: true)` is
+the same hazard as `onResult(true)`. Two callbacks would also have satisfied it
+and are strictly worse — "which one resumes?" is a weaker statement than "this one
+resumes", and the latch above depends on the second reading. An enum removes the
+hazard and the suppression together.
 
 ---
 

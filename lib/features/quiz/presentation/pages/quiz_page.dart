@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,7 @@ import 'package:flutter/material.dart';
 /// kind of placeholder to write, because the backend's duplicate-submit `409`
 /// and the `already_answered` flags mean the real feedback logic is not
 /// something that can be faked convincingly.
+@RoutePage()
 class QuizPage extends StatelessWidget {
   const QuizPage({super.key});
 
