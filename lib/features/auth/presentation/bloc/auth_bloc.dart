@@ -375,6 +375,42 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final GetCurrentSession _getCurrentSession;
   final SignOut _signOut;
 
+  /// Counts the session-ending events this bloc has handled.
+  ///
+  /// ## WHY A GENERATION AND NOT A `cancel()` ON THE EMITTER
+  ///
+  /// `_onSubmitted` holds an `await` across a `Future` it does not own, and a
+  /// reader can end the session while that await is open. Measured without the
+  /// counter: dispatch a submit, let it reach the await, dispatch `AuthSignedOut`,
+  /// let it settle, then resolve the sign-in — the bloc emits `signedOut` and
+  /// **then `signedIn`**, so the reader is left signed in by an attempt they
+  /// abandoned, with `signOut` having run exactly once.
+  ///
+  /// Two alternatives were rejected rather than weighed:
+  ///
+  /// * **`Emitter.isDone` / cancelling the handler.** That answers "did *this*
+  ///   emitter stop", which is a statement about the bloc's lifecycle rather than
+  ///   about the session. A sign-out does not close the submitting handler; the
+  ///   handler is perfectly alive and simply holds an answer that is no longer
+  ///   wanted.
+  /// * **A `bool _signedOut` flag.** Correct, but it cannot express the general
+  ///   case, and the general case is one event away: a second `AuthSignedOut`, a
+  ///   future `AuthStarted` restoring a session under an in-flight sign-in, a
+  ///   "cancel this attempt" control. A counter distinguishes "the session changed
+  ///   while you were away" from any specific way it changed, and costs one
+  ///   integer.
+  ///
+  /// Incremented by [_onSignedOut] alone, because that is the only handler that
+  /// ends a session. Read by [_onSubmitted] alone, because that is the only
+  /// handler that awaits across a session change.
+  ///
+  /// **MEDIUM, not HIGH, and the reason is recorded rather than remembered:**
+  /// `rg 'AuthSignedOut' lib/` finds the declaration and the handler and nothing
+  /// that dispatches it, so no shipping control reaches this path today. It becomes
+  /// reachable the moment a sign-out button exists. `auth_bloc_test.dart` drives it
+  /// with a held-open `Completer` so the answer is pinned before the control is.
+  int _sessionGeneration = 0;
+
   /// Answers the one question a cold launch asks: is anybody already signed in?
   ///
   /// "No session" and "the check failed" are the same answer here, and the port's
@@ -456,9 +492,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       ).withFormError(null),
     );
 
+    // Read **before** the `await` and checked **after** it. See [_sessionGeneration].
+    final int generation = _sessionGeneration;
+
     final Result<AuthSession> result = await _signIn(
       SignInParams(email: state.email, password: state.password),
     );
+
+    if (generation != _sessionGeneration) {
+      // A sign-out landed while this attempt was in flight, so its answer
+      // describes a session the reader has already ended. Returning is the whole
+      // fix: the alternative — applying it — leaves the bloc `signedIn` after a
+      // `signOut` that ran, with `signOuts == 1`.
+      return;
+    }
 
     switch (result) {
       case Success<AuthSession>(:final AuthSession value):
@@ -484,6 +531,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthSignedOut event,
     Emitter<AuthState> emit,
   ) async {
+    // Before the `await`, not after: the point is that any in-flight attempt is
+    // stale the moment the reader asks to sign out, whether or not the repository
+    // has finished clearing the session.
+    _sessionGeneration++;
     await _signOut();
     emit(const AuthState(status: AuthSessionStatus.signedOut));
   }

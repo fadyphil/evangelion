@@ -12,12 +12,23 @@
 /// ## WHY IT LIVES HERE, INSTEAD OF BESIDE THE GUARD
 ///
 /// Two consumers, which is the placement test in AGENT_CONTEXT §3: the router
-/// (`lib/app/router/`) asks it, and the `auth` feature implements it in Phase 5.
-/// So it is shared, and shared types live in `core/`. It is also **pure Dart**,
-/// which matters twice over: `core/navigation/` is one of the directories
-/// `tool/verify_purity.sh` Gate 1 holds to no Flutter, Dio or http — and the
-/// guard, which has to live in `lib/app/` because it names `LoginRoute`, cannot
-/// be the thing that keeps it honest.
+/// (`lib/app/router/`) asks it, and **the composition root** supplies the
+/// implementation — `BlocAuthStatus` in `lib/app/di/navigation_injection.dart`. So
+/// it is shared, and shared types live in `core/`.
+///
+/// This paragraph used to say the `auth` feature implements it, and named Phase 5
+/// as the phase that would. **The `auth` feature does not implement it and never
+/// did** — `features/auth/` has no reference to `AuthStatus`; the implementation is
+/// in `lib/app/di/`, beside the four hand-written registrations, because it needs
+/// `AuthBloc`, which cannot be generated (recorded decision 17). So the sentence
+/// cited a consumer that does not exist, and it is precisely §3's own placement
+/// test that would have caught it: the type has one real reader and one real
+/// implementer, and neither is `features/auth/`.
+///
+/// It is also **pure Dart**, which matters twice over: `core/navigation/` is one of
+/// the directories `tool/verify_purity.sh` Gate 1 holds to no Flutter, Dio or http —
+/// and the guard, which has to live in `lib/app/` because it names `LoginRoute`,
+/// cannot be the thing that keeps it honest.
 ///
 /// ## WHAT IT IS NOT
 ///

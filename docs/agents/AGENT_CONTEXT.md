@@ -606,23 +606,44 @@ user.` All eight are in `api_error_mapper_test.dart` under a group named
 `observed`.
 
 The `{statusCode, code, error, message}` shape appears nowhere in the backend: no
-`setErrorHandler`, no `code` key in any route, and the only `statusCode`
-occurrences in `src/` are `res.statusCode` on its own HTTP client. Its test group is
-named **`SYNTHETIC — defensive branch, a body this server cannot produce`**, and
+`setErrorHandler`, no `code` key in any route, and `grep -rn statusCode src/`
+returns **nothing at all** — the server's source never writes that key. The 18
+occurrences in the repository are all `res.statusCode` in `tests/api.test.ts` and
+`tests/streak.test.ts`, which are the *client* asserting on the responses it got.
+Re-verified against `HEAD = 4a1c834`. (An earlier draft of this decision said the
+only occurrences in `src/` were `res.statusCode` on its own HTTP client; `src/` has
+zero, so the citation was wrong about where it looked while the conclusion held —
+and held more strongly, since there is now no plausible site for the key to hide.)
+Its test group is named
+**`SYNTHETIC — defensive branch, a body this server cannot produce`**, and
 `Failure.details` is populated only for it. Both shapes produce a `Failure` that
 compares **equal**, because `details` is excluded from `props` — so a repository
 cannot reclassify the error, and a bloc cannot emit a spurious state change.
 
 **15. `X-User-Id`'s UUID shape is the CLIENT's obligation, and it is checked in
-exactly two places.** The table above says why: the backend validates presence and
+exactly ONE place.** The table above says why: the backend validates presence and
 nothing else. One implementation, `isValidUserId` in
-`core/network/interceptors/identity_headers.dart`, called from (1) `buildApiDio`,
-which throws `ArgumentError` naming the value, because a malformed seed is a
-programmer error and belongs at composition; and (2) `FakeAuthRepository.signIn`,
-which returns `Result.failure`, because a repository never throws across its seam
-(§3, LSP). Note the asymmetry with the **group** id, which the server also does not
-check but which no client-side check is needed for — group is a small integer and
-`3` is the only value that works end to end.
+`core/network/interceptors/identity_headers.dart`, called from `buildApiDio`, which
+throws `ArgumentError` naming the value — a malformed seed is a programmer error and
+belongs at composition.
+
+Note the asymmetry with the **group** id, which the server also does not check but
+which no client-side check is needed for — group is a small integer and `3` is the
+only value that works end to end.
+
+**Corrected after this phase's review: it is one place, not two.** This decision
+originally said the check ran in two — `buildApiDio`, and `FakeAuthRepository.signIn`,
+which returned a `Result.failure` because a repository never throws across its seam
+(§3, LSP). The second was **dead code**: `signIn` seeds from `seedAuthSession`,
+which hard-codes `kSeedUserId` with no injection point, so `isValidUserId(existing
+.userId)` was tautologically true and deleting the block turned nothing red. The
+guard, its `Failure` and the "both are tested" claim are deleted.
+
+That was recorded decision 14's own defect class — a fixture describing a state the
+system cannot produce — arriving one decision after 14 was written to forbid it,
+which is worth recording as the lesson rather than as a footnote: **"this path has a
+branch" is a claim, and the only cheap check is deleting the branch.** The
+composition-root check is the one that can fire, and it is tested.
 
 Also recorded, from the same live checks: **`GET /readings/today/{en,ar}` does not
 require `X-User-Id` at all** (200 without it), while `/streak/summary` does. The
@@ -755,6 +776,35 @@ the sweep above, and it should be part of closing any phase:
 ```bash
 rg -n "Phase [0-9]" lib/ --glob '!**/*.gr.dart'   # audit every hit against the code
 ```
+
+**The recorded command swept `lib/` only, and `test/` had 102 hits with four that
+were false the day it was written.** Corrected after Phase 5's own review:
+
+```bash
+rg -n "Phase [0-9]" lib test tool --glob '!**/*.gr.dart'   # audit EVERY hit
+```
+
+`test/` is where the sweep found the sharpest one, and the shape of it is worth
+recording because it is the *same sentence the `lib/` sweep had just corrected*:
+
+* `test/support/design_system_harness.dart` claimed `MaterialApp.builder` "is where
+  Phase 5 will install `evaScalerFor`". `eva_theme.dart` says in its own words that
+  the builder line "does **not** exist yet" and that `evaScalerFor`'s `step` belongs
+  to **Phase 9**. Wrong phase, and wrong about what Phase 5 did.
+* `test/app/app_test.dart` claimed the app opens dark "and Phase 5 replaces this with
+  the reader's persisted setting". Phase 9, again — and `app.dart` sets
+  `ThemeMode.dark` explicitly and still does.
+* `test/core/design_system/effects/neural_motion_test.dart` said "Phase 5 replaces the
+  default with `UserSettings`". Phase 9.
+* `test/core/design_system/widgets/surfaces_test.dart` deferred the §3.1 deletion test
+  with the reason "there is no feature to demote into until Phase 5" — the wrong-premise,
+  right-conclusion flavour above, in a file the `lib/` sweep had already fixed twice
+  over in the same shapes.
+
+And one that is not a phase number at all: `app_test.dart`'s test **name** said
+`/login` was "the login stub", in a commit that gave it a real `AuthBloc` and a real
+`onResult`. A test name is where a reader looks first, so a stale forward reference
+there is worse than one in a comment.
 
 Fix the doc or delete the claim — never leave a forward reference that has stopped
 being true, because a reader cannot tell it apart from one that still holds. That is

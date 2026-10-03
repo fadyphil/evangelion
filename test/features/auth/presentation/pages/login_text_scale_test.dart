@@ -231,6 +231,102 @@ void main() {
     }
   });
 
+  group('the social labels FIT, which is not the same claim as "no overflow"', () {
+    // ## WHY THIS GROUP EXISTS, AND IT IS NOT REDUNDANT WITH THE ONE ABOVE
+    //
+    // Every test above asserts `tester.takeException()` is `null`, and every one of
+    // them was satisfiable by a button whose label read **"Continue with Go…"**.
+    //
+    // The mechanism: `SocialAuthButton` renders `maxLines: 1` with
+    // `TextOverflow.ellipsis`, so an over-wide label clips its own **string**.
+    // `RenderFlex` never overflows, so no `FlutterError` is raised, so
+    // `takeException()` is `null`. §14's row — "text scales to 1.22× without
+    // overflow at 320px width" — was being satisfied by deleting the reader's
+    // words, and the negative control at the bottom of this file proves the suite
+    // detects overflow and that **nothing here detected truncation**.
+    //
+    // Measured at this surface before the fix, with the real `pumpLogin` and a
+    // `TextPainter` over the real style:
+    //
+    // ```
+    // available inner width                 192.0
+    // "Continue with Google"  @ titleMedium (16sp)  201.63  -> clipped by  9.63
+    // "المتابعة عبر Google"  @ titleMedium (16sp)  193.34  -> clipped by  1.34
+    // ```
+    //
+    // The English label truncated *more* than the Arabic, which is the opposite of
+    // this file's own stated intuition ("Arabic is longer than English for several
+    // of these strings"). `SocialAuthButton` moved to `bodyMedium` (14sp) as a
+    // result; these assertions hold it there.
+
+    /// The widest the label may be: the button's own width less the horizontal
+    /// inset `SocialAuthButton` applies on each side.
+    double availableWidth(WidgetTester tester) =>
+        tester.getSize(find.byType(SocialAuthButton).first).width -
+        2 * EvaSpacing.lg;
+
+    for (final (String name, Locale locale, String longest)
+        in <(String, Locale, String)>[
+          ('English', const Locale('en'), 'Continue with Google'),
+          ('Arabic', const Locale('ar'), 'المتابعة عبر Google'),
+        ]) {
+      testWidgets('the $name label is not ellipsised', (
+        WidgetTester tester,
+      ) async {
+        final AuthBloc bloc = buildTestBloc();
+        addTearDown(bloc.close);
+        await pumpLogin(
+          tester,
+          bloc: bloc,
+          locale: locale,
+          size: kNarrowSurface,
+          textScale: kEvaRequiredTextScale,
+        );
+
+        final Finder label = find.descendant(
+          of: find.byType(SocialAuthButton).first,
+          matching: find.byType(Text),
+        );
+        final Text widget = tester.widget<Text>(label);
+        expect(
+          widget.data,
+          longest,
+          reason: 'the fixture is wrong if this is not the longest label',
+        );
+
+        // The **rendered** width, not a `TextPainter`'s: a `TextPainter` over the
+        // style would measure the text the widget *would* draw, and the claim under
+        // test is about the width the widget actually gave it. `maxLines: 1` plus an
+        // ellipsis means the rendered box is capped at the constraint and says
+        // nothing about whether anything was dropped — so the style is measured
+        // directly and compared against the box.
+        final double rendered = tester.getSize(label).width;
+        final TextPainter painter = TextPainter(
+          text: TextSpan(text: widget.data, style: widget.style),
+          textDirection: Directionality.of(tester.element(label)),
+          maxLines: 1,
+        )..layout();
+        final double intrinsic = painter.width;
+
+        expect(
+          intrinsic,
+          lessThanOrEqualTo(availableWidth(tester)),
+          reason:
+              '"${widget.data}" wants $intrinsic and the box offers '
+              '${availableWidth(tester)}. An ellipsis keeps this test\'s siblings '
+              'green while deleting the reader\'s words',
+        );
+        expect(
+          rendered,
+          greaterThanOrEqualTo(intrinsic),
+          reason:
+              'the painted box is narrower than the words need, so the label was '
+              'clipped — the `maxLines: 1` case the assertion above rules out',
+        );
+      });
+    }
+  });
+
   group('the negative control, so the gate is known to bite', () {
     testWidgets('a column that provably overflows is detected', (
       WidgetTester tester,

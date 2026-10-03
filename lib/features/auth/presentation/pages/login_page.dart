@@ -390,6 +390,13 @@ class _LoginFormState extends State<_LoginForm> {
                   EvaTextField(
                     label: strings.emailLabel,
                     controller: _email,
+                    // `LoginScreen.tsx:49` — `placeholder="you@example.com"`. The
+                    // prototype draws greyed text inside the empty field; until
+                    // `EvaTextField` grew a `hintText` there was nothing to pass
+                    // one to, which is how a transcribed screen could render both
+                    // of its fields empty for a whole phase. See that parameter's
+                    // doc for the cost.
+                    hintText: strings.emailHint,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     errorText: state.emailError,
@@ -400,6 +407,8 @@ class _LoginFormState extends State<_LoginForm> {
                   EvaTextField(
                     label: strings.passwordLabel,
                     controller: _password,
+                    // `LoginScreen.tsx:51` — `placeholder="••••••••"`.
+                    hintText: strings.passwordHint,
                     obscureText: !state.isPasswordVisible,
                     textInputAction: TextInputAction.done,
                     errorText: state.passwordError,

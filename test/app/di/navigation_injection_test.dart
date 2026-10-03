@@ -3,6 +3,8 @@ import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/app/router/app_router.gr.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
@@ -341,11 +343,210 @@ void main() {
       await configureDependencies();
       configureNavigation();
 
-      expect(getIt<AuthBloc>(), same(getIt<AuthBloc>()));
+      final AuthBloc bloc = getIt<AuthBloc>();
+
+      expect(bloc, same(getIt<AuthBloc>()));
       expect(
         getIt<AuthStatus>().isAuthenticated,
-        same(getIt<AuthBloc>().state.isSignedIn),
+        bloc.state.isSignedIn,
         reason: 'the seam reads the bloc, it does not cache an answer',
+      );
+    });
+
+    // ## WHY `same()` WAS THE WRONG MATCHER HERE, AND WHAT IT HID
+    //
+    // The first version of the assertion above read
+    //
+    // ```dart
+    // expect(getIt<AuthStatus>().isAuthenticated, same(getIt<AuthBloc>().state.isSignedIn));
+    // ```
+    //
+    // with a `reason:` naming the exact claim — "the seam reads the bloc, it does
+    // not cache an answer" — and **no mutation could ever turn it red**. Both
+    // operands are `bool`, and Dart canonicalises `true` and `false`, so
+    // `same(...)` returns `true` for any two bools whatever they say. This is the
+    // `const`-canonicalisation class of defect this project has now paid for seven
+    // times, and it sat directly under the most expensive defect in the phase:
+    // freezing `BlocAuthStatus`'s answer at construction
+    // (`bool get isAuthenticated => _cached`) left **all 1200 tests green**.
+    //
+    // Two things had to be true for that to ship: the matcher could not fail, and
+    // every other assertion in the file read the seam while the bloc was still
+    // `unknown` — so a constant `false` satisfied the whole suite. Which is why
+    // the test below drives the bloc and reads the seam again rather than merely
+    // swapping the matcher.
+    test('and the seam follows the bloc when the session changes', () async {
+      await resetServiceLocator();
+      await configureDependencies();
+      configureNavigation();
+
+      final AuthBloc bloc = getIt<AuthBloc>();
+      final AuthStatus seam = getIt<AuthStatus>();
+
+      // Direction one: a cold launch reads `false`, and the bloc agrees.
+      expect(bloc.state.isSignedIn, isFalse);
+      expect(seam.isAuthenticated, isFalse);
+
+      // Direction two, and the direction the mutation above broke: a bloc that
+      // becomes signed in must change the answer the guard reads. Asserting only
+      // the value **before** the change is what let a constant pass.
+      //
+      // Two `Future.delayed` turns per step rather than one, for the reason the
+      // change-signal test above gives: the bloc's handlers are `async`, so one
+      // turn observes the first event and not the state it produces.
+      bloc.add(const AuthEmailChanged('david@evangelion.app'));
+      bloc.add(const AuthPasswordChanged('correct horse'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      bloc.add(const AuthSubmitted());
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        bloc.state.isSignedIn,
+        isTrue,
+        reason:
+            'the fixture is wrong if this is false — a value comparison against a '
+            'bloc that never signed in would prove nothing',
+      );
+      expect(
+        seam.isAuthenticated,
+        isTrue,
+        reason:
+            'a seam that cached its cold-launch answer would still report false '
+            'here, and every reader would be thrown back to /login after signing '
+            'in successfully',
+      );
+    });
+  });
+
+  group('the integrated loop over the real registrations', () {
+    // ## WHAT THIS GROUP IS, AND WHY NOTHING ELSE COULD HAVE CAUGHT THE CACHE
+    //
+    // Everything above inspects the graph. This drives it: the router, the guard,
+    // the real `LoginPage`, the real `AuthBloc`, and the real `FakeAuthRepository`
+    // behind three generated use cases — all assembled by `configureNavigation()`,
+    // the function the production bootstrap calls. The reader signs in and the
+    // stack must end at `[HomeRoute]`.
+    //
+    // It exists because freezing `BlocAuthStatus`'s answer at construction was
+    // invisible to all 1200 tests while breaking the app completely, and the
+    // breakage was *not* a missing screen: `bloc.state == signedIn`, the form was
+    // replaced, and only then did the guard ask the seam again and get the stale
+    // `false`. Under the mutation the stack settles back on `[LoginRoute]` and
+    // `HomePage` is never built.
+    //
+    // No cheaper assertion sees that. The seam's own test sees a bool; the guard's
+    // suites see a substituted `FakeAuthStatus`; the page's suites pass a bloc and
+    // assert nothing about navigation. Only the loop crosses all four.
+
+    // NO `setUp(configureNavigation)` — a measured decision, and the same fact
+    // `app_harness.dart` records as harness fact 1. A `Bloc` built in `setUp` runs
+    // outside `testWidgets`' fake-async zone, so its events are delivered on the
+    // **real** microtask queue, which `tester.pump()` does not drain. Probed with
+    // `configureNavigation()` in `setUp`: `bloc.state.email` and `.password` were
+    // both correct and `state.canSubmit` was `true`, while `LoginPage`'s
+    // `BlocConsumer` builder had run **exactly once** and the "Sign in" button's
+    // `onPressed` was still `null` — so every assertion below would have failed for
+    // a reason three steps upstream of the defect it exists to catch.
+    //
+    // `pumpApp` calls `configureNavigation()` itself, from inside the test body,
+    // when the router is not registered — which is both the production order and the
+    // right zone. So this group deliberately does **not** pre-register it.
+    testWidgets('signing in lands on Home and leaves nothing of Login behind', (
+      WidgetTester tester,
+    ) async {
+      await pumpApp(tester);
+
+      // Read **after** the pump, because `pumpApp` is what runs
+      // `configureNavigation()`: before it there is no router and no bloc to read.
+      final AppRouter router = getIt<AppRouter>();
+      final AuthBloc bloc = getIt<AuthBloc>();
+      final AuthStatus seam = getIt<AuthStatus>();
+
+      // The entry-point half: `/` is guarded, so a cold launch is redirected to the
+      // form rather than reaching `HomePage`. Without this the rest of the test could
+      // pass on a router that never guarded anything.
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(HomePage), findsNothing);
+      expect(bloc.state.isSignedIn, isFalse);
+      expect(seam.isAuthenticated, isFalse);
+      expect(
+        router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[LoginRoute.name],
+        reason: 'the entry route was guarded and never built',
+      );
+      expect(find.byType(TextField), findsNWidgets(2));
+
+      // **No `pushPath('/')`, and that is a measured deviation from the brief.**
+      // The brief asked for one, on the reasoning that only a guard-redirected page
+      // carries a resumable `onResult`. Probed: the cold launch's page already does,
+      // because `AuthGuard._redirectToLogin` builds it with `resolver.redirectUntil`.
+      // The deep link therefore buys no coverage and costs the test its subject —
+      // measured, it leaves the stack at `[LoginRoute, LoginRoute]`, mounts two
+      // forms, and the typed values land in the **stale** form's controllers while
+      // `EvaButton.last` is the fresh form's still-disabled button. The loop then ends
+      // at `[HomeRoute, LoginRoute, HomeRoute]` with two `HomePage`s. The cold launch
+      // alone ends at `[HomeRoute]`, which is the claim worth making.
+      await tester.enterText(
+        find.byType(TextField).at(0),
+        'david@evangelion.app',
+      );
+      await tester.enterText(find.byType(TextField).at(1), 'correct horse');
+      await tester.pump();
+
+      // The control is live now, which is the form's validation having run on every
+      // keystroke rather than on submit. Asserted rather than assumed because a tap on
+      // a disabled `EvaButton` does nothing at all — no throw, no state change — and
+      // every assertion below would then fail for a reason three steps upstream.
+      expect(
+        tester.widget<EvaButton>(find.byType(EvaButton)).onPressed,
+        isNotNull,
+        reason: 'the form is valid, so the button can be pressed',
+      );
+
+      await tester.tap(find.byType(EvaButton));
+
+      // A bounded loop in `EvaMotion.screen` steps. Two measured facts: the outgoing
+      // form stays mounted through the transition, so the loop waits for `HomePage`
+      // rather than for `LoginPage` to vanish; and `tester.pump()` with no duration
+      // advances no animation at all, so the outgoing form is still in the tree after
+      // any number of them. Twelve steps is `app_harness.dart`'s bound — three
+      // seconds, three orders of magnitude past the two the loop actually takes.
+      for (int frame = 0; frame < 12; frame++) {
+        if (find.byType(HomePage).evaluate().isNotEmpty) {
+          break;
+        }
+        await tester.pump(EvaMotion.screen);
+      }
+      await tester.pump(EvaMotion.screen);
+      await tester.pump(EvaMotion.screen);
+
+      expect(
+        bloc.state.isSignedIn,
+        isTrue,
+        reason:
+            'the fixture is wrong if this is false — an assertion about the stack '
+            'under a bloc that never signed in would prove nothing',
+      );
+      expect(
+        seam.isAuthenticated,
+        isTrue,
+        reason:
+            'a seam that cached its cold-launch answer still reports false here, and '
+            'every reader is thrown back to /login after signing in successfully',
+      );
+      expect(find.byType(HomePage), findsOneWidget);
+      // The stack, not just the mounted pages. `find.byType` reads the tree, and a
+      // router can leave a page in the stack while nothing renders it — which is how
+      // the cached seam failed: `HomePage` was never built and `[LoginRoute]` was the
+      // answer.
+      expect(
+        router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[HomeRoute.name],
+        reason:
+            'the guard resumed the interrupted navigation and every other route came '
+            'off the stack, so there is no way back to the form',
       );
     });
   });

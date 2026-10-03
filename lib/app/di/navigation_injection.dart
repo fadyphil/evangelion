@@ -141,6 +141,20 @@ void configureNavigation() {
 ///    every call rather than cached, so a bloc that emits between two navigations
 ///    is reflected immediately — which is the whole reason the signal below exists
 ///    alongside it.
+///
+/// **Contract 4 was the one the suite could not see, and the mutation is recorded
+/// here because the number is the interesting part.** Freezing the answer at
+/// construction — `bool get isAuthenticated => _cached`, with `_cached` set in the
+/// constructor — left all 1200 tests green at the time this was written. What it
+/// cost was measured: the reader signs in, `bloc.state` becomes `signedIn`, the
+/// form reports `LoginOutcome.signedIn`, and the guard then asks the seam again on
+/// the re-evaluation and gets the stale `false`. The stack settles back on
+/// `[LoginRoute]` with `HomePage` never built.
+///
+/// Two assertions now hold it, both in `navigation_injection_test.dart`: the seam
+/// is read in **both** directions around a real session change, and the whole loop
+/// is driven end to end over these registrations. The first version of the file's
+/// claim was `same(...)` on two `bool`s, which can never be false.
 final class BlocAuthStatus implements AuthStatus {
   /// Reports [bloc]'s current state.
   const BlocAuthStatus(this._bloc);

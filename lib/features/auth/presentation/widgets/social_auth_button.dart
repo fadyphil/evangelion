@@ -7,12 +7,40 @@ import 'package:flutter/material.dart';
 ///
 /// | prototype | here |
 /// | --- | --- |
-/// | `fontFamily: F.ui, fontSize: 15, fontWeight: 500, color: T.ink` | `titleMedium` w500, [EvaColors.ink] — `titleMedium` is Material 3's 16sp slot, and the same substitution `EvaButton`'s ghost variant makes for the prototype's 15 |
+/// | `fontFamily: F.ui, fontSize: 15, fontWeight: 500, color: T.ink` | `bodyMedium` w500, [EvaColors.ink] — Material 3's 14sp slot; `titleMedium` (16sp) was tried first and truncates at §14's surface. See the section below. |
 /// | `background: rgba(255, 0.05)` dark / `rgba(0, 0.03)` light | [EvaColors.glassFill] — 5% dark, 3% light, exactly |
 /// | `border: 1px solid rgba(#fff \| #000, 0.1)` | 1px [EvaColors.glassBorder] |
 /// | `borderRadius: 14` | [EvaRadii.button] |
 /// | `height: 50` | [kSocialButtonHeight] — `LoginScreen.tsx:91` |
-/// | `gap: 10` | [kSocialButtonGap] — `LoginScreen.tsx:92`; the mark's inset, which is why the mark is gone; see below |
+/// | `gap: 10` | **not transcribed** — it separated the brand mark from the label,
+///   and there is no mark. See below; the constant is gone rather than kept as an
+///   inset it never was. |
+///
+/// ## THE LABEL IS `bodyMedium`, NOT `titleMedium`, AND §14 IS WHY
+///
+/// `LoginScreen.tsx:87` writes `fontSize: 15`, and the first version of this
+/// widget used `titleMedium` — Material 3's 16sp slot — as the same substitution
+/// `EvaButton`'s ghost variant makes. Measured at §14's own surface (320px wide,
+/// 1.22×, the real screen pumped):
+///
+/// ```
+/// available inner width                192.0
+/// "Continue with Google"  @ 16sp      201.63   -> clipped by  9.63
+/// "المتابعة عبر Google"  @ 16sp      193.34   -> clipped by  1.34
+/// ```
+///
+/// `maxLines: 1` + `TextOverflow.ellipsis` means clipping the **string**, not
+/// overflowing the box, so `RenderFlex` never raised a `FlutterError` and
+/// `login_text_scale_test.dart`'s `takeException() == null` was satisfied by a
+/// label reading "Continue with Go…". §14's row is "text scales to 1.22× without
+/// overflow at 320px", and a truncated label is not that; the negative control in
+/// that file proves it detects *overflow* and that nothing detected *truncation*.
+///
+/// `bodyMedium` is 14sp, so the same measurement gives 176.4 and 169.0 — inside
+/// 192 — and it is *closer* to the prototype's 15 than 16 was. So this is the same
+/// recorded decision 5 substitution as everywhere else, moved in the direction that
+/// makes §14 true. `login_text_scale_test.dart` now asserts the label fits rather
+/// than only that nothing overflowed.
 ///
 /// ## THE BRAND MARKS ARE NOT REPRODUCED, AND THE FILE MAP IS OUT OF DATE
 ///
@@ -79,11 +107,6 @@ class SocialAuthButton extends StatelessWidget {
   /// `LoginScreen.tsx:91` — `height: 50`.
   static const double kSocialButtonHeight = 50;
 
-  /// `LoginScreen.tsx:92` — `gap: 10`. Retained because it is also the inset that
-  /// keeps a long Arabic label off the rim; see the class doc for the mark it
-  /// originally separated.
-  static const double kSocialButtonGap = 10;
-
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
@@ -120,7 +143,12 @@ class SocialAuthButton extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium!
+                // `bodyMedium`, not `titleMedium`. See the class doc: at
+                // `titleMedium`'s 16sp the English label is 201.63 wide inside a
+                // 192.0 box at 320px/1.22×, and an ellipsised label is a §14
+                // failure that raises no `FlutterError` for the overflow suite to
+                // see.
+                style: Theme.of(context).textTheme.bodyMedium!
                     .copyWith(color: colors.ink, fontWeight: FontWeight.w500),
               ),
             ),

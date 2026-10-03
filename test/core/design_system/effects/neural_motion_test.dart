@@ -259,8 +259,11 @@ void main() {
     ) async {
       // `animationsEnabled` is a parameter and the composition root owns it; the
       // default resolves the signal, the parameter states an answer. Saying so
-      // matters because Phase 5 replaces the default with `UserSettings` and a
-      // reader's stored choice has to beat the OS.
+      // matters because a later phase replaces the default with `UserSettings` and
+      // a reader's stored choice has to beat the OS. **Phase 9**, not Phase 5: the
+      // settings repository is Phase 9's, and Phase 5 delivered `core/network` and
+      // the `auth` feature. This line used to credit Phase 5, which had already
+      // landed when it was written.
       useReducedMotionPlatform(tester);
       final EvaNeuralMotion motion = await pumpScope(tester);
       await tester.pump();

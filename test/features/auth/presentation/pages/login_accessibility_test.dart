@@ -451,8 +451,91 @@ void main() {
         reason: 'the tree still has controls after the failure',
       );
 
+      // ## AND IT IS **ACTUALLY** A LIVE REGION
+      //
+      // Everything above was already here and none of it reads a `SemanticsData`.
+      // Deleting `liveRegion: true` from `LoginPage`'s `_FormError` left the whole
+      // suite green, while the test's own name and §14's claim ("a refusal that
+      // belongs to no single field is announced once") both say it is there — so the
+      // `EvaTextField._ErrorText` equivalent was pinned and the per-field one was
+      // not. The difference is per-screen, not per-principle.
+      final Iterable<SemanticsData> liveRegions = semanticsTree(tester)
+          .where((SemanticsData data) => data.flagsCollection.isLiveRegion);
+
+      expect(
+        liveRegions,
+        isNotEmpty,
+        reason:
+            '`liveRegion: true` is what makes the refusal announced rather than '
+            'merely drawn. The rest of this test proves the message exists, which '
+            'is not the same claim',
+      );
+      expect(
+        liveRegions.map(
+          (SemanticsData data) => data.value.isEmpty ? data.label : data.value,
+        ),
+        anyElement(contains('No such user in this build.')),
+        reason: 'and it is **this** refusal that is in the live region',
+      );
+
       handle.dispose();
     });
+
+    testWidgets(
+      'and the password toggle announces its state, not only its name',
+      (WidgetTester tester) async {
+        // `PasswordVisibilityToggle`'s doc lists `Semantics(toggled:)` as one of its
+        // four §14 obligations — "the reader is told the *state* and not only the
+        // control's identity". Deleting `toggled: visible` turned nothing red.
+        //
+        // **Both states, in both directions**, because `toggled: visible` is one line
+        // and an assertion on either half of it would be satisfied by the constant
+        // `true`. `isToggled` is a `Tristate` for exactly this reason: `null` means
+        // the control does not announce a state at all, which is the third case and
+        // the one the mutation produces. `controls_test.dart` reads it the same way.
+        final SemanticsHandle handle = tester.ensureSemantics();
+        final AuthBloc bloc = buildTestBloc();
+        addTearDown(bloc.close);
+        await pumpLogin(tester, bloc: bloc, size: const Size(430, 932));
+
+        SemanticsData? nodeNamed(String label) {
+          for (final SemanticsData data in semanticsTree(tester)) {
+            if (data.label == label) {
+              return data;
+            }
+          }
+          return null;
+        }
+
+        // Masked: the name is the action ("show"), and the announced state is off.
+        final SemanticsData masked = nodeNamed('Show password')!;
+        expect(masked.label, 'Show password');
+        expect(
+          masked.flagsCollection.isToggled.toBoolOrNull(),
+          isFalse,
+          reason:
+              'the password is masked, so the control is announced as off. `null` '
+              'would mean it announces no state at all, which is what deleting '
+              '`toggled:` does',
+        );
+
+        await tester.tap(find.byType(PasswordVisibilityToggle));
+        await tester.pump();
+
+        // Shown: the name flips to "hide" **and** the announced state flips with it.
+        final SemanticsData shown = nodeNamed('Hide password')!;
+        expect(shown.label, 'Hide password');
+        expect(
+          shown.flagsCollection.isToggled.toBoolOrNull(),
+          isTrue,
+          reason:
+              'and it still announces a state, now on — so `toggled:` tracks '
+              '`visible` rather than being a constant',
+        );
+
+        handle.dispose();
+      },
+    );
   });
 }
 

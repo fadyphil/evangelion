@@ -43,11 +43,13 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i568.SignOut>(() => authModule.signOut);
     gh.lazySingleton<_i174.GetIt>(() => coreModule.serviceLocator);
-    gh.lazySingleton<_i361.Dio>(() => coreModule.apiClient);
     gh.lazySingleton<_i998.ApiErrorMapper>(() => coreModule.apiErrorMapper);
     gh.lazySingleton<String>(
       () => coreModule.apiBaseUrl,
       instanceName: 'apiBaseUrl',
+    );
+    gh.lazySingleton<_i361.Dio>(
+      () => coreModule.apiClient(gh<String>(instanceName: 'apiBaseUrl')),
     );
     return this;
   }

@@ -84,6 +84,23 @@ abstract class CoreModule {
   ///
   /// The `/api/v1` prefix is deliberately absent — it belongs to the endpoint
   /// definitions, not to the host.
+  ///
+  /// ## AND IT IS ACTUALLY CONSUMED, WHICH IT WAS NOT
+  ///
+  /// The first version of this file registered the name and then ignored it:
+  /// [apiClient] read `AppConfig.apiBaseUrl` inline, so nothing ever asked the
+  /// locator which string it wanted and the paragraph above — "naming it means the
+  /// lookup site has to say which string it wants" — described a lookup that did not
+  /// exist. A registration with no consumer is documentation with a dependency
+  /// resolver attached, and it is worse than not registering at all, because the
+  /// naming reads as a guarantee.
+  ///
+  /// So [apiClient] now **takes the URL as a parameter** and get_it injects the named
+  /// registration into it. That is also the shape `dio_client.dart` demands: its doc
+  /// requires that "every input is a parameter and this file never names `AppConfig`
+  /// at all", and reading the constant inline in the provider was the one place that
+  /// broke the rule. The composition root supplies the value; it no longer supplies it
+  /// by reaching past its own registration.
   @lazySingleton
   @Named('apiBaseUrl')
   String get apiBaseUrl => AppConfig.apiBaseUrl;
@@ -110,9 +127,28 @@ abstract class CoreModule {
   /// and it is recorded here rather than left to be rediscovered as a layering
   /// question. The alternative, a second module, would move the meeting point
   /// somewhere less obvious without making it any safer.
+  ///
+  /// ## AND IT IS EXERCISED, WHICH IT WAS NOT
+  ///
+  /// `injection_test.dart` resolved the **string** `lazySingleton<Dio> apiClient` in
+  /// the generated file's text, which is not behaviour, and nothing in the suite
+  /// resolved `getIt<Dio>()` at all. Replacing both timeouts with
+  /// `const Duration(days: 1)` therefore left all 1200 tests green. The test now
+  /// resolves the client and reads `options.baseUrl`, `options.connectTimeout`,
+  /// `options.receiveTimeout` and the interceptor list off it, so the transport
+  /// configuration is a fact about the graph the app really builds.
+  ///
+  /// ## WHY THE TIMEOUTS ARE READ INLINE AND THE BASE URL IS NOT
+  ///
+  /// Because the base URL has a **named registration that must be consumed** and the
+  /// timeouts do not. Adding `@Named('connectTimeout')` / `@Named('receiveTimeout')`
+  /// would be the same defect as an unread `@Named('apiBaseUrl')`: two more names in
+  /// the locator with exactly one reader each, and `AppConfig` is the transport's one
+  /// home (recorded decision 16), so `core_module.dart` reading it is the documented
+  /// meeting point rather than a leak.
   @lazySingleton
-  Dio get apiClient => buildApiDio(
-    baseUrl: AppConfig.apiBaseUrl,
+  Dio apiClient(@Named('apiBaseUrl') String baseUrl) => buildApiDio(
+    baseUrl: baseUrl,
     identity: const IdentityHeadersInterceptor(
       userId: kSeedUserId,
       groupId: kSeedGroupId,

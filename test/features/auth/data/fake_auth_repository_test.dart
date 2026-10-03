@@ -28,8 +28,15 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// A `FakeAuthRepository` must be substitutable for a real one (AGENT_CONTEXT §3,
 /// LSP) — and it is, because it honours the whole contract including the part
-/// that is inconvenient: it never throws, always returns a `Result`, and a
-/// malformed user id is a `Failure` rather than an exception.
+/// that is inconvenient: it never throws and always returns a `Result`.
+///
+/// **It used to also claim that "a malformed user id is a `Failure` rather than
+/// an exception". That claim is deleted, not weakened.** `signIn` seeds the
+/// session from `seedAuthSession`, which hard-codes `kSeedUserId` with no
+/// injection point, so a malformed id was not reachable from this class at all —
+/// deleting the guard turned nothing red. The obligation it described is real and
+/// it lives in `buildApiDio`, which throws `ArgumentError` at composition and is
+/// tested there; see `dio_client_test.dart`.
 void main() {
   /// A well-formed address, reused so the rule tests read as the rule and not as
   /// a fixture.

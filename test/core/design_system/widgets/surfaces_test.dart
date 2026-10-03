@@ -504,10 +504,17 @@ void main() {
   group('the §3.1 deletion test is deferred, not passed', () {
     test('the four watch-list widgets built here say so', () {
       // `04-widget-inventory.md` §3.1 requires a re-run of the deletion test on
-      // six widgets. Phase 1 did not re-run it and this phase cannot: there is no
-      // feature to demote into until Phase 5. The deferral is recorded in each
-      // widget's doc, and this test is the single place a reader has to look to
-      // find that the test was NOT re-run.
+      // six widgets. Phase 1 did not re-run it and this phase cannot: Phase 5 built
+      // `features/auth/`, but the six widgets below still have exactly one call
+      // site each, and the re-run needs a second feature to demote them **into**.
+      // The deferral is recorded in each widget's doc, and this test is the single
+      // place a reader has to look to find that the test was NOT re-run.
+      //
+      // (The reason used to read "there is no feature to demote into until Phase 5",
+      // which is the same wrong-premise/right-conclusion shape decision 21 records
+      // for two `lib/` sites: Phase 5 arrived and the deferral was still correct,
+      // so only the stated reason rotted. It now cites the call sites, which is the
+      // thing that was always load-bearing.)
       for (final Type widget in <Type>[
         ProgressBeads,
         SettingsGroup,

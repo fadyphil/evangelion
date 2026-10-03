@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/common/app_config.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
+import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
@@ -561,6 +563,13 @@ void main() {
       // five `AuthModule` providers (`authLocalDataSource`, `authRepository`,
       // `signIn`, `getCurrentSession`, `signOut`) and two `CoreModule` ones
       // (`apiClient`, `apiErrorMapper`) to the two that were there.
+      //
+      // **`apiBaseUrl` now precedes `apiClient`, and that is the point.** The
+      // generated order is dependency order: `CoreModule.apiClient` takes the base
+      // URL as an injected parameter (the `@Named('apiBaseUrl')` registration now
+      // has a reader, which `core_module.dart` records), so injectable orders the
+      // string first. Before that change the two were adjacent by accident, in
+      // declaration order, and `apiBaseUrl` was registered with nothing to serve.
       expect(
         configuredRegistrations(File(configPath).readAsStringSync())
             .map((ConfiguredRegistration r) => r.toString()),
@@ -571,9 +580,9 @@ void main() {
           'lazySingleton<GetCurrentSession> getCurrentSession',
           'lazySingleton<SignOut> signOut',
           'lazySingleton<GetIt> serviceLocator',
-          'lazySingleton<Dio> apiClient',
           'lazySingleton<ApiErrorMapper> apiErrorMapper',
           'lazySingleton<String> apiBaseUrl',
+          'lazySingleton<Dio> apiClient',
         ],
       );
     });
@@ -634,6 +643,82 @@ void main() {
               'must not also be generated — see that file for why it cannot be',
         );
       }
+    });
+  });
+
+  // ## THE CLIENT IS **EXERCISED**, WHICH NOTHING DID BEFORE
+  //
+  // Every other assertion in this file about `apiClient` read the **text** of the
+  // generated config. That proves a registration exists; it says nothing about the
+  // object the registration produces. Probed: replacing both timeouts in
+  // `CoreModule.apiClient` with `const Duration(days: 1)` left the entire suite
+  // green — 1200 tests, no resolution, no observation.
+  //
+  // These resolve `getIt<Dio>()` and read the transport configuration off it, so a
+  // change to any of it is a failing assertion rather than an unexamined default.
+  group('the API client the graph actually builds', () {
+    // The file's own `setUp` already resets and rebuilds the graph, so this group
+    // only has to resolve the client.
+    late Dio client;
+
+    setUp(() => client = getIt<Dio>());
+
+    test('carries AppConfig\'s base URL, and no `/api/v1` prefix', () {
+      // The prefix is the endpoint's job (AGENT_CONTEXT §5), and `buildApiDio`'s own
+      // doc is emphatic that moving it here would make the base URL a lie about
+      // which backend it addresses. Asserted as both halves so neither can move
+      // alone: a `/api/v1` appearing here, or a prefix silently dropped from the
+      // constant, each turns this red.
+      expect(client.options.baseUrl, AppConfig.apiBaseUrl);
+      expect(
+        client.options.baseUrl,
+        isNot(contains('/api/v1')),
+        reason: 'the prefix belongs to the endpoint definitions, not the host',
+      );
+      expect(
+        client.options.baseUrl,
+        getIt<String>(instanceName: 'apiBaseUrl'),
+        reason:
+            'and it is the **named** registration, injected into the provider — not '
+            'a second read of AppConfig that could disagree with it',
+      );
+    });
+
+    test('carries both of AppConfig\'s timeouts', () {
+      // The mutation that motivated this group: `Duration(days: 1)` on both, and
+      // nothing noticed.
+      expect(client.options.connectTimeout, AppConfig.connectTimeout);
+      expect(client.options.receiveTimeout, AppConfig.receiveTimeout);
+    });
+
+    test('and exactly two interceptors — the identity one, and dio\'s own', () {
+      // `dio_client.dart` says "the list below is the whole of it, so 'what runs
+      // before my request?' has one answer rather than one per call site". That
+      // claim is about **the app's** list, and dio installs one of its own:
+      // `ImplyContentTypeInterceptor`, which sets `Content-Type` from the body's
+      // content type when a request did not set one. Measured, and named here
+      // rather than filtered out — a filter would hide a third app interceptor
+      // behind the same expression.
+      expect(
+        client.interceptors.map((Interceptor i) => i.runtimeType.toString()),
+        <String>['ImplyContentTypeInterceptor', 'IdentityHeadersInterceptor'],
+        reason:
+            'dio installs the first itself. `buildApiDio` adds exactly one: the '
+            'identity interceptor, which is where `X-User-Id` / `X-Group-Id` / '
+            '`X-User-Role` come from',
+      );
+      expect(
+        client.interceptors.whereType<IdentityHeadersInterceptor>(),
+        hasLength(1),
+      );
+    });
+
+    test('and the JSON content type, because a POST without it is a 415', () {
+      expect(client.options.contentType, Headers.jsonContentType);
+    });
+
+    test('and it is a singleton, so there is one identity in the app', () {
+      expect(getIt<Dio>(), same(client));
     });
   });
 }

@@ -192,10 +192,20 @@ const double kEvaRequiredTextScale = 1.22;
 /// passing for the wrong reason.
 ///
 /// [textScale] is injected through [MediaQuery.textScalerOf], which is where a
-/// device puts it — not through `MaterialApp.builder`, which is where Phase 5
-/// will install `evaScalerFor`. That distinction matters: a test that installed
-/// the reader's *preference* here would be testing the wrong scaler, and the
-/// §14 requirement is about the platform's accessibility scaling.
+/// device puts it — not through `MaterialApp.builder`.
+///
+/// This paragraph used to say `MaterialApp.builder` "is where Phase 5 will install
+/// `evaScalerFor`". Two things are wrong with that, and both are load-bearing.
+///
+/// * **Phase 5 has landed** and installed nothing: `eva_theme.dart:50-57` says so
+///   in its own words — "That builder line does **not** exist yet. `evaScalerFor`
+///   is exported and tested but uninstalled, because its `step` argument belongs to
+///   Phase 9's `settings_repository`." The phase was **9**, not 5.
+/// * So this harness is not describing a plumbing gap. It is describing the
+///   **correct** arrangement: the platform's own accessibility scaling is injected
+///   through `MediaQuery`, and the reader's own preference is a separate mechanism
+///   that does not exist yet. A test that installed the preference here would be
+///   testing a scaler the app does not have.
 Widget evaPrimitiveHarness({
   required Widget child,
   ThemeData? theme,
