@@ -1,32 +1,70 @@
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
+import 'package:evangelion/features/auth/data/datasources/repositories/fake_auth_repository.dart';
+import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:injectable/injectable.dart';
 
 /// The `auth` feature's registrations.
 ///
-/// **THIS MODULE REGISTERS NOTHING TODAY.** That is the honest state, not an
-/// oversight: Phase 5 owns `FakeAuthRepository`, its local data source and the auth session model are Phase 5's, and so is the `AuthBloc` this module exists to register., so until that phase lands there is nothing to
-/// put here. The module exists now, empty and named, because a container whose
-/// shape appears one feature at a time is one feature at a time.
+/// ## WHAT IS HERE, AND WHAT IS NOT, AND WHY THE LINE IS WHERE IT IS
 ///
-/// A `@module` with no providers emits no registration at all, so an empty one
-/// costs nothing at runtime. The record of what the graph actually contains is
-/// `injection.config.dart`, which is committed on purpose: it names `CoreModule`
-/// alone, and a reviewer reading a diff sees this module for the empty shell it is
-/// rather than trusting the file name.
+/// **Here:** the store, the repository and the three use cases. All five are pure
+/// Dart, so all five are reachable from `injection.dart`'s graph without violating
+/// the Flutter-free rule AGENT_CONTEXT §6 recorded decision 4 makes part of the
+/// contract — `injection_test.dart` walks that whole transitive project-local
+/// graph and fails on any Flutter import it reaches.
 ///
-/// ## WHY IT IS PURE DART, AND WHY THAT IS A CONSTRAINT RATHER THAN A COINCIDENCE
+/// **Not here:** [`AuthBloc`]. `flutter_bloc` re-exports the framework's widget
+/// layer alongside the bloc, and `bloc` itself is a transitive dependency this
+/// project may not promote to a direct one — so a provider here would put
+/// `package:flutter/material.dart` inside the composition root's closure. It is
+/// registered by hand from `lib/app/di/navigation_injection.dart`, the
+/// Flutter-permitted half of the graph, which is the fix already taken for the
+/// router.
 ///
-/// Everything reachable from `injection.dart` has to stay Flutter-free: the
-/// composition root's whole transitive project-local import graph is walked by
-/// `injection_test.dart`, and AGENT_CONTEXT §6 recorded decision 4 makes that
-/// walk part of the contract. A `@module` here is therefore reachable from that
-/// walk, and so is anything it names.
+/// The split is not a preference. Phase 4 measured it: registering the router
+/// from a module makes `verify_purity.sh` report seven violations, because
+/// `auto_route_generator` names its output after the router's own file and emits
+/// a `.gr.dart` beside it that imports all six feature pages.
 ///
-/// Phase Phase 5 will break that, because {@code AuthBloc} is a Flutter type in
-/// practice — `flutter_bloc` re-exports the framework's widget layer alongside
-/// the bloc, and `bloc` itself is a transitive dependency this project may not
-/// promote to a direct one. The fix is the one already taken for the router:
-/// register it from `lib/app/di/navigation_injection.dart`, the Flutter-permitted
-/// composition root, rather than moving `injection.dart`'s imports. Recorded here
-/// now so the next phase rediscovers it as a decision instead of as a puzzle.
+/// ## THE REPOSITORY IS REGISTERED **AGAINST THE PORT**
+///
+/// [authRepository] returns `AuthRepository`, not `FakeAuthRepository`. That is
+/// the substitution AGENT_CONTEXT §2 decision 3 depends on: when a real adapter
+/// arrives, this provider's body changes and **nothing else in the app does** —
+/// no use case, no bloc, no page names `FakeAuthRepository`. A
+/// `FakeAuthRepository`-typed registration would make every one of those types
+/// part of the graph and the swap a change to each of them.
 @module
-abstract class AuthModule {}
+abstract class AuthModule {
+  /// The in-memory session store.
+  ///
+  /// `@lazySingleton`, and the lifetime matters: the store *is* the session. A
+  /// factory would hand out a fresh empty store per lookup and a signed-in
+  /// reader would appear signed out, with no error anywhere to explain it.
+  @lazySingleton
+  AuthLocalDataSource get authLocalDataSource => AuthLocalDataSource();
+
+  /// The one [AuthRepository] that ships.
+  ///
+  /// Typed as the port. See the class doc.
+  @lazySingleton
+  AuthRepository get authRepository =>
+      FakeAuthRepository(getIt<AuthLocalDataSource>());
+
+  /// Signs in.
+  @lazySingleton
+  SignIn get signIn => SignIn(getIt<AuthRepository>());
+
+  /// Reads an existing session.
+  @lazySingleton
+  GetCurrentSession get getCurrentSession =>
+      GetCurrentSession(getIt<AuthRepository>());
+
+  /// Ends a session.
+  @lazySingleton
+  SignOut get signOut => SignOut(getIt<AuthRepository>());
+}

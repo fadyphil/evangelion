@@ -179,6 +179,7 @@ class EvaTextField extends StatefulWidget {
   const EvaTextField({
     required this.label,
     required this.controller,
+    this.hintText,
     this.errorText,
     this.obscureText = false,
     this.keyboardType,
@@ -191,6 +192,31 @@ class EvaTextField extends StatefulWidget {
   /// The mono-caps label above the field, and the field's accessible name
   /// (§14: "`EvaTextField` supplies `Semantics(label: label)` to the field").
   final String label;
+
+  /// Greyed placeholder text drawn while the field is empty. `null` means none.
+  ///
+  /// ## WHY THIS WAS MISSING FOR THREE PHASES, AND WHAT IT COST
+  ///
+  /// `ds.tsx:301` types the field's `placeholder` straight onto the `<input>`, and
+  /// `LoginScreen.tsx:49,51` pass `you@example.com` and `••••••••`. Phase 3
+  /// transcribed `ds.tsx`'s `Input` and did not transcribe its `placeholder`, and
+  /// Phase 5's `LoginPage` passed no value because **there was no parameter to pass
+  /// one to**. So the prototype draws greyed text inside both empty fields and this
+  /// app drew nothing.
+  ///
+  /// The interesting part is not the missing text; it is that the gap was invisible
+  /// to a suite whose whole subject is comparing this screen against the prototype.
+  /// `login_geometry_test.dart` parsed every `key: N` in `LoginScreen.tsx` — a
+  /// string with no number is not a row in that table — and `dsClaims` reads
+  /// `fontSize` / `height` / `padding` lines only. **A line map of numbers cannot
+  /// see a missing string.** That is recorded rather than fixed here, because the
+  /// harness's limits are decision 8's own "what it still cannot see" section.
+  ///
+  /// `hintStyle` is derived from the entered text's own style with `colors.ink3`,
+  /// because §5.1 gives `ink3` the role of "de-emphasised ink" and the prototype's
+  /// placeholder is `rgba(#fff | #000, 0.35)` — the same colour `ds.tsx:315` uses
+  /// for the field's own `rightIcon`.
+  final String? hintText;
 
   /// The text. Owned by the caller: this widget never disposes it, never
   /// initialises it, and never writes to it.
@@ -241,80 +267,156 @@ class _EvaTextFieldState extends State<EvaTextField> {
     // Focus drives the rim, so the shell has to rebuild when it moves. The
     // `ListenableBuilder` lives in `_FieldShell` because that is the widget
     // whose decoration changes.
-    return Semantics(
-      // §14, verbatim: the field has no programmatic label in the prototype
-      // because it is a bare `<input>` with a sibling `<label>` and nothing ties
-      // them together.
-      label: widget.label,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          // `ds.tsx:297-300` — `F.mono, 10, 700, letterSpacing 0.12em,
-          // textTransform: uppercase, color: T.ink2`.
-          //
-          // Excluded from semantics because the enclosing [Semantics] already
-          // names the field with this exact string; leaving both in makes a
-          // screen reader say "Email, Email".
-          ExcludeSemantics(
-            child: Text(
-              // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
-              // no equivalent for.
-              widget.label.toUpperCase(),
-              style: EvaTypography.monoCaps(colors)
-                  .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: kEvaTextFieldStackGap),
-          _FieldShell(
-            focusNode: _focus,
-            hasError: _hasError,
-            radius: kEvaTextFieldRadius,
-            child: Padding(
-              padding: kEvaTextFieldPadding,
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: widget.controller,
-                      focusNode: _focus,
-                      obscureText: widget.obscureText,
-                      keyboardType: widget.keyboardType,
-                      textInputAction: widget.textInputAction,
-                      onSubmitted: widget.onSubmitted,
-                      // The label is above the field and is the semantics name;
-                      // Material's own would duplicate it.
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      // `ds.tsx:305,309` — `F.ui, fontSize: 15, fontWeight: 400,
-                      // color: T.ink`. `bodyLarge` is Material 3's 16sp slot.
-                      style: Theme.of(context).textTheme.bodyLarge!
-                          .copyWith(color: colors.ink),
-                      cursorColor: colors.ember,
-                    ),
-                  ),
-                  if (widget.trailing case final Widget control)
-                    Padding(
-                      padding: const EdgeInsets.only(right: EvaSpacing.sm),
-                      child: IconTheme.merge(
-                        // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
-                        data: IconThemeData(color: colors.ink3),
-                        child: control,
-                      ),
-                    ),
-                ],
+    final Widget row = Row(
+      children: <Widget>[
+        Expanded(
+          child: Semantics(
+            // §14, verbatim: the field has no programmatic label in the
+            // prototype because it is a bare `<input>` with a sibling
+            // `<label>` and nothing ties them together.
+            //
+            // ## WHY IT WRAPS THE `TextField` AND NOT THE WHOLE COLUMN
+            //
+            // Because `EditableText` publishes a semantics node of its own
+            // (`isTextField == true`), and an ancestor's `Semantics(label:)`
+            // merges into that node only when nothing between them is a
+            // semantics boundary — and a `trailing` control is one: it is
+            // focusable and carries its own `Semantics`. Measured on `/login`'s
+            // password field, whose `trailing` is the show/hide toggle:
+            //
+            // ```
+            // "Password"                  <- the Semantics around the column
+            //   ""          tap=true      <- EditableText's node, **unlabelled**
+            //   "Show password" tap=true  <- the toggle, correctly named
+            // ```
+            //
+            // The node a reader activates to reach the field had no name at
+            // all, which is §14's "no unlabeled interactive node" — found by
+            // walking the tree rather than by reading this comment. A field
+            // with no `trailing` merged into one labelled node and read
+            // fine, which is why the email field on the same screen was
+            // never a problem and the password field was.
+            //
+            // ## AND WHY NOT *ALSO* AROUND THE COLUMN
+            //
+            // Because two annotations of the same label on the same merged
+            // node do not read as one. The first version of this fix put a
+            // second `Semantics(label:)` **inside** the outer one and kept
+            // both; the field's node came out with an **empty** label and
+            // `find.bySemanticsLabel('Password')` matched nothing at all —
+            // `chip_beads_field_test.dart`'s §14 assertion caught it on the
+            // first run. The outer annotation is removed rather than
+            // duplicated.
+            label: widget.label,
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              obscureText: widget.obscureText,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              onSubmitted: widget.onSubmitted,
+              // **No `hintText` here**, and the placeholder is drawn by
+              // [_Placeholder] instead — for a measured accessibility reason,
+              // not a stylistic one. Routing it through
+              // `InputDecoration.hintText` merges the placeholder into
+              // `EditableText`'s own semantics node, so the field's accessible
+              // name becomes `"Email" + "\n" + "you@example.com"`; probed,
+              // exactly that, and `find.bySemanticsLabel('Email')` then matches
+              // nothing. A browser does not put an `<input>`'s `placeholder` in
+              // its accessible name — only the `<label>` — so excluding it is
+              // the faithful transcription, not a loss.
+              //
+              // The label is above the field and is the semantics name;
+              // Material's own would duplicate it.
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
               ),
+              // `ds.tsx:305,309` — `F.ui, fontSize: 15, fontWeight: 400,
+              // color: T.ink`. `bodyLarge` is Material 3's 16sp slot.
+              style: Theme.of(context).textTheme.bodyLarge!
+                  .copyWith(color: colors.ink),
+              cursorColor: colors.ember,
             ),
           ),
-          if (_hasError) ...<Widget>[
-            const SizedBox(height: kEvaTextFieldStackGap),
-            _ErrorText(message: widget.errorText!, colors: colors),
-          ],
+        ),
+        if (widget.trailing case final Widget control)
+          Padding(
+            padding: const EdgeInsets.only(right: EvaSpacing.sm),
+            child: IconTheme.merge(
+              // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
+              data: IconThemeData(color: colors.ink3),
+              child: control,
+            ),
+          ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // `ds.tsx:297-300` — `F.mono, 10, 700, letterSpacing 0.12em,
+        // textTransform: uppercase, color: T.ink2`.
+        //
+        // Excluded from semantics because the field's own node already carries this
+        // exact string as its name; leaving both in makes a screen reader say
+        // "Email, Email".
+        ExcludeSemantics(
+          child: Text(
+            // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
+            // no equivalent for.
+            widget.label.toUpperCase(),
+            style: EvaTypography.monoCaps(colors)
+                .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: kEvaTextFieldStackGap),
+        _FieldShell(
+          focusNode: _focus,
+          hasError: _hasError,
+          radius: kEvaTextFieldRadius,
+          child: Padding(
+            padding: kEvaTextFieldPadding,
+            // The placeholder is a **sibling** of the row rather than a decoration
+            // of it, so it can be `ExcludeSemantics`-ed without reaching inside
+            // `EditableText`. See the `decoration:` comment below.
+            //
+            // **And only when there is one.** With no `hintText` the stack would be
+            // a `Stack` around a single child plus a `ValueListenableBuilder`
+            // firing on every keystroke for no visual result. That is not only
+            // wasted work: the extra frame boundary moved the caret's blink phase
+            // and broke `eva_text_field_state_focused.png` by 56px — a 2×38 bar at
+            // the caret's own coordinates, measured. A golden that encodes a blink
+            // phase is not a golden, so the branch is here rather than accepted.
+            child: widget.hintText == null
+                ? row
+                : ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: widget.controller,
+                    builder:
+                        (
+                          BuildContext context,
+                          TextEditingValue value,
+                          Widget? inner,
+                        ) => Stack(
+                          children: <Widget>[
+                            if (value.text.isEmpty)
+                              _Placeholder(
+                                text: widget.hintText!,
+                                colors: colors,
+                              ),
+                            inner!,
+                          ],
+                        ),
+                    child: row,
+                  ),
+          ),
+        ),
+        if (_hasError) ...<Widget>[
+          const SizedBox(height: kEvaTextFieldStackGap),
+          _ErrorText(message: widget.errorText!, colors: colors),
         ],
-      ),
+      ],
     );
   }
 }
@@ -358,6 +460,51 @@ class _FieldShell extends StatelessWidget {
       );
     },
     child: child,
+  );
+}
+
+/// `ds.tsx:301`'s `placeholder`, drawn by this widget rather than by
+/// `InputDecoration.hintText`.
+///
+/// [EvaTextField]'s `decoration:` argument explains the accessibility reason. The
+/// two visual requirements are ordinary: it sits behind the text at the text's own
+/// baseline position, and it disappears the moment there is a character to show
+/// instead. [EvaTextField] owns the second by rebuilding this through a
+/// [ValueListenableBuilder] over the controller.
+///
+/// `IgnorePointer` because it is drawn *over* the row's area: without it the
+/// placeholder would swallow taps aimed at the field.
+class _Placeholder extends StatelessWidget {
+  /// Greyed placeholder text.
+  const _Placeholder({required this.text, required this.colors});
+
+  /// What the prototype's `placeholder` attribute carries.
+  final String text;
+
+  /// The palette, for the de-emphasised ink.
+  final EvaColors colors;
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Align(
+      // `AlignmentDirectional`, so the placeholder starts at the text's own edge in
+      // both directions rather than always on the left.
+      alignment: AlignmentDirectional.centerStart,
+      child: ExcludeSemantics(
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.clip,
+          softWrap: false,
+          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            // `colors.ink3`, the same de-emphasised ink `ds.tsx:315` gives the
+            // field's own `rightIcon` and this project's token table gives any
+            // text that is present but not the content.
+            color: colors.ink3,
+          ),
+        ),
+      ),
+    ),
   );
 }
 

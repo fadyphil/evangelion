@@ -441,6 +441,45 @@ repository is a claim a human verified by reading `eva/`, not a claim a test
 enforces.** A reviewer reading a `ds.tsx:NNN` citation should treat it as an
 unverified assertion unless a test names it.
 
+**Phase 5 built the harness, for `LoginPage`, and it found two of its own
+citations wrong on its first run.** `test/features/auth/presentation/pages/login_geometry_test.dart`
+parses `eva/src/screens/LoginScreen.tsx` and `eva/src/components/ds.tsx` **at test
+time** and does three things:
+
+1. a **line map** — every transcription claim names a prototype line, and each line
+   is asserted to still declare that number;
+2. a **symbol map** — each claim that has a Flutter constant names the symbol, and
+   the constant is asserted to equal the prototype's value;
+3. a **rendered-geometry** half — the boxes `RenderBox` actually reports are compared
+   against the same numbers.
+
+It cannot render the React component: there is no JS runtime in the test process
+and `eva/` is read-only reference material (§2, §8). So it does the next mechanical
+thing — the prototype's declared numbers are a **test input**, parsed from the file
+rather than copied into a table.
+
+Two findings, both of which are the decision-8 failure class:
+
+* **Three of this phase's own citations were wrong.** The social button's height
+  and `borderRadius` are on `LoginScreen.tsx:91`, not `:92`, and its `gap` on `:92`,
+  not `:93`. The line map failed on its first run, three times, before the table was
+  corrected. A doc comment quoting `ds.tsx:NNN` is exactly the unverified assertion
+  this decision describes; from this phase forward, on this screen, it is not.
+* **A `symbol`-less line map proves nothing about the widget.** The first version
+  checked only that the *prototype* still said `72`. Changing
+  `LoginPage.kTopSpacer` to `71` — one character — left all 37 tests green. The
+  prototype was right, the citation was right, and the screen was wrong. That is
+  decision 8's failure mode one layer in from where it was written to apply, and it
+  is why the symbol map exists.
+
+**What the harness still cannot see, stated rather than left for Phase 9.** It reads
+geometry only: a colour, a radius or a blur alpha is a token, and a *wrong* token is
+still invisible to it. It compares what `RenderBox` exposes, so `padding: 24` and
+`EdgeInsets.all(24)` are indistinguishable. And it covers `LoginPage` only — the
+other five screens are still unverified against `eva/`, so **the "a human verified
+this by reading `eva/`" caveat above still stands for them**, and Phases 6–9 should
+add each screen's own claims rather than assume this generalises.
+
 ### Recorded decisions — Phase 4 review
 
 Phase 4 delivered a seam rather than the thing the plan asked for, so everything
@@ -551,6 +590,225 @@ resumes", and the latch above depends on the second reading. An enum removes the
 hazard and the suppression together.
 
 ---
+
+### Recorded decisions — Phase 5 review
+
+**14. The dual-shape error mapper's second shape is DEFENSIVE, and the branch stays
+anyway.** §5 trap 1 already records the correction, restated from the live checks:
+`GET /streak/summary` with `X-User-Id` **absent** gives 400
+`headers must have required property 'x-user-id'`; **empty** (sent with an empty
+value, not omitted) gives 401 `Missing user identification (X-User-Id header)`; and
+a **non-UUID** value gives **200** with `"user_id":"not-a-uuid"` echoed back. The
+other observed bodies are `400 body/question_id must match format "uuid"`, `400
+querystring/date must match format "date"`, `400 body must be object`, `415
+Unsupported Media Type` and `409 This question has already been submitted by this
+user.` All eight are in `api_error_mapper_test.dart` under a group named
+`observed`.
+
+The `{statusCode, code, error, message}` shape appears nowhere in the backend: no
+`setErrorHandler`, no `code` key in any route, and `grep -rn statusCode src/`
+returns **nothing at all** — the server's source never writes that key. The 18
+occurrences in the repository are all `res.statusCode` in `tests/api.test.ts` and
+`tests/streak.test.ts`, which are the *client* asserting on the responses it got.
+Re-verified against `HEAD = 4a1c834`. (An earlier draft of this decision said the
+only occurrences in `src/` were `res.statusCode` on its own HTTP client; `src/` has
+zero, so the citation was wrong about where it looked while the conclusion held —
+and held more strongly, since there is now no plausible site for the key to hide.)
+Its test group is named
+**`SYNTHETIC — defensive branch, a body this server cannot produce`**, and
+`Failure.details` is populated only for it. Both shapes produce a `Failure` that
+compares **equal**, because `details` is excluded from `props` — so a repository
+cannot reclassify the error, and a bloc cannot emit a spurious state change.
+
+**15. `X-User-Id`'s UUID shape is the CLIENT's obligation, and it is checked in
+exactly ONE place.** The table above says why: the backend validates presence and
+nothing else. One implementation, `isValidUserId` in
+`core/network/interceptors/identity_headers.dart`, called from `buildApiDio`, which
+throws `ArgumentError` naming the value — a malformed seed is a programmer error and
+belongs at composition.
+
+Note the asymmetry with the **group** id, which the server also does not check but
+which no client-side check is needed for — group is a small integer and `3` is the
+only value that works end to end.
+
+**Corrected after this phase's review: it is one place, not two.** This decision
+originally said the check ran in two — `buildApiDio`, and `FakeAuthRepository.signIn`,
+which returned a `Result.failure` because a repository never throws across its seam
+(§3, LSP). The second was **dead code**: `signIn` seeds from `seedAuthSession`,
+which hard-codes `kSeedUserId` with no injection point, so `isValidUserId(existing
+.userId)` was tautologically true and deleting the block turned nothing red. The
+guard, its `Failure` and the "both are tested" claim are deleted.
+
+That was recorded decision 14's own defect class — a fixture describing a state the
+system cannot produce — arriving one decision after 14 was written to forbid it,
+which is worth recording as the lesson rather than as a footnote: **"this path has a
+branch" is a claim, and the only cheap check is deleting the branch.** The
+composition-root check is the one that can fire, and it is tested.
+
+Also recorded, from the same live checks: **`GET /readings/today/{en,ar}` does not
+require `X-User-Id` at all** (200 without it), while `/streak/summary` does. The
+interceptor sends it unconditionally, which is correct either way and costs nothing.
+
+**16. `AppConfig` was split, as recorded decision 2 required, and the reason is
+"reason to change" rather than tidiness.** A base URL and a hard-coded
+`11111111-1111-1111-1111-111111111111` are two different kinds of fact: one is
+chosen per deployment, the other is a fixture of the backend's in-memory fallback. A
+deployment pointed at a real database keeps the first and loses the second, and one
+file holding both makes "which of these did this build forget to override?" a
+question about a file that cannot answer it. `AppConfig` now holds transport alone;
+the seed is `kSeedUserId` / `kSeedGroupId` / `kSeedUserRole` in
+`features/auth/data/datasources/auth_local_data_source.dart`. `core_module.dart` is
+the one line in the app that touches both, which is the point — it is the single
+place the two facts have to agree.
+
+**17. `AuthBloc` is hand-registered, and that made `configureNavigation` DEPEND on
+`configureDependencies` for the first time.** Decision 11 predicted the wall exactly:
+`flutter_bloc` re-exports Flutter's widget layer, and `bloc` is a transitive
+dependency §8.4 will not let this project promote, so there is no spelling of
+"generate this registration" that keeps `injection.dart`'s graph Flutter-free.
+`AuthBloc` is therefore built in `navigation_injection.dart` from the three
+*generated* use cases and registered with `registerSingleton` — a singleton, because
+a factory whose body re-ran would hand out a **second** bloc with its own stream,
+which is the stale-bloc hazard that function already records for the router.
+
+The consequence is real and is asserted in the failing direction:
+`bootstrapApp`'s "graph first, router second" went from advisory to load-bearing,
+and `navigation_injection_test.dart` replaced its Phase-4 test *"neither step
+depends on the other having run first"* — **that property was true and is now
+false** — with one that requires `configureNavigation` to throw a `StateError`
+naming an unregistered use case when the graph is missing.
+
+**18. `/login` ships four permanently inert controls, deliberately, and the element
+table lives in `LoginPage`.** Email, password, the show/hide toggle and "Sign in" are
+live. "Forgot password?", "Create account", and Google and Apple are **rendered and
+disabled**: `Semantics(enabled: false)`, no tap action, no focus node, 45% opacity,
+and — the part that matters — the accessible name carries the reason
+("… — unavailable in this build").
+
+They are rendered rather than dropped because §2's route table says `/login`
+includes "social buttons", and a divergence is not this phase's to make silently.
+They are *disabled* rather than "live and explains itself" because a fifth control
+whose only behaviour is to report its own absence teaches a reader that a button
+here sometimes answers with a message about the app rather than about the task. The
+cost is stated in `LoginPage` and is real: **four dead controls is visible product
+debt**, and the fix is one `onPressed` each once a route or endpoint exists.
+
+Two divergences from `docs/plans/07-file-map.md` §7, which is out of date and is not
+edited here (AGENTS.md §8.6): **`google_mark.dart` and `apple_mark.dart` do not
+exist.** Reproducing either brand mark faithfully from hand-typed path data means
+inventing coordinates — `flutter_svg` is unavailable under §8.4 and Material has no
+icon for either — and a four-point polygon that *approximates* Google's mark is a
+different logo. The social buttons are text-only. And the file map's §7.1 claim that
+the backend "emits **two** error body shapes" is superseded by §5 trap 1.
+
+**19. The password visibility toggle is a feature widget, not `IconActionButton`, and
+the `EvaTextField` label had to move.** Two mechanical reasons: `IconActionButton`'s
+minimum is `size: 44`, and `EvaTextField` reserves exactly `44` of right inset for
+this control — a 44-wide control would need 52 and would overflow the field. And
+`IconActionButton.tooltip` is one fixed string, while this control needs "Show
+password" / "Hide password".
+
+Building it exposed a **real §14 violation through a Phase-3 widget**. `EditableText`
+publishes a semantics node of its own, and an ancestor's `Semantics(label:)` merges
+into it only when nothing between them is a semantics boundary — and a `trailing`
+control is one. Measured on `/login`'s password field:
+
+```
+"Password"                  <- the Semantics around the column, tap=false
+  ""          tap=true      <- EditableText's node, UNLABELLED
+  "Show password" tap=true  <- the toggle, correctly named
+```
+
+A field with no `trailing` merged correctly and read fine, which is why the email
+field was never a problem and the password field was, and why `EvaTextField`'s own
+`trailing` parameter had never been exercised by a screen. `EvaTextField` now puts
+the label on the `TextField` **and removes** the annotation around the column — the
+first attempt kept both, and the field's label came out **empty** with
+`find.bySemanticsLabel('Password')` matching nothing, which `chip_beads_field_test.dart`
+caught on its first run. All 440 design-system tests and the existing goldens are
+unchanged.
+
+**20. Two harness facts that cost real time and will cost it again.** Both are in
+`test/support/`, and both are the same class: a test that is *not* what it looks
+like, and that looks like a broken widget rather than a broken harness.
+
+* **A `Bloc` created in `setUp` does not drive a `testWidgets` tree.** `setUp` runs
+  outside the test body's fake-async zone, so the bloc's events are scheduled on a
+  microtask queue `tester.pump()` never drains. The state updates and the widget tree
+  does not rebuild — measured as `bloc.state` correct and `find.text(…)` returning
+  **zero** widgets. Every suite that mounts a bloc builds it **in the test body**,
+  with `addTearDown(…close)`.
+* **`materialApp(home: Builder(…))` resolves an `ar` locale back to `en_US`.**
+  `MaterialApp` matches `locale` against `supportedLocales` (default
+  `[Locale('en', 'US')]`) and falls back; `Localizations.localeOf` then reports `en`.
+  `evaPrimitiveHarness` also wraps its child in an explicit `Directionality`, which
+  sits inside `home` and therefore **overrides** the direction Material installs
+  from the locale. Both parameters are now optional on the harness and
+  `login_harness.dart`'s `pumpLogin` supplies the app's own pair and derives the
+  direction from the locale.
+
+**21. Eight forward-references to "Phase 5" were false the moment Phase 5 closed, and
+nobody had noticed for want of a mechanical check.** After the phase's own report was
+written, `rg -n "Phase [0-9]" lib/` was swept and every hit audited against the code as
+it now stands. Six were wrong, in two flavours:
+
+* **Wrong owner.** `app.dart` (three sites), `bootstrap.dart` and
+  `neural_motion.dart` all promised that *this* phase would read a persisted
+  `UserSettings` for theme, locale and reduced motion. It did not: this phase
+  delivered `core/network` and the `auth` feature, and the settings repository is
+  Phase 9. `eva_typography.dart` already said Phase 9, so the file set was internally
+  contradictory. `eva_theme_light.dart` went further and claimed "Phase 5 owns the
+  `ThemeMode` that chooses between them" — `app.dart` sets `ThemeMode.dark`
+  explicitly and still does.
+* **Wrong premise, right conclusion.** `eva_section_header.dart` and
+  `settings_group.dart` both defer the §3.1 deletion test with the reason "there is no
+  feature to demote into until Phase 5". Phase 5 built `features/auth/` and gave
+  neither widget a second call site. The **deferral is still correct**; only the
+  stated reason rotted. Rewriting a valid decision's justification to match new facts
+  would have been as wrong as leaving it — the reasons now cite the call sites, which
+  is the thing that was always load-bearing.
+
+The lesson is not "be careful with comments", it is that a phase number in a comment
+is a **claim about the future that stops being checked the moment it is written**. It
+passed review for two phases because prose cannot fail a test. The cheap defence is
+the sweep above, and it should be part of closing any phase:
+
+```bash
+rg -n "Phase [0-9]" lib/ --glob '!**/*.gr.dart'   # audit every hit against the code
+```
+
+**The recorded command swept `lib/` only, and `test/` had 102 hits with four that
+were false the day it was written.** Corrected after Phase 5's own review:
+
+```bash
+rg -n "Phase [0-9]" lib test tool --glob '!**/*.gr.dart'   # audit EVERY hit
+```
+
+`test/` is where the sweep found the sharpest one, and the shape of it is worth
+recording because it is the *same sentence the `lib/` sweep had just corrected*:
+
+* `test/support/design_system_harness.dart` claimed `MaterialApp.builder` "is where
+  Phase 5 will install `evaScalerFor`". `eva_theme.dart` says in its own words that
+  the builder line "does **not** exist yet" and that `evaScalerFor`'s `step` belongs
+  to **Phase 9**. Wrong phase, and wrong about what Phase 5 did.
+* `test/app/app_test.dart` claimed the app opens dark "and Phase 5 replaces this with
+  the reader's persisted setting". Phase 9, again — and `app.dart` sets
+  `ThemeMode.dark` explicitly and still does.
+* `test/core/design_system/effects/neural_motion_test.dart` said "Phase 5 replaces the
+  default with `UserSettings`". Phase 9.
+* `test/core/design_system/widgets/surfaces_test.dart` deferred the §3.1 deletion test
+  with the reason "there is no feature to demote into until Phase 5" — the wrong-premise,
+  right-conclusion flavour above, in a file the `lib/` sweep had already fixed twice
+  over in the same shapes.
+
+And one that is not a phase number at all: `app_test.dart`'s test **name** said
+`/login` was "the login stub", in a commit that gave it a real `AuthBloc` and a real
+`onResult`. A test name is where a reader looks first, so a stale forward reference
+there is worse than one in a comment.
+
+Fix the doc or delete the claim — never leave a forward reference that has stopped
+being true, because a reader cannot tell it apart from one that still holds. That is
+the same rule as §9's "no report without `file:line`", applied to comments.
 
 ## 7. Verification — run before reporting done
 

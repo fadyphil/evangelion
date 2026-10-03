@@ -43,8 +43,18 @@
 /// ## SCOPE
 ///
 /// Everything under `tokens/`, `theme/`, `effects/` and `widgets/`. Phase 1 shipped
-/// the first two; Phase 2 added `effects/` and the decorative part of `widgets/`,
-/// and Phase 3 fills in the Tier-1 primitives and the Tier-3 composites.
+/// the first two; Phase 2 added `effects/` plus the **five** decorative widgets in
+/// its commit (`glass_surface`, `passage_drop_cap`, `seal_monogram`,
+/// `streak_flame`, `sun_burst` — counted from `git show --stat 81f5034`); and
+/// Phase 3 added the Tier-1 primitives in a commit whose subject is literally
+/// "the 17 Tier-1 primitive widgets" (`3804939`).
+///
+/// The previous version of this sentence said Phase 3 "fills in the Tier-1
+/// primitives and the Tier-3 composites", which stopped being true the moment
+/// Phase 3 landed. It is written down now rather than left, because a phase number
+/// in a comment is a claim about the future that nothing checks — the lesson
+/// AGENT_CONTEXT §9's recorded decision 21 records, and it applies to this file as
+/// much as to the ones that sweep found.
 ///
 /// The directory-listing comparison in `barrel_test.dart` walks all four
 /// directories, so every design-system file landing on disk has to be exported

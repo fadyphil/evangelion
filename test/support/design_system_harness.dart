@@ -192,10 +192,20 @@ const double kEvaRequiredTextScale = 1.22;
 /// passing for the wrong reason.
 ///
 /// [textScale] is injected through [MediaQuery.textScalerOf], which is where a
-/// device puts it — not through `MaterialApp.builder`, which is where Phase 5
-/// will install `evaScalerFor`. That distinction matters: a test that installed
-/// the reader's *preference* here would be testing the wrong scaler, and the
-/// §14 requirement is about the platform's accessibility scaling.
+/// device puts it — not through `MaterialApp.builder`.
+///
+/// This paragraph used to say `MaterialApp.builder` "is where Phase 5 will install
+/// `evaScalerFor`". Two things are wrong with that, and both are load-bearing.
+///
+/// * **Phase 5 has landed** and installed nothing: `eva_theme.dart:50-57` says so
+///   in its own words — "That builder line does **not** exist yet. `evaScalerFor`
+///   is exported and tested but uninstalled, because its `step` argument belongs to
+///   Phase 9's `settings_repository`." The phase was **9**, not 5.
+/// * So this harness is not describing a plumbing gap. It is describing the
+///   **correct** arrangement: the platform's own accessibility scaling is injected
+///   through `MediaQuery`, and the reader's own preference is a separate mechanism
+///   that does not exist yet. A test that installed the preference here would be
+///   testing a scaler the app does not have.
 Widget evaPrimitiveHarness({
   required Widget child,
   ThemeData? theme,
@@ -208,6 +218,8 @@ Widget evaPrimitiveHarness({
   // does not work.
   Size? size,
   bool ambientAnimations = false,
+  Iterable<LocalizationsDelegate<dynamic>>? localizationsDelegates,
+  List<Locale>? supportedLocales,
 }) => NeuralMotionScope(
   // OFF by default, and that is not a shortcut. A primitive test never paints a
   // [NeuralBackground], so the three shared clocks tick forever over nothing —
@@ -220,10 +232,23 @@ Widget evaPrimitiveHarness({
     debugShowCheckedModeBanner: false,
     theme: theme ?? EvaThemeDark.theme,
     locale: locale,
-    localizationsDelegates: const <LocalizationsDelegate<Object>>[
-      DefaultMaterialLocalizations.delegate,
-      DefaultWidgetsLocalizations.delegate,
-    ],
+    // The default pair supports **only** `en`, so an `ar` locale silently resolves
+    // back to English — the exact failure `app_test.dart`'s localisation group
+    // documents. A caller testing the Arabic arm therefore passes
+    // `GlobalMaterialLocalizations.delegates`; see `pumpLogin` in
+    // `login_harness.dart`, which is the one suite that does.
+    localizationsDelegates:
+        localizationsDelegates ??
+        const <LocalizationsDelegate<Object>>[
+          DefaultMaterialLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
+    // `null` leaves MaterialApp's own default, which is `[Locale('en', 'US')]` — so
+    // a caller passing `locale: Locale('ar')` without also listing `ar` gets it
+    // resolved **back to `en_US`**, and the failure reads as "the widget ignored the
+    // locale" rather than as a missing declaration. Both parameters are therefore
+    // needed together, which is exactly what `app.dart` does.
+    supportedLocales: supportedLocales ?? const <Locale>[Locale('en', 'US')],
     home: Builder(
       builder: (BuildContext context) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
