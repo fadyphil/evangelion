@@ -170,7 +170,7 @@ Prefix: `/api/v1`. CORS is wide open. Auth is **not** implemented — identity i
 
 | Header | Rule |
 |---|---|
-| `X-User-Id` | **Must be a non-empty, valid UUID string.** Empty string → **401**. Absent → **400**. |
+| `X-User-Id` | **Must be a non-empty string.** Absent → **400** (Fastify schema, `headers must have required property 'x-user-id'`). Present but **empty** → **401**. A **non-UUID** value such as `not-a-uuid` is accepted with **200** and echoed back as `user_id`. |
 | `X-Group-Id` | Required for reading + leaderboard routes. Integer string. Use **`3`**. |
 | `X-User-Role` | Parsed but **never checked**. Send `kid`. Decorative. |
 
@@ -233,8 +233,17 @@ today_completed, next_milestone, days_to_milestone, … }`.
 
 ### Traps — the client must handle all of these
 
-1. **Two different error body shapes.** Most routes: `{ "error", "message" }`.
-   Some: `{ "statusCode", "code", "error", "message" }`. The error mapper must accept both.
+1. **Two error body shapes — but only one is real.** Every error this backend
+   emits is `{"error": ..., "message": ...}` (Fastify's default reply, plus the four
+   hand-written 401s in `streak.routes.ts:84,158` and `submissions.routes.ts:61`).
+   The second shape, `{statusCode, code, error, message}`, **appears nowhere** — not in
+   `src/`, not in `dist/`, not in `tests/api.test.ts`; the only `statusCode` occurrences
+   are `res.statusCode` on the backend's own HTTP client, and there is **no
+   `setErrorHandler`**. *Verified live against `HEAD=4a1c834`.* An earlier draft of this
+   document asserted "some routes" emit it; that was wrong. The mapper must still accept
+   both, because it costs one branch and a later backend may add it — but **document it as
+   defensive, never as observed**, or the next reader will write a test that asserts a
+   response this server cannot produce.
 2. **`text_clean` exists only in Arabic.** English localized responses have no `text_clean`
    key at all. Do not assume its presence.
 3. **Duplicate submit → `409`.** The quiz must disable questions where
