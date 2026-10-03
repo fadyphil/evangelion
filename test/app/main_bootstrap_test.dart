@@ -1,6 +1,7 @@
 import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/bootstrap.dart';
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/router/app_router.dart';
 // Prefixed, because this file declares its own `main`. An unprefixed import
 // would be shadowed by it, and `unused_import` is fatal under --fatal-infos.
 import 'package:evangelion/main.dart' as entrypoint;
@@ -19,7 +20,7 @@ typedef _AwaitedEntryPoint = Future<void> Function();
 /// WHY NOT `main()`. `main()` calls `runApp`, which needs a live view and a
 /// running frame pipeline. A test that invoked it would attach a second root
 /// widget to a binding the harness already owns, and the outcome would tell us
-/// nothing about the bootstrap. `bootstrapApp` is the same three steps with the
+/// nothing about the bootstrap. `bootstrapApp` is the same four steps with the
 /// one untestable step injected, which is what makes them observable.
 ///
 /// WHY THIS FILE DOES NOT READ `lib/main.dart` AS TEXT. It used to, and the
@@ -120,6 +121,24 @@ void main() {
             'configureDependencies() must complete before runApp, or the first '
             'frame renders with nothing registered',
       );
+    });
+
+    test('the navigation graph is registered before run(), and the app root can be '
+        'built from it', () async {
+      // Step 3. `configureNavigation()` is synchronous and cannot throw once the
+      // pure-Dart graph is up, so the observable it has is *presence at the
+      // moment `run` is called* — the same shape as the sampling above. Sampled
+      // after the fact this would be vacuous: the graph outlives `run` by
+      // design.
+      final List<bool> routerWasRegisteredWhenRun = <bool>[];
+
+      await bootstrapApp(
+        run: (Widget _) {
+          routerWasRegisteredWhenRun.add(getIt.isRegistered<AppRouter>());
+        },
+      );
+
+      expect(routerWasRegisteredWhenRun, <bool>[true]);
     });
 
     test('run() receives the app root, not a stock MaterialApp', () async {

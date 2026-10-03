@@ -1,13 +1,34 @@
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 /// The application's root widget.
 ///
-/// A plain `MaterialApp`, not `MaterialApp.router`: Phase 4 owns the router, and
-/// wiring a `routerConfig` to a stub would make this file look more finished
-/// than it is.
+/// `MaterialApp.router`, over the `AppRouter` resolved from the locator.
+///
+/// ## WHY THE ROUTER IS RESOLVED HERE AND NOT BUILT HERE
+///
+/// `06-navigation.md` §8: the router takes the session by constructor, so a
+/// second instance built as a field or in `build` would sit alongside the
+/// injected one holding a stale answer — two routers, two `navigatorKey`s, and
+/// nothing to say which one the user is looking at. So `build` asks the locator.
+/// There is no constructor parameter to pass a different one, deliberately: an
+/// override is a way for a second router to exist, which is the exact hazard the
+/// plan names.
+///
+/// Resolving inside `build` rather than caching it in a field keeps the lookup
+/// lazy, and keeps this a `StatelessWidget`: a field would resolve during
+/// construction, which is earlier than anything in the tree exists.
+///
+/// ## WHERE `reevaluateListenable` ACTUALLY GOES
+///
+/// Not here: `MaterialApp.router` has no such parameter. It belongs on the
+/// `RouterConfig`, which is what `AppRouter.config(reevaluateListenable:)` builds,
+/// and `config()` is what gets handed to `MaterialApp.router` below. The plan
+/// says "in `MaterialApp.router`"; the listenable reaches the delegate through
+/// that config, which is the only route auto_route offers.
 ///
 /// [locale] exists for one reason — the localisation assertions in `app_test`
 /// need to pin the app to a specific language, and `MaterialApp.locale` left
@@ -45,7 +66,7 @@ class EvangelionApp extends StatelessWidget {
     // per-widget reduced motion is honoured where the `MediaQuery` is, inside
     // `NeuralBackground` and `GoldFlecks`.
     return NeuralMotionScope(
-      child: MaterialApp(
+      child: MaterialApp.router(
         debugShowCheckedModeBanner: false,
         title: 'Evangelion',
 
@@ -94,8 +115,11 @@ class EvangelionApp extends StatelessWidget {
         // time to discover it.
         themeMode: ThemeMode.dark,
 
-        // NO `routerConfig` — see the class doc.
-        home: const LoginPage(),
+        // The one place the router enters the widget tree. See the class doc
+        // for why it is resolved from the locator and never constructed here.
+        routerConfig: getIt<AppRouter>().config(
+          reevaluateListenable: getIt<AppRouter>().authChanges,
+        ),
       ),
     );
   }

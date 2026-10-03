@@ -421,8 +421,10 @@ reading the prototype, not by any test failing.
 is the only thing its test name claims, and two of Phase 3's pairs were. It cannot
 compare against `eva/`, and it is not a substitute.
 
-**Owner: the phase that first transcribes a screen.** Phase 4 builds Login, the first
-real screen, and a screen is where a wrong number becomes a user's day. The owner
+**Owner: the phase that first transcribes a screen**, which is **Phase 5**
+(`core/network` + the `auth` feature, whose deliverable is `LoginPage`) — *not*
+Phase 4, which is routing and DI and writes no screen. A screen is where a wrong
+number becomes a user's day. The owner
 builds a prototype-comparison harness — a `ds.tsx` line map plus a test that renders
 the React component and the Flutter widget over the same inputs and compares
 geometry — or records here again why not. Until then, **every transcription claim in

@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,7 @@ import 'package:flutter/material.dart';
 /// one carries an `AppBar`. The `AppBar` is scaffolding, not a design decision —
 /// the real screen is built to hide it. It is here so the page has the shape
 /// the router and the widget tests can both recognise.
+@RoutePage()
 class ReadingPage extends StatelessWidget {
   const ReadingPage({super.key});
 

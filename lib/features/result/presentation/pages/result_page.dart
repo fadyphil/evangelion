@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,7 @@ import 'package:flutter/material.dart';
 /// yet: AGENT_CONTEXT §5 trap 4, that streak fields only change when
 /// `reading_completed == true`, so a result screen that shows a streak without
 /// reading that flag is wrong in a way no widget test would catch.
+@RoutePage()
 class ResultPage extends StatelessWidget {
   const ResultPage({super.key});
 
