@@ -9,9 +9,11 @@ import 'package:flutter/widgets.dart';
 /// function:
 ///
 /// 1. `WidgetsFlutterBinding.ensureInitialized()` — binds the engine. First
-///    because later phases register dependencies that talk to a platform channel
-///    (`SharedPreferences`, from the Phase 5 settings repository), and a channel
-///    with no binding under it throws.
+///    because a later phase registers dependencies that talk to a platform
+///    channel (`SharedPreferences`, from the settings repository), and a channel
+///    with no binding under it throws. Phase 5 added `core/network`, which talks
+///    to sockets rather than channels, so nothing new here needed a binding and
+///    this comment's "later phase" is still the accurate description.
 /// 2. `await configureDependencies()` — builds the pure-Dart object graph.
 /// 3. `configureNavigation()` — registers the auth seam and the router. Second
 ///    because `AppRouter`'s provider reads `AuthStatus` out of the locator as it

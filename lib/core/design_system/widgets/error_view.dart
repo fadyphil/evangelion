@@ -21,11 +21,13 @@ import 'package:flutter/material.dart';
 ///
 /// ## AND WHY THE MESSAGE IS NOT INVENTED HERE
 ///
-/// [message] is required and has no default. The two failure messages this app
-/// will show are Phase 5's job — the dual-shape error mapper's `Failure.message`
-/// is the only source, so a second English string invented in the design system
-/// would be a second thing to translate and a third thing to keep in step with
-/// the mapper.
+/// [message] is required and has no default. The failure messages this app
+/// shows come from `ApiErrorMapper` in `core/network` — Phase 5 built it, and its
+/// `Failure.message` is deliberately the only source, so a second English string
+/// invented in the design system would be a second thing to translate and a third
+/// thing to keep in step with the mapper. The mapper is unit-tested against
+/// bodies captured from the live server, so a wording change in `error_view.dart`
+/// would break a test rather than silently fork the vocabulary.
 class ErrorView extends StatelessWidget {
   /// An error view saying [message], optionally offering [onRetry].
   const ErrorView({

@@ -11,6 +11,8 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i7;
+import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
+    as _i9;
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
     as _i2;
 import 'package:evangelion/features/home/presentation/pages/home_page.dart'
@@ -47,10 +49,11 @@ class LoginRoute extends _i7.PageRouteInfo<LoginRouteArgs> {
   LoginRoute({
     _i8.Key? key,
     _i2.LoginResultCallback? onResult,
+    _i9.AuthBloc? bloc,
     List<_i7.PageRouteInfo>? children,
   }) : super(
          LoginRoute.name,
-         args: LoginRouteArgs(key: key, onResult: onResult),
+         args: LoginRouteArgs(key: key, onResult: onResult, bloc: bloc),
          initialChildren: children,
        );
 
@@ -62,32 +65,38 @@ class LoginRoute extends _i7.PageRouteInfo<LoginRouteArgs> {
       final args = data.argsAs<LoginRouteArgs>(
         orElse: () => const LoginRouteArgs(),
       );
-      return _i2.LoginPage(key: args.key, onResult: args.onResult);
+      return _i2.LoginPage(
+        key: args.key,
+        onResult: args.onResult,
+        bloc: args.bloc,
+      );
     },
   );
 }
 
 class LoginRouteArgs {
-  const LoginRouteArgs({this.key, this.onResult});
+  const LoginRouteArgs({this.key, this.onResult, this.bloc});
 
   final _i8.Key? key;
 
   final _i2.LoginResultCallback? onResult;
 
+  final _i9.AuthBloc? bloc;
+
   @override
   String toString() {
-    return 'LoginRouteArgs{key: $key, onResult: $onResult}';
+    return 'LoginRouteArgs{key: $key, onResult: $onResult, bloc: $bloc}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! LoginRouteArgs) return false;
-    return key == other.key && onResult == other.onResult;
+    return key == other.key && onResult == other.onResult && bloc == other.bloc;
   }
 
   @override
-  int get hashCode => key.hashCode ^ onResult.hashCode;
+  int get hashCode => key.hashCode ^ onResult.hashCode ^ bloc.hashCode;
 }
 
 /// generated route for

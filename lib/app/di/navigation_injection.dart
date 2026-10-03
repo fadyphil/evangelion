@@ -2,6 +2,10 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
+import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// The **Flutter half** of the object graph: the auth seam and the router.
 ///
@@ -18,15 +22,23 @@ import 'package:evangelion/core/navigation/auth_status.dart';
 /// defeated by a single `export … show X;` line, so it is not one to route
 /// around.
 ///
-/// Both requirements are otherwise legitimate and neither may be weakened, so
-/// the graph splits along the line that already exists in it: the pure-Dart half
-/// keeps its generated `@InjectableInit`, and the half that genuinely needs the
-/// framework is registered by hand here. `06-navigation.md` §8's requirement —
-/// "registered as a factory that reads the session from the `getIt` instance" —
-/// is honoured; only the file differs from the plan, and `core_module.dart` says
-/// so where the plan's file map would have put it.
+/// `AuthBloc` hits the identical wall, and the mechanism is spelled out here
+/// because it is not obvious: `AuthBloc extends Bloc`, and `Bloc` arrives through
+/// `package:flutter_bloc/flutter_bloc.dart`, which **re-exports Flutter's widget
+/// layer** alongside the bloc. The obvious-looking import —
+/// `package:bloc/bloc.dart` — is unavailable, because `bloc` is a *transitive*
+/// dependency and AGENT_CONTEXT §8.4 makes promoting it a hard stop. So there is
+/// no spelling of "register this bloc" that keeps Flutter out of the closure.
 ///
-/// WHAT THIS COSTS, STATED PLAINLY: three registrations are now written by hand
+/// Both requirements are legitimate and neither may be weakened, so the graph
+/// splits along the line that already exists in it: the pure-Dart half keeps its
+/// generated `@InjectableInit`, and the half that genuinely needs the framework is
+/// registered by hand here. `06-navigation.md` §8's requirement — "registered as a
+/// factory that reads the session from the `getIt` instance" — is honoured for the
+/// router; only the file differs from the plan, and `core_module.dart` says so
+/// where the plan's file map would have put it.
+///
+/// WHAT THIS COSTS, STATED PLAINLY: four registrations are now written by hand
 /// instead of generated, so `injection.config.dart` no longer shows them in a
 /// diff. That is the price of the purity gate, taken knowingly, and it is why
 /// `navigation_injection_test.dart` exercises this function as behaviour —
@@ -46,78 +58,109 @@ import 'package:evangelion/core/navigation/auth_status.dart';
 /// prints two routers with identical `toString` — which is the whole difficulty
 /// of this bug, since nothing about either object looks wrong.
 ///
-/// The one sharp edge: the provider reads [AuthStatus] from the locator at
-/// **construction** time, so re-registering `AuthStatus` after the router exists
-/// would leave the router holding the previous one. Phase 5 must therefore
-/// register the bloc-backed `AuthStatus` *before* anything resolves `AppRouter`,
-/// which `bootstrapApp`'s ordering already guarantees. The consequence is
-/// asserted in `navigation_injection_test.dart` rather than left to this comment.
+/// ## ORDER: `AuthBloc` BEFORE `AuthStatus`, AND WHY IT IS NOT A LUCKY SEQUENCE
 ///
-/// ## WHAT PHASE 5 REPLACES
+/// [AuthStatus]'s provider reads [AuthBloc] out of the locator when it resolves,
+/// and `AppRouter`'s provider reads [AuthStatus]. All three are
+/// `@lazySingleton`, so nothing runs during this function — the order below is
+/// readability, and the real requirement is that `bootstrapApp` calls
+/// `configureNavigation()` **after** `configureDependencies()`, which it does
+/// (step 3 of 4, `bootstrap.dart`).
 ///
-/// Both of the first two registrations are placeholders, and both are labelled as
-/// such at their declarations. Phase 5 replaces [AuthStatus] with one reading
-/// `AuthBloc.state`, and replaces the listenable with
-/// `ReevaluateListenable.stream(authBloc.stream)` so a sign-out re-evaluates the
-/// stack. Nothing in `app_router.dart`, `auth_guard.dart` or `app.dart` changes
-/// to do it — that is the whole point of the seam.
+/// Getting that wrong has a measured cost, not a hypothetical one: re-binding
+/// `AuthStatus` after the router exists leaves the router holding the previous
+/// one, because the router captured it at construction. `app.dart` reads the
+/// locator once, in `build`, so that dependency is visible in the shape of the
+/// statement rather than hidden inside it, and
+/// `navigation_injection_test.dart` asserts the re-binding case in the failing
+/// direction.
 ///
-/// ## THE PLACEHOLDERS ARE PINNED BEHAVIOURALLY, BECAUSE THEY ARE THE TEMPLATE
+/// ## WHAT PHASE 4 LEFT BEHIND, AND WHAT REPLACED IT
 ///
-/// Two properties of `_NoAuthChanges` are asserted by *executing* it rather than
-/// by reading it, and both are properties the Phase 5 replacement must keep:
+/// Phase 4's `AuthStatus` was `_NoSession` and its change signal was
+/// `_NoAuthChanges`, both labelled as placeholders. Both are gone:
 ///
-///  * **it never announces anything.** `navigation_injection_test.dart` subscribes,
-///    gives the event loop two turns, and asserts the count is still zero. An
-///    earlier version of that test asserted only that the object was non-null and
-///    alive while its name claimed silence, so a placeholder that fired on
-///    construction passed. That matters because `ReevaluateListenable.stream(…)` is
-///    a different shape with the same contract, and a placeholder that fires is the
-///    wrong shape to copy.
-///  * **`AuthStatus` reports no session**, so a cold launch reaches `/login`. Phase
-///    5's replacement must not report `true` before its bloc says so, because the
-///    guard acts on that answer.
+/// * `_NoSession` is replaced by [BlocAuthStatus], which reads `AuthBloc.state` —
+///   a field read, which is exactly what `core/navigation/auth_status.dart`
+///   demands of an implementation ("a pure read … cheap, never a fetch, never a
+///   validation").
+/// * `_NoAuthChanges` is replaced by `ReevaluateListenable.stream(authBloc.stream)`,
+///   so a sign-out re-evaluates the whole stack. `_NoAuthChanges` had no
+///   subscription to leak and could not accidentally start notifying; the stream
+///   wrapper can, which is why `AppRouter.dispose()` disposes it (see that
+///   getter's doc) rather than leaving it to the widget tree, which knows nothing
+///   about a `ReevaluateListenable` it was handed.
 ///
-/// And one property of the seam they do NOT own, which is worth stating because it
-/// is the one that bites: `AuthGuard` latches its redirect's `onResult`, so a
-/// sign-in control that fires twice — an `onPressed` plus the form's
-/// `onSubmitted`, or a double tap — is harmless. See `auth_guard.dart`. Phase 5
-/// therefore does not have to make "exactly once" true at the call site, though it
-/// should still try.
+/// The placeholder's pinned behaviour is worth keeping in mind as the shape to
+/// copy: `navigation_injection_test.dart` subscribes, gives the event loop two
+/// turns, and asserts the count is still **zero** — a signal that announces
+/// nothing. The replacement is the same contract with a real source.
 void configureNavigation() {
+  // **Built here, not resolved from the locator** — that is what "hand-registered"
+  // means. Nothing generates this registration, so nothing else will construct the
+  // bloc; the three use cases *are* generated, so they are resolved from the
+  // locator, which is what makes the hand-written half depend on the generated one
+  // and not the other way round.
+  final AuthBloc authBloc = AuthBloc(
+    signIn: getIt<SignIn>(),
+    getCurrentSession: getIt<GetCurrentSession>(),
+    signOut: getIt<SignOut>(),
+  );
   getIt
-    ..registerLazySingleton<AuthStatus>(_NoSession.new)
-    ..registerLazySingleton<ReevaluateListenable>(_NoAuthChanges.new)
+    // `registerSingleton`, not `registerLazySingleton`: the object is already
+    // built, and a lazy singleton whose factory re-ran would hand out a *second*
+    // bloc with its own stream — a signal subscribed to a bloc nothing else reads,
+    // which is the exact "stale bloc" hazard this file's `AppRouter` section is
+    // about.
+    ..registerSingleton<AuthBloc>(authBloc)
+    ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
+    ..registerLazySingleton<ReevaluateListenable>(
+      () => ReevaluateListenable.stream(authBloc.stream),
+    )
     ..registerLazySingleton<AppRouter>(
       () => AppRouter(getIt<AuthStatus>(), getIt<ReevaluateListenable>()),
     );
 }
 
-/// Phase 4's [AuthStatus]: there is no session, ever.
+/// [AuthStatus] over an [AuthBloc].
 ///
-/// Not a stub pretending otherwise. AGENT_CONTEXT §2, decision 3 fixes login as
-/// UI-only over a `FakeAuthRepository`, and that repository is Phase 5's — so
-/// today there is nothing that *could* produce a session, and reporting one would
-/// be a lie the guard would then act on.
+/// The whole of Phase 4's four contracts is satisfied by three lines, and the
+/// length is the point — see `core/navigation/auth_status.dart` for what each
+/// contract costs when broken:
 ///
-/// It is also the state a cold launch is in anyway: `/` is the initial route, the
-/// guard asks this, gets `false`, and redirects to `/login` — which is the app's
-/// documented entry point. So the app opens on the login screen for the right
-/// reason rather than by a special case.
-final class _NoSession implements AuthStatus {
-  const _NoSession();
+/// 1. **A pure read.** `state.isSignedIn` is a getter over an enum, so it is
+///    cheap and side-effect-free. The guard calls it on every navigation *and*
+///    again on every stack re-evaluation; an async answer would turn a redirect
+///    into a loading state.
+/// 2. **It cannot throw.** `AuthState.isSignedIn` compares an enum against a
+///    constant. There is no await, no nullable dereference and no port call, so
+///    the escape the guard deliberately does not catch is unreachable from here.
+/// 3. **It is bound before the router resolves it**, by `configureNavigation`'s
+///    order and by `bootstrapApp`'s.
+/// 4. **It is not a mirror.** The answer is read from the bloc's current state on
+///    every call rather than cached, so a bloc that emits between two navigations
+///    is reflected immediately — which is the whole reason the signal below exists
+///    alongside it.
+///
+/// **Contract 4 was the one the suite could not see, and the mutation is recorded
+/// here because the number is the interesting part.** Freezing the answer at
+/// construction — `bool get isAuthenticated => _cached`, with `_cached` set in the
+/// constructor — left all 1200 tests green at the time this was written. What it
+/// cost was measured: the reader signs in, `bloc.state` becomes `signedIn`, the
+/// form reports `LoginOutcome.signedIn`, and the guard then asks the seam again on
+/// the re-evaluation and gets the stale `false`. The stack settles back on
+/// `[LoginRoute]` with `HomePage` never built.
+///
+/// Two assertions now hold it, both in `navigation_injection_test.dart`: the seam
+/// is read in **both** directions around a real session change, and the whole loop
+/// is driven end to end over these registrations. The first version of the file's
+/// claim was `same(...)` on two `bool`s, which can never be false.
+final class BlocAuthStatus implements AuthStatus {
+  /// Reports [bloc]'s current state.
+  const BlocAuthStatus(this._bloc);
+
+  final AuthBloc _bloc;
 
   @override
-  bool get isAuthenticated => false;
+  bool get isAuthenticated => _bloc.state.isSignedIn;
 }
-
-/// Phase 4's auth-change signal: nothing ever changes, so nothing re-evaluates.
-///
-/// A bare [ReevaluateListenable] rather than `ReevaluateListenable.stream(...)`
-/// over a stream nothing writes to. Both would be equally silent today; this one
-/// has no subscription to leak, and it cannot accidentally start notifying
-/// before Phase 5 wires the real signal.
-///
-/// `AppRouter.dispose()` disposes it, which is why it is safe for the router to
-/// own one — see that getter's doc comment.
-final class _NoAuthChanges extends ReevaluateListenable {}

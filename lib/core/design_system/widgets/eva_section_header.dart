@@ -38,13 +38,17 @@ enum EvaSectionHeaderSize {
 /// complexity does not reappear — most likely to a private `_`-prefixed widget
 /// inside the feature that owns the single call site".
 ///
-/// Phase 1 did not re-run it and this phase has not either, because **there is
-/// nowhere to put the result**: no feature exists until Phase 5, so
-/// `features/settings/presentation/widgets/` is a stub page and moving a widget
-/// into it would put it in a file that is about to be rewritten. It ships public,
-/// with the deferral recorded here rather than a passing claim attached to it.
-/// Re-run it in the phase that first gives it a second call site, or in Phase 9
-/// when `SettingsScreen` lands and the deletion test can be run honestly.
+/// Phase 1 did not re-run it and no phase since has either, because **there is
+/// still nowhere to put the result**: all four watch-list widgets below are used
+/// only by the stub `SettingsPage`, and moving one into a feature that does not
+/// use it would be inventing a call site to satisfy a rule rather than satisfying
+/// the rule. Phase 5 built `features/auth/` and gave this widget no second caller
+/// — the login screen needs a heading, not a section label — so the earlier
+/// version of this comment, which said "no feature exists until Phase 5", stopped
+/// being true at the end of that phase without this paragraph being updated.
+/// It ships public, with the deferral recorded here rather than a passing claim
+/// attached to it. Re-run it when `SettingsScreen` lands and the page it is
+/// demoted into actually imports the widget.
 ///
 /// Four of the six watch-list entries are in this phase — `SettingsGroup`,
 /// `EvaSectionHeader`, `TextLink`, `ProgressBeads` — and all four say the same

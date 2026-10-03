@@ -197,11 +197,35 @@ abstract final class EvaTypography {
 /// 320px width; 1.22 is the top of that requirement, not a round number chosen
 /// after it.
 ///
-/// NOT APPLIED BY THE THEME. `MaterialApp.builder` installs this scaler in
-/// Phase 5, once the setting is readable. Baking it into `ThemeData` would make
-/// the reader's preference untestable and would silently override the platform's
-/// own accessibility scaling — a user who raised the OS font size would find the
-/// app ignoring them.
+/// NOT APPLIED BY THE THEME, AND NOT INSTALLED ANYWHERE YET.
+///
+/// An earlier version of this comment said "`MaterialApp.builder` installs this
+/// scaler in Phase 5, once the setting is readable". Phase 5 is complete and the
+/// scaler is **not** installed, so that sentence is removed rather than left to rot.
+///
+/// The reason is ordering, not oversight: the `step` argument comes from
+/// `settings_repository`, which does not exist until Phase 9. `MaterialApp.builder`
+/// receives an `AsyncSnapshot` and rebuilds when the future resolves, so the
+/// installation is a one-liner whenever that repository lands — but installing it
+/// now with a hard-coded `3` would ship a preference the reader cannot change and
+/// cannot change back, which is worse than not shipping it.
+///
+/// Neither placement is acceptable for the same reason, so the two options that
+/// were ruled out stay ruled out: baking it into `ThemeData` would make the
+/// preference untestable, and wrapping the platform's scaler in a way that ignores
+/// it would silently override a user who has raised the OS font size.
+///
+/// ## WHAT §14 IS ACTUALLY SATISFIED BY, THEN
+///
+/// The requirement is that the app survives 1.22× at 320px width. That is now tested
+/// against the **platform** scaler in `login_text_scale_test.dart` — which is the
+/// stronger form, because it proves the layouts survive the *maximum of the two
+/// inputs* rather than one of them. So the §14 gate does not wait on Phase 9; only
+/// the reader-facing stepper does. The distinction matters: the layout work is done
+/// and verified, and the remaining Phase 9 work is the control, not the constraint.
+///
+/// The function stays exported, and `eva_typography_test.dart` checks all five arms
+/// so it cannot rot in the meantime.
 TextScaler evaScalerFor(int step) => switch (step) {
   1 => const TextScaler.linear(0.90),
   2 => const TextScaler.linear(0.95),
