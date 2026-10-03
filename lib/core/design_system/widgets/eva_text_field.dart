@@ -241,40 +241,74 @@ class _EvaTextFieldState extends State<EvaTextField> {
     // Focus drives the rim, so the shell has to rebuild when it moves. The
     // `ListenableBuilder` lives in `_FieldShell` because that is the widget
     // whose decoration changes.
-    return Semantics(
-      // §14, verbatim: the field has no programmatic label in the prototype
-      // because it is a bare `<input>` with a sibling `<label>` and nothing ties
-      // them together.
-      label: widget.label,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          // `ds.tsx:297-300` — `F.mono, 10, 700, letterSpacing 0.12em,
-          // textTransform: uppercase, color: T.ink2`.
-          //
-          // Excluded from semantics because the enclosing [Semantics] already
-          // names the field with this exact string; leaving both in makes a
-          // screen reader say "Email, Email".
-          ExcludeSemantics(
-            child: Text(
-              // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
-              // no equivalent for.
-              widget.label.toUpperCase(),
-              style: EvaTypography.monoCaps(colors)
-                  .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        // `ds.tsx:297-300` — `F.mono, 10, 700, letterSpacing 0.12em,
+        // textTransform: uppercase, color: T.ink2`.
+        //
+        // Excluded from semantics because the field's own node already carries this
+        // exact string as its name; leaving both in makes a screen reader say
+        // "Email, Email".
+        ExcludeSemantics(
+          child: Text(
+            // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
+            // no equivalent for.
+            widget.label.toUpperCase(),
+            style: EvaTypography.monoCaps(colors)
+                .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: kEvaTextFieldStackGap),
-          _FieldShell(
-            focusNode: _focus,
-            hasError: _hasError,
-            radius: kEvaTextFieldRadius,
-            child: Padding(
-              padding: kEvaTextFieldPadding,
-              child: Row(
-                children: <Widget>[
-                  Expanded(
+        ),
+        const SizedBox(height: kEvaTextFieldStackGap),
+        _FieldShell(
+          focusNode: _focus,
+          hasError: _hasError,
+          radius: kEvaTextFieldRadius,
+          child: Padding(
+            padding: kEvaTextFieldPadding,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Semantics(
+                    // §14, verbatim: the field has no programmatic label in the
+                    // prototype because it is a bare `<input>` with a sibling
+                    // `<label>` and nothing ties them together.
+                    //
+                    // ## WHY IT WRAPS THE `TextField` AND NOT THE WHOLE COLUMN
+                    //
+                    // Because `EditableText` publishes a semantics node of its own
+                    // (`isTextField == true`), and an ancestor's
+                    // `Semantics(label:)` merges into that node only when nothing
+                    // between them is a semantics boundary — and a `trailing`
+                    // control is one: it is focusable and carries its own
+                    // `Semantics`. Measured on `/login`'s password field, whose
+                    // `trailing` is the show/hide toggle:
+                    //
+                    // ```
+                    // "Password"                  <- the Semantics around the column
+                    //   ""          tap=true      <- EditableText's node, **unlabelled**
+                    //   "Show password" tap=true  <- the toggle, correctly named
+                    // ```
+                    //
+                    // The node a reader activates to reach the field had no name at
+                    // all, which is §14's "no unlabeled interactive node" — found by
+                    // walking the tree rather than by reading this comment. A field
+                    // with no `trailing` merged into one labelled node and read
+                    // fine, which is why the email field on the same screen was
+                    // never a problem and the password field was.
+                    //
+                    // ## AND WHY NOT *ALSO* AROUND THE COLUMN
+                    //
+                    // Because two annotations of the same label on the same merged
+                    // node do not read as one. The first version of this fix put a
+                    // second `Semantics(label:)` **inside** the outer one and kept
+                    // both; the field's node came out with an **empty** label and
+                    // `find.bySemanticsLabel('Password')` matched nothing at all —
+                    // `chip_beads_field_test.dart`'s §14 assertion caught it on the
+                    // first run. The outer annotation is removed rather than
+                    // duplicated.
+                    label: widget.label,
                     child: TextField(
                       controller: widget.controller,
                       focusNode: _focus,
@@ -296,25 +330,25 @@ class _EvaTextFieldState extends State<EvaTextField> {
                       cursorColor: colors.ember,
                     ),
                   ),
-                  if (widget.trailing case final Widget control)
-                    Padding(
-                      padding: const EdgeInsets.only(right: EvaSpacing.sm),
-                      child: IconTheme.merge(
-                        // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
-                        data: IconThemeData(color: colors.ink3),
-                        child: control,
-                      ),
+                ),
+                if (widget.trailing case final Widget control)
+                  Padding(
+                    padding: const EdgeInsets.only(right: EvaSpacing.sm),
+                    child: IconTheme.merge(
+                      // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
+                      data: IconThemeData(color: colors.ink3),
+                      child: control,
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
-          if (_hasError) ...<Widget>[
-            const SizedBox(height: kEvaTextFieldStackGap),
-            _ErrorText(message: widget.errorText!, colors: colors),
-          ],
+        ),
+        if (_hasError) ...<Widget>[
+          const SizedBox(height: kEvaTextFieldStackGap),
+          _ErrorText(message: widget.errorText!, colors: colors),
         ],
-      ),
+      ],
     );
   }
 }

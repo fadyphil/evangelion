@@ -47,9 +47,14 @@ abstract final class EvaTheme {
   /// second place where "are we Material 3?" is answered.
   ///
   /// No `textScaleFactor` and no scaler: the reader's font-size preference is
-  /// installed by `MaterialApp.builder` in Phase 5 through `evaScalerFor`, so
-  /// that the platform's own accessibility scaling is composed with it rather
-  /// than overwritten by it.
+  /// applied by `MaterialApp.builder`, not here, so that the platform's own
+  /// accessibility scaling is composed with it rather than overwritten by it.
+  ///
+  /// That builder line does **not** exist yet. `evaScalerFor` is exported and
+  /// tested but uninstalled, because its `step` argument belongs to Phase 9's
+  /// `settings_repository`; see the comment above `evaScalerFor` in
+  /// `tokens/eva_typography.dart` for the full ordering and for why installing it
+  /// with a hard-coded step would be worse than leaving it out.
   static ThemeData build(EvaColors colors) {
     final TextTheme textTheme = EvaTypography.textTheme(colors);
 

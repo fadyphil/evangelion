@@ -236,13 +236,22 @@ void main() {
       // have passed just as happily if `configureDependencies` were broken in a
       // completely unrelated way, which makes it a very poor way to say "a
       // double call is rejected here and nowhere else".
+      //
+      // **The type named is not pinned.** The first version of this asserted
+      // `contains('GetIt is already registered')`, because `CoreModule`'s
+      // `serviceLocator` happened to be the first registration. Phase 5 added
+      // `AuthModule`'s five providers and the first name became
+      // `AuthLocalDataSource` — so the assertion was really pinning *registration
+      // order*, which is generated output rather than a contract. What is
+      // contractual is that the rejection names **some** already-registered type,
+      // and that it is an `ArgumentError` rather than a silent no-op.
       await expectLater(
         configureDependencies(),
         throwsA(
           isA<ArgumentError>().having(
             (ArgumentError e) => e.message.toString(),
             'message',
-            contains('GetIt is already registered'),
+            allOf(contains('is already registered'), contains('inside GetIt')),
           ),
         ),
       );
@@ -542,22 +551,55 @@ void main() {
       );
     });
 
-    test(
-      'the two current registrations are the ones the config actually names',
-      () {
-        // Spelled out rather than counted, for the reason
-        // `app_routes_test.dart` gives: a parser that quietly returned two entries
-        // of the wrong shape would sail through a length check.
-        expect(
-          configuredRegistrations(File(configPath).readAsStringSync())
-              .map((ConfiguredRegistration r) => r.toString()),
-          <String>[
-            'lazySingleton<GetIt> serviceLocator',
-            'lazySingleton<String> apiBaseUrl',
-          ],
-        );
-      },
-    );
+    test('the nine current registrations are the ones the config actually names', () {
+      // Spelled out rather than counted, for the reason
+      // `app_routes_test.dart` gives: a parser that quietly returned entries of
+      // the wrong shape would sail through a length check.
+      //
+      // The full inventory, so a reader learns what the graph contains from a
+      // failing diff rather than by opening the generated file. Phase 5 added
+      // five `AuthModule` providers (`authLocalDataSource`, `authRepository`,
+      // `signIn`, `getCurrentSession`, `signOut`) and two `CoreModule` ones
+      // (`apiClient`, `apiErrorMapper`) to the two that were there.
+      expect(
+        configuredRegistrations(File(configPath).readAsStringSync())
+            .map((ConfiguredRegistration r) => r.toString()),
+        <String>[
+          'lazySingleton<AuthLocalDataSource> authLocalDataSource',
+          'lazySingleton<AuthRepository> authRepository',
+          'lazySingleton<SignIn> signIn',
+          'lazySingleton<GetCurrentSession> getCurrentSession',
+          'lazySingleton<SignOut> signOut',
+          'lazySingleton<GetIt> serviceLocator',
+          'lazySingleton<Dio> apiClient',
+          'lazySingleton<ApiErrorMapper> apiErrorMapper',
+          'lazySingleton<String> apiBaseUrl',
+        ],
+      );
+    });
+
+    test('and the auth providers are registered against the PORT, not the fake', () {
+      // `auth_module.dart` returns `AuthRepository` rather than
+      // `FakeAuthRepository` so a real adapter is a change to one provider body
+      // and nothing else. The generated config is where that decision becomes
+      // observable: `gh.lazySingleton<AuthRepository>` is the assertion, and a
+      // future edit that widens it to the concrete type turns this red rather
+      // than making every use case part of the swap.
+      expect(
+        configuredRegistrations(File(configPath).readAsStringSync()),
+        contains(
+          const ConfiguredRegistration(
+            lifetime: 'lazySingleton',
+            type: 'AuthRepository',
+            member: 'authRepository',
+          ),
+        ),
+      );
+      expect(
+        File(configPath).readAsStringSync(),
+        isNot(contains('FakeAuthRepository')),
+      );
+    });
 
     test('and the config names none of the hand-registered navigation types', () {
       // The collision gap, closed by name. `configureNavigation()` registers
@@ -575,6 +617,14 @@ void main() {
         'AppRouter',
         'AuthStatus',
         'ReevaluateListenable',
+        // Phase 5's fourth. `AuthBloc` is a bloc, and the only import that reaches
+        // it — `package:flutter_bloc/flutter_bloc.dart` — re-exports Flutter's
+        // widget layer; `package:bloc/bloc.dart` is unavailable because `bloc` is
+        // a transitive dependency AGENT_CONTEXT §8.4 will not let this project
+        // promote. So there is no spelling of "generate this registration" that
+        // keeps `injection.dart`'s graph Flutter-free, which is exactly why it is
+        // hand-registered alongside the router. See `navigation_injection.dart`.
+        'AuthBloc',
       ]) {
         expect(
           config,

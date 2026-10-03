@@ -10,8 +10,14 @@ import 'package:flutter/material.dart';
 ///
 /// `darkTheme:` rather than `theme:` is the light one's job in this app. The
 /// design is a dark glassmorphic system (AGENT_CONTEXT §2, decision 6); light is
-/// the alternative a reader picks in Settings, not the default. Phase 5 owns the
-/// `ThemeMode` that chooses between them.
+/// the alternative a reader picks in Settings, not the default.
+///
+/// The `ThemeMode` that chooses between them is **not** Phase 5's, whatever this
+/// comment used to say. `app.dart` sets `ThemeMode.dark` explicitly and still
+/// does; Phase 5 delivered `core/network` and the `auth` feature, so the switch
+/// belongs to the phase that lands `UserSettings`. Until then the light theme is
+/// reachable only from a test that names `EvaThemeLight.theme` directly, which is
+/// exactly what `eva_theme_test.dart` does.
 abstract final class EvaThemeLight {
   /// The light theme, built from [EvaColors.light].
   ///
