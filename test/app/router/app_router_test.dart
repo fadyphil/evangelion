@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 // The generated `*Route` classes, reached the same way `app_router.dart` reaches
 // them: through the generated library, not through the six pages.
@@ -8,10 +9,13 @@ import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
@@ -450,6 +454,78 @@ void main() {
     });
   });
 
+  group('the route observer `config()` installs', () {
+    // ## WHY THIS GROUP IS HERE RATHER THAN A COMMENT ON THE OVERRIDE
+    //
+    // `AppRouter.config()` overrides `RootStackRouter.config()` only to install an
+    // `AutoRouteObserver`, because the inherited default is `const []` and a missing
+    // `NavigatorObserver` made every `AutoRouteAware` in the app a silent no-op.
+    //
+    // **The override is `navigatorObservers: () => [...?navigatorObservers?.call(),
+    // AutoRouteObserver()]` — additive, not substitutive.** A `NavigatorObserver`
+    // *sees* events, it does not own them, so replacing a caller's list would
+    // silently un-subscribe whatever the caller installed. That reasoning is only
+    // worth anything if it is executed, and the first version of this override was
+    // `navigatorObservers: () => [AutoRouteObserver()]` — which would have been
+    // exactly the bug, with the fix in the comment asserting the opposite.
+    testWidgets('a caller-supplied observer is ADDED to, not substituted for', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = routerFor(FakeAuthStatus());
+      addTearDown(router.dispose);
+
+      // The caller's own observer, so "added" and "replaced" are distinguishable by
+      // identity rather than only by the doc.
+      final _MarkerObserver supplied = _MarkerObserver();
+
+      await tester.pumpWidget(
+        _hostWithObservers(router, <NavigatorObserver>[supplied]),
+      );
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      final List<NavigatorObserver> installed = _installedObservers(tester);
+
+      expect(
+        installed,
+        contains(supplied),
+        reason:
+            'the caller installed this one, and a substitution would have silently '
+            'un-subscribed it — which is the whole reason the override spreads '
+            'rather than replaces',
+      );
+      expect(
+        installed.whereType<AutoRouteObserver>(),
+        hasLength(1),
+        reason:
+            'and the router still installs its own, because the override is additive '
+            'rather than a choice between the two',
+      );
+    });
+
+    testWidgets('and the caller\'s comes FIRST, the router\'s own last', (
+      WidgetTester tester,
+    ) async {
+      // The order is not load-bearing for correctness — a `NavigatorObserver` list is
+      // dispatched to in order and two observers that both only *observe* cannot
+      // interfere. It is asserted because `...?a` followed by `b` versus `b` followed
+      // by `...?a` is a reordering no behavioural test in this suite would notice, and
+      // a diff is not a gate.
+      final AppRouter router = routerFor(FakeAuthStatus());
+      addTearDown(router.dispose);
+      final _MarkerObserver supplied = _MarkerObserver();
+
+      await tester.pumpWidget(
+        _hostWithObservers(router, <NavigatorObserver>[supplied]),
+      );
+      await pumpUntilFound(tester, find.byType(LoginPage));
+
+      final List<NavigatorObserver> installed = _installedObservers(tester);
+
+      expect(installed.indexOf(supplied), lessThan(installed.length - 1));
+      expect(installed.last, isA<AutoRouteObserver>());
+    });
+  });
+
   group('disposal', () {
     test('disposing the router disposes the auth signal it owns', () {
       // The reason `AppRouter.dispose` exists. `ReevaluateListenable` is a
@@ -471,3 +547,58 @@ void main() {
     });
   });
 }
+
+/// A `MaterialApp.router` over [router]'s `config()`, with [observers] passed in.
+///
+/// `routerHost` in `app_harness.dart` is the app's real shell and deliberately does
+/// **not** take observers — production calls it with only `reevaluateListenable`,
+/// and that is the default arm this group is *not* about. This is the same shell with
+/// the second argument a future caller might use, so the override's **additive** arm
+/// has something to be additive to.
+///
+/// Duplicated rather than parameterised for one call site: `routerHost`'s own doc
+/// records that the app's shell is not this suite's to reshape, and a parameter
+/// defaulted to `const []` is a parameter nobody sets — which is the same
+/// argument-as-burden this project has recorded against `TodayReadingPanel`'s named
+/// constructors.
+Widget _hostWithObservers(AppRouter router, List<NavigatorObserver> observers) {
+  if (!getIt.isRegistered<AuthBloc>()) {
+    registerTestAuthBloc();
+  }
+  if (!getIt.isRegistered<HomeBloc>()) {
+    registerTestHomeBloc();
+  }
+  return NeuralMotionScope(
+    child: MaterialApp.router(
+      routerConfig: router.config(
+        reevaluateListenable: router.authChanges,
+        navigatorObservers: () => observers,
+      ),
+      theme: EvaThemeLight.theme,
+      darkTheme: EvaThemeDark.theme,
+      themeMode: ThemeMode.dark,
+      locale: const Locale('en'),
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+    ),
+  );
+}
+
+/// A `NavigatorObserver` that is identifiable by identity and does nothing.
+///
+/// An `AutoRouterObserver` would have been the obvious choice and it would have made
+/// the assertion unfalsifiable: `contains(someAutoRouteObserver)` is true whichever
+/// of the two installed entries is *which*. A private subclass nothing else
+/// instantiates is the only way to ask "is **this** one still installed".
+final class _MarkerObserver extends NavigatorObserver {}
+
+/// The `NavigatorObserver` list the mounted tree actually has.
+///
+/// Read off the live `RouterScope` rather than off `RouterConfig`: the builder is
+/// called when the delegate builds its navigator, so nothing before the mount can say
+/// what the router composed — which is why the first version of this assertion was
+/// `expect(config, isNotNull)` and proved nothing at all.
+List<NavigatorObserver> _installedObservers(WidgetTester tester) => tester
+    .widgetList<RouterScope>(find.byType(RouterScope))
+    .first
+    .navigatorObservers;

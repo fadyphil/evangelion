@@ -1,7 +1,7 @@
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
-import 'package:evangelion/features/auth/data/datasources/repositories/fake_auth_repository.dart';
+import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';

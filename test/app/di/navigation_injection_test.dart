@@ -5,9 +5,11 @@ import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -240,6 +242,11 @@ void main() {
       // `FakeAuthStatus` above — the bloc here is only what the screen reads to
       // render, and its own state is not what the guard answers with.
       registerTestAuthBloc();
+      // And the `HomeBloc` this screen now resolves, for the same reason: Phase 6
+      // made `/` a real page that reads its bloc from the locator, so a locator
+      // without one throws `StateError` inside `HomePage.build` — and this test
+      // lands on `/` deliberately, to change the session while it is on screen.
+      registerTestHomeBloc();
       getIt
         ..registerLazySingleton<AuthStatus>(() => status)
         ..registerLazySingleton<ReevaluateListenable>(() => changes)
@@ -418,6 +425,120 @@ void main() {
             'in successfully',
       );
     });
+  });
+
+  group('the cross-feature seam: sign-out empties `/`\'s state', () {
+    // ## THE ONLY PLACE BOTH FEATURES MAY BE NAMED
+    //
+    // `AuthBloc` is in `features/auth` and `HomeCleared` is in `features/home`, so
+    // `AuthBloc._onSignedOut` **cannot** dispatch it — that is Gate 2, and the same
+    // wall `navigation_injection.dart`'s `HomeBloc` section spent a paragraph on. The
+    // reverse is closed too. `lib/app/` is the one directory Gate 2 exempts, and
+    // `configureNavigation()` already builds **both** blocs two lines above the
+    // subscription, so the seam is one listener in the composition root.
+    //
+    // And it had to be, not merely could be: `HomeBloc` is a `registerSingleton`, so
+    // between sign-out and process death it held a reader's `displayName`, monogram,
+    // today's reading and their streak, and nothing took them out. `/` is also the
+    // screen a *second* signed-in reader lands on, and `HomeStarted`'s first emit
+    // copies the previous reader's fields forward — so this was not only hygiene, it
+    // was the wrong name greeting the wrong person.
+    //
+    // Nothing else in the suite crosses this boundary, which is why it is here rather
+    // than in `auth_bloc_test.dart` or `home_bloc_test.dart`: both of those can only
+    // see one half. `home_bloc_test.dart` owns `HomeCleared`'s **effect**; this owns
+    // the **dispatch**, over the real registrations.
+
+    test('sign-out empties the HomeBloc that holds the reader', () async {
+      configureNavigation();
+
+      final AuthBloc auth = getIt<AuthBloc>();
+      final HomeBloc home = getIt<HomeBloc>();
+
+      // Sign in, so the session — and therefore the name — exists.
+      auth
+        ..add(const AuthEmailChanged('david@evangelion.app'))
+        ..add(const AuthPasswordChanged('correct horse'))
+        ..add(const AuthSubmitted());
+      await auth.stream.firstWhere((AuthState state) => state.isSignedIn);
+
+      // Give `/` something to hold. The repositories `configureNavigation()` built are
+      // the real ones over the **fake** auth repository and whatever `Reading`/
+      // `Streak` adapters Phase 6 registered — so the reading may well fail, and this
+      // test does not depend on it succeeding. The identity does not: `readerName`
+      // comes from the session alone.
+      home.add(const HomeStarted(ReadingLanguage.english));
+      await home.stream.firstWhere(
+        (HomeState state) => state.readerStatus != HomeSectionStatus.loading,
+      );
+      expect(
+        home.state.readerName,
+        'David Mina',
+        reason:
+            'the premise: the seeded session\'s display name is in the bloc, so the '
+            'assertion below is about the clear and not about a name that was never '
+            'there',
+      );
+
+      // Sign out.
+      auth.add(const AuthSignedOut());
+      await auth.stream.firstWhere((AuthState state) => !state.isSignedIn);
+
+      // The composition root's listener runs on the bloc's own stream, so it is one
+      // microtask behind the auth emit — pumped here rather than raced, because a
+      // `firstWhere` on the HomeBloc's stream is the deterministic wait and it is
+      // what the assertion is actually about.
+      await home.stream.firstWhere(
+        (HomeState state) => state == const HomeState(),
+      );
+
+      expect(home.state.readerName, isNull);
+      expect(home.state.readerInitials, isNull);
+      expect(home.state.reading, isNull);
+      expect(home.state.streak, isNull);
+    });
+
+    test(
+      'and a sign-IN does not, because the two are different states',
+      () async {
+        // The direction the seam must **not** fire in. `_clearHomeStateOnSignOut` tests
+        // `!state.isSignedIn`, so signing in leaves `/`'s state alone — which is the
+        // whole reason it is a listener on the stream and not a call from the sign-in
+        // path: the reset belongs to exactly one of the two transitions.
+        configureNavigation();
+
+        final AuthBloc auth = getIt<AuthBloc>();
+        final HomeBloc home = getIt<HomeBloc>();
+
+        home.add(const HomeStarted(ReadingLanguage.english));
+        await home.stream.firstWhere(
+          (HomeState state) => state.readerStatus != HomeSectionStatus.loading,
+        );
+
+        auth
+          ..add(const AuthEmailChanged('david@evangelion.app'))
+          ..add(const AuthPasswordChanged('correct horse'))
+          ..add(const AuthSubmitted());
+        await auth.stream.firstWhere((AuthState state) => state.isSignedIn);
+        // One turn of the event loop, so the composition root's listener has run if it
+        // was going to. **Not** `home.state == before` — that was the first version and
+        // it failed for a reason three steps from the claim: `HomeStarted` has three
+        // emits and only the first had landed, so `before` was a snapshot the bloc then
+        // moved past on its own. The claim is "the clear did not happen", and that is
+        // `!= const HomeState()`.
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          home.state,
+          isNot(const HomeState()),
+          reason:
+              'sign-in is not a reset. `_clearHomeStateOnSignOut` tests '
+              '`!state.isSignedIn`, so only the sign-out transition clears — and a '
+              'listener on the wrong arm would empty `/` in the middle of a sign-in, '
+              'which is the direction that would be hardest to notice.',
+        );
+      },
+    );
   });
 
   group('the integrated loop over the real registrations', () {

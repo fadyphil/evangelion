@@ -164,7 +164,8 @@ The prototype's `blur(72px)` is achieved by a soft radial gradient with a wide t
 
 - Reading and Quiz screens: `.tint` — the content is dense and the blur is barely perceptible.
 - Login: `.tint` — it is a full-screen field cluster, so a blur buys nothing.
-- Home: `.blur` on the today's-reading panel and the top bar only; `.tint` on everything else.
+- Home: `.blur` on the today's-reading panel **only**; `.tint` on everything else, the top bar included. **Corrected in Phase 6** — this line previously said "and the top bar", and `ds.tsx:499-530` (`TopBar`) contains **no `backdropFilter`**: the prototype's bar is a transparent `div` over the animated background. So the shipped budget on `/` is one `saveLayer`, not two, and `glass_blur_budget_test.dart`'s ceiling for `lib/features/` moved from 2 to 1 with it. The *inventory* above is unchanged and was always right — eight prototype sites, six of them surviving in `ds.tsx` after `PassageCard` is cut with the library.
+- The **radius** is one number for the same reason the tier is: `kGlassBlurSigma` is **24**, which is `HomeScreen.tsx:39`'s own `blur(24px)` — the only site's prototype radius. **Corrected in Phase 6's review pass:** it was `20`, justified in `glass_surface.dart` as "the median of the eight radii", and that was false twice over — the median of `8, 12, 12, 16, 16, 20, 20, 24` is **16**, and Home's panel was never a `20`. There was nothing to compromise between eight radii once only one site blurs, so the surviving site's own number is the only defensible choice. A `BackdropFilter` costs one `saveLayer` **whatever** the sigma, so this is not a frame-budget change and no upper bound is set.
 - Wrap static groups (the result stat rows) in `RepaintBoundary`.
 - A `NeuralTier` derived from `MediaQuery` size and platform frame budget drops to `low` on low-end devices: no orbs, aurora only, at 30% cost.
 
