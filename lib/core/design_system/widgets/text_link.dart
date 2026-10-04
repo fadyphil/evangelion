@@ -22,6 +22,25 @@ import 'package:flutter/material.dart';
 /// It is a control, so §14 applies to it exactly as it applies to a button. The
 /// only reason it is not an `EvaButton` is typography, and saying so is cheaper
 /// than a `Variant`-per-size enum.
+///
+/// ## AND WHY IT HAS **NO** `labelFamily`, WHICH IS THE POINT OF
+///
+/// `EvaButton` has a **required** `labelFamily` (recorded decision 66) and this
+/// widget has none, and the difference is not an oversight.
+///
+/// An `EvaButton` caller **has the payload arm in hand** — `TodayReading.language`,
+/// `ReadingLanguage` — which is why it can be asked. A `TextLink` caller has a
+/// `String` and nothing else: `TextLink(label: strings.createAccount)` on `/login`,
+/// `TextLink(label: strings.startReflection)` on `/`. There is no arm to pass, so a
+/// required family here would be a required argument no caller could answer
+/// correctly, and the two shipped Arabic links rendered `نسيت كلمة المرور؟` and
+/// `أنشئ حسابًا` in **DM Sans** — six tofu boxes each — while `EvaButton`'s label
+/// rendered in Amiri.
+///
+/// So the family is resolved from the ambient `Directionality` by
+/// [arabicAware], which is the arm this widget actually has. The gate is
+/// `test/arabic_typography_test.dart`, which reads the rendered family off `/` and
+/// `/login` rather than trusting the call site.
 class TextLink extends StatelessWidget {
   /// A link labelled [label].
   const TextLink({
@@ -82,15 +101,19 @@ class TextLink extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelLarge!.copyWith(
-              color: ink,
-              // `ds.tsx:277` — `fontWeight: 500`; `LoginScreen.tsx:70` —
-              // `fontWeight: 600`. Six hundred is the call site's emphasis and
-              // 500 is the component's, so 600 is used: a link that is the only
-              // action on a row is emphasised, and the neutral variant at 500 is
-              // a one-word change if that proves wrong.
-              fontWeight: FontWeight.w600,
-            ),
+            style:
+                arabicAware(
+                  Theme.of(context).textTheme.labelLarge!,
+                  Directionality.of(context),
+                ).copyWith(
+                  color: ink,
+                  // `ds.tsx:277` — `fontWeight: 500`; `LoginScreen.tsx:70` —
+                  // `fontWeight: 600`. Six hundred is the call site's emphasis and
+                  // 500 is the component's, so 600 is used: a link that is the only
+                  // action on a row is emphasised, and the neutral variant at 500 is
+                  // a one-word change if that proves wrong.
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
         if (chevron)

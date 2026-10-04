@@ -216,6 +216,16 @@ class EvaTextField extends StatefulWidget {
   /// because §5.1 gives `ink3` the role of "de-emphasised ink" and the prototype's
   /// placeholder is `rgba(#fff | #000, 0.35)` — the same colour `ds.tsx:315` uses
   /// for the field's own `rightIcon`.
+  ///
+  /// ## AND ALL THREE OF THIS WIDGET'S **STRINGS** TAKE THE AMBIENT ARM
+  ///
+  /// [label], [hintText] and [errorText] are all caller-supplied, all localised by
+  /// `LoginStrings`, and none had a family parameter — so on the Arabic arm
+  /// `البريد الإلكتروني` and `كلمة المرور` rendered in **Space Mono** and the other
+  /// two in DM Sans, on the one screen a reader reaches before any content exists.
+  /// Each is wrapped in [arabicAware], which is the whole of the fix and costs no
+  /// constructor argument. The error is the one that mattered most, and
+  /// [ErrorView]'s doc says why: a `Failure.message` is the **server's** text.
   final String? hintText;
 
   /// The text. Owned by the caller: this widget never disposes it, never
@@ -335,8 +345,17 @@ class _EvaTextFieldState extends State<EvaTextField> {
               ),
               // `ds.tsx:305,309` — `F.ui, fontSize: 15, fontWeight: 400,
               // color: T.ink`. `bodyLarge` is Material 3's 16sp slot.
-              style: Theme.of(context).textTheme.bodyLarge!
-                  .copyWith(color: colors.ink),
+              //
+              // **Swapped for the ambient arm**, like the label above. This is the one
+              // run on the widget that is not the app's own string — it is whatever
+              // the reader **types** — and `bodyLarge` is DM Sans, which carries no
+              // Arabic glyph at all, so an Arabic keyboard on the Arabic arm produced
+              // tofu in a field with room for it. Amiri carries ASCII as well, so a
+              // Latin address and a transliterated one both render.
+              style: arabicAware(
+                Theme.of(context).textTheme.bodyLarge!,
+                Directionality.of(context),
+              ).copyWith(color: colors.ink),
               cursorColor: colors.ember,
             ),
           ),
@@ -367,8 +386,10 @@ class _EvaTextFieldState extends State<EvaTextField> {
             // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
             // no equivalent for.
             widget.label.toUpperCase(),
-            style: EvaTypography.monoCaps(colors)
-                .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+            style: arabicAware(
+              EvaTypography.monoCaps(colors),
+              Directionality.of(context),
+            ).copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(height: kEvaTextFieldStackGap),
@@ -496,12 +517,19 @@ class _Placeholder extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.clip,
           softWrap: false,
-          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-            // `colors.ink3`, the same de-emphasised ink `ds.tsx:315` gives the
-            // field's own `rightIcon` and this project's token table gives any
-            // text that is present but not the content.
-            color: colors.ink3,
-          ),
+          // Swapped for the ambient arm, like the label above. The
+          // geometry is untouched — `bodyLarge` is still the style this run was
+          // built from, and only its family is resolved for the direction.
+          style:
+              arabicAware(
+                Theme.of(context).textTheme.bodyLarge!,
+                Directionality.of(context),
+              ).copyWith(
+                // `colors.ink3`, the same de-emphasised ink `ds.tsx:315` gives the
+                // field's own `rightIcon` and this project's token table gives any
+                // text that is present but not the content.
+                color: colors.ink3,
+              ),
         ),
       ),
     ),
@@ -532,8 +560,10 @@ class _ErrorText extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: Theme.of(context).textTheme.bodySmall!
-                .copyWith(color: colors.err),
+            style: arabicAware(
+              Theme.of(context).textTheme.bodySmall!,
+              Directionality.of(context),
+            ).copyWith(color: colors.err),
           ),
         ),
       ],

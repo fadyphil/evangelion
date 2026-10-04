@@ -156,8 +156,27 @@ void main() {
       await tester.tap(find.byIcon(Icons.format_size));
       await pumpReadingFrames(tester, 4);
 
-      final SemanticsData? slider = _nodeLabelled(tester, 'Font size');
-      expect(slider, isNotNull);
+      // **`ReadingStrings.en().fontSize`, and it is a DIFFERENT string from
+      // `textSize`.** `FontSizeStepper`'s slider label used to be the hard-coded
+      // `'Font size'` — the language half of the defect this phase closed — so the
+      // label now comes from the table.
+      //
+      // It is a separate field rather than `textSize` because an earlier version of
+      // this change reused `textSize` for both, on the reasoning that they "name the
+      // same control from two positions". They do not: one names the **button you
+      // press** and the other the **slider it reveals**, and sharing a string put two
+      // nodes on the screen with the identical label. `_nodeLabelled` then returned
+      // the *button's* node — the `isSlider` flag was `false` — which is precisely
+      // the discrimination this lookup exists to make.
+      final SemanticsData? slider = _nodeLabelled(
+        tester,
+        const ReadingStrings.en().fontSize,
+      );
+      expect(
+        slider,
+        isNotNull,
+        reason: 'the track\'s own name, not the button\'s',
+      );
       expect(slider!.flagsCollection.isSlider, isTrue);
       expect(slider.value, '${ReadingCubit.defaultFontStep}');
       // Both directions are offered, so a reader who cannot drag can still press.

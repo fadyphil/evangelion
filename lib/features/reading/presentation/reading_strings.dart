@@ -64,6 +64,9 @@ final class ReadingStrings {
   const ReadingStrings.en()
     : back = 'Back',
       textSize = 'Text size',
+      fontSize = 'Font size',
+      decreaseFontSize = 'Decrease font size',
+      increaseFontSize = 'Increase font size',
       bookmark = 'Bookmark',
       beginReflection = 'Begin reflection',
       unavailableSuffix = 'unavailable in this build',
@@ -81,6 +84,9 @@ final class ReadingStrings {
   const ReadingStrings.ar()
     : back = 'رجوع',
       textSize = 'حجم الخط',
+      fontSize = 'مقياس حجم الخط',
+      decreaseFontSize = 'تصغير الخط',
+      increaseFontSize = 'تكبير الخط',
       bookmark = 'إشارة مرجعية',
       beginReflection = 'ابدأ التأمل',
       unavailableSuffix = 'غير متاح في هذه النسخة',
@@ -106,6 +112,46 @@ final class ReadingStrings {
   /// that widget with a `Text size` tooltip rather than a text button whose label is
   /// its own name.
   final String textSize;
+
+  /// The `FontSizeStepper`'s track, as the slider's own accessible name.
+  ///
+  /// ## A **SEPARATE** STRING FROM [textSize], AND THE TEST THAT PROVED IT
+  ///
+  /// The first version of this change reused [textSize] here, on the reasoning that
+  /// "they name the same control from two positions". They do not: [textSize] names
+  /// the **`Aa` disclosure you press**, and this names **the slider the disclosure
+  /// reveals** — two different nodes, both focusable-adjacent, both announced.
+  ///
+  /// Sharing one string put **two nodes on the screen with the identical label**,
+  /// which is a §14 failure in the one place §14 is unambiguous: a screen-reader user
+  /// hears "Text size" twice and cannot tell the button from the thing it opened.
+  /// `reading_accessibility_test.dart` caught it in the failing direction —
+  /// `_nodeLabelled` found the button's node instead of the slider's and the
+  /// `isSlider` flag was `false`.
+  ///
+  /// So they are two strings, and the Arabic pair is `حجم الخط` (the button) and
+  /// `مقياس حجم الخط` (the scale itself).
+  final String fontSize;
+
+  /// The `FontSizeStepper`'s decrement button, as an `IconActionButton` tooltip and
+  /// accessible name.
+  ///
+  /// **Written here and not left in the design system as a literal**, which is what
+  /// it was. `FontSizeStepper` hard-coded `'Decrease font size'` and
+  /// `'Increase font size'` — so a reader who opened the `Aa` panel on the Arabic arm
+  /// was told, in English, what the two buttons beside them did. `ErrorView.retryLabel`
+  /// is the precedent for the alternative: a design-system widget that renders a
+  /// caller's script takes the caller's string, because a hard-coded English string
+  /// in `core/` is the half-translated UI this app exists not to ship.
+  ///
+  /// And the prototype has no wording to transcribe: `SettingsScreen.tsx:66-68` is a
+  /// bare range input with `−` and `+` and no labels at all, so §14's accessible-name
+  /// requirement forced these two into the client exactly as it forced `back` and
+  /// `textSize`.
+  final String decreaseFontSize;
+
+  /// The `FontSizeStepper`'s increment button. [decreaseFontSize]'s reason.
+  final String increaseFontSize;
 
   /// The bookmark control's accessible name, before any suffix.
   final String bookmark;
@@ -223,6 +269,9 @@ final class ReadingStrings {
   List<(String, String)> get fields => <(String, String)>[
     ('back', back),
     ('textSize', textSize),
+    ('fontSize', fontSize),
+    ('decreaseFontSize', decreaseFontSize),
+    ('increaseFontSize', increaseFontSize),
     ('bookmark', bookmark),
     ('beginReflection', beginReflection),
     ('unavailableSuffix', unavailableSuffix),

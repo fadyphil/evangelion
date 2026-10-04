@@ -253,7 +253,7 @@ final AuthSession liveSession = AuthSession(
 );
 
 /// A [Failure] that says what it is, for the "one section failed" fixtures.
-const Failure readingFailure = Failure(
+const Failure homeReadingFailure = Failure(
   kind: FailureKind.serialization,
   message:
       "Could not read today's reading: `verses` is absent, and a non-empty "

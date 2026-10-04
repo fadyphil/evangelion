@@ -1827,6 +1827,287 @@ clothes. What is decided here is only that the two button labels this phase had 
 are no longer among them, and that the measurement is written down at the two call sites so
 the next reader is not told those screens are whole.
 
+**CORRECTED AND DONE BY THE NEXT PHASE — SEE DECISIONS 74–80 BELOW.** The deferral was
+reasonable and the *diagnosis* was wrong twice over, which is the more useful part:
+
+* the claim that fixing it means a per-arm family on every run is **false**, and it is
+  false for a measured reason — `TextLink(label: strings.createAccount)` has **no arm to
+  pass**. There is no payload behind a link's label, so the required constructor argument
+  that decisions 66 and 71 built for `EvaButton` and `IconActionButton` is *unanswerable*
+  on a `TextLink`. The rewrite was avoided by a function, not deferred;
+* the **measurement itself was incomplete**. Re-measured off the rendered tree with a walk
+  that resolves spans the way the engine does, `/` had **five** wrong Arabic runs of seven
+  — not three — and `/login` had **nine** of ten, not six. The four `/login` runs it missed
+  were `كلمة المرور`, `جديد هنا؟`, `أنشئ حسابًا` and `أو`; the `/` run it missed entirely was
+  the greeting's lead-in, which the old walk could not see at all (decision 76).
+
+So the lesson is decision 73's own, one level up: **a measurement written in a doc comment
+is a claim, and §9's rule is that a claim is only as good as the test that checks it.** There
+was none. There is now — `test/arabic_typography_test.dart`, over all six screens.
+
+
+### Recorded decisions — bilingual typography (decision 73's follow-up)
+
+**74. THE ARABIC ARM'S FAMILY IS RESOLVED BY **ONE FUNCTION**, AND THE AMBIENT
+**`TextDirection`** IS ITS INPUT.** `arabicAware(style, direction)` and
+`arabicAwareFamily(direction, latin)` in `core/design_system/tokens/eva_typography.dart`,
+applied as `arabicAware(theme.bodyMedium!, Directionality.of(context))` — one expression
+per run, and **no constructor anywhere in the app gained an argument.**
+
+**Why this is cheaper than threading a family, which is what Phase 7 refused and why
+Phase 7 was right to.** The measurement that settles it is not a line count, it is this:
+`TextLink(label: strings.createAccount)`, `SocialAuthButton(label: strings.continueWithGoogle)`,
+`HairlineDivider(label: strings.divider)` and `EvaTextField(label: strings.emailLabel)` have
+**no arm to pass**. There is no payload behind a chrome label. Decisions 66 and 71 made
+`EvaButton.labelFamily` and `IconActionButton.tooltipFamily` **required** precisely because
+their callers hold the arm — `TodayReading.language`, `ReadingLanguage` — and the
+"requiredness is the whole value" argument only works where the argument is answerable. On a
+`TextLink` it is not: the honest required argument is the locale, which is the ambient
+direction, which is what `arabicAware` takes. Parameter threading would have added a
+required argument to **six** design-system widgets plus a family expression at every feature
+run site, in order to reach a value the design system could have read for itself.
+
+Four alternatives, all rejected:
+
+- **A `TextTheme` whose Arabic slots resolve to Amiri.** **Not available, and this is a
+  framework fact rather than a preference.** `MaterialApp` takes one `theme:` and one
+  `darkTheme:` and has **no per-locale theme hook**, so there is nowhere to put a second
+  text theme for the engine to choose between. Every design system that appears to do this
+  is switching one at runtime in `MaterialApp.builder`; that is a theme swap, and on this
+  app it would swap `TextTheme` for the whole screen rather than resolve a run's family.
+- **Reading `Localizations.localeOf` inside a Tier-1 primitive.** Decisions 66 and 71 reject
+  this and the rejection stands: an English label and an Arabic one would travel the same
+  invisible code path. `arabicAware` takes the direction **as a parameter**, so every call
+  site names the ambient source in full — `Directionality.of(context)` — and a reviewer can
+  see it. It also adds no second decision: decision 61 established that direction comes from
+  the locale through `MaterialApp`, so there is nothing new to keep in step, and `lib/` still
+  contains **no `Directionality` this client installs** and **no `startsWith('ar')`**.
+- **A shape test on each run's own script.** Decision 29 rejects one for this family of
+  widget for a measured reason (it breaks on a verse opening with a numeral or a bracket, and
+  §5's live payload opens one behind a `‹Verily`), and it would be a per-run scan on every
+  frame of a scrolling list.
+- **Parameter threading.** Phase 7's reviewer already called it "a screen rewrite wearing a
+  parameter's clothes"; this is that rewrite with a constructor on each end of it.
+
+**And the one thing this rule depends on, stated because it is a dependency.** RTL implies
+Arabic **because `app.dart` declares exactly `supportedLocales: [Locale('en'), Locale('ar')]`
+** and only `ar` is right-to-left. A third, non-Arabic RTL locale would make it false. The
+failure would be **loud**: `arabic_typography_test.dart` asserts every rendered Arabic run is
+in Amiri **and** that Amiri carries every character on screen, so a Hebrew run in Amiri fails
+the second assertion on the first frame it is painted. A gate that reports the wrong family
+is worth more here than a font swap that looks correct.
+
+**75. THE PER-ARM `*FamilyFor` SWITCHES AND THE TWO REQUIRED FAMILY PARAMETERS **STAY**,
+AND THE SEAM IS TWO DIFFERENT QUESTIONS, NOT A DUPLICATE SOURCE OF TRUTH.**
+
+| the run | where its arm comes from | the mechanism |
+| --- | --- | --- |
+| payload content — the preview, the citation, the CTA label, the caption, the marker | `TodayReading.language` / `ReadingLanguage`, **the fact the server sent** | the existing `*FamilyFor` switches and `EvaButton.labelFamily` / `IconActionButton.tooltipFamily` |
+| the app's own chrome — every label, link, hint, error, tooltip and status line | the ambient locale, because there is no payload | `arabicAware` |
+
+Zero lines of decision 54, 66 or 71 were changed. The seam looks like the "dual source of
+truth for one value" shape that decisions 5 and 68 removed, and it is not: the payload arm
+and the ambient arm are different facts, and they survive each other disagreeing — which is
+the property that matters if a locale switch and a fetch ever race. Recorded because a reader
+who sees two mechanisms for "which family" will otherwise unify them, and unifying them means
+deleting one.
+
+**76. THE WALK RESOLVED `TextSpan`s WITH `??` WHERE THE ENGINE USES A **MERGE** — AND THE
+MERGE'S BASE/OTHER ORDER IS LOAD-BEARING. THE FIXED WALK REPORTED A **CORRECT** RENDER AS
+TOFU, IN BOTH DIRECTIONS.**
+
+The promoted walk is `test/support/arabic_typography_gate.dart`. Promoting it to all six
+screens found five bugs in it, and **every one was found because it disagreed with the
+engine**:
+
+1. a `Tooltip` paints nothing until a gesture, so the walk is `Future`-returning (decision
+   71's fix, kept);
+2. a `TextSpan` with **no** style of its own inherits its parent's — decision 71's second
+   fix, kept;
+3. **a `TextSpan` that styles only *some* fields inherits the rest.** `TextSpan.build`
+   **pushes** styles onto a `ui.ParagraphBuilder` and pops them, so a child carrying only a
+   colour **keeps its parent's family**. `??` read that child's family as `null` and
+   substituted the ambient fallback, reporting **`monospace`** for `_Greeting`'s Arabic
+   lead-in `صباح الخير، ` — a run that renders in Cormorant Garamond. **A correct render
+   reported as tofu**, which is worse than no gate: it trains its readers to ignore it.
+4. and the repair's **base/other order was backwards.** `TextStyle.merge` reads "a copy of
+   **this** where the non-null fields in **other** have replaced the corresponding null
+   fields in **this**" — so the **parent is the base**. Written the other way, the parent
+   wins every field. Bug 3's plant cannot see this (a child carrying only a colour gets the
+   parent's family either way); it took a **second** plant — a child naming its *own* family
+   under a parent naming a different one — to see it, and that plant reported Cormorant for a
+   run that renders in Amiri.
+5. the redundant `find.byType(Text)` pass is **deleted**. `Text` always builds a `RichText`
+   and `Text.build` puts the **merged** ambient style on a root span with the widget's own
+   span as a **child**, so the `RichText` pass already reports every `Text`'s family as the
+   engine resolves it — and the second pass reported it differently and worse: measured,
+   `monospace` against `DMSans` for the same run on the stub screens.
+
+**And a measurement both this file and the walk it replaces got wrong, in the same place.**
+`MaterialApp` installs its own `DefaultTextStyle`, `_errorTextStyle` — `debugLabel`:
+*"fallback style; consider putting your text in a Material"*, `fontFamily: 'monospace'` — so
+the **outermost** provider's family is **`monospace`**, which `pubspec.yaml` does not
+declare, so the engine's default font renders it. That is **not** what a style-less run
+renders in: a `Tooltip` with no `textStyle` — decision 71's defect — resolves to **`DMSans`**,
+because its content is built inside the `Material` and `Material` installs `bodyMedium`.
+**Decision 71's documented mechanism is correct and measured**, and it is re-asserted in
+`arabic_typography_gate_test.dart` so the next reader who measures `monospace` does not
+"correct" it in the other direction. `materialAppDefaultFamily` names the narrow question it
+answers, and it is public because `expectNoTofuInAnyRun` now treats an **undeclared** family
+as a **finding** rather than skipping it — which is how the `monospace` misreporting was
+found in the first place, since the old walk skipped every undeclared family and so passed
+the runs it had got wrong.
+
+**77. A `Failure.message` IS THE **SERVER'S** TEXT, AND **THREE** SITES RENDER IT — TWO OF
+WHICH REASONED ABOUT IT IN PROSE.**
+
+`streak_flame_row.dart` carried a ten-line comment arguing that `ApiErrorMapper` and
+`TodayReadingMapper` "write **English ASCII literals** naming the key that was wrong — there
+is no Arabic in the vocabulary", and used that claim as the load-bearing justification for a
+Latin family on a string this client does not control. `api_error_mapper.dart` says
+`message: decoded?.message ?? 'HTTP $status'` — so when the server sends a message, which is
+**the normal case** and is every one of the eight observed bodies in
+`api_error_mapper_test.dart`, `Failure.message` carries **the server's own text**. The
+premise was contradicted by the code two files away.
+
+**The claim is deleted rather than repaired, because the reasoning was the defect.** It
+reasoned about what the server might send, which is not a fact this client has. The answer is
+not a better guess but a face that needs none: measured over the bundled `cmap`s, Amiri
+carries U+0600–U+06FF (255 codepoints), U+0750–U+077F, both Arabic Presentation Forms blocks
+(611 and 140), **all 95 printable ASCII codepoints and all 96 Latin-1 ones**. So under RTL it
+renders the server's message correctly whichever script arrives, and under LTR it is exactly
+the Latin face it always was.
+
+**The other two sites, and they did not even have a comment.**
+`ErrorView`'s `message` was `titleMedium` — DM Sans, no Arabic at all — on the one screen
+where something has already gone wrong. `TodayReadingPanel`'s failed state reaches it with
+`state.readingFailure?.message`, so **two** of the three are on `/` and the third is wherever
+`ErrorView` is next used. All three now resolve from the ambient arm. `ErrorView`'s
+`retryFamily`/`retryLabel` pair is the precedent that makes this cheap, and it is worth
+naming that its own doc had already rejected the thing this decision needed: "a second
+English string invented in the design system would be a second thing to translate", and
+hard-coding a **family** was the same mistake one layer down.
+
+**78. `FontSizeStepper`'s THREE STRINGS ARE THE CALLER'S, VIA `FontSizeStepperLabels` — AND
+THE TRACK'S LABEL MUST **DIFFER** FROM THE `Aa` BUTTON'S, WHICH AN EXISTING TEST PROVED.**
+
+They were `'Decrease font size'`, `'Increase font size'` and `'Font size'`, hard-coded in
+`core/`, so a reader who opened the `Aa` panel on the Arabic arm was told **in English** what
+the two buttons beside them did. `ErrorView.retryLabel` is the precedent: a design-system
+widget that renders a caller's script takes the caller's string, because "a hard-coded English
+string in `core/` is the half-translated UI this app exists not to ship".
+
+One value class rather than three `String` parameters, because §4's named-parameters rule
+makes three parameters on a widget that also takes `step` and `onChanged` five at every call
+site, and a caller can put the increase label in the decrease slot with nothing to catch it —
+`EvaButtonStyle` and `EvaTextFieldStyle` are the precedent for one value object per widget's
+treatments. **No defaults**, so the next design-system widget cannot reintroduce the same
+English by omission.
+
+**And the track's label is a DIFFERENT STRING from the `Aa` tooltip's, which
+`reading_accessibility_test.dart` caught in the failing direction.** The first version reused
+`ReadingStrings.textSize` for both, on the reasoning that "they name the same control from two
+positions". They do not: one names the **button you press** and the other the **slider it
+reveals**, and one string put **two nodes on the screen with the identical label** — a §14
+failure in the one place §14 is unambiguous. `_nodeLabelled` then returned the *button's* node
+and `isSlider` was `false`. So `ReadingStrings` gained `fontSize` (`'Font size'` /
+`'مقياس حجم الخط'`) beside `textSize` (`'Text size'` / `'حجم الخط'`).
+
+**79. THE GATE IS THE DELIVERABLE, IT IS ON **ALL SIX** SCREENS, AND THREE OF THEM REPORT
+THEMSELVES **VACUOUS**. `test/arabic_typography_test.dart` over
+`test/support/arabic_typography_gate.dart`; the harness's own anti-vacuity suite is
+`test/support/arabic_typography_gate_test.dart`.
+
+**The declared set, not a count.** `expectedArabic` is compared for equality in **both**
+directions, because a count cannot catch the failure that matters most: a run silently
+vanishing makes "every Arabic run is Amiri" **vacuously true**, and §7's "a gate that cannot
+fail is worse than no gate" has never had a quieter costume. A declared list of the runs that
+*should* be there cannot be satisfied by their absence, and a new run is red by name.
+
+**Every declared list is built from the string tables and the payload fixtures, not typed.**
+The first version was Arabic literals and **four of them were wrong on the first run** — a
+missing combining mark is invisible in a diff, and the failure then reads as "the widget
+rendered the wrong string" rather than "the test typed the wrong string". A hand-typed
+Arabic list in a test is a second copy of the corpus; this one is not.
+
+**Three of the six screens are stubs, and their gates are installed anyway.** `/quiz`,
+`/result` and **`/settings`** — the brief named two, §2's route table names three — render
+`Placeholder for /quiz` and nothing else, so their Arabic lists are empty and each one passes
+a `vacuousBecause` saying why and which phase writes the screen. That is §7's rule applied
+literally: "report that honestly rather than calling it a pass". Each is proved capable rather
+than assumed capable: a per-screen mutation gives each one its **first** Arabic run in DM Sans
+and each fails naming the string. §8's rule — "**A gate whose target directory does not exist
+yet**" — is about a missing directory; a screen with no Arabic is the same shape, and the
+honest word is *vacuous*, not *pass*.
+
+**Per-screen mutations, run one screen at a time.** Forcing one Arabic run to DM Sans:
+
+| screen | planted at | tests red, attributed to that screen |
+| --- | --- | --- |
+| `/` | `_StreakSubtitle`'s style | **3** |
+| `/login` | `SocialAuthButton`'s label | **2** |
+| `/reading` | `FontSizeStepper`'s decrement tooltip | **1** |
+| `/quiz` | the stub body's first Arabic run | **1** |
+| `/result` | the stub body's first Arabic run | **1** |
+| `/settings` | the stub body's first Arabic run | **1** |
+
+Nine attributed failures from six one-line edits. A single screen with a gate is a gate with
+one screen in it.
+
+**And the mechanism's own two degenerate states, which are **not** per screen and are
+reported as such.** Forcing `arabicAware` to `return style;` and `arabicAwareFamily` to
+`return latin;` turns **8** red: three on `/`, two on `/login`, one on `/reading`'s `Aa`
+disclosure, and the two `arabicAware` unit tests. **`/reading`'s main arm does not go red,
+and that is correct**: its Arabic families come from decision 54's per-arm switches, which
+this phase did not touch, because `/reading` was never broken. The three stubs do not go red
+either, and that is also correct — a mutation to a helper cannot affect a screen with no call
+site for it, which is why their capability is proved by the per-screen plant above rather
+than by this one. **The brief's expectation that "every gate goes red" is wrong for `/reading`
+and for the stubs, and the reason is structural rather than a gap.**
+
+`/reading`'s nine-site table stays in `reading_glyph_test.dart`, because it is reading-specific:
+it names each prototype line, asserts each site by what it *renders*, and walks the verse
+markers, which are `TextSpan`s inside a paragraph that `find.byType(Text)` cannot see. What
+was promoted is the general half, and `reading_glyph_test.dart` now imports it.
+
+**80. TWO THINGS THIS PHASE FOUND AND **DID NOT** FIX, WITH WHAT THE NEXT PHASE INHERITS.**
+
+**The `/login` validator's two messages are English literals, and the fix is a domain
+change.** `kRequiredMessage = 'This field is required'` and
+`kShortPasswordMessage = "That password's too short"` live in
+`features/auth/domain/login_credentials.dart` — a **pure-Dart** file, which by Gate 1 has no
+`Locale` and therefore *cannot* pick an arm. On the Arabic arm of `/login` two English
+sentences render in the right family. The fix is a validation-**code** enum on
+`LoginValidation` plus a message in `LoginStrings`, which changes `AuthState`'s public shape
+and is a domain decision a typography gate does not own. **This phase fixed the family** — the
+error text is wrapped in `arabicAware`, so the moment the message is Arabic it renders — and
+`arabic_typography_test.dart` **pins the English wording**, so the day someone localises it
+that test goes red and points at this decision. A recorded gap that is pinned is a gap that is
+tracked; the same wording in a doc comment is the thing decision 73 was about.
+
+**The two recorded limits I was asked to rule on: I AGREE WITH BOTH, and one of them has a
+consequence worth writing down.**
+
+*Phase 7's `splitDropCap` repairs the surrogates it **introduces** and cannot repair a string
+that arrived malformed.* Correct, and the honest place for the repair is a **mapper** rule,
+not a string function. `RenderParagraph` throws `ArgumentError: string is not well-formed
+UTF-16`, and nothing between `features/reading/data/` and the engine catches it — so a single
+malformed verse takes the whole panel, which is the same "an exception crossing the seam"
+hazard §3's LSP row forbids at the repository boundary. "Is this verse usable?" is the same
+question as "is this verse empty?", which `today_reading_mapper.dart` **deliberately does not
+answer**, and it should be answered **once**, in one place, for both. That is Phase 8's, when
+`text_clean` is read. Recorded, not fixed: the alternative is validation in a string helper,
+which is a shape test and would make the decision about a *corpus* rather than about a
+*function*.
+
+*Phase 7 did **not** strip a leading combining mark before the drop cap, on the grounds that
+stripping marks is a shape test and decision 29 rejects one for this widget.* Agree, and the
+exposure is smaller than the decision implies: the split is only reached for the **Latin**
+arm (decision 29 makes the drop cap Latin-only), so the string at risk is an NKJV verse opening
+with a bare `\u0301`, which the corpus does not produce. The refusal also has the right
+*shape* of reason — the fix and the decision are the same shape, and a fix that is the same
+shape as the thing it would override is not a fix.
+
 
 ## 7. Verification — run before reporting done
 

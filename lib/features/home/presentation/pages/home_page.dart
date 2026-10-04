@@ -443,11 +443,23 @@ class _Greeting extends StatelessWidget {
           // `headlineMedium` is 28sp and is what `EmptyState.titleStyle` already
           // chose for this design system against the same requirement; see that
           // method's doc for the 1.22×/320px arithmetic.
-          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-            fontWeight: FontWeight.w600,
-            height: 1.1,
-            letterSpacing: -0.01,
-          ),
+          //
+          // **Swapped for the ambient arm at the ROOT, not on the two spans.** The
+          // lead-in and the name carry `TextStyle(color: …)` and nothing else, so the
+          // engine resolves their family by *merging* them over this span's style —
+          // wrapping this one line fixes both runs and cannot leave one of them out.
+          // Done per span instead it would have been two `arabicAware` calls whose
+          // outputs must agree, and the third instance in this repository of two
+          // copies of one rule is what recorded decision 69 is about.
+          style:
+              arabicAware(
+                Theme.of(context).textTheme.headlineMedium!,
+                Directionality.of(context),
+              ).copyWith(
+                fontWeight: FontWeight.w600,
+                height: 1.1,
+                letterSpacing: -0.01,
+              ),
         ),
         const SizedBox(height: EvaSpacing.sm + 2),
       ],
@@ -517,8 +529,14 @@ class _StreakSubtitle extends StatelessWidget {
             ? strings.streakGlowing
             : strings.streakResting,
         // `HomeScreen.tsx:30` — `F.ui 14 / 400 / ink2 / marginTop 6`.
-        style: Theme.of(context).textTheme.bodyMedium!
-            .copyWith(color: context.colors.ink2),
+        //
+        // Swapped for the ambient arm: on the Arabic arm this run is
+        // `ابدأ سلسلة اليوم. يكفي قراءة واحدة.` and `bodyMedium` is DM Sans, which
+        // carries no Arabic glyph at all.
+        style: arabicAware(
+          Theme.of(context).textTheme.bodyMedium!,
+          Directionality.of(context),
+        ).copyWith(color: context.colors.ink2),
       ),
     );
   }
