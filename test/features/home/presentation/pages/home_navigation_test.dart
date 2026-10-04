@@ -17,9 +17,10 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/home_strings.dart';
@@ -172,20 +173,40 @@ void main() {
           daysToMilestone: 3,
         ),
       );
-      h.readings.answer = const Result<TodayReading>.success(
-        TodayReading(
+      // A **wide** entity, because `TodayReading` is a view of this one now and a
+      // narrow one has no way to say "five verses" — the count was the only thing
+      // the old fixture varied besides the reference.
+      h.readings.scripture = const Result<ScriptureText>.success(
+        ScriptureText(
           readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           groupId: 3,
           scheduledDate: '2026-10-03',
           language: ReadingLanguage.english,
           reference: 'John 4:1-14',
           translation: 'NKJV (New King James Version)',
-          verseCount: 5,
-          firstVerseText:
-              'When therefore the Lord knew that the Pharisees had heard that '
-              'Jesus made and baptized more disciples than John,',
-          questionCount: 1,
-          answeredQuestionCount: 0,
+          verses: <Verse>[
+            Verse(
+              bookNumber: 43,
+              chapter: 4,
+              number: 1,
+              text:
+                  'When therefore the Lord knew that the Pharisees had heard that '
+                  'Jesus made and baptized more disciples than John,',
+            ),
+          ],
+          // One question, **unanswered** — which is what
+          // `answeredQuestionCount: 0` meant, and is now a property of the list.
+          questions: <Question>[
+            Question(
+              id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+              sortOrder: 1,
+              type: 'mcq',
+              prompt: "Whose disciples outnumbered John's?",
+              options: <String, String>{'A': 'Jesus', 'B': 'John'},
+              pointsValue: 10,
+              alreadyAnswered: false,
+            ),
+          ],
           isFullyCompleted: false,
           pointsEarnedToday: 10,
           currentStreak: 4,

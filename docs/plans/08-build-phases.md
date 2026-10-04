@@ -93,11 +93,13 @@ Then `AuthBloc` → `LoginPage`. Real `TextField`s, real validation, real error 
 
 ### Phase 7 — `reading` feature
 
-`ScriptureText`/`Verse`/`Question` entities · the **remote data source** (`GET /readings/today/{en,ar}`) and its **mapper** · one `ReadingPage` for both languages · `ScriptureBlock`/`ScriptureVerse` with `WidgetSpan` drop cap · `ReadingControls` direction-aware · `StickyCta` · `ReadingCubit` (font scale and verse numbers, which come from `SettingsRepository`).
+`ScriptureText`/`Verse`/`Question` entities · the **remote data source** (`GET /readings/today/{en,ar}`) and its **mapper** · one `ReadingPage` for both languages · `ScriptureBlock`/`ScriptureVerse` with `WidgetSpan` drop cap · `ReadingControls` direction-aware · `StickyCta` · `ReadingCubit` (the font step; **no** verse-number flag and **no** `SettingsRepository` — see decisions 56 and 57).
 
-**Fixes #2 here** — Arabic never uses the mono family. Test: assert no `Text` widget in the AR tree has a `Space Mono` font family.
+**Fixes #2 here** — Arabic never uses the mono family, at **nine** sites and not two ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §2, decision 54), and the prototype's nine turned out to be the **floor**: three more Arabic sites exist only in this client because §14 gave four unlabelled prototype buttons accessible names. Test: `reading_glyph_test.dart` parses the five bundled TTFs and asserts every character it walks is carried by the family that renders it — strictly stronger than "no `Text` has a Space Mono family", which passes for a screen that rendered nothing. **It used to say "every character on the screen" and that was false by thirty tofu boxes**, because a `Tooltip` paints nothing until a gesture: the walk is now `Future`-returning and holds each tooltip open past `kLongPressTimeout` before it reads the tree.
 
-**Verify:** a mapper test asserting `text_clean` maps to `null` for the English payload, where the key is **absent** rather than empty ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §5, trap 2); a test that a `409` on a duplicate answer becomes a typed `Failure`, never a thrown exception.
+**Verify:** a mapper test asserting `text_clean` maps to `null` for the English payload, where the key is **absent** rather than empty ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §5, trap 2).
+
+> **The `409` clause is Phase 8's, not this phase's.** `POST /readings/:id/submit` is the quiz feature's call, and no submit request is made from `/reading`. The mapping itself is already covered — `api_error_mapper_test.dart` asserts a `409` becomes a typed `Failure` rather than a thrown exception — so nothing is deferred; the endpoint simply does not exist yet to be called.
 
 ### Phase 8 — `quiz` + `result` features
 

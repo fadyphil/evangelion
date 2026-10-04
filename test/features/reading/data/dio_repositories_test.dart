@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -447,25 +449,36 @@ void main() {
 final class _FakeReadingRepository
     implements ReadingRepository, StreakRepository {
   @override
-  Future<Result<TodayReading>> today({
+  Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
-  }) async => Result<TodayReading>.success(
-    TodayReading(
+  }) async => Result<ScriptureText>.success(
+    ScriptureText(
       readingId: 'fake',
       groupId: 3,
       scheduledDate: '2026-10-03',
       language: language,
       reference: 'fake',
       translation: 'fake',
-      verseCount: 0,
-      firstVerseText: 'fake',
-      questionCount: 0,
-      answeredQuestionCount: 0,
+      verses: const <Verse>[
+        Verse(bookNumber: 43, chapter: 3, number: 1, text: 'fake'),
+      ],
+      questions: const <Question>[],
       isFullyCompleted: false,
       pointsEarnedToday: 0,
       currentStreak: 0,
     ),
   );
+
+  /// The port defines [today] as a narrowing of [todayScripture], and this fake
+  /// takes the same route `DioReadingRepository.today` takes rather than a second
+  /// one — the substitutability assertion in this file is only meaningful if the
+  /// substitute is shaped like the thing it substitutes for.
+  @override
+  Future<Result<TodayReading>> today({
+    required ReadingLanguage language,
+  }) async =>
+      (await todayScripture(language: language))
+          .map((ScriptureText scripture) => scripture.toTodayReading());
 
   @override
   Future<Result<StreakSummary>> summary() async =>

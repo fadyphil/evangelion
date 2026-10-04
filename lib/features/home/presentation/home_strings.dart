@@ -93,6 +93,29 @@ final class HomeStrings {
       startReflection = 'ابدأ التأمل',
       retry = 'حاول مرة أخرى';
 
+  /// Whether this arm is Arabic.
+  ///
+  /// ## WHY IT IS A COMPARISON AND NOT A STORED FIELD
+  ///
+  /// `ReadingStrings.isArabic` is the precedent and gives the whole argument: a
+  /// `bool` field would be a second source of truth for the same fact as the nouns
+  /// being Arabic, and the two could disagree. Comparing one field against the
+  /// Arabic arm's is the same fact read from the other side, and it cannot drift
+  /// from the strings it governs — so a translation that made `streakLabel`
+  /// identical in both arms would turn this to `false`, which is the right answer
+  /// for "is there any Arabic in here to render".
+  ///
+  /// **Added in Phase 7, for one caller.** `EvaButton.labelFamily` became required,
+  /// and `TodayReadingPanel`'s **failed** state has no reading to read an arm from,
+  /// so `strings` is the only thing this widget is handed that knows. See
+  /// `TodayReadingPanel.retryFamilyFor`.
+  ///
+  /// **`streakLabel`, not `greetingSeparator`.** The separator is the one field
+  /// whose doc says the arms "genuinely differ", which makes it a tempting sentinel
+  /// — and it is the wrong one, because a comma's script says nothing about whether
+  /// the sentence around it is Arabic. A noun does.
+  bool get isArabic => streakLabel == const HomeStrings.ar().streakLabel;
+
   /// The product's name, in the top bar. `ds.tsx:508`.
   final String wordmark;
 

@@ -69,11 +69,49 @@ const double kPreviewBoundaryFraction = 0.2;
 /// can end a few code units short of [maxChars], and one can be cut at a combining
 /// mark. Neither is visible at 17px, and Phase 7 — which renders whole paragraphs
 /// rather than a preview — is the phase that would care.
+///
+/// ## AND THE CUT IS **NEVER** BETWEEN THE TWO HALVES OF AN ASTRAL CHARACTER
+///
+/// Being a code-unit budget is fine; being **half a character** is not. `substring(0,
+/// maxChars)` on `'x' * 55 + '\u{1F600}'` at the default 56 leaves U+D83D — the
+/// emoji's **high surrogate** — as the last unit, and that is not a truncated emoji,
+/// it is not a character, and `RenderParagraph` throws `ArgumentError: string is not
+/// well-formed UTF-16` on it out of
+/// `_RenderScaledInlineWidget.performLayout`. Because the panel's two controls are
+/// the `_Preview`'s own children, `Continue` → `/reading` and `Start reflection` →
+/// `/quiz` both disappear with it.
+///
+/// **The surface is wider than the drop cap's.** `splitDropCap`'s identical bug is
+/// reachable only at index 0 of a verse; this one is reachable at **any** offset
+/// inside the first 56 code units of verse one, so an emoji anywhere in the opening
+/// of today's reading — not only at its start — is what puts a lone surrogate into
+/// `/`'s preview.
+///
+/// So the budget is spent in whole characters: if the last unit taken is a high
+/// surrogate, it is given back and the preview is one code unit shorter. The cost is
+/// stated because it is real and invisible: **55 characters and a half** is not a
+/// preview length, and §9's rule is that a number in a doc is a claim about
+/// something. The alternative — spending *more* than the budget to keep the pair —
+/// is worse: a preview that overflows its panel is visible, and one that is short is
+/// not.
+///
+/// **And the guard runs before the word-boundary back-up**, because that is the
+/// order that makes the fix total: the boundary search runs on [taken], and a
+/// dangling surrogate is not a space, so a text with spaces either loses it by
+/// accident or keeps it. Guarding afterwards would be a fix that works on some
+/// inputs.
 String previewText(String text, {int maxChars = kPreviewMaxChars}) {
   if (text.length <= maxChars) {
     return text;
   }
-  final String taken = text.substring(0, maxChars);
+  String taken = text.substring(0, maxChars);
+  // A high surrogate (U+D800–U+DBFF) is legal in `taken` only when the **next**
+  // unit is a low surrogate (U+DC00–U+DFFF). The next unit is beyond the cut, so a
+  // high surrogate in the last position is always the first half of a pair this
+  // function just cut in half.
+  if (isHighSurrogate(taken.codeUnits.last)) {
+    taken = taken.substring(0, taken.length - 1);
+  }
   final int floor = maxChars - (maxChars * kPreviewBoundaryFraction).floor();
   final int lastSpace = taken.lastIndexOf(' ');
   final String body = lastSpace >= floor
@@ -81,3 +119,10 @@ String previewText(String text, {int maxChars = kPreviewMaxChars}) {
       : taken;
   return '$body$kPreviewEllipsis';
 }
+
+/// Whether [codeUnit] is a UTF-16 **high** surrogate — U+D800 through U+DBFF.
+///
+/// A named predicate rather than a literal comparison at the one call site, because
+/// "the first half of a surrogate pair" is the concept and `0xD800` is not, and
+/// because a reader who has to re-derive the range will get it wrong.
+bool isHighSurrogate(int codeUnit) => codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
