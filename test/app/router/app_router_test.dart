@@ -8,6 +8,7 @@ import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
@@ -36,6 +37,22 @@ AppRouter routerFor(
   FakeAuthStatus status, {
   ReevaluateListenable? authChanges,
 }) => AppRouter(status, authChanges ?? _SilentAuthChanges());
+
+/// A graded answer for the router suite.
+///
+/// **A transcription, not a capture** — §5 trap 10 records that no successful submit
+/// has ever been observed against this backend, so `contract_payloads.dart` is where
+/// the shape comes from. The router suite needs *a* `SubmitResult` to push `/result`
+/// with, and this is the one the rest of the phase agrees on.
+const SubmitResult kAContractSubmitResult = SubmitResult(
+  questionId: 'question-group-3',
+  isCorrect: true,
+  pointsEarned: 10,
+  currentTotalPoints: 40,
+  currentStreak: 4,
+  longestStreak: 6,
+  readingCompleted: true,
+);
 
 void main() {
   setUp(resetServiceLocator);
@@ -417,40 +434,90 @@ void main() {
     // Phase 4's second verification line: "a router test that a cold push of
     // `/result` renders `EmptyState` rather than calling the API".
     //
-    // **THE FIRST HALF OF THAT SENTENCE IS NOT TRUE OF THIS PHASE**, and the
-    // difference is worth stating rather than engineering around. `/result` is
-    // still the Phase-0c stub: `Scaffold` + `AppBar` + a `Text`. `EmptyState`
-    // exists (`core/design_system/widgets/empty_state.dart`, goldened in Phase 3)
-    // but no page uses it — `08-build-phases.md` Phase 10 is what wires `EmptyState`
-    // into every async page, and retrofitting it here would be Phase 4 writing a
-    // screen, which the phase forbids. So this pins what the route ACTUALLY
-    // renders, and dates it.
+    // **BOTH HALVES OF THAT SENTENCE ARE NOW FALSE, AND BOTH ARE PROGRESS.**
     //
-    // The second half is true, and structurally so: `core/network` is Phase 5's,
-    // so there is no client in the graph for a data-driven screen to call with.
-    // `navigation_injection_test.dart` pins that graph is exactly what Phase 4
-    // declares.
-    testWidgets('builds the Phase-0c stub, which is a placeholder, not an '
-        'EmptyState', (WidgetTester tester) async {
+    // `/result` is no longer the Phase-0c stub (`Scaffold` + `AppBar` + a `Text`);
+    // `08-build-phases.md` Phase 8 built it, so the `EmptyState` assertion Phase 4
+    // left behind as a tripwire has fired and this is the swap it was watching for.
+    //
+    // And the second half is now false in the more interesting way: there **is** a
+    // client in the graph, and `ResultPage` genuinely cannot call it — it is a pure
+    // function of a `SubmitResult` handed to its constructor. There is no
+    // repository, no use case and no endpoint behind `/result`; the submit response
+    // lives in `QuizBloc.lastResult` and nowhere else.
+    //
+    // ## SO THIS GROUP NO LONGER PUSHES A PATH AT ALL — AND THAT IS THE POINT
+    //
+    // `ResultRoute` takes a required `result`, so `ResultRoute.page` cannot be
+    // built from a bare `/result`. A `pushPath(AppRoutes.result)` therefore does not
+    // reach the screen. This suite **finds that out by accident**: the first version
+    // of this test did `unawaited(router.pushPath(AppRoutes.result))`, the route
+    // silently failed to build, `currentPath` stayed on `/`, and the assertion that
+    // used to say "the stub is on screen" failed with
+    //
+    //     Expected: '/result'
+    //       Actual: '/'
+    //
+    // The three assertions below make that deliberate instead of accidental, and the
+    // second one is the one that matters: **a deep link to `/result` cannot show a
+    // graded answer, because there is no way to fetch one.** Pushed cold, the
+    // screen stays down. The only way in is `QuizPage`'s terminal `finish` arm,
+    // `quiz_page.dart`'s `context.router.push(ResultRoute(result: result))`, and
+    // `quiz_page_test.dart` covers that path with a real `QuizBloc`.
+    testWidgets('a path-only push builds NO screen, because there is nothing to '
+        'show', (WidgetTester tester) async {
       final AppRouter router = routerFor(FakeAuthStatus());
       addTearDown(router.dispose);
 
       await tester.pumpWidget(routerHost(router));
       await pumpUntilFound(tester, find.byType(HomePage));
 
-      unawaited(router.pushPath<void>(AppRoutes.result));
+      // `await`ed, and the completion value asserted, rather than `unawaited` +
+      // `pumpUntilFound`. `unawaited` is what hid the failure in the first version:
+      // the push rejected, the rejection went nowhere, and the test went on to
+      // assert about a screen it never reached.
+      final bool? reached = await router
+          .pushPath<bool>(AppRoutes.result)
+          .then<bool?>((bool? _) => true, onError: (Object _) => false);
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        reached,
+        isFalse,
+        reason:
+            '`/result` is pushed with a graded answer, never by path. `ResultRoute` '
+            'requires `result`, so building the page from a bare path has to fail '
+            '— and it must fail here, at the boundary, not render a screen full of '
+            'zeroes',
+      );
+      expect(find.byType(ResultPage), findsNothing);
+      expect(router.currentPath, AppRoutes.home);
+    });
+
+    testWidgets('and the screen that does exist is not a placeholder', (
+      WidgetTester tester,
+    ) async {
+      // The other half of Phase 4's assertion, inverted. Pushed **with** a submit
+      // response, the route builds and the placeholder text is gone.
+      final AppRouter router = routerFor(FakeAuthStatus());
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(routerHost(router));
+      await pumpUntilFound(tester, find.byType(HomePage));
+
+      unawaited(router.push<void>(ResultRoute(result: kAContractSubmitResult)));
       await pumpUntilFound(tester, find.byType(ResultPage));
 
       expect(router.currentPath, AppRoutes.result);
       expect(find.byType(ResultPage), findsOneWidget);
       expect(
-        find.byType(EmptyState),
+        find.text('Placeholder for ${AppRoutes.result}'),
         findsNothing,
         reason:
-            'the stub renders `Placeholder for /result`. Phase 10 owns the swap '
-            'to EmptyState and this assertion is what will notice it happen',
+            'the Phase-0c stub is gone. `ResultPage` renders the submit response; '
+            'this is the assertion Phase 4 wrote to notice the swap, now satisfied',
       );
-      expect(find.text('Placeholder for ${AppRoutes.result}'), findsOneWidget);
     });
   });
 

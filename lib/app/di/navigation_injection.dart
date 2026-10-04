@@ -10,6 +10,10 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
+import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
+import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
+import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 
@@ -45,7 +49,8 @@ import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart
 /// where the plan's file map would have put it.
 ///
 /// WHAT THIS COSTS, STATED PLAINLY: **five** registrations are now written by hand
-/// instead of generated, so `injection.config.dart` no longer shows them in a
+/// instead of generated (`AuthBloc`, `HomeBloc`, `ReadingCubit`, `QuizBloc` and the
+/// router), so `injection.config.dart` no longer shows them in a
 /// diff. That is the price of the purity gate, taken knowingly, and it is why
 /// `navigation_injection_test.dart` exercises this function as behaviour —
 /// presence, lifetime, identity — rather than trusting the source.
@@ -87,6 +92,22 @@ import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart
 /// to resolve. The single-instance hazard `HomeBloc` documents applies here with more
 /// force, because `ReadingCubit` holds something a reader set rather than something
 /// refetched.
+///
+/// ## AND `QuizBloc` HITS IT A **FIFTH** TIME — AND ITS `lastResult` IS WHY THE
+/// ## SINGLETON MATTERS MORE HERE THAN ANYWHERE ELSE
+///
+/// `QuizBloc extends Bloc`, so the mechanism above applies verbatim, and
+/// `quiz_module.dart` said so in advance — "there is no spelling of 'register this
+/// bloc' that keeps Flutter out of this graph". It is here.
+///
+/// **The extra stake is `QuizState.lastResult`.** §2's route table gives `/result`
+/// "submit response" as its data source and `08-build-phases.md` says the screen
+/// "reads the submit response held by `QuizBloc`" — so this object is the **only**
+/// place that response is kept. A `@factory` would hand out a **second** bloc whose
+/// `lastResult` was `null` for ever, and a reader who answered three questions and
+/// pressed "See results" would arrive at a screen that cannot be built. `quiz_module`
+/// registers the three use cases, all `@lazySingleton` over the same
+/// `ReadingRepository`, so every bloc in the process talks to one port instance.
 ///
 /// ## WHY `AppRouter` IS A LAZY SINGLETON AND NOT A FACTORY
 ///
@@ -163,6 +184,14 @@ void configureNavigation() {
     loadScripture: getIt<LoadScripture>(),
   );
 
+  // **Built here, not resolved from the locator** — see the `QuizBloc` section for
+  // the mechanism and for why `lastResult` makes the singleton load-bearing.
+  final QuizBloc quizBloc = QuizBloc(
+    startSession: getIt<StartSession>(),
+    refreshSessionQuestions: getIt<RefreshSessionQuestions>(),
+    submitAnswer: getIt<SubmitAnswer>(),
+  );
+
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
     // built, and a lazy singleton whose factory re-ran would hand out a *second*
@@ -172,6 +201,7 @@ void configureNavigation() {
     ..registerSingleton<AuthBloc>(authBloc)
     ..registerSingleton<HomeBloc>(homeBloc)
     ..registerSingleton<ReadingCubit>(readingCubit)
+    ..registerSingleton<QuizBloc>(quizBloc)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(
       () => ReevaluateListenable.stream(authBloc.stream),

@@ -10,6 +10,7 @@ import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart
 import 'package:evangelion/features/reading/data/datasources/reading_remote_data_source.dart';
 import 'package:evangelion/features/reading/data/datasources/streak_remote_data_source.dart';
 import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.dart';
+import 'package:evangelion/features/reading/data/mappers/submit_result_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
 import 'package:evangelion/features/reading/data/repositories/dio_reading_repository.dart';
 import 'package:evangelion/features/reading/data/repositories/dio_streak_repository.dart';
@@ -80,11 +81,22 @@ abstract class HomeModule {
   @lazySingleton
   StreakSummaryMapper get streakSummaryMapper => const StreakSummaryMapper();
 
+  /// The submission body → `SubmitResult` projection.
+  ///
+  /// **Phase 8's twenty-first registration**, and the reason it lives here rather
+  /// than in `quiz_module.dart` is [quiz_module.dart]'s own subject: the endpoint is
+  /// `POST /readings/:id/submit`, the port is `ReadingRepository`, and the adapter is
+  /// this class. A `quiz` module providing a mapper for a `/readings/` route would
+  /// be the mirror image of the puzzle recorded decision 23 rejects.
+  @lazySingleton
+  SubmitResultMapper get submitResultMapper => const SubmitResultMapper();
+
   /// The one [ReadingRepository] that ships.
   @lazySingleton
   ReadingRepository get readingRepository => DioReadingRepository(
     dataSource: getIt<ReadingRemoteDataSource>(),
     mapper: getIt<TodayReadingMapper>(),
+    submits: getIt<SubmitResultMapper>(),
     errors: getIt<ApiErrorMapper>(),
   );
 

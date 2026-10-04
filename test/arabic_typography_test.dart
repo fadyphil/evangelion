@@ -43,8 +43,10 @@ library;
 
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
@@ -55,10 +57,11 @@ import 'package:evangelion/features/auth/presentation/auth_strings.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/home_strings.dart';
-import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
-import 'package:evangelion/features/reading/domain/arabic_digits.dart';
+import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
+import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/reading/presentation/reading_strings.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/features/result/presentation/result_strings.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -67,8 +70,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/arabic_typography_gate.dart';
 import 'support/design_system_harness.dart';
 import 'support/font_coverage.dart';
-import 'support/home_harness.dart';
+import 'support/home_harness.dart' hide CountingReadingRepository;
 import 'support/login_harness.dart';
+import 'support/quiz_harness.dart';
 import 'support/reading_harness.dart';
 
 void main() {
@@ -404,41 +408,317 @@ void main() {
   // honest report §7 asks for, and which is also a live claim: a stub that grows its
   // first Arabic run is red here, naming the string, until somebody has checked the
   // family it renders in.
-  for (final (String route, Widget page, String visible)
-      in <(String, Widget, String)>[
-        ('/quiz', const QuizPage(), 'Placeholder for /quiz'),
-        ('/result', const ResultPage(), 'Placeholder for /result'),
-        ('/settings', const SettingsPage(), 'Placeholder for /settings'),
-      ]) {
-    group('`$route`', () {
-      testWidgets('the gate is installed and reports itself VACUOUS', (
-        WidgetTester tester,
-      ) async {
-        await _pumpStub(tester, page);
-        await expectArabicTypography(
-          tester,
-          screen: route,
-          expectedArabic: const <String>[],
-          vacuousBecause:
-              '$route is a stub: its whole body is the literal `$visible` and the '
-              'route name, both Latin. Phase 8 ($route) and Phase 9 write this '
-              'screen, and this gate is what will hold their Arabic runs to Amiri '
-              'from their first commit.',
-        );
-        // Not vacuous after all, in the one direction that can be checked: the two
-        // Latin runs are real, and the cmap assertion covers them.
-        await expectNoTofuInAnyRun(tester, screen: route);
-        expect(
-          familyOfText(tester, visible),
-          isNot(EvaTypography.arabicFamily),
-          reason:
-              'this screen is Latin-only today. If this ever becomes false, the '
-              'screen has been given Arabic and `vacuousBecause` is stale — which '
-              'is the failure this assertion exists to make loud.',
-        );
-      });
+  group('`/quiz`', () {
+    // ## NO LONGER VACUOUS, AND THE LIST IS BUILT FROM THE FIXTURE
+    //
+    // Recorded decision 79 declared this screen **vacuous** — a stub whose whole body
+    // was `Placeholder for /quiz` — and passed a `vacuousBecause` saying Phase 8
+    // would write it. Phase 8 did, so `vacuousBecause` is now `null` and the list is
+    // **declared**, which is decision 79's actual mechanism: a run cannot disappear
+    // and leave the gate satisfied by the ones that remain.
+    //
+    // Built from the Arabic fixture and `QuizStrings.ar()`, for decision 79's reason:
+    // a hand-typed Arabic list in a test is a second copy of the corpus.
+    const QuizStrings ar = QuizStrings.ar();
+    final List<String> arabic = <String>[
+      // The progress label — `questionProgress` with Arabic-Indic digits.
+      ar.questionProgress(1, 1),
+      // The question text — the **payload** arm again, and the one this list was
+      // missing when the gate first fired on this screen. The failure named it
+      // exactly: `Declared but NOT rendered: {تحقق من الإجابة}`, `Rendered: … ما اسم
+      // الفريسي الذي جاء إلى يسوع ليلاً؟`. An option list is not a question.
+      liveArabicQuestion.prompt,
+      // The four option texts: the **payload** arm, so `QuizOptionCard`'s required
+      // `ReadingLanguage` is the only thing that can put them in Amiri.
+      ...liveArabicQuestion.options.values,
+      // The close control's tooltip — a bare `<button>` around an `<svg>` cross in
+      // the prototype (`QuizScreen.tsx:46-50`), so §14 forced the string into this
+      // client, exactly as it forced `ReadingStrings.back` on Phase 7.
+      ar.exit,
+    ];
+    // **`ar.progress` is DELIBERATELY NOT IN THE LIST, and that is a fact about the
+    // gate rather than an omission.**
+    //
+    // `QuizHeader` passes `strings.progress` to `ProgressBeads.semanticLabel`, and
+    // `ProgressBeads` puts it in a `Semantics(label: …, excludeSemantics: true)`
+    // node — it is **never rendered as text**. This gate reads *painted* runs, so a
+    // semantics-only string cannot appear in the rendered set, and declaring it
+    // fails the gate's other half: `Declared but NOT rendered: {السؤال}`. That is
+    // the assertion working — it caught a category error I had made, where I
+    // listed every Arabic string on the screen without asking whether any of them
+    // reaches a glyph buffer.
+    //
+    // The label is still asserted, by the gate that covers the right layer:
+    // `quiz_page_test.dart`'s semantics group reads `ProgressBeads`' merged node and
+    // names it. Two instruments, two layers, and this one declines to claim the
+    // other's coverage.
+
+    testWidgets('the Arabic arm, with the live Arabic question', (
+      WidgetTester tester,
+    ) async {
+      final QuizBloc bloc = quizBloc(
+        const Result<ScriptureText>.success(liveArabicQuizPassage),
+      );
+      await pumpQuiz(tester, bloc: bloc, locale: const Locale('ar'));
+
+      await expectArabicTypography(
+        tester,
+        screen: '/quiz',
+        // **The CTA label is added per test, not hoisted into the base list.** The
+        // button relabels itself — `checkAnswer` before a choice, `nextQuestion`
+        // after a check — so one of the two labels is always absent, and hoisting
+        // it would leave whichever test did not render it failing the gate's
+        // `Declared but NOT rendered` half. The failure said exactly that:
+        // `Actual: Set:['تحقق من الإجابة']` while the rendered tree said
+        // `السؤال التالي`.
+        expectedArabic: <String>[...arabic, ar.checkAnswer],
+        vacuousBecause: null,
+      );
     });
-  }
+
+    testWidgets('and the FEEDBACK banner is gated too', (
+      WidgetTester tester,
+    ) async {
+      // The banner is the one run on this screen that only exists **after** a check,
+      // so its own gate needs its own pump — the same reason `/reading`'s `Aa`
+      // disclosure has one.
+      // **`quizBlocWith`, not a hand-built bloc**: decision 20's rule is that the bloc
+      // is built in the test body, and this suite already imports
+      // `home_harness.dart`, whose `CountingReadingRepository` collides with
+      // `reading_harness.dart`'s by name. The harness takes the collision away, which
+      // is decision 47's argument one layer up: one rule, one place.
+      final ({QuizBloc bloc, CountingReadingRepository readings}) fixture =
+          quizBlocWith(
+            const Result<ScriptureText>.success(liveArabicQuizPassage),
+          );
+      await pumpQuiz(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+
+      // **Read off the fixture, not typed here.** A hand-typed copy of a corpus
+      // string is the "second declaration" this gate's own doc warns against: if the
+      // fixture's option text is ever corrected, the tap silently misses and the
+      // banner never appears, which fails as *"the banner is absent"* and reads as
+      // the gate working. `liveArabicQuestion` is the one transcription.
+      await tester.tap(find.text(liveArabicQuestion.options['A']!));
+      await pumpQuizFrames(tester, 2);
+      await tester.tap(find.text(ar.checkAnswer));
+      await pumpQuizFrames(tester, 4);
+
+      expect(find.byType(FeedbackBanner), findsOneWidget);
+      await expectArabicTypography(
+        tester,
+        screen: '/quiz',
+        // Same reasoning as the arm above, and for one more run: the **verdict
+        // sentence** the banner shows once an answer is checked, and the CTA's new
+        // label. `correctSuffix` is *not* here — like `ProgressBeads`' label it is a
+        // semantics-only string, and `quiz_page_test.dart`'s spoiler group is what
+        // reads it.
+        expectedArabic: <String>[...arabic, ar.verdictCorrect, ar.nextQuestion],
+        vacuousBecause: null,
+      );
+    });
+
+    testWidgets('and in English renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      final QuizBloc bloc = quizBloc(
+        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+      );
+      await pumpQuiz(tester, bloc: bloc);
+      await _expectNoArabic(tester, '/quiz');
+    });
+  });
+
+  group('`/result`', () {
+    // ## ALSO NO LONGER VACUOUS, AND IT HAS NO BLOB TO START FROM
+    //
+    // `/reading` and `/quiz` have a captured Arabic payload. `/result` has **no
+    // fixture at all** — the plan's own cut gives it no repository, so there is
+    // nothing to capture — which makes this list the purest form of decision 79's
+    // rule: every run here is either the app's own chrome or an integer the client
+    // rendered, and all of it comes from `ResultStrings.ar()`.
+    const ResultStrings ar = ResultStrings.ar();
+    final List<String> arabic = <String>[
+      // The headline sentence.
+      ar.completeMessage,
+      // The streak pill, with **Arabic-Indic digits** — `ResultStrings.streakLabelFor`
+      // runs `_countIn`, so `4` is `٤`. This is the one run on the screen whose
+      // *numerals* are Arabic, and it is why `arabic_digits.dart` moved to
+      // `core/domain/` in Phase 8: three features needed it.
+      ar.streakLabelFor(current: 4, longest: 6),
+      // The two stat tiles' **labels**, which `StatTile` renders in mono caps — the
+      // Latin-on-the-AR-arm family is `StatTile`'s own recorded Phase-10 debt and is
+      // not this phase's, so only the *strings* are declared here.
+      ar.thisAnswer,
+      ar.bestRun,
+      // The score's caption, and both buttons.
+      ar.totalCaption,
+      ar.reflectAgain,
+      ar.backHome,
+      // **The three bare numerals**, which is what the gate found missing and is
+      // the reason `arabic_digits.dart` had to move to `core/domain/` in Phase 8.
+      //
+      // A run of *only* digits is still a run of Arabic characters: U+0660–U+0669
+      // sits inside the U+0600–U+06FF block this gate's predicate is a range over,
+      // so `٤٠` is Arabic to it and to a reader. The three numbers the screen shows
+      // are `٤٠` (the total, which also appears inside `completeMessage` — hence two
+      // separate runs of it on screen), `١٠` (this answer's points) and `٦` (the
+      // longest run), and `arabicIndicDigits` is the one function that produces all
+      // three.
+      arabicIndicDigits(40),
+      arabicIndicDigits(10),
+      arabicIndicDigits(6),
+    ];
+
+    testWidgets('the Arabic arm, with the live-shaped submit response', (
+      WidgetTester tester,
+    ) async {
+      await pumpResult(
+        tester,
+        locale: const Locale('ar'),
+        result: const SubmitResult(
+          questionId: 'question-group-3',
+          isCorrect: true,
+          pointsEarned: 10,
+          currentTotalPoints: 40,
+          currentStreak: 4,
+          longestStreak: 6,
+          readingCompleted: true,
+        ),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/result',
+        expectedArabic: arabic,
+        vacuousBecause: null,
+      );
+    });
+
+    // ## AND THE **WRONG** ARM, WHICH IS THE STATE THAT BREAKS THE LIST ABOVE
+    //
+    // The list is one screen's runs, and one screen has **four** states. The gate
+    // above declares the correct-and-complete one, so the three others are rendered by
+    // no test in this family — and the wrong arm is the interesting one, because it is
+    // the only state where **every number is zero**:
+    //
+    // ```text
+    // is_correct: false, points_earned: 0, current_streak: 0, longest_streak: 0
+    // → ٠   twice  (the streak pill's count and the longest run's)
+    // → اليوم ٠  (the pill's own label for a zero streak)
+    // → ليس هذه المرة…  (incorrectMessage, which never appears in the list above)
+    // ```
+    //
+    // `ArabicIndicDigits(0)` is `U+0660`, inside the U+0600–U+06FF block this gate's
+    // predicate is a range over, so a bare `٠` is a run of Arabic to it and to a
+    // reader — which is the whole argument the three non-zero numerals above make.
+    // Declaring the wrong arm is what turns that argument from "the predicate accepts
+    // digits" into "the screen's zero state is gated".
+    //
+    // **`partialMessage` is still undeclared**, and that is recorded rather than
+    // papered over: it needs a *correct* answer with `reading_completed: false`, which
+    // is a fifth `SubmitResult` and a third pump, for a sentence that differs from
+    // `completeMessage` only in its second clause. The family gate covers the numeral
+    // rule and the two divergent headline sentences; the per-string script check that
+    // would cover the fifth state is `result_strings_test.dart`'s, over [ResultStrings.fields].
+    //
+    // **And the list below is NOT `arabic` plus two entries.** `expectArabicTypography`
+    // asserts in **both** directions — nothing declared may go unrendered, and nothing
+    // rendered may go undeclared — so carrying the correct arm's `completeMessage`,
+    // `اليوم ٤` and `٤٠`/`١٠`/`٦` into a screen that shows none of them fails the first
+    // half. Measured, the wrong arm renders exactly:
+    ///
+    /// ```text
+    /// ٠ | نقطة | ليس هذه المرة. كل سؤال يُحتسب. | اليوم ٠ | ٠ | هذه الإجابة | ٠ | أطول سلسلة
+    /// ```
+    ///
+    /// plus the two button captions. So `٠` appears **three** times on screen and the
+    /// two stat labels are unchanged, while the score, the pill and the headline are
+    /// all different strings from the correct arm's.
+    testWidgets('the WRONG arm, where every number is `٠`', (
+      WidgetTester tester,
+    ) async {
+      const SubmitResult wrong = SubmitResult(
+        questionId: 'question-group-3',
+        isCorrect: false,
+        pointsEarned: 0,
+        currentTotalPoints: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        readingCompleted: false,
+      );
+      await pumpResult(tester, locale: const Locale('ar'), result: wrong);
+
+      await expectArabicTypography(
+        tester,
+        screen: '/result (wrong)',
+        expectedArabic: <String>[
+          // The headline sentence the correct arm never shows.
+          ar.incorrectMessage,
+          // The score — a bare `٠`, from `currentTotalPoints: 0`.
+          arabicIndicDigits(0),
+          // The score's caption, unchanged by the state.
+          ar.totalCaption,
+          // The pill: **the label and a zero count**, so the string differs from the
+          // correct arm's `اليوم ٤` in its numeral and nowhere else.
+          ar.streakLabelFor(current: 0, longest: 0),
+          // The two stat tiles — label unchanged, value `٠` in both.
+          ar.thisAnswer,
+          ar.bestRun,
+          // Both buttons, unchanged by the state.
+          ar.reflectAgain,
+          ar.backHome,
+        ],
+        vacuousBecause: null,
+      );
+    });
+
+    testWidgets('and in English renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      await pumpResult(
+        tester,
+        result: const SubmitResult(
+          questionId: 'question-group-3',
+          isCorrect: true,
+          pointsEarned: 10,
+          currentTotalPoints: 40,
+          currentStreak: 4,
+          longestStreak: 6,
+          readingCompleted: true,
+        ),
+      );
+      await _expectNoArabic(tester, '/result');
+    });
+  });
+
+  group('`/settings`', () {
+    // **The one screen still vacuous**, and decision 79's rule is that saying so is
+    // what makes it a pass rather than a silence. Phase 9 writes it.
+    testWidgets('the gate is installed and reports itself VACUOUS', (
+      WidgetTester tester,
+    ) async {
+      await _pumpStub(tester, const SettingsPage());
+      await expectArabicTypography(
+        tester,
+        screen: '/settings',
+        expectedArabic: const <String>[],
+        vacuousBecause:
+            '/settings is a stub: its whole body is the literal '
+            '`Placeholder for /settings` and the route name, both Latin. Phase 9 '
+            'writes this screen, and this gate is what will hold its Arabic runs to '
+            'Amiri from their first commit.',
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/settings');
+      expect(
+        familyOfText(tester, 'Placeholder for /settings'),
+        isNot(EvaTypography.arabicFamily),
+        reason:
+            'this screen is Latin-only today. If this ever becomes false, the screen '
+            'has been given Arabic and `vacuousBecause` is stale — which is the '
+            'failure this assertion exists to make loud.',
+      );
+    });
+  });
 
   group('the ARM ITSELF, and what the two hard-coded states of the rule do', () {
     // The three properties the whole mechanism rests on, tested as a plain function

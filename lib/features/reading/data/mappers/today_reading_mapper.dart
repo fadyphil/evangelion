@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/renderable_text.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 
@@ -51,6 +52,7 @@ import 'package:evangelion/core/domain/entities/today_reading.dart';
 /// | `reading_id`, `group_id`, `scheduled_date` | passed through | identity and scheduling metadata; nothing on `/` renders them, so an odd value is inert |
 /// | `translation` | passed through | an edition name; empty is a missing label, not a broken reading |
 /// | `reference` (**empty**) | passed through | it is a heading *over* the passage — refusing it would make the passage unreachable over a missing label, the same argument as `text: ''` below |
+/// | `reference`, `translation` (**malformed**) | **blanked to `''`** | a heading over the passage may be missing, but it may not be unpaintable: the engine throws on a lone surrogate from `dart:ui`'s `addText`, so keeping the bytes costs a tofu box and a caught `ArgumentError` on every layout of the title. Blanking reaches a state this table already permits two lines above; refusing it would cost the reader the whole reading |
 /// | `current_streak` (large positive) | passed through | this client has seen no upper bound, and inventing one is a claim about a payload it has not seen — the same argument this section makes against defaults |
 /// | `total_points_earned_today`, `is_fully_completed` | passed through | `0` and `false` are real answers, not absences |
 ///
@@ -79,12 +81,28 @@ final class TodayReadingMapper {
   /// Creates a mapper. Stateless and `const`.
   const TodayReadingMapper();
 
+  /// The resource this endpoint hangs off: `/api/v1/readings`.
+  ///
+  /// ## WHY IT IS A CONSTANT AND NOT PART OF [todayEndpoint]'s LITERAL
+  ///
+  /// Phase 8 added `POST /api/v1/readings/:id/submit`, whose path is a **sibling**
+  /// of the read and not a child of it — `/api/v1/readings/today` and
+  /// `/api/v1/readings/{id}/submit` share only this prefix. Writing `/api/v1` and
+  /// `/readings` into a second file would put one string in two places with nothing
+  /// keeping them equal, which is AGENT_CONTEXT §7's "two implementations of one
+  /// invariant".
+  ///
+  /// It lives here because this is the mapper that already owned the `/api/v1`
+  /// prefix for the read (`TodayReadingMapper`'s class doc says so), and §8's "prefer
+  /// editing an existing file over creating a new one" cuts the same way.
+  static const String readingsRoot = '/api/v1/readings';
+
   /// The endpoint, without the `{lang}` segment.
   ///
   /// The `/api/v1` prefix lives here and not in `AppConfig` for the reason
   /// `dio_client.dart`'s doc gives: the base URL is the host, and a deployment
   /// behind a path-prefixed proxy has to stay reachable.
-  static const String todayEndpoint = '/api/v1/readings/today';
+  static const String todayEndpoint = '$readingsRoot/today';
 
   /// The path for [language].
   ///
@@ -196,8 +214,22 @@ final class TodayReadingMapper {
         groupId: groupId.valueOrElse(0),
         scheduledDate: scheduledDate.valueOrElse(''),
         language: language.valueOrElse(ReadingLanguage.english),
-        reference: reference.valueOrElse(''),
-        translation: translation.valueOrElse(''),
+        // ## THE TWO LABEL FIELDS, AND WHY THEY ARE BLANKED RATHER THAN REFUSED
+        //
+        // `renderableTextOrEmpty` and not `valueOrElse('')`: both fields are painted
+        // — `reading_header.dart` puts `reference` in the title and `translation` in
+        // the metadata row — and the engine throws `ArgumentError: string is not
+        // well-formed UTF-16` from `dart:ui`'s `addText` on a lone surrogate, so a
+        // verbatim pass-through is not free.
+        //
+        // The alternative to blanking is not "keep the bytes", it is **refusing the
+        // whole reading**, and one malformed label must not cost the reader the
+        // passage. Blanking reaches a state this table already permits two rows
+        // above: `reference: ''` and `translation: ''` are values the server can send
+        // and this mapper has always passed through on purpose. See decision 95 in
+        // `renderable_text.dart`.
+        reference: renderableTextOrEmpty(reference.valueOrElse('')),
+        translation: renderableTextOrEmpty(translation.valueOrElse('')),
         verses: mappedVerses.valueOrElse(<Verse>[]),
         questions: mappedQuestions,
         isFullyCompleted: isFullyCompleted.valueOrElse(false),
@@ -257,6 +289,33 @@ final class TodayReadingMapper {
   /// is the reason: the English localized response has no such key at all. Every
   /// other field is required, because each is either a number the reader sees
   /// beside the verse or the verse itself.
+  ///
+  /// ## `text` IS ALSO REQUIRED TO BE **RENDERABLE**, AND THAT IS A DIFFERENT
+  /// ## QUESTION FROM REQUIRED
+  ///
+  /// `text: ''` passes this method. `text: '\uD83D…'` does not, and the two
+  /// verdicts are both deliberate — see `isRenderableText`'s table.
+  ///
+  /// The reason the check lives here and not in a widget is that nothing between
+  /// this method and `RenderParagraph` can catch it. **The throw is real, and it is
+  /// also caught** — both halves matter, and this doc once asserted only the first
+  /// and then, for one draft, wrongly denied it.
+  ///
+  /// Measured on `Flutter 3.47.4`: the engine's `ParagraphBuilder::addText` returns
+  /// an error string for a lone surrogate and `dart:ui` turns it into
+  /// `ArgumentError: Invalid argument(s): string is not well-formed UTF-16` at
+  /// `dart:ui/text.dart:3724`, from inside `RenderParagraph.performLayout`. The
+  /// painting library **catches** it, so the frame completes — which is exactly why
+  /// a probe that watched for a frame concluded there was no throw. In a test an
+  /// exception left untaken fails the test, so the cost is not invisible there
+  /// either.
+  ///
+  /// So the cost the rule removes is real and is **two** things: a tofu box where the
+  /// scripture should be, and a caught `ArgumentError` on every layout of that
+  /// paragraph. Skipping that row instead costs the reader one missing number. That
+  /// is a smaller prize than taking the screen with it and it is still worth having.
+  /// Recorded decision 80 deferred this rule to the phase that reads `text_clean`;
+  /// this is it, asked once.
   Result<Verse> _verse(Map<Object?, Object?> body, int index) {
     final Result<int> bookNumber = _int(body, 'book_number');
     final Result<int> chapter = _int(body, 'chapter');
@@ -273,6 +332,27 @@ final class TodayReadingMapper {
       return Result<Verse>.failure(_renamed(failure, 'verses[$index]'));
     }
 
+    final String verseText = text.valueOrElse('');
+
+    // **Paintability is a second gate, and it is a different gate from the type
+    // check above.** A `String` that is not renderable throws from `dart:ui`'s
+    // `addText` during layout — measured on `Flutter 3.47.4` — so this row is skipped
+    // and a malformed verse never reaches a `Text` at all; an empty one renders as an
+    // empty numbered line. Both are visible gaps, and the two verdicts are separated
+    // because one of them is a sentence the reader is trying to read and the other is
+    // a number with nothing beside it. `reference` and `translation` are painted too
+    // and are handled by `renderableTextOrEmpty` above rather than by this gate:
+    // blanking a label keeps the passage, refusing it would not. See
+    // `isRenderableText`'s decision 95.
+    if (!isRenderableText(verseText)) {
+      return Result<Verse>.failure(
+        _renamed(
+          _bad('text', verseText, _renderableExpectation),
+          'verses[$index]',
+        ),
+      );
+    }
+
     // **`null` for absence, and the empty string for an empty value.** This is the
     // distinction §5 trap 2 and Phase 7's own verify item are about, and it is why
     // the check is `is String` and not `is String && isNotEmpty`: the *field*
@@ -280,6 +360,14 @@ final class TodayReadingMapper {
     // `text_clean` this client cannot read as a `String` is treated as absent — the
     // same leniency `already_answered` gets, because one object read by one rule is
     // what keeps two fields of it from disagreeing about how strict this is.
+    //
+    // **And a `text_clean` that cannot be painted is dropped for the same reason a
+    // `Verse.text` cannot be**: it reaches a `Text` through `Verse.displayText`, so
+    // keeping it would move the throw one field along rather than remove it. §5 trap
+    // 9's three-state rule gains a fourth state here — present, a `String`, and
+    // unpaintable — and `null` is its answer, which is what `textClean`'s own doc
+    // means by "the server sent no clean text". `/`'s preview falls back to `text`
+    // and `/reading` renders `text` anyway, so nothing is lost on either arm.
     final Object? clean = body['text_clean'];
 
     return Result<Verse>.success(
@@ -287,8 +375,8 @@ final class TodayReadingMapper {
         bookNumber: bookNumber.valueOrElse(0),
         chapter: chapter.valueOrElse(0),
         number: number.valueOrElse(0),
-        text: text.valueOrElse(''),
-        textClean: clean is String ? clean : null,
+        text: verseText,
+        textClean: clean is String && isRenderableText(clean) ? clean : null,
       ),
     );
   }
@@ -327,6 +415,13 @@ final class TodayReadingMapper {
   /// **lenient** and default to "not answered, no answer, no verdict". That split
   /// is §5's own response shape: it shows the first six on every question and the
   /// last three varying between `true`/`'A'` and `false`/`null`.
+  ///
+  /// **`prompt` and every option must also be renderable**, and they get the same
+  /// verdict a malformed `verse` gets: a **skipped question**. That is not a new
+  /// branch — [\_questions] already skips anything this method refuses — it is the
+  /// existing skip rule reaching the two fields `/quiz` paints. A question whose
+  /// text would throw out of `RenderParagraph` costs the reader that question and
+  /// nothing else.
   Result<Question> _question(Map<Object?, Object?> body) {
     final Result<String> id = _string(body, 'id');
     final Result<int> sortOrder = _int(body, 'sort_order');
@@ -347,6 +442,18 @@ final class TodayReadingMapper {
       return Result<Question>.failure(failure);
     }
 
+    final String questionPrompt = prompt.valueOrElse('');
+
+    // The paintability gate, and it is a separate `if` from the type gate above for
+    // the reason `_verse`'s is: `''` is a question with no wording and a malformed
+    // one is a question that takes the screen down, and a rule that collapsed them
+    // would have to pick one verdict for both.
+    if (!isRenderableText(questionPrompt)) {
+      return Result<Question>.failure(
+        _bad('prompt', questionPrompt, _renderableExpectation),
+      );
+    }
+
     // Lenient reads, and the reasons are §5's: the endpoint sends
     // `already_answered` on every question, and a flag this client cannot read can
     // only mean "not proven answered". §5 trap 3 makes the consequence concrete — a
@@ -361,7 +468,7 @@ final class TodayReadingMapper {
         id: id.valueOrElse(''),
         sortOrder: sortOrder.valueOrElse(0),
         type: type.valueOrElse(''),
-        prompt: prompt.valueOrElse(''),
+        prompt: questionPrompt,
         options: options.valueOrElse(const <String, String>{}),
         pointsValue: pointsValue.valueOrElse(0),
         alreadyAnswered: answered == true,
@@ -391,6 +498,13 @@ final class TodayReadingMapper {
       if (key is! String || option is! String) {
         return Result<Map<String, String>>.failure(
           _bad('options', value, 'an object of String to String'),
+        );
+      }
+      // The same paintability gate as `text` and `prompt`, for the same reason:
+      // `/quiz` puts every option on screen through a `Text`.
+      if (!isRenderableText(option)) {
+        return Result<Map<String, String>>.failure(
+          _bad('options.$key', option, _renderableExpectation),
         );
       }
       mapped[key] = option;
@@ -565,4 +679,14 @@ final class TodayReadingMapper {
         '${value == null ? 'absent' : '$value (${value.runtimeType})'}, '
         'and $expected was expected.',
   );
+
+  /// What [\_bad] says when the value is a `String` that cannot be painted.
+  ///
+  /// **The diagnosis is named, not just the type.** "a `String` was expected" is
+  /// what the reader already knows — the wire sent a string — and it sends them
+  /// looking for a schema problem when the actual defect is an encoder that emitted
+  /// half a code point. `isRenderableText`'s doc carries the whole argument;
+  /// `today_reading_mapper_test.dart` asserts this word is in the message.
+  static const String _renderableExpectation =
+      'a String that can be rendered (well-formed UTF-16)';
 }
