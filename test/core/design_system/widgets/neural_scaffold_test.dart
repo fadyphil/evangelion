@@ -400,7 +400,11 @@ void main() {
               Text('Evangelion', textAlign: TextAlign.center),
               Text('Read. Reflect. Remember.'),
               SizedBox(height: EvaSpacing.xl),
-              EvaButton(label: 'Begin reflection', onPressed: _noop),
+              EvaButton(
+                labelFamily: EvaTypography.uiFamily,
+                label: 'Begin reflection',
+                onPressed: _noop,
+              ),
             ],
           ),
         ),

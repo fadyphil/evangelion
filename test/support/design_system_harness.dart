@@ -541,7 +541,11 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   (
     widget: EvaButton,
     name: 'ds.tsx ButtonPrimary / ButtonSecondary / ButtonText',
-    build: () => const EvaButton(label: 'Sign in', onPressed: _noop),
+    build: () => const EvaButton(
+      labelFamily: EvaTypography.uiFamily,
+      label: 'Sign in',
+      onPressed: _noop,
+    ),
     activation: SemanticsAction.tap,
     tappableLabel: 'Sign in',
   ),
@@ -606,6 +610,8 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
     widget: IconActionButton,
     name: '§14 "icon-only buttons have no accessible name"',
     build: () => const IconActionButton(
+      tooltipFamily: EvaTypography.uiFamily,
+
       icon: Icons.arrow_back,
       tooltip: 'Back',
       onPressed: _noop,
@@ -638,6 +644,7 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
       message: 'Could not load today\'s reading.',
       onRetry: _noop,
       retryLabel: 'Retry',
+      retryFamily: EvaTypography.uiFamily,
     ),
     // The retry button. `ErrorView`'s own node is a `Semantics(liveRegion:)` and
     // has no action by design — it announces the failure, the button acts on it.
@@ -676,7 +683,8 @@ final List<InteractiveWidget> kDisabledWidgets = <InteractiveWidget>[
   (
     widget: EvaButton,
     name: 'ds.tsx:245 — `opacity: disabled ? 0.45`',
-    build: () => const EvaButton(label: 'Sign in'),
+    build: () =>
+        const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
     activation: SemanticsAction.tap,
     tappableLabel: 'Sign in',
   ),
@@ -697,8 +705,11 @@ final List<InteractiveWidget> kDisabledWidgets = <InteractiveWidget>[
   (
     widget: IconActionButton,
     name: '§14:39 — a disabled icon button is invisible to Tab',
-    build: () =>
-        const IconActionButton(icon: Icons.arrow_back, tooltip: 'Back'),
+    build: () => const IconActionButton(
+      tooltipFamily: EvaTypography.uiFamily,
+      icon: Icons.arrow_back,
+      tooltip: 'Back',
+    ),
     activation: SemanticsAction.tap,
     tappableLabel: 'Back',
   ),

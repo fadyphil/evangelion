@@ -22,7 +22,9 @@ library;
 
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/features/home/domain/preview_text.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -36,6 +38,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/home_harness.dart';
+import '../../../../support/utf16.dart';
 
 /// The preview paragraph's [TextSpan] — the one whose first run is a [WidgetSpan].
 ///
@@ -203,7 +206,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
-      h.readings.answer = const Result.success(liveArabicReading);
+      h.readings.scripture = const Result.success(liveArabicScripture);
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
       // Asked for the Arabic endpoint, not the English one.
@@ -338,7 +341,7 @@ void main() {
       expect(h.streaks.calls, 1);
       expect(h.auth.calls, 1);
 
-      h.readings.answer = const Result.success(liveEnglishReading);
+      h.readings.scripture = const Result.success(liveEnglishScripture);
       // `ensureVisible` first: at 320x568 the panel is below the fold, and a tap on
       // an off-screen widget throws a hit-test warning rather than pressing the
       // button — which reads as "the retry does not work".
@@ -490,10 +493,23 @@ void main() {
         // gap between the reference and the buttons that is indistinguishable from a
         // layout failure.
         final HomeHarness h = harness();
-        h.readings.answer = Result.success(
-          liveEnglishReading.copyWith(
-            questionCount: 0,
-            answeredQuestionCount: 0,
+        // Zero questions is an **empty list** on the wide entity, because the
+        // narrow `questionCount` is now `questions.length`. The old spelling,
+        // `liveEnglishReading.copyWith(questionCount: 0)`, narrowed a count that no
+        // longer exists anywhere.
+        h.readings.scripture = const Result<ScriptureText>.success(
+          ScriptureText(
+            readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            groupId: 3,
+            scheduledDate: '2026-10-03',
+            language: ReadingLanguage.english,
+            reference: 'John 3:1-5',
+            translation: 'NKJV (New King James Version)',
+            verses: liveEnglishVerses,
+            questions: <Question>[],
+            isFullyCompleted: true,
+            pointsEarnedToday: 10,
+            currentStreak: 4,
           ),
         );
         await pumpHome(tester, bloc: h.bloc);
@@ -549,7 +565,7 @@ void main() {
       // unconditionally passed all 1520 tests — so neither direction was watched,
       // and this pair of tests is what watches both.
       final HomeHarness h = harness();
-      h.readings.answer = const Result.success(liveArabicReading);
+      h.readings.scripture = const Result.success(liveArabicScripture);
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
       // The Arabic arm renders the preview whole — a plain `Text`, because there is
@@ -592,8 +608,8 @@ void main() {
       // into the preview. The Arabic arm was already safe, and asserting the Arabic
       // arm too is what stops a future "simplification" that re-joins them.
       final HomeHarness h = harness();
-      h.readings.answer = Result.success(
-        liveEnglishReading.copyWith(firstVerseText: ''),
+      h.readings.scripture = Result<ScriptureText>.success(
+        withEmptyFirstVerse(liveEnglishScripture),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -617,8 +633,8 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
-      h.readings.answer = Result.success(
-        liveArabicReading.copyWith(firstVerseText: ''),
+      h.readings.scripture = Result<ScriptureText>.success(
+        withEmptyFirstVerse(liveArabicScripture),
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
@@ -687,7 +703,7 @@ void main() {
       // than a rendering of the design, and the same class as Phase 7's defect #2
       // ("Arabic never uses the mono family").
       final HomeHarness h = harness();
-      h.readings.answer = const Result.success(liveArabicReading);
+      h.readings.scripture = const Result.success(liveArabicScripture);
       await pumpHome(tester, bloc: h.bloc);
 
       // **Exact, whole.** 49 characters, so `previewText` leaves it alone, and the
@@ -696,6 +712,69 @@ void main() {
       // which is why the first version's `isNot(contains('ان إنسان'))` was a test
       // that could not fail.
       expect(find.text(liveArabicReading.firstVerseText), findsOneWidget);
+    });
+  });
+
+  group('an ASTRAL character inside the preview\'s budget', () {
+    testWidgets('still renders BOTH controls, because it cannot throw', (
+      WidgetTester tester,
+    ) async {
+      // ## THE SAME TOTALITY CLAIM, AND A **WIDER** SURFACE THAN THE EMPTY VERSE
+      //
+      // `previewText` cuts at a **code unit**, so a budget of 56 landing between an
+      // emoji's two units leaves the **high surrogate alone** in the result. That is
+      // not a truncated emoji — it is not a character — and `RenderParagraph` throws
+      // `ArgumentError: string is not well-formed UTF-16` out of
+      // `_RenderScaledInlineWidget.performLayout`.
+      //
+      // **`/` is the wider surface of the two.** The drop cap's identical bug on
+      // `/reading` is reachable only at index 0 of a verse; this one is reachable at
+      // **any** offset inside the first 56 code units, so an emoji anywhere in the
+      // opening of today's reading is enough — not only at its start.
+      //
+      // And because the panel's `EvaButton` and `TextLink` are `_Preview`'s own
+      // children, the exception takes **`Continue` → `/reading` and `Start
+      // reflection` → `/quiz`** with it: the same two routes the empty-verse case
+      // took, for a different reason, discovered the same way.
+      final HomeHarness h = harness();
+      h.readings.scripture = Result<ScriptureText>.success(
+        withAstralFirstVerse(liveEnglishScripture),
+      );
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TodayReadingPanel), findsOneWidget);
+      expect(find.text(const HomeStrings.en().continueLabel), findsOneWidget);
+      expect(find.text(const HomeStrings.en().startReflection), findsOneWidget);
+      expect(find.text('John 3:1-5'), findsOneWidget);
+    });
+
+    testWidgets('and the cap is a WHOLE character, not half of one', (
+      WidgetTester tester,
+    ) async {
+      // The other end of the same string: `splitDropCap` cuts on a **rune**, so a
+      // preview opening with an emoji gives the cap the whole emoji. The drop cap is
+      // a `WidgetSpan`, so its letter is read off the plain text — where a `WidgetSpan`
+      // renders as U+FFFC.
+      final HomeHarness h = harness();
+      h.readings.scripture = Result<ScriptureText>.success(
+        withAstralFirstVerse(liveEnglishScripture),
+      );
+      await pumpHome(tester, bloc: h.bloc);
+
+      // …and nothing anywhere on the panel is unpaired. This is the assertion that
+      // says the *result* is renderable, which `RenderParagraph` only reports by
+      // throwing.
+      for (final String rendered in <String>[
+        for (final Text t in tester.widgetList<Text>(find.byType(Text)))
+          if (t.data != null) t.data!,
+      ]) {
+        expect(
+          isWellFormedUtf16(rendered),
+          isTrue,
+          reason: 'unpaired at ${unpairedSurrogates(rendered)}',
+        );
+      }
     });
   });
 

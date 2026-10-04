@@ -142,7 +142,10 @@ void main() {
     });
 
     test('the inventory defaults are primary, 52 high, expanded', () {
-      const EvaButton button = EvaButton(label: 'Sign in');
+      const EvaButton button = EvaButton(
+        labelFamily: EvaTypography.uiFamily,
+        label: 'Sign in',
+      );
       expect(button.variant, EvaButtonVariant.primary);
       expect(button.height, 52.0);
       expect(button.expanded, isTrue);
@@ -218,7 +221,14 @@ void _widgetTests() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
       handle.dispose();
 
       expect(find.text('Sign in'), findsOneWidget);
@@ -232,7 +242,10 @@ void _widgetTests() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await _pump(tester, const EvaButton(label: 'Sign in'));
+      await _pump(
+        tester,
+        const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
+      );
       handle.dispose();
 
       final node = semanticsOf(tester, find.byType(EvaButton));
@@ -244,7 +257,14 @@ void _widgetTests() {
       WidgetTester tester,
     ) async {
       int taps = 0;
-      await _pump(tester, EvaButton(label: 'Sign in', onPressed: () => taps++));
+      await _pump(
+        tester,
+        EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: () => taps++,
+        ),
+      );
       await tester.tap(find.byType(EvaButton));
       await tester.pump();
       expect(taps, 1);
@@ -253,7 +273,10 @@ void _widgetTests() {
     testWidgets('a disabled button cannot be tapped', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, const EvaButton(label: 'Sign in'));
+      await _pump(
+        tester,
+        const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
+      );
       await tester.tap(find.byType(EvaButton));
       await tester.pump();
       expect(tester.takeException(), isNull);
@@ -262,7 +285,14 @@ void _widgetTests() {
     testWidgets('it is 52 tall and as wide as it is told to be', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
       expect(tester.getSize(find.byType(EvaButton)).height, 52.0);
       expect(tester.getSize(find.byType(EvaButton)).width, 320.0);
     });
@@ -272,7 +302,12 @@ void _widgetTests() {
     ) async {
       await _pump(
         tester,
-        const EvaButton(label: 'Sign in', expanded: false, onPressed: _noop),
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          expanded: false,
+          onPressed: _noop,
+        ),
       );
       expect(tester.getSize(find.byType(EvaButton)).width, lessThan(320.0));
     });
@@ -280,12 +315,21 @@ void _widgetTests() {
     testWidgets('the trailing chevron appears only when asked for', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
       expect(find.byIcon(Icons.chevron_right), findsNothing);
 
       await _pump(
         tester,
         const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+
           label: 'Sign in',
           trailingChevron: true,
           onPressed: _noop,
@@ -297,7 +341,14 @@ void _widgetTests() {
     testWidgets('pressing fills with emberDeep and drops the glow', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
 
       final BoxDecoration idle = _bodyOf(tester).decoration as BoxDecoration;
       expect(idle.boxShadow, hasLength(2));
@@ -322,7 +373,11 @@ void _widgetTests() {
       // the pressed fill, so one `pump()` must already show it.
       await _pump(
         tester,
-        const EvaButton(label: 'Sign in', onPressed: _noop),
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
         disableAnimations: true,
       );
       final TestGesture gesture = await tester.startGesture(
@@ -344,7 +399,10 @@ void _widgetTests() {
     testWidgets('the disabled state is the prototype\'s 45%', (
       WidgetTester tester,
     ) async {
-      await _pump(tester, const EvaButton(label: 'Sign in'));
+      await _pump(
+        tester,
+        const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
+      );
       final opacity = tester.widget<Opacity>(
         find.descendant(
           of: find.byType(EvaButton),
@@ -360,7 +418,11 @@ void _widgetTests() {
       ) async {
         await _pump(
           tester,
-          const EvaButton(label: 'Sign in', onPressed: _noop),
+          const EvaButton(
+            labelFamily: EvaTypography.uiFamily,
+            label: 'Sign in',
+            onPressed: _noop,
+          ),
           theme: data,
         );
         await tester.pump();
@@ -376,6 +438,8 @@ void _widgetTests() {
         await _pump(
           tester,
           const EvaButton(
+            labelFamily: EvaTypography.uiFamily,
+
             label: 'Back to library',
             variant: EvaButtonVariant.secondary,
             onPressed: _noop,
@@ -395,6 +459,8 @@ void _widgetTests() {
         await _pump(
           tester,
           const EvaButton(
+            labelFamily: EvaTypography.uiFamily,
+
             label: 'Forgot password?',
             variant: EvaButtonVariant.ghost,
             trailingChevron: true,
@@ -412,7 +478,14 @@ void _widgetTests() {
     }
 
     testWidgets('state golden — pressed', (WidgetTester tester) async {
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
       final TestGesture gesture = await tester.startGesture(
         tester.getCenter(find.byType(EvaButton)),
       );
@@ -426,7 +499,10 @@ void _widgetTests() {
     });
 
     testWidgets('state golden — disabled', (WidgetTester tester) async {
-      await _pump(tester, const EvaButton(label: 'Sign in'));
+      await _pump(
+        tester,
+        const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
+      );
       await tester.pump();
       await expectLater(
         find.byType(EvaButton),
@@ -435,7 +511,14 @@ void _widgetTests() {
     });
 
     testWidgets('state golden — focused', (WidgetTester tester) async {
-      await _pump(tester, const EvaButton(label: 'Sign in', onPressed: _noop));
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'Sign in',
+          onPressed: _noop,
+        ),
+      );
       await tabUntilFocused(tester, find.byType(EvaButton));
       await tester.pump();
       await expectLater(

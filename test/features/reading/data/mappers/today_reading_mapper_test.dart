@@ -250,7 +250,17 @@ void main() {
       final TodayReading reading = entityOf(
         mapper.map(
           withVerses(liveReadingEn(), <Map<String, Object?>>[
-            <String, Object?>{'text': 'bare', 'text_clean': ''},
+            <String, Object?>{
+              // The three numbers are here because Phase 7's wide projection reads
+              // them, so a fixture that omits them now describes a verse shape the
+              // server never sends. **The assertion under test is untouched** —
+              // it is still only about which of `text` / `text_clean` is chosen.
+              'book_number': 43,
+              'chapter': 3,
+              'verse': 1,
+              'text': 'bare',
+              'text_clean': '',
+            },
           ]),
         ),
       );
@@ -285,7 +295,15 @@ void main() {
       final TodayReading reading = entityOf(
         mapper.map(
           withVerses(liveReadingEn(), <Map<String, Object?>>[
-            <String, Object?>{'text': ''},
+            <String, Object?>{
+              // As above: Phase 7's wide projection requires the three numbers, so
+              // this fixture spells them out. What is being asserted is still that
+              // `text: ''` MAPS — the numbers are not the subject.
+              'book_number': 43,
+              'chapter': 3,
+              'verse': 1,
+              'text': '',
+            },
           ]),
         ),
       );

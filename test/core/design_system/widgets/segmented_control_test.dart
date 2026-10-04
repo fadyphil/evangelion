@@ -68,7 +68,11 @@ void main() {
         const Column(
           children: <Widget>[
             _Live(initial: 'Dark', onPicked: null),
-            EvaButton(label: 'After', onPressed: _noop),
+            EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+              label: 'After',
+              onPressed: _noop,
+            ),
           ],
         ),
       );

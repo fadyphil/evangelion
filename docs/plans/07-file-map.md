@@ -115,15 +115,32 @@ lib/
       domain/
         usecases/get_scripture_text.dart  get_streak_summary.dart  get_settings.dart
       data/
-        models/scripture_text_model.dart  verse_model.dart  question_model.dart
-        mappers/scripture_text_mapper.dart     # text_clean is AR-only; never asserted
+        # There is **no `models/` directory**, and these five names are not files.
+        # `ReadingRemoteDataSource` parses the response into `ScriptureText` in one
+        # step, so a `ScriptureTextModel`/`VerseModel`/`QuestionModel` trio would be
+        # three classes whose only field is a copy of the entity's, and a mapper that
+        # then copies them back ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md) §2,
+        # decision 68). `streak_summary_mapper.dart` is the sibling that proves the
+        # pattern generalises: two features, both mapping straight to domain entities.
+        mappers/today_reading_mapper.dart  streak_summary_mapper.dart
+                                           # text_clean is AR-only; never asserted
         datasources/reading_remote_data_source.dart  # GET /readings/today/{en,ar}
-        repositories/reading_repository_impl.dart    # implements ReadingRepository
+                     streak_remote_data_source.dart
+        repositories/dio_reading_repository.dart     # implements ReadingRepository
+                     dio_streak_repository.dart
       presentation/
-        cubit/reading_cubit.dart  reading_state.dart
+        bloc/reading_cubit.dart            # ReadingStatus and ReadingState live here too
         pages/reading_page.dart                       # ONE page, both languages
-        widgets/reading_controls.dart  scripture_block.dart  scripture_verse.dart
-               scripture_metadata_row.dart  sticky_cta.dart
+        widgets/reading_controls.dart  scripture_block.dart
+               reading_header.dart  sticky_cta.dart
+        # Two names here are **not** files. `scripture_verse.dart` is a private method
+        # on `ScriptureBlock` (`_verseParagraph`) — the verse needs the block's derived
+        # body style, its marker style and the first-verse-only drop cap, so a widget
+        # would be four required parameters and no behaviour ([AGENT_CONTEXT](../agents/AGENT_CONTEXT.md)
+        # §2, decision 67). `scripture_metadata_row.dart` is `ReadingHeader`'s metadata
+        # section: the reference, the translation and the caption are one row in the
+        # prototype and one widget here, and splitting it would give a widget with one
+        # call site.
 
     quiz/
       domain/

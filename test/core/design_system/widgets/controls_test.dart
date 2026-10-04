@@ -265,6 +265,8 @@ void main() {
       await pumpAt(
         tester,
         const IconActionButton(
+          tooltipFamily: EvaTypography.uiFamily,
+
           icon: Icons.arrow_back,
           tooltip: 'Back',
           onPressed: _noop,
@@ -290,6 +292,8 @@ void main() {
       await pumpAt(
         tester,
         const IconActionButton(
+          tooltipFamily: EvaTypography.uiFamily,
+
           icon: Icons.close,
           tooltip: 'Close',
           onPressed: _noop,
@@ -305,7 +309,11 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpAt(
         tester,
-        const IconActionButton(icon: Icons.close, tooltip: 'Close'),
+        const IconActionButton(
+          tooltipFamily: EvaTypography.uiFamily,
+          icon: Icons.close,
+          tooltip: 'Close',
+        ),
       );
       handle.dispose();
 
@@ -326,6 +334,8 @@ void main() {
         await pumpAt(
           tester,
           const IconActionButton(
+            tooltipFamily: EvaTypography.uiFamily,
+
             icon: Icons.arrow_back,
             tooltip: 'Back',
             onPressed: _noop,
@@ -344,6 +354,8 @@ void main() {
       await pumpAt(
         tester,
         const IconActionButton(
+          tooltipFamily: EvaTypography.uiFamily,
+
           icon: Icons.arrow_back,
           tooltip: 'Back',
           onPressed: _noop,

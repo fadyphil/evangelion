@@ -186,21 +186,31 @@ Map<String, Object?> withKey(
 /// [body] with its `verses` list replaced by [verses].
 ///
 /// The interesting cases are combinations the live payload does not contain: no
-/// verses at all, and a first verse with `text_clean` absent where the Arabic arm
-/// has one.
+/// verses at all, a first verse with `text_clean` absent where the Arabic arm has
+/// one, and — since Phase 7's wide projection reads every verse — an entry that is
+/// **not an object**, which is what a malformed response looks like.
+///
+/// **`List<Object>` and not `List<Map<String, Object?>>`**, because Phase 7's mapper
+/// has a skip branch for an unreadable entry and a fixture typed to exclude one
+/// could not reach it. The widening costs nothing to the callers that pass real
+/// maps (`List<Map<…>>` is a `List<Object>`) and buys the malformed cases, and the
+/// widened parameter is exactly the shape `TodayReadingMapper._verses` accepts.
 Map<String, Object?> withVerses(
   Map<String, Object?> body,
-  List<Map<String, Object?>> verses,
+  List<Object> verses,
 ) => withKey(body, 'verses', verses);
 
 /// [body] with its `questions` list replaced by [questions].
 ///
 /// A fixture the caller builds by hand, because the interesting cases are
-/// combinations the live payload does not contain: zero questions, one answered
-/// of two, `already_answered` missing.
+/// combinations the live payload does not contain: zero questions, one answered of
+/// two, `already_answered` missing, and — since Phase 7 — entries that are not
+/// objects or are missing a required field, which the wide mapper **skips**.
+///
+/// Widened to `List<Object>` for the same reason as [withVerses].
 Map<String, Object?> withQuestions(
   Map<String, Object?> body,
-  List<Map<String, Object?>> questions,
+  List<Object> questions,
 ) => withKey(body, 'questions', questions);
 
 /// A question object shaped like the live one, with the one flag a projection
