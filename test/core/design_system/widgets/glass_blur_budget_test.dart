@@ -1,9 +1,25 @@
 /// §13.4's blur budget, enforced rather than documented.
 ///
 /// `09-quality-gates.md` §13.4 counts **eight** `backdrop-filter: blur(Npx)` sites
-/// across the six shipped screens and rules that only **two** of them may
+/// across the six shipped screens and rules that only **one** of them may
 /// actually blur. Every one of the eight is a `saveLayer` plus a full read-back
 /// of everything painted behind it, **per frame**.
+///
+/// ## THE CEILING FOR `lib/features/` MOVED FROM 2 TO 1 IN PHASE 6
+///
+/// §13 rule 4's per-screen line said "`/`: `.blur` on the today's-reading panel
+/// **and the top bar**", and this file's doc repeated it. **Both were wrong.**
+/// `ds.tsx:499-530` is `TopBar`, and it contains **no `backdropFilter` at all** —
+/// the prototype's top bar is a transparent `div` over the animated background, and
+/// that is deliberate.
+///
+/// So the shipped budget on `/` is one site, and a ceiling of 2 would have let a
+/// second blur through with nothing red. Home now spends exactly 1 and this gate
+/// fails at 2, which is the whole of what a ceiling is for.
+///
+/// The inventory it is derived from did **not** change: eight prototype sites, of
+/// which six survive in `ds.tsx` after `PassageCard` is cut with the library, plus
+/// two inline (the Login form and Home's panel) = 8.
 ///
 /// ## WHY A SOURCE SCAN AND NOT A RUNTIME COUNT
 ///
@@ -19,19 +35,20 @@
 /// true and is also the thing that is not a gate: a reviewer has to notice,
 /// count, and remember the number. This walks the files instead.
 ///
-/// ## THE TWO ALLOWED SITES
+/// ## THE ONE ALLOWED SITE
 ///
 /// | site | why |
 /// | --- | --- |
 /// | `/` (Home) — today's-reading panel | it sits directly over the animated background and is expected to let it show through |
-/// | `/` (Home) — the top bar | same, and the only other surface that overlays the orbs |
 ///
-/// Both are Home, both are `GlassSurface(tier: GlassTier.blur)`, and neither
-/// exists yet. The budget is therefore 2 while the count is 0 — which is the
-/// point: Phase 3 spends two, and the third is red.
+/// It is `GlassSurface(tier: GlassTier.blur)` and it exists. The count is 1 and the
+/// ceiling is 1, so the second is red — which is the point.
 ///
-/// Everything else is `GlassTier.tint`: a translucent fill, a hairline rim and
-/// the ambient shadow, with no `saveLayer` at all.
+/// Everything else is `GlassTier.tint`: a translucent fill, a hairline rim and the
+/// ambient shadow, with no `saveLayer` at all.
+///
+/// **The top bar used to be in that table.** It is not, and `GlassSurface`'s doc
+/// carries the correction at length.
 ///
 /// ### WHAT THIS GATE COUNTS, AND WHAT IT DOES NOT — CORRECTED IN PHASE 5
 ///
@@ -71,7 +88,7 @@
 ///
 /// | directory | `GlassTier.blur` allowance | direct `BackdropFilter` allowance |
 /// | --- | --- | --- |
-/// | `lib/features/` | 2 — the two allowed sites | 0 |
+/// | `lib/features/` | **1** — Home's today's-reading panel | 0 |
 /// | `lib/core/design_system/widgets/` | 1 — `GlassSurface`'s own tier test | 0 outside `glass_surface.dart` |
 ///
 /// The design-system allowance is 1 and not 0 because `GlassSurface` is the widget
@@ -91,6 +108,23 @@
 ///   must not read as "no violations found".
 /// - an empty walk → **fail**. A directory with no `.dart` files under it is a walk
 ///   that found nothing, and a count of zero over nothing is not a pass.
+/// ## THE **STRINGS** WERE WRONG TOO, AND A STRING IS WHAT A DEVELOPER READS
+///
+/// Phase 6's correction reached the assertion (`<= 1`) and the first failure
+/// message, and missed this file's test *name* and this second failure message —
+/// both of which still said "two sites" and "Home's top bar may blur".
+///
+/// That is not a naming nit, because **the message is the artifact a developer
+/// reads when they trip the gate.** The gate was tripped deliberately during the
+/// review: `/login`'s form was moved back to `GlassTier.blur` to read the output,
+/// and the output was half-corrected. A developer who had planted a blur in a
+/// design-system primitive would have been told by this line that the top bar was
+/// an allowed second site — and gone looking for a precedent that does not exist.
+///
+/// So: **a correction to a gate has to reach every string the gate can print**, not
+/// only the number in its `expect`. The name is listed here for the same reason —
+/// a test named "at most two" that asserts "at most one" is the kind of mismatch a
+/// reader trusts the name over.
 library;
 
 import 'dart:io';
@@ -159,7 +193,7 @@ List<String> _sitesMentioning(List<File> files, String marker) {
 }
 
 void main() {
-  test('at most two sites blur anywhere — §13.4 spends two of eight', () {
+  test('at most ONE screen site blurs — §13.4 spends one of eight', () {
     final List<String> features = _sitesMentioning(
       _dartFilesUnder(_features),
       'GlassTier.blur',
@@ -171,11 +205,12 @@ void main() {
 
     expect(
       features,
-      hasLength(lessThanOrEqualTo(2)),
+      hasLength(lessThanOrEqualTo(1)),
       reason:
-          "§13.4 budgets two blur sites across the six screens — Home's "
-          "today's-reading panel and Home's top bar — and lists eight prototype "
-          'sites that would each be a per-frame saveLayer. The over-budget '
+          "§13.4 budgets ONE blur site across the six screens — Home's "
+          "today's-reading panel, and nothing else — and lists eight prototype "
+          'sites that would each be a per-frame saveLayer. The top bar is NOT the '
+          'second: `ds.tsx:499-530` has no `backdropFilter` in it. The over-budget '
           'sites:\n${features.join('\n')}',
     );
     expect(
@@ -188,14 +223,14 @@ void main() {
           'primitive is deciding for itself:\n${widgets.join('\n')}',
     );
     // The ceiling the rule states, over both directories together. Two separate
-    // per-directory bounds would let a fourth site through by arithmetic — 2 in
-    // features plus 1 in the design system is 3 — so the global figure is asserted
+    // per-directory bounds would let a third site through by arithmetic — 1 in
+    // features plus 1 in the design system is 2 — so the global figure is asserted
     // as well as the two that make it up.
     expect(
       features.length + widgets.length,
-      lessThanOrEqualTo(2 + 1),
+      lessThanOrEqualTo(1 + 1),
       reason:
-          '§13.4 budgets two screen sites. The one design-system occurrence is '
+          '§13.4 budgets ONE screen site. The one design-system occurrence is '
           "GlassSurface's own decision, not a site, and the two together are the "
           'whole of what exists:\n${[...features, ...widgets].join('\n')}',
     );
@@ -216,7 +251,8 @@ void main() {
       reason:
           '§13.4 — a `GlassTier.blur` in the design system is a per-frame '
           "saveLayer with no screen behind it to justify the budget. Only Home's "
-          "today's-reading panel and Home's top bar may blur:\n${hits.join('\n')}",
+          "today's-reading panel may blur — the top bar is NOT a second one, "
+          "because `ds.tsx:499-530` has no `backdropFilter` in it:\n${hits.join('\n')}",
     );
   });
 

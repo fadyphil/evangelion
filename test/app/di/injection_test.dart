@@ -553,38 +553,174 @@ void main() {
       );
     });
 
-    test('the nine current registrations are the ones the config actually names', () {
-      // Spelled out rather than counted, for the reason
-      // `app_routes_test.dart` gives: a parser that quietly returned entries of
-      // the wrong shape would sail through a length check.
-      //
-      // The full inventory, so a reader learns what the graph contains from a
-      // failing diff rather than by opening the generated file. Phase 5 added
-      // five `AuthModule` providers (`authLocalDataSource`, `authRepository`,
-      // `signIn`, `getCurrentSession`, `signOut`) and two `CoreModule` ones
-      // (`apiClient`, `apiErrorMapper`) to the two that were there.
-      //
-      // **`apiBaseUrl` now precedes `apiClient`, and that is the point.** The
-      // generated order is dependency order: `CoreModule.apiClient` takes the base
-      // URL as an injected parameter (the `@Named('apiBaseUrl')` registration now
-      // has a reader, which `core_module.dart` records), so injectable orders the
-      // string first. Before that change the two were adjacent by accident, in
-      // declaration order, and `apiBaseUrl` was registered with nothing to serve.
-      expect(
-        configuredRegistrations(File(configPath).readAsStringSync())
-            .map((ConfiguredRegistration r) => r.toString()),
-        <String>[
-          'lazySingleton<AuthLocalDataSource> authLocalDataSource',
-          'lazySingleton<AuthRepository> authRepository',
-          'lazySingleton<SignIn> signIn',
-          'lazySingleton<GetCurrentSession> getCurrentSession',
-          'lazySingleton<SignOut> signOut',
-          'lazySingleton<GetIt> serviceLocator',
-          'lazySingleton<ApiErrorMapper> apiErrorMapper',
-          'lazySingleton<String> apiBaseUrl',
-          'lazySingleton<Dio> apiClient',
-        ],
+    test(
+      'the eighteen current registrations are the ones the config names',
+      () {
+        // Spelled out rather than counted, for the reason
+        // `app_routes_test.dart` gives: a parser that quietly returned entries of the
+        // wrong shape would sail through a length check.
+        //
+        // **Phase 6 added nine**, and the two `CoreModule` ones are unchanged:
+        //
+        // - `HomeModule`: `todayReadingMapper`, `streakSummaryMapper`,
+        //   `readingRepository`, `streakRepository`, `loadTodayReading`,
+        //   `loadStreakSummary`, `getReaderSession` (7)
+        // - the two data sources (2), which injectable orders **last** because they
+        //   take the injected `Dio` — the same dependency-order rule that moved
+        //   `apiBaseUrl` ahead of `apiClient` in Phase 5.
+        //
+        // `HomeBloc` is **not** in this list and never will be: it is hand-registered
+        // beside `AuthBloc`, and the group below refuses it by name.
+        expect(
+          configuredRegistrations(File(configPath).readAsStringSync())
+              .map((ConfiguredRegistration r) => r.toString()),
+          <String>[
+            'lazySingleton<AuthLocalDataSource> authLocalDataSource',
+            'lazySingleton<AuthRepository> authRepository',
+            'lazySingleton<SignIn> signIn',
+            'lazySingleton<GetCurrentSession> getCurrentSession',
+            'lazySingleton<SignOut> signOut',
+            'lazySingleton<GetIt> serviceLocator',
+            'lazySingleton<ApiErrorMapper> apiErrorMapper',
+            'lazySingleton<TodayReadingMapper> todayReadingMapper',
+            'lazySingleton<StreakSummaryMapper> streakSummaryMapper',
+            'lazySingleton<ReadingRepository> readingRepository',
+            'lazySingleton<StreakRepository> streakRepository',
+            'lazySingleton<LoadTodayReading> loadTodayReading',
+            'lazySingleton<LoadStreakSummary> loadStreakSummary',
+            'lazySingleton<GetReaderSession> getReaderSession',
+            'lazySingleton<String> apiBaseUrl',
+            'lazySingleton<Dio> apiClient',
+            'lazySingleton<ReadingRemoteDataSource> readingRemoteDataSource',
+            'lazySingleton<StreakRemoteDataSource> streakRemoteDataSource',
+          ],
+        );
+      },
+    );
+
+    test('and the two live adapters are registered against the PORTS', () {
+      // The substitution AGENT_CONTEXT §2's "live API" decision depends on: a
+      // different transport is a change to one provider body in `home_module.dart`
+      // and nothing else — no use case, no bloc, no page names
+      // `DioReadingRepository`. Asserted in the failing direction **and** by name,
+      // because "the config does not mention the concrete type" is the half that
+      // can pass vacuously.
+      final List<ConfiguredRegistration> configured = configuredRegistrations(
+        File(configPath).readAsStringSync(),
       );
+
+      expect(
+        configured,
+        contains(
+          const ConfiguredRegistration(
+            lifetime: 'lazySingleton',
+            type: 'ReadingRepository',
+            member: 'readingRepository',
+          ),
+        ),
+      );
+      expect(
+        configured,
+        contains(
+          const ConfiguredRegistration(
+            lifetime: 'lazySingleton',
+            type: 'StreakRepository',
+            member: 'streakRepository',
+          ),
+        ),
+      );
+      expect(
+        File(configPath).readAsStringSync(),
+        isNot(contains('DioReadingRepository')),
+      );
+      expect(
+        File(configPath).readAsStringSync(),
+        isNot(contains('DioStreakRepository')),
+      );
+    });
+
+    test('and no feature imports another, for every feature that exists', () {
+      // `home_module.dart` names `features/reading/data/…` classes, which is legal
+      // because `lib/app/` is the directory Gate 2 exempts (recorded decision 16).
+      // The claim worth pinning is the narrower one: **`features/home/` itself**
+      // reaches no adapter, so a reader of the feature can find its dependency and
+      // its type without crossing into another feature's tree.
+      //
+      // ## WHY THE SCAN IS OVER **EVERY** FEATURE NOW, WHICH IS L6
+      //
+      // It used to refuse `features/reading/` and `features/auth/` by name, so
+      // `features/settings/`, `features/quiz/` and `features/result/` would have
+      // passed. That is defence in depth — `tool/verify_purity.sh`'s Gate 2 already
+      // covers all six, and it is the authority — but a test in `test/app/` that
+      // reads `lib/` catches a violation with the analyzer running and without a
+      // shell script, which is a different failure mode from the gate's.
+      //
+      // The sibling in `home_strings_test.dart` is what made this worth doing: it
+      // walks `lib/features/home/` for the prototype's identity literals, and the
+      // lesson written into that test is "the exact mechanism, in the exact shape,
+      // one file over, and not reused". Reused here.
+      final Set<String> features = <String>{
+        for (final FileSystemEntity entity in Directory(
+          'lib/features',
+        ).listSync())
+          if (entity is Directory) entity.path.split('/').last,
+      };
+
+      // Non-vacuous by construction, and stated so a rename cannot empty the set and
+      // turn the scan into a walk over nothing.
+      expect(
+        features,
+        containsAll(<String>[
+          'home',
+          'auth',
+          'reading',
+          'quiz',
+          'result',
+          'settings',
+        ]),
+        reason:
+            'the walk found ${features.length} feature directories, so the loop below '
+            'is either not seeing the feature or is seeing a different layout: '
+            '${features.toList()..sort()}',
+      );
+
+      for (final String feature in features) {
+        final Directory home = Directory('lib/features/$feature');
+        for (final FileSystemEntity entity in home.listSync(recursive: true)) {
+          if (entity is! File || !entity.path.endsWith('.dart')) continue;
+          // **Directives only.** A doc comment naming another feature is a reader
+          // being told why it does not — `home_module.dart`'s is the whole argument
+          // for where the adapters live — and Gate 2 already matches directives for
+          // the same reason it is anchored to the keyword.
+          for (final String line in entity.readAsLinesSync()) {
+            final String trimmed = line.trimLeft();
+            if (!trimmed.startsWith('import ') &&
+                !trimmed.startsWith('export ')) {
+              continue;
+            }
+            // **Own-feature imports are allowed and `part` is not a case.** The
+            // anchored `^import 'package:evangelion/features/([^/]+)/` means a
+            // relative or `part` directive cannot produce a feature name at all,
+            // which is the same reasoning Gate 2 uses.
+            final RegExpMatch? otherFeature = RegExp(
+              r"^import 'package:evangelion/features/([^/]+)/",
+            ).firstMatch(trimmed);
+            final String? imported = otherFeature?.group(1);
+            if (imported == null) {
+              continue;
+            }
+            expect(
+              imported == feature,
+              isTrue,
+              reason:
+                  '${entity.path} imports `features/$imported/`. A feature depends '
+                  'on the PORTS only; `lib/app/di/` is where an adapter is chosen. '
+                  'Gate 2 is the authority and this is the same rule at the unit '
+                  'level.',
+            );
+          }
+        }
+      }
     });
 
     test('and the auth providers are registered against the PORT, not the fake', () {
@@ -634,6 +770,11 @@ void main() {
         // keeps `injection.dart`'s graph Flutter-free, which is exactly why it is
         // hand-registered alongside the router. See `navigation_injection.dart`.
         'AuthBloc',
+        // Phase 6's second. `HomeBloc` is a bloc, so it hits the identical wall —
+        // the only import that reaches it re-exports Flutter's widget layer — and
+        // is registered by hand in `navigation_injection.dart` beside the router
+        // and `AuthBloc`. See that file's `HomeBloc` section.
+        'HomeBloc',
       ]) {
         expect(
           config,

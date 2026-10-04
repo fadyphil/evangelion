@@ -22,6 +22,29 @@ import 'package:evangelion/features/auth/domain/login_credentials.dart';
 /// untestable — which is the difference between a fake that is *substitutable*
 /// (AGENT_CONTEXT §3, LSP) and one that is merely present.
 ///
+/// ## WHY IT LIVES IN `data/repositories/` AND NOT `data/datasources/repositories/`
+///
+/// It was at `lib/features/auth/data/datasources/repositories/` through Phase 5,
+/// and it is a **repository implementation nested inside `datasources/`**.
+///
+/// `AGENTS.md`'s layout — `features/…/data/`, holding "models, mappers, data
+/// sources, repository impls" — is four things, and this is one of the fourth. A
+/// repository is
+/// not a data source: it does not touch a socket, a file or a key-value store, it
+/// orchestrates a data source, and `auth_module.dart` registers it beside the use
+/// cases rather than beside `AuthLocalDataSource`.
+///
+/// The directory was worse than the location. `datasources/repositories/` is a
+/// *second* `repositories` directory in a tree that already has a top-level one
+/// three levels up, and nothing in `§3` or `verify_purity.sh` looks at either — so a
+/// reader had two candidate homes for an adapter and no rule to choose between them.
+/// Phase 6 found this while adding a second adapter and moving it to
+/// `features/reading/data/repositories/`, where the question of "which
+/// `repositories`?" came up for real.
+///
+/// **Recorded as a Phase 5 structural defect found in Phase 6**, because that is
+/// when it was found and where a reader will look.
+///
 /// ## AND THERE IS NO USER-ID CHECK HERE, WHICH USED TO BE CLAIMED TWICE
 ///
 /// An earlier version carried a second `isValidUserId(existing.userId)` guard

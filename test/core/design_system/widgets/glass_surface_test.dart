@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -187,6 +188,13 @@ void main() {
       // a constant and the filter as an `ImageFilter`, and the sigma itself is
       // pinned by the golden pair below. The name says so rather than claiming a
       // round trip that does not exist.
+      //
+      // **`24`, and it is the prototype's own number for this surface.** It used to
+      // be `20`, justified as "the median of the eight prototype radii" — which was
+      // false of the list it gave (the median of `8, 12, 12, 16, 16, 20, 20, 24` is
+      // 16) and of the sites it named (Home's panel is `HomeScreen.tsx:39`'s
+      // `blur(24px)`, not `20`). Only one site blurs, so there was never a
+      // compromise to make; `glass_surface.dart`'s doc carries the whole correction.
       await tester.pumpWidget(
         _onSurface(
           const GlassSurface(tier: GlassTier.blur, child: SizedBox.shrink()),
@@ -198,7 +206,7 @@ void main() {
           matching: find.byType(BackdropFilter),
         ),
       );
-      expect(kGlassBlurSigma, 20.0);
+      expect(kGlassBlurSigma, 24.0);
       expect(filter.filter, isA<ui.ImageFilter>());
     });
 
@@ -512,7 +520,147 @@ void main() {
       });
     }
   });
+
+  group('the sigma doc table, against the prototype it transcribes', () {
+    // The rows of `kGlassBlurSigma`'s doc table: name, prototype file, line, radius.
+    // Parsed out of the doc comment itself, so the table is the subject and not a
+    // second copy of it living here.
+    //
+    // The name is matched as **anything up to the parenthesis**, not as a backticked
+    // token, and that is not looseness for its own sake: four of the nine rows are not
+    // a single backticked name (`` `SealFAB` dock item ``, `` Login form ``), and a
+    // parser that only understood the tidy five would have quietly covered five of
+    // nine — which is the failure this group exists to prevent, one level up. The
+    // first version of this pattern allowed backticks but not a space-separated name
+    // and matched **two** of nine, which is why the anti-vacuity test below asserts a
+    // count and not merely a non-empty list: a parser change is a silent coverage
+    // change otherwise.
+    final List<RegExpMatch> rows =
+        RegExp(
+              r'\|\s*([^|]+?)\s*\(`([^`]+):(\d+)`\)\s*\|\s*(\d+)\s*\|',
+              multiLine: true,
+            )
+            .allMatches(
+              File('lib/core/design_system/widgets/glass_surface.dart')
+                  .readAsStringSync(),
+            )
+            .toList();
+
+    test('the table is parsed out of the doc, and is not empty', () {
+      // Anti-vacuity. Every check below iterates `rows`, so a reformat of the table
+      // would otherwise turn this whole group into a green walk over nothing — which
+      // is the exact shape of the failure this table already had once.
+      expect(
+        rows,
+        hasLength(9),
+        reason:
+            'the table must list all nine prototype sites — seven in `ds.tsx` plus '
+            'the two inline. Found ${rows.length}. A smaller number means a row was '
+            'dropped or the table was reformatted, and every check below silently '
+            'stopped covering it.',
+      );
+    });
+
+    for (final RegExpMatch row in rows) {
+      // Backticks stripped, so `_cutSites` spells a site the way a reader would.
+      final String name = row.group(1)!.replaceAll('`', '').trim();
+      final String file = row.group(2)!;
+      final int line = int.parse(row.group(3)!);
+      final int radius = int.parse(row.group(4)!);
+
+      test('$name is really blur(${radius}px) at $file:$line', () {
+        final File source = File('eva/src/${_prototypePath(file)}');
+        expect(source.existsSync(), isTrue, reason: '$file does not exist');
+
+        final List<String> lines = source.readAsLinesSync();
+        expect(
+          line - 1,
+          lessThan(lines.length),
+          reason: '$file has ${lines.length} lines, so `$line` is past the end',
+        );
+
+        expect(
+          lines[line - 1],
+          contains('blur(${radius}px)'),
+          reason:
+              '`glass_surface.dart` says `$name` is `blur(${radius}px)` at '
+              '`$file:$line`, and that line says:\n${lines[line - 1]}\n\n'
+              'A table of another repository numbers is a claim until something '
+              'checks it, and this is what checks it.',
+        );
+      });
+    }
+
+    test('and the shipped sigma is the radius of the ONE site that blurs', () {
+      // The claim the whole correction rests on: `HomeScreen.tsx:39` writes
+      // `blur(24px)`, Home panel is the only `GlassTier.blur` site, and therefore
+      // the sigma is `24` and not a compromise between eight radii. Read against the
+      // prototype rather than against the constant, so a change that moved the
+      // number and left the argument is red.
+      final List<String> home = File('eva/src/screens/HomeScreen.tsx')
+          .readAsLinesSync();
+
+      expect(home[38], contains('blur(24px)'));
+      expect(
+        kGlassBlurSigma,
+        24.0,
+        reason:
+            'only one site blurs, so there is no median to take: the sigma is the '
+            'prototype own radius for that site',
+      );
+    });
+
+    test('and NO surviving site is a 20, which is what the old median missed', () {
+      // The falsifying check, and the one the old doc made impossible to write. The
+      // two `20` sites are `PassageCard` and the `SealFAB` button, both cut — so `20`
+      // was the median of a list in which the relevant entries are not present.
+      final Set<int> shipping = <int>{
+        for (final RegExpMatch row in rows)
+          if (!_cutSites.contains(row.group(1)!.replaceAll('`', '').trim()))
+            int.parse(row.group(4)!),
+      };
+
+      expect(
+        shipping,
+        <int>{8, 12, 16, 24},
+        reason:
+            'the radii of the sites that survive into the shipped app. If a cut '
+            'screen is restored this list changes, and the sigma justification has '
+            'to be re-derived rather than inherited.',
+      );
+      expect(
+        shipping.contains(20),
+        isFalse,
+        reason:
+            'a surviving `20` site is exactly the premise decision 34 relied on and '
+            'the measurement showed does not exist',
+      );
+    });
+  });
 }
+
+/// The prototype file a doc row names, relative to `eva/src`.
+String _prototypePath(String name) => switch (name) {
+  'ds.tsx' => 'components/ds.tsx',
+  'HomeScreen.tsx' => 'screens/HomeScreen.tsx',
+  'LoginScreen.tsx' => 'screens/LoginScreen.tsx',
+  _ => throw StateError(
+    'the sigma doc names a prototype file this test cannot find: $name. Add it to '
+    '_prototypePath rather than skipping the row — an unmapped file means an '
+    'unchecked claim.',
+  ),
+};
+
+/// The doc-table sites that do **not** ship, and why.
+///
+/// A hard-coded set, and the reason it is *not* read from the table's third column is
+/// that a self-certifying table proves nothing: the check has to live outside the
+/// thing it checks. Adding a row here is a deliberate act with a reason attached.
+const Set<String> _cutSites = <String>{
+  'SealFAB dock item',
+  'PassageCard',
+  'SealFAB button',
+};
 
 Future<List<int>> _screenPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester

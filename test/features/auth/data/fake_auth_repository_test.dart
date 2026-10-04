@@ -3,7 +3,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
-import 'package:evangelion/features/auth/data/datasources/repositories/fake_auth_repository.dart';
+import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:flutter_test/flutter_test.dart';
 
