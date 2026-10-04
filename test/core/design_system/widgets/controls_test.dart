@@ -28,6 +28,12 @@ import '../../../support/design_system_harness.dart';
 /// [kInteractiveWidgets] inventory, which `focus_ring_gate_test.dart` also uses.
 /// One inventory, two §14 rows.
 void main() {
+  const FontSizeStepperLabels stepperLabels = FontSizeStepperLabels(
+    decrease: 'Decrease font size',
+    increase: 'Increase font size',
+    track: 'Font size',
+  );
+
   Finder findToggle() => find.byType(EvaToggle);
   Finder findStepper() => find.byType(FontSizeStepper);
   Finder findIconButton() => find.byType(IconActionButton);
@@ -186,7 +192,10 @@ void main() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpAt(tester, FontSizeStepper(step: 3, onChanged: (int _) {}));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 3, onChanged: (int _) {}),
+      );
       handle.dispose();
 
       expect(find.bySemanticsLabel('Decrease font size'), findsOneWidget);
@@ -198,7 +207,10 @@ void main() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpAt(tester, FontSizeStepper(step: 4, onChanged: (int _) {}));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 4, onChanged: (int _) {}),
+      );
       handle.dispose();
 
       final node = semanticsOf(tester, find.bySemanticsLabel('Font size'));
@@ -212,12 +224,18 @@ void main() {
       WidgetTester tester,
     ) async {
       final List<int> seen = <int>[];
-      await pumpAt(tester, FontSizeStepper(step: 1, onChanged: seen.add));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 1, onChanged: seen.add),
+      );
       await tester.tap(find.bySemanticsLabel('Decrease font size'));
       await tester.pump();
       expect(seen, isEmpty, reason: 'step 1 is already the floor');
 
-      await pumpAt(tester, FontSizeStepper(step: 5, onChanged: seen.add));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 5, onChanged: seen.add),
+      );
       await tester.tap(find.bySemanticsLabel('Increase font size'));
       await tester.pump();
       expect(seen, isEmpty, reason: 'step 5 is already the ceiling');
@@ -226,7 +244,10 @@ void main() {
     testWidgets('a corrupt stored step renders as the nearest real one', (
       WidgetTester tester,
     ) async {
-      await pumpAt(tester, FontSizeStepper(step: 99, onChanged: (int _) {}));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 99, onChanged: (int _) {}),
+      );
       expect(
         semanticsOf(tester, find.bySemanticsLabel('Font size')).value,
         '5',
@@ -237,7 +258,10 @@ void main() {
     testWidgets('the track is 80 wide, the prototype\'s own value', (
       WidgetTester tester,
     ) async {
-      await pumpAt(tester, FontSizeStepper(step: 3, onChanged: (int _) {}));
+      await pumpAt(
+        tester,
+        FontSizeStepper(labels: stepperLabels, step: 3, onChanged: (int _) {}),
+      );
       expect(FontSizeStepper.trackWidth, 80);
     });
 
@@ -245,7 +269,11 @@ void main() {
       testWidgets('a golden per theme — $theme', (WidgetTester tester) async {
         await pumpAt(
           tester,
-          FontSizeStepper(step: 3, onChanged: (int _) {}),
+          FontSizeStepper(
+            labels: stepperLabels,
+            step: 3,
+            onChanged: (int _) {},
+          ),
           theme: data,
         );
         await tester.pump();

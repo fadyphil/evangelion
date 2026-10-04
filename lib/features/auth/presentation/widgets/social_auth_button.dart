@@ -148,8 +148,15 @@ class SocialAuthButton extends StatelessWidget {
                 // 192.0 box at 320px/1.22×, and an ellipsised label is a §14
                 // failure that raises no `FlutterError` for the overflow suite to
                 // see.
-                style: Theme.of(context).textTheme.bodyMedium!
-                    .copyWith(color: colors.ink, fontWeight: FontWeight.w500),
+                //
+                // Swapped for the ambient arm, and there is no `labelFamily` to swap
+                // for the same reason `TextLink` has none: this widget's caller holds
+                // a `String` and nothing else. `المتابعة عبر Google` and
+                // `المتابعة عبر Apple` rendered in DM Sans.
+                style: arabicAware(
+                  Theme.of(context).textTheme.bodyMedium!,
+                  Directionality.of(context),
+                ).copyWith(color: colors.ink, fontWeight: FontWeight.w500),
               ),
             ),
           ),

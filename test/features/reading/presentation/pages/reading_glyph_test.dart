@@ -1,12 +1,29 @@
-/// **Defect #2, in both directions, and the phase's own `08-build-phases.md` test.**
+/// **Defect #2's site table for `/reading`, and the shared harness's screen gate
+/// over the same tree.**
 ///
-/// `01-source-analysis.md`'s row: "**Arabic rendered in Space Mono.** Space Mono has no
-/// Arabic glyphs → tofu boxes in the metadata row and CTA caption.
-/// `ReadingArScreen.tsx:35,86`. … `ScriptureLanguage.ar` maps to `EvaTypography.arabic`
-/// everywhere; drop `mono` from the AR metadata row and CTA caption; **add a
-/// glyph-coverage test**."
+/// ## THIS FILE IS NOW THE **SCREEN-SPECIFIC HALF** OF A SHARED INSTRUMENT
 ///
-/// ## THE DEFECT TABLE NAMED **TWO** SITES. THERE ARE **NINE**.
+/// Everything general — the rendered-tree walk, the tooltip painting, the Arabic
+/// block predicate, the family and coverage assertions — is
+/// `test/support/arabic_typography_gate.dart`, and every one of the six screens runs
+/// it in `test/arabic_typography_test.dart`. Duplicating it here is what let
+/// recorded decision 73 happen: the instrument existed and was applied to one screen,
+/// and the other two built screens were mostly tofu with a green suite.
+///
+/// So what is left here is the part that is genuinely about `/reading` and about
+/// nothing else:
+///
+/// * the **nine-site table**, which names each prototype line and what it wraps, and
+///   asserts each site by *what it renders* rather than by a family constant;
+/// * the **verse-marker walk**, which is reading-specific because the marker is a
+///   `TextSpan` inside the paragraph and `find.byType(Text)` cannot see it;
+/// * the **English control**, which is the one place `Space Mono` is the right answer
+///   and saying so is the point.
+///
+/// The doc below records defect #2 in full, the under-count that produced it, and
+/// the four bugs the walk had. **Those four were all found because a correct fix was
+/// reported as wrong**, and the fifth was found in this phase's promotion; each has a
+/// plant in `test/support/arabic_typography_gate_test.dart`.
 ///
 /// | # | site | prototype | Arabic text it wraps |
 /// | --- | --- | --- | --- |
@@ -20,8 +37,8 @@
 /// | 8 | **the text-size tooltip** | **not in the prototype at all** | `حجم الخط` |
 /// | 9 | **the bookmark tooltip** | **not in the prototype at all** | `إشارة مرجعية — غير متاح في هذه النسخة` |
 ///
-/// Sites 3, 4 and 5 are **not in the table**. Site 5 is in a *shared component*, so it
-/// would have hit `/quiz`'s Arabic arm too and this phase would never have seen it.
+/// Sites 3, 4 and 5 are **not** in the table. Site 5 is in a *shared component*, so
+/// it would have hit `/quiz`'s Arabic arm too and this phase would never have seen it.
 ///
 /// ## AND THE PROTOTYPE'S NINE WERE THE **FLOOR**, NOT THE CEILING
 ///
@@ -33,20 +50,32 @@
 /// `bodyMedium`, which is **DM Sans**.
 ///
 /// So the correct count was never "`01-source-analysis.md`'s nine". It is
-/// **everything the reader can see on the screen**, and three of those sites were
-/// invisible to this gate for two independent reasons, both of which had to be fixed
-/// before the count could be stated at all:
+/// **everything the reader can see on the screen**.
 ///
-/// 1. `renderedRuns()` walked the **already-painted** tree, and a `Tooltip` paints
-///    nothing until a gesture. The probe found **zero** tooltip `Text` widgets.
-/// 2. `_isArabic` tested four hand-picked codepoints — `[0x0628 ب, 0x0644 ل,
-///    0x064Eَ, 0x0665 ٥]`. `رجوع` is `U+0631,062C,0648,0639`: **none of the
-///    four**. So even once painted, sites 7 and 8 would have been skipped by tests 1
-///    and 2.
+/// ## FIVE BUGS THE WALK HAD, AND WHERE THEY ARE NOW DOCUMENTED AND PROVED
 ///
-/// `01-source-analysis.md`'s defect row and `08-build-phases.md`'s Phase-7 note both
-/// claimed this gate asserts "**every character on the screen**". It did not, and
-/// the difference was 30 tofu boxes.
+/// All five were found **because a correct fix was reported as wrong**, or because
+/// the walk reported a correct render as broken. The three span-resolution ones are
+/// documented in `arabic_typography_gate.dart`'s `_paintedRuns`, each with the plant
+/// that fires it in `arabic_typography_gate_test.dart`:
+///
+/// 1. a `Tooltip` paints nothing until a gesture, so the walk is `Future`-returning;
+/// 2. a `TextSpan` with no style of its own inherits its parent's;
+/// 3. **a `TextSpan` that styles only some fields inherits the rest** — a `merge`,
+///    and not a `??`; and the merge's base/other **order** is load-bearing, which the
+///    first version of the repair got backwards;
+/// 4. a `TextSpan` with children and no text of its own paints nothing, so it
+///    contributes no run;
+/// 5. the redundant `find.byType(Text)` pass, which double-reported every run with a
+///    **worse** family than the `RichText` pass — `monospace` against `DMSans` for the
+///    same run.
+///
+/// The sixth is not a walk bug but the finding that produced it: `MaterialApp`'s own
+/// `DefaultTextStyle` is `_errorTextStyle`, whose family is `monospace`, and the probe
+/// the old walk used read `textTheme.bodyMedium` instead. Both values are real and
+/// they answer different questions; the harness's
+/// `materialAppDefaultFamily` doc says which is which, because a reader who has just
+/// measured one of them will otherwise "correct" the other.
 ///
 /// ## WHY "NOT SPACE MONO" IS NOT THE ASSERTION, AND WHAT IS
 ///
@@ -56,16 +85,11 @@
 /// 'not Space Mono' alone passes for `DMSans`, which also has no Arabic glyphs."
 ///
 /// `font_coverage_test.dart` measures that: **Amiri is the only bundled family with
-/// any Arabic glyph at all.** So `not SpaceMono` would be satisfied by Cormorant, DM
-/// Sans and EB Garamond — three families that render six tofu boxes each.
-///
-/// Both halves are therefore asserted, and a third one that is stronger than either:
-///
-/// 1. no rendered run in the AR tree uses a family the assets cannot render Arabic in;
-/// 2. every rendered Arabic run uses `Amiri`, by name — the token **and** the literal
-///    string the engine receives;
-/// 3. every character actually on the AR screen is covered by the family that renders
-///    it.
+/// any Arabic glyph at all** — 1700 codepoints, 255 of them in U+0600–U+06FF, while
+/// Cormorant Garamond, DM Sans, EB Garamond and Space Mono have **zero**. So
+/// `not SpaceMono` would be satisfied by three families that render six tofu boxes
+/// each. Both halves are asserted, plus a third that is stronger than either: every
+/// character on the screen is covered by the family that renders it.
 ///
 /// ## AND IT IS READ OFF THE **RENDERED** TREE, WHICH IS THE WHOLE OF PHASE 6'S
 /// C1 LESSON
@@ -73,8 +97,7 @@
 /// `today_reading_panel.dart` cited defect #2 as the reason it branched on language
 /// and then built one `TextStyle` for both arms — the Arabic preview rendered in
 /// `EBGaramond` and **1520 tests stayed green**, because nothing read a `fontFamily`
-/// off the tree. `home_page_test.dart` fixed that by reading the rendered style; this
-/// file walks the same ground on a screen where the Arabic arm is *entirely* Arabic.
+/// off the tree.
 library;
 
 import 'package:evangelion/core/common/result.dart';
@@ -86,82 +109,15 @@ import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../../support/font_coverage.dart';
+import '../../../../support/arabic_typography_gate.dart';
 import '../../../../support/reading_harness.dart';
-
-/// One rendered run of text: where it is and what family it renders in.
-typedef RenderedRun = ({String label, String family});
 
 void main() {
   group('the ARABIC arm', () {
-    testWidgets('no rendered run uses a family with no Arabic glyphs', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
-      );
-      await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
-
-      final List<RenderedRun> runs = await renderedRuns(tester);
-      expect(runs, isNotEmpty, reason: 'the screen rendered no text at all');
-
-      for (final RenderedRun run in runs) {
-        if (!_isArabic(run.label)) continue;
-        // **Every Arabic run must name one of the app's own five faces**, and this is
-        // where that is said rather than assumed. `Icon` also builds a `RichText` — in
-        // the framework's `MaterialIcons` font — and `codepointsForFamily` *throws* for
-        // a family `pubspec.yaml` does not declare, which is the behaviour the parser
-        // wants and the wrong thing to ask here. So the answer to "is this one of
-        // ours?" is its own assertion.
-        expect(
-          kBundledFontFamilies,
-          contains(run.family),
-          reason:
-              '`${run.label}` renders Arabic in `${run.family}`, which is not '
-              'one of the five bundled faces. `pubspec.yaml` declares those, and a '
-              'name outside them resolves to the fallback font with no error.',
-        );
-        expect(
-          familyCovers(run.family, <int>[0x0628, 0x0644]),
-          isTrue,
-          reason:
-              '`${run.label}` renders Arabic in `${run.family}`, which carries no '
-              'Arabic glyph at all. "Not Space Mono" would have passed this: '
-              '`CormorantGaramond`, `DMSans` and `EBGaramond` are all equally tofu.',
-        );
-      }
-    });
-
-    testWidgets(
-      'every Arabic run uses `Amiri` — the token AND the literal string',
-      (WidgetTester tester) async {
-        final ReadingHarness h = readingHarness(
-          scripture: const Result<ScriptureText>.success(liveArabicPassage),
-        );
-        await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
-
-        final Set<String> arabicFamilies = <String>{
-          for (final RenderedRun run in await renderedRuns(tester))
-            if (_isArabic(run.label)) run.family,
-        };
-        expect(
-          arabicFamilies,
-          <String>{EvaTypography.arabicFamily},
-          reason:
-              'one family for the whole Arabic arm, and it is the token the design '
-              'system names. The literal string is asserted as well as the token '
-              'because `eva_typography.dart` warns that "a name that merely looks right '
-              'resolves to the fallback font with no error at all"',
-        );
-        expect(EvaTypography.arabicFamily, 'Amiri');
-      },
-    );
-
-    testWidgets('and the NINE sites are each named by what they render', (
+    testWidgets('the NINE sites are each named by what they render', (
       WidgetTester tester,
     ) async {
       // The eight that were tofu, one assertion each, so a regression says **which
@@ -171,15 +127,19 @@ void main() {
       );
       await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
 
+      const ReadingStrings strings = ReadingStrings.ar();
       // Site 1 — the metadata row.
       expect(
-        familyOfText(tester, 'Smith & Van Dyck (فانديك)'),
+        familyOfText(tester, liveArabicPassage.translation),
         EvaTypography.arabicFamily,
         reason: 'defect #2 site 1 — `ReadingArScreen.tsx:35`',
       );
       // Site 2 — the CTA caption, with Arabic-Indic digits in it.
       expect(
-        familyOfText(tester, '${arabicIndicDigits(1)} سؤال واحد'),
+        familyOfText(
+          tester,
+          '${arabicIndicDigits(1)} ${strings.questionSingular}',
+        ),
         EvaTypography.arabicFamily,
         reason:
             'defect #2 site 2 — `ReadingArScreen.tsx:86`, and the numeral is '
@@ -210,7 +170,7 @@ void main() {
       );
       // Site 4 — the citation.
       expect(
-        familyOfText(tester, 'يوحنا 3: 1-5'),
+        familyOfText(tester, liveArabicPassage.reference),
         EvaTypography.arabicFamily,
         reason:
             'defect #2 site 4 — `ReadingArScreen.tsx:41`, and NOT in the defect '
@@ -218,7 +178,7 @@ void main() {
       );
       // Site 5 — the CTA label, through a *shared* component.
       expect(
-        familyOfText(tester, 'ابدأ التأمل'),
+        familyOfText(tester, strings.beginReflection),
         EvaTypography.arabicFamily,
         reason:
             'defect #2 site 5 — `ds.tsx:237` sets `F.ui` on every '
@@ -233,7 +193,7 @@ void main() {
       // on **both** themes, which carries no Arabic glyph at all.
       //
       // The strings are looked up through the table rather than written out, and
-      // each one is asserted to be **Arabic by the block test** below — because
+      // each one is asserted to be **Arabic by the block test** — because
       // `رجوع` contains none of the four codepoints the first version of `_isArabic`
       // sampled, and a gate that cannot see the string cannot gate it.
       final Map<String, RenderedRun> painted = <String, RenderedRun>{
@@ -249,20 +209,19 @@ void main() {
             'and §14 requires a name on each',
       );
       for (final (String site, String message) in <(String, String)>[
-        ('7 — the back control', const ReadingStrings.ar().back),
-        ('8 — the `Aa` control', const ReadingStrings.ar().textSize),
+        ('7 — the back control', strings.back),
+        ('8 — the `Aa` control', strings.textSize),
         (
           '9 — the bookmark control',
-          '${const ReadingStrings.ar().bookmark} — '
-              '${const ReadingStrings.ar().unavailableSuffix}',
+          '${strings.bookmark} — ${strings.unavailableSuffix}',
         ),
       ]) {
         expect(
-          _isArabic(message),
+          containsArabic(message),
           isTrue,
           reason:
               'site $site: `"$message"` is what this gate has to recognise as '
-              'Arabic, and the first version of this predicate sampled four '
+              'Arabic, and the first version of the predicate sampled four '
               'codepoints this string contains none of',
         );
         expect(
@@ -279,39 +238,6 @@ void main() {
         ScriptureBlock.familyFor(ReadingLanguage.arabic),
         EvaTypography.arabicFamily,
       );
-    });
-
-    testWidgets('EVERY character on the AR screen is covered by its own family', (
-      WidgetTester tester,
-    ) async {
-      // The strongest form, and the one that does not care which widget a run belongs
-      // to: take the rendered text and the rendered family **together** and ask the
-      // font's own `cmap`.
-      final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
-      );
-      await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
-
-      for (final RenderedRun run in await renderedRuns(tester)) {
-        final String family = run.family;
-        // `Icon` builds a `RichText` in the framework's `MaterialIcons` font, and the
-        // icons carry no text; the assertion above is the one that says every Arabic
-        // run uses one of the five bundled faces.
-        if (!kBundledFontFamilies.contains(family)) continue;
-        final Set<int> available = codepointsForFamily(family);
-        final List<int> missing = <int>{
-          for (final int unit in run.label.codeUnits)
-            if (!_isIgnorable(unit) && !available.contains(unit)) unit,
-        }.toList()..sort();
-        expect(
-          missing,
-          isEmpty,
-          reason:
-              '`${run.label}` is rendered in `$family`, which has no glyph for '
-              '${missing.map((int u) => 'U+${u.toRadixString(16).toUpperCase()}').join(", ")} — '
-              'these would be tofu boxes on the sanctuary.',
-        );
-      }
     });
   });
 
@@ -345,7 +271,7 @@ void main() {
         );
         for (final RenderedRun run in await renderedRuns(tester)) {
           expect(
-            _isArabic(run.label),
+            containsArabic(run.label),
             isFalse,
             reason: 'the EN arm has no Arabic',
           );
@@ -394,235 +320,6 @@ void main() {
       }
     });
   });
-}
-
-/// Characters no bundled family carries and no screen legitimately renders.
-///
-/// **Space** is here because none of the five `.ttf` files declares U+0020 in its
-/// `cmap` — a TrueType space is drawn by the layout engine, not by a glyph — and the
-/// zero-width joiner and bidi marks are the same story.
-bool _isIgnorable(int unit) =>
-    unit == 0x20 ||
-    unit == 0x200C ||
-    unit == 0x200D ||
-    unit == 0x200E ||
-    unit == 0x200F ||
-    unit == 0x061C;
-
-/// Whether [rune] is in one of the four Unicode blocks Arabic script occupies.
-///
-/// **The blocks, and not four hand-picked codepoints.** The first version sampled
-/// `[0x0628 ب, 0x0644 ل, 0x064Eَ, 0x0665 ٥]`, and H1 measured what that cost: the
-/// back control's label `رجوع` is `U+0631,062C,0648,0639` — **none of the four** —
-/// so a painted Arabic tooltip would have been skipped by tests 1 and 2, and the
-/// 30 tofu boxes H1 found would still have shipped behind a green gate.
-///
-/// A range is also the answer a reader can check: "is any character on this screen
-/// from the Arabic block" is one question with one answer, and four samples is a
-/// question about four characters that happen to be in the app today.
-bool _isArabicRune(int rune) =>
-    // Arabic
-    (rune >= 0x0600 && rune <= 0x06FF) ||
-    // Arabic Supplement
-    (rune >= 0x0750 && rune <= 0x077F) ||
-    // Arabic Presentation Forms-A
-    (rune >= 0xFB50 && rune <= 0xFDFF) ||
-    // Arabic Presentation Forms-B
-    (rune >= 0xFE70 && rune <= 0xFEFF);
-
-bool _isArabic(String text) => text.runes.any(_isArabicRune);
-
-/// The family [text] is rendered in, or `null` when it is not on screen.
-///
-/// `null` and not a default, so a string that has quietly stopped being rendered is a
-/// **failure naming the string** rather than a pass with an empty family.
-String? familyOfText(WidgetTester tester, String text) {
-  for (final Text widget in tester.widgetList<Text>(find.byType(Text))) {
-    if (widget.data != text) continue;
-    return widget.style?.fontFamily ?? '';
-  }
-  for (final RichText rich in tester.widgetList<RichText>(
-    find.byType(RichText),
-  )) {
-    if (rich.text.toPlainText() != text) continue;
-    final InlineSpan span = rich.text;
-    return span is TextSpan ? span.style?.fontFamily ?? '' : '';
-  }
-  return null;
-}
-
-/// Every run of text the tree actually renders, with the family it renders in —
-/// **including every tooltip, painted one at a time**.
-///
-/// ## WHY THIS IS `Future` AND NOT A PLAIN FUNCTION
-///
-/// A `Tooltip` paints nothing until a gesture: its message lives in an overlay that
-/// is not built at all until a long press is held past `kLongPressTimeout`. The
-/// first version of this walk was synchronous, so the probe found **zero** tooltip
-/// runs and the gate was blind to three Arabic sites — H1's thirty tofu boxes.
-///
-/// So the walk is: everything painted now, then each `Tooltip` in turn held open and
-/// everything painted then. The result is **deduplicated**, because four snapshots of
-/// the same screen would otherwise list every other run four times.
-///
-/// ## AND WHY A WALK AND NOT `find.byType(Text)`
-///
-/// `Text` is a `StatelessWidget` that builds a `RichText`, and `RichText` is also
-/// what `Text.rich`, the scripture paragraphs **and** `Tooltip`'s own content are —
-/// so the tree has all three, and a `Text`-only walk misses the verse markers
-/// entirely, which is three of the nine sites this file exists for.
-///
-/// The family fallback is the theme's `bodyMedium` **captured before the gesture
-/// loop**. The first version read `Theme.of(tester.element(find.byType(Text).first))`
-/// inside the walk, which throws on a tree with no `Text` in it — and it is also the
-/// value `Tooltip` resolves a null `textStyle` to, which is exactly the H1 defect,
-/// so it is named here rather than being an accident.
-Future<List<RenderedRun>> renderedRuns(WidgetTester tester) async {
-  final String fallback =
-      Theme.of(tester.element(find.byType(ScriptureBlock).first))
-          .textTheme
-          .bodyMedium
-          ?.fontFamily ??
-      '';
-
-  final Set<RenderedRun> runs = <RenderedRun>{
-    ..._paintedRuns(tester, fallback),
-    for (final ({String message, RenderedRun run}) tooltip
-        in await _tooltipRuns(tester, fallback))
-      tooltip.run,
-  };
-  return runs.toList();
-}
-
-/// What each `Tooltip` on screen **paints**, and in what family.
-///
-/// One entry per tooltip per painted run, so a tooltip whose message arrives as two
-/// spans is two entries rather than one lossy join.
-Future<List<({String message, RenderedRun run})>> paintedTooltips(
-  WidgetTester tester,
-) async {
-  final String fallback =
-      Theme.of(tester.element(find.byType(ScriptureBlock).first))
-          .textTheme
-          .bodyMedium
-          ?.fontFamily ??
-      '';
-  return _tooltipRuns(tester, fallback);
-}
-
-/// The runs the three control tooltips add to the tree, one at a time.
-///
-/// **Indexed rather than matched by widget instance**, because a `Tooltip` is
-/// re-created on every rebuild of its parent and `find.byWidget` would then be
-/// looking for a widget that is no longer in the tree — which reads as "the tooltip
-/// did not paint" rather than as a stale finder.
-Future<List<({String message, RenderedRun run})>> _tooltipRuns(
-  WidgetTester tester,
-  String fallback,
-) async {
-  // `Tooltip.message` is nullable because a tooltip may carry a `richMessage`
-  // instead, and `IconActionButton` only ever passes the plain one — so `!` is
-  // right here and `?? ''` would be a silent empty message.
-  final List<String> messages = <String>[
-    for (final Tooltip tip in tester.widgetList<Tooltip>(find.byType(Tooltip)))
-      tip.message!,
-  ];
-  final List<({String message, RenderedRun run})> painted =
-      <({String message, RenderedRun run})>[];
-
-  for (int index = 0; index < messages.length; index++) {
-    final Finder target = find.byType(Tooltip).at(index);
-    final TestGesture gesture = await tester.startGesture(
-      tester.getCenter(target),
-      kind: PointerDeviceKind.touch,
-    );
-    // The tooltip's own `showDuration`/`enterDuration` are what this waits out. A
-    // fixed 12 pumps was tried first and is a second number to get wrong.
-    for (int frame = 0; frame < 20; frame++) {
-      await tester.pump(const Duration(milliseconds: 50));
-      if (_isPainted(tester, messages[index])) break;
-    }
-    for (final RenderedRun run in _paintedRuns(tester, fallback)) {
-      if (run.label == messages[index]) {
-        painted.add((message: messages[index], run: run));
-      }
-    }
-    await gesture.up();
-    await tester.pumpAndSettle();
-  }
-  return painted;
-}
-
-/// Whether [message] is on screen, which is how the loop above knows the tooltip
-/// has actually painted rather than merely been told to.
-bool _isPainted(WidgetTester tester, String message) => tester
-    .widgetList<RichText>(find.byType(RichText))
-    .any((RichText rich) => rich.text.toPlainText() == message);
-
-/// Everything painted right now, one entry per run of text.
-///
-/// ## TWO THINGS THE FIRST VERSION GOT WRONG, AND BOTH WERE **THE H1 FAMILY**
-///
-/// **1. A `TextSpan` with children and no text of its own paints nothing.** The
-/// walk added a run for *every* span, using the whole span's plain text as the label
-/// — so a verse paragraph was counted twice, once by its parent and once by its
-/// children. Harmless for the verses (the parent carries `bodyStyle`), and for the
-/// **tooltip's** `RichText` it produced a duplicate run labelled `رجوع`.
-///
-/// **2. And a `TextSpan` with no style of its own inherits its parent's.** This is
-/// the one that mattered. Flutter's `Tooltip` builds its content as
-/// `TextSpan(style: effective, children: [TextSpan(text: message)])` — the **root**
-/// carries the family and the **child** carries the text — so the walk read the
-/// child's `fontFamily` as `null` and substituted the theme's `bodyMedium`, which is
-/// **`DMSans`**. The tooltip was already rendered in `Amiri` and the gate reported
-/// `DMSans`, in the one family this file exists to catch: a correct fix looks wrong.
-///
-/// So the walk now threads the effective style down the way `TextSpan.build` does,
-/// and a `WidgetSpan` is labelled with **its own** plain text (U+FFFC) rather than
-/// its parent's — the drop cap's box is one character to the engine, not a second
-/// copy of the paragraph.
-List<RenderedRun> _paintedRuns(WidgetTester tester, String fallback) {
-  final List<RenderedRun> runs = <RenderedRun>[];
-  void collectSpan(InlineSpan span, String label, [TextStyle? inherited]) {
-    if (span is! TextSpan) {
-      // A `WidgetSpan` or a `PlaceholderSpan`: its OWN plain text, in the family it
-      // inherits. The drop cap's box is one character to the engine (U+FFFC), not a
-      // second copy of the paragraph it hangs in.
-      runs.add((
-        label: span.toPlainText(),
-        family: inherited?.fontFamily ?? fallback,
-      ));
-      return;
-    }
-    // `TextSpan.build` resolves a null `style` against the parent's, so this walk
-    // has to as well — that resolution *is* what the engine does.
-    final TextStyle effective = span.style ?? inherited ?? const TextStyle();
-    if (span.text != null || span.children == null) {
-      runs.add((
-        label: span.text ?? label,
-        family: effective.fontFamily ?? fallback,
-      ));
-    }
-    for (final InlineSpan child in span.children ?? const <InlineSpan>[]) {
-      collectSpan(child, label, effective);
-    }
-  }
-
-  void collectRoot(InlineSpan span) =>
-      collectSpan(span, span.toPlainText(), null);
-
-  for (final RichText rich in tester.widgetList<RichText>(
-    find.byType(RichText),
-  )) {
-    collectRoot(rich.text);
-  }
-  for (final Text widget in tester.widgetList<Text>(find.byType(Text))) {
-    runs.add((
-      label: widget.data ?? '',
-      family: widget.style?.fontFamily ?? fallback,
-    ));
-  }
-  return runs;
 }
 
 /// The plain text of every verse marker on screen, in order.

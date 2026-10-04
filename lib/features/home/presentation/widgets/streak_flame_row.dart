@@ -51,11 +51,18 @@ class StreakFlameRow extends StatelessWidget {
 
   /// The streak could not be read, and this is the repository's own message.
   ///
-  /// **Not reworded.** `failure.dart` requires the server's wording to be
-  /// preserved verbatim, and this is the one place on `/` a repository message is
-  /// shown. It reaches the player as an [IconActionButton]'s tooltip and label,
-  /// which is why the bar's height is 44 and not the prototype's 32 — see
-  /// [AppTopBar].
+  /// **Not reworded, and the reason is the one that actually holds.**
+  /// `failure.dart` requires the server's wording to be preserved verbatim, and this
+  /// is the one place on `/` a repository message is shown. It reaches the player as
+  /// an [IconActionButton]'s tooltip and label, which is why the bar's height is 44
+  /// and not the prototype's 32 — see [AppTopBar].
+  ///
+  /// **Verbatim means the script is the server's, not ours.** A previous version of
+  /// this field's tooltip family rested on the claim that every such message is an
+  /// English ASCII literal naming a bad key, which `api_error_mapper.dart` contradicts
+  /// (`decoded?.message ?? 'HTTP $status'` — the server's text when there is any). The
+  /// tooltip's family now follows the ambient arm instead, and the class doc says why
+  /// that is the answer rather than a guess.
   final String? failureMessage;
 
   /// What to run when the reader asks to try again.
@@ -107,14 +114,33 @@ class StreakFlameRow extends StatelessWidget {
       return IconActionButton(
         icon: Icons.sync_problem_outlined,
         tooltip: message,
-        // `uiFamily`, and the reason this is not a guess: the message is a
-        // `Failure.message` from `ApiErrorMapper` / `TodayReadingMapper`, and both
-        // write **English ASCII literals** naming the key that was wrong — there is
-        // no Arabic in the vocabulary. So the Latin family is not "the default
-        // nobody chose", it is the correct answer for the only string this site can
-        // receive, and `IconActionButton.tooltipFamily`'s assert-that-the-caller-said-
-        // something requirement is what proves it.
-        tooltipFamily: EvaTypography.uiFamily,
+        // ## THE PREVIOUS COMMENT HERE WAS **FALSE**, AND THE FAMILY WAS CHOSEN ON
+        // ## THE STRENGTH OF IT
+        //
+        // It read: *"the message is a `Failure.message` from `ApiErrorMapper` /
+        // `TodayReadingMapper`, and both write **English ASCII literals** naming the
+        // key that was wrong — there is no Arabic in the vocabulary. So the Latin
+        // family is not 'the default nobody chose', it is the correct answer for the
+        // only string this site can receive."*
+        //
+        // `api_error_mapper.dart` says `message: decoded?.message ?? 'HTTP $status'`.
+        // So when the server sends a message — **the normal case**, and every one of
+        // the eight observed bodies in `api_error_mapper_test.dart` does —
+        // `Failure.message` carries **the server's own text**. The premise was
+        // contradicted by the code two files away, and it was load-bearing: it was
+        // the stated reason for putting a Latin family on a string this client does
+        // not control.
+        //
+        // The claim is deleted rather than repaired, because the *reasoning* was the
+        // problem: it reasoned about what the server might send, which is not a fact
+        // this client has. The family is now resolved from the ambient arm, which is
+        // — and Amiri carries ASCII and Latin-1 as well as the Arabic block
+        // (measured from the bundled `cmap`s), so it renders the message correctly
+        // whichever script arrives. No prediction, no wrong prediction to maintain.
+        tooltipFamily: arabicAwareFamily(
+          Directionality.of(context),
+          EvaTypography.uiFamily,
+        ),
         onPressed: onRetry,
       );
     }

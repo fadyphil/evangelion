@@ -210,13 +210,26 @@ class TodayReadingPanel extends StatelessWidget {
   /// it with the Latin face on the Arabic arm is asserting the defect rather than
   /// fixing it.
   ///
-  /// **Not a claim that `/` is whole.** Measured on the shipped `/` at `ar`, the
-  /// families in the tree are `{CormorantGaramond, SpaceMono, DMSans, EBGaramond}`
-  /// — the subtitle, the reference, the status line and `Start reflection` are all
-  /// DM Sans or Space Mono. This widget's **preview** is Amiri because `_Preview`
-  /// already branched on the arm; this adds the button. The rest of the screen's
-  /// Arabic runs are Phase 10's, and the measurement is in the review report rather
-  /// than pinned here as a claim about something this file does not own.
+  /// **Not a claim that `/` is whole, and the claim that it was has been deleted.**
+  ///
+  /// This doc used to carry a measurement of `/`'s broken Arabic arm — "the
+  /// subtitle, the reference, the status line and `Start reflection` are all DM Sans
+  /// or Space Mono" — and to name the rest "Phase 10's work". It is gone because it
+  /// was **both incomplete and out of date**: it missed the greeting's lead-in, the
+  /// beads' `0 / 0` line and the failed state's `Failure.message`, and it counted
+  /// this widget's own button as sound when the *link* beside it was tofu.
+  ///
+  /// `test/arabic_typography_test.dart` is the thing that keeps a measurement like
+  /// that true, because it re-derives it from the rendered tree on every run and
+  /// fails when the count moves. A measurement written down in a doc comment is a
+  /// claim; §9's rule is that a claim about a specific thing is only as good as the
+  /// test that checks it, and there was none.
+  ///
+  /// What is here instead is the decision: `continueFamilyFor` is keyed on the
+  /// **payload's** arm, which is a fact the caller holds, and every run that renders
+  /// the app's own chrome on this panel resolves its family from the ambient
+  /// direction through `arabicAware`. Two sources for two different questions, and
+  /// neither has to guess.
   static String continueFamilyFor(ReadingLanguage language) =>
       switch (language) {
         ReadingLanguage.english => EvaTypography.uiFamily,
@@ -284,8 +297,16 @@ class TodayReadingPanel extends StatelessWidget {
           // `HomeScreen.tsx:44` — `F.mono 9 / 700 / letterSpacing .14em / ink3`.
           // `EvaTypography.monoCaps` is `labelMedium`'s geometry with the mono
           // family, and §5.2 gives mono no size — see `eva_typography.dart`.
-          style: EvaTypography.monoCaps(colors)
-              .copyWith(fontWeight: FontWeight.w700, color: colors.ink3),
+          //
+          // Swapped for the ambient arm, and **Space Mono is the worst case in the
+          // app**: it carries no Arabic glyph whatsoever, so `متابعة القراءة` and
+          // `اكتملت القراءة` were six and fifteen tofu boxes respectively. The
+          // geometry is untouched — `monoCaps` is still the style this run is built
+          // from, and only its family is resolved for the direction.
+          style: arabicAware(
+            EvaTypography.monoCaps(colors),
+            Directionality.of(context),
+          ).copyWith(fontWeight: FontWeight.w700, color: colors.ink3),
         ),
         const SizedBox(height: eyebrowGap),
         _Preview(reading: today, strings: strings),
@@ -297,8 +318,17 @@ class TodayReadingPanel extends StatelessWidget {
           // size — so the prototype's *ratio* to the preview is what is kept and
           // the slot is `titleLarge`, the smallest slot that still reads as a
           // heading. Recorded rather than hidden.
-          style: Theme.of(context).textTheme.titleLarge!
-              .copyWith(fontWeight: FontWeight.w600, color: colors.ink),
+          //
+          // Swapped for the ambient arm. `today.reference` is the **server's** string
+          // (`Decision 53: rendered verbatim and never parsed`) and on the Arabic arm
+          // it is `يوحنا 3: 1-5`, so `titleLarge`'s Cormorant Garamond — which has no
+          // Arabic block at all, 974 glyphs and none of them U+0600–U+06FF — rendered
+          // the whole citation as tofu. That is not tofu in a *Latin* face on an
+          // Arabic screen; it is a citation a reader cannot read at all.
+          style: arabicAware(
+            Theme.of(context).textTheme.titleLarge!,
+            Directionality.of(context),
+          ).copyWith(fontWeight: FontWeight.w600, color: colors.ink),
         ),
         const SizedBox(height: referenceGap),
         _Beads(reading: today, strings: strings),

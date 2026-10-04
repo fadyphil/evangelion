@@ -22,6 +22,17 @@ import 'package:flutter/material.dart';
 /// would disappear on the near-black reading screen. The prototype's 8% white is
 /// about three times that. Recorded, because "the divider IS the hairline token"
 /// is true of `ThemeData.dividerColor` and is not true of this widget.
+///
+/// ## THE LABEL IS SWAPPED FOR THE AMBIENT ARM, AND `toUpperCase` IS A NO-OP THERE
+///
+/// [label] is a caller's string with no family parameter, for [TextLink]'s reason:
+/// `LoginPage` passes `LoginStrings.of(locale).divider` and has nothing else to
+/// pass. So `أو` rendered in **Space Mono** — one tofu box — on a bilingual screen,
+/// while the `EvaButton` two lines above it rendered its Arabic label in Amiri.
+///
+/// `text.toUpperCase()` is kept and is a no-op on the Arabic arm: Arabic has no
+/// case, so the transform is idempotent there and the prototype's uppercase rule
+/// (`ds.tsx:297`) still holds on the English one.
 class HairlineDivider extends StatelessWidget {
   /// A rule, optionally labelled [label] in the middle.
   const HairlineDivider({this.label, this.color, this.width, super.key});
@@ -62,11 +73,15 @@ class HairlineDivider extends StatelessWidget {
           const SizedBox(width: labelGap),
           Text(
             text.toUpperCase(),
-            style: EvaTypography.monoCaps(colors).copyWith(
-              // `LoginScreen.tsx:78` — `color: T.ink3`.
-              color: colors.ink3,
-              fontWeight: FontWeight.w700,
-            ),
+            style:
+                arabicAware(
+                  EvaTypography.monoCaps(colors),
+                  Directionality.of(context),
+                ).copyWith(
+                  // `LoginScreen.tsx:78` — `color: T.ink3`.
+                  color: colors.ink3,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
           const SizedBox(width: labelGap),
           Expanded(child: line),
