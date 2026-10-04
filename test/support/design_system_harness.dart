@@ -599,7 +599,15 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   (
     widget: FontSizeStepper,
     name: 'SettingsScreen.tsx:63-69 — the range input row',
-    build: () => const FontSizeStepper(step: 3, onChanged: _noopInt),
+    build: () => const FontSizeStepper(
+      step: 3,
+      onChanged: _noopInt,
+      labels: FontSizeStepperLabels(
+        decrease: 'Decrease font size',
+        increase: 'Increase font size',
+        track: 'Font size',
+      ),
+    ),
     // The steppers, not the track: the track is a `GestureDetector` deliberately
     // left out of the focus order (see `_delegatesFocusRingTo`), so the two
     // `IconActionButton`s are the surfaces a reader can actually press.

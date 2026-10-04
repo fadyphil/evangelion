@@ -96,7 +96,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result<ScriptureText>.failure(readingFailure),
+        reading: const Result<ScriptureText>.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
 

@@ -28,6 +28,25 @@ import 'package:flutter/material.dart';
 /// thing to keep in step with the mapper. The mapper is unit-tested against
 /// bodies captured from the live server, so a wording change in `error_view.dart`
 /// would break a test rather than silently fork the vocabulary.
+///
+/// ## …AND THE MESSAGE'S **FAMILY** FOLLOWS THE AMBIENT ARM, BECAUSE THE CLIENT
+/// ## DOES NOT KNOW WHAT SCRIPT THE SERVER WROTE IN
+///
+/// `Failure.message` is the backend's wording **verbatim** — the paragraph above is
+/// the reason this widget does not reword it. So the message's script is a fact the
+/// client does not have, and a widget that picks a family for it is guessing.
+///
+/// The guess this file used to make was implicit: `titleMedium` is DM Sans, and DM
+/// Sans has no Arabic glyphs at all, so an Arabic `Failure.message` rendered as tofu
+/// boxes. The other site that reasoned about `Failure.message` —
+/// `streak_flame_row.dart` — at least said so, and said it wrongly.
+///
+/// The answer is not a better guess but a face that does not need one: Amiri carries
+/// U+0600–U+06FF, U+0750–U+077F, both Arabic Presentation Forms blocks, **and** all
+/// 95 printable ASCII codepoints plus Latin-1 — measured from the bundled `cmap`s by
+/// `font_coverage.dart`. Under RTL, `arabicAware` therefore renders the server's
+/// message correctly whichever script it is in, and under LTR it is exactly the
+/// Latin face it always was.
 class ErrorView extends StatelessWidget {
   /// An error view saying [message], optionally offering [onRetry].
   const ErrorView({
@@ -136,8 +155,25 @@ class ErrorView extends StatelessWidget {
                   // `titleMedium` rather than a display slot, for the reason
                   // [EmptyState.titleStyle] gives: 57sp at 1.22× on a 320px screen
                   // is four lines.
-                  style: Theme.of(context).textTheme.titleMedium!
-                      .copyWith(color: colors.ink),
+                  //
+                  // **Swapped for the ambient arm, and this is the second of the
+                  // three sites that reason from `Failure.message`.** The first
+                  // version of the justification was that `Failure.message` is
+                  // "English ASCII from `ApiErrorMapper`", and
+                  // `streak_flame_row.dart` still carried that claim in a 10-line
+                  // comment. `api_error_mapper.dart` says `message: decoded?.message
+                  // ?? 'HTTP $status'` — so when the **server** sends a message,
+                  // which is the normal case, this renders the server's own words in
+                  // whatever script they are in. A backend that localises its errors
+                  // is a one-commit change, and this is where it would land as tofu.
+                  //
+                  // Amiri carries ASCII and Latin-1 alongside the Arabic block
+                  // (measured over the bundled `cmap`s), so under RTL this renders
+                  // **either** script correctly and the client never has to guess.
+                  style: arabicAware(
+                    Theme.of(context).textTheme.titleMedium!,
+                    Directionality.of(context),
+                  ).copyWith(color: colors.ink),
                 ),
                 if (onRetry case final VoidCallback retry) ...<Widget>[
                   const SizedBox(height: EvaSpacing.xl),

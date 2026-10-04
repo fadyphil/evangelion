@@ -39,6 +39,12 @@ import '../../../support/design_system_harness.dart';
 /// everywhere below" is indistinguishable from "this file detects nothing", and
 /// that is the same failure as a gate that cannot fail.
 void main() {
+  const FontSizeStepperLabels stepperLabels = FontSizeStepperLabels(
+    decrease: 'Decrease font size',
+    increase: 'Increase font size',
+    track: 'Font size',
+  );
+
   /// Every text-bearing Tier-1 widget, in the inventory's own order.
   ///
   /// Enumerated rather than discovered: discovery would need a legal argument for
@@ -135,8 +141,11 @@ void main() {
       onPressed: _noopVoid,
     ),
     'EvaToggle': () => const EvaToggle(value: true, onChanged: _noopBool),
-    'FontSizeStepper': () =>
-        const FontSizeStepper(step: 3, onChanged: _noopInt),
+    'FontSizeStepper': () => const FontSizeStepper(
+      labels: stepperLabels,
+      step: 3,
+      onChanged: _noopInt,
+    ),
     'SegmentedControl': () => SegmentedControl<String>(
       values: const <String>['Light', 'Dark', 'System'],
       selected: 'Dark',

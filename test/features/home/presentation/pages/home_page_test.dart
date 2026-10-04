@@ -277,13 +277,13 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(readingFailure),
+        reading: const Result.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
       expect(find.byType(ErrorView), findsOneWidget);
       // Verbatim, per `failure.dart`.
-      expect(find.text(readingFailure.message), findsOneWidget);
+      expect(find.text(homeReadingFailure.message), findsOneWidget);
       expect(find.byType(TodayReadingPanel), findsOneWidget);
     });
 
@@ -292,7 +292,7 @@ void main() {
       (WidgetTester tester) async {
         // The phase's own wording: "not a blank panel, and not a whole-screen error".
         final HomeHarness h = harness(
-          reading: const Result.failure(readingFailure),
+          reading: const Result.failure(homeReadingFailure),
         );
         await pumpHome(tester, bloc: h.bloc);
 
@@ -313,7 +313,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(readingFailure),
+        reading: const Result.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -333,7 +333,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(readingFailure),
+        reading: const Result.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -376,7 +376,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(readingFailure),
+        reading: const Result.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
