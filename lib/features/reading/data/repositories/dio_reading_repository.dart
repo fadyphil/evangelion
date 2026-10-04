@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
@@ -70,19 +71,41 @@ final class DioReadingRepository implements ReadingRepository {
   /// Exception → [Failure]. `const`, and the one place a status becomes a kind.
   final ApiErrorMapper errors;
 
+  /// The wide read. One `get`, one mapper pass — see [todayScripture].
   @override
-  Future<Result<TodayReading>> today({
+  Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
   }) async {
     try {
       final Object? body = await dataSource.today(language);
-      return mapper.map(body);
+      return mapper.mapScripture(body);
     } on DioException catch (error) {
       // Every transport fault and every non-2xx arrives here. §5 records that a
       // *missing* `X-User-Id` is a **400**, not a 401, so nothing below may
       // distinguish "unauthenticated" from "bad request" — the status decides the
       // kind and the body decides the message, both in `ApiErrorMapper`.
-      return Result<TodayReading>.failure(errors.fromDioException(error));
+      return Result<ScriptureText>.failure(errors.fromDioException(error));
     }
   }
+
+  /// `/`'s narrow read, and it is a **narrowing of [todayScripture]** rather than
+  /// a second request.
+  ///
+  /// That is the whole of recorded decision 23 as implemented, and it is why the
+  /// body above is the *only* `try` in this class. An earlier version had a second
+  /// one — identical, calling `mapper.map` — which meant the two projections could
+  /// disagree about whether a payload was readable and nothing would say so. A
+  /// single `DioException` handler also means a new fault cannot be handled on one
+  /// path and missed on the other.
+  ///
+  /// `Result.map` runs its function only for a success and leaves a failure
+  /// byte-for-byte identical, so a 409 or a transport error propagates unchanged
+  /// and the `Failure` a reader sees is the one the mapper or the error mapper
+  /// wrote.
+  @override
+  Future<Result<TodayReading>> today({
+    required ReadingLanguage language,
+  }) async =>
+      (await todayScripture(language: language))
+          .map((ScriptureText scripture) => scripture.toTodayReading());
 }

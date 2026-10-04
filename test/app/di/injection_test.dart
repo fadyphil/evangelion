@@ -553,50 +553,55 @@ void main() {
       );
     });
 
-    test(
-      'the eighteen current registrations are the ones the config names',
-      () {
-        // Spelled out rather than counted, for the reason
-        // `app_routes_test.dart` gives: a parser that quietly returned entries of the
-        // wrong shape would sail through a length check.
-        //
-        // **Phase 6 added nine**, and the two `CoreModule` ones are unchanged:
-        //
-        // - `HomeModule`: `todayReadingMapper`, `streakSummaryMapper`,
-        //   `readingRepository`, `streakRepository`, `loadTodayReading`,
-        //   `loadStreakSummary`, `getReaderSession` (7)
-        // - the two data sources (2), which injectable orders **last** because they
-        //   take the injected `Dio` — the same dependency-order rule that moved
-        //   `apiBaseUrl` ahead of `apiClient` in Phase 5.
-        //
-        // `HomeBloc` is **not** in this list and never will be: it is hand-registered
-        // beside `AuthBloc`, and the group below refuses it by name.
-        expect(
-          configuredRegistrations(File(configPath).readAsStringSync())
-              .map((ConfiguredRegistration r) => r.toString()),
-          <String>[
-            'lazySingleton<AuthLocalDataSource> authLocalDataSource',
-            'lazySingleton<AuthRepository> authRepository',
-            'lazySingleton<SignIn> signIn',
-            'lazySingleton<GetCurrentSession> getCurrentSession',
-            'lazySingleton<SignOut> signOut',
-            'lazySingleton<GetIt> serviceLocator',
-            'lazySingleton<ApiErrorMapper> apiErrorMapper',
-            'lazySingleton<TodayReadingMapper> todayReadingMapper',
-            'lazySingleton<StreakSummaryMapper> streakSummaryMapper',
-            'lazySingleton<ReadingRepository> readingRepository',
-            'lazySingleton<StreakRepository> streakRepository',
-            'lazySingleton<LoadTodayReading> loadTodayReading',
-            'lazySingleton<LoadStreakSummary> loadStreakSummary',
-            'lazySingleton<GetReaderSession> getReaderSession',
-            'lazySingleton<String> apiBaseUrl',
-            'lazySingleton<Dio> apiClient',
-            'lazySingleton<ReadingRemoteDataSource> readingRemoteDataSource',
-            'lazySingleton<StreakRemoteDataSource> streakRemoteDataSource',
-          ],
-        );
-      },
-    );
+    test('the nineteen current registrations are the ones the config names', () {
+      // Spelled out rather than counted, for the reason
+      // `app_routes_test.dart` gives: a parser that quietly returned entries of the
+      // wrong shape would sail through a length check.
+      //
+      // **Phase 6 added nine**, and the two `CoreModule` ones are unchanged:
+      //
+      // - `HomeModule`: `todayReadingMapper`, `streakSummaryMapper`,
+      //   `readingRepository`, `streakRepository`, `loadTodayReading`,
+      //   `loadStreakSummary`, `getReaderSession` (7)
+      // - the two data sources (2), which injectable orders **last** because they
+      //   take the injected `Dio` — the same dependency-order rule that moved
+      //   `apiBaseUrl` ahead of `apiClient` in Phase 5.
+      //
+      // `ReadingModule`: `loadScripture` (1), which **Phase 7 added**.
+      //
+      // `HomeBloc` and `ReadingCubit` are **not** in this list and never will be:
+      // they are hand-registered beside `AuthBloc` — `ReadingCubit` is the fourth
+      // such registration and `navigation_injection.dart` argues why — and the
+      // group below refuses them by name. `ReadingRepository`'s adapter, the data
+      // source and the mapper are Phase 6's and are listed once, because Phase 7
+      // **widened** those classes rather than registering a second pair (recorded
+      // decision 23).
+      expect(
+        configuredRegistrations(File(configPath).readAsStringSync())
+            .map((ConfiguredRegistration r) => r.toString()),
+        <String>[
+          'lazySingleton<AuthLocalDataSource> authLocalDataSource',
+          'lazySingleton<AuthRepository> authRepository',
+          'lazySingleton<SignIn> signIn',
+          'lazySingleton<GetCurrentSession> getCurrentSession',
+          'lazySingleton<SignOut> signOut',
+          'lazySingleton<GetIt> serviceLocator',
+          'lazySingleton<ApiErrorMapper> apiErrorMapper',
+          'lazySingleton<TodayReadingMapper> todayReadingMapper',
+          'lazySingleton<StreakSummaryMapper> streakSummaryMapper',
+          'lazySingleton<ReadingRepository> readingRepository',
+          'lazySingleton<StreakRepository> streakRepository',
+          'lazySingleton<LoadTodayReading> loadTodayReading',
+          'lazySingleton<LoadStreakSummary> loadStreakSummary',
+          'lazySingleton<GetReaderSession> getReaderSession',
+          'lazySingleton<LoadScripture> loadScripture',
+          'lazySingleton<String> apiBaseUrl',
+          'lazySingleton<Dio> apiClient',
+          'lazySingleton<ReadingRemoteDataSource> readingRemoteDataSource',
+          'lazySingleton<StreakRemoteDataSource> streakRemoteDataSource',
+        ],
+      );
+    });
 
     test('and the two live adapters are registered against the PORTS', () {
       // The substitution AGENT_CONTEXT §2's "live API" decision depends on: a

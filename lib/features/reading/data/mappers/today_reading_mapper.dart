@@ -1,6 +1,8 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 
 /// Turns one `GET /api/v1/readings/today/{lang}` body into a [TodayReading].
@@ -48,7 +50,7 @@ import 'package:evangelion/core/domain/entities/today_reading.dart';
 /// | `current_streak` (**negative**) | **refused** | a streak counts completed days; `-5` on the flame is not a fact about anyone |
 /// | `reading_id`, `group_id`, `scheduled_date` | passed through | identity and scheduling metadata; nothing on `/` renders them, so an odd value is inert |
 /// | `translation` | passed through | an edition name; empty is a missing label, not a broken reading |
-/// | `reference` (**empty**) | passed through | it is a heading *over* the passage — refusing it would make the passage unreachable over a missing label, the same argument as `_preview` below |
+/// | `reference` (**empty**) | passed through | it is a heading *over* the passage — refusing it would make the passage unreachable over a missing label, the same argument as `text: ''` below |
 /// | `current_streak` (large positive) | passed through | this client has seen no upper bound, and inventing one is a claim about a payload it has not seen — the same argument this section makes against defaults |
 /// | `total_points_earned_today`, `is_fully_completed` | passed through | `0` and `false` are real answers, not absences |
 ///
@@ -91,14 +93,44 @@ final class TodayReadingMapper {
   static String pathFor(ReadingLanguage language) =>
       '$todayEndpoint/${language.code}';
 
-  /// Maps [body] to a [TodayReading].
+  /// Maps [body] to a [ScriptureText] — **the whole passage**, verses and
+  /// questions as entities.
   ///
-  /// Never throws. Every rejection is a [Failure] whose [Failure.message] names
-  /// the key and what was expected, so the failure a reader sees is a statement
-  /// about the response rather than a Dart type error.
-  Result<TodayReading> map(Object? body) {
+  /// This is the mapper's real body. [map] is this, narrowed by
+  /// [ScriptureText.toTodayReading], which is recorded decision 23's resolution
+  /// reached from the other end: one data source, one mapper, one set of scalar
+  /// rules, and the narrow projection `/`'s panel reads became a view of the wide
+  /// payload rather than a second parse of the wire.
+  ///
+  /// Never throws, and says why the way [map] does: a 200 whose body cannot be
+  /// read is [FailureKind.serialization], produced next to the field that is
+  /// malformed.
+  ///
+  /// ## THE STRICTNESS IS **NOT** UNIFORM, AND THE ASYMMETRY IS THE DESIGN
+  ///
+  /// | what | unreadable | why |
+  /// | --- | --- | --- |
+  /// | a top-level scalar | **refused** | §5's live payload carries all of them, and the table in the class doc argues each one |
+  /// | `verses` not a list, or empty | **refused** | there is no passage to show and no count to draw |
+  /// | `verses[0]`, any required field | **refused** | verse 1 opens the passage, feeds `firstVerseText` and is what the drop cap hangs off; a passage whose opening cannot be read cannot be rendered honestly |
+  /// | `verses[1…]` | **skipped** | decision 40: a defect in one verse costs that verse, not the passage |
+  /// | `questions` not a list | **refused** | Phase 6's rule; there is no question to count. Enforced by [_list], **not** by [_questions] — which is handed a `List<Object?>`, so it has nothing left to refuse |
+  /// | any question | **skipped** | a quiz-payload defect is not a scripture defect |
+  ///
+  /// **The cost of skipping a question is real and is on
+  /// `ScriptureText.questionCount`:** a payload of four unreadable questions
+  /// reports `0`, where Phase 6's count-only projection reported `4`. Every
+  /// Phase-6 fixture that exercises the leniency counts objects, so no Phase-6
+  /// assertion moved. The alternative — a wire count beside a readable list — is
+  /// two sources for one fact, which is the hazard `TodayReading.isFullyCompleted`
+  /// records about the two endpoints disagreeing.
+  ///
+  /// **Rejected: skip `verses[0]` as well.** Then a passage whose opening verse is
+  /// malformed would silently render from verse 2, which is a passage this client
+  /// would be showing a reader with its first line missing and nothing saying so.
+  Result<ScriptureText> mapScripture(Object? body) {
     if (body is! Map<Object?, Object?>) {
-      return Result<TodayReading>.failure(_notAnObject(body));
+      return Result<ScriptureText>.failure(_notAnObject(body));
     }
 
     // Read in **wire order**, so the message on a body with several problems names
@@ -119,8 +151,7 @@ final class TodayReadingMapper {
     final Result<List<Object?>> verses = _list(body, 'verses');
     final Result<List<Object?>> questions = _list(body, 'questions');
 
-    // One gate for every check, in the order above. The preview is read after it
-    // because it needs `verses`, which the gate has already proved readable.
+    // One gate for every check, in the order above.
     final Result<void> scalars = _firstFailure(<Result<Object?>>[
       readingId,
       groupId,
@@ -135,39 +166,277 @@ final class TodayReadingMapper {
       questions,
     ]);
     if (scalars case FailureResult<void>(:final Failure failure)) {
-      return Result<TodayReading>.failure(failure);
+      return Result<ScriptureText>.failure(failure);
     }
 
-    final Result<String> preview = _preview(verses.valueOrElse(<Object?>[]));
-    if (preview case FailureResult<String>(:final Failure failure)) {
-      return Result<TodayReading>.failure(failure);
+    final Result<List<Verse>> mappedVerses = _verses(
+      verses.valueOrElse(<Object?>[]),
+    );
+    if (mappedVerses case FailureResult<List<Verse>>(:final Failure failure)) {
+      return Result<ScriptureText>.failure(failure);
     }
 
-    // `valueOrElse` from here, not `!`: the gate above has proved there is no
+    // **A `List<Question>` and not a `Result`,** because [\_questions] cannot fail:
+    // an unreadable entry is **skipped**, and the whole question of skipping is
+    // settled by the table below. A `Result` here manufactured an arm that nothing
+    // could reach — `mappedQuestions case FailureResult<List<Question>>` was dead
+    // code, and this file's two remaining uncovered lines were its banner and this
+    // arm.
+    final List<Question> mappedQuestions = _questions(
+      questions.valueOrElse(<Object?>[]),
+    );
+
+    // `valueOrElse` from here, not `!`: the gates above have proved there is no
     // failure arm to take, so the fallback can never be reached, and spelling it
     // this way keeps §4's "no `!` unless provably non-null" honest without an
     // ignore.
-    return Result<TodayReading>.success(
-      TodayReading(
+    return Result<ScriptureText>.success(
+      ScriptureText(
         readingId: readingId.valueOrElse(''),
         groupId: groupId.valueOrElse(0),
         scheduledDate: scheduledDate.valueOrElse(''),
         language: language.valueOrElse(ReadingLanguage.english),
         reference: reference.valueOrElse(''),
         translation: translation.valueOrElse(''),
-        verseCount: verses.valueOrElse(<Object?>[]).length,
-        firstVerseText: preview.valueOrElse(''),
-        questionCount: questions.valueOrElse(<Object?>[]).length,
-        answeredQuestionCount: _answeredCount(
-          questions.valueOrElse(<Object?>[]),
-        ),
+        verses: mappedVerses.valueOrElse(<Verse>[]),
+        questions: mappedQuestions,
         isFullyCompleted: isFullyCompleted.valueOrElse(false),
         pointsEarnedToday: points.valueOrElse(0),
         // The reading endpoint's **own** streak copy, which reads `4` where
         // `streak/summary` reads `0`. Carried because the payload carries it;
-        // `TodayReading.currentStreak`'s doc says why nothing reads it and why
+        // `ScriptureText.currentStreak`'s doc says why nothing reads it and why
         // removing it would be worse.
         currentStreak: streak.valueOrElse(0),
+      ),
+    );
+  }
+
+  /// The `verses` list as entities.
+  ///
+  /// Index 0 is strict; every other index is skipped when unreadable. See
+  /// [mapScripture]'s table for why the asymmetry is the design and not an
+  /// oversight.
+  Result<List<Verse>> _verses(List<Object?> raw) {
+    if (raw.isEmpty) {
+      return Result<List<Verse>>.failure(
+        _bad('verses', raw, 'a non-empty list'),
+      );
+    }
+
+    final List<Verse> mapped = <Verse>[];
+    for (int index = 0; index < raw.length; index++) {
+      switch (_verseEntry(raw[index], index)) {
+        case Success<Verse>(:final Verse value):
+          mapped.add(value);
+        case FailureResult<Verse>(:final Failure failure):
+          if (index == 0) return Result<List<Verse>>.failure(failure);
+      }
+    }
+
+    return Result<List<Verse>>.success(mapped);
+  }
+
+  /// One entry of the `verses` list.
+  ///
+  /// The only thing this adds is the non-object refusal, because a bare string in
+  /// the `verses` array is what a malformed response looks like and the message
+  /// has to name the position — `verses[2]`, not `verses`.
+  Result<Verse> _verseEntry(Object? entry, int index) {
+    if (entry is! Map<Object?, Object?>) {
+      return Result<Verse>.failure(_bad('verses[$index]', entry, 'an object'));
+    }
+    // The reported key is applied **once**, in [_verse], which already knows the
+    // index. Renaming here as well produced `verses[0].verses[0].book_number` on the
+    // first run — a message nobody debugging a payload wants to read.
+    return _verse(entry, index);
+  }
+
+  /// One verse object.
+  ///
+  /// **`text_clean` is the only field here allowed to be absent**, and §5's trap 2
+  /// is the reason: the English localized response has no such key at all. Every
+  /// other field is required, because each is either a number the reader sees
+  /// beside the verse or the verse itself.
+  Result<Verse> _verse(Map<Object?, Object?> body, int index) {
+    final Result<int> bookNumber = _int(body, 'book_number');
+    final Result<int> chapter = _int(body, 'chapter');
+    final Result<int> number = _int(body, 'verse');
+    final Result<String> text = _string(body, 'text');
+
+    final Result<void> gate = _firstFailure(<Result<Object?>>[
+      bookNumber,
+      chapter,
+      number,
+      text,
+    ]);
+    if (gate case FailureResult<void>(:final Failure failure)) {
+      return Result<Verse>.failure(_renamed(failure, 'verses[$index]'));
+    }
+
+    // **`null` for absence, and the empty string for an empty value.** This is the
+    // distinction §5 trap 2 and Phase 7's own verify item are about, and it is why
+    // the check is `is String` and not `is String && isNotEmpty`: the *field*
+    // reports what arrived and `verseDisplayText` decides what to show. A
+    // `text_clean` this client cannot read as a `String` is treated as absent — the
+    // same leniency `already_answered` gets, because one object read by one rule is
+    // what keeps two fields of it from disagreeing about how strict this is.
+    final Object? clean = body['text_clean'];
+
+    return Result<Verse>.success(
+      Verse(
+        bookNumber: bookNumber.valueOrElse(0),
+        chapter: chapter.valueOrElse(0),
+        number: number.valueOrElse(0),
+        text: text.valueOrElse(''),
+        textClean: clean is String ? clean : null,
+      ),
+    );
+  }
+
+  /// The `questions` list as entities. **Nothing in here is refused** — see
+  /// [mapScripture]'s table, and its "any question → **skipped**" row is the whole
+  /// argument for the return type.
+  ///
+  /// ## WHY IT RETURNS A **LIST** AND NOT A `Result`
+  ///
+  /// Because it cannot fail, and a `Result` it cannot fail in is a `Failure` arm no
+  /// caller can reach. The caller had exactly that:
+  /// `if (mappedQuestions case FailureResult<List<Question>>(…)) return …` — dead
+  /// code, and the second of this file's three unreachable lines.
+  ///
+  /// **The table's "`questions` not a list → **refused**" row is still true, and it
+  /// is enforced one level up** by `_list(body, 'questions')`, which is where the
+  /// type check belongs: this function is handed a `List<Object?>` it can already
+  /// trust, and a type it is handed a checked value cannot re-check.
+  List<Question> _questions(List<Object?> raw) {
+    final List<Question> mapped = <Question>[];
+    for (final Object? entry in raw) {
+      if (entry is! Map<Object?, Object?>) continue;
+      final Result<Question> question = _question(entry);
+      if (question case Success<Question>(:final Question value)) {
+        mapped.add(value);
+      }
+    }
+    return mapped;
+  }
+
+  /// One question object.
+  ///
+  /// `id`, `sort_order`, `type`, `prompt`, `options` and `points_value` are
+  /// **required**; `already_answered`, `user_answer` and `is_correct` are
+  /// **lenient** and default to "not answered, no answer, no verdict". That split
+  /// is §5's own response shape: it shows the first six on every question and the
+  /// last three varying between `true`/`'A'` and `false`/`null`.
+  Result<Question> _question(Map<Object?, Object?> body) {
+    final Result<String> id = _string(body, 'id');
+    final Result<int> sortOrder = _int(body, 'sort_order');
+    final Result<String> type = _string(body, 'type');
+    final Result<String> prompt = _string(body, 'prompt');
+    final Result<Map<String, String>> options = _options(body);
+    final Result<int> pointsValue = _int(body, 'points_value');
+
+    final Result<void> gate = _firstFailure(<Result<Object?>>[
+      id,
+      sortOrder,
+      type,
+      prompt,
+      options,
+      pointsValue,
+    ]);
+    if (gate case FailureResult<void>(:final Failure failure)) {
+      return Result<Question>.failure(failure);
+    }
+
+    // Lenient reads, and the reasons are §5's: the endpoint sends
+    // `already_answered` on every question, and a flag this client cannot read can
+    // only mean "not proven answered". §5 trap 3 makes the consequence concrete — a
+    // question that has actually been submitted comes back as **409**, so an
+    // `already_answered == false` on one that has is visible rather than silent.
+    final Object? answered = body['already_answered'];
+    final Object? answer = body['user_answer'];
+    final Object? correct = body['is_correct'];
+
+    return Result<Question>.success(
+      Question(
+        id: id.valueOrElse(''),
+        sortOrder: sortOrder.valueOrElse(0),
+        type: type.valueOrElse(''),
+        prompt: prompt.valueOrElse(''),
+        options: options.valueOrElse(const <String, String>{}),
+        pointsValue: pointsValue.valueOrElse(0),
+        alreadyAnswered: answered == true,
+        userAnswer: answer is String ? answer : null,
+        isCorrect: correct is bool ? correct : null,
+      ),
+    );
+  }
+
+  /// `options` — a **flat** `Map` of letter to option text (§5).
+  ///
+  /// Every key and every value must be a `String`. A `Map<String, dynamic>` whose
+  /// values are not all strings is unreadable rather than coercible, because the
+  /// alternative — `'$value'` — would invent an option label the server never sent
+  /// and the reader would answer a question that was not asked.
+  Result<Map<String, String>> _options(Map<Object?, Object?> body) {
+    final Object? value = body['options'];
+    if (value is! Map<Object?, Object?>) {
+      return Result<Map<String, String>>.failure(
+        _bad('options', value, 'an object of String to String'),
+      );
+    }
+    final Map<String, String> mapped = <String, String>{};
+    for (final MapEntry<Object?, Object?> entry in value.entries) {
+      final Object? key = entry.key;
+      final Object? option = entry.value;
+      if (key is! String || option is! String) {
+        return Result<Map<String, String>>.failure(
+          _bad('options', value, 'an object of String to String'),
+        );
+      }
+      mapped[key] = option;
+    }
+    return Result<Map<String, String>>.success(mapped);
+  }
+
+  /// [body] to a [TodayReading] — `/`'s narrow projection.
+  ///
+  /// **A narrowing of [mapScripture], and nothing else.** The first version of this
+  /// method parsed the body itself, which meant the scalar table in the class doc
+  /// existed in two places free to disagree — and `text_clean`'s
+  /// absent-versus-empty rule would have had a second spelling. Recorded decision
+  /// 23 chose one mapper over two repositories, and this is the shape that choice
+  /// takes.
+  ///
+  /// Never throws; [Failure.message] names the key and what was expected.
+  Result<TodayReading> map(Object? body) =>
+      mapScripture(body)
+          .map((ScriptureText scripture) => scripture.toTodayReading());
+
+  /// [failure] with its reported key rewritten to [prefix].`field`.
+  ///
+  /// String surgery on a message is the wrong shape in general and the right shape
+  /// here, and the reason is that there is exactly **one** message format in this
+  /// file: [_bad] is the only producer of a `FailureKind.serialization` whose
+  /// message names a key. So there is one template to rewrite and not a family.
+  ///
+  /// **Why not a `reportKey` parameter on the typed readers instead.** Because
+  /// `_int(body, 'chapter')` would then carry two keys — the one it reads and the
+  /// one it reports — and every call site would pass both, and the two would drift
+  /// apart silently the first time someone typed the reported key where the wire key
+  /// belonged. The wire key stays the reader's only argument and the position is
+  /// applied once, on the way out.
+  Failure _renamed(Failure failure, String prefix) {
+    const String open = '`';
+    final int start = failure.message.indexOf(open);
+    if (start < 0) return failure;
+    final int end = failure.message.indexOf(open, start + 1);
+    if (end < 0) return failure;
+    return Failure(
+      kind: failure.kind,
+      message: failure.message.replaceRange(
+        start,
+        end + 1,
+        '$open$prefix.${failure.message.substring(start + 1, end)}$open',
       ),
     );
   }
@@ -188,82 +457,6 @@ final class TodayReadingMapper {
             _bad('language', value, 'one of ${ReadingLanguage.values}'),
           )
         : Result<ReadingLanguage>.success(language);
-  }
-
-  /// The first verse's preview text.
-  ///
-  /// `text_clean` where the key **exists and carries something**, `text`
-  /// otherwise. Both absences are live: the English payload has no `text_clean`
-  /// key at all, and "present but empty" is a third shape a proxy or a
-  /// re-encoder can produce.
-  ///
-  /// ## AND IT DELIBERATELY DOES **NOT** RULE ON AN EMPTY VERSE
-  ///
-  /// `text_clean` empty falls through to `text`, and `text` empty maps to `''`.
-  ///
-  /// **This doc used to claim the opposite** — "neither falls through to `''`,
-  /// because an empty preview renders an empty paragraph in the panel" — and the
-  /// panel did not render an empty paragraph. `_Preview` called
-  /// `preview.substring(0, 1)` on the result, which is a `RangeError` out of
-  /// `TodayReadingPanel.build`, and because the panel's two controls are that
-  /// widget's own children the error took **`Continue` → `/reading` and
-  /// `Start reflection` → `/quiz`** with it. A doc claim contradicted by the file
-  /// it lives in, three directories away, and 1520 tests green throughout.
-  ///
-  /// **Refusing here was rejected, and the reason is worth keeping.** The verse
-  /// text is the one field on `/` a reader cannot be shown without; every other
-  /// field is a label *over* content (a reference, a completion flag, a bead
-  /// count). A payload missing its label should cost the label, not the passage —
-  /// so `text: ''` maps, `firstVerseText` is `''`, and `_Preview` renders an empty
-  /// paragraph and **both its controls stay**. The alternative — treating an empty
-  /// verse as unparseable — would have made one cosmetic upstream defect into "the
-  /// reader cannot open today's reading at all".
-  ///
-  /// The division of labour this records: **the mapper says what the payload
-  /// means, the widget says it renders whatever it is handed.** Neither guesses for
-  /// the other, and the widget's totality is asserted rather than assumed.
-  Result<String> _preview(List<Object?>? verses) {
-    if (verses == null || verses.isEmpty) {
-      return Result<String>.failure(_bad('verses', verses, 'a non-empty list'));
-    }
-    final Object? first = verses.first;
-    if (first is! Map<Object?, Object?>) {
-      return Result<String>.failure(_bad('verses[0]', first, 'an object'));
-    }
-
-    final Object? clean = first['text_clean'];
-    if (clean is String && clean.isNotEmpty) {
-      return Result<String>.success(clean);
-    }
-
-    final Object? text = first['text'];
-    if (text is! String) {
-      return Result<String>.failure(_bad('verses[0].text', text, 'a String'));
-    }
-    return Result<String>.success(text);
-  }
-
-  /// How many of [questions] carry `already_answered == true`.
-  ///
-  /// A question that is not an object, or whose flag is not a `bool`, counts as
-  /// **not answered** rather than failing the whole reading. That is the opposite
-  /// of the scalars, and deliberately so: a flag this client cannot read is a
-  /// question it cannot claim is done, so the panel's bead row shows one more
-  /// open bead rather than an error over a reading the reader can still open.
-  ///
-  /// The cost is stated because it is a real difference in strictness: a payload
-  /// whose questions are *all* malformed maps successfully with
-  /// `answeredQuestionCount == 0`. `questions` not being a list at all **is**
-  /// rejected, because then there is no question to draw a bead for.
-  int _answeredCount(List<Object?> questions) {
-    int answered = 0;
-    for (final Object? question in questions) {
-      if (question is Map<Object?, Object?> &&
-          question['already_answered'] == true) {
-        answered++;
-      }
-    }
-    return answered;
   }
 
   // --- typed reads ----------------------------------------------------------

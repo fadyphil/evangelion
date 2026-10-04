@@ -10,6 +10,7 @@ import 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_light.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -26,6 +27,8 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
+import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -137,6 +140,14 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   // so a third page cannot be added without the next reader seeing this line.
   if (!getIt.isRegistered<HomeBloc>()) {
     registerTestHomeBloc();
+  }
+  // **The third registration, for the same reason.** `ReadingPage` resolves its
+  // `ReadingCubit` from the locator exactly as `HomePage` resolves its `HomeBloc` and
+  // `LoginPage` its `AuthBloc`, so a router test that lands on `/reading` needs one in
+  // the graph or the page throws a `StateError` out of `build`. Adding it here rather
+  // than at each call site is the point of the paragraph above.
+  if (!getIt.isRegistered<ReadingCubit>()) {
+    registerTestReadingCubit();
   }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
@@ -350,6 +361,23 @@ HomeBloc registerTestHomeBloc() {
   return bloc;
 }
 
+/// Registers the `ReadingCubit` [ReadingPage] resolves, and returns it.
+///
+/// The third of the three, and the first whose state a **reader** sets rather than a
+/// repository fills: the font step lives for the life of the cubit because Phase 7 has
+/// no `SettingsRepository` (see `reading_cubit.dart`). That is also why this is a
+/// `registerSingleton` and not a factory — the same single-instance hazard
+/// `registerTestHomeBloc`'s doc gives.
+ReadingCubit registerTestReadingCubit() {
+  final ReadingCubit cubit = ReadingCubit(
+    loadScripture: LoadScripture(_FakeReadingRepository()),
+  );
+  getIt.registerSingleton<ReadingCubit>(cubit);
+  addTearDown(() => getIt.unregister<ReadingCubit>());
+  addTearDown(cubit.close);
+  return cubit;
+}
+
 /// A [ReadingRepository] that answers a fixed reading.
 ///
 /// Hand-written rather than a `mocktail` mock for the reason the LSP row in
@@ -358,14 +386,25 @@ HomeBloc registerTestHomeBloc() {
 /// `routerHost`'s callers need — they are about the route, not about the payload.
 final class _FakeReadingRepository implements ReadingRepository {
   @override
-  Future<Result<TodayReading>> today({
+  Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
-  }) async => const Result<TodayReading>.failure(
+  }) async => const Result<ScriptureText>.failure(
     Failure(
       kind: FailureKind.network,
       message: 'No reading: this harness does not open a socket.',
     ),
   );
+
+  /// Narrowing, exactly as `DioReadingRepository.today` does — the port defines
+  /// [today] in terms of [todayScripture], and a fake that answered the narrow
+  /// method by a second route would be the one implementation in the tree that
+  /// does not.
+  @override
+  Future<Result<TodayReading>> today({
+    required ReadingLanguage language,
+  }) async =>
+      (await todayScripture(language: language))
+          .map((ScriptureText scripture) => scripture.toTodayReading());
 }
 
 /// The [StreakRepository] twin of [_FakeReadingRepository].

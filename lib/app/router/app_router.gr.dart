@@ -21,6 +21,8 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart'
     as _i1;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
     as _i3;
+import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart'
+    as _i11;
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart'
     as _i4;
 import 'package:evangelion/features/result/presentation/pages/result_page.dart'
@@ -152,18 +154,51 @@ class QuizRoute extends _i7.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i4.ReadingPage]
-class ReadingRoute extends _i7.PageRouteInfo<void> {
-  const ReadingRoute({List<_i7.PageRouteInfo>? children})
-    : super(ReadingRoute.name, initialChildren: children);
+class ReadingRoute extends _i7.PageRouteInfo<ReadingRouteArgs> {
+  ReadingRoute({
+    _i8.Key? key,
+    _i11.ReadingCubit? cubit,
+    List<_i7.PageRouteInfo>? children,
+  }) : super(
+         ReadingRoute.name,
+         args: ReadingRouteArgs(key: key, cubit: cubit),
+         initialChildren: children,
+       );
 
   static const String name = 'ReadingRoute';
 
   static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i4.ReadingPage();
+      final args = data.argsAs<ReadingRouteArgs>(
+        orElse: () => const ReadingRouteArgs(),
+      );
+      return _i4.ReadingPage(key: args.key, cubit: args.cubit);
     },
   );
+}
+
+class ReadingRouteArgs {
+  const ReadingRouteArgs({this.key, this.cubit});
+
+  final _i8.Key? key;
+
+  final _i11.ReadingCubit? cubit;
+
+  @override
+  String toString() {
+    return 'ReadingRouteArgs{key: $key, cubit: $cubit}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ReadingRouteArgs) return false;
+    return key == other.key && cubit == other.cubit;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ cubit.hashCode;
 }
 
 /// generated route for

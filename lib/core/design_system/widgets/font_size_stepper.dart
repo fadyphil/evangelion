@@ -99,6 +99,13 @@ class FontSizeStepper extends StatelessWidget {
         IconActionButton(
           icon: Icons.remove,
           tooltip: 'Decrease font size',
+          // `uiFamily`, which is `bodyMedium`'s own family — so passing it is the
+          // same rendering the null default produced, stated rather than inherited.
+          // **The string above is hard-coded English**, which is a real
+          // localisation gap on a bilingual screen and is not this change's to
+          // close; it is Latin, though, so this is the *correct* family for it and
+          // the requirement costs nothing here.
+          tooltipFamily: EvaTypography.uiFamily,
           onPressed: current > kFontStepMin
               ? () => onChanged(clampFontStep(current - 1))
               : null,
@@ -110,6 +117,8 @@ class FontSizeStepper extends StatelessWidget {
         IconActionButton(
           icon: Icons.add,
           tooltip: 'Increase font size',
+          // See the decrement button above.
+          tooltipFamily: EvaTypography.uiFamily,
           onPressed: current < kFontStepMax
               ? () => onChanged(clampFontStep(current + 1))
               : null,

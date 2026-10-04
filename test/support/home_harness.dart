@@ -2,7 +2,9 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
@@ -67,28 +69,44 @@ final class HomeHarness {
   final CountingAuthRepository auth;
 }
 
-/// [ReadingRepository] that answers [answer] and counts its calls.
+/// [ReadingRepository] that answers [scripture] and counts its calls.
+///
+/// ## WHY IT STORES THE **WIDE** ANSWER
+///
+/// `ReadingRepository` has two methods since Phase 7 and [today] is defined as a
+/// narrowing of [todayScripture], so a fake that stored a `Result<TodayReading>`
+/// and answered `today` from it would be answering `/`'s question by a route the
+/// production adapter does not take — which is the substitution hazard §3's LSP row
+/// is about, in a fixture rather than in an adapter. Storing the wide result and
+/// narrowing is one line and makes the fake drive exactly the production shape.
 final class CountingReadingRepository implements ReadingRepository {
-  /// Starts out answering [answer].
-  CountingReadingRepository({required this.answer});
+  /// Starts out answering [scripture].
+  CountingReadingRepository({required this.scripture});
 
   /// What the next call answers.
-  Result<TodayReading> answer;
+  Result<ScriptureText> scripture;
 
-  /// How many times [today] has been called.
+  /// How many times either method has been called.
   int calls = 0;
 
-  /// The languages [today] has been asked for, in order.
+  /// The languages the port has been asked for, in order.
   final List<ReadingLanguage> asked = <ReadingLanguage>[];
 
   @override
-  Future<Result<TodayReading>> today({
+  Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
   }) async {
     calls++;
     asked.add(language);
-    return answer;
+    return scripture;
   }
+
+  @override
+  Future<Result<TodayReading>> today({
+    required ReadingLanguage language,
+  }) async =>
+      (await todayScripture(language: language))
+          .map((ScriptureText text) => text.toTodayReading());
 }
 
 /// [StreakRepository] that answers [answer] and counts its calls.
@@ -242,6 +260,258 @@ const Failure readingFailure = Failure(
       'list was expected.',
 );
 
+/// [liveEnglishReading] as the wide entity the repository actually returns.
+///
+/// **Not a conversion.** The wide payload is the one the server sends and
+/// `TodayReadingMapper.mapScripture` produces, so the fixture is written as what
+/// comes out of the mapper rather than derived from the narrow entity — deriving it
+/// would mean inventing verses to satisfy a constructor, and the whole point of the
+/// fixture is that its verses are the live ones.
+const ScriptureText liveEnglishScripture = ScriptureText(
+  readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  groupId: 3,
+  scheduledDate: '2026-10-03',
+  language: ReadingLanguage.english,
+  reference: 'John 3:1-5',
+  translation: 'NKJV (New King James Version)',
+  verses: liveEnglishVerses,
+  questions: liveEnglishQuestions,
+  isFullyCompleted: true,
+  pointsEarnedToday: 10,
+  currentStreak: 4,
+);
+
+/// The five live English verses, `text_clean` **absent** on every one.
+///
+/// The absence is the point: the English payload has no `text_clean` key at all
+/// (§5, trap 2), so a fixture that spelled `null` would be describing a shape the
+/// server never sends.
+const List<Verse> liveEnglishVerses = <Verse>[
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 1,
+    text: 'There was a man of the Pharisees, named Nicodemus, a ruler of the Jews:',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 2,
+    text:
+        'The same came to Jesus by night, and said unto him, Rabbi, we know that '
+        'thou art a teacher come from God: for no man can do these miracles that '
+        'thou doest, except God be with him.',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 3,
+    text:
+        'Jesus answered and said unto him, ‹Verily, verily, I say unto thee, '
+        'Except a man be born again, he cannot see the kingdom of God.›',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 4,
+    text:
+        'Nicodemus saith unto him, How can a man be born when he is old? can he '
+        "enter the second time into his mother's womb, and be born?",
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 5,
+    text:
+        'Jesus answered, ‹Verily, verily, I say unto thee, Except a man be born '
+        'of water and› [of] ‹the Spirit, he cannot enter into the kingdom of God.›',
+  ),
+];
+
+/// The one live question, **already answered and carrying the answer**.
+///
+/// `user_answer: 'A'` and `is_correct: true` are inside the reading response —
+/// verified live against `HEAD = 4a1c834` — so the fixture has to carry them, or
+/// `/reading`'s "the answer is not on the screen" gate would be asserting against a
+/// payload that never had an answer to hide.
+const List<Question> liveEnglishQuestions = <Question>[
+  Question(
+    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    sortOrder: 1,
+    type: 'mcq',
+    prompt: 'What was the name of the Pharisee who came to Jesus by night?',
+    options: <String, String>{
+      'A': 'Nicodemus',
+      'B': 'Paul',
+      'C': 'Peter',
+      'D': 'Lazarus',
+    },
+    pointsValue: 10,
+    alreadyAnswered: true,
+    userAnswer: 'A',
+    isCorrect: true,
+  ),
+];
+
+/// [base] with its first verse's text emptied.
+///
+/// `TodayReading.firstVerseText` is a **view** of the wide entity's first verse
+/// now, so the fixture that used to say `liveEnglishReading.copyWith(
+/// firstVerseText: '')` has to be written against [ScriptureText] instead — and
+/// that is the right place for it, because the empty verse it describes is a
+/// property of the wire rather than of the panel's projection.
+ScriptureText withEmptyFirstVerse(ScriptureText base) {
+  if (base.verses.isEmpty) return base;
+  return base.copyWith(
+    verses: <Verse>[
+      base.verses.first.copyWith(text: ''),
+      ...base.verses.skip(1),
+    ],
+  );
+}
+
+/// [base] with its first verse's text **opened by an emoji** and padded so the
+/// emoji lands inside `previewText`'s 56-code-unit budget rather than at the cut.
+///
+/// ## WHY THE PADDING, AND WHY IT IS NOT COSMETIC
+///
+/// `previewText` cuts at a **code unit**, so the defect needs the emoji's high
+/// surrogate to be the last unit taken: `'x' * 55 + '\u{1F600}'` does exactly that
+/// and is the shortest string that reaches it. A fixture of `'\u{1F600} There was…'`
+/// would put the emoji at index 0, which is the *other* half of the same bug — the
+/// one `/reading`'s drop cap has — and would leave the truncation untested.
+///
+/// So this is the **wider surface** the review measured: an emoji anywhere in the
+/// first 56 code units of verse one, not only at its start.
+ScriptureText withAstralFirstVerse(ScriptureText base) {
+  if (base.verses.isEmpty) return base;
+  return base.copyWith(
+    verses: <Verse>[
+      base.verses.first.copyWith(
+        text: '${'x' * 55}\u{1F600} There was a man of the Pharisees',
+      ),
+      ...base.verses.skip(1),
+    ],
+  );
+}
+
+/// [liveArabicReading] as the wide entity.
+///
+/// The Arabic verses carry **`text_clean` on every one**, which the English arm has
+/// no key for at all — and that asymmetry is the whole reason the wide fixture
+/// cannot be generated from the narrow one.
+const ScriptureText liveArabicScripture = ScriptureText(
+  readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  groupId: 3,
+  scheduledDate: '2026-10-03',
+  language: ReadingLanguage.arabic,
+  reference: 'يوحنا 3: 1-5',
+  translation: 'Smith & Van Dyck (فانديك)',
+  verses: liveArabicVerses,
+  // **Three** questions against the payload's one, and one answered. The narrow
+  // fixture says three too, and the mismatch with the wire is deliberate: `/`'s
+  // Arabic arm needs an *unfinished* reading so both branches of the eyebrow are
+  // reachable, and inventing that through the entity would mean inventing verses.
+  questions: liveArabicQuestions,
+  isFullyCompleted: false,
+  pointsEarnedToday: 0,
+  currentStreak: 4,
+);
+
+/// The five live Arabic verses, each with a diacritic-stripped `text_clean`.
+const List<Verse> liveArabicVerses = <Verse>[
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 1,
+    text: 'كَانَ إِنْسَانٌ مِنَ ٱلْفَرِّيسِيِّينَ ٱسْمُهُ نِيقُودِيمُوسُ، رَئِيسٌ',
+    textClean: 'كان إنسان من الفريسيين اسمه نيقوديموس، رئيس',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 2,
+    text: 'جَاءَ هَذَا إِلَىٰ يَسُوعَ لَيْلاً وَقَالَ لَهُ يَا مُعَلِّمُ، قَدْ نَعْلَمُ أَنَّكَ قَدْ أَتَيْتَ مِنَ ٱللَّهِ مُعَلِّمًا، لأَنَّهُ لَيْسَ أَحَدٌ يَقْدِرُ أَنْ يَعْمَلَ هَذِهِ ٱلْآيَاتِ ٱلَّتِ أَنْتَ تَعْمَلُ إِلَّا إِنْ كَانَ ٱللَّهُ مَعَهُ.',
+    textClean:
+        'جاء هذا إلى يسوع لياً وقال له يا معلم، نعلم أنك قد أتيت من الله معلماً، '
+        'لأنه ليس أحد يقدر أن يعمل هذه الآيات التي أنت تعمل إلا إن كان الله معه',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 3,
+    text: 'أَجَابَ يَسُوعُ وَقَالَ لَهُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لا يُولَدُ مِنْ فَوْقُ لَا يَقْدِرُ أَنْ يَرَى مَلَكُوتَ ٱللَّهِ.»',
+    textClean:
+        'أجاب يسوع وقال له: «الحق الحق أقول لك إن كان أحد لا يولد من فوق لا يقدر '
+        'أن يرى ملكوت الله.»',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 4,
+    text: 'قَالَ لَهُ نِيقُودِيمُوسُ: كَيْفَ يُولَدُ ٱلْإِنْسَانُ وَهُوَ شَيْخٌ؟ أَلَعَلَّهُ يَقْدِرُ أَنْ يَدْخُلَ بَطْنَ أُمِّهِ ثَانِيَةً وَيَلِدُ؟',
+    textClean:
+        'قال له نيقوديموس: كيف يولد الإنسان وهو شيخ؟ ألاعله يقدر أن يدخل بطن أمه '
+        ' ثانية ويولد؟',
+  ),
+  Verse(
+    bookNumber: 43,
+    chapter: 3,
+    number: 5,
+    text: 'أَجَابَ يَسُوعُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لا يُولَدُ مِنْ ٱلْمَاءِ وَٱلرُّوحِ لَا يَقْدِرُ أَنْ يَدْخُلَ مَلَكُوتَ ٱللَّهِ.»',
+    textClean:
+        'أجاب يسوع: «الحق الحق أقول لك إن كان أحد لا يولد من الماء والروح لا يقدر '
+        'أن يدخل ملكوت الله.»',
+  ),
+];
+
+/// The Arabic arm's questions: **three**, of which one is answered.
+///
+/// Deliberately three where the payload carries one, and the reason is written on
+/// [liveArabicScripture]: `/`'s Arabic arm must reach both branches of the
+/// eyebrow's status line, and `is_fully_completed: false` with one answered question
+/// out of three is the only fixture that does. The wide entity makes the
+/// inconsistency **visible** where the narrow one hid it behind a count.
+const List<Question> liveArabicQuestions = <Question>[
+  Question(
+    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    sortOrder: 1,
+    type: 'mcq',
+    prompt: 'ما اسم الفريسي الذي جاء إلى يسوع ليلاً؟',
+    options: <String, String>{
+      'A': 'نيقوديموس',
+      'B': 'بولس',
+      'C': 'بطرس',
+      'D': 'لعازر',
+    },
+    pointsValue: 10,
+    alreadyAnswered: true,
+    userAnswer: 'A',
+    isCorrect: true,
+  ),
+  Question(
+    id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    sortOrder: 2,
+    type: 'mcq',
+    prompt: 'ماذا قال الرب لنيقوديموس؟',
+    options: <String, String>{'A': 'اذهب', 'B': 'تابعني'},
+    pointsValue: 10,
+    alreadyAnswered: false,
+  ),
+  Question(
+    id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    sortOrder: 3,
+    type: 'mcq',
+    prompt: 'ما معنى الولادة الجديدة؟',
+    options: <String, String>{
+      'A': 'من الماء والروح',
+      'B': 'من الماء والروح أيضًا',
+    },
+    pointsValue: 10,
+    alreadyAnswered: false,
+  ),
+];
+
 /// The streak endpoint's own failure, for the mirror-image fixture.
 const Failure streakFailure = Failure(
   kind: FailureKind.network,
@@ -250,7 +520,7 @@ const Failure streakFailure = Failure(
 
 /// Builds a [HomeBloc] over counting fakes, and registers the teardown.
 HomeHarness harness({
-  Result<TodayReading>? reading,
+  Result<ScriptureText>? reading,
   Result<StreakSummary>? streak,
   AuthSession? session,
   // **Not `session: null`.** A nullable parameter with a default cannot tell "the
@@ -263,7 +533,8 @@ HomeHarness harness({
   DateTime? at,
 }) {
   final CountingReadingRepository readings = CountingReadingRepository(
-    answer: reading ?? const Result<TodayReading>.success(liveEnglishReading),
+    scripture:
+        reading ?? const Result<ScriptureText>.success(liveEnglishScripture),
   );
   final CountingStreakRepository streaks = CountingStreakRepository(
     answer: streak ?? const Result<StreakSummary>.success(liveStreakSummary),

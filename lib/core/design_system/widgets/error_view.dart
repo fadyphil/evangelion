@@ -34,6 +34,7 @@ class ErrorView extends StatelessWidget {
     required this.message,
     this.onRetry,
     this.retryLabel,
+    this.retryFamily,
     super.key,
   });
 
@@ -53,6 +54,30 @@ class ErrorView extends StatelessWidget {
   /// close.
   final String? retryLabel;
 
+  /// The family [retryLabel] renders in.
+  ///
+  /// ## WHY A TIER-2 WIDGET HAS TO KNOW ABOUT SCRIPT, AND WHAT THAT COST
+  ///
+  /// `EvaButton.labelFamily` is **required** — recorded decision 66 says it is and
+  /// the parameter was optional, which is the W1 finding: a nullable knob means the
+  /// compiler is silent at every call site that forgets it, and the value it falls
+  /// back to is `titleMedium`'s, which is **DM Sans**, which carries no Arabic at
+  /// all. So "required" propagated here, and a design-system widget cannot be asked
+  /// for a locale it does not resolve — the alternative, resolving the arm from
+  /// `Localizations` inside `EvaButton`, is what `EvaButton`'s own doc rejects.
+  ///
+  /// **[retryLabel] is the app's own localized string, so this is not defensive.**
+  /// Both shipped call sites pass `ReadingStrings.of(locale).retry` /
+  /// `HomeStrings.of(locale).retry`, and on the Arabic arm that is Arabic text
+  /// going into a button whose only family knob is this one.
+  ///
+  /// Nullable-and-[assert]ed rather than required, and that is **not** a retreat from
+  /// requiredness: Dart cannot express "required only when `onRetry` is set", and
+  /// [retryLabel] — the same shape of obligation on the same button — is already
+  /// handled this way. The [assert] in [build] is what turns the omission into a
+  /// debug crash rather than a tofu box in production.
+  final String? retryFamily;
+
   /// The icon's box. See [EmptyState.iconBox]; no prototype value.
   static const double iconBox = EvaSpacing.huge * 2;
 
@@ -66,6 +91,16 @@ class ErrorView extends StatelessWidget {
       onRetry == null || retryLabel != null,
       'an ErrorView with a retry action needs a retryLabel — an unlabelled '
       'button is the §14 gap this widget exists to close',
+    );
+    // **Paired with [retryLabel], and for the same reason with the opposite
+    // failure.** A retry label is the app's own localized string, so on the Arabic
+    // arm it needs Amiri; without this the button falls back to `titleMedium`'s
+    // family and renders six tofu boxes on the one screen where something has
+    // already gone wrong.
+    assert(
+      onRetry == null || retryFamily != null,
+      'an ErrorView with a retry action needs a retryFamily — `EvaButton'
+      '.labelFamily` is required, and the label it renders is localized',
     );
 
     return Semantics(
@@ -108,6 +143,13 @@ class ErrorView extends StatelessWidget {
                   const SizedBox(height: EvaSpacing.xl),
                   EvaButton(
                     label: retryLabel ?? 'Retry',
+                    // `?? EvaTypography.uiFamily` rather than `!`, because the
+                    // [assert] above runs in **debug** only and a release build that
+                    // reached this line would otherwise fail to compile rather than
+                    // render — and `retryLabel ?? 'Retry'` on this line is itself the
+                    // English fallback, so the English family is the consistent
+                    // answer for it.
+                    labelFamily: retryFamily ?? EvaTypography.uiFamily,
                     onPressed: retry,
                     expanded: false,
                     variant: EvaButtonVariant.secondary,

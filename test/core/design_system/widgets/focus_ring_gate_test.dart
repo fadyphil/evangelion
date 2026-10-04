@@ -181,7 +181,11 @@ void main() {
           disableAnimations: true,
           child: const Align(
             alignment: Alignment.topCenter,
-            child: EvaButton(label: 'Sign in', onPressed: _noop),
+            child: EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+              label: 'Sign in',
+              onPressed: _noop,
+            ),
           ),
         ),
       );

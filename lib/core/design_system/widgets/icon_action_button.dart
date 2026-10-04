@@ -24,6 +24,7 @@ class IconActionButton extends StatelessWidget {
   const IconActionButton({
     required this.icon,
     required this.tooltip,
+    required this.tooltipFamily,
     this.onPressed,
     this.size = 44,
     this.iconSize,
@@ -38,6 +39,48 @@ class IconActionButton extends StatelessWidget {
 
   /// The accessible name, and the [Tooltip]'s text.
   final String tooltip;
+
+  /// The family the **tooltip's visible text** renders in.
+  ///
+  /// ## WHY THIS PARAMETER EXISTS AT ALL, AND IT IS THE SAME FINDING AS
+  /// ## `EvaButton.labelFamily`'S — ONE PHASE, TWO SITES
+  ///
+  /// The prototype's four buttons are bare `<button>`s with an inline `<svg>` and
+  /// **no label of any kind** (`SettingsScreen.tsx:39-41`,
+  /// `ReadingEnScreen.tsx:14-16`, `QuizScreen.tsx:46-50`), so §14's requirement for
+  /// an accessible name on an icon-only control forced three Arabic strings into
+  /// this widget that the prototype never wrote. `reading_controls.dart` supplies
+  /// all three, and they render where a reader can see them.
+  ///
+  /// **`Tooltip(message: tooltip)` with no `textStyle`**, which is what this was,
+  /// makes Flutter resolve `null` to `ThemeData.textTheme.bodyMedium` — measured
+  /// **DMSans** on **both** themes, which carries no Arabic glyph at all. Measured
+  /// on the real shipped `ReadingPage` at `Locale('ar')` with the long press held
+  /// open: `TOOLTIP "رجوع"` (4 tofu), `"حجم الخط"` (7), and
+  /// `"إشارة مرجعية — غير متاح في هذه النسخة"` (**19** codepoints).
+  ///
+  /// **And the phase's own glyph gate could not see any of it**, for two independent
+  /// reasons that both had to be fixed: `renderedRuns()` walked the already-painted
+  /// tree and a `Tooltip` paints nothing until a gesture (the probe found **zero**
+  /// tooltip `Text` widgets), and `_isArabic` sampled four codepoints that
+  /// `رجوع` contains none of. So the prototype's nine Arabic sites were the **floor**,
+  /// not the ceiling — `reading_glyph_test.dart`'s table is **nine** rows of which
+  /// **eight** were tofu, and three of those eight are these.
+  ///
+  /// ## WHY IT IS **REQUIRED**, AND NOT NULLABLE
+  ///
+  /// Because it does not affect the button at all — it affects a `Text` the design
+  /// system builds, and a caller that omits it gets `bodyMedium` **silently**. The
+  /// compiler asking is the entire value, the same argument as `EvaButton`'s, and
+  /// `reading_glyph_test.dart`'s painted-tooltip enumeration is what proves the
+  /// answer reached the engine rather than merely being passed.
+  ///
+  /// **Rejected: resolving it from the locale inside this widget.** `EvaButton`'s doc
+  /// rejects it for the shared reason — a Tier-1 primitive branching on
+  /// `Localizations.localeOf` puts `/login`'s English label and an Arabic one on one
+  /// invisible code path. §14's lesson from recorded decision 19 is that a
+  /// locale-derived style has to be passed in and asserted at a call site.
+  final String tooltipFamily;
 
   /// What to run on activation. `null` disables it — invisible to Tab, to the
   /// ink and to `Semantics(enabled:)`.
@@ -64,6 +107,11 @@ class IconActionButton extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
+      // The one line that reaches the engine. **`Tooltip` has no `textStyle`
+      // default**, which is the whole defect: `null` resolves to the theme's
+      // `bodyMedium`, and a design-system widget that renders a caller's string in a
+      // family the caller never chose is a widget with a missing parameter.
+      textStyle: TextStyle(fontFamily: tooltipFamily),
       child: Semantics(
         button: true,
         enabled: enabled,

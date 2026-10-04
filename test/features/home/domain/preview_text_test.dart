@@ -1,6 +1,8 @@
 import 'package:evangelion/features/home/domain/preview_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/utf16.dart';
+
 /// [previewText] — red-first (AGENT_CONTEXT §6: extracted domain logic, TDD'd).
 ///
 /// ## THE LIVE ENGLISH VERSE IS 71 CHARACTERS, SO THIS ALWAYS RUNS
@@ -125,6 +127,92 @@ void main() {
         previewText('alpha bravo charlie delta echo', maxChars: 20),
         'alpha bravo charlie$kPreviewEllipsis',
       );
+    });
+  });
+
+  group('an ASTRAL character at the cut, which is a thrown `ArgumentError`', () {
+    // `String.substring` indexes **UTF-16 code units**, so a budget that lands
+    // between a surrogate pair leaves the **high surrogate alone** in the result.
+    // That is not a truncated emoji, it is half a character — and `RenderParagraph`
+    // throws `ArgumentError: string is not well-formed UTF-16` out of
+    // `_RenderScaledInlineWidget.performLayout`, which takes the panel's own two
+    // controls with it.
+    //
+    // 55 ASCII characters then one emoji is exactly that: the budget of 56 lands on
+    // the emoji's first code unit.
+    test('the result is well-formed UTF-16', () {
+      final String preview = previewText('${'x' * 55}\u{1F600} tail');
+      expect(
+        isWellFormedUtf16(preview),
+        isTrue,
+        reason:
+            'the preview holds ${unpairedSurrogates(preview)}, so '
+            '`RenderParagraph` throws when the panel renders it',
+      );
+      // The control: the cut this fix makes, without the fix.
+      expect(
+        isWellFormedUtf16('${'x' * 55}\u{1F600} tail'.substring(0, 56)),
+        isFalse,
+        reason: 'this is what `substring(0, maxChars)` alone produces',
+      );
+    });
+
+    test('and no half of an emoji survives into it', () {
+      final String preview = previewText('${'x' * 55}\u{1F600} tail');
+      expect(
+        preview.runes,
+        isNot(contains(0xD83D)),
+        reason: 'U+D83D on its own is the high surrogate of U+1F600',
+      );
+      expect(preview, '${'x' * 55}$kPreviewEllipsis');
+      expect(isWellFormedUtf16(preview), isTrue);
+    });
+
+    test('the whole emoji is kept when the budget allows for both units', () {
+      // The other side, so the fix cannot be "drop the last character whatever it
+      // is": at a budget of 57 the pair fits and nothing is lost.
+      expect(
+        previewText('${'x' * 55}\u{1F600} tail', maxChars: 57),
+        '${'x' * 55}\u{1F600}$kPreviewEllipsis',
+      );
+    });
+
+    test('one unit short of the pair also keeps nothing half-formed', () {
+      expect(
+        previewText('${'x' * 55}\u{1F600} tail', maxChars: 56),
+        '${'x' * 55}$kPreviewEllipsis',
+      );
+    });
+
+    test('and the low surrogate is never what gets kept', () {
+      // Every emoji at every offset inside the budget: the low surrogate is never a
+      // legal result of a cut, and this is the sweep that says so rather than one
+      // measured offset.
+      for (int prefix = 0; prefix < 8; prefix++) {
+        for (int budget = 1; budget <= 8; budget++) {
+          final String preview = previewText(
+            '${'x' * prefix}\u{1F600}${'y' * 20}',
+            maxChars: budget,
+          );
+          expect(
+            isWellFormedUtf16(preview),
+            isTrue,
+            reason:
+                'prefix $prefix, budget $budget → unpaired '
+                '${unpairedSurrogates(preview)}',
+          );
+        }
+      }
+    });
+
+    test('a word-boundary back-up cannot rescue one, so the guard is before it', () {
+      // The order matters: the boundary search runs on `taken`, and a dangling
+      // surrogate is not a space, so a text with spaces either drops it by accident
+      // (when a space happens to fall inside the final fifth) or keeps it. The
+      // well-formedness guard has to be the first thing that touches the cut.
+      final String preview = previewText('${'ab ' * 20}\u{1F600}');
+      expect(isWellFormedUtf16(preview), isTrue);
+      expect(preview, endsWith(kPreviewEllipsis));
     });
   });
 

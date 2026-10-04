@@ -1,7 +1,7 @@
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +46,9 @@ void main() {
       // Arabic script is *taller* at the same point size and the reference is a
       // wider string in practice, so the RTL arm is not a mirror of the LTR one.
       final HomeHarness h = harness();
-      h.readings.answer = const Result<TodayReading>.success(liveArabicReading);
+      h.readings.scripture = const Result<ScriptureText>.success(
+        liveArabicScripture,
+      );
       await pumpHome(
         tester,
         bloc: h.bloc,
@@ -94,7 +96,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result<TodayReading>.failure(readingFailure),
+        reading: const Result<ScriptureText>.failure(readingFailure),
       );
       await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
 

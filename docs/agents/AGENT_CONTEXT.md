@@ -1457,6 +1457,377 @@ error today and a silent no-op the moment the package gives it a body), recorded
 rather than suppressed.
 
 
+### Recorded decisions — Phase 7 review
+
+**49. ONE PORT, TWO METHODS, AND THE WIDE ONE IS THE PORT.** `ReadingRepository` gains
+`todayScripture` alongside `today`, and the wide one is the *port* rather than a private
+detail of the data layer. `07-file-map.md` §7 implies one method; `08-build-phases.md`
+§Phase 7 requires `GET /readings/today/{lang}` through it. Two alternatives were
+rejected:
+
+- **A second port, `ScriptureRepository`.** Two ports for one endpoint means two
+  adapters, two sets of fakes, and a question — answered per screen — about which one a
+  caller wanted. `core/domain/` exists so a type consumed by two features lives in one
+  place; `ScriptureText` is consumed by `/` and `/reading`, so it belongs there, and so
+  does its port.
+- **Make `today` return the wide type and let the screens ignore the extra.** This is
+  what actually shipped, and the reason it is right is that `TodayReading` stays a
+  **projection** rather than being deleted: `/` wants six fields and `/reading` wants
+  verses. `ScriptureText.toTodayReading` is the narrowing, it is in the domain layer, and
+  `DioReadingRepository.today` delegates to `todayScripture` rather than fetching twice.
+
+**50. THE MAPPER IS WIDE AND NARROWING, WITH A STATED SKIP POLICY, BECAUSE THE LIVE
+PAYLOAD IS NEITHER CLEAN NOR UNIFORM.** §5 traps 2 and 3 are the measurement. Verse 0 is
+**strict**: a malformed first verse is a `Failure`, because the screen has nothing to show
+without it. Verses 1 and up are **skipped**, and malformed questions are **skipped**,
+because a passage with four of five verses is still the passage and a screen is not a
+validator. Three alternatives were rejected:
+
+- **Strict on every verse.** One bad row in a 40-verse passage blanks the whole reading.
+- **Substitute an empty verse.** The reader sees a numbered gap with nothing in it and no
+  way to know it is a gap; the skip is at least visible as a missing number.
+- **Throw the whole response away.** Strict-on-first is already that, for the only case
+  where it is defensible.
+
+`questionCount` counts the questions that **survived**, not the ones the server sent, so
+the CTA cannot promise five questions and deliver three.
+
+**51. `Verse` RENDERS `text`, NEVER `displayText`, AND THE FALLBACK IS ONE SHARED RULE.**
+`textClean` is absent on every English verse and present on every Arabic one (§5 trap 2), so
+both arms have to resolve a string. The rule is `textClean ?? text` — **the same sentence
+in both arms**, which is what lets one `RichText` per verse serve them. `verseDisplayText`
+exists as the single place that sentence lives.
+
+**52. THE QUESTIONS TRAVEL WITH THE ANSWER AND ARE NOT RENDERED.** The live reading
+response already ships `user_answer` and `is_correct` (`reading_harness.dart`'s fixture is
+the evidence). `/reading` shows the passage and a CTA; the questions belong to `/quiz`,
+which is Phase 8's. The temptation to render them here is declined and recorded, because
+"the answer is not on the screen" is a claim that has to be asserted against a payload that
+**has** one to hide — which is why the fixture carries it rather than omitting it.
+
+**53. THE REFERENCE IS VERBATIM AND THE TRANSLATION IS A LABEL; THERE IS NO DURATION.** The
+Arabic reference keeps the server's space after the colon (`يوحنا 3: 1-5`) because
+normalising a citation is the client editing the server's data. The translation row is
+`Smith & Van Dyck (فانديك)` **as one string** — the server already merged the Arabic name
+into the Latin one, and splitting it would be a guess about where the boundary is. No
+reading duration is rendered: the live payload's is `null` and §5 records that, so a
+number would be invented.
+
+**54. THE ARABIC ARM IS ALL AMIRI, AT NINE SITES, AND THE DEFECT WAS UNDER-COUNTED.**
+`01-source-analysis.md` §2 row 2 said two; the source says **nine** — `ReadingArScreen.tsx:35`
+(metadata), `:86` (CTA caption) and `:49,51,56,58,63,68,70` (the seven `<sup>` verse
+markers). The row has been corrected. `ds.tsx:298,341` are the two **English-only** sites
+and stay in Space Mono, which is the point of the split. `reading_glyph_test.dart` parses
+the five bundled TTFs and asserts every character on the screen is carried by the family
+that renders it — so a future font swap that drops a codepoint fails here rather than
+shipping as tofu.
+
+**55. THE `✦` DROP CAP IS ABSENT FROM ALL FIVE FAMILIES, SO THE GLYPH GATE EXCLUDES IT
+RATHER THAN PRETENDING.** Measured: `U+2726` is in none of the bundled TTFs. The prototype
+uses it as a passage ornament; the client does not draw it, and `reading_glyph_test.dart`
+filters it by name with that measurement in its doc. Substituting another ornament would be
+a new design decision, and inventing a codepoint's coverage is worse than recording its
+absence.
+
+**56. NO `SettingsRepository`, SO THE FONT STEP IS EPHEMERAL AND SAID TO BE SO.** Nothing
+in `lib/` reads a settings port — `07-file-map.md` §7 lists the file, and Phase 9 is what
+owns it. There is therefore nowhere durable for the reader's `Aa` choice to be written, so
+it lives in `ReadingCubit` for the life of the cubit. `reading_text_scale.dart`'s doc states
+in prose that the choice does not survive leaving `/reading`, which is the honest
+alternative to silently implying persistence. Two alternatives were rejected: a
+`shared_preferences` call now (a dependency added in a phase that does not own it), and
+dropping the control (it is in the prototype and `SettingsScreen.tsx:66`).
+
+**57. NO VERSE-NUMBER FLAG.** The `Ss`/`١٢` toggle exists in the prototype. Nothing in the
+live payload or the six screens needs it, and it would be a state flag with no consumer.
+
+**58. THE BOOKMARK IS INERT AND SAYS WHY IN ITS OWN NAME.** There is no bookmark endpoint,
+so the button is `onPressed: null` with the label `Bookmark — unavailable`. §14's disabled
+row is the reason: the action is **absent**, not present-and-flagged, and the name carries
+the reason. `reading_accessibility_test.dart` asserts the absence and the name, and the
+keyboard group asserts it is not a Tab stop.
+
+**59. THE COMPOSED SCALER IS THE PRODUCT, CAPPED AT THE TABLE'S TOP ROW, AND THE DEAD ZONE
+IS ASSERTED RATHER THAN ONLY DESCRIBED.** `reading_text_scale.dart` carries the four-rule
+table and the measurements. `reading_text_scale_test.dart` mounts all four: step 1 at
+platform 1.0 (which a `max` rule renders as 1.00, so the reader's drag toward "smallest"
+does nothing), step 1 at platform 1.22 (which a *replacing* rule renders as 0.90, losing
+the reader's OS setting in the one screen where reading is hardest), the ceiling, and the
+**collapse at 1.22** — §14's own surface is above the 1.109 the file names, so the dead
+zone is present and the test says so. If a future table change removes the dead zone, that
+test is red, which is the correct direction: the cost is a promise.
+
+**60. ONE PARAGRAPH PER VERSE.** `ScriptureBlock` emits one `TextSpan` per verse, each
+labelled `Verse <n>` in its own `Semantics`, so a reader navigating by node can be told
+which verse they are on. One label for the whole passage would be more useful to a screen
+reader in one sense and useless in the one that matters. The header has **no** label of its
+own, and `reading_accessibility_test.dart` asserts it has none.
+
+**61. RTL IS A TRUE MIRROR, AND THE PROTOTYPE'S INCONSISTENT CHILD ORDER IS NOT REPRODUCED.**
+`ReadingArScreen.tsx` sets `textAlign: 'right'` where the English screen sets none, and
+`textAlign: 'start'` resolves to exactly those two under the ambient direction — so this
+client writes `TextAlign.start` and neither arm names a direction. The metadata row and the
+citation are `'center'` on **both** arms and are therefore not mirrored; `MaterialApp`
+supplies the direction and there is no `Directionality` anywhere under `lib/`.
+
+**62. THE CTA IS A BARE `Container` INSIDE A `Stack`, NOT GLASS, AND THE `Stack` PUTS IT
+ABOVE THE `Scaffold`.** `04-widget-inventory.md` line 54 already says the prototype's CTA is
+not glass; `ReadingEnScreen.tsx:88-92` draws `rgba(15,17,26,0.96)` at `4px 24px 32px` blur
+`20px` over the scrolling page, which is a scrim, not a `GlassSurface`. A `GlassSurface`
+there would be a second backdrop on screen and `reading_geometry_test.dart` measures the
+padding and the radius against the prototype. The `Stack` ordering is asserted by
+`reading_geometry_test.dart`: the CTA is a sibling **after** `Scaffold` and the bottom fade,
+because a `Column` would let `Scaffold`'s own background paint over it.
+
+**63. THE ARABIC BAND'S HUE IS SUBSTITUTED, AND THE SUBSTITUTION IS NAMED.** The
+prototype's `#B79CF0` is not in `EvaColors`, and `no_colour_literals_test.dart` forbids a
+literal in `lib/`. `colors.ink` at `0.3` / `0.2` alpha is the substitute, chosen because it
+is a token that exists on both themes. Recorded as a divergence rather than added as a
+13th colour token, which would be a design-system change in a phase that does not own it.
+
+**64. THE DROP CAP DIVERGES FROM THE PROTOTYPE'S LITERAL 76 — AT 146.57, NOT 131.1.**
+`ScriptureBlock._dropCapFor` derives the size from the body size and a cap-height ratio:
+`3 × 1.8 × 19 / 0.7` = **146.57142857142858**, against the prototype's 82 on this screen
+and 76 on `/`. `01-source-analysis.md` and the Phase 6 comment that called it a
+"transcription" have been corrected. The `76` and `82` are `fontSize` literals with no
+`Symbol` to certify, and the geometry suite now says so instead of leaving the impression
+that nothing was checked.
+
+**This decision previously said 131.1 and was wrong about the value it was attached to.**
+131.1 is the *same arithmetic at body size 17* — `TodayReadingPanel.previewFontSize`, `/`'s
+size — so the number was not invented, it was correct for the other screen and quoted for
+this one. The code and `passage_drop_cap_test.dart` (`closeTo(146.57, 0.01)`) agreed with
+the arithmetic all along; only the prose was wrong, in four places, and it was wrong
+*downward*, so a reader checking it found a plausible number rather than an obvious typo.
+The largest element on `/reading` is **146.57**.
+
+**The lesson is the one §9's rule already states, applied to itself:** a number in a doc
+is a claim about a specific thing, and "which thing" is part of the claim. Three places
+now say `fontSizeFor(19)` or `fontSizeFor(17)` by name instead of saying "the drop cap".
+
+**65. THE ARABIC PLURAL BOUNDARY IS `== 1`, AND THE LIMITATION IS DOCUMENTED IN
+`ReadingStrings`.** English has two forms and Arabic has six. `captionFor` special-cases
+`1` on both arms and renders the **real count** for everything else, which is **wrong for
+2, 3 and 11** in Arabic. The chosen rule is the one that is right for the common case and
+never *wrong-looking*, and `ReadingStrings`'s doc says plainly which counts are
+mistranslated and that the six-form table is Phase 8's — because the alternative (six
+hand-written forms in a phase whose scope is the passage) is a bigger unreviewed guess.
+
+**This decision previously said `captionFor` "renders `5` for everything else". That is
+false and was never true.** It renders the count it is given; hard-coding `5` fails four
+tests. The prototype's `٥ أسئلة` was a hard-coded number, and the whole point of the
+change was to stop transcribing it.
+
+**And "§5 records that the server counts questions in Western digits" does not contradict
+`reading_strings.dart`.** They are two different facts: §5 is about the **`question_count`
+field the server sends**, and the caption's numerals are a **client-chosen** rendering of
+it — `arabicIndicDigits` converts, so the Arabic arm draws `١` from a Western `1`. As
+written the sentence described code that does not exist, because it implied the two were
+about the same string.
+
+**66. `EvaButton` GAINS A **REQUIRED** `labelFamily`, BECAUSE A LABEL THAT NEEDS A FACE THE
+BUTTON CANNOT SET IS A NEW WIDGET.** The CTA renders its caption in Amiri on the AR arm
+without a second button type. The alternative was a `StickyCta`-local `TextButton`, which
+duplicates focus ring, disabled state and hit target. The glyph test is what forced it:
+the CTA label is one of the AR sites.
+
+**Two claims this decision made about itself were false and are corrected here.** It said
+"All eight existing call sites are untouched" — there are **four** `EvaButton(` sites in
+`lib/`, not eight — and it said "the parameter is required and every one passes it" —
+it shipped **optional and nullable**, and **one** site in four passed it. A nullable knob
+means the compiler is silent at every site that forgets it, and the value it falls back
+to is `titleMedium`'s, which is **DM Sans**, which carries no Arabic glyph at all; so
+Phase 8's quiz CTA and Phase 9's settings CTA would have shipped tofu in Arabic with the
+compiler silent. It is now `required`, all four sites pass a **per-arm** family, and
+`ErrorView` — which builds a button — grew a `retryFamily` for the same reason. See
+decision 69.
+
+**67. THERE IS NO `ScriptureVerse` WIDGET; THE VERSE IS A PRIVATE METHOD ON
+`ScriptureBlock`.** `07-file-map.md` line 125 lists `scripture_verse.dart`. The verse
+needs four things from its parent — the `TextStyle` the block derived for the language,
+the `TextStyle` for the marker, and the `PassageDropCap` that only the **first** verse
+may have — so a separate widget would take three of them as required parameters and a
+fourth as a nullable. That is the shape of a parameter object with no behaviour of its
+own. The method that exists (`ScriptureBlock._verseParagraph`) builds the same
+`RichText` with the same four inputs, so nothing is lost and the block's
+`ListView.builder` remains the single place an item is built.
+
+Two alternatives were rejected:
+
+- **A `ScriptureVerse` widget taking the three styles.** It would be testable in
+  isolation, and it would need a test that passes all three styles to construct it — a
+fixture that re-derives the production derivation, which is the coverage that reads as
+coverage and asserts nothing.
+
+**68. THERE IS NO `models/` LAYER IN `reading/data/`, AND THAT IS A PHASE 6 DECISION THIS
+PHASE INHERITED.** `07-file-map.md` listed `scripture_text_model.dart`, `verse_model.dart`
+and `question_model.dart`. Phase 6 shipped `streak_summary_mapper.dart` mapping **straight
+to the domain entity**, with no model class, and the reading data source parses into
+`ScriptureText` in one step. A model trio would be three classes whose every field is a
+copy of an entity's, plus a mapper that copies them back — the "dual source of truth for
+one value" shape that defect 5 already removed from the design system, in the data layer
+instead. Three alternatives were rejected: keep the models for symmetry (symmetry with a
+file that does not exist), keep them "in case the wire shape changes" (a `Map<String,
+dynamic>` parse is where a wire change is absorbed anyway, and a model class would have to
+change too), and make the models `freezed` (a generator for a shape already represented by
+a hand-written immutable entity with `==`).
+
+The naming that did survive is `DioReadingRepository` and `DioStreakRepository` — two
+`Dio`-prefixed adapters for two ports, which is what decision 23 already settled. The
+file-map lines have been corrected rather than left to be read as omissions.
+- **A widget taking the `Verse` and the language and deriving the styles itself.** Then
+  the drop cap has to be threaded in too, and `first` becomes a positional boolean at a
+  call site that reads `child: ScriptureVerse(verse, language, cap: null)`.
+
+`reading_geometry_test.dart` asserts the *paragraph* geometry, which is what a reader
+meets, so the missing widget costs no measurable coverage — the file-map line has been
+annotated rather than left to be read as an omission.
+
+**69. THE FIRST CHARACTER OF A PASSAGE IS SPLIT BY ONE SHARED PURE FUNCTION, ON A **RUNE**,
+AND THE CUT IS **NEVER** BETWEEN THE TWO HALVES OF AN ASTRAL CHARACTER.**
+`core/domain/entities/drop_cap_text.dart`'s `splitDropCap` answers "what is the drop cap's
+letter, and what is the rest of the paragraph" for **both** screens — `/`'s preview
+(`today_reading_panel.dart`) and `/reading`'s first verse (`scripture_block.dart`).
+
+**The defect it fixes, measured twice.** `String.substring` indexes **UTF-16 code units**,
+so `substring(0, 1)` on a character above U+FFFF returns the **high surrogate alone** —
+measured `codeUnits == [55357]`. `RenderParagraph` then throws `ArgumentError: string is
+not well-formed UTF-16` out of `_RenderScaledInlineWidget.performLayout`; and because the
+cap is a `WidgetSpan` **inside the first paragraph**, the throw takes the passage, the
+metadata row **and both CTAs**. `/` is the wider of the two surfaces: its bug is the
+*truncation*, so an emoji anywhere in the first 56 code units of verse one is enough, not
+only at index 0.
+
+**Why one function and not two fixes.** Phase 6 fixed the *empty* string at `/` and Phase 7
+re-created the identical `substring(0, 1)` at `/reading`, in a new call site, with the same
+`isEmpty`-only guard — so the C3 fix was incomplete and this phase reproduced the failure
+it was written to prevent. Two call sites of a two-line rule is one rule, and a rule with
+two copies has one copy wrong before the next reviewer notices.
+
+**Why it is in `core/domain/`.** §3: two features consume it, so it is the shared kernel.
+§6: it is a conditional plus a calculation, which is the definition of logic a widget must
+not contain. Gate 1 holds the file Flutter-free, and `runes` / `fromCharCode` are pure Dart.
+
+**Why the cut skips leading whitespace.** `isEmpty` is the right question about a string and
+the wrong question about a *character*: `' ‹Verily…'` is not empty, its first character is
+a space, and a space enlarged to 146.6 logical px is an **invisible glyph** — the largest
+element on the screen rendering nothing, with the paragraph starting one letter in. A tab is
+the same. Only **leading** whitespace is the cap's business; the tail belongs to the
+paragraph and dropping it would be the client editing scripture.
+
+**And it is NOT a shape test, which recorded decision 29 still refuses.** A verse opening
+with a bare combining mark (`'\u0301Verily'`) would still make an enlarged accent the cap.
+Stripping marks is a shape test, and decision 29 rejects one for this widget for a measured
+reason: it breaks on a verse opening with a numeral or a bracket, and §5's live payload
+opens one behind a `‹Verily`. Recorded as a non-fix rather than fixed, because the fix and
+the decision are the same shape.
+
+Alternatives rejected:
+
+- **`text.runes.take(1).map(String.fromCharCode)` inline at each call site.** Two copies of
+  the astral fix and the trim rule, which is exactly the shape that let Phase 7 re-create
+  Phase 6's defect.
+- **`package:characters`.** Already a transitive dependency, so no `pubspec.yaml` change —
+  and §8.4 pins that file, so promoting it is a hard stop. It also does not answer the trim
+  question, and `String.fromCharCode` on a single rune is the whole of what is needed.
+- **Stripping combining marks too.** A shape test; see above.
+- **Leaving the second half to `previewText` only.** `previewText` owns the *truncation* and
+  cannot own the *first-rune* split, and fixing only the truncation leaves
+  `preview.substring(0, 1)` returning a lone surrogate for a preview that opens with one.
+
+**70. THE CTA IS GATED ON A QUESTION, NOT ON A PASSAGE.** `ReadingPage` renders
+`StickyCta` when `state.scripture != null`. That is the right question about the **failure**
+state and the wrong one about a **succeeded** one: `questions: []` is reachable, because the
+mapper **skips** an unreadable question rather than refusing the passage (recorded decision
+40), so a payload of four unreadable questions reports `questionCount == 0`. Measured: the
+caption rendered `"0 questions"` / `"٠ أسئلة"` and **Begin reflection was still offered**, so
+a reader with nothing to reflect on was invited through to an empty quiz. The gate is now
+`when passage.questionCount > 0`, and the passage itself is untouched — the sanctuary still
+renders in full; what goes is the invitation.
+
+Rejected: hiding the CTA on `status != ready`. It reads as if the passage were not loaded
+either, and the failure state is already covered by its own test — the same test that
+states the principle ("the CTA is gone, because there is nothing to reflect on") this one
+now applies to the second payload shape.
+
+**71. THE GLYPH GATE PAINTS ITS TOOLTIPS, AND ITS ARABIC PREDICATE IS THE **BLOCK**, NOT
+FOUR SAMPLED CODEPOINTS.** `01-source-analysis.md`'s defect #2 and `08-build-phases.md`'s
+Phase-7 note both said the gate asserts "**every character on the screen**". It did not, and
+the difference was **thirty tofu boxes**.
+
+The prototype's nine Arabic sites were the **floor, not the ceiling**. Its four top controls
+are bare `<button>`s with an inline `<svg>` and **no label at all**
+(`ReadingEnScreen.tsx:14-16`, `ReadingArScreen.tsx:21-29`), so §14's requirement for an
+accessible name forced three Arabic strings into this client that the prototype never
+wrote — and they render through `IconActionButton`'s `Tooltip`, whose
+`Tooltip(message: …)` carried **no `textStyle`**, so Flutter resolved `null` to
+`ThemeData.textTheme.bodyMedium`, measured **`DMSans`** on **both** themes. Measured on the
+shipped `ReadingPage` at `Locale('ar')` with the long press held: `TOOLTIP "رجوع"` (4
+tofu), `"حجم الخط"` (7), `"إشارة مرجعية — غير متاح في هذه النسخة"` (**19** codepoints). Every
+other Arabic run on the screen was Amiri.
+
+**Two independent reasons the gate was blind to all three, and both had to be fixed.**
+
+1. `renderedRuns()` walked the **already-painted** tree, and a `Tooltip` paints nothing
+   until a gesture. The probe found **zero** tooltip `Text` widgets. So the walk is now
+   `Future`-returning: everything painted now, then each `Tooltip` held open past
+   `kLongPressTimeout` and everything painted then, deduplicated.
+2. `_isArabic` sampled `[0x0628 ب, 0x0644 ل, 0x064Eَ, 0x0665 ٥]`. `رجوع` is
+   `U+0631,062C,0648,0639` — **none of the four**. So even painted, two of the three would
+   have been skipped by tests 1 and 2. It is now a **range** over the four Unicode blocks
+   Arabic script occupies, which is the question a reader can check.
+
+**And the walk itself had a third bug, found by the fix and worth recording.** It added a
+run for *every* `TextSpan`, using the whole span's plain text as the label and
+`bodyMedium` as the family when the span carried no style. Flutter's `Tooltip` builds its
+content as `TextSpan(style: effective, children: [TextSpan(text: message)])` — the **root**
+carries the family, the **child** carries the text — so the walk read the child's
+`fontFamily` as `null` and substituted `bodyMedium`: it reported **`DMSans`** for a tooltip
+the app had already rendered in **`Amiri`**. A correct fix looked wrong, in the one family
+the file exists to catch. The walk now threads the effective style down the way
+`TextSpan.build` does, and a `TextSpan` with children and no text of its own contributes no
+run at all — it paints nothing.
+
+The gate's table is now **nine** rows of which **eight** were tofu. `IconActionButton`
+gained a **required** `tooltipFamily` for the same reason `EvaButton.labelFamily` is
+required (decision 66): the knob does not affect the button at all, it affects a `Text` the
+design system builds, and a caller that omits it gets `bodyMedium` silently.
+
+**72. THE PROTOTYPE LINE MAP IS **ANCHORED ON BOTH ENDS**, AND `contains` WAS ADMITTING A
+FALSE MATCH.** `reading_geometry_test.dart` compared each claim's `pattern` with
+`String.contains`, and every pattern ends in a **number**. So `fontSize: 19` is satisfied by
+`fontSize: 190`, `marginTop: 8` by `marginTop: 80`, `height: 5` by `height: 50` — and the
+symbol map cannot see it, because `expected` is the number the *table* says rather than the
+number the *prototype* says. **Live, end-to-end**: the Arabic band's claim was the bare
+string `'2px,'`; the line has **two** `2px,` (the dash and the transparent stop beside it);
+rewriting the prototype's dash from `2px` to `12px` left the **whole suite green** while
+`arabicBandDash == 2` was separately asserted. **Third instance** of `contains` accepting
+`240` for `24`.
+
+The check is now `declaresAt(line, pattern)`: a regular expression with `(?![0-9.])`, so a
+match may not end on a digit or a decimal point. `(?![0-9A-Za-z])` and not that, because the
+tracking claims end in `em` and the letter after a matched `'0.10em'` is its closing quote.
+The **left** end cannot be generalised, so the one claim whose false match is on the left
+carries the boundary in its own pattern: `bandDash` quotes `')} 2px, transparent'`, which
+marks *which* `2px` is the dash. A leading space was tried first and **does not work** — the
+line's surviving `transparent 2px,` still matched it; that is measured and named here so it
+is not tried again.
+
+**73. `home_page_test.dart`'s ARABIC ARM WAS AND IS **MOSTLY TOFU**, AND THIS PHASE DID NOT
+FIX IT — THE MEASUREMENT IS RECORDED INSTEAD.** With `EvaButton.labelFamily` now required,
+`/login` and `/` render their Arabic button labels in Amiri; measured on the shipped
+screens at `ar`, the families in the tree are still `{CormorantGaramond, SpaceMono, DMSans,
+EBGaramond}` — **`Amiri` present only because of `_Preview`**. `/`'s subtitle, reference,
+status line and `Start reflection` are DM Sans or Space Mono; `/login`'s tagline, field
+labels, hint, links and both social buttons are the same. Ten-plus runs per screen.
+
+This is Phase 10's work and it is **not** this phase's: fixing it means giving every run on
+two shipped screens a per-arm family, which is a screen rewrite wearing a parameter's
+clothes. What is decided here is only that the two button labels this phase had to touch
+are no longer among them, and that the measurement is written down at the two call sites so
+the next reader is not told those screens are whole.
+
+
 ## 7. Verification — run before reporting done
 
 ```bash

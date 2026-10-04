@@ -1,11 +1,20 @@
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/repositories/reading_repository.dart';
+import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:injectable/injectable.dart';
 
 /// The `reading` feature's registrations.
 ///
-/// **THIS MODULE REGISTERS NOTHING TODAY.** That is the honest state, not an
-/// oversight: Phase 7 owns `DioReadingRepository`, the remote data source behind `GET /readings/today/{lang}`, and the cubit holding font scale and verse numbers, so until that phase lands there is nothing to
-/// put here. The module exists now, empty and named, because a container whose
-/// shape appears one feature at a time is one feature at a time.
+/// **THIS MODULE REGISTERS ONE THING: [loadScripture].** Everything else `/reading`
+/// needs is either a Phase-6 registration (`ReadingRemoteDataSource`,
+/// `TodayReadingMapper`, `DioReadingRepository`) or a hand-registration — see
+/// [readingModuleNote] below.
+///
+/// `DioReadingRepository` and the remote data source are **Phase 6's**, registered
+/// by `home_module.dart` because `/` was their first consumer; Phase 7 *widened*
+/// those classes rather than registering a second pair, which is recorded decision
+/// 23's resolution. Registering them again here would be the "adapter inventory
+/// grows from three to four" outcome that decision rejects.
 ///
 /// A `@module` with no providers emits no registration at all, so an empty one
 /// costs nothing at runtime. The record of what the graph actually contains is
@@ -29,4 +38,13 @@ import 'package:injectable/injectable.dart';
 /// composition root, rather than moving `injection.dart`'s imports. Recorded here
 /// now so the next phase rediscovers it as a decision instead of as a puzzle.
 @module
-abstract class ReadingModule {}
+abstract class ReadingModule {
+  /// Today's passage, in the reader's language.
+  ///
+  /// Over the **port**, and registered as `@lazySingleton` for the reason
+  /// `home_module.dart`'s providers are: it holds no state, so the lifetime buys
+  /// nothing, but a `@factory` would build a second request path per lookup and the
+  /// identity interceptor's state is per-client.
+  @lazySingleton
+  LoadScripture get loadScripture => LoadScripture(getIt<ReadingRepository>());
+}

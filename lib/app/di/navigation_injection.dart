@@ -10,6 +10,8 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
+import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 
 /// The **Flutter half** of the object graph: the auth seam and the router.
 ///
@@ -42,7 +44,7 @@ import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 /// router; only the file differs from the plan, and `core_module.dart` says so
 /// where the plan's file map would have put it.
 ///
-/// WHAT THIS COSTS, STATED PLAINLY: four registrations are now written by hand
+/// WHAT THIS COSTS, STATED PLAINLY: **five** registrations are now written by hand
 /// instead of generated, so `injection.config.dart` no longer shows them in a
 /// diff. That is the price of the purity gate, taken knowingly, and it is why
 /// `navigation_injection_test.dart` exercises this function as behaviour —
@@ -66,10 +68,25 @@ import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 /// the only place a `Locale` exists is a widget and this function is not one. See
 /// `HomeStarted`'s doc.
 ///
-/// The cost is the same four-registrations-by-hand line the rest of this file's doc
-/// already states, now five. `injection_test.dart` refuses `HomeBloc` in the
-/// generated config and `navigation_injection_test.dart` resolves it, so neither
-/// half can drift.
+/// The cost is the same line the rest of this file's doc already states, now three
+/// hand-registered blocs. `injection_test.dart` refuses them in the generated config
+/// and `navigation_injection_test.dart` resolves them, so neither half can drift.
+///
+/// ## AND `ReadingCubit` HITS IT A **FOURTH** TIME — WHICH IS THE PREDICTION
+/// `reading_module.dart` MADE BEFORE PHASE 7 EXISTED
+///
+/// `ReadingCubit extends Cubit`, so the mechanism above applies verbatim, and
+/// `reading_module.dart`'s own doc said so in advance: "there is no spelling of
+/// 'register this cubit' that keeps Flutter out of this graph". It is here.
+///
+/// ## AND IT IS A **`registerSingleton`**, LIKE THE OTHER TWO, FOR THE SAME REASON
+///
+/// A `@factory` here would hand out a **second** cubit with its own state, and the
+/// reader's font step — which is state for the life of the cubit, because Phase 7 has
+/// no `SettingsRepository` — would live in whichever instance `ReadingPage` happened
+/// to resolve. The single-instance hazard `HomeBloc` documents applies here with more
+/// force, because `ReadingCubit` holds something a reader set rather than something
+/// refetched.
 ///
 /// ## WHY `AppRouter` IS A LAZY SINGLETON AND NOT A FACTORY
 ///
@@ -141,6 +158,10 @@ void configureNavigation() {
     loadStreakSummary: getIt<LoadStreakSummary>(),
     getReaderSession: getIt<GetReaderSession>(),
   );
+  // **Built here, not resolved from the locator** — see the `ReadingCubit` section.
+  final ReadingCubit readingCubit = ReadingCubit(
+    loadScripture: getIt<LoadScripture>(),
+  );
 
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
@@ -150,6 +171,7 @@ void configureNavigation() {
     // about.
     ..registerSingleton<AuthBloc>(authBloc)
     ..registerSingleton<HomeBloc>(homeBloc)
+    ..registerSingleton<ReadingCubit>(readingCubit)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(
       () => ReevaluateListenable.stream(authBloc.stream),
