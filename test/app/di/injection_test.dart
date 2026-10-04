@@ -553,7 +553,7 @@ void main() {
       );
     });
 
-    test('the nineteen current registrations are the ones the config names', () {
+    test('the twenty-three current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -569,13 +569,30 @@ void main() {
       //
       // `ReadingModule`: `loadScripture` (1), which **Phase 7 added**.
       //
-      // `HomeBloc` and `ReadingCubit` are **not** in this list and never will be:
-      // they are hand-registered beside `AuthBloc` — `ReadingCubit` is the fourth
-      // such registration and `navigation_injection.dart` argues why — and the
-      // group below refuses them by name. `ReadingRepository`'s adapter, the data
-      // source and the mapper are Phase 6's and are listed once, because Phase 7
-      // **widened** those classes rather than registering a second pair (recorded
-      // decision 23).
+      // **Phase 8 added four**, and the ordering in the list below is the evidence:
+      //
+      // - `submitResultMapper` lands beside the other two mappers, inside the
+      //   `HomeModule` block, because that is where injectable puts a provider whose
+      //   only dependency is `TodayReadingMapper`.
+      // - `startSession`, `refreshSessionQuestions` and `submitAnswer` land
+      //   **between `getReaderSession` and `loadScripture`** — that is not where I
+      //   wrote them. `quiz_module.dart` reads in the order use case, data source,
+      //   repository, but injectable emits in reverse-dependency order, so the
+      //   three quiz use cases precede the one reading use case that shares the same
+      //   repository. A test that asserted a hand-maintained order would have
+      //   encoded a generator's implementation detail; this one asserts **which**
+      //   providers exist, and the generator chooses where.
+      //
+      // `HomeBloc`, `ReadingCubit` and `QuizBloc` are **not** in this list and never
+      // will be: they are hand-registered beside `AuthBloc` — `QuizBloc` is the
+      // fifth such registration and `navigation_injection.dart` argues why — and
+      // the group below refuses them by name. `ReadingRepository`'s adapter, the
+      // data source and the mapper are Phase 6's and are listed once, because both
+      // Phase 7 and Phase 8 **widened** those classes rather than registering a
+      // second pair (recorded decision 23). Phase 8's third port method,
+      // `ReadingRepository.submitAnswer`, is asserted by *method* in
+      // `submit_result_mapper_test.dart`, not by a registration here, because adding
+      // a method to an existing port must not move a single line of this list.
       expect(
         configuredRegistrations(File(configPath).readAsStringSync())
             .map((ConfiguredRegistration r) => r.toString()),
@@ -589,11 +606,15 @@ void main() {
           'lazySingleton<ApiErrorMapper> apiErrorMapper',
           'lazySingleton<TodayReadingMapper> todayReadingMapper',
           'lazySingleton<StreakSummaryMapper> streakSummaryMapper',
+          'lazySingleton<SubmitResultMapper> submitResultMapper',
           'lazySingleton<ReadingRepository> readingRepository',
           'lazySingleton<StreakRepository> streakRepository',
           'lazySingleton<LoadTodayReading> loadTodayReading',
           'lazySingleton<LoadStreakSummary> loadStreakSummary',
           'lazySingleton<GetReaderSession> getReaderSession',
+          'lazySingleton<StartSession> startSession',
+          'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
+          'lazySingleton<SubmitAnswer> submitAnswer',
           'lazySingleton<LoadScripture> loadScripture',
           'lazySingleton<String> apiBaseUrl',
           'lazySingleton<Dio> apiClient',
@@ -780,6 +801,21 @@ void main() {
         // is registered by hand in `navigation_injection.dart` beside the router
         // and `AuthBloc`. See that file's `HomeBloc` section.
         'HomeBloc',
+        // Phase 7's third. `ReadingCubit` is a cubit, so the identical wall applies
+        // — and it is in this list for the same reason the three before it are: the
+        // generator would produce a second registration of a type the router
+        // already reads out of the locator by hand, and the duplicate-type
+        // `ArgumentError` would surface in `configureNavigation()` rather than in
+        // the file that caused it.
+        'ReadingCubit',
+        // **Phase 8's fifth, and the strongest case of the five.** `QuizBloc` holds
+        // the `SubmitResult` that `ResultRoute` is pushed with, so it is not merely
+        // hand-registered — it is the **only** holder of that value, and a
+        // generated second instance of it would be an empty one. The test below
+        // cannot prove that; `navigation_injection_test.dart` proves the singleton
+        // by resolving it twice and getting one `identical` object. See that file's
+        // `QuizBloc` section for why it cannot be generated.
+        'QuizBloc',
       ]) {
         expect(
           config,

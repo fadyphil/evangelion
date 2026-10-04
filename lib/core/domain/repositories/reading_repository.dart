@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 
 /// Today's scheduled reading, as far as this client is concerned.
@@ -18,8 +19,11 @@ import 'package:evangelion/core/domain/entities/today_reading.dart';
 /// in the shared kernel for the same reason `AuthRepository` is: so the question
 /// can be asked from either feature without either feature knowing the other.
 ///
-/// ## THE PORT HAS **TWO** METHODS OVER ONE ENDPOINT, AND THAT IS RECORDED
+/// ## THE PORT HAD **TWO** METHODS OVER ONE ENDPOINT, AND THAT IS RECORDED
 /// DECISION 23
+///
+/// …and Phase 8 added a **third**, over a different endpoint, for the reason
+/// [submitAnswer]'s own doc gives.
 ///
 /// [todayScripture] is the wide read — every verse, every question, the whole
 /// passage. [today] is `/`'s narrow read, and it is a **narrowing of the wide
@@ -68,10 +72,11 @@ import 'package:evangelion/core/domain/entities/today_reading.dart';
 /// * **Always return a [Result]**, including for success. There is no overload
 ///   returning a bare value, so "did this handle the error arm?" is answered by
 ///   the type rather than by review.
-/// * **HTTP 409 is a typed `Failure`, never an exception.** Not reachable from
-///   this method — §5 trap 3's 409 belongs to `POST /readings/:id/submit` — and
-///   named here because the contract is the contract for every method of the port
-///   a future submit would join.
+/// * **HTTP 409 is a typed `Failure`, never an exception.** Not reachable from the
+///   two **reads** — §5 trap 3's 409 belongs to `POST /readings/:id/submit`, which
+///   is [submitAnswer] — and named here because it is the contract for that method
+///   too, where it *is* reachable. A typed failure and a prevented request are two
+///   different things; see [submitAnswer].
 /// * **A body that cannot be mapped is `FailureKind.serialization`,** not a
 ///   throw and not a default. `failure.dart` documents that kind; the mappers in
 ///   `features/reading/data/mappers/` are where it is produced.
@@ -104,5 +109,59 @@ abstract interface class ReadingRepository {
   /// a body the wide mapper refuses produces the **same** [Failure] through both.
   Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
+  });
+
+  /// Grades one answer: `POST /api/v1/readings/:id/submit`.
+  ///
+  /// ## WHY A **THIRD** METHOD ON THIS PORT AND NOT A SECOND PORT
+  ///
+  /// §3's ISP row asks for the smallest interface that satisfies a client, and the
+  /// temptation here is `QuizRepository`: `/quiz` is the only consumer and a new
+  /// feature is a new port. That is rejected on the same grounds
+  /// `reading_repository.dart`'s own header records for
+  /// [todayScripture] — **the endpoint is a reading endpoint.**
+  /// `submissions.routes.ts` registers `fastify.post('/readings/:id/submit')`, the
+  /// path is under `/readings`, and [readingId] is a field the reading endpoint
+  /// produced. A `QuizRepository` would split one resource's writes from its reads
+  /// across two files that have to agree about `reading_id` being today's.
+  ///
+  /// And `quiz`'s half of the argument is stronger: `08-build-phases.md` §Phase 8
+  /// says `quiz` "declares no repository and no data source of its own", and the
+  /// `POST` call "rides `reading`'s existing remote data source". A new port would
+  /// have to be declared *somewhere*, and `core/domain/` is the only place a port
+  /// may live (§3), so `QuizRepository` would sit beside `ReadingRepository` and
+  /// `DioReadingRepository` would implement both — two interfaces over one class,
+  /// which is the fat-port shape §3's ISP row forbids.
+  ///
+  /// ## AND THE PARAMETERS ARE **NOT VALIDATED HERE**
+  ///
+  /// `submissions.routes.ts:18` types the path parameter as
+  /// `description: 'Reading UUID'` — a description, **not** a schema — while `:7`
+  /// validates `question_id: z.string().uuid()`. So the backend validates one of
+  /// these three values and not the others, and §5 traps 10 and 11 record that the
+  /// `reading_id` it serves is a fabricated, **date-dependent** non-UUID today.
+  ///
+  /// A client-side UUID check on [readingId] would therefore reject the only reading
+  /// this backend serves, and one on [questionId] would turn §5's documented `400`
+  /// into a client-side failure that never reaches the wire — which is precisely
+  /// the reasoning recorded decision 15 already refused for `X-User-Id`.
+  /// **`answer` is passed verbatim for the same reason**, and its contract is
+  /// `z.string().min(1)`: `submissions.routes.ts:35` documents it as *"Selected
+  /// option (A, B, C, D) or boolean"*, so `'true'` is legal and a client that
+  /// checked it against the option letters would refuse a valid request.
+  ///
+  /// ## AND THE 409 IS **A TYPED FAILURE THE CLIENT MUST PREVENT**
+  ///
+  /// §5 trap 3: a duplicate submit is `409 This question has already been submitted
+  /// by this user.` Mapping it here is necessary and **not sufficient** — the plan's
+  /// requirement is that the quiz disable a question whose `already_answered` is
+  /// `true` so the reader is never walked into a conflict. That is
+  /// `QuizAnswer.isAnswerable`'s job, in the domain layer, and no repository can do
+  /// it: by the time a request exists the reader has already pressed the button.
+  /// `dio_repositories_test.dart` asserts both halves side by side.
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
   });
 }

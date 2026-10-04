@@ -7,10 +7,28 @@
 /// CTA caption) — would put a ten-arm table in the presentation layer twice, and
 /// the second copy is the one a translator's change would miss.
 ///
-/// It is in `features/reading/domain/` rather than the design system because
-/// **nothing outside this feature renders Arabic numerals**: the settings screen
-/// has no numeric input, and `ProgressBeads` draws dots rather than digits. §3's
-/// placement test puts a type used by one feature in that feature.
+/// ## IT MOVED TO `core/domain/` IN PHASE 8, AND THE SENTENCE THAT WAS WRONG
+/// ## IS THE ONE THAT PROVED IT HAD TO
+///
+/// The first version of this doc read:
+///
+/// > *"It is in `features/reading/domain/` rather than the design system because
+/// > **nothing outside this feature renders Arabic numerals**: the settings screen
+/// > has no numeric input, and `ProgressBeads` draws dots rather than digits. §3's
+/// > placement test puts a type used by one feature in that feature."*
+///
+/// That was **true when written and a phase number away from false** — the exact
+/// class AGENT_CONTEXT's recorded decision 21 is about, where a claim about the
+/// future stops being checked the moment it is written. Phase 8 made it false:
+/// `/quiz` renders `Question 2 of 5` and `/result` renders a score, so three
+/// features need this function and §3 puts it in the shared kernel.
+///
+/// It did **not** go to the design system, and that is the second half of the
+/// placement test rather than an oversight: it is not a token, a colour or a style,
+/// it has no knowledge of a widget, and a design-system file is the one place §7's
+/// import-graph walk would not police. `core/domain/` is beside
+/// `drop_cap_text.dart`, which is the other top-level function in the kernel and the
+/// precedent for this shape.
 ///
 /// ## AND WHY THE ARABIC ARM USES THEM AT ALL
 ///
