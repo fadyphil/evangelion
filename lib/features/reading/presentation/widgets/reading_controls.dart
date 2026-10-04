@@ -212,7 +212,20 @@ class ReadingControls extends StatelessWidget {
             // §14: the stepper's own track is a slider node with increase/decrease
             // actions and its two buttons are real tab stops, so the reader can both
             // drag and press, and both are named by `FontSizeStepper` itself.
-            FontSizeStepper(step: fontStep, onChanged: onFontStepChanged),
+            //
+            // **The labels come from [strings], not from the design system.** They
+            // were `'Decrease font size'` / `'Increase font size'` / `'Font size'`
+            // hard-coded in `FontSizeStepper`, so this panel told an Arabic reader in
+            // English what its two buttons did.
+            FontSizeStepper(
+              step: fontStep,
+              onChanged: onFontStepChanged,
+              labels: FontSizeStepperLabels(
+                decrease: strings.decreaseFontSize,
+                increase: strings.increaseFontSize,
+                track: strings.fontSize,
+              ),
+            ),
             const SizedBox(height: EvaSpacing.lg),
           ],
         ],

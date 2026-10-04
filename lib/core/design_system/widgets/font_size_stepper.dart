@@ -42,6 +42,48 @@ int fontStepFromScaler(TextScaler scaler) {
   return step;
 }
 
+/// The three strings [FontSizeStepper] renders.
+///
+/// ## WHY A VALUE CLASS AND NOT THREE `String` PARAMETERS
+///
+/// §4 says named parameters for anything past two arguments, and three parameters
+/// on a widget that also takes `step` and `onChanged` is five at every call site —
+/// so the call sites would be unreadable and, worse, a caller could supply the
+/// increase label in the decrease slot with nothing to catch it. `EvaButtonStyle`
+/// and `EvaTextFieldStyle` are the precedent for one value object per widget's
+/// treatments.
+///
+/// **No defaults, deliberately.** The strings this class used to hard-code were
+/// `'Decrease font size'`, `'Increase font size'` and `'Font size'`, and the reason
+/// they are parameters is that the app is bilingual: on the Arabic arm a reader who
+/// opened the `Aa` panel was told in English what the two buttons beside them did. A
+/// default would let the next design-system widget reintroduce the same English, and
+/// §14's first row — a control with no name in the reader's own language — is a
+/// failure a widget-level default makes invisible.
+@immutable
+class FontSizeStepperLabels {
+  /// The stepper's three strings.
+  const FontSizeStepperLabels({
+    required this.decrease,
+    required this.increase,
+    required this.track,
+  });
+
+  /// The decrement button's accessible name and tooltip.
+  final String decrease;
+
+  /// The increment button's accessible name and tooltip.
+  final String increase;
+
+  /// The track's slider label.
+  ///
+  /// **The same string the `Aa` disclosure's own tooltip uses**, and deliberately
+  /// one value rather than two: they name the same control from two positions, and a
+  /// table with `textSize` beside `trackLabel` would be a translation decision that
+  /// can disagree with itself.
+  final String track;
+}
+
 /// The Settings font-size control.
 ///
 /// The prototype's row (`SettingsScreen.tsx:63-69`) is a small `A`, a native
@@ -65,8 +107,12 @@ class FontSizeStepper extends StatelessWidget {
   const FontSizeStepper({
     required this.step,
     required this.onChanged,
+    required this.labels,
     super.key,
   });
+
+  /// The three strings this control renders. See [FontSizeStepperLabels].
+  final FontSizeStepperLabels labels;
 
   /// The current step. Clamped for display, so a corrupt stored value renders
   /// as the nearest real step instead of a knob past the end of the track.
@@ -98,27 +144,38 @@ class FontSizeStepper extends StatelessWidget {
         const SizedBox(width: EvaSpacing.sm),
         IconActionButton(
           icon: Icons.remove,
-          tooltip: 'Decrease font size',
-          // `uiFamily`, which is `bodyMedium`'s own family — so passing it is the
-          // same rendering the null default produced, stated rather than inherited.
-          // **The string above is hard-coded English**, which is a real
-          // localisation gap on a bilingual screen and is not this change's to
-          // close; it is Latin, though, so this is the *correct* family for it and
-          // the requirement costs nothing here.
-          tooltipFamily: EvaTypography.uiFamily,
+          tooltip: labels.decrease,
+          // Swapped for the ambient arm, and the English string that used to sit on
+          // this line is what made that necessary: `'Decrease font size'` is Latin,
+          // so passing it `uiFamily` was correct **for that string** and would have
+          // been six tofu boxes the moment the caller passed the Arabic one. The
+          // family now follows the direction, and the string comes from
+          // [labels] — so this site has no language and no family of its own.
+          tooltipFamily: arabicAwareFamily(
+            Directionality.of(context),
+            EvaTypography.uiFamily,
+          ),
           onPressed: current > kFontStepMin
               ? () => onChanged(clampFontStep(current - 1))
               : null,
           size: EvaSpacing.xxxl,
         ),
         const SizedBox(width: EvaSpacing.xs),
-        _Track(step: current, colors: colors, onChanged: onChanged),
+        _Track(
+          step: current,
+          colors: colors,
+          onChanged: onChanged,
+          labels: labels,
+        ),
         const SizedBox(width: EvaSpacing.xs),
         IconActionButton(
           icon: Icons.add,
-          tooltip: 'Increase font size',
+          tooltip: labels.increase,
           // See the decrement button above.
-          tooltipFamily: EvaTypography.uiFamily,
+          tooltipFamily: arabicAwareFamily(
+            Directionality.of(context),
+            EvaTypography.uiFamily,
+          ),
           onPressed: current < kFontStepMax
               ? () => onChanged(clampFontStep(current + 1))
               : null,
@@ -160,7 +217,12 @@ class _Track extends StatelessWidget {
     required this.step,
     required this.colors,
     required this.onChanged,
+    required this.labels,
   });
+
+  /// The stepper's strings, for the slider node's own label. See
+  /// [FontSizeStepperLabels.track].
+  final FontSizeStepperLabels labels;
 
   final int step;
   final EvaColors colors;
@@ -180,7 +242,7 @@ class _Track extends StatelessWidget {
       // `Semantics` has no `value` slot for a slider, so the step is announced
       // through the increase/decrease actions' own labels plus the thumb's
       // position as a `label`.
-      label: 'Font size',
+      label: labels.track,
       value: '$step',
       increasedValue: '${clampFontStep(step + 1)}',
       decreasedValue: '${clampFontStep(step - 1)}',

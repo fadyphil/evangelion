@@ -185,7 +185,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
 
       final HomeHarness h = harness(
-        reading: const Result.failure(readingFailure),
+        reading: const Result.failure(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -238,7 +238,7 @@ void main() {
           (
             'a failed reading',
             () => harness(
-              reading: const Result<ScriptureText>.failure(readingFailure),
+              reading: const Result<ScriptureText>.failure(homeReadingFailure),
             ),
           ),
           (

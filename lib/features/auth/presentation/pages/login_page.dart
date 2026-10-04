@@ -252,12 +252,18 @@ class LoginPage extends StatelessWidget {
   /// because the script varies; answering it with the Latin face on the Arabic arm
   /// asserts the defect.
   ///
-  /// **It does not make `/login` whole.** Measured on the shipped screen at `ar`,
-  /// the tagline, the field labels, the hint, the forgot-password link and the two
-  /// social buttons are all DM Sans or Space Mono, so the arm is tofu in nine more
-  /// places than this one. That is Phase 10's work and it is named in the review
-  /// report; a fix that touched all ten would be a screen rewrite wearing a
-  /// parameter's clothes.
+  /// **It does not make `/login` whole — AND THE CLAIM THAT IT DID NOT IS NOW
+  /// DELETED, BECAUSE IT WAS MEASURED WRONG TWICE.** The measurement it carried
+  /// named six of the ten tofu runs; it missed `كلمة المرور` (the password field's
+  /// label), `جديد هنا؟`, `أنشئ حسابًا` and the divider's `أو`, all of which were
+  /// tofu. Every run on this screen now resolves its family through
+  /// `arabicAware`, and `test/arabic_typography_test.dart` enumerates all ten with
+  /// their families and fails when that set moves.
+  ///
+  /// What replaced it is not a number in a doc comment — §9's rule is that a claim
+  /// about a specific thing is only as good as the test that checks it, and there was
+  /// none — but a declared list in a gate, re-derived from the rendered tree on every
+  /// run. See recorded decisions 74 and 79.
   ///
   /// **Keyed on [ReadingLanguage] and not on the locale**, for
   /// `ReadingLanguage.forLocale`'s reason: a `Locale` at the presentation edge, the
@@ -537,8 +543,10 @@ class _SignUpRow extends StatelessWidget {
     children: <Widget>[
       Text(
         strings.newHere,
-        style: Theme.of(context).textTheme.bodyMedium!
-            .copyWith(color: context.colors.ink2),
+        style: arabicAware(
+          Theme.of(context).textTheme.bodyMedium!,
+          Directionality.of(context),
+        ).copyWith(color: context.colors.ink2),
       ),
       const SizedBox(width: LoginPage.kSignUpRowGap),
       TextLink(label: strings.createAccount, onPressed: null),
@@ -572,8 +580,13 @@ class _Brand extends StatelessWidget {
         Text(
           strings.tagline,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge!
-              .copyWith(color: colors.ink2),
+          // Swapped for the ambient arm. `اقرأ. تأمل. تذكّر.` is the first Arabic
+          // string a reader of this app ever sees and it rendered in DM Sans — three
+          // words, ten characters, ten tofu boxes.
+          style: arabicAware(
+            Theme.of(context).textTheme.bodyLarge!,
+            Directionality.of(context),
+          ).copyWith(color: colors.ink2),
         ),
       ],
     );
@@ -606,8 +619,10 @@ class _FormError extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: Theme.of(context).textTheme.bodySmall!
-                .copyWith(color: context.colors.err),
+            style: arabicAware(
+              Theme.of(context).textTheme.bodySmall!,
+              Directionality.of(context),
+            ).copyWith(color: context.colors.err),
           ),
         ),
       ],

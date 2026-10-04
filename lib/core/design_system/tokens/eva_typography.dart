@@ -163,8 +163,92 @@ abstract final class EvaTypography {
       textTheme(colors).labelMedium!.copyWith(fontFamily: monoFamily);
 }
 
-/// The [TextScaler] for font-size step [step], from the Settings slider.
+/// The family that renders a run of text whose script follows [direction], given
+/// the family [latin] that renders it otherwise.
 ///
+/// Identity under [TextDirection.ltr], and **exactly** identity: no size, weight,
+/// tracking or ink is touched, because the only thing wrong with a Latin face on the
+/// Arabic arm is that it carries no Arabic glyph.
+///
+/// ## WHY THE DIRECTION AND NOT THE LOCALE
+///
+/// Phase 6 established that direction comes from the **locale through
+/// `MaterialApp`**, and recorded decision 61 that there is **no `Directionality`
+/// anywhere under `lib/`** and no `startsWith('ar')` guess on a language field.
+/// This function keeps that: it takes the direction the engine already resolved, so
+/// a caller passes `Directionality.of(context)` and nothing else, and there is no
+/// second locale→script decision in the app to disagree with the first.
+///
+/// **RTL implies Arabic here because the app ships two locales.** `app.dart`
+/// declares `supportedLocales: [Locale('en'), Locale('ar')]`, and of those only
+/// `ar` resolves to RTL — so today the two questions have the same answer. A third,
+/// non-Arabic RTL locale (Hebrew, for instance) would make it false, and the failure
+/// would be loud rather than silent: `test/support/arabic_typography_gate.dart`
+/// asserts every rendered Arabic run is in Amiri **and** that Amiri carries every
+/// character on screen, so a Hebrew run in Amiri fails the second assertion on the
+/// first frame it is painted. That is the shape of answer worth having — a gate that
+/// reports the wrong family, rather than a font swap that looks fine.
+///
+/// ## AND WHY IT IS NOT A `TextTheme`
+///
+/// The obvious alternative is a `TextTheme` whose Arabic slots resolve to Amiri,
+/// applied under the Arabic arm. **It is not available.** `MaterialApp` takes one
+/// `theme:` and one `darkTheme:` and has **no per-locale theme hook**, so there is
+/// nowhere to put a second text theme that the engine would choose between. Recorded
+/// because "why not just localise the theme" is the first question a reader asks of
+/// this rule and the answer is a framework fact rather than a preference.
+String arabicAwareFamily(TextDirection direction, String latin) =>
+    direction == TextDirection.rtl ? EvaTypography.arabicFamily : latin;
+
+/// [style] with its family resolved for [direction].
+///
+/// The same rule as [arabicAwareFamily] for the two design-system parameters that
+/// are a family **name** rather than a style, which is why those two functions exist
+/// rather than one: `EvaButton.labelFamily` and `IconActionButton.tooltipFamily` are
+/// `String`, and forcing them to `String` callers would mean a `TextStyle` built and
+/// immediately unwrapped at four call sites.
+///
+/// ## WHY A HELPER RATHER THAN A PARAMETER ON EVERY RUN SITE
+///
+/// The alternative is threading a per-arm family into every widget that renders a
+/// caller-supplied string — `TextLink`, `SocialAuthButton`, `HairlineDivider`,
+/// `EvaTextField`, `ErrorView`, `FontSizeStepper` — which is a required constructor
+/// argument on six design-system widgets plus every feature widget that builds a
+/// `TextStyle`, and a new argument at every one of their call sites. Recorded
+/// decision 73's reviewer already called the parameter version "a screen rewrite
+/// wearing a parameter's clothes"; this is the same rewrite with a constructor on
+/// each end of it.
+///
+/// The parameter version also has a second cost that the helper does not: the caller
+/// has to *know* the arm. For a run whose text is the app's own strings the ambient
+/// direction is the whole of what the caller knows — `TextLink(label:
+/// strings.createAccount)` has no payload to read an arm from, which is why
+/// `TextLink` never grew a family parameter while `EvaButton` did (`EvaButton`'s
+/// callers *do* have `TodayReading.language` in hand, and that is what
+/// `TodayReadingPanel.continueFamilyFor` reads).
+///
+/// ## WHAT THIS DOES NOT REPLACE
+///
+/// The per-arm **`*FamilyFor` switches stay**, and so do `EvaButton.labelFamily`
+/// and `IconActionButton.tooltipFamily`. Those are keyed on the **payload's** arm —
+/// `TodayReading.language`, `ReadingLanguage` — which is a different fact from the
+/// ambient locale and survives the two disagreeing. This rule is for runs that render
+/// the app's own chrome, where the ambient direction is the only arm there is.
+///
+/// ## AND IT CANNOT FAIL SILENTLY
+///
+/// A helper that took a `Locale` and compared `languageCode == 'ar'` would resolve to
+/// nothing for a third language and hand back the Latin face — no error, tofu on
+/// screen. This one takes the direction the engine already decided, so there is no
+/// string to be wrong about and no default to fall through; and its output is read
+/// back off the rendered tree by `test/support/arabic_typography_gate.dart`, which is
+/// what turns "the call site called it" into "the engine received it".
+TextStyle arabicAware(TextStyle style, TextDirection direction) =>
+    direction == TextDirection.rtl
+    ? style.copyWith(fontFamily: EvaTypography.arabicFamily)
+    : style;
+
+/// The [TextScaler] for font-size step [step], from the Settings slider.///
 /// `docs/plans/03-design-system.md` §5.2 gives the table verbatim, and the shape
 /// with it: 1 → 0.90, 2 → 0.95, 3 → 1.00, 4 → 1.10, and everything else → 1.22.
 /// The executable form is the one immediately below.
