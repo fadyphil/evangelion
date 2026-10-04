@@ -1,4 +1,5 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/drop_cap_text.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/domain/preview_text.dart';
@@ -194,6 +195,47 @@ class TodayReadingPanel extends StatelessWidget {
   /// is the call site that fixes it.
   static const int dropCapLines = 3;
 
+  /// The `Continue` label's family, for [language].
+  ///
+  /// ## WHY A PER-ARM FAMILY APPEARS ON A PHASE-6 WIDGET IN PHASE 7
+  ///
+  /// `EvaButton.labelFamily` was optional and nullable, and this call site — one of
+  /// four — did not pass it, so `متابعة` went through **DM Sans**, which carries no
+  /// Arabic at all. W1's finding is that the parameter's *necessity* was unearned:
+  /// it is now **required**, so the compiler asks this site rather than a reviewer,
+  /// and a per-arm value is the honest answer because [strings] is per-arm too.
+  ///
+  /// **The alternative was `EvaTypography.uiFamily`, and that would have written
+  /// the tofu down.** The knob exists because the label's script varies; answering
+  /// it with the Latin face on the Arabic arm is asserting the defect rather than
+  /// fixing it.
+  ///
+  /// **Not a claim that `/` is whole.** Measured on the shipped `/` at `ar`, the
+  /// families in the tree are `{CormorantGaramond, SpaceMono, DMSans, EBGaramond}`
+  /// — the subtitle, the reference, the status line and `Start reflection` are all
+  /// DM Sans or Space Mono. This widget's **preview** is Amiri because `_Preview`
+  /// already branched on the arm; this adds the button. The rest of the screen's
+  /// Arabic runs are Phase 10's, and the measurement is in the review report rather
+  /// than pinned here as a claim about something this file does not own.
+  static String continueFamilyFor(ReadingLanguage language) =>
+      switch (language) {
+        ReadingLanguage.english => EvaTypography.uiFamily,
+        ReadingLanguage.arabic => EvaTypography.arabicFamily,
+      };
+
+  /// The retry label's family, for [strings]. [ErrorView.retryFamily]'s reason,
+  /// applied to this call site: the label is `strings.retry`, so on the Arabic arm
+  /// it is Arabic text.
+  ///
+  /// **The strings and not a `ReadingLanguage`,** and the asymmetry is forced by the
+  /// two states: the **content** state has `today.language`, and the
+  /// **failed** state has no reading at all — so there is no arm on the payload to
+  /// read and `HomeStrings.isArabic` is the only thing this widget was handed that
+  /// knows. Two spellings of one question in one file would be worse than one
+  /// spelling that takes the weaker source.
+  static String retryFamilyFor(HomeStrings strings) =>
+      strings.isArabic ? EvaTypography.arabicFamily : EvaTypography.uiFamily;
+
   @override
   Widget build(BuildContext context) {
     final TodayReading? today = reading;
@@ -218,6 +260,7 @@ class TodayReadingPanel extends StatelessWidget {
         null => _FailedOrLoading(
           message: failure,
           retryLabel: strings.retry,
+          retryFamily: retryFamilyFor(strings),
           onRetry: onRetry,
         ),
         final TodayReading value => _content(context, value),
@@ -266,6 +309,11 @@ class TodayReadingPanel extends StatelessWidget {
             Expanded(
               child: EvaButton(
                 label: strings.continueLabel,
+                // See [continueFamilyFor]. `reading` is the arm; `strings` is not
+                // asked, because the passage already carries the answer and one
+                // source for "which arm is this" is the rule `ScriptureText`'s own
+                // docs keep making.
+                labelFamily: continueFamilyFor(today.language),
                 onPressed: onOpenReading,
                 expanded: true,
               ),
@@ -347,17 +395,38 @@ class _Preview extends StatelessWidget {
     // `String`**; deciding what an empty verse *means* is the mapper's question and
     // it is answered there (`today_reading_mapper.dart`), not by an index into a
     // string this widget did not check.
-    if (!isEnglish || preview.isEmpty) {
+    //
+    // ## AND `isEmpty` WAS NOT ENOUGH — THE SAME DEFECT, THE OTHER HALF OF IT
+    //
+    // Phase 7's adversarial review found the identical `substring(0, 1)` **still
+    // here**, having been fixed for emptiness in Phase 6 and re-created for
+    // **astral characters** in Phase 7's own `/reading` block. Two consequences,
+    // both measured:
+    //
+    // * `substring` indexes UTF-16 code units, so a preview opening with `'\u{1F600}'`
+    //   yields the **high surrogate alone** and `RenderParagraph` throws
+    //   `ArgumentError: string is not well-formed UTF-16` — taking `Continue` →
+    //   `/reading` and `Start reflection` → `/quiz` with it, exactly as the empty
+    //   string did.
+    // * `' ‹Verily…'` is not empty, so the guard passed, and the cap was `' '`: an
+    //   **invisible 131.1px glyph**.
+    //
+    // `splitDropCap` is the shared answer for both screens, so the two copies of
+    // this rule cannot disagree — which is the whole reason it is in `core/domain/`.
+    // **[Split] before the `isEnglish` test**, so one well-formed answer covers both
+    // arms: the Arabic arm renders `preview` whole, and the split is wasted on it.
+    final DropCapText split = splitDropCap(preview);
+    if (!isEnglish || split.letter.isEmpty) {
       return Text(preview, style: body);
     }
 
     final PassageDropCap cap = PassageDropCap(
-      letter: preview.substring(0, 1),
+      letter: split.letter,
       lines: TodayReadingPanel.dropCapLines,
       color: colors.ember,
     );
     return cap.paragraph(
-      rest: preview.substring(1),
+      rest: split.rest,
       bodyStyle: body,
       // §14: the reader's own scaling, composed rather than reset. Passed rather
       // than read so a caller can honour a preference; `PassageDropCap`'s own doc
@@ -402,11 +471,15 @@ class _FailedOrLoading extends StatelessWidget {
   const _FailedOrLoading({
     required this.message,
     required this.retryLabel,
+    required this.retryFamily,
     required this.onRetry,
   });
 
   final String? message;
   final String retryLabel;
+
+  /// See [TodayReadingPanel.retryFamilyFor].
+  final String retryFamily;
   final VoidCallback? onRetry;
 
   /// The panel's own height while it has no content, so the bar above it does not
@@ -429,6 +502,7 @@ class _FailedOrLoading extends StatelessWidget {
           message: failure,
           onRetry: onRetry,
           retryLabel: retryLabel,
+          retryFamily: retryFamily,
         ),
       );
     }

@@ -333,7 +333,11 @@ void main() {
           icon: Icons.inbox_outlined,
           title: 'Nothing yet',
           message: 'Your reflections will appear here.',
-          action: EvaButton(label: 'Start', onPressed: _noop),
+          action: EvaButton(
+            labelFamily: EvaTypography.uiFamily,
+            label: 'Start',
+            onPressed: _noop,
+          ),
         ),
       );
       expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
@@ -382,7 +386,11 @@ void main() {
             icon: Icons.inbox_outlined,
             title: 'Nothing yet',
             message: 'Your reflections will appear here.',
-            action: EvaButton(label: 'Start', onPressed: _noop),
+            action: EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+              label: 'Start',
+              onPressed: _noop,
+            ),
           ),
           theme: data,
         );
@@ -406,6 +414,7 @@ void main() {
           message: 'Could not reach the server.',
           onRetry: () => retries++,
           retryLabel: 'Retry',
+          retryFamily: EvaTypography.uiFamily,
         ),
       );
       expect(find.text('Could not reach the server.'), findsOneWidget);
@@ -434,7 +443,38 @@ void main() {
         evaPrimitiveHarness(
           child: const Align(
             alignment: Alignment.topCenter,
+            // **`retryLabel` and `retryFamily` both absent on purpose**: the pair of
+            // asserts below fires on the missing label, which is this test's subject.
+            // The family half has its own test underneath, so neither one silently
+            // stops being about what it names.
             child: ErrorView(message: 'Boom', onRetry: _noop),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isAssertionError);
+    });
+
+    testWidgets('and so is a retry with a label but no FAMILY', (
+      WidgetTester tester,
+    ) async {
+      // `EvaButton.labelFamily` became **required** in Phase 7, and the label a
+      // retry renders is the app's own localized string — `حاول مرة أخرى` on the
+      // Arabic arm. A label with no family falls back to `titleMedium`'s, which is
+      // **DM Sans** and carries no Arabic at all, so this is a second tofu on the
+      // one screen where something has already gone wrong.
+      //
+      // Asserted rather than assumed because `retryFamily` is nullable-and-asserted
+      // like `retryLabel`: Dart cannot express "required only when `onRetry` is
+      // set", and a debug crash is the honest substitute.
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          child: const Align(
+            alignment: Alignment.topCenter,
+            child: ErrorView(
+              message: 'Boom',
+              onRetry: _noop,
+              retryLabel: 'Retry',
+            ),
           ),
         ),
       );
@@ -489,6 +529,7 @@ void main() {
             message: 'Could not reach the server.',
             onRetry: _noop,
             retryLabel: 'Retry',
+            retryFamily: EvaTypography.uiFamily,
           ),
           theme: data,
         );

@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/features/auth/presentation/auth_strings.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/widgets/password_visibility_toggle.dart';
@@ -238,6 +239,34 @@ class LoginPage extends StatelessWidget {
   /// link.
   static const double kSignUpRowGap = 6;
 
+  /// The sign-in label's family, for [language].
+  ///
+  /// ## WHY A PHASE-7 FIX LANDS HERE, AND WHAT IT DOES **NOT** CLAIM
+  ///
+  /// `EvaButton.labelFamily` shipped optional and nullable; Phase 7 made it
+  /// **required**, and this is one of the four call sites that has to answer. The
+  /// label is `LoginStrings.signIn`, which is `تسجيل الدخول` on the Arabic arm, and
+  /// the fallback was `titleMedium`'s — **DM Sans**, no Arabic glyphs at all.
+  ///
+  /// **A per-arm family and not `EvaTypography.uiFamily`**, because the knob exists
+  /// because the script varies; answering it with the Latin face on the Arabic arm
+  /// asserts the defect.
+  ///
+  /// **It does not make `/login` whole.** Measured on the shipped screen at `ar`,
+  /// the tagline, the field labels, the hint, the forgot-password link and the two
+  /// social buttons are all DM Sans or Space Mono, so the arm is tofu in nine more
+  /// places than this one. That is Phase 10's work and it is named in the review
+  /// report; a fix that touched all ten would be a screen rewrite wearing a
+  /// parameter's clothes.
+  ///
+  /// **Keyed on [ReadingLanguage] and not on the locale**, for
+  /// `ReadingLanguage.forLocale`'s reason: a `Locale` at the presentation edge, the
+  /// enum everywhere below, and one conversion rather than two.
+  static String signInFamilyFor(ReadingLanguage language) => switch (language) {
+    ReadingLanguage.english => EvaTypography.uiFamily,
+    ReadingLanguage.arabic => EvaTypography.arabicFamily,
+  };
+
   @override
   Widget build(BuildContext context) {
     // Two sources for one bloc, one provider either way. See [bloc]'s doc: with a
@@ -349,8 +378,13 @@ class _LoginFormState extends State<_LoginForm> {
 
   @override
   Widget build(BuildContext context) {
-    final LoginStrings strings = LoginStrings.of(
-      Localizations.localeOf(context),
+    final Locale locale = Localizations.localeOf(context);
+    final LoginStrings strings = LoginStrings.of(locale);
+    // **A getter, not a field**: `Localizations.localeOf` is an inherited-widget
+    // lookup, and `ReadingLanguage.forLocale` is the one conversion of it in the
+    // app. See [signInFamilyFor].
+    final ReadingLanguage language = ReadingLanguage.forLocale(
+      locale.languageCode,
     );
 
     return BlocConsumer<AuthBloc, AuthState>(
@@ -430,6 +464,8 @@ class _LoginFormState extends State<_LoginForm> {
                   const SizedBox(height: LoginPage.kFormGap),
                   EvaButton(
                     label: strings.signIn,
+                    // See [LoginPage.signInFamilyFor]. Required since Phase 7.
+                    labelFamily: LoginPage.signInFamilyFor(language),
                     // The only live control on this screen. `null` when the form is
                     // incomplete or wrong — and the errors are already on screen, so
                     // a reader is never left guessing why.

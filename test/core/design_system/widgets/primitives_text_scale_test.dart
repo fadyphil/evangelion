@@ -47,14 +47,21 @@ void main() {
   /// coverage test below counts it, so a widget added without a row is visible as
   /// a count that a reader can compare with `04-widget-inventory.md`.
   final Map<String, Widget Function()> cases = <String, Widget Function()>{
-    'EvaButton — primary': () =>
-        const EvaButton(label: 'Begin reflection', onPressed: _noopVoid),
+    'EvaButton — primary': () => const EvaButton(
+      labelFamily: EvaTypography.uiFamily,
+      label: 'Begin reflection',
+      onPressed: _noopVoid,
+    ),
     'EvaButton — secondary, expanded': () => const EvaButton(
+      labelFamily: EvaTypography.uiFamily,
+
       label: 'Back to library',
       variant: EvaButtonVariant.secondary,
       onPressed: _noopVoid,
     ),
     'EvaButton — ghost + chevron': () => const EvaButton(
+      labelFamily: EvaTypography.uiFamily,
+
       label: 'Forgot password?',
       variant: EvaButtonVariant.ghost,
       trailingChevron: true,
@@ -108,14 +115,21 @@ void main() {
       icon: Icons.inbox_outlined,
       title: 'Nothing here yet',
       message: 'Your reflections will appear here once you finish a reading.',
-      action: EvaButton(label: 'Start', onPressed: _noopVoid),
+      action: EvaButton(
+        labelFamily: EvaTypography.uiFamily,
+        label: 'Start',
+        onPressed: _noopVoid,
+      ),
     ),
     'ErrorView': () => const ErrorView(
       message: 'Could not reach the server.',
       onRetry: _noopVoid,
       retryLabel: 'Retry',
+      retryFamily: EvaTypography.uiFamily,
     ),
     'IconActionButton': () => const IconActionButton(
+      tooltipFamily: EvaTypography.uiFamily,
+
       icon: Icons.arrow_back,
       tooltip: 'Back',
       onPressed: _noopVoid,
@@ -197,15 +211,25 @@ void main() {
             Text('Evangelion', textAlign: TextAlign.center),
             Text('Read. Reflect. Remember.', textAlign: TextAlign.center),
             SizedBox(height: EvaSpacing.huge),
-            EvaButton(label: 'Sign in', onPressed: _noopVoid),
+            EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+              label: 'Sign in',
+              onPressed: _noopVoid,
+            ),
             SizedBox(height: EvaSpacing.md),
             EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+
               label: 'Back to library',
               variant: EvaButtonVariant.secondary,
               onPressed: _noopVoid,
             ),
             HairlineDivider(label: 'or'),
-            EvaButton(label: 'Continue with Google', onPressed: _noopVoid),
+            EvaButton(
+              labelFamily: EvaTypography.uiFamily,
+              label: 'Continue with Google',
+              onPressed: _noopVoid,
+            ),
             SizedBox(height: EvaSpacing.xxl),
             TextLink(label: 'Create account', onPressed: _noopVoid),
           ],
@@ -556,8 +580,11 @@ typedef _FixedHeight = ({
 final List<_FixedHeight> _fixed = <_FixedHeight>[
   (
     label: 'EvaButton at 52',
-    build: () =>
-        const EvaButton(label: 'Begin reflection', onPressed: _noopVoid),
+    build: () => const EvaButton(
+      labelFamily: EvaTypography.uiFamily,
+      label: 'Begin reflection',
+      onPressed: _noopVoid,
+    ),
     box: () => find.byType(EvaButton),
     finderReason: 'the button is its own box — it sets `height:` on its shell',
     height: kEvaButtonHeight,
@@ -610,6 +637,8 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
   (
     label: 'IconActionButton at 44',
     build: () => const IconActionButton(
+      tooltipFamily: EvaTypography.uiFamily,
+
       icon: Icons.arrow_back,
       tooltip: 'Back',
       onPressed: _noopVoid,

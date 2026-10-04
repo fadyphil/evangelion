@@ -375,10 +375,22 @@ void main() {
       // none: the sizes come from the SDK's Material 3 scale, and a constant here
       // would be a second copy of it free to drift from the theme.
       //
-      // The drop cap is the sharper case: the prototype's literal 76 is transcribed
-      // by `PassageDropCap.fontSizeFor`, which *derives* it from the body size and
-      // the cap-height ratio. That is the widget's own documented argument and it is
-      // asserted in `passage_drop_cap_test.dart`; there is nothing here to certify.
+      // The drop cap is the sharper case, and it is a **divergence** rather than a
+      // transcription: the prototype's literal `76` is derived instead, from the body
+      // size and the cap-height ratio. **At `previewFontSize` 17 — which is the number
+      // this file's `nulls` row is about — the derived value is `3 × 1.8 × 17 / 0.7` =
+      // 131.14.** So this file certifies nothing about it: the number lives in
+      // `PassageDropCap.fontSizeFor`, is asserted there and in
+      // `passage_drop_cap_test.dart`, and `reading_geometry_test.dart` is where the
+      // rendered size is compared. Claiming 76 here would be a claim about a value
+      // nothing renders.
+      //
+      // **This comment used to cite `ScriptureBlock._dropCapFor`'s doc for 131.1, and
+      // that doc said `fontSizeFor(19)` = 131.1.** Both were wrong about the value they
+      // were attached to: at 19 the derived size is **146.57**, and 131.14 is the value
+      // at 17 — which is *this* screen's. The same number was quoted for the wrong
+      // screen in four places, and every one of them now names the body size it is
+      // about. See [AGENT_CONTEXT decision 64].
       //
       // If either gains a symbol, this list is what notices.
     });

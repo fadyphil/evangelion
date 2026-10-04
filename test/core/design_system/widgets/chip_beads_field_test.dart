@@ -573,6 +573,8 @@ void main() {
             label: 'Password',
             controller: TextEditingController(),
             trailing: const IconActionButton(
+              tooltipFamily: EvaTypography.uiFamily,
+
               icon: Icons.visibility,
               tooltip: 'Show password',
               onPressed: _noopVoid,

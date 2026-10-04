@@ -107,6 +107,14 @@ class StreakFlameRow extends StatelessWidget {
       return IconActionButton(
         icon: Icons.sync_problem_outlined,
         tooltip: message,
+        // `uiFamily`, and the reason this is not a guess: the message is a
+        // `Failure.message` from `ApiErrorMapper` / `TodayReadingMapper`, and both
+        // write **English ASCII literals** naming the key that was wrong — there is
+        // no Arabic in the vocabulary. So the Latin family is not "the default
+        // nobody chose", it is the correct answer for the only string this site can
+        // receive, and `IconActionButton.tooltipFamily`'s assert-that-the-caller-said-
+        // something requirement is what proves it.
+        tooltipFamily: EvaTypography.uiFamily,
         onPressed: onRetry,
       );
     }

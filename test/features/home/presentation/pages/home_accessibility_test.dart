@@ -2,8 +2,8 @@ import 'dart:ui' show Tristate;
 
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/home/presentation/widgets/streak_flame_row.dart';
@@ -238,7 +238,7 @@ void main() {
           (
             'a failed reading',
             () => harness(
-              reading: const Result<TodayReading>.failure(readingFailure),
+              reading: const Result<ScriptureText>.failure(readingFailure),
             ),
           ),
           (

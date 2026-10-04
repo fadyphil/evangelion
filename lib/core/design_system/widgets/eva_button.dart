@@ -199,6 +199,7 @@ class EvaButton extends StatefulWidget {
     this.trailingChevron = false,
     this.expanded = true,
     this.height = kEvaButtonHeight,
+    required this.labelFamily,
     super.key,
   });
 
@@ -228,6 +229,60 @@ class EvaButton extends StatefulWidget {
 
   /// Button height. [kEvaButtonHeight] unless a caller needs otherwise.
   final double height;
+
+  /// The family [label] renders in.
+  ///
+  /// ## IT IS **REQUIRED**, AND THAT IS THE WHOLE POINT OF IT
+  ///
+  /// It shipped optional and nullable, and one call site in four passed it. The
+  /// fallback the parameter's own doc called "the ordinary case" is `titleMedium`'s
+  /// family — **DM Sans** — which carries no Arabic glyph at all. So the parameter
+  /// did nothing for the three call sites that did not use it, the compiler was
+  /// silent at each of them, and Phase 8's quiz CTA and Phase 9's settings CTA would
+  /// have shipped tofu in Arabic for the same reason.
+  ///
+  /// **Required is the fix and it is a compiler fix, not a review fix.** The
+  /// alternative — resolving the family from `Localizations.localeOf` inside this
+  /// widget — is what the "Rejected" note below rejects, and it stays rejected; see
+  /// that note, which is unchanged and still right. A locale read here would make a
+  /// Tier-1 primitive branch on an inherited widget, so `/login`'s English label and
+  /// an Arabic one would travel the same code path and the branch would be invisible
+  /// in review. §14's lesson from recorded decision 19 is that a locale-derived
+  /// style has to be **passed in and asserted at a call site**, and "required" is
+  /// what forces the pass.
+  ///
+  /// Every one of the four `EvaButton(` call sites in `lib/` now names its family,
+  /// and `ErrorView` — which builds one — grew a `retryFamily` for the same reason.
+  ///
+  /// ## WHY THIS EXISTS, AND IT IS BECAUSE OF A MEASURED FACT
+  ///
+  /// `ds.tsx:237` writes `fontFamily: F.ui` on `ButtonPrimary`, i.e. **DM Sans**. §5.2
+  /// and `reading_glyph_test.dart`'s coverage check both establish that DM Sans
+  /// carries **no Arabic glyphs at all** — the same fact `01-source-analysis.md`'s
+  /// defect **#2** is about, except that #2 names `ReadingArScreen.tsx:35` and `:86`
+  /// and not the *button*.
+  ///
+  /// So `/reading`'s Arabic arm renders `ابدأ التأمل` through this widget and would
+  /// render six tofu boxes without an override. That makes this parameter a
+  /// **fourth site of defect #2**, in a shared component rather than in a screen,
+  /// and `reading_glyph_test.dart` reads the family off the rendered `Text` rather
+  /// than trusting that a caller remembered.
+  ///
+  /// ## AND IT IS A **FAMILY**, NOT A `TextStyle`
+  ///
+  /// A `TextStyle` parameter would let a caller set a size, a weight or a colour
+  /// and silently win against `resolveButtonStyle`'s foreground — which is the
+  /// "caller-chosen font size is how a 12sp label ends up on a 52px pill" hazard
+  /// `TextLink`'s doc records for exactly this widget family. The family is the one
+  /// thing a caller legitimately needs to differ, and nothing else moves.
+  ///
+  /// **Rejected: reading the locale inside this widget.** That would make a
+  /// Tier-1 primitive branch on `Localizations.localeOf`, so `/login`'s English
+  /// label would go through the same code path as an Arabic one and the branch
+  /// would be invisible in review. §14's own lesson from recorded decision 19 is
+  /// that a locale-derived style is exactly the kind of thing that has to be passed
+  /// in and asserted at a call site.
+  final String labelFamily;
 
   @override
   State<EvaButton> createState() => _EvaButtonState();
@@ -407,7 +462,13 @@ class _EvaButtonState extends State<EvaButton> {
     BuildContext context,
     Color foreground,
     FontWeight weight,
-  ) =>
-      Theme.of(context).textTheme.titleMedium!
-          .copyWith(color: foreground, fontWeight: weight);
+  ) => Theme.of(context).textTheme.titleMedium!.copyWith(
+    color: foreground,
+    fontWeight: weight,
+    // The one line `reading_glyph_test.dart` reads the rendered family back off, so
+    // it is the only place the knob reaches the engine. Non-nullable now, so there
+    // is no `copyWith(fontFamily: null)` subtlety left to reason about: the caller's
+    // family, always.
+    fontFamily: widget.labelFamily,
+  );
 }
