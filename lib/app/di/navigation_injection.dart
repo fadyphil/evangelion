@@ -6,6 +6,10 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
+import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
+import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 
 /// The **Flutter half** of the object graph: the auth seam and the router.
 ///
@@ -43,6 +47,29 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 /// diff. That is the price of the purity gate, taken knowingly, and it is why
 /// `navigation_injection_test.dart` exercises this function as behaviour —
 /// presence, lifetime, identity — rather than trusting the source.
+///
+/// ## `HomeBloc` HITS THE SAME WALL, AND IT IS THE THIRD TIME
+///
+/// `HomeBloc extends Bloc`, so the mechanism above applies verbatim:
+/// `package:bloc/bloc.dart` is unavailable because `bloc` is a transitive dependency
+/// §8.4 will not promote, and `package:flutter_bloc/flutter_bloc.dart` re-exports
+/// Flutter's widget layer. So `HomeBloc` is built here from the three **generated**
+/// use cases and registered with `registerSingleton`.
+///
+/// **`registerSingleton`, not `registerLazySingleton`, for the same reason `AuthBloc`
+/// uses it.** A lazy singleton whose factory re-ran would hand out a second bloc
+/// with its own stream, subscribed to by nothing. The object is already built here,
+/// so there is no factory to re-run.
+///
+/// **And no `language` parameter**, which is the one thing that differs from a
+/// naive hand registration: the arm of the corpus arrives on `HomeStarted`, because
+/// the only place a `Locale` exists is a widget and this function is not one. See
+/// `HomeStarted`'s doc.
+///
+/// The cost is the same four-registrations-by-hand line the rest of this file's doc
+/// already states, now five. `injection_test.dart` refuses `HomeBloc` in the
+/// generated config and `navigation_injection_test.dart` resolves it, so neither
+/// half can drift.
 ///
 /// ## WHY `AppRouter` IS A LAZY SINGLETON AND NOT A FACTORY
 ///
@@ -106,6 +133,15 @@ void configureNavigation() {
     getCurrentSession: getIt<GetCurrentSession>(),
     signOut: getIt<SignOut>(),
   );
+  // **Built here, not resolved from the locator** — see the `HomeBloc` section for
+  // why, and why it is a `registerSingleton` for the reason the `AuthBloc` comment
+  // below gives.
+  final HomeBloc homeBloc = HomeBloc(
+    loadTodayReading: getIt<LoadTodayReading>(),
+    loadStreakSummary: getIt<LoadStreakSummary>(),
+    getReaderSession: getIt<GetReaderSession>(),
+  );
+
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
     // built, and a lazy singleton whose factory re-ran would hand out a *second*
@@ -113,6 +149,7 @@ void configureNavigation() {
     // which is the exact "stale bloc" hazard this file's `AppRouter` section is
     // about.
     ..registerSingleton<AuthBloc>(authBloc)
+    ..registerSingleton<HomeBloc>(homeBloc)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(
       () => ReevaluateListenable.stream(authBloc.stream),
@@ -120,6 +157,66 @@ void configureNavigation() {
     ..registerLazySingleton<AppRouter>(
       () => AppRouter(getIt<AuthStatus>(), getIt<ReevaluateListenable>()),
     );
+
+  _clearHomeStateOnSignOut(authBloc, homeBloc);
+}
+
+/// Sign-out empties `/`'s state, and **this function is why**.
+///
+/// ## THE RETENTION, MEASURED
+///
+/// `HomeBloc` is a `registerSingleton` above, so it lives for the whole process.
+/// `_onStarted` puts a reader's `displayName`, `initials`, today's `reading` and the
+/// `streak` into it, and nothing took them out: `AuthBloc._onSignedOut` emits
+/// `AuthState.signedOut` and stops there. A signed-out process therefore held a
+/// person's display name, their monogram, and their reading history in memory
+/// indefinitely — and it is not only a hygiene point, because `/` is the screen a
+/// **second** signed-in reader would land on and `HomeStarted`'s first emit copies
+/// the previous reader's fields forward.
+///
+/// ## WHY IT LIVES HERE AND NOT IN `AuthBloc`
+///
+/// The obvious fix is for `AuthBloc` to clear it, and it is forbidden twice over:
+/// `AuthBloc` is in `features/auth` and `HomeBloc` is in `features/home`, so naming
+/// it is a cross-feature import — **Gate 2**, and the same wall the `HomeBloc`
+/// section above spent a paragraph on. The reverse direction is equally closed.
+///
+/// `lib/app/` is the one directory Gate 2 exempts (decision 16) and this function
+/// already has **both** blocs in hand: it built them two lines above. So the seam
+/// is one subscription in the composition root, which is the only place that is
+/// allowed to know about both features — and is the place a reader looks for
+/// cross-feature wiring.
+///
+/// ## NOT DISPOSED, DELIBERATELY
+///
+/// The subscription outlives the call, like the blocs it joins: both are
+/// process-wide, so there is nothing shorter for it to be scoped to. `Bloc.stream`
+/// closes when the bloc does, and the locator is reset between tests rather than
+/// between users.
+///
+/// **Not a `ReevaluateListenable`** the way the router's change signal is. That one
+/// exists to re-run the guard, and a guard re-run on sign-*in* is what resumes the
+/// interrupted navigation — this one has no router work to do, only memory to
+/// release, and routing the same event through a second signal would have given the
+/// router a second reason to rebuild the stack.
+/// ## AND IT FIRES ON `signedOut`, **NOT** ON `!isSignedIn` — measured
+///
+/// The first version wrote `if (!state.isSignedIn)`. `AuthSessionStatus` has **four**
+/// values — `unknown`, `signedOut`, `signingIn`, `signedIn` — so `!isSignedIn` is
+/// also true of `signingIn`, and `AuthSubmitted` emits exactly that on its way to
+/// `signedIn`. The clear therefore ran **in the middle of every successful sign-in**,
+/// blanking `/` three emits before the greeting resolved. The test written for the
+/// opposite direction (`a sign-IN does not`) is what caught it, which is the argument
+/// for writing both directions of a new listener.
+///
+/// `status == AuthSessionStatus.signedOut` is the one transition that means "there is
+/// no session and there will not be one".
+void _clearHomeStateOnSignOut(AuthBloc auth, HomeBloc home) {
+  auth.stream.listen((AuthState state) {
+    if (state.status == AuthSessionStatus.signedOut) {
+      home.add(const HomeCleared());
+    }
+  });
 }
 
 /// [AuthStatus] over an [AuthBloc].

@@ -12,9 +12,11 @@
 
 import 'package:auto_route/auto_route.dart' as _i7;
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
-    as _i9;
+    as _i10;
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
     as _i2;
+import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart'
+    as _i9;
 import 'package:evangelion/features/home/presentation/pages/home_page.dart'
     as _i1;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
@@ -29,18 +31,51 @@ import 'package:flutter/material.dart' as _i8;
 
 /// generated route for
 /// [_i1.HomePage]
-class HomeRoute extends _i7.PageRouteInfo<void> {
-  const HomeRoute({List<_i7.PageRouteInfo>? children})
-    : super(HomeRoute.name, initialChildren: children);
+class HomeRoute extends _i7.PageRouteInfo<HomeRouteArgs> {
+  HomeRoute({
+    _i8.Key? key,
+    _i9.HomeBloc? bloc,
+    List<_i7.PageRouteInfo>? children,
+  }) : super(
+         HomeRoute.name,
+         args: HomeRouteArgs(key: key, bloc: bloc),
+         initialChildren: children,
+       );
 
   static const String name = 'HomeRoute';
 
   static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i1.HomePage();
+      final args = data.argsAs<HomeRouteArgs>(
+        orElse: () => const HomeRouteArgs(),
+      );
+      return _i1.HomePage(key: args.key, bloc: args.bloc);
     },
   );
+}
+
+class HomeRouteArgs {
+  const HomeRouteArgs({this.key, this.bloc});
+
+  final _i8.Key? key;
+
+  final _i9.HomeBloc? bloc;
+
+  @override
+  String toString() {
+    return 'HomeRouteArgs{key: $key, bloc: $bloc}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! HomeRouteArgs) return false;
+    return key == other.key && bloc == other.bloc;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ bloc.hashCode;
 }
 
 /// generated route for
@@ -49,7 +84,7 @@ class LoginRoute extends _i7.PageRouteInfo<LoginRouteArgs> {
   LoginRoute({
     _i8.Key? key,
     _i2.LoginResultCallback? onResult,
-    _i9.AuthBloc? bloc,
+    _i10.AuthBloc? bloc,
     List<_i7.PageRouteInfo>? children,
   }) : super(
          LoginRoute.name,
@@ -81,7 +116,7 @@ class LoginRouteArgs {
 
   final _i2.LoginResultCallback? onResult;
 
-  final _i9.AuthBloc? bloc;
+  final _i10.AuthBloc? bloc;
 
   @override
   String toString() {

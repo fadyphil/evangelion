@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 ///
 /// ## THE PATH IS THE PROTOTYPE'S, CHARACTER FOR CHARACTER
 ///
-/// `eva/src/components/ds.tsx:513-514` draws a `<svg viewBox="0 0 16 20">` with
+/// `eva/src/components/ds.tsx:514` draws a `<svg viewBox="0 0 16 20">` with
 /// one `<path>` and no other element. The `d` attribute is transcribed into
 /// [flamePath] unchanged — every curve command, every coordinate. Re-deriving a
 /// flame shape from a description would be a different flame.
@@ -15,7 +15,7 @@ import 'package:flutter/material.dart';
 /// [size] is the **height**, and the width follows the viewBox's `16:20` ratio,
 /// so the whole box scales uniformly and the path cannot be distorted. The
 /// prototype renders the svg at `width="14" height="18"`
-/// (`ds.tsx:513`) — 0.778 of its height rather than the viewBox's 0.8. The 2%
+/// (`ds.tsx:514`) — 0.778 of its height rather than the viewBox's 0.8. The 2%
 /// difference is the viewBox's own horizontal padding (the path spans x 2…14 of
 /// a 16-wide box), and scaling the box uniformly rather than reproducing the
 /// element's pixel box is the choice that keeps the shape honest at any size.
