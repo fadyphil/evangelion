@@ -1,4 +1,4 @@
-import 'package:evangelion/features/reading/domain/arabic_digits.dart';
+import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// `arabicIndicDigits` — red-first (AGENT_CONTEXT §6: domain logic).

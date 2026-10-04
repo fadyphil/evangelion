@@ -19,6 +19,32 @@ import 'package:flutter/material.dart';
 /// is **not** transcribed. Two rules disagree and §13.4 is the one that states a
 /// budget, so it wins. Recorded rather than silently resolved: a reader
 /// comparing against `ds.tsx` will find a missing blur here.
+///
+/// ## AND BOTH ITS RUNS GO THROUGH `arabicAware`, WHICH PHASE 8 HAD TO ADD HERE
+///
+/// This widget was built in Phase 3 and had **no** Arabic arm, because the only
+/// screen that used it was the `/result` stub. Phase 8 built that screen, handed
+/// this tile an Arabic caption and an Arabic-Indic number, and the bilingual gate
+/// immediately reported:
+///
+///     `١٠` renders Arabic in `CormorantGaramond`, which carries no Arabic glyph at all
+///     `هذه الإجابة` renders Arabic in `SpaceMono`, which carries no Arabic glyph at all
+///
+/// Both halves are tofu — one box per character. Neither is a `StatTile` bug in the
+/// sense of a wrong constant: the widget resolved [Theme.of]'s `headlineSmall` and
+/// [EvaTypography.monoCaps], both of which are Latin families, and neither has an
+/// opinion about the ambient arm.
+///
+/// The fix is [arabicAware] on both runs rather than an `if (isArabic)` branch,
+/// because both strings are the **app's own chrome** — a caption from
+/// `ResultStrings.ar()` and a number `arabicIndicDigits` produced — so the ambient
+/// direction is the only arm there is. This is exactly the case that helper's doc
+/// names ("runs that render the app's own strings"), and it is why Phase 3 could
+/// not have written it: there was no Arabic on this screen to write it for.
+///
+/// **Nothing changes under LTR.** `arabicAware` is the identity there, so the
+/// Phase-3 goldens are unaffected and this is not a visual regression on the arm
+/// that shipped.
 class StatTile extends StatelessWidget {
   /// A tile showing [value] over [label].
   const StatTile({required this.value, required this.label, super.key});
@@ -52,6 +78,9 @@ class StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
+    // The ambient direction, read once — see the class doc for why both runs below
+    // need it and why the widget has no `isArabic` branch.
+    final TextDirection direction = Directionality.of(context);
     return GlassSurface(
       // See the class doc for why this is `tint` and not the prototype's blur.
       tier: GlassTier.tint,
@@ -68,18 +97,24 @@ class StatTile extends StatelessWidget {
             // `headlineSmall` is Material 3's 24sp slot, so the prototype's 24
             // lands exactly — the first widget in this phase where the phase-1
             // decision to keep M3's scale costs nothing.
-            style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-              color: colors.ink,
-              fontWeight: FontWeight.w600,
-              height: 1,
+            style: arabicAware(
+              Theme.of(context).textTheme.headlineSmall!.copyWith(
+                color: colors.ink,
+                fontWeight: FontWeight.w600,
+                height: 1,
+              ),
+              direction,
             ),
           ),
           const SizedBox(height: stackGap),
           Text(
             label.toUpperCase(),
             textAlign: TextAlign.center,
-            style: EvaTypography.monoCaps(colors)
-                .copyWith(color: colors.ink3, fontWeight: FontWeight.w700),
+            style: arabicAware(
+              EvaTypography.monoCaps(colors)
+                  .copyWith(color: colors.ink3, fontWeight: FontWeight.w700),
+              direction,
+            ),
           ),
         ],
       ),

@@ -7,6 +7,7 @@ import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -14,12 +15,14 @@ import 'package:evangelion/core/network/api_error_mapper.dart';
 import 'package:evangelion/features/reading/data/datasources/reading_remote_data_source.dart';
 import 'package:evangelion/features/reading/data/datasources/streak_remote_data_source.dart';
 import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.dart';
+import 'package:evangelion/features/reading/data/mappers/submit_result_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
 import 'package:evangelion/features/reading/data/repositories/dio_reading_repository.dart';
 import 'package:evangelion/features/reading/data/repositories/dio_streak_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../../support/contract_payloads.dart';
 import '../../../support/fake_dio.dart';
 import '../../../support/live_payloads.dart';
 
@@ -67,6 +70,7 @@ void main() {
     readings = DioReadingRepository(
       dataSource: ReadingRemoteDataSource(dio),
       mapper: const TodayReadingMapper(),
+      submits: const SubmitResultMapper(),
       errors: const ApiErrorMapper(),
     );
     streak = DioStreakRepository(
@@ -75,6 +79,19 @@ void main() {
       errors: const ApiErrorMapper(),
     );
   });
+
+  /// A submit over the port, spelled once so the three submit groups below do not
+  /// each restate the three arguments — and so a change to the port's parameter
+  /// names is a compile error in one place rather than four.
+  Future<Result<SubmitResult>> submit({
+    String readingId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    String questionId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    String answer = 'A',
+  }) => readings.submitAnswer(
+    readingId: readingId,
+    questionId: questionId,
+    answer: answer,
+  );
 
   Future<Failure> failureOf(Future<Result<Object?>> call) async {
     final Result<Object?> result = await call;
@@ -159,6 +176,231 @@ void main() {
       expect(sent.single.headers['x-user-id'], kSeededUserId);
       expect(sent.single.headers['x-group-id'], '3');
       expect(sent.single.headers['x-user-role'], 'kid');
+    });
+  });
+
+  group('ReadingRepository.submitAnswer — the request, which is the point', () {
+    // ## WHY THIS GROUP IS THE LARGEST IN THE FILE
+    //
+    // The other two methods read an endpoint this client calls all day. This one
+    // **cannot be verified against a running server**, because no successful submit
+    // is reachable — AGENT_CONTEXT §5 trap 10, measured against `HEAD = 4a1c834`:
+    // the endpoint answers `400` for the id it hands out itself, `404` for a
+    // well-formed id that is not in the store, and `409` for the seeded one.
+    //
+    // So the request is the part that must be right, and the **only** authority for
+    // it is the backend's own schema:
+    //
+    // ```ts
+    // // src/modules/submissions/submissions.routes.ts:6-8
+    // const submitSchema = z.object({
+    //   question_id: z.string().uuid(),
+    //   answer: z.string().min(1)
+    // });
+    // ```
+    //
+    // and the path's shape, from the same file's `fastify.post('/readings/:id/submit')`
+    // with `headers: { required: ['x-user-id'] }` and a JSON body — which is why
+    // §5 trap 5 (a `POST` without `Content-Type: application/json` → `415`) is a
+    // live hazard for this request and not for the two `GET`s.
+    //
+    // `SubmitResultMapper`'s own suite holds the **response** side against the
+    // service's `SubmitAnswerResult` interface. This group holds the request side
+    // against the route's schema. Between them the contract is covered from both
+    // ends by **declaration**, and that is the honest word for it.
+
+    setUp(() {
+      when(() => adapter.fetch(any(), any(), any()))
+          .thenAnswer((Invocation invocation) async {
+            sent.add(invocation.positionalArguments.first as RequestOptions);
+            return jsonBody(kContractSubmitAnswerJson, 200);
+          });
+    });
+
+    test('resolves the contract body to the contract entity', () async {
+      final Result<SubmitResult> result = await submit();
+
+      expect(result.isSuccess, isTrue);
+      expect(
+        (result as Success<SubmitResult>).value,
+        const SubmitResult(
+          questionId: 'question-group-3',
+          isCorrect: true,
+          pointsEarned: 10,
+          currentTotalPoints: 40,
+          currentStreak: 4,
+          longestStreak: 6,
+          readingCompleted: true,
+        ),
+      );
+    });
+
+    test('asks for exactly the one documented URL', () async {
+      await submit(
+        readingId: 'reading-group-3-2026-10-04',
+        questionId: 'question-group-3',
+        answer: 'B',
+      );
+
+      expect(sent, hasLength(1));
+      // **The id is in the path and is whatever the server handed out.** §5 traps 10
+      // and 11: it is fabricated and it is date-dependent, and it has already rolled
+      // over once between two probes of `GET /readings/today/en`. The route types the
+      // parameter as `description: 'Reading UUID'` — a description, not a schema —
+      // so nothing validates it here and the client must not invent a check.
+      expect(
+        sent.single.uri.path,
+        '/api/v1/readings/reading-group-3-2026-10-04/submit',
+      );
+      expect(sent.single.method, 'POST');
+    });
+
+    test('sends `Content-Type: application/json`, because §5 trap 5 is a 415', () async {
+      // The one request in this client with a body, and therefore the only one
+      // where a missing content type is a **415** rather than a harmless omission.
+      // This assertion exists because dio will happily not set it if a caller ever
+      // posts a bare `Map`, and the resulting 415 would read as a server fault.
+      await submit();
+
+      expect(
+        sent.single.headers[Headers.contentTypeHeader],
+        contains(Headers.jsonContentType),
+        reason: '§5 trap 5: a POST without this is 415 Unsupported Media Type',
+      );
+    });
+
+    test('and the body is exactly `{question_id, answer}` — the route schema', () async {
+      // **Exactly.** `submitSchema` is a `z.object` with two keys and zod strips
+      // unknown ones, so a third key would be silently dropped by the server and
+      // would look correct in every test: the request "worked", the field just
+      // never arrived. `SubmitAnswerResult` has seven keys and a reader could
+      // plausibly send them; this assertion is what keeps that from being silent.
+      await submit(
+        questionId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        answer: 'A',
+      );
+
+      final Object? body = sent.single.data;
+      expect(body, isA<Map<String, Object?>>());
+      expect((body as Map<String, Object?>).keys.toSet(), <String>{
+        'question_id',
+        'answer',
+      });
+      expect(body['question_id'], 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+      expect(body['answer'], 'A');
+    });
+
+    test('`answer` is sent **verbatim**, because the route only says `min(1)`', () async {
+      // `submissions.routes.ts:35` documents `answer` as *"Selected option
+      // (A, B, C, D) or boolean"*, so a bare `'true'` is a legal value and a
+      // client that validated it against the option letters would refuse a legal
+      // request. Recorded decision 15's argument, applied to a different field:
+      // **the backend is the validator.**
+      for (final String answer in <String>[
+        'A',
+        'B',
+        'C',
+        'D',
+        'true',
+        'false',
+      ]) {
+        sent.clear();
+        await submit(answer: answer);
+        expect(
+          ((sent.single.data as Map<String, Object?>)['answer']),
+          answer,
+          reason: '`$answer` is within `z.string().min(1)`',
+        );
+      }
+    });
+
+    test('sends `X-User-Id`, the one header this route requires', () async {
+      // `submissions.routes.ts:24-27` — `required: ['x-user-id']`, and **no**
+      // `x-group-id`. The interceptor sends all three unconditionally, which
+      // `core/network/dio_client.dart` records as correct either way; this
+      // assertion is here because a group header *missing* from this request would
+      // be a different defect from the two GETs and would not show up in any of
+      // their suites.
+      await submit();
+
+      expect(sent.single.headers['x-user-id'], kSeededUserId);
+    });
+
+    test('the reading id is NOT url-encoded into a different path', () async {
+      // The id contains no reserved characters today. If a backend ever fabricated
+      // one with a `/`, dio's `Uri` would treat the segment as a path component and
+      // the request would address a different route — silently, because it is still
+      // a 200-shaped request. Asserting the exact path above is what makes that
+      // visible, and this case names it.
+      await submit(readingId: 'reading-group-3-2026-10-04');
+      expect(sent.single.uri.pathSegments, <String>[
+        'api',
+        'v1',
+        'readings',
+        'reading-group-3-2026-10-04',
+        'submit',
+      ]);
+    });
+  });
+
+  group('submitAnswer — the three dead ends, as typed failures', () {
+    // §5 trap 10's three rows, verbatim, through the adapter rather than a socket.
+    // They are here rather than only in `api_error_mapper_test.dart` because the
+    // claim under test is not "the status maps to a kind" — decision 14 owns that —
+    // it is "**this** client, on **this** request, surfaces each of them as a typed
+    // `Result` and never a throw", and that is a claim about the repository's third
+    // arm.
+    const List<(int, String, FailureKind)> deadEnds =
+        <(int, String, FailureKind)>[
+          (
+            400,
+            'body/question_id must match format "uuid"',
+            FailureKind.validation,
+          ),
+          (
+            404,
+            'QUESTION_NOT_FOUND: Specified question does not exist.',
+            FailureKind.notFound,
+          ),
+          (
+            409,
+            'This question has already been submitted by this user.',
+            FailureKind.conflict,
+          ),
+        ];
+
+    for (final (int, String, FailureKind) row in deadEnds) {
+      test('${row.$1} `${row.$2}` is a Failure, not an exception', () async {
+        when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+          (Invocation _) async => jsonBody(
+            jsonEncode(<String, String>{'error': row.$2, 'message': row.$2}),
+            row.$1,
+          ),
+        );
+
+        final Failure failure = await failureOf(submit());
+        expect(failure.kind, row.$3);
+        expect(failure.statusCode, row.$1);
+        expect(failure.message, row.$2);
+      });
+    }
+
+    test('and a 409 is a `conflict` — the one the client must PREVENT, not absorb', () {
+      // §5 trap 3 and the plan's Phase-8 requirement: "the quiz must disable
+      // questions where `already_answered == true` rather than discovering this as
+      // an error." The mapper's job is done — the 409 is typed and its message is
+      // the server's — and **it is still the wrong answer**, because the reader was
+      // walked into a conflict the client could have seen coming. The thing that
+      // prevents it is `QuizAnswer.isAnswerable`, in the domain layer, and
+      // `quiz_page_test.dart` holds it. Nothing in the repository can.
+      expect(
+        kindForStatus(409),
+        FailureKind.conflict,
+        reason:
+            'this assertion is the control for the sentence above: the type is '
+            'right and the behaviour is still wrong, so "the mapper handles it" '
+            'must never be read as "the client prevents it".',
+      );
     });
   });
 
@@ -479,6 +721,28 @@ final class _FakeReadingRepository
   }) async =>
       (await todayScripture(language: language))
           .map((ScriptureText scripture) => scripture.toTodayReading());
+
+  /// The third method of the port, and the one Phase 8 added.
+  ///
+  /// Answered rather than `unimplemented`, for this file's reason: a hand-written
+  /// substitute has to be substitutable, and a bloc holding this fake would call
+  /// this the moment a reader pressed "Check answer".
+  @override
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
+  }) async => Result<SubmitResult>.success(
+    SubmitResult(
+      questionId: questionId,
+      isCorrect: true,
+      pointsEarned: 10,
+      currentTotalPoints: 10,
+      currentStreak: 1,
+      longestStreak: 1,
+      readingCompleted: true,
+    ),
+  );
 
   @override
   Future<Result<StreakSummary>> summary() async =>

@@ -19,9 +19,11 @@ import 'package:flutter/material.dart';
 ///
 /// ## WHAT IS DELIBERATELY NOT BUILT
 ///
-/// Defect #12: "`App.tsx`'s screen switcher and `QuizScreen`'s "Frame A/B"
+/// Defect #12: "`App.tsx`'s screen switcher and `QuizScreen`'s two-state preview
 /// toggle exist only to let the Figma agent preview states … **Do not port**".
-/// Neither is ported, and no widget here has a "frame" concept. What is
+/// Neither is ported, and no widget here has a "frame" concept — described by
+/// behaviour rather than by the prototype's own labels, which is the same rule
+/// `quiz_page.dart` follows and `quiz_page_test.dart`'s source sweep enforces. What is
 /// transcribed is the shared pill *recipe* — which those two happen to agree on
 /// with the Settings language pills, which are a real call site — because the
 /// inventory collapses four definitions into one widget and a widget needs a

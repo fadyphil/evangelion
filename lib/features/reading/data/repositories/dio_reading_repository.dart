@@ -2,10 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
 import 'package:evangelion/features/reading/data/datasources/reading_remote_data_source.dart';
+import 'package:evangelion/features/reading/data/mappers/submit_result_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
 
 /// The live [ReadingRepository].
@@ -49,15 +51,16 @@ import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.da
 /// each of them — the same argument `auth_module.dart` makes for
 /// `FakeAuthRepository`.
 final class DioReadingRepository implements ReadingRepository {
-  /// A repository over [dataSource], projecting with [mapper] and translating
-  /// faults with [errors].
+  /// A repository over [dataSource], projecting with [mapper] and [submits] and
+  /// translating faults with [errors].
   ///
-  /// All three are named and required, and none of them is resolved from the
+  /// All four are named and required, and none of them is resolved from the
   /// locator here: §3's DIP row says no `domain/` file names `Dio`, and a
   /// repository that reached for the global would be untestable over a fixture.
   const DioReadingRepository({
     required this.dataSource,
     required this.mapper,
+    required this.submits,
     required this.errors,
   });
 
@@ -65,8 +68,24 @@ final class DioReadingRepository implements ReadingRepository {
   /// repository over a fake adapter and so the endpoint path has exactly one home.
   final ReadingRemoteDataSource dataSource;
 
-  /// Body → entity. `const`, and shared by every `DioReadingRepository`.
+  /// Reading body → entity. `const`, and shared by every `DioReadingRepository`.
   final TodayReadingMapper mapper;
+
+  /// Submission body → [SubmitResult].
+  ///
+  /// ## A SEPARATE INJECTED MAPPER, NOT A SECOND BRANCH OF [mapper]
+  ///
+  /// The two bodies are different shapes, and `TodayReadingMapper` is named for one
+  /// of them. A `mapSubmit` method on it would make a **reading** mapper own the
+  /// quiz's write path, and every reader of `SubmitResultMapper`'s scalar policy
+  /// would have to find it through a class about verses.
+  ///
+  /// **Injected rather than `const SubmitResultMapper()` in the body**, so the
+  /// repository has no hidden dependency: `home_module.dart` provides it, which is
+  /// what makes the mapper swappable in one provider — and so a test can drive this
+  /// repository over a fixture mapper, which `dio_repositories_test.dart` does not
+  /// need today and which would otherwise be impossible without editing this class.
+  final SubmitResultMapper submits;
 
   /// Exception → [Failure]. `const`, and the one place a status becomes a kind.
   final ApiErrorMapper errors;
@@ -108,4 +127,52 @@ final class DioReadingRepository implements ReadingRepository {
   }) async =>
       (await todayScripture(language: language))
           .map((ScriptureText scripture) => scripture.toTodayReading());
+
+  /// Grades one answer, and it is the port's only **write**.
+  ///
+  /// ## THE THIRD `try`, AND WHY IT IS NOT "A THIRD COPYING OF THE FIRST TWO"
+  ///
+  /// The two reads share one `try` because they are one path — [today] narrows
+  /// [todayScripture]. This one is genuinely a different request with a different
+  /// body and a different mapper, so it needs its own arm; what makes the shape
+  /// uniform is that both arms are exactly the same two lines and a *different*
+  /// mapper each.
+  ///
+  /// **Rejected: a shared private `_run(body, mapper)` helper.** It would be three
+  /// lines long and would have to be generic over the mapper's output type, so the
+  /// two call sites would each carry a type argument and a cast that the compiler
+  /// cannot check across the erasure. §7's rule — two implementations of one
+  /// invariant are two things to keep in step — cuts the other way here: there is
+  /// one invariant ("`DioException` becomes a `Failure`, everything else goes
+  /// through a mapper") and it is visible in three two-line arms that a reader can
+  /// compare by eye, which is more than a generic wrapper invites.
+  ///
+  /// ## AND THE 409 IS **MAPPED, NOT PREVENTED**, AND ONLY ONE OF THOSE IS HERE
+  ///
+  /// §5 trap 3: a duplicate submit is `409 This question has already been submitted
+  /// by this user.` This method maps it to `FailureKind.conflict` with the server's
+  /// own message — `ApiErrorMapper`'s job, and required by §3's LSP row.
+  ///
+  /// It cannot **prevent** it, and nothing here pretends to. The prevention is
+  /// `QuizAnswer.isAnswerable` in the domain layer, which closes a question whose
+  /// wire `already_answered` is `true` before a request can exist. By the time this
+  /// method is called the reader has already pressed the button, which is exactly
+  /// why the rule belongs upstream.
+  @override
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
+  }) async {
+    try {
+      final Object? body = await dataSource.submit(
+        readingId: readingId,
+        questionId: questionId,
+        answer: answer,
+      );
+      return submits.map(body);
+    } on DioException catch (error) {
+      return Result<SubmitResult>.failure(errors.fromDioException(error));
+    }
+  }
 }

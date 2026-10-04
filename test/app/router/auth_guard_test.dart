@@ -5,11 +5,15 @@ import 'package:evangelion/app/router/app_router.dart';
 // The generated `*Route` classes, reached the way `app_router.dart` reaches them.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
+import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
+import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
@@ -17,6 +21,7 @@ import 'package:evangelion/features/settings/presentation/pages/settings_page.da
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/quiz_harness.dart';
 
 /// A session that throws, which [FakeAuthStatus] must never do.
 ///
@@ -97,6 +102,24 @@ LoginResultCallback loginOutcomeOn(WidgetTester tester) {
 /// reads unambiguously either way.
 void completeLogin(WidgetTester tester, {required LoginOutcome outcome}) =>
     loginOutcomeOn(tester)(outcome);
+
+/// A graded answer for the router suites.
+///
+/// **A transcription, not a capture** — §5 trap 10 records that no successful submit
+/// has ever been observed against this backend, so `contract_payloads.dart` is where
+/// the shape comes from. `/result` cannot be pushed without one, so every suite that
+/// mounts it needs this, and `app_router_test.dart` declares the identical constant
+/// rather than sharing it: that file is the router suite's own inventory and a suite
+/// that reads its fixture from another suite stops failing when the other changes.
+const SubmitResult kAContractSubmitResult = SubmitResult(
+  questionId: 'question-group-3',
+  isCorrect: true,
+  pointsEarned: 10,
+  currentTotalPoints: 40,
+  currentStreak: 4,
+  longestStreak: 6,
+  readingCompleted: true,
+);
 
 void main() {
   setUp(resetServiceLocator);
@@ -313,9 +336,20 @@ void main() {
       await pumpUntilFound(tester, find.byType(LoginPage));
 
       unawaited(
+        // **Both arms changed in Phase 8, for two different reasons.**
+        //
+        // `ResultRoute` now takes its submit response, and this suite is what caught
+        // that: `const ResultRoute()` could no longer be called, so `/result` became
+        // unpushable without a graded answer — enforced by the compiler rather than
+        // by a runtime guard.
+        //
+        // `QuizRoute()` lost `const` for an unrelated reason: auto_route generates a
+        // parameter for every argument of the page's constructor, and `QuizPage`
+        // takes `bloc`, so the generated constructor takes `QuizRouteArgs` and cannot
+        // be `const`. Nothing about `QuizPage` changed; the generator's output did.
         harness.router.pushAll(<PageRouteInfo<void>>[
-          const QuizRoute(),
-          const ResultRoute(),
+          QuizRoute(),
+          ResultRoute(result: kAContractSubmitResult),
         ]),
       );
       for (int frame = 0; frame < 12; frame++) {
@@ -383,9 +417,20 @@ void main() {
       await pumpUntilFound(tester, find.byType(LoginPage));
 
       unawaited(
+        // **Both arms changed in Phase 8, for two different reasons.**
+        //
+        // `ResultRoute` now takes its submit response, and this suite is what caught
+        // that: `const ResultRoute()` could no longer be called, so `/result` became
+        // unpushable without a graded answer — enforced by the compiler rather than
+        // by a runtime guard.
+        //
+        // `QuizRoute()` lost `const` for an unrelated reason: auto_route generates a
+        // parameter for every argument of the page's constructor, and `QuizPage`
+        // takes `bloc`, so the generated constructor takes `QuizRouteArgs` and cannot
+        // be `const`. Nothing about `QuizPage` changed; the generator's output did.
         harness.router.pushAll(<PageRouteInfo<void>>[
-          const QuizRoute(),
-          const ResultRoute(),
+          QuizRoute(),
+          ResultRoute(result: kAContractSubmitResult),
         ]),
       );
       for (int frame = 0; frame < 12; frame++) {
@@ -517,9 +562,32 @@ void main() {
 
       await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(HomePage));
-      unawaited(harness.router.pushPath<void>(AppRoutes.quiz));
+      // **Both routes are pushed, not path-pushed**, and Phase 8 is why.
+      //
+      // `pushPath('/result')` can no longer build the page: `ResultRoute` requires
+      // `result`. `app_router_test.dart` pins that failure deliberately; this suite
+      // needs the route **mounted**, because the claim under test is that a
+      // re-evaluation tears down every guarded route in the stack and not only the
+      // top one, and a route that never built would have proved nothing.
+      //
+      // `QuizPage` needed the same treatment for a further reason. The Phase-0c
+      // stub read nothing, so a path push mounted it; the real page resolves
+      // `QuizBloc` from the locator, and `AuthHarness` deliberately builds **only** a
+      // router — no `configureNavigation()`, no graph — so the push failed with
+      //
+      //     Bad state: GetIt: Object/factory with type QuizBloc is not registered
+      //
+      // `QuizRoute` takes an optional `bloc` exactly so a caller can supply one.
+      // A guarded-route test is about the *guard*, so it hands the page the one thing
+      // the guard does not care about.
+      final QuizBloc quiz = quizBloc(
+        const Result<ScriptureText>.success(liveArabicQuizPassage),
+      );
+      unawaited(harness.router.push<void>(QuizRoute(bloc: quiz)));
       await pumpUntilFound(tester, find.byType(QuizPage));
-      unawaited(harness.router.pushPath<void>(AppRoutes.result));
+      unawaited(
+        harness.router.push<void>(ResultRoute(result: kAContractSubmitResult)),
+      );
       await pumpUntilFound(tester, find.byType(ResultPage));
 
       expect(find.byType(QuizPage), findsOneWidget);
