@@ -26,17 +26,23 @@ import '../../features/auth/domain/usecases/sign_out.dart' as _i568;
 import '../../features/home/domain/usecases/get_reader_session.dart' as _i806;
 import '../../features/home/domain/usecases/load_streak_summary.dart' as _i605;
 import '../../features/home/domain/usecases/load_today_reading.dart' as _i1067;
+import '../../features/quiz/domain/usecases/refresh_session_questions.dart'
+    as _i788;
+import '../../features/quiz/domain/usecases/start_session.dart' as _i521;
+import '../../features/quiz/domain/usecases/submit_answer.dart' as _i84;
 import '../../features/reading/data/datasources/reading_remote_data_source.dart'
     as _i48;
 import '../../features/reading/data/datasources/streak_remote_data_source.dart'
     as _i692;
 import '../../features/reading/data/mappers/streak_summary_mapper.dart'
     as _i460;
+import '../../features/reading/data/mappers/submit_result_mapper.dart' as _i840;
 import '../../features/reading/data/mappers/today_reading_mapper.dart' as _i220;
 import '../../features/reading/domain/usecases/load_scripture.dart' as _i574;
 import 'modules/auth_module.dart' as _i4;
 import 'modules/core_module.dart' as _i134;
 import 'modules/home_module.dart' as _i443;
+import 'modules/quiz_module.dart' as _i697;
 import 'modules/reading_module.dart' as _i768;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -49,6 +55,7 @@ extension GetItInjectableX on _i174.GetIt {
     final authModule = _$AuthModule();
     final coreModule = _$CoreModule();
     final homeModule = _$HomeModule();
+    final quizModule = _$QuizModule();
     final readingModule = _$ReadingModule();
     gh.lazySingleton<_i852.AuthLocalDataSource>(
       () => authModule.authLocalDataSource,
@@ -67,6 +74,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i460.StreakSummaryMapper>(
       () => homeModule.streakSummaryMapper,
     );
+    gh.lazySingleton<_i840.SubmitResultMapper>(
+      () => homeModule.submitResultMapper,
+    );
     gh.lazySingleton<_i499.ReadingRepository>(
       () => homeModule.readingRepository,
     );
@@ -78,6 +88,11 @@ extension GetItInjectableX on _i174.GetIt {
       () => homeModule.loadStreakSummary,
     );
     gh.lazySingleton<_i806.GetReaderSession>(() => homeModule.getReaderSession);
+    gh.lazySingleton<_i521.StartSession>(() => quizModule.startSession);
+    gh.lazySingleton<_i788.RefreshSessionQuestions>(
+      () => quizModule.refreshSessionQuestions,
+    );
+    gh.lazySingleton<_i84.SubmitAnswer>(() => quizModule.submitAnswer);
     gh.lazySingleton<_i574.LoadScripture>(() => readingModule.loadScripture);
     gh.lazySingleton<String>(
       () => coreModule.apiBaseUrl,
@@ -101,5 +116,7 @@ class _$AuthModule extends _i4.AuthModule {}
 class _$CoreModule extends _i134.CoreModule {}
 
 class _$HomeModule extends _i443.HomeModule {}
+
+class _$QuizModule extends _i697.QuizModule {}
 
 class _$ReadingModule extends _i768.ReadingModule {}

@@ -1,32 +1,66 @@
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/repositories/reading_repository.dart';
+import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
+import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
+import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:injectable/injectable.dart';
 
 /// The `quiz` feature's registrations.
 ///
-/// **THIS MODULE REGISTERS NOTHING TODAY.** That is the honest state, not an
-/// oversight: Phase 8 owns `QuizBloc` and the use cases it drives — all of which run through the `reading` feature's `ReadingRepository` port, because `quiz` declares no repository of its own, so until that phase lands there is nothing to
-/// put here. The module exists now, empty and named, because a container whose
-/// shape appears one feature at a time is one feature at a time.
+/// **THIS MODULE REGISTERS THREE THINGS, AND THE ONE IT DELIBERATELY DOES NOT IS
+/// `QuizBloc`.** `08-build-phases.md` §Phase 8: "`quiz` declares no repository and
+/// no data source of its own" — and every provider below is a use case over
+/// `ReadingRepository`, the **port**, which `home_module.dart` has registered
+/// against `DioReadingRepository` since Phase 6.
 ///
-/// A `@module` with no providers emits no registration at all, so an empty one
-/// costs nothing at runtime. The record of what the graph actually contains is
-/// `injection.config.dart`, which is committed on purpose: it names `CoreModule`
-/// alone, and a reviewer reading a diff sees this module for the empty shell it is
-/// rather than trusting the file name.
+/// ## WHY ALL THREE ARE **PURE DART**, AND WHY THAT IS THE WHOLE TRICK
 ///
-/// ## WHY IT IS PURE DART, AND WHY THAT IS A CONSTRAINT RATHER THAN A COINCIDENCE
+/// `StartSession`, `RefreshSessionQuestions` and `SubmitAnswer` are callable objects
+/// over an interface. `injection.dart`'s transitive project-local import graph is
+/// walked by `injection_test.dart` and must stay Flutter-free (AGENT_CONTEXT §6,
+/// recorded decision 4), and this file is inside that graph — so everything it names
+/// is inside it too.
 ///
-/// Everything reachable from `injection.dart` has to stay Flutter-free: the
-/// composition root's whole transitive project-local import graph is walked by
-/// `injection_test.dart`, and AGENT_CONTEXT §6 recorded decision 4 makes that
-/// walk part of the contract. A `@module` here is therefore reachable from that
-/// walk, and so is anything it names.
+/// That is exactly why the module can be filled in at all: the three use cases import
+/// `core/domain/` and `core/common/` and nothing else. Had any of them needed a
+/// widget, there would have been nothing to register here.
 ///
-/// Phase Phase 8 will break that, because {@code QuizBloc} is a Flutter type in
-/// practice — `flutter_bloc` re-exports the framework's widget layer alongside
-/// the bloc, and `bloc` itself is a transitive dependency this project may not
-/// promote to a direct one. The fix is the one already taken for the router:
-/// register it from `lib/app/di/navigation_injection.dart`, the Flutter-permitted
-/// composition root, rather than moving `injection.dart`'s imports. Recorded here
-/// now so the next phase rediscovers it as a decision instead of as a puzzle.
+/// ## WHY `SubmitAnswer` IS REGISTERED HERE AND NOT IN `home_module.dart`
+///
+/// Its **port method** is registered there, on `ReadingRepository`, and the endpoint
+/// is `POST /readings/:id/submit`. But a use case is the *quiz's* application
+/// behaviour, not the reading repository's — `SubmitAnswerParams` is a type only
+/// `features/quiz/` names, and §3's placement rule is about which feature **owns** a
+/// thing. The line is: the port and the adapter follow the **resource**, and a use
+/// case follows the **feature that drives it**.
+///
+/// `reading_module.dart` registered `LoadScripture` on the same reasoning, one phase
+/// earlier.
+///
+/// ## AND THE `submitResultMapper` PROVIDER IS **NOT** HERE
+///
+/// `home_module.dart` holds it, beside `todayReadingMapper` and the two repositories
+/// it belongs to. One mapper per adapter, and recorded decision 23's "adapter
+/// inventory grows from three to four" is the outcome this avoids: registering
+/// `SubmitResultMapper` here would put a `/readings/` mapper in a feature that
+/// declares no data layer.
 @module
-abstract class QuizModule {}
+abstract class QuizModule {
+  /// Today's questions, as a session.
+  @lazySingleton
+  StartSession get startSession => StartSession(getIt<ReadingRepository>());
+
+  /// A **re-read** of today's reading, for fresh `already_answered` flags.
+  ///
+  /// **`@lazySingleton`, not `@factory`,** for the reason every provider here is:
+  /// it holds no state, so the lifetime buys nothing — but a `@factory` would build
+  /// a second request path per lookup, and the **identity interceptor's** state is
+  /// per-client (`core_module.dart` says so for the client itself).
+  @lazySingleton
+  RefreshSessionQuestions get refreshSessionQuestions =>
+      RefreshSessionQuestions(getIt<ReadingRepository>());
+
+  /// Grades one answer.
+  @lazySingleton
+  SubmitAnswer get submitAnswer => SubmitAnswer(getIt<ReadingRepository>());
+}

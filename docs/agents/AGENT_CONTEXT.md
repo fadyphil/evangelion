@@ -288,6 +288,69 @@ today_completed, next_milestone, days_to_milestone, … }`.
    is not — which is a difference, not a defect, and `today_reading_panel.dart`
    records it.
 
+10. **NO SUCCESSFUL SUBMIT HAS EVER BEEN OBSERVED, AND THE IDS PROVE WHY.** Phase 8
+    is the first phase to write to this backend, and it cannot. Verified live
+    against `HEAD = 4a1c834`, group 3, 2026-10-04, by three POSTs to
+    `/readings/:reading_id/submit`:
+
+    | `question_id` sent | response |
+    | --- | --- |
+    | `question-group-3` — **the id the read endpoint hands out** | `400` · `{"error":"Bad Request","message":"body/question_id must match format \"uuid\""}` |
+    | `dddddddd-dddd-dddd-dddd-dddddddddddd` | `404` · `{"error":"Not Found","message":"QUESTION_NOT_FOUND: Specified question does not exist."}` |
+    | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` | `409` · `{"error":"Conflict","message":"This question has already been submitted by this user."}` |
+
+    `GET /readings/today/{lang}` builds its question ids by string interpolation —
+    `src/db/memory_db.ts:241` (`question-group-${groupId}`), `:256`, `:304`, `:320` —
+    and `submissions.routes.ts:7` declares the submit body against a `uuid` schema.
+    **The two halves cannot both be satisfied**, so the seeded data and the route
+    are mutually exclusive and no client can submit against the seeded group.
+
+    **Two consequences, and both are client rules rather than workarounds.**
+
+    * **Do not validate `question_id` or `reading_id` as UUIDs.** They are not, on
+      this server, for any reading a reader can actually load. A `uuid` check would
+      reject every real payload before it left the device and report a malformed
+      request for a well-formed response. The ids are echoed, never authored.
+    * **Every submit fixture in `test/` is a TRANSCRIPTION, not a capture.** The shape
+      comes from `SubmitAnswerResult` in `src/modules/submissions/submissions.service.ts:5-13`
+      and the request body from `submissions.routes.ts:6-8`, with `answer` documented
+      at `:35`. `test/support/contract_payloads.dart` is where that lives and it says
+      so in its own header, because a fixture whose provenance is a declaration must
+      not sit in a file that claims to have been recorded. `reading_harness.dart` and
+      `quiz_harness.dart` both read it from there rather than each keeping a copy.
+
+    The `409` row is trap 3 seen from the other side, and it is the one row that is
+    *reachable*, so the client's answer to it is the one trap 3 already demanded:
+    disable what `already_answered == true` says is done, rather than spending the
+    request to learn it.
+
+11. **`readings/today` IS THE ONLY READING, AND ITS ID IS DATE-STAMPED.** §2's route
+    table gives `/` one reading and `/reading` another, and Phase 8 found the two are
+    the **same resource**. `GET /readings/today/{lang}` returns
+    `reading_id: "reading-group-3-2026-10-04"`, and that value is what
+    `POST /readings/:reading_id/submit` is addressed by. There is no
+    `GET /readings/:id`; a passage screen has nothing to fetch that today's reading
+    did not already carry.
+
+    The id changes at midnight, so a fixture that hard-codes yesterday's rots
+    silently. `ScriptureText.readingId`'s doc records it, and the harness builds
+    passages through `englishPassageWith` rather than transcribing the block per
+    fixture, so the date lives in exactly one place.
+
+    This is also why `/result` has **no repository, no use case and no endpoint**:
+    the submit response is the only artifact it renders, and that response exists
+    only as the POST's reply. There is nothing to re-fetch it from, which is what
+    makes `QuizBloc.lastResult` the only holder and `ResultPage({required
+    SubmitResult})` a required parameter rather than a resolved dependency.
+
+    **A consequence with a cost, recorded so nobody re-derives it:** `/result` is
+    therefore **not deep-linkable**. `ResultRoute` requires its `result`, so
+    `pushPath('/result')` cannot build the page. `app_router_test.dart` asserts the
+    failure deliberately rather than working around it. The only way in is
+    `QuizPage`'s terminal `finish` arm.
+
+
+
 ---
 
 ## 6. TDD protocol
@@ -2107,6 +2170,341 @@ arm (decision 29 makes the drop cap Latin-only), so the string at risk is an NKJ
 with a bare `\u0301`, which the corpus does not produce. The refusal also has the right
 *shape* of reason — the fix and the decision are the same shape, and a fix that is the same
 shape as the thing it would override is not a fix.
+
+
+### Recorded decisions — Phase 8 review
+
+**81. `/result` TAKES ITS SUBMIT RESPONSE AS A **REQUIRED CONSTRUCTOR PARAMETER**, AND
+THE PRICE IS THAT THE ROUTE IS **NOT DEEP-LINKABLE**.
+
+`08-build-phases.md` Phase 8: "`/result` reads the submit response held by `QuizBloc`
+and has no repository, no use case, and no API call of its own." The response therefore has to
+survive the reader leaving `/quiz`, and there are exactly two places it can live: inside
+`features/quiz/`, or passed across the boundary.
+
+**It is passed across.** `features/result/` importing `features/quiz/` is Gate 2, the same wall
+`HomeCleared` could not cross in the other direction, and the alternative — reading
+`getIt<QuizBloc>()` from a result page — is a **locator dependency on a feature this page must
+not know about**, which is the same violation wearing an injection. So `ResultPage`'s
+parameter is required, and the constraint becomes compile-enforced rather than documented.
+
+**The cost, stated rather than discovered:** `ResultRoute` takes a `result`, so
+`pushPath('/result')` **cannot build the page**. `app_router_test.dart` asserts that failure —
+`Expected: true / Actual: false`, with the router left on `/` — instead of working around it,
+because a workaround would have meant either an optional parameter (so the screen could render
+with nothing in it, which is the defect the requirement exists to prevent) or a second route
+for the empty case (a seventh screen, which §2 forbids). The only way in is `QuizPage`'s
+terminal `finish` arm, and `quiz_page_test.dart` drives it with a real `QuizBloc`.
+
+The dead end that falls out of this is **real, reachable, and rendered**: a reader whose every
+question is already answered reaches the last question with nothing to submit, so there is no
+`SubmitResult`, so there is no result screen. See decision 85.
+
+**82. `arabic_digits.dart` MOVES TO `core/domain/entities/`, AND GATE 2 IS THE ONLY
+REASON IT MOVES NOW.**
+
+Phase 7 wrote it in `features/reading/domain/` because `/reading` was the only screen with
+Arabic-Indic numerals on it. Phase 8 put them in two more places — `/quiz`'s
+`questionProgress`, `/result`'s headline and stat values — and the two obvious answers were
+both refusals. `features/quiz/` importing `features/reading/` for a **string helper** is Gate 2
+again. And *duplicating* the function would leave two implementations that agree today and drift
+when the zero-width handling is ever questioned.
+
+So the kernel took it, which is what `core/domain/` is for: §3's rule is that an entity or
+helper consumed by two or more features belongs there, and this one is now consumed by three.
+`renderable_text.dart` moved for the same reason in the same commit.
+
+The gate is `test/core/domain/entities/arabic_digits_test.dart`, which moved with the file, plus
+`test/arabic_typography_test.dart`'s `/result` list — which **declares the three bare numerals
+(`٤٠`, `١٠`, `٦`) individually** and so fails if a future `/result` starts printing a Western
+`4` where `arabicIndicDigits` used to be.
+
+**83. DECISION 80's FIRST HALF IS DISCHARGED AS A **MAPPER** RULE, AND THE DISTINCTION
+IS EMPTY-VERSUS-MALFORMED.**
+
+Decision 80 recorded that Phase 7's `splitDropCap` repairs the surrogates it introduces and
+cannot repair a string that arrived malformed, and that `RenderParagraph` throws
+`ArgumentError: string is not well-formed UTF-16` with nothing between
+`features/reading/data/` and the engine to catch it — so one bad verse takes the whole panel.
+
+The fix is `core/domain/entities/renderable_text.dart`: `isRenderableText` answers "is this
+usable in the engine?", and it is **empty, not broken**. An empty string maps, because a missing
+verse is a fact the panel already handles; a malformed one does not, because there is nothing
+downstream that can. That distinction is the whole content of the helper — a predicate named
+`isNonEmpty` would have been the wrong function and would have failed on exactly the case it
+was written for.
+
+It is applied in `today_reading_mapper.dart` to **six** painted fields. Four are **refused** —
+verse `text`, verse `text_clean`, question `prompt`, and question option text — and each is a
+separate case; the last two are Phase 8's, and they are the same hazard on a different screen,
+since an option card renders its text through `Text`. The other two, `reference` and
+`translation`, are painted too and are **blanked rather than refused**: see decision 95, which
+also corrects the one claim in this decision's own first paragraph — the throw is real *and* it is
+caught by the painting library, so it costs a tofu box and a per-layout `ArgumentError` rather
+than the screen.
+
+**This is a mapper rule and not a widget guard, and that placement is the point.** A widget
+guard would leave three callers each holding their own copy of the decision, and the fourth
+surface added later would not have it. The gate is `today_reading_mapper_test.dart`'s malformed
+cases, one per field.
+
+**84. `StatTile` GAINED `arabicAware` ON BOTH RUNS, AND THIS IS A PHASE-3 WIDGET PHASE 8
+HAD TO FIX.**
+
+The bilingual gate reported, in its first run against a built `/result`:
+
+```
+`١٠` renders Arabic in `CormorantGaramond`, which carries no Arabic glyph at all
+`هذه الإجابة` renders Arabic in `SpaceMono`, which carries no Arabic glyph at all
+```
+
+Both are tofu — one box per character — and **neither is a wrong constant**. `StatTile` resolved
+`Theme.of(context).textTheme.headlineSmall` and `EvaTypography.monoCaps`, both Latin families,
+and neither has an opinion about the ambient arm. The widget had no Arabic arm because the only
+screen that used it was the `/result` stub.
+
+`arabicAware` rather than an `if (isArabic)` branch, because both strings are the **app's own
+chrome** — a caption from `ResultStrings.ar()` and a number `arabicIndicDigits` produced — and
+the ambient direction is the only arm there is. That is precisely the case the helper's doc
+names, and it is decision 74's rule applied to a widget that predates it.
+
+**Nothing changes under LTR**, so the Phase-3 goldens are unaffected: `arabicAware` is the
+identity there. The gate is `test/arabic_typography_test.dart`'s `/result` list, which is no
+longer `vacuousBecause: null` — decision 79's mechanism finally has a screen to bite on.
+
+**85. `QuizCta.none` IS A REAL ARM, AND THE DEAD END IS RENDERED **DISABLED WITH ITS REASON**,
+NOT HIDED.**
+
+A reader who has done today's quiz arrives on `/quiz`, finds every question closed, and has
+nothing to submit — so there is no `SubmitResult`, so per decision 81 there is no result screen.
+The alternatives were: hide the button (a reader cannot tell a missing feature from a missing
+control), leave it enabled and let the tap do nothing (§14's forbidden state), or label it with
+something that is not true.
+
+It is a **disabled `EvaButton` whose visible label is still the prototype's** and whose
+*accessible* name carries the reason as a suffix — the same shape as `LoginPage`'s disabled
+field, and decision 18's rule applied twice. The split is deliberate: the label is transcribed
+(`QuizScreen.tsx:127`) and the reason is written, and the reader who cannot see the button is the
+one who needs the reason.
+
+**What this cost, and it is worth stating because the test found it rather than the code.** The
+draft suite drove the transition with a press — press `next` on a one-question payload, expect
+`none`. That is unreachable: with one closed question the state is `none` **from the first
+frame**, so there is no `next` to press. `QuizCta`'s rows `closed, on the last, not yet
+finished → next` and `closed, on the last, and nothing was submitted → none` differ by **nothing
+in the payload**; they are separated by whether a question *follows*. So the `next` arm is
+reachable only from a multi-question payload, which is what `mixedQuizPassage` exists for. A test
+that assumed a press where the state machine has an edge would have asserted a transition the
+app does not have.
+
+**86. A CLOSED QUESTION DISABLES **EVERY** CARD, AND THE REASON IS IN EACH ACCESSIBLE NAME.**
+
+Trap 3's client-side half. `already_answered == true` means no option on that question will ever
+take a verdict, so `QuizOptionCard.enabled` is false for all four and the bloc's `isAnswerable`
+guard is what holds if the event arrives from somewhere else.
+
+§14's disabled row is `Semantics(enabled: false)` **and** the reason in the name, and both halves
+are asserted — a `SemanticsFlag` check alone would pass on a control that says "dimmed" and
+leaves the reader to guess. The reason is `alreadyAnsweredSuffix`, and it is per-card rather than
+per-screen because the screen has one question and a reader navigating by element hears each
+option's own state.
+
+**87. ONLY THE SUBMITTED LETTER IS GRADED, BECAUSE `SubmitResult` SAYS **WHETHER** AND NEVER
+**WHICH**.**
+
+`_optionStateFor`'s first version read `if (current.isCorrect == true) return correct` before
+consulting `letter`, so a right answer painted **all four** cards green and drew four
+celebrations. `quiz_page_test.dart` caught it by asserting *exactly one* correct card — a count,
+not a membership test. That is the difference between "a correct card exists" and "the correct
+card is the only correct card", and the second is the one the wire can support.
+
+This is decision 83's discipline one level further out: the client knows the verdict on exactly
+one option and must not extrapolate it. The other three cards are `idle`, not `dimmed`, before a
+check — `_isDimmed` is `checked && letter !== selected`, so nothing is dimmed on a question
+nobody has attempted.
+
+**88. THE VERDICT ON SCREEN IS THE **SUBMIT RESPONSE**'S, AND NEVER THE PAYLOAD'S
+`is_correct`.**
+
+Two different objects, and conflating them is the mistake this decision exists to prevent.
+`SubmitResult.isCorrect` arrives over HTTP and describes the answer the reader just submitted.
+`Question.isCorrect` is in the payload the reader was handed **before** answering, and is a
+spoiler (§5 trap 3).
+
+`quiz_page_test.dart`'s graded-arm group asserts both: that the banner matches
+`bloc.state.lastResult?.isCorrect`, **and** that the marked card is the letter the *reader
+tapped*. A screen that trusted the payload would mark a card correct before the press, and the
+"before the reader commits" groups are what catch that.
+
+The fixture makes the two distinguishable on purpose: `verdictCarryingQuestion` is an **open**
+question that nevertheless carries `user_answer: 'A'` and `is_correct: true`, so the payload has
+an answer key and `liveEnglishQuestion` — the live capture — does not. Testing the boundary
+against the capture would pass on **any** screen, because there is nothing on that fixture to
+leak.
+
+**89. `/quiz` HAS NO DATA LAYER, AND THAT IS WHY `ReadingRepository` HAS **THREE** METHODS
+RATHER THAN A SECOND PORT.**
+
+The plan's own cut: the quiz reads today's reading, which is the same `GET /readings/today/{lang}`
+the home screen already reads, and submits one answer. A `QuizRepository` would be a port whose
+only other method is the home screen's method, so it would be two ports over one endpoint and
+one place for the `reading_id` to be read differently on each screen — and the submit would have
+to echo a `reading_id` the second port also had to fetch.
+
+So `ReadingRepository` gained `submitAnswer`, `DioReadingRepository` gained the POST, and
+`SubmitResultMapper` was registered beside the other two mappers. The gate is
+`injection_test.dart`'s inventory, which is now **twenty-three** registrations and names each of
+the four new ones — and the comment beside the list records that the *order* is the generator's,
+not ours, so nobody encodes it.
+
+**90. THE PROTOTYPE'S NOT-PORTED TOGGLE IS DESCRIBED **BY BEHAVIOUR**, AND THE SWEEP IS A
+**RAW** `lib/` GREP.**
+
+`01-source-analysis.md` defect #12: `App.tsx`'s screen switcher and `QuizScreen`'s two preview
+buttons "must not be ported". The second preview button sets the correct answer to `B` and marks
+it correct **without asking the server**, so porting it would put a grade on the quiz that the
+backend never produced.
+
+Phase 8's first sweep stripped doc comments before matching, on the reasoning that a provenance
+note ought to be allowed to quote what it documents. **That reasoning was wrong**, and the
+requirement settled it: the labels must not reach `lib/` **at all**. Two files documented the
+toggle and both quoted its labels verbatim — `quiz_page.dart` and `eva_chip.dart` — so the sweep
+had to be the sophisticated kind to let them through, and *a sweep that has to be sophisticated
+enough to forgive comments will also forgive a comment quoting the very string it exists to keep
+out*. Both docs now describe the toggle by behaviour, and `rg 'Frame A|Frame B' lib/` is empty.
+
+The gate is `quiz_page_test.dart`'s source sweep, and it took **three planted mutations** to make
+it honest, each recorded at the mutation site because each was a way the gate looked fine:
+
+| planted | first version | now |
+| --- | --- | --- |
+| `const String _leak = 'Frame A';` | **passed** — equality against the whole line | fails |
+| `/// Do not port Frame B.` | **passed** — comment markers stripped first | fails |
+| `// … this screen was rebuilt from the prototype …` | **passed** | fails |
+
+The first two are the general shape of a green gate: both were code that looked like a check and
+checked nothing, and only a mutation distinguished them from one.
+
+**91. THE HARNESS BUILDS PASSAGES WITH A **FUNCTION**, NOT A FOURTH `const` TRANSCRIPTION.**
+
+`ScriptureText` carries ten fields, eight of them irrelevant to every quiz suite, and three of
+those eight are date-stamped (trap 11). Copying the block per fixture is how a fixture and its
+passage drift apart silently, because nothing compares them. `englishPassageWith` and
+`arabicPassageWith` take the questions and supply everything else from the one transcription, so
+the date lives in exactly one place and a fixture can only vary in the one thing it is about.
+
+**92. `/result` HAS **TWO** STAT TILES, NOT THREE, AND THE HEADLINE IS THE SCORE.**
+
+`ResultScreen.tsx:69-73` is a three-tile row, and the plan transcribes three. The first draft
+built three, and the third duplicated `currentTotalPoints` — which is already the headline, in
+Arabic-Indic digits, one line above. Two tiles is the honest count: *this answer* and *your
+longest run*. There is no `/N` anywhere either, because the submit response carries no total
+question count (decision 93).
+
+The gate is `result_page_test.dart`, which asserts the two tile labels and asserts the
+**absence** of a third tile whose value equals the headline's — a duplication check rather than a
+count check, because a count check passes on a screen that duplicated by some other route.
+
+**93. THE STREAK IS `SubmitResult.currentStreak`, PER DECISION 22'S EXTENSION, AND THE
+FIXTURE MAKES THE ALTERNATIVES FAIL LOUDLY.**
+
+`/readings/today` says `current_streak: 4` and `streak/summary` says `0` (trap 8), and the only
+two numbers available to `/result` are the submit response's and today's reading's. The submit
+response's is right: it is the value **at the moment the answer was graded**, and it is the one
+that agrees with the points shown beside it. `streak/summary`'s `0` would render a reader's
+current run as zero on the screen whose whole job is to report it.
+
+Decision 22's extension test uses a **sentinel** — `current_streak: 77` — and asserts the live
+alternatives `4` and `0` are both **absent** from the screen. A test asserting `find.text('77')`
+alone would pass on a screen that also printed a `4` somewhere; this one cannot, because the
+alternatives are named and refused.
+
+`longest_streak: 6` is deliberately **above** `current_streak`, so `/result`'s "your longest yet"
+sentence is its *false* arm — a fixture where the two agree tests the interesting branch nowhere.
+
+**94. REFRESH RE-FETCHES `reading_id` AND `already_answered`, AND **KEEPS** THE READER'S
+SELECTION.**
+
+`RefreshSessionQuestions` re-reads `GET /readings/today/{lang}` rather than re-using the session's
+cached questions, because a flag that has gone stale is the one thing §5 trap 3 exists to catch,
+and a reader who pressed "try again" after a failed submit has told us the flag may be wrong.
+
+The selection survives, which is the half the first version lost: `_onRetried` emitted `loading`
+and then read `state` to find out what the reader had chosen — **after** the emit, so it read the
+state it had just replaced. The payload is captured before the emit, and
+`quiz_bloc_test.dart` asserts the selection is still on screen after a successful refresh.
+
+A failed **read** clears the session to `null` rather than keeping the last good one, for
+`ReadingCubit`'s reason: a reader looking at a stale `already_answered` under an error message
+would be shown exactly the flags this feature exists to distrust. A failed **submit** leaves the
+session alone, because the flags are not in question — the reader's own selection is.
+
+**95. THE MALFORMED-STRING THROW IS **REAL**, IT IS **CAUGHT**, AND DECISION 83's GATE
+EXTENDS TO THE TWO LABELS — BLANKED, NOT REFUSED.**
+
+Three halves, and the first is a retraction of this phase's own work.
+
+**The retraction.** A draft of `renderable_text.dart`, `utf16.dart`,
+`today_reading_mapper.dart` and `today_reading_mapper_test.dart` stated that
+`RenderParagraph` **does not** throw on a lone surrogate on `Flutter 3.47.4`, and built a cost
+argument on it. That was false, and it contradicted decision 83 and three earlier statements in
+this file (`:1757`, `:2156`, `:2226`). The probe that "refuted" the throw printed its own
+`no throw` label beside `tester.takeException()`'s value and the conclusion read the label.
+Measured, per `Text` / `SelectableText` / `Text.rich`:
+
+```text
+takeException == null   : false
+takeException runtime   : ArgumentError
+takeException toString  : Invalid argument(s): string is not well-formed UTF-16
+#0  _NativeParagraphBuilder.addText  (dart:ui/text.dart:3724)
+#1  TextSpan.build                    (painting/text_span.dart:298)
+#3  TextPainter.layout                (painting/text_painter.dart:1264)
+#4  RenderParagraph._layoutTextWithConstraints
+#5  RenderParagraph.performLayout     (rendering/paragraph.dart:966)
+```
+
+**And it is caught**, which is why the draft's probe misled it: the painting library catches a
+layout exception, records it and completes the frame, so *"a frame appeared"* is not *"nothing
+threw"*. An exception left untaken also **fails the test** — `AutomatedTestWidgetsFlutterBinding`
+rethrows at teardown — so `takeException() == null` is the only negative test available. The cost
+of a malformed painted string is therefore **two** things: a tofu box, **and** a caught
+`ArgumentError` on every layout of that paragraph. Not an outage — decision 83's *"takes the whole
+panel"* overstates it — but not the silent nothing the draft claimed either.
+
+**The extension.** The gate reaches **six** painted fields, not four, and the two labels get a
+**different verdict**. Decision 83's reasoning for a mapper rule is unchanged; only the field list
+grew. `reference` and `translation` are painted (`reading_header.dart` puts one in the title and
+one in the metadata row), so:
+
+| field | role | malformed, **blanked** (kept) | malformed, **refused** (rejected) |
+| --- | --- | --- | --- |
+| `text`, `text_clean`, `prompt`, `options` | content | not applicable — refused | the verse or question is skipped; the screen works |
+| `reference`, `translation` | labels over the content | a blank citation/edition row | **the whole reading fails to map** |
+
+The real trade, both directions. What the reader loses when a label is malformed and we blank it:
+the citation, or the edition name — **the same thing they already see** when the server sends
+`''`, which this mapper has always passed through on purpose. What they lose instead of that: a
+tofu box plus a caught `ArgumentError` on every layout of the heading. What they lose if the gate
+**refuses** a malformed label: the entire reading, on both screens, with both controls dead. One
+bad label must not cost the passage; that is decision 40's `text: ''` argument exactly.
+
+So: `renderableTextOrNull` for content, `renderableTextOrEmpty` for labels, and the empty label is
+**proved renderable** rather than assumed — `reading_page_test.dart`'s *"a BLANK LABEL RENDERS"*
+pair mounts `/reading` with `reference: ''` and `translation: ''` on both arms and asserts
+`takeException()` is `null` with the header and the passage still on screen. Before that test,
+"the server can send `''`" was a claim about a payload, not a measurement of a screen.
+
+**The test that pinned the wrong behaviour was inverted, and that is the record.**
+`today_reading_mapper_test.dart` asserted *"a malformed `$field` is PASSED THROUGH, and the passage
+survives"*. It rested on the false cost argument, so it pinned the defect: a test whose reason
+turns out to be false blocks the repair. Both halves moved — the label is blanked, the passage is
+still whole, and the *other* label is asserted untouched so a blunt "blank both" fails.
+
+**The lesson, recorded because it is the third instance in two phases:** a probe whose output can
+carry a verdict must print the verdict **as the asserted value**, never as a label beside a value
+that has to be read separately. Phase 7's `find.textContaining` miss, Phase 8's `excludeSemantics`
+miss, and this.
+
 
 
 ## 7. Verification — run before reporting done

@@ -365,6 +365,69 @@ void main() {
     });
   });
 
+  group('A BLANK LABEL RENDERS, WHICH IS THE STATE THE MALFORMED RULE BLANKS TO', () {
+    // ## WHY THIS GROUP IS A **WITNESS** AND NOT A RESTATEMENT
+    //
+    // `today_reading_mapper.dart` now blanks an unpaintable `reference` /
+    // `translation` to `''` rather than refusing the reading, and the argument for
+    // that is that `''` is a state this screen already had to handle — the server can
+    // send it, and the mapper has always passed it through. **That argument is only
+    // as good as this test.** Before it existed, "the server can send `''`" was an
+    // assertion about a payload, not a measurement of a screen, and a screen that
+    // threw or overflowed on an empty citation would have made the mapper's blank the
+    // worse of the two verdicts.
+    //
+    // So this is the half of decision 95 that only a widget test can give: the
+    // blanked label renders, the header is still there, and the passage is still
+    // there. Both arms, because the metadata row uppercases on English and not on
+    // Arabic and a title is right-aligned in neither.
+    for (final (String label, ReadingLanguage language)
+        in <(String, ReadingLanguage)>[
+          ('English', ReadingLanguage.english),
+          ('Arabic', ReadingLanguage.arabic),
+        ]) {
+      testWidgets('the $label arm takes a blank citation and a blank edition', (
+        WidgetTester tester,
+      ) async {
+        final ReadingHarness h = readingHarness(
+          scripture: Result<ScriptureText>.success(
+            (language == ReadingLanguage.english
+                    ? liveEnglishPassage
+                    : liveArabicPassage)
+                .copyWith(reference: '', translation: ''),
+          ),
+        );
+        await pumpReading(
+          tester,
+          cubit: h.cubit,
+          locale: Locale(language.code),
+        );
+
+        // ## `takeException() == null`, WHICH IS THE ONLY NEGATIVE TEST HERE
+        //
+        // Not "a frame appeared". A layout exception is **caught** by the painting
+        // library and recorded, the frame still paints, and the only way to read it is
+        // `takeException()` — which is precisely the mistake an earlier draft of
+        // `renderable_text.dart` made about the engine, in the opposite direction.
+        // An exception left untaken also fails this test on its own, so the
+        // assertion below is belt *and* braces on purpose.
+        expect(tester.takeException(), isNull);
+        expect(find.byType(ReadingHeader), findsOneWidget);
+        // The passage, because a blank label that took the passage with it would
+        // satisfy every assertion above. Counted rather than matched on a string,
+        // because the needle would have to be English on one arm and Arabic on the
+        // other — and a witness that needs two spellings is a witness that will
+        // silently stop matching when a fixture's wording changes.
+        expect(find.byType(ScriptureBlock), findsOneWidget);
+        expect(
+          scriptureRichTexts(tester),
+          isNotEmpty,
+          reason: 'the scripture is still on screen',
+        );
+      });
+    }
+  });
+
   group('NOTHING INVENTED IS ON THE SCREEN', () {
     testWidgets('no duration — the payload has no duration field', (
       WidgetTester tester,

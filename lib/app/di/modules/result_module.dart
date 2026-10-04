@@ -2,10 +2,29 @@ import 'package:injectable/injectable.dart';
 
 /// The `result` feature's registrations.
 ///
-/// **THIS MODULE REGISTERS NOTHING TODAY.** That is the honest state, not an
-/// oversight: Phase 8 owns nothing at all: `/result` reads the last `SubmitResult` held by `QuizBloc` and has no repository, no use case and no API call of its own, so until that phase lands there is nothing to
-/// put here. The module exists now, empty and named, because a container whose
-/// shape appears one feature at a time is one feature at a time.
+/// **THIS MODULE REGISTRES NOTHING, AND PHASE 8 IS WHY.**
+///
+/// The prediction this doc made is now a measurement, and it held: `/result` has no
+/// repository, no use case and no API call of its own, so there is nothing to put
+/// here. `ResultPage` takes the graded answer as a **required constructor
+/// parameter** — `SubmitResult` is a plain immutable value, not a dependency — so
+/// `features/result/` contributes no type to the object graph at all.
+///
+/// ## AND THE PLAN'S PHRASING WAS CORRECTED, BECAUSE IT NAMED THE WRONG MECHANISM
+///
+/// This file used to say "`/result` reads the last `SubmitResult` **held by
+/// `QuizBloc`**", and `QuizBloc` still holds it — `QuizState.lastResult` is the
+/// only copy that exists, and `QuizPage` is what reads it. But `ResultPage` does
+/// **not** read it from the bloc, and cannot: `features/result/` importing
+/// `features/quiz/presentation/bloc/quiz_bloc.dart` is **Gate 2**, the same wall
+/// `HomeCleared` could not cross in the other direction.
+///
+/// So the response travels as an argument from the one screen that has it to the
+/// one screen that needs it. That is not a simplification of the plan's shape — it
+/// is the only spelling of it that Gate 2 permits, and it has a consequence worth
+/// stating: **`/result` cannot be pushed without a graded answer**, because the
+/// route's constructor requires one. A reader who has submitted nothing has no
+/// result screen, which is why `QuizState.cta` is `QuizCta.none` in that case.
 ///
 /// A `@module` with no providers emits no registration at all, so an empty one
 /// costs nothing at runtime. The record of what the graph actually contains is

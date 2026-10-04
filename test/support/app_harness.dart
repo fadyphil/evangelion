@@ -12,6 +12,7 @@ import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -27,6 +28,10 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
+import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
+import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
+import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:flutter/material.dart';
@@ -148,6 +153,21 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   // than at each call site is the point of the paragraph above.
   if (!getIt.isRegistered<ReadingCubit>()) {
     registerTestReadingCubit();
+  }
+  // **The fourth registration, for the same reason, and it is the one that would
+  // have been forgotten.** `QuizPage` resolves its `QuizBloc` from the locator —
+  // `passed ?? getIt<QuizBloc>()` — so a router test that lands on `/quiz` throws a
+  // `StateError` out of `build` without one. That is not hypothetical: three suites
+  // (`home_navigation_test.dart` twice, `reading_navigation_test.dart` once) pushed
+  // `/quiz` for four phases while it was a stub that read nothing, and all three
+  // went red on the same day the screen was built. The three registrations above
+  // each cost a red test to discover; this one is written down instead.
+  //
+  // `registerSingleton` for production's reason (`navigation_injection.dart`'s
+  // `QuizBloc` section): it holds `lastResult`, and a second instance would be an
+  // empty one.
+  if (!getIt.isRegistered<QuizBloc>()) {
+    registerTestQuizBloc();
   }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
@@ -368,6 +388,29 @@ HomeBloc registerTestHomeBloc() {
 /// no `SettingsRepository` (see `reading_cubit.dart`). That is also why this is a
 /// `registerSingleton` and not a factory — the same single-instance hazard
 /// `registerTestHomeBloc`'s doc gives.
+/// The fourth, and the only one of the four whose state a **reader** produces.
+///
+/// The three use cases share one fake, and the fake **fails** — `_FakeReadingRepository`
+/// opens no socket, so this bloc reaches `failed`, not `ready`.
+///
+/// That is deliberate and it is the right answer here. A router suite is testing the
+/// *navigation*, so it does not need a question; a bloc that answered a fabricated
+/// success would render a real quiz and invite the next reader to assert on its
+/// content, which is `quiz_page_test.dart`'s job and which has its own fixtures.
+/// `Retry` on screen is a truthful report of what this graph can do.
+QuizBloc registerTestQuizBloc() {
+  final _FakeReadingRepository readings = _FakeReadingRepository();
+  final QuizBloc bloc = QuizBloc(
+    startSession: StartSession(readings),
+    refreshSessionQuestions: RefreshSessionQuestions(readings),
+    submitAnswer: SubmitAnswer(readings),
+  );
+  getIt.registerSingleton<QuizBloc>(bloc);
+  addTearDown(() => getIt.unregister<QuizBloc>());
+  addTearDown(bloc.close);
+  return bloc;
+}
+
 ReadingCubit registerTestReadingCubit() {
   final ReadingCubit cubit = ReadingCubit(
     loadScripture: LoadScripture(_FakeReadingRepository()),
@@ -405,6 +448,21 @@ final class _FakeReadingRepository implements ReadingRepository {
   }) async =>
       (await todayScripture(language: language))
           .map((ScriptureText scripture) => scripture.toTodayReading());
+
+  /// Phase 8's third port method, failing like its siblings: this harness is about
+  /// routes and opens no socket, so a failure is the honest answer and a stubbed
+  /// success would be a payload a reader of the harness could mistake for real.
+  @override
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
+  }) async => const Result<SubmitResult>.failure(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No submit: this harness does not open a socket.',
+    ),
+  );
 }
 
 /// The [StreakRepository] twin of [_FakeReadingRepository].

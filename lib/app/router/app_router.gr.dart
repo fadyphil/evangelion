@@ -11,6 +11,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i7;
+import 'package:evangelion/core/domain/entities/submit_result.dart' as _i13;
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
     as _i10;
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
@@ -19,10 +20,12 @@ import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart'
     as _i9;
 import 'package:evangelion/features/home/presentation/pages/home_page.dart'
     as _i1;
+import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart'
+    as _i11;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
     as _i3;
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart'
-    as _i11;
+    as _i12;
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart'
     as _i4;
 import 'package:evangelion/features/result/presentation/pages/result_page.dart'
@@ -138,18 +141,51 @@ class LoginRouteArgs {
 
 /// generated route for
 /// [_i3.QuizPage]
-class QuizRoute extends _i7.PageRouteInfo<void> {
-  const QuizRoute({List<_i7.PageRouteInfo>? children})
-    : super(QuizRoute.name, initialChildren: children);
+class QuizRoute extends _i7.PageRouteInfo<QuizRouteArgs> {
+  QuizRoute({
+    _i8.Key? key,
+    _i11.QuizBloc? bloc,
+    List<_i7.PageRouteInfo>? children,
+  }) : super(
+         QuizRoute.name,
+         args: QuizRouteArgs(key: key, bloc: bloc),
+         initialChildren: children,
+       );
 
   static const String name = 'QuizRoute';
 
   static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i3.QuizPage();
+      final args = data.argsAs<QuizRouteArgs>(
+        orElse: () => const QuizRouteArgs(),
+      );
+      return _i3.QuizPage(key: args.key, bloc: args.bloc);
     },
   );
+}
+
+class QuizRouteArgs {
+  const QuizRouteArgs({this.key, this.bloc});
+
+  final _i8.Key? key;
+
+  final _i11.QuizBloc? bloc;
+
+  @override
+  String toString() {
+    return 'QuizRouteArgs{key: $key, bloc: $bloc}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! QuizRouteArgs) return false;
+    return key == other.key && bloc == other.bloc;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ bloc.hashCode;
 }
 
 /// generated route for
@@ -157,7 +193,7 @@ class QuizRoute extends _i7.PageRouteInfo<void> {
 class ReadingRoute extends _i7.PageRouteInfo<ReadingRouteArgs> {
   ReadingRoute({
     _i8.Key? key,
-    _i11.ReadingCubit? cubit,
+    _i12.ReadingCubit? cubit,
     List<_i7.PageRouteInfo>? children,
   }) : super(
          ReadingRoute.name,
@@ -183,7 +219,7 @@ class ReadingRouteArgs {
 
   final _i8.Key? key;
 
-  final _i11.ReadingCubit? cubit;
+  final _i12.ReadingCubit? cubit;
 
   @override
   String toString() {
@@ -203,18 +239,49 @@ class ReadingRouteArgs {
 
 /// generated route for
 /// [_i5.ResultPage]
-class ResultRoute extends _i7.PageRouteInfo<void> {
-  const ResultRoute({List<_i7.PageRouteInfo>? children})
-    : super(ResultRoute.name, initialChildren: children);
+class ResultRoute extends _i7.PageRouteInfo<ResultRouteArgs> {
+  ResultRoute({
+    required _i13.SubmitResult result,
+    _i8.Key? key,
+    List<_i7.PageRouteInfo>? children,
+  }) : super(
+         ResultRoute.name,
+         args: ResultRouteArgs(result: result, key: key),
+         initialChildren: children,
+       );
 
   static const String name = 'ResultRoute';
 
   static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i5.ResultPage();
+      final args = data.argsAs<ResultRouteArgs>();
+      return _i5.ResultPage(result: args.result, key: args.key);
     },
   );
+}
+
+class ResultRouteArgs {
+  const ResultRouteArgs({required this.result, this.key});
+
+  final _i13.SubmitResult result;
+
+  final _i8.Key? key;
+
+  @override
+  String toString() {
+    return 'ResultRouteArgs{result: $result, key: $key}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! ResultRouteArgs) return false;
+    return result == other.result && key == other.key;
+  }
+
+  @override
+  int get hashCode => result.hashCode ^ key.hashCode;
 }
 
 /// generated route for

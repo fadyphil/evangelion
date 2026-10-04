@@ -1,4 +1,4 @@
-import 'package:evangelion/features/reading/domain/arabic_digits.dart';
+import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:flutter/widgets.dart';
 
 /// The bilingual string table for `/reading`.

@@ -6,6 +6,7 @@ import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -107,6 +108,27 @@ final class CountingReadingRepository implements ReadingRepository {
   }) async =>
       (await todayScripture(language: language))
           .map((ScriptureText text) => text.toTodayReading());
+
+  /// Phase 8's third port method.
+  ///
+  /// **Present and answering rather than absent**, because this fake exists to be a
+  /// substitutable `ReadingRepository` and a port method a substitute cannot answer
+  /// is not substitutable — it is a compile error in every caller. No `home` suite
+  /// calls it (nothing on `/` submits an answer), which is exactly why it must still
+  /// compile: the port growing is a cost every fake in the tree pays, and this is
+  /// where that cost is paid.
+  @override
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
+  }) async => const Result<SubmitResult>.failure(
+    Failure(
+      kind: FailureKind.network,
+      message:
+          'This fake does not submit: no home screen calls the submit path.',
+    ),
+  );
 }
 
 /// [StreakRepository] that answers [answer] and counts its calls.

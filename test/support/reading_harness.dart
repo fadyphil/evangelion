@@ -4,6 +4,7 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
@@ -13,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'contract_payloads.dart';
 import 'design_system_harness.dart';
 
 /// The shared fixture for every `/reading` widget test.
@@ -56,6 +58,19 @@ final class CountingReadingRepository implements ReadingRepository {
   /// The languages the port has been asked for, in order.
   final List<ReadingLanguage> asked = <ReadingLanguage>[];
 
+  /// What [submitAnswer] answers. Settable, because the bloc tests need both a
+  /// graded answer and a 409-shaped failure and neither is the interesting default.
+  Result<SubmitResult> submission = const Result<SubmitResult>.success(
+    contractSubmitAnswerFixture,
+  );
+
+  /// How many times [submitAnswer] has been called.
+  int submitCalls = 0;
+
+  /// What [submitAnswer] was asked, in order.
+  final List<({String readingId, String questionId, String answer})>
+  submissions = <({String readingId, String questionId, String answer})>[];
+
   @override
   Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
@@ -71,6 +86,31 @@ final class CountingReadingRepository implements ReadingRepository {
   }) async =>
       (await todayScripture(language: language))
           .map((ScriptureText text) => text.toTodayReading());
+
+  /// Phase 8's third port method, and this fake is the one the **quiz** suites
+  /// drive rather than merely compile against — so unlike its two siblings it
+  /// answers with something and counts what it was asked.
+  ///
+  /// It records every `(readingId, questionId, answer)` triple, because the two
+  /// claims a quiz suite needs are "the body sent was the contract's" and "the
+  /// answer went out **verbatim**", and a count alone says neither. It is also the
+  /// only place a test can see the request at all: §5 trap 10 records that no
+  /// successful submit has ever been observed, so nothing may be verified against a
+  /// socket.
+  @override
+  Future<Result<SubmitResult>> submitAnswer({
+    required String readingId,
+    required String questionId,
+    required String answer,
+  }) async {
+    submitCalls++;
+    submissions.add((
+      readingId: readingId,
+      questionId: questionId,
+      answer: answer,
+    ));
+    return submission;
+  }
 }
 
 /// Builds a [ReadingCubit] over a counting fake, and registers the teardown.
@@ -330,6 +370,68 @@ const ScriptureText liveArabicPassage = ScriptureText(
   isFullyCompleted: true,
   pointsEarnedToday: 10,
   currentStreak: 4,
+);
+
+/// The live English passage's **first verse**, shared so a suite can build a
+/// `ScriptureText` whose `verses` list is one entry without restating it.
+///
+/// Added in Phase 8 for the quiz's fixtures: `threeOpen` and its siblings each
+/// declare a full `ScriptureText`, and a fixture that copied verse one five times
+/// is five places to keep in step. `/quiz` never reads a verse, so **one** is enough
+/// — and its brevity is the honest description of what the quiz cares about.
+const Verse firstVerse = Verse(
+  bookNumber: 43,
+  chapter: 3,
+  number: 1,
+  text:
+      'There was a man of the Pharisees, named Nicodemus, a ruler of the Jews:',
+);
+
+/// The live English passage's single question, already answered and carrying the
+/// answer. See [liveEnglishPassageQuestions], which is the `const` list form.
+///
+/// Spelled out rather than indexed out of that list because a suite needs a
+/// **named** question to assert on, and `liveEnglishPassageQuestions.first` reads
+/// as "the first of the live list" while this is "the already-answered question",
+/// which is what a quiz fixture is about.
+const Question answeredQuestion = Question(
+  id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  sortOrder: 1,
+  type: 'mcq',
+  prompt: 'What was the name of the Pharisee who came to Jesus by night?',
+  options: <String, String>{
+    'A': 'Nicodemus',
+    'B': 'Paul',
+    'C': 'Peter',
+    'D': 'Lazarus',
+  },
+  pointsValue: 10,
+  alreadyAnswered: true,
+  userAnswer: 'A',
+  isCorrect: true,
+);
+
+/// A question that is **open**, which the live payloads of 2026-10-04 are and the
+/// 2026-10-03 one is not.
+///
+/// Its `id` is `question-group-3` — the fabricated id the live endpoint hands out
+/// (§5 trap 10) — and that is deliberate rather than a convenient UUID: the client's
+/// only job is to echo whatever the server gave it, and `question_repository`'s
+/// port doc says so. A fixture using a well-formed UUID would pass the same tests
+/// and hide the case this backend actually produces.
+const Question openQuestion = Question(
+  id: 'question-group-3',
+  sortOrder: 1,
+  type: 'mcq',
+  prompt: 'What was the name of the man who came to Jesus by night?',
+  options: <String, String>{
+    'A': 'Nicodemus',
+    'B': 'Paul',
+    'C': 'Peter',
+    'D': 'Lazarus',
+  },
+  pointsValue: 10,
+  alreadyAnswered: false,
 );
 
 /// The letter of every drop cap on screen, in order.
