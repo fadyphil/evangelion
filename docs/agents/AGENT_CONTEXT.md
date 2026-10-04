@@ -254,6 +254,40 @@ today_completed, next_milestone, days_to_milestone, … }`.
 6. **`?date=` must be exactly `YYYY-MM-DD`.** Anything else is rejected.
 7. **`X-User-Role` does nothing.** Never gate UI on it expecting server enforcement.
 
+8. **THE BACKEND DISAGREES WITH ITSELF ABOUT TODAY, AND `/` READS BOTH ANSWERS.**
+   Measured live against `HEAD = 4a1c834`, group 3, user
+   `11111111-1111-1111-1111-111111111111`, 2026-10-03 — the two responses were read
+   in the same minute:
+
+   | field | `GET /readings/today/en` | `GET /streak/summary` |
+   | --- | --- | --- |
+   | streak | `current_streak: 4` | `current_streak: 0` |
+   | is today done | `is_fully_completed: true` | `today_completed: false`, `today_status: 'pending'` |
+
+   **Neither is a transcription slip** and neither endpoint is wrong about *its own*
+   job. The resolution this client takes: **each field comes from the endpoint whose
+   job it is, and the two are never reconciled.** `/`'s top-bar flame reads
+   `StreakSummary.currentStreak`; `/`'s panel status reads
+   `TodayReading.isFullyCompleted`. Nothing sums them, prefers one, or cross-checks
+   them — so **when the backend fixes the disagreement, no client line changes.**
+   Reconciling (max, "completed if either says completed") is the one answer that
+   is ruled out: it invents a number the server never sent.
+
+   The gate is `test/features/home/presentation/pages/home_page_test.dart`, which
+   builds both fakes with deliberately contradictory numbers and asserts each
+   surface shows its own. `next_milestone: 3` and `days_to_milestone: 3` are carried
+   on `StreakSummary` for Phase 8's `StreakPill` and read by nothing in Phase 6;
+   `home_page_test.dart` asserts neither reaches the screen.
+
+9. **`text_clean` is AR-only, and it is *absent* rather than null.** Repeated here
+   beside trap 2 because Phase 6 acted on it: `GET /readings/today/en` has no
+   `text_clean` key on its verses at all, and `GET /readings/today/ar` has one on
+   every verse. A preview is a *display* string, so the mapper takes `text_clean`
+   when the key **exists and carries something** and `text` otherwise. The visible
+   consequence is that the Arabic preview is diacritic-stripped and the English one
+   is not — which is a difference, not a defect, and `today_reading_panel.dart`
+   records it.
+
 ---
 
 ## 6. TDD protocol
@@ -809,6 +843,619 @@ there is worse than one in a comment.
 Fix the doc or delete the claim — never leave a forward reference that has stopped
 being true, because a reader cannot tell it apart from one that still holds. That is
 the same rule as §9's "no report without `file:line`", applied to comments.
+
+### Recorded decisions — Phase 6 review
+
+**22. THE BACKEND'S TWO TRUTHS ABOUT TODAY ARE BOTH SHOWN, AND NEITHER IS
+CORRECTED.** §5 trap 8 is the measurement; the decision is what to do with it.
+**Each field comes from the endpoint whose job it is, and the two are never
+reconciled.** Three alternatives were rejected:
+
+- **Prefer the reading endpoint's streak (`4`).** It agrees with the reading the
+  reader is looking at, which is what makes it tempting. It is also a choice made
+  *in the client* about a disagreement the *server* owns, and it would silently
+  change every number the top bar draws the moment either endpoint is corrected.
+- **Prefer the streak endpoint's (`0`).** Same objection, and worse: it is the
+  endpoint whose entire job is the streak, so preferring it here means `/` reads the
+  summary and ignores the reading it is named for.
+- **Reconcile** — take the max, or "completed if either says completed". Strictly
+  the worst. It invents a third source of truth that matches neither response, so a
+  reader sees a number the server has never sent and the client cannot be debugged
+  from the wire.
+
+The property that makes "neither" the right answer is that it is also the
+**cheapest**: a backend fix changes the response, not this client. The test that
+holds it is a **widget** test with contradictory fakes, not an entity test —
+`home_bloc_test.dart` asserts the numbers survived the bloc, and
+`home_page_test.dart` asserts each *surface* shows its own. An entity test alone
+would only be asserting `props`.
+
+**23. THE TWO DIO ADAPTERS AND THEIR PORTS EXIST NOW, AND PHASE 7 WIDENS THEM
+RATHER THAN CREATING A SECOND PAIR.** `07-file-map.md` §7 puts
+`DioReadingRepository` and `SettingsRepository` in `reading/data/` and
+`FakeAuthRepository` in `auth/data/` — and **names no streak adapter at all**.
+`08-build-phases.md` §Phase 6 requires live data through both ports while §Phase 7
+claims it owns "the remote data source (`GET /readings/today/{lang}`) and its
+mapper". Both cannot be true of the same file.
+
+Resolution: `features/reading/data/` is created **now** with the two data sources,
+the two mappers and `DioReadingRepository` + `DioStreakRepository`, projecting the
+narrow shape `/` needs; Phase 7 **widens** the same classes. Two ports over one
+endpoint — one wide for `/reading`, one narrow for `/` — were rejected: two
+repositories, two data sources and two mappers for one request, and the file map's
+adapter inventory growing from three to four. A `features/shared/data/` was
+rejected because `shared` is not a feature, so Gate 2 has no rule about it, and a
+directory whose only content is "the adapters two features share" is the shared
+kernel with none of §3's placement test behind it.
+
+**The file map's adapter list is now stale and says so where a reader will look.**
+`injection_test.dart`'s registration inventory spells out all eighteen entries, so
+the file a reviewer reads to learn what the graph contains is correct even though
+`docs/plans/` is not — §8.6 gives `docs/plans/` a dedicated owner and this file
+records the correction instead.
+
+**24. `ReadingLanguage` SPLITS ONE LOOKUP INTO TWO, BECAUSE THE SAME FUNCTION IS
+NEEDED IN TWO PLACES WITH OPPOSITE REQUIREMENTS.** `fromCode(String)` is the **wire**
+direction and returns `null` for anything it does not know, because a mapper that
+guessed `english` for an unrecognised `language` would build an entity that claims
+to be English scripture and is not. `forLocale(String)` is the **locale** direction
+and defaults to English, following `LoginStrings.of`'s existing rule, because
+`app.dart` declares exactly two `supportedLocales` and `MaterialApp` resolves an
+unlisted one before a screen ever reads it.
+
+The task as dispatched specified a single
+`ReadingLanguage.fromCode(Localizations.localeOf(context).languageCode)` for both.
+One function cannot do both jobs: a non-nullable `fromCode` forces the mapper to
+guess, and the guess is the failure mode the nullable version exists to prevent.
+The two names make the two contracts say which is which.
+
+**The locale lives on the EVENT, not on the bloc.** `HomeStarted(language)` and
+`HomeRetried(language)` carry it. A constructor parameter cannot work: the bloc is
+hand-registered once for the process, so a language fixed at construction would be
+the language at *launch* for the rest of the run. A private nullable field with a
+`!` at the retry site is the third option, and it trades a read for a field that can
+be empty.
+
+**25. THE `home` FEATURE REUSES `AuthRepository` TO GET A NAME, AND THEREFORE
+DECLARES ITS OWN `GetReaderSession`.** `HomeScreen.tsx:27` renders `Miriam` and
+`ds.tsx:516` renders `MK`; there is no user endpoint and the profile screen is cut,
+so those two literals are the prototype's only "who is this". `AuthSession` already
+carries `displayName: 'David Mina'` and `initials: 'DM'`, and `/` reads them through
+the **port** — which is legal precisely because the port lives in `core/domain/`.
+
+`features/home` may not import `features/auth`, so `GetCurrentSession` is declared
+again on this side of the boundary over the same port. That duplication is the
+accepted price of §3, not an oversight; promoting the use case to
+`core/domain/usecase/` was weighed and not taken, because §3 says
+`features/<f>/domain/` holds *this feature's own use cases* and applies the same
+placement test that put the port in the shared kernel. `injection_test.dart` asserts
+in the failing direction that `lib/features/home/` has **no** import of either
+`features/reading/` or `features/auth/`.
+
+**26. THE SESSION HAS NO ERROR SURFACE ON `/`, AND THE BRANCH IS STILL TESTED.**
+`AuthRepository.getCurrentSession` answering `Failure` is **unreachable in
+production**: `/` is behind `AuthGuard`, which reads `AuthStatus`, which reads
+`AuthBloc.state` — the same repository. So the failure arm produces **no name** and
+the greeting falls back to the prototype's `…evening.` split. `AuthBloc`'s
+`_onSignedOut` takes the same position on the same reasoning.
+
+A test reaches it where production cannot, because a test is one of the two places
+an unreachable branch can be reached from — and "no test reaches it" is not the same
+claim as "nothing reaches it".
+
+**27. THE PROGRESS BEADS COUNT QUESTIONS, AND THE CLAMP IS CURRENTLY
+UNOBSERVABLE — both stated rather than one.** `HomeScreen.tsx:65` is
+`<ProgressBeads total={5} completed={2} current={2} />`, which describes *passage*
+progress across the four-card library grid §2 decision 1 cut. The live reading
+carries **one** reflection question, so the row counts
+`TodayReading.questionCount` / `answeredQuestionCount`, and `current` is
+`firstUnansweredQuestionIndex(answered, total)`.
+
+The clamp to `total - 1` when everything is answered **changes no rendered state
+today**, and that was measured rather than assumed: `beadStateAt`'s rule is
+`done = i < completed; curr = i === current && !done`, so with
+`completed == total` every bead is `done` whichever index is passed as `current`.
+The first version of the doc claimed the clamp keeps a bead reading as "current"
+when the reading is finished. **It does not**, and the claim was deleted rather
+than reworded. The clamp is kept because `ProgressBeads` *deliberately does not
+clamp `current`* — its own doc says so — so an out-of-range value is the one input
+that widget lets through, harmless only because `beadStates` compares
+`i === current` for an `i` it generated itself. That is a forward-looking argument
+and it is labelled as such. `question_progress_test.dart` asserts the equivalence,
+so the day it stops being an equivalence the doc is there to be corrected.
+
+**28. A `0 / 0` BEAD ROW RENDERS A LINE, AND THAT IS THE ANSWER, NOT AN ACCIDENT.**
+`ProgressBeads` clamps `total` to `0` and returns `SizedBox.shrink()`. A reading with
+no questions would therefore render *nothing* between the reference and the two
+buttons — a gap indistinguishable from a layout failure, next to a live control,
+with nothing saying which it is. `TodayReadingPanel` renders
+`HomeStrings.noQuestionsToday` in that slot at the same ink the row's label would
+have had, so the row's absence always has a reason. `home_page_test.dart` asserts
+it in the failing direction.
+
+**29. THE DROP CAP IS LATIN-ONLY, AND PHASE 7 INHERITS THE RULE.**
+`HomeScreen.tsx:55-58` splits a literal `I` off `"n the beginning…"` with a 76px
+ember `I`. The Arabic first verse begins `كَانَ`, and enlarging a joined,
+right-to-left Arabic letter to 76px breaks its connection to the word it belongs to
+and puts an accent glyph where ink should be. That is a defect rather than a
+rendering of the design, and it is the same class as defect #2 ("Arabic never uses
+the mono family"), which Phase 7 owns in the sanctuary. So `PassageDropCap` is used
+for the Latin arm only and the Arabic preview is rendered whole — the rule is
+recorded next to the use so Phase 7 does not re-derive it from the prototype.
+
+The branch is on `TodayReading.language` and **not** on "does the text look Latin":
+the corpus is the decision (NKJV is Latin, Smith & Van Dyck is Arabic) and the
+*language* is the fact the server sent. A shape test would break on a verse opening
+with a numeral or a bracket, which §5's live payload does — verse 3 opens
+`Jesus answered …`, and a future one could open `‹Verily,`.
+
+**30. THE PREVIEW COMES FROM `firstVerseText` AND IS CUT ON A WORD BOUNDARY.**
+`preview_text.dart` is a pure function for §6's reason, and its three decisions are a
+budget (56, the prototype's own preview length), a boundary (back up to the last
+space in the final fifth) and one character (`…`, U+2026 — the prototype's own glyph,
+and §5's payloads contain real ones inside quoted scripture).
+
+**31. THE AVATAR IS 32 PAINTED INSIDE A 44 BOX, AND THAT IS THE ONE DELIBERATE §14
+DIVERGENCE FROM THE PROTOTYPE.** `ds.tsx:517` is `width: 32, height: 32`. The painted
+circle is exactly that; the **tap and focus box** around it is 44, because
+`IconActionButton`'s default and `iOSTapTargetGuideline`'s minimum are both 44 and a
+32px target is below what a finger reliably hits. The extra 12 pixels are a
+transparent box, so the bar draws what the prototype draws — **the cost is that the
+bar's row is 44 tall rather than 32**, because a row is as tall as its tallest
+child, and that one number is the whole divergence.
+
+**The avatar's gradient is NOT the prototype's, and that is a recorded
+substitution.** `ds.tsx:517-521` fills it with `rgba('#14B8A6', .5)` →
+`rgba('#3B5BDB', .5)` and rims it with the same teal. **Neither hue is a token** —
+`03-design-system.md` §5.1 publishes fourteen — and `no_colour_literals_test.dart`
+refuses every colour in `lib/` that does not resolve through `EvaColors`. So the
+badge is the **ink** ramp at two alphas with a `canvas` monogram, which is the
+highest-contrast pairing both palettes offer and is what the prototype was reaching
+for with a white monogram on a dark badge; the rim is `ember` at 35%, because the
+prototype's rim is a hue separating badge from bar and `ember` is §5.1's only
+accent.
+
+**32. THE AVATAR IS RENDERED AND DISABLED, WITH THE REASON IN ITS NAME.** The
+prototype navigates to `profile` and §2 decision 1 **cut** it, so there is no
+destination. `/settings` is the nearest live route and using it would be a product
+decision this phase may not make. So `AppTopBar.onAvatarTap` is **required and
+nullable** — required so a hard-coded value cannot be reintroduced where one used to
+be, nullable because there is nothing to call — and `HomePage` passes `null`. The
+accessible name carries `HomeStrings.unavailableSuffix`, for `LoginPage`'s recorded
+reason: a reader must be told *why* a control cannot be pressed.
+
+This is **visible product debt** and it is stated as such: `/` ships one permanently
+inert control, and the fix is one argument at one call site.
+
+**33. `AppTopBar` HAS NO DEFAULTS AT ALL — AND REQUIREDNESS IS **NOT** THE
+WHOLE OF DEFECT #11.** `ds.tsx:508,525,516` hard-code `Evangelion`, `MK` and `12`.
+Every value is a **required named parameter** — including the wordmark, which is a
+product name, because a hard-coded value and a passed-in value are identical in a
+diff and only one of them can be wrong. Three more parameters exist because §14
+requires them and a feature widget cannot invent them: `streakSemanticLabel`,
+`avatarSemanticLabel` and `avatarUnavailableReason`.
+
+**CORRECTED IN PHASE 6'S REVIEW PASS. This decision previously ended "which is the
+whole of defect #11", and that half was false.** `AppTopBar.build` could render
+`Text('Evangelion')`, ignore `wordmark` entirely, and pass all 1520 tests — because
+the prototype's literal and the shipped value are **the same string**, so every
+fixture agreed with the hard-coding. Measured: `app_top_bar_test.dart` passed a
+wordmark and never asserted it was rendered, and the only two wordmark assertions in
+the phase were `find.text('Evangelion')`, which is tautological between two things
+that are supposed to disagree.
+
+**Requiredness guarantees the parameter *exists* at the call site. It guarantees
+nothing about whether `build` *reads* it**, and the earlier version of this decision
+said so in a subordinate clause while the headline claimed otherwise. The gate is one
+assertion: `app_top_bar_test.dart`'s fixture passes `wordmark: 'ZZZ-SENTINEL'` and
+asserts `find.text('ZZZ-SENTINEL')`, plus `find.text('Evangelion')` is `findsNothing`.
+That is the same discrimination the streak (fixture `4` vs prototype `12`) and the
+monogram (fixture `DM` vs prototype `MK`) get for free — applied to the one value
+whose two spellings happened to coincide.
+
+`AppTopBar` draws **no glass at all** — see decision 34.
+
+**34. ONE BLUR SITE ON `/`, NOT TWO. §13 RULE 4'S PER-SCREEN LINE WAS WRONG, AND IT
+WAS WRONG AGAINST ITS OWN INVENTORY.** The rule counts eight prototype sites and its
+per-screen line said "`/`: `.blur` on the today's-reading panel **and the top bar**".
+`ds.tsx:499-530` is `TopBar`: a `display: flex` `div` with a `padding` and a
+`zIndex` and **no `backdropFilter` in its 32 lines**. The prototype deliberately
+leaves the bar see-through so the orbs show behind it.
+
+**One** blur ships, on the panel (`HomeScreen.tsx:39`, `blur(24px)`). `AppTopBar`
+stays transparent. A `BackdropFilter` is a `saveLayer` plus a full read-back of
+everything behind it, per frame, and adding one to a surface the prototype
+deliberately leaves see-through is exactly the "improve the design" this project
+forbids.
+
+**`kGlassBlurSigma` IS 24, NOT 20, AND THE `20` WAS NEVER THE MEDIAN.** This decision
+previously said the number "stays `20` — with `PassageCard` cut, the one `20` that
+survives **is** Home's panel, so the blur that ships is the blur that panel already
+had". **All three clauses were wrong**, and the whole of `glass_surface.dart`'s doc
+repeated them:
+
+* the radii were misattributed — it named Home's panel as a `20` and the FAB button as
+  a `24`. Measured: the panel is `HomeScreen.tsx:39`'s `blur(24px)` and the FAB button
+  is `ds.tsx:561`'s `blur(20px)`. The two are swapped, and **no `20` site survives at
+  all** (`PassageCard` and `SealFAB` are both cut with the screens that used them);
+* `20` is not the median of its own list. The eight are `8, 12, 12, 16, 16, 20, 20,
+  24`; sorted, the median is **16**;
+* so "the blur that ships is the blur Home's panel had" was false: the sigma was `20`
+  against the panel's `24`.
+
+**The number is now `24`, and that is not a new value — it is the prototype's own.**
+The only reason to pick a compromise was that eight hand-written CSS radii had to
+become one widget, and **only one site blurs**, so there is nothing to compromise.
+Rejected: keeping `20` as a "recorded divergence", because the only two arguments
+available were the median and the surviving-`20`, and both are false. Rejected: an
+upper bound for performance — a `BackdropFilter` costs one `saveLayer` whatever the
+sigma, and §13.4's rule is about the *count*. The truth is recorded as the fact it
+is: the surviving sites are `8 / 12 / 12 / 16 / 24 / 24`, the shipped sigma is `24`,
+and it is Home's panel's own number.
+
+`GlassTier`'s doc named "Home's today's-reading panel and the top bar" and inherited
+the error; it is corrected there, at `kGlassBlurSigma`, and in
+`glass_blur_budget_test.dart`, whose ceiling for `lib/features/` moved from **2 to
+1** so a second site is red. `docs/plans/09-quality-gates.md` §13 rule 4's per-screen
+line is corrected in place rather than deleted, so the change is visible; the
+*inventory* above it is unchanged and was always right.
+
+**AND THE GATE'S OWN STRINGS WERE HALF-CORRECTED.** The first correction reached the
+assertion (`<= 1`) and the first failure message, and missed the test's **name** and
+the **second** failure message — both of which still said "two sites" and "Home's top
+bar may blur". A gate was tripped deliberately to read the output, and the message a
+developer reads when planting a blur in a design-system primitive named a precedent
+that does not exist. **A correction to a gate has to reach every string the gate can
+print.**
+
+**The previous turn's statement that Home owns two blur sites was wrong, and it was
+wrong by repeating the contradiction without checking it.** Phase 5 found the
+opposite lesson and recorded it: a claim about a file that is easy to check is a
+claim that has to be checked.
+
+**35. `HomePage` LOADS ITSELF, FOR A PASSED-IN BLOC TOO.** `LoginPage` dispatches
+`AuthStarted` only on the locator path, which is defensible there —
+`AuthStarted` is idempotent against an in-memory fake and the caller owns the bloc.
+`HomePage` dispatches `HomeStarted` unconditionally, because the alternative was
+measured twice: a widget test has to send the event itself before every assertion
+(the first run of `home_page_test.dart` found nothing on screen in **eight** tests
+for exactly that reason), and the page then behaves differently depending on where
+its bloc came from.
+
+And `HomeStarted` goes out from **`didChangeDependencies`**, not `initState`:
+`Localizations.localeOf` is an inherited-widget lookup and Flutter forbids those in
+`initState`. The first version dispatched from `initState` and four router suites
+went red on landing `/` with
+"`dependOnInheritedWidgetOfExactType<_LocalizationsScope>()` … was called before
+`_HomeBodyState.initState()` completed". A `_started` flag keeps it to once.
+
+**36. `FakeAuthRepository` MOVED OUT OF `datasources/`, AND IT WAS A PHASE 5
+STRUCTURAL DEFECT FOUND IN PHASE 6.** It was at
+`lib/features/auth/data/datasources/repositories/` — a repository implementation
+nested inside `datasources/`, and a **second** `repositories` directory in a tree
+that already has one three levels up. `AGENTS.md`'s layout lists "data sources,
+repository impls" as siblings; a repository does not touch a socket, a file or a
+store, it orchestrates a data source, and `auth_module.dart` registers it beside the
+use cases rather than beside `AuthLocalDataSource`. It is now at
+`lib/features/auth/data/repositories/`, and Phase 6 is what found it: adding a
+second adapter made "which `repositories`?" a real question with no rule to answer
+it.
+
+**37. A NEVER-COMPLETING `Future` IN A `testWidgets` FIXTURE HANGS THE TEST, AND IT
+COST FOUR SUITES AT FIVE MINUTES EACH.** `test/support/app_harness.dart`'s first
+`HomeBloc` fakes answered by `await Completer<void>().future` — never completed. The
+test bodies **finished**; the suite did not. The signature is `test did not
+complete` after the full timeout, with `Bad state: Cannot close sink while adding
+stream` as the only output, which names neither the fixture nor the cause.
+
+Both fakes now answer a synchronous `Result.failure`, which is the same observable
+state with none of it. `login_page_test.dart` records the related and much more
+common trap — a bloc built in `setUp` does not deliver its events into the zone
+`tester.pump()` drains.
+
+**38. `ensureSemantics` MUST BE DISPOSED IN THE TEST BODY, NOT IN `addTearDown`.**
+§14's correction says the handle "must be disposed to avoid leaking across tests",
+and it is right — but Flutter 3.47.4's `testWidgets` already holds one of its own
+and `_endOfTestVerifications` compares the live handle count against the count
+recorded *before* the framework took its own. An `addTearDown` disposal runs after
+that comparison, so §14's pattern **verbatim** fails with "A SemanticsHandle was
+active at the end of the test". Measured: eight tests, eight failures, on
+`home_accessibility_test.dart`'s first run. `login_accessibility_test.dart` records
+the same and `focus_ring_gate_test.dart` carries the negative control.
+
+**39. `/` CARRIES FOUR GROUPS OF FIELDS NOBODY READS, AND THE SUITE PROVES NONE OF
+THEM IS ALREADY ON SCREEN.** `TodayReading.translation`,
+`TodayReading.pointsEarnedToday`, `TodayReading.readingId` / `groupId` and
+`StreakSummary.nextMilestone` / `days_to_milestone` are on the payloads and off the
+screen.
+
+`nextMilestone` / `days_to_milestone` are recorded in §5 as **Phase 8's `StreakPill`
+input** and carried now for the measured reason: the values are recorded, the
+payload carries them today, and discarding them would mean a second request to draw
+a pill this object could already hold. That is §3's placement rule pushed the other
+way, and it is recorded rather than bent quietly. `home_page_test.dart` asserts that
+no milestone text, no points figure and no translation name reaches the screen, so a
+future phase cannot find them already drawn.
+
+**40. A WIDGET HANDED A `String` MUST NOT THROW ON ANY `String`, AND AN EMPTY VERSE
+IS NOT THE MAPPER'S TO REFUSE.** `TodayReadingPanel._Preview` built its drop cap with
+`preview.substring(0, 1)`, and `previewText('')` is `''` — so one verse with no text
+threw `RangeError (end): Only valid value is 0: 1` **out of
+`TodayReadingPanel.build`**. The panel's two controls are that same widget's children,
+so the exception took **`Continue` → `/reading` and `Start reflection` → `/quiz`** with
+it: the reading route became unreachable from `/`, and nothing caught it because no
+fixture had ever had an empty verse.
+
+The false half is the interesting half. `today_reading_mapper.dart` asserted the
+opposite in prose — *"neither falls through to `''`, because an empty preview renders
+an empty paragraph in the panel"* — and it **did** fall through, and the panel rendered
+a thrown exception instead of an empty paragraph. **A doc claim contradicted by the file
+it lives in, three directories away, through 1520 green tests.**
+
+The division of labour, which is the part worth keeping: **the mapper says what the
+payload means, the widget says it renders whatever it is handed.** Neither guesses for
+the other.
+
+*Rejected: refuse `text: ''` in the mapper.* It is the obvious repair and it is wrong.
+The verse text is the one field a reader cannot be shown without; everything else in
+that payload is a label *over* content. A payload missing its label should cost the
+label, not the passage — refusing would turn one cosmetic upstream defect into "the
+reader cannot open today's reading at all", which is strictly worse than an empty
+paragraph and a reachable `Continue`. *Rejected: a `PreviewText` sentinel.* It would
+have made `previewText` total by moving the problem one layer up, and the layer up is
+pure domain logic with no rendering to protect.
+
+Witnesses, and **both are needed** — a fix to only one half leaves the other untested,
+which is how the two halves drifted apart in the first place:
+`today_reading_mapper_test.dart`'s `text: ''` MAPS, deliberately, and
+`home_page_test.dart`'s `an empty first verse still renders BOTH controls, because it
+cannot throw` — which asserts `Continue` **and** `Start reflection` are still there,
+because those two labels are the whole content of the finding.
+
+**41. `/` RE-LOADS ON **RE-ENTRY**, AND THE TRIGGER NEEDED A `NavigatorObserver` THAT
+THE ROUTER DID NOT INSTALL.** `_HomeBodyState._started` was a `bool`, set once per
+`State` and never reset. Measured with the real router: land on `/`, tap Continue →
+`/reading`, `pop` — `readings=1 streaks=1` on entry **and** after returning.
+`HomePage`'s element is retained under a pushed route, so `_HomeBodyState` survived.
+The reader finishes a reflection on `/quiz`, comes back, and the flame still reads the
+number they had before finishing it; there is no pull-to-refresh and no other
+invalidation, so this was the whole refresh story.
+
+**The missing wiring was the finding.** `RootStackRouter.config()`'s own default for
+`navigatorObservers` is `AutoRouterDelegate.defaultNavigatorObserversBuilder`, which
+returns `const []` — so this app installed **no `NavigatorObserver` at all**, and
+`AutoRouteAwareStateMixin`'s
+`_observer = RouterScope.of(context).firstObserverOfType<AutoRouteObserver>()`
+followed by `if (_observer != null)` turned the whole mechanism into a **silent
+no-op**. `null` is not an error there; it is the absence of one, which is why nothing
+in the tree ever went red. `AppRouter` now overrides `config()` and installs one
+`AutoRouteObserver`.
+
+*Rejected: `AutoRouteAwareStateMixin`, which is the obvious spelling.* Its
+`didChangeDependencies` calls `RouterScope.of(context)` **unguarded**, and that asserts
+— it throws — when the context is not under a `RouterScope`. `pumpHome` mounts
+`HomePage` over a bare `MaterialApp`, so the mixin turned every non-router suite in the
+feature red on the first pump. `_subscribeToRoute` is the same mechanism with the lookup
+as `findAncestorWidgetOfExactType<RouterScope>()`, which returns `null` instead of
+throwing — and "no router, no re-entry" is the *correct* behaviour for a page mounted
+bare in a widget test. *Rejected: passing `navigatorObservers` at the two `config()`
+call sites.* A parameter passed at a call site is one a future call site forgets, and the
+whole defect was a default nobody overrode.
+
+**And `_requested` is a `ReadingLanguage`, not a `bool`.** A `bool` cannot say *which*
+arm of the corpus was asked for, and `didChangeDependencies` also fires on a **locale**
+change — which Phase 9's real switch will cause. With the flag, a locale change left
+`/` rendering Arabic strings over English scripture. One field, both triggers.
+
+The re-entry assertion is a **real push and a real pop** in
+`home_navigation_test.dart`, and it asserts the **new** answer on screen (`7`,
+`John 4:1-14`) after re-stubbing the fakes *while `/` was covered*, with the
+first-landing values asserted beforehand so the pair cannot pass by never having been
+shown. Its control — `a REBUILD still asks for nothing` — is what stops "re-fetch on
+re-entry" and "re-fetch every frame" being the same green test. **The test it
+replaced, `'loads once, on entry, and not again on rebuild'`, asserted `calls == 1`
+after extra `pump()`s: a rebuild is not a re-entry, the extra pumps did not even rebuild
+`_HomeBody`, and the file that could not express the bug was the file that certified
+the fix. It was deleted, not fixed.**
+
+**42. A SIGN-OUT CLEARS `/`'S STATE, AND THE SEAM LIVES IN THE COMPOSITION ROOT.**
+`HomeBloc` is a `registerSingleton`, so between sign-out and process death it held a
+reader's `displayName`, monogram, today's `reading` and their `streak`, and **nothing
+took them out**: `AuthBloc._onSignedOut` emits and stops. That is not only hygiene —
+`/` is the screen a *second* signed-in reader lands on, and `HomeStarted`'s first emit
+(`withGreetingPeriod`, which copies every other field verbatim) carries the previous
+reader's name forward.
+
+`AuthBloc` **cannot** dispatch `HomeCleared`: it is in `features/auth` and the event is
+in `features/home`, which is Gate 2 — the same wall `navigation_injection.dart`'s
+`HomeBloc` section already spent a paragraph on. The reverse is closed too. `lib/app/`
+is the one directory Gate 2 exempts (decision 16) and `configureNavigation()` already
+holds **both** blocs, so the seam is one listener there.
+
+*Rejected: clear on the page's departure.* It drops the data the screen is about to
+re-request, showing a spinner for a frame it created, and it does nothing for a process
+that signs out while `/` is **not on screen** — which is the case that actually leaks,
+since a route-driven clear only runs while the route is alive.
+
+**The listener fires on `status == AuthSessionStatus.signedOut`, not on `!isSignedIn`,
+and the opposite-direction test is why.** `AuthSessionStatus` has four values, so
+`!isSignedIn` is *also* true of `signingIn` — which `AuthSubmitted` emits on its way to
+`signedIn`. The first version therefore cleared `/` **in the middle of every successful
+sign-in**, blanking it three emits before the greeting resolved. The test asserting
+`a sign-IN does not` is what caught it, which is the argument for writing both
+directions of any new listener.
+
+**43. THE SCRIPTURE **BODY** BRANCHES ON LANGUAGE, AND THE WIDGET THAT CITED THE
+DEFECT WAS THE ONE BREAKING IT.** `today_reading_panel.dart` cites defect #2 —
+"Arabic never uses the mono family" — as the reason it branches on `reading.language`
+at all, and then built **one** `TextStyle` from `EvaTypography.scriptureLatin` for both
+arms, 200 lines below that sentence. Only the drop cap branched. Measured on an `ar`
+screen: the families in the tree were `{CormorantGaramond, SpaceMono, DMSans,
+EBGaramond}` — **`Amiri` absent** — and `EvaTypography.scriptureArabic` was named by
+nothing in `lib/` except its own definition and doc. Decision 29 repeated the citation
+without noticing the body did not honour it.
+
+Swapping `scriptureLatin` for `scriptureArabic` **unconditionally passed all 1520
+tests**, which is the sharper half: neither direction was watched, and grepping the four
+`/` suites plus `app_top_bar_test.dart` for `fontFamily` returned zero hits. Branches
+that nothing reads are decoration.
+
+`home_page_test.dart` now reads the **rendered** style's `fontFamily` in **both** arms —
+the `WidgetSpan`-first paragraph's second `TextSpan` on the Latin arm, and the whole
+`Text` on the Arabic arm — and asserts the token **and** the literal family name
+(`EBGaramond` / `Amiri`) **and** that the arms are not each other. Asserting
+`EvaTypography.scriptureFamily` alone would tie the test to the token rather than to the
+rendering, so the literal string is there as the thing the engine actually receives.
+*Rejected: a source grep for `scriptureArabic`.* It would watch that the call exists
+and not that the right arm calls it.
+
+**44. `withSection`'s INDEPENDENCE IS A DESIGN PROPERTY AND IT HAD **ONE** WITNESS, IN A
+TEST NAMED FOR A DIFFERENT PROPERTY.** `home_page_test.dart`'s `'the retry re-fetches
+ONLY the streak'` counted `streaks.calls == 2` and `readings.calls == 1` but never
+re-asserted that the reading was still **on screen**. Mutating `home_bloc.dart`'s
+`withSection` from `reading: nextReading == ready ? reading : null` to `reading: null`
+re-issued no request, changed no counter, blanked the panel — and produced exactly
+**one** failing test in the whole phase: `home_bloc_test.dart`'s `'withSection() with
+both parameters null is the identity'`. **Delete that one test and 1519 pass** with the
+reading unconditionally nulled on every retry.
+
+Two assertions now close both directions: `find.text('John 3:1-5')` after the *streak*
+retry, and `find.text('0')` after the *reading* retry. The general rule, which is the
+transferable part: **a call count is not a rendering.** "`Only` the streak was
+re-fetched" is a claim about the network, and the reader-visible consequence is that the
+panel is still there — and `HomeState`'s own doc argues that `withSection` rebuilds the
+whole state precisely so the untouched section comes through verbatim. A design property
+documented in three places and asserted in one is a property with one witness.
+
+**45. THE MAPPER'S SCALAR POLICY: **ONE** REFUSAL, AND IT IS A NEGATIVE NUMBER.**
+`reference: ''` and `current_streak: -5` both mapped successfully. `-5` rendered as the
+streak in the top bar, beside a sentence saying the streak is glowing or resting.
+
+The line between **refused as impossible** and **passed through as "the server said so"**
+is one question: *would this client render the value as something a reader would read as
+a fact about their own reading?* Nothing else decides it — not "is it empty", not "is
+it big". Refused: a non-list or empty `verses`, a non-object `verses[0]`, an unknown
+`language`, and a **negative `current_streak`**. Passed through: `reading_id`,
+`group_id`, `scheduled_date`, `translation`, an **empty `reference`**, a large positive
+`current_streak`, and a **negative** `pointsEarnedToday`.
+
+*Rejected: refuse every empty string.* Wrong twice over — it refuses `reference: ''` and
+makes today's reading unreachable over a missing label (decision 40's argument), and it
+makes `current_streak: 0` a failure, which is **exactly the value the live payload
+carries on every cold launch**. *Rejected: an upper bound on `current_streak`.* This
+client has seen none, and a bound is a claim about a payload it has not seen — the same
+argument the class doc makes against *defaults*, applied symmetrically. What makes that
+defensible is **layout, and the witness lives in the widget's suite**:
+`home_page_test.dart` renders a twelve-digit streak at 320px and asserts no overflow,
+because `AppTopBar` puts the wordmark in an `Expanded` with `TextOverflow.ellipsis` and
+the number is absorbed by truncating the wordmark. *Rejected: refuse negative points
+too.* It is rendered nowhere on `/`, so an impossible value there is inert rather than
+loud; the asymmetry is recorded rather than smoothed over, because smoothing it is how
+this table began as two unstated habits.
+
+**46. THE STREAK ROW IS **RESERVED**, NOT REMOVED, AND THE RESERVATION IS AN EMPTY
+`Text` BECAUSE IT WAS MEASURED.** `home_page.dart` gated the subtitle on
+`if (state.streak case …)`, so it vanished while loading and again on a streak failure,
+taking `EvaSpacing.xxl` with it and moving the panel up a line mid-screen —
+`TodayReadingPanel`'s `_FailedOrLoading.placeholderHeight` exists for exactly that class
+of jump, 140 lines away and about a different widget.
+
+Measured, because the whole question is whether an empty paragraph reserves its line:
+**`Text('')` at `bodyMedium` is 20.0 tall and 0.0 wide**, the same 20.0 as a non-empty
+one. So one `Text` covers both non-ready states and the reserved height cannot drift
+from the text's. *Rejected: `SizedBox`.* It satisfies the same measurement and is wrong —
+its height would be a second copy of `fontSize × height` that does not move with the
+reader's text scale, which §14's 1.22× requirement would then expose. The empty `Text`
+moves because it *is* the text, and `and the reserved row grows with the reader's text
+scale` is the assertion that rules the `SizedBox` out.
+
+*Rejected: a "streak unavailable" sentence.* Invented copy for a state the prototype
+never designed — the same refusal as `_Beads`'s `noQuestionsToday`, which earns its
+place by *having* a string. The gap is covered; the silence is not.
+
+**Loading and failure are the same render** — one branch on `streak == null`, one
+witness. The loading state is in any case **not reachable from a page-level widget
+test**: both fakes answer in a microtask and even a bare `tester.pumpWidget` with no
+`pumpFrames` drains enough of the queue for all three emits to have landed. The only
+ways to hold the request open are a `Completer` the fake waits on, and decision 37 is
+that this **hangs the suite**. Left unwitnessed here and `home_bloc_test.dart`'s to own.
+
+**47. "NO NAME CONSTANT IN `features/home/`" HAD NO GATE, AND THE GATE MECHANISM WAS
+ALREADY BUILT ONE FILE OVER.** The rendered value was pinned — `find.text('Miriam')` and
+`find.text('MK')` are `findsNothing`, so a *live* hard-coded name is 2 failures. What
+nothing pinned was the **constant**: adding
+`const String kUnusedReaderName = 'Miriam';` and
+`const String kUnusedMonogram = 'MK';` to `home_page.dart` passed all 1520 tests. A
+**private** unused constant is caught incidentally, by the analyzer's `unused_element`; a
+**public** one is caught by nothing, and one edit makes it live.
+
+What existed instead was two narrower things: `home_strings_test.dart` checked
+`HomeStrings` declares no *field* named `name`/`displayName`/`userName`/`greeting`, and
+scanned **only `home_strings.dart`**, only for numeric literals.
+
+The scan now walks `lib/features/home/` line by line — **which is `injection_test.dart`'s
+loop, in the same shape, built one file over and not reused.** It is not extracted into a
+shared helper because it asserts a different thing over a different root and neither
+copy is long; what is reused is the *decision* to walk executable lines of a directory
+rather than inspect a widget tree, which is the part that was missing. Matching on
+**literals** rather than identifiers is what makes it total: a constant, a parameter
+default and a `switch` arm all contain `'Miriam'`. Doc comments are skipped, because this
+decision and `home_page.dart`'s table *name* the literals in order to forbid them.
+
+**`injection_test.dart`'s own import scan widened with it.** It refused
+`features/reading/` and `features/auth/` by name, so `settings/`, `quiz/` and `result/`
+would have passed; it is now anchored on the import path and applied to every feature
+directory, with an anti-vacuity assertion on the directory set. That is defence in depth
+— `verify_purity.sh`'s Gate 2 remains the authority — but a violation caught with the
+analyzer running and no shell script is a different failure mode from the gate's.
+
+**48. `HomeEvent.props` IS THE ONE UNCOVERED LINE IN THE PHASE, AND IT IS UNCOVERED
+BECAUSE IT IS UNREACHABLE.** It was found by running coverage, and no rationale was
+recorded anywhere.
+
+`HomeEvent` is `sealed` and **every subclass overrides `props`** — `HomeStarted` and
+`HomeRetried` each return `<Object?>[language]`, and `HomeCleared` returns `const []`
+because every clear is the same request. So no instance of the base ever reaches its
+getter and it is dead code by construction rather than by omission. `const []` is the
+honest answer: it says "no subclass has told me what makes it distinct", which is true,
+and returning anything else would be a lie.
+
+Left **without** an `// ignore:` on purpose, because this repository has zero of them by
+policy and an ignore would suppress the only signal this line can give — that a fourth
+subclass arrived without `props`, which is the classic Equatable mistake where every
+event becomes equal and `bloc.add` swallows the duplicate. `home_bloc_test.dart` pins all
+three events' equality in the failing direction, so the subclass that drops `props` is
+red immediately. *Rejected: making `HomeEvent` abstract and dropping the getter.* It
+removes the Equatable contract from the base and leaves each subclass to remember it
+alone.
+
+**`HomeCleared.props` IS UNCOVERED FOR THE SAME REASON, AND IT COST A DELETED
+ASSERTION TO LEARN SO.** The obvious test — "two `HomeCleared`s are equal" — **cannot be
+written without proving nothing**: Dart canonicalises a `const` object, so
+`expect(const HomeCleared(), const HomeCleared())` compares one instance with itself,
+`Equatable.==` returns on `identical`, and `props` is never read. Building two
+**non-const** instances does read it, and `prefer_const_constructors` fires on every
+spelling of that because the constructor is `const` and no argument could vary. The
+remaining escape is an `// ignore:`, and this repository uses none.
+
+So the assertion was **deleted rather than suppressed**, which is the ninth time that
+trade has been made here and the first time the *test itself* was the thing that had to
+go. The coverage gap is recorded here instead, which is strictly more than the assertion
+was worth: it said `const [] == const []` and this says **why the getter is unreachable
+and which subclass to watch for**. The behaviour that would actually matter is asserted
+where it is observable — `HomeCleared and it is idempotent, because sign-out can arrive
+twice` — because `HomeState`'s equality is what suppresses a duplicate emit, and that
+one *is* exercised.
+
+The same shape covers `home_page.dart`'s three remaining uncovered lines:
+`didPop`, `didInitTabRoute` and `didChangeTabRoute` are the empty bodies auto_route 11's
+`AutoRouteAware` requires. `didInitTabRoute` / `didChangeTabRoute` are **permanently**
+unreachable — none of the six routes is a tab route — and `didPop` needs a test that
+pops `/` itself, which asserts nothing a reader could observe. Three one-line interface
+members, written out rather than left unimplemented (an unimplemented one is a compile
+error today and a silent no-op the moment the package gives it a body), recorded here
+rather than suppressed.
+
 
 ## 7. Verification — run before reporting done
 

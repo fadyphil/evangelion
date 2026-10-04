@@ -3,6 +3,8 @@ import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart';
 
 // The generated `*Route` classes, and the ONLY bridge to the six features.
 //
@@ -79,6 +81,24 @@ class AppRouter extends RootStackRouter {
   /// Builds the router over the current session [authStatus] and its change
   /// signal [authChanges], positionally and in that order — the order
   /// `06-navigation.md` §8 spells for `AppRouter(this._authBloc)`.
+  ///
+  /// ## THE `AutoRouteObserver` IS NOT OPTIONAL, AND IT WAS MISSING
+  ///
+  /// `RootStackRouter`'s default `navigatorObservers` is
+  /// `AutoRouterDelegate.defaultNavigatorObserversBuilder`, which returns
+  /// `const []`. So **this router installed no `NavigatorObserver` at all**, and
+  /// anything relying on one was silently inert: `AutoRouteAwareStateMixin`'s
+  /// `didChangeDependencies` does
+  /// `_observer = RouterScope.of(context).firstObserverOfType<AutoRouteObserver>()`
+  /// and then `if (_observer != null)`. A `null` observer is not an error — it is
+  /// a no-op, which is the worst shape of defect.
+  ///
+  /// That is how `/` came to never re-load on re-entry. `AutoRouteObserver` is what
+  /// turns a `Navigator`'s push and pop into `didPushNext()` / `didPopNext()` on
+  /// the route underneath, and with none installed, no page could be told it had
+  /// been covered and uncovered. Phase 6 added the one observer the app needs;
+  /// `home_navigation_test.dart` drives a real push/pop and asserts the re-fetch,
+  /// which is the proof that it is wired rather than present.
   AppRouter(this._authStatus, this._authChanges);
 
   final AuthStatus _authStatus;
@@ -132,6 +152,63 @@ class AppRouter extends RootStackRouter {
     transitionsBuilder: EvaMotion.fadeSlide,
     duration: EvaMotion.screen,
     reverseDuration: EvaMotion.screen,
+  );
+
+  /// ## THE `AutoRouteObserver` IS NOT OPTIONAL, AND IT WAS MISSING
+  ///
+  /// `RootStackRouter.config()`'s own default for `navigatorObservers` is
+  /// `AutoRouterDelegate.defaultNavigatorObserversBuilder`, which returns
+  /// `const []`. So **this router installed no `NavigatorObserver` at all**, and
+  /// anything relying on one was silently inert: `AutoRouteAwareStateMixin`'s
+  /// `didChangeDependencies` does
+  /// `_observer = RouterScope.of(context).firstObserverOfType<AutoRouteObserver>()`
+  /// and then guards on `if (_observer != null)`. A `null` observer is not an
+  /// error there — it is a no-op, which is the worst shape of defect: the code
+  /// reads as wired and is not.
+  ///
+  /// That is how `/` came to never re-load on re-entry. `AutoRouteObserver` is what
+  /// turns the `Navigator`'s push and pop into `didPushNext()` / `didPopNext()` on
+  /// the route underneath, and with none installed no page could be told it had been
+  /// covered and uncovered.
+  ///
+  /// **Overridden rather than handed in at the two `config()` call sites**, because
+  /// the whole defect was a default nobody overrode: `app.dart` and
+  /// `test/support/app_harness.dart` both call `router.config(reevaluateListenable:
+  /// …)` and neither mentioned observers. A parameter passed at a call site is one
+  /// a future call site forgets; a default replaced here cannot be forgotten.
+  /// `home_navigation_test.dart` drives a real push/pop and asserts the re-fetch,
+  /// which is the proof that it is wired rather than merely present.
+  ///
+  /// A caller-supplied [navigatorObservers] is honoured and this one is **added**,
+  /// not substituted — an observer is additive (a `NavigatorObserver` sees events,
+  /// it does not own them), so replacing the list would silently un-subscribe
+  /// whatever the caller installed.
+  @override
+  RouterConfig<UrlState> config({
+    DeepLinkTransformer? deepLinkTransformer,
+    DeepLinkBuilder? deepLinkBuilder,
+    String? navRestorationScopeId,
+    WidgetBuilder? placeholder,
+    NavigatorObserversBuilder? navigatorObservers,
+    bool includePrefixMatches = !kIsWeb,
+    bool Function(String? location)? neglectWhen,
+    bool rebuildStackOnDeepLink = false,
+    Listenable? reevaluateListenable,
+    Clip clipBehavior = Clip.hardEdge,
+  }) => super.config(
+    deepLinkTransformer: deepLinkTransformer,
+    deepLinkBuilder: deepLinkBuilder,
+    navRestorationScopeId: navRestorationScopeId,
+    placeholder: placeholder,
+    navigatorObservers: () => <NavigatorObserver>[
+      ...?navigatorObservers?.call(),
+      AutoRouteObserver(),
+    ],
+    includePrefixMatches: includePrefixMatches,
+    neglectWhen: neglectWhen,
+    rebuildStackOnDeepLink: rebuildStackOnDeepLink,
+    reevaluateListenable: reevaluateListenable,
+    clipBehavior: clipBehavior,
   );
 
   /// The six locked routes, then the wildcard.

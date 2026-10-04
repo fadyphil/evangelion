@@ -3,19 +3,31 @@ import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/effects/neural_motion.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_light.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/repositories/reading_repository.dart';
+import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
-import 'package:evangelion/features/auth/data/datasources/repositories/fake_auth_repository.dart';
+import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
+import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
+import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
@@ -113,9 +125,18 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
 /// substitute their own `AuthStatus` and listenable and that function rejects a
 /// duplicate registration. `registerTestAuthBloc` supplies exactly the one piece
 /// they do not own, and `addTearDown`s it.
-Widget routerHost(AppRouter router) {
+Widget routerHost(AppRouter router, {Locale? locale}) {
   if (!getIt.isRegistered<AuthBloc>()) {
     registerTestAuthBloc();
+  }
+  // **The same obligation, one route over.** Phase 6 made `/` resolve its
+  // `HomeBloc` from the locator for the reason `LoginPage` resolves its `AuthBloc`:
+  // a page that created its own would have one set of repository results per mount,
+  // and a retry has to be able to replace them. So every router test that can land
+  // on `/` needs a `HomeBloc` in the graph, and the two registrations live together
+  // so a third page cannot be added without the next reader seeing this line.
+  if (!getIt.isRegistered<HomeBloc>()) {
+    registerTestHomeBloc();
   }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
@@ -131,6 +152,27 @@ Widget routerHost(AppRouter router) {
       theme: EvaThemeLight.theme,
       darkTheme: EvaThemeDark.theme,
       themeMode: ThemeMode.dark,
+      // Phase 6 needs the app's own delegate trio and locale pair, and for the same
+      // reason the theme is installed above: `HomePage` reads
+      // `Localizations.localeOf(context)` to resolve the `ReadingLanguage` the
+      // reading is requested in, and a `MaterialApp` with no
+      // `localizationsDelegates` installs no `_LocalizationsScope` at all — so
+      // `Localizations.localeOf` **throws** rather than returning a default.
+      //
+      // The pair is `app.dart`'s, not a convenient one: `supportedLocales` must list
+      // `ar` or `MaterialApp` resolves it back to `en`, which is the harness bug
+      // `login_harness.dart` already records.
+      //
+      // **`locale` is Phase 6's addition, and it is a parameter rather than a
+      // `Localizations` wrapper for a measured reason.** `MaterialApp` installs its
+      // own `_LocalizationsScope` as a **descendant** of anything wrapped around it,
+      // so a `Localizations` widget above this one is shadowed and silently
+      // ineffective — a wrapper that looks like it works and does not. With
+      // [locale] null the app resolves the platform locale, which is every existing
+      // caller's situation, so the default changes nothing for them.
+      locale: locale,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
     ),
   );
 }
@@ -277,6 +319,65 @@ AuthBloc registerTestAuthBloc() {
   addTearDown(() => getIt.unregister<AuthBloc>());
   addTearDown(bloc.close);
   return bloc;
+}
+
+/// Registers the `HomeBloc` [HomePage] resolves, and returns it.
+///
+/// The `HomeBloc` twin of [registerTestAuthBloc], over the same three fake ports,
+/// and for the same two reasons: `HomePage` resolves its bloc from the locator, and
+/// a bloc created in `setUp` does not deliver its events into the fake-async zone
+/// `tester.pump()` drains (`login_harness.dart` records the measurement).
+///
+/// Built over **fakes**, not the live adapters, and that is what keeps the router
+/// suites about the router: `HomePage` reaching `DioReadingRepository` in a widget
+/// test would either open a socket to `localhost:3000` or fail, and a suite about
+/// which route is on top would then depend on whether a backend happens to be
+/// running.
+///
+/// No `Dio`, so this file stays importable from a suite that must not pull the
+/// network stack into the graph it is asserting on.
+HomeBloc registerTestHomeBloc() {
+  final HomeBloc bloc = HomeBloc(
+    loadTodayReading: LoadTodayReading(_FakeReadingRepository()),
+    loadStreakSummary: LoadStreakSummary(_FakeStreakRepository()),
+    getReaderSession: GetReaderSession(
+      FakeAuthRepository(AuthLocalDataSource()),
+    ),
+  );
+  getIt.registerSingleton<HomeBloc>(bloc);
+  addTearDown(() => getIt.unregister<HomeBloc>());
+  addTearDown(bloc.close);
+  return bloc;
+}
+
+/// A [ReadingRepository] that answers a fixed reading.
+///
+/// Hand-written rather than a `mocktail` mock for the reason the LSP row in
+/// `home_bloc_test.dart` gives: a mock implements whatever it is told to, so it can
+/// satisfy the port and answer nothing. This one always answers, which is what
+/// `routerHost`'s callers need — they are about the route, not about the payload.
+final class _FakeReadingRepository implements ReadingRepository {
+  @override
+  Future<Result<TodayReading>> today({
+    required ReadingLanguage language,
+  }) async => const Result<TodayReading>.failure(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No reading: this harness does not open a socket.',
+    ),
+  );
+}
+
+/// The [StreakRepository] twin of [_FakeReadingRepository].
+final class _FakeStreakRepository implements StreakRepository {
+  @override
+  Future<Result<StreakSummary>> summary() async =>
+      const Result<StreakSummary>.failure(
+        Failure(
+          kind: FailureKind.network,
+          message: 'No streak: this harness does not open a socket.',
+        ),
+      );
 }
 
 /// Empties the locator, so each test starts from a clean registration set.
