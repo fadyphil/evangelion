@@ -15,8 +15,8 @@ import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
@@ -645,7 +645,7 @@ Widget _hostWithObservers(AppRouter router, List<NavigatorObserver> observers) {
       darkTheme: EvaThemeDark.theme,
       themeMode: ThemeMode.dark,
       locale: const Locale('en'),
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
     ),
   );

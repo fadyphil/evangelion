@@ -17,7 +17,7 @@
 ///
 /// `/result` takes one `SubmitResult` and derives four screens from it: correct and
 /// complete, correct and not, wrong, and the zero case. They differ in the **headline
-/// sentence** (`ResultStrings.messageFor` switches over two booleans) and in **every
+/// sentence** (`AppLocalizations.messageFor` switches over two booleans) and in **every
 /// number** — the score, the points, the streak, the longest run. A sentence is what
 /// wraps and a two-digit number is what widens, so the four are four layouts.
 ///
@@ -31,7 +31,8 @@ library;
 import 'package:evangelion/core/design_system/widgets/streak_flame.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
-import 'package:evangelion/features/result/presentation/result_strings.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,7 +43,7 @@ import '../../../../support/quiz_harness.dart';
 void main() {
   const Size surface = kNarrowSurface;
   const double scale = kEvaRequiredTextScale;
-  const ResultStrings en = ResultStrings.en();
+  final AppLocalizations en = AppLocalizationsEn();
 
   /// The four states, and the string each is identified by in this file.
   ///
@@ -187,7 +188,11 @@ void main() {
       );
 
       expect(find.byType(Scrollable), findsWidgets);
-      expect(en.completeMessage, isNotEmpty, reason: 'the arm is spelled out');
+      expect(
+        en.resultCompleteMessage,
+        isNotEmpty,
+        reason: 'the arm is spelled out',
+      );
       _expectNoOverflow(tester, screen: 'scrolling');
     });
   });

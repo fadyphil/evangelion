@@ -1,6 +1,6 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The quiz's top row: a close control, the progress beads, and a spacer.
@@ -68,7 +68,7 @@ class QuizHeader extends StatelessWidget {
   final ReadingLanguage language;
 
   /// The bilingual strings.
-  final QuizStrings strings;
+  final AppLocalizations strings;
 
   /// What the close control runs. `null` renders it disabled, as [SocialAuthButton]
   /// does.
@@ -99,8 +99,8 @@ class QuizHeader extends StatelessWidget {
           // `QuizScreen.tsx:46-50` is a `<button>` wrapping a bare `<svg>` cross
           // with **no label at all** — §14's first row, the same gap as
           // `ReadingEnScreen.tsx:14-16`, and the reason this is
-          // `QuizStrings.exit` rather than the string a reader would guess.
-          tooltip: strings.exit,
+          // `AppLocalizations.quizExit` rather than the string a reader would guess.
+          tooltip: strings.quizExit,
           // `tooltipFamily` is **required** (recorded decision 71): `IconActionButton`
           //'s `Tooltip` carries no `textStyle` of its own, so omitting this resolves
           // to `ThemeData.textTheme.bodyMedium` — measured **`DMSans`** on both
@@ -120,7 +120,7 @@ class QuizHeader extends StatelessWidget {
           // `semanticLabel` defaults to the English `'Progress'`, which would put an
           // English word in the Arabic arm's semantics tree — the same half-translated
           // string decision 78 removed from `FontSizeStepper`.
-          semanticLabel: strings.progress,
+          semanticLabel: strings.quizProgress,
         ),
         const SizedBox(width: endWidth),
       ],

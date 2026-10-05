@@ -91,7 +91,7 @@ class QuizOptionCard extends StatelessWidget {
   /// the class of defect Phase 7 caught by looking at semantics separately from
   /// pixels.
   ///
-  /// So the name is built by `QuizStrings.optionLabel`, which takes the verdict as a
+  /// So the name is built by `QuizStringsPhrases.optionLabel`, which takes the verdict as a
   /// `null`-able suffix, and `quiz_page_test.dart` asserts that **no** node carries
   /// one before a check. It is a required parameter rather than a default so that a
   /// card cannot be added without someone deciding what it says.
@@ -294,7 +294,7 @@ class QuizOptionCard extends StatelessWidget {
       child: Semantics(
         // §14's disabled row, `SocialAuthButton`'s shape: `enabled` is stated,
         // `onTap` is **absent** rather than present-and-flagged, and the name
-        // carries the reason (built by `QuizStrings.optionLabel`).
+        // carries the reason (built by `QuizStringsPhrases.optionLabel`).
         button: true,
         enabled: enabled,
         label: semanticLabel,

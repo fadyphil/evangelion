@@ -7,12 +7,13 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/reading_text_scale.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_controls.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -205,9 +206,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
 
   @override
   Widget build(BuildContext context) {
-    final ReadingStrings strings = ReadingStrings.of(
-      Localizations.localeOf(context),
-    );
+    final AppLocalizations strings = context.l10n;
     final ReadingLanguage language = _language;
 
     return BlocBuilder<ReadingCubit, ReadingState>(
@@ -224,7 +223,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
           // `questions: []` is reachable: `today_reading_mapper.dart` **skips** an
           // unreadable question rather than refusing the passage (recorded decision
           // 40), so a payload of four unreadable questions reports
-          // `questionCount == 0` — and `ReadingStrings.captionFor`'s own doc says so.
+          // `questionCount == 0` — and `readingCaptionFor`'s own description says so.
           //
           // Measured: the caption rendered `"0 questions"` / `"٠ أسئلة"` and **Begin
           // reflection was still offered**, so a reader with nothing to reflect on
@@ -267,9 +266,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
     required ReadingLanguage language,
     required ReadingState state,
   }) {
-    final ReadingStrings strings = ReadingStrings.of(
-      Localizations.localeOf(context),
-    );
+    final AppLocalizations strings = context.l10n;
     final ReadingCubit cubit = context.read<ReadingCubit>();
 
     // ## THE COMPOSED SCALER IS INSTALLED ON A **`MediaQuery`**, NOT THREADED
@@ -340,7 +337,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
     BuildContext context, {
     required ReadingLanguage language,
     required ReadingState state,
-    required ReadingStrings strings,
+    required AppLocalizations strings,
   }) => switch (state.status) {
     ReadingStatus.failed => ErrorView(
       // The failure's **message**, not a string from the table. Phase 6's precedent:
@@ -348,7 +345,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
       // inventing a sentence here would hide the field that is actually wrong.
       message: state.failure?.message ?? '',
       onRetry: () => context.read<ReadingCubit>().retry(_language),
-      retryLabel: strings.retry,
+      retryLabel: strings.readingRetry,
       // `ErrorView.retryFamily`: the label above is the string table's, and on the
       // Arabic arm it is Arabic text going into a button whose only family knob
       // this is. **`StickyCta.ctaFamilyFor`**, not a new constant and not
@@ -365,7 +362,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
       final ScriptureText passage => ScriptureBlock(
         verses: passage.verses,
         language: language,
-        strings: ReadingStrings.of(Localizations.localeOf(context)),
+        strings: context.l10n,
         // **Inside** the scrollable, so the metadata and citation travel with the
         // passage — `ReadingEnScreen.tsx:26-77` puts all four in one `overflowY:
         // 'auto'` div. A pinned header would be a different screen.

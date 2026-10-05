@@ -1,7 +1,10 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
-import 'package:evangelion/features/result/presentation/result_strings.dart';
+import 'package:evangelion/features/result/presentation/result_l10n.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -104,11 +107,11 @@ void main() {
     testWidgets(
       '"your longest yet" appears only when the reader is AT their best',
       (WidgetTester tester) async {
-        final ResultStrings strings = const ResultStrings.en();
+        final AppLocalizations strings = AppLocalizationsEn();
 
         // Behind the record.
         await pumpResult(tester, result: aSentinelResult);
-        expect(find.textContaining(strings.longestYet), findsNothing);
+        expect(find.textContaining(strings.resultLongestYet), findsNothing);
         expect(
           find.text(strings.streakLabelFor(current: 77, longest: 90)),
           findsOneWidget,
@@ -116,12 +119,12 @@ void main() {
 
         // **On** the record: `>=` is what says so.
         await pumpResult(tester, result: _withStreak(current: 90, longest: 90));
-        expect(find.textContaining(strings.longestYet), findsOneWidget);
+        expect(find.textContaining(strings.resultLongestYet), findsOneWidget);
 
         // **Ahead** of it: a reader who has just extended their run by one is the case
         // the sentence is most true of, and `==` would say nothing.
         await pumpResult(tester, result: _withStreak(current: 91, longest: 90));
-        expect(find.textContaining(strings.longestYet), findsOneWidget);
+        expect(find.textContaining(strings.resultLongestYet), findsOneWidget);
       },
     );
 
@@ -130,9 +133,9 @@ void main() {
     ) async {
       // `0 >= 0` is true, and "Day 0 — your longest yet" is a sentence about a reader
       // who has not started.
-      final ResultStrings strings = const ResultStrings.en();
+      final AppLocalizations strings = AppLocalizationsEn();
       await pumpResult(tester, result: _withStreak(current: 0, longest: 0));
-      expect(find.textContaining(strings.longestYet), findsNothing);
+      expect(find.textContaining(strings.resultLongestYet), findsNothing);
       expect(
         find.text(strings.streakLabelFor(current: 0, longest: 0)),
         findsOneWidget,
@@ -179,9 +182,12 @@ void main() {
           );
         }
         // …and the **written** two are, and there are **two** tiles, not three.
-        final ResultStrings strings = const ResultStrings.en();
-        expect(find.text(strings.thisAnswer.toUpperCase()), findsOneWidget);
-        expect(find.text(strings.bestRun.toUpperCase()), findsOneWidget);
+        final AppLocalizations strings = AppLocalizationsEn();
+        expect(
+          find.text(strings.resultThisAnswer.toUpperCase()),
+          findsOneWidget,
+        );
+        expect(find.text(strings.resultBestRun.toUpperCase()), findsOneWidget);
         expect(find.byType(StatTile), findsNWidgets(2));
       },
     );
@@ -257,21 +263,21 @@ void main() {
     testWidgets('right and finished, right and not, and wrong', (
       WidgetTester tester,
     ) async {
-      final ResultStrings strings = const ResultStrings.en();
+      final AppLocalizations strings = AppLocalizationsEn();
 
       for (final (SubmitResult, String) row in <(SubmitResult, String)>[
-        (aSentinelResult, strings.completeMessage),
-        (_withReadingCompleted(false), strings.partialMessage),
-        (contractWrongAnswerFixture, strings.incorrectMessage),
+        (aSentinelResult, strings.resultCompleteMessage),
+        (_withReadingCompleted(false), strings.resultPartialMessage),
+        (contractWrongAnswerFixture, strings.resultIncorrectMessage),
       ]) {
         await pumpResult(tester, result: row.$1);
         expect(find.text(row.$2), findsOneWidget);
         // **Only the three sentences**, not every field: `reflectAgain` is a button
         // label and is on screen in all three states.
         for (final String other in <String>[
-          strings.completeMessage,
-          strings.partialMessage,
-          strings.incorrectMessage,
+          strings.resultCompleteMessage,
+          strings.resultPartialMessage,
+          strings.resultIncorrectMessage,
         ]) {
           if (other == row.$2) continue;
           expect(
@@ -291,11 +297,11 @@ void main() {
       // **`Back`, not `Back to library`.** `ResultScreen.tsx:78` writes the latter and
       // §2 decision 1 cut the library; the destination is `/`. Transcribing the label
       // would be a lie about where the button leads.
-      final ResultStrings strings = const ResultStrings.en();
+      final AppLocalizations strings = AppLocalizationsEn();
       await pumpResult(tester, result: aSentinelResult);
 
-      expect(find.text(strings.reflectAgain), findsOneWidget);
-      expect(find.text(strings.backHome), findsOneWidget);
+      expect(find.text(strings.resultReflectAgain), findsOneWidget);
+      expect(find.text(strings.resultBackHome), findsOneWidget);
       expect(find.textContaining('library'), findsNothing);
       expect(find.byType(EvaButton), findsNWidgets(2));
     });
@@ -333,7 +339,7 @@ void main() {
     testWidgets('renders Arabic strings and Arabic-Indic numerals', (
       WidgetTester tester,
     ) async {
-      final ResultStrings strings = const ResultStrings.ar();
+      final AppLocalizations strings = AppLocalizationsAr();
       await pumpResult(
         tester,
         result: const SubmitResult(
@@ -348,7 +354,7 @@ void main() {
         locale: const Locale('ar'),
       );
 
-      expect(find.text(strings.completeMessage), findsOneWidget);
+      expect(find.text(strings.resultCompleteMessage), findsOneWidget);
       // **The pill's own sentence**, not `find.textContaining`: the flame's semantic
       // label is the same word and a `containing` search matched both nodes.
       expect(

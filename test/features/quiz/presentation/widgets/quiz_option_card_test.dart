@@ -1,10 +1,12 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -36,7 +38,7 @@ Semantics _nodeLabelled(WidgetTester tester, String label) =>
     );
 
 void main() {
-  const QuizStrings strings = QuizStrings.en();
+  final AppLocalizations strings = AppLocalizationsEn();
 
   Future<void> pumpCard(
     WidgetTester tester, {
@@ -55,7 +57,7 @@ void main() {
         theme: EvaThemeDark.theme,
         locale: const Locale('en'),
         textDirection: TextDirection.ltr,
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
         child: Center(
           child: SizedBox(
@@ -265,10 +267,10 @@ void main() {
       await pumpCard(
         tester,
         state: QuizOptionState.idle,
-        semanticLabel: 'A. Nicodemus — ${strings.alreadyAnsweredSuffix}',
+        semanticLabel: 'A. Nicodemus — ${strings.quizAlreadyAnsweredSuffix}',
       );
       expect(
-        find.bySemanticsLabel(RegExp(strings.alreadyAnsweredSuffix)),
+        find.bySemanticsLabel(RegExp(strings.quizAlreadyAnsweredSuffix)),
         findsOneWidget,
       );
       handle.dispose();
@@ -418,7 +420,7 @@ void main() {
           evaPrimitiveHarness(
             theme: EvaThemeDark.theme,
             textScale: 1.22,
-            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
             child: const Center(
               child: SizedBox(
@@ -465,9 +467,9 @@ void main() {
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-          child: const Scaffold(
+          child: Scaffold(
             body: QuizHeader(
               total: 3,
               completed: 1,
@@ -514,15 +516,15 @@ void main() {
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-          child: const Scaffold(
+          child: Scaffold(
             body: QuizHeader(
               total: 3,
               completed: 1,
               current: 1,
               language: ReadingLanguage.arabic,
-              strings: QuizStrings.ar(),
+              strings: AppLocalizationsAr(),
             ),
           ),
         ),
@@ -530,7 +532,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.bySemanticsLabel(RegExp(const QuizStrings.ar().progress)),
+        find.bySemanticsLabel(RegExp(AppLocalizationsAr().quizProgress)),
         findsOneWidget,
       );
       expect(find.bySemanticsLabel(RegExp('Progress')), findsNothing);
@@ -543,15 +545,15 @@ void main() {
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-          child: const Scaffold(
+          child: Scaffold(
             body: QuizHeader(
               total: 1,
               completed: 0,
               current: 0,
               language: ReadingLanguage.arabic,
-              strings: QuizStrings.ar(),
+              strings: AppLocalizationsAr(),
             ),
           ),
         ),
@@ -564,7 +566,7 @@ void main() {
       final IconActionButton close = tester.widget<IconActionButton>(
         find.byType(IconActionButton),
       );
-      expect(close.tooltip, const QuizStrings.ar().exit);
+      expect(close.tooltip, AppLocalizationsAr().quizExit);
       expect(close.tooltipFamily, EvaTypography.arabicFamily);
     });
   });

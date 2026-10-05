@@ -4,7 +4,8 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/domain/preview_text.dart';
 import 'package:evangelion/features/home/domain/question_progress.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 
 /// Today's reading, in the glass panel that opens the sanctuary.
@@ -53,7 +54,7 @@ import 'package:flutter/material.dart';
 /// reading with no questions would render *nothing* between the reference and the
 /// buttons — a gap indistinguishable from a layout failure, next to a button, with
 /// nothing saying which it is. The deliberate answer is
-/// [HomeStrings.noQuestionsToday] in the same slot, at the same ink, so the row's
+/// [AppLocalizations.homeNoQuestionsToday] in the same slot, at the same ink, so the row's
 /// absence always has a reason. `home_page_test.dart` asserts it.
 ///
 /// ## THE DROP CAP IS **LATIN-ONLY**, AND THAT IS NOT A TRANSLATION
@@ -150,7 +151,7 @@ class TodayReadingPanel extends StatelessWidget {
   final String? failure;
 
   /// The bilingual strings.
-  final HomeStrings strings;
+  final AppLocalizations strings;
 
   /// Runs when the reader opens the reading — the whole panel and its primary CTA.
   final VoidCallback? onOpenReading;
@@ -237,17 +238,29 @@ class TodayReadingPanel extends StatelessWidget {
       };
 
   /// The retry label's family, for [strings]. [ErrorView.retryFamily]'s reason,
-  /// applied to this call site: the label is `strings.retry`, so on the Arabic arm
+  /// applied to this call site: the label is `strings.homeRetry`, so on the Arabic arm
   /// it is Arabic text.
   ///
   /// **The strings and not a `ReadingLanguage`,** and the asymmetry is forced by the
   /// two states: the **content** state has `today.language`, and the
   /// **failed** state has no reading at all — so there is no arm on the payload to
-  /// read and `HomeStrings.isArabic` is the only thing this widget was handed that
-  /// knows. Two spellings of one question in one file would be worse than one
-  /// spelling that takes the weaker source.
-  static String retryFamilyFor(HomeStrings strings) =>
-      strings.isArabic ? EvaTypography.arabicFamily : EvaTypography.uiFamily;
+  /// read and the locale is the only thing this widget was handed that knows. Two
+  /// spellings of one question in one file would be worse than one spelling that
+  /// takes the weaker source.
+  ///
+  /// ## AND `isArabicArm` IS NOW A STRONGER SOURCE THAN THE STRINGS WERE
+  ///
+  /// This is the one caller that existed, and the reason `HomeStrings.isArabic` was
+  /// derived rather than stored. Its doc called the strings "the weaker source", and
+  /// with ARB they would have got weaker still: comparing a generated getter against
+  /// a second generated instance tests the generator, and it breaks the moment a
+  /// translator picks an Arabic value that coincides with the English one.
+  /// [AppLocalizationsArm.isArabicArm] reads the locale, which is the fact the
+  /// question actually asks — and it is the same shape as `context.l10n` resolving
+  /// the label in the first place, so the label and its family cannot come from two
+  /// different notions of "the arm".
+  static String retryFamilyFor(AppLocalizations strings) =>
+      strings.isArabicArm ? EvaTypography.arabicFamily : EvaTypography.uiFamily;
 
   @override
   Widget build(BuildContext context) {
@@ -268,11 +281,11 @@ class TodayReadingPanel extends StatelessWidget {
       // and that is also why the failed panel needs no accessible name: it is not a
       // button.
       onTap: today == null ? null : onOpenReading,
-      semanticLabel: today == null ? null : strings.todayReading,
+      semanticLabel: today == null ? null : strings.homeTodayReading,
       child: switch (today) {
         null => _FailedOrLoading(
           message: failure,
-          retryLabel: strings.retry,
+          retryLabel: strings.homeRetry,
           retryFamily: retryFamilyFor(strings),
           onRetry: onRetry,
         ),
@@ -292,8 +305,8 @@ class TodayReadingPanel extends StatelessWidget {
           // records that this field disagrees with `streak/summary.today_completed`,
           // and this widget reads **this** one because this is the reading panel.
           today.isFullyCompleted
-              ? strings.readingComplete
-              : strings.continueReading,
+              ? strings.homeReadingComplete
+              : strings.homeContinueReading,
           // `HomeScreen.tsx:44` — `F.mono 9 / 700 / letterSpacing .14em / ink3`.
           // `EvaTypography.monoCaps` is `labelMedium`'s geometry with the mono
           // family, and §5.2 gives mono no size — see `eva_typography.dart`.
@@ -338,7 +351,7 @@ class TodayReadingPanel extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: EvaButton(
-                label: strings.continueLabel,
+                label: strings.homeContinueLabel,
                 // See [continueFamilyFor]. `reading` is the arm; `strings` is not
                 // asked, because the passage already carries the answer and one
                 // source for "which arm is this" is the rule `ScriptureText`'s own
@@ -352,7 +365,7 @@ class TodayReadingPanel extends StatelessWidget {
             Expanded(
               child: Center(
                 child: TextLink(
-                  label: strings.startReflection,
+                  label: strings.homeStartReflection,
                   onPressed: onStartReflection,
                 ),
               ),
@@ -369,7 +382,7 @@ class _Preview extends StatelessWidget {
   const _Preview({required this.reading, required this.strings});
 
   final TodayReading reading;
-  final HomeStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
@@ -472,14 +485,14 @@ class _Beads extends StatelessWidget {
   const _Beads({required this.reading, required this.strings});
 
   final TodayReading reading;
-  final HomeStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
     if (reading.questionCount == 0) {
       // The deliberate answer to `0 / 0`. See the class doc.
       return Text(
-        strings.noQuestionsToday,
+        strings.homeNoQuestionsToday,
         style: EvaTypography.monoCaps(context.colors)
             .copyWith(color: context.colors.ink3),
       );
@@ -491,7 +504,7 @@ class _Beads extends StatelessWidget {
         answered: reading.answeredQuestionCount,
         total: reading.questionCount,
       ),
-      semanticLabel: strings.reflectionProgress,
+      semanticLabel: strings.homeReflectionProgress,
     );
   }
 }

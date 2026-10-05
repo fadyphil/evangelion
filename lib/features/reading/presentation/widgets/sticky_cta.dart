@@ -1,6 +1,7 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
+import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The sticky call to action, and the caption under it.
@@ -69,9 +70,9 @@ class StickyCta extends StatelessWidget {
   final ReadingLanguage language;
 
   /// The bilingual strings.
-  final ReadingStrings strings;
+  final AppLocalizations strings;
 
-  /// `ScriptureText.questionCount`, which feeds [ReadingStrings.captionFor].
+  /// `ScriptureText.questionCount`, which feeds [ReadingStringsPhrases.readingCaption].
   ///
   /// **A count and not a caption string**, so the pluralisation lives in the string
   /// table — one implementation, one place — rather than at each call site.
@@ -150,13 +151,13 @@ class StickyCta extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           EvaButton(
-            label: strings.beginReflection,
+            label: strings.readingBeginReflection,
             onPressed: onPressed,
             labelFamily: ctaFamilyFor(language),
           ),
           const SizedBox(height: captionGap),
           Text(
-            strings.captionFor(questionCount),
+            strings.readingCaption(questionCount),
             textAlign: TextAlign.center,
             style: EvaTypography.monoCaps(colors).copyWith(
               fontFamily: captionFamilyFor(language),

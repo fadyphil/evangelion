@@ -2,7 +2,7 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/drop_cap_text.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The passage, every verse, in the reader's language.
@@ -71,7 +71,7 @@ class ScriptureBlock extends StatelessWidget {
   final ReadingLanguage language;
 
   /// The bilingual strings, for the block's and each marker's accessible names.
-  final ReadingStrings strings;
+  final AppLocalizations strings;
 
   /// An optional block rendered **above the first verse, inside the same
   /// scrollable**.
@@ -283,7 +283,7 @@ class ScriptureBlock extends StatelessWidget {
             // named by its number so a reader can say "verse three" rather than
             // counting. `excludeSemantics: false` — the verse text is content, not a
             // duplicate of the label.
-            label: '${strings.verse} ${verse.number}',
+            label: '${strings.readingVerse} ${verse.number}',
             child: _verseParagraph(
               context,
               verse: verse,

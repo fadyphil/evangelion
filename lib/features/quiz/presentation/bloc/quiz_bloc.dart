@@ -341,7 +341,7 @@ final class QuizState with _$QuizState {
   /// reason" — which holds only where a second channel exists, and here the sighted
   /// reader has none.
   ///
-  /// So the visible label becomes [QuizStrings.unavailableSuffix] for (3), and stays
+  /// So the visible label becomes [AppLocalizations.quizUnavailableSuffix] for (3), and stays
   /// the prototype's for (2). That is a written string on a state the prototype does
   /// not have, which is the same trade `finish` already makes.
   ///

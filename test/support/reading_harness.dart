@@ -10,8 +10,8 @@ import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'contract_payloads.dart';
@@ -171,7 +171,7 @@ Future<void> pumpReading(
       textDirection: locale.languageCode == 'ar'
           ? TextDirection.rtl
           : TextDirection.ltr,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
       child: ReadingPage(cubit: cubit),
     ),

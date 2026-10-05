@@ -10,8 +10,8 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'contract_payloads.dart';
@@ -295,7 +295,7 @@ Future<void> pumpQuiz(
       textDirection: locale.languageCode == 'ar'
           ? TextDirection.rtl
           : TextDirection.ltr,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
       child: QuizPage(bloc: bloc),
     ),
@@ -358,7 +358,7 @@ Future<void> pumpResult(
       textDirection: locale.languageCode == 'ar'
           ? TextDirection.rtl
           : TextDirection.ltr,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
       child: ResultPage(result: result),
     ),

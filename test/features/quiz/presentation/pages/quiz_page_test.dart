@@ -55,10 +55,12 @@ import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,7 +69,7 @@ import '../../../../support/quiz_harness.dart';
 import '../../../../support/reading_harness.dart';
 
 /// The English strings, once, for the whole file.
-const QuizStrings en = QuizStrings.en();
+final AppLocalizations en = AppLocalizationsEn();
 
 /// The letter this suite taps.
 ///
@@ -213,10 +215,10 @@ void main() {
 
         // No verdict sentence. [FeedbackBanner] exists but is not on screen.
         expect(find.byType(FeedbackBanner), findsNothing);
-        expect(find.text(en.verdictCorrect), findsNothing);
-        expect(find.text(en.verdictIncorrect), findsNothing);
-        expect(find.text(en.correctSuffix), findsNothing);
-        expect(find.text(en.incorrectSuffix), findsNothing);
+        expect(find.text(en.quizVerdictCorrect), findsNothing);
+        expect(find.text(en.quizVerdictIncorrect), findsNothing);
+        expect(find.text(en.quizCorrectSuffix), findsNothing);
+        expect(find.text(en.quizIncorrectSuffix), findsNothing);
 
         // And no flecks, which are the prototype's reward animation for a correct
         // answer. Four `GoldFlecks` would be the giveaway even with the colours gone.
@@ -224,45 +226,42 @@ void main() {
       },
     );
 
-    testWidgets(
-      'nor does the SEMANTICS tree, which is the half a screen reader '
-      'would leak through',
-      (WidgetTester tester) async {
-        // The widget tree and the semantics tree are different objects, and a
-        // screen-reader user reads the second one. `QuizOptionCard`'s accessible name
-        // is built by `QuizStrings.optionLabel`, which takes the suffix as a
-        // **parameter** precisely so the decision has one home — and that home returns
-        // `null` until there is a verdict. If it returned a suffix unconditionally, the
-        // colour would stay idle and this test would still catch it.
-        final QuizBloc bloc = quizBloc(aSpoilerFixture);
-        await mountQuiz(tester, bloc: bloc);
+    testWidgets('nor does the SEMANTICS tree, which is the half a screen reader '
+        'would leak through', (WidgetTester tester) async {
+      // The widget tree and the semantics tree are different objects, and a
+      // screen-reader user reads the second one. `QuizOptionCard`'s accessible name
+      // is built by `AppLocalizations.optionLabel`, which takes the suffix as a
+      // **parameter** precisely so the decision has one home — and that home returns
+      // `null` until there is a verdict. If it returned a suffix unconditionally, the
+      // colour would stay idle and this test would still catch it.
+      final QuizBloc bloc = quizBloc(aSpoilerFixture);
+      await mountQuiz(tester, bloc: bloc);
 
-        final SemanticsNode node = tester.getSemantics(
-          find.byType(QuizOptionCard).first,
-        );
-        expect(node.label, isNot(contains(en.correctSuffix)));
-        expect(node.label, isNot(contains(en.incorrectSuffix)));
+      final SemanticsNode node = tester.getSemantics(
+        find.byType(QuizOptionCard).first,
+      );
+      expect(node.label, isNot(contains(en.quizCorrectSuffix)));
+      expect(node.label, isNot(contains(en.quizIncorrectSuffix)));
 
-        // Every card's merged label, not just the first. A `first` here would pass on
-        // an implementation that leaked from the fourth card only.
-        for (final Element element in find.byType(QuizOptionCard).evaluate()) {
-          final String label = tester
-              .getSemantics(find.byWidget(element.widget))
-              .label;
-          expect(label, isNot(contains(en.correctSuffix)));
-          expect(label, isNot(contains(en.incorrectSuffix)));
-        }
-      },
-    );
+      // Every card's merged label, not just the first. A `first` here would pass on
+      // an implementation that leaked from the fourth card only.
+      for (final Element element in find.byType(QuizOptionCard).evaluate()) {
+        final String label = tester
+            .getSemantics(find.byWidget(element.widget))
+            .label;
+        expect(label, isNot(contains(en.quizCorrectSuffix)));
+        expect(label, isNot(contains(en.quizIncorrectSuffix)));
+      }
+    });
 
     testWidgets('and the CTA is `Check answer`, which names the action without '
         'naming the answer', (WidgetTester tester) async {
       final QuizBloc bloc = quizBloc(aSpoilerFixture);
       await mountQuiz(tester, bloc: bloc);
 
-      expect(find.text(en.checkAnswer), findsOneWidget);
-      expect(find.text(en.nextQuestion), findsNothing);
-      expect(find.text(en.seeResults), findsNothing);
+      expect(find.text(en.quizCheckAnswer), findsOneWidget);
+      expect(find.text(en.quizNextQuestion), findsNothing);
+      expect(find.text(en.quizSeeResults), findsNothing);
     });
   });
 
@@ -283,7 +282,7 @@ void main() {
 
       await tester.tap(find.text(theAnsweredOption));
       await pumpQuizFrames(tester, 2);
-      await tester.tap(find.text(en.checkAnswer));
+      await tester.tap(find.text(en.quizCheckAnswer));
       await pumpQuizFrames(tester, 6);
 
       return bloc;
@@ -380,7 +379,7 @@ void main() {
         );
         await tester.tap(find.text(theAnsweredOption));
         await pumpQuizFrames(tester, 2);
-        await tester.tap(find.text(en.checkAnswer));
+        await tester.tap(find.text(en.quizCheckAnswer));
         await pumpQuizFrames(tester, 6);
 
         // `GoldFlecks` only mounts on a graded-correct card, so this runs on a screen
@@ -458,14 +457,14 @@ void main() {
             'true. Asserting the payload instead would not notice the two '
             'disagreeing',
       );
-      expect(find.text(en.verdictCorrect), findsOneWidget);
-      expect(find.text(en.verdictIncorrect), findsNothing);
+      expect(find.text(en.quizVerdictCorrect), findsOneWidget);
+      expect(find.text(en.quizVerdictIncorrect), findsNothing);
 
       // `QuizScreen.tsx:127`'s `{checked ? 'Next question' : 'Check answer'}` — the
       // same button, relabelled. `checkAnswer` must be **gone**, because a screen
       // showing both is ambiguous about which press does what.
-      expect(find.text(en.nextQuestion), findsOneWidget);
-      expect(find.text(en.checkAnswer), findsNothing);
+      expect(find.text(en.quizNextQuestion), findsOneWidget);
+      expect(find.text(en.quizCheckAnswer), findsNothing);
     });
 
     testWidgets('and the SEMANTICS tree carries the verdict the card colours '
@@ -477,7 +476,7 @@ void main() {
           tester.getSemantics(find.byWidget(element.widget)).label,
       ];
       expect(
-        labels.where((String l) => l.contains(en.correctSuffix)),
+        labels.where((String l) => l.contains(en.quizCorrectSuffix)),
         hasLength(1),
       );
     });
@@ -493,7 +492,7 @@ void main() {
     // ## FOR AND WHAT NOTHING WAS ASSERTING
     //
     // `QuizOptionCard`'s `Semantics(label: semanticLabel, excludeSemantics: true)`
-    // builds the name out of `QuizStrings.optionLabel` — the letter, the text and the
+    // builds the name out of `AppLocalizations.optionLabel` — the letter, the text and the
     // verdict — and then **drops the children's own nodes**, which are the letter badge
     // and the option text as `Text`s. Without `excludeSemantics` the merged node's
     // label is `A. Nicodemus — …` **plus** `A` **plus** `Nicodemus`, and a screen
@@ -532,7 +531,7 @@ void main() {
           en.optionLabel(
             letter: card.letter,
             text: text,
-            suffix: en.alreadyAnsweredSuffix,
+            suffix: en.quizAlreadyAnsweredSuffix,
           ),
         );
       }
@@ -550,7 +549,7 @@ void main() {
       await mountQuiz(tester, bloc: bloc);
       await tester.tap(find.text(theAnsweredOption));
       await pumpQuizFrames(tester, 2);
-      await tester.tap(find.text(en.checkAnswer));
+      await tester.tap(find.text(en.quizCheckAnswer));
       await pumpQuizFrames(tester, 6);
 
       for (final Element element in find.byType(QuizOptionCard).evaluate()) {
@@ -582,7 +581,7 @@ void main() {
             'enabled would accept a tap that the bloc would then refuse — a dead '
             'control, which is the thing §5 trap 3 exists to prevent',
       );
-      expect(find.text(en.alreadyAnsweredSuffix), findsNothing);
+      expect(find.text(en.quizAlreadyAnsweredSuffix), findsNothing);
 
       // ## AND **NOTHING** IS MARKED — NOT EVEN THE READER'S OWN PREVIOUS ANSWER
       //
@@ -638,7 +637,7 @@ void main() {
       ];
       expect(nodes, hasLength(4));
       for (final SemanticsNode each in nodes) {
-        expect(each.label, contains(en.alreadyAnsweredSuffix));
+        expect(each.label, contains(en.quizAlreadyAnsweredSuffix));
         // `flagsCollection`, not `hasFlag` — §4's forbidden-API table takes
         // `SemanticsNode.hasFlag`, deprecated after 3.32, and the replacement reads
         // `isEnabled` off the collection rather than passing a flag to a predicate.
@@ -735,7 +734,7 @@ void main() {
       // ## AND ITS **VISIBLE** LABEL NAMES WHAT IS MISSING, NOT AN ACTION THIS
       // ## SCREEN CANNOT PERFORM
       //
-      // This used to assert `find.text(en.checkAnswer)`, on the reasoning that
+      // This used to assert `find.text(en.quizCheckAnswer)`, on the reasoning that
       // `QuizScreen.tsx:127` transcribes `{checked ? 'Next question' : 'Check
       // answer'}` and `graded` is false here. But the prototype's `disabled={!checked
       // && !selected}` covers **one** state — nothing chosen yet — and this is the
@@ -749,8 +748,8 @@ void main() {
       // channel. Here they do not: no banner, no empty state, no caption. So the
       // reason moves onto the label, and it is `unavailableSuffix` because that is
       // the string already written for exactly this state and already bilingual.
-      expect(find.text(en.checkAnswer), findsNothing);
-      expect(find.text(en.unavailableSuffix), findsOneWidget);
+      expect(find.text(en.quizCheckAnswer), findsNothing);
+      expect(find.text(en.quizUnavailableSuffix), findsOneWidget);
 
       final SemanticsNode node = tester.getSemantics(cta);
       // `isFalse` and not `isNull`: `QuizOptionCard` states `enabled: false`
@@ -762,7 +761,7 @@ void main() {
       // second time would read "there is no answer to show — there is no answer to
       // show" — and a `contains` assertion would sit right through that. This is the
       // same lesson as `the reason is named only by a DEAD cta`, one level down.
-      expect(node.label, en.unavailableSuffix);
+      expect(node.label, en.quizUnavailableSuffix);
     });
 
     testWidgets('but "nothing chosen yet" KEEPS the prototype\'s label', (
@@ -782,9 +781,12 @@ void main() {
       expect(bloc.state.cta, QuizCta.none, reason: 'nothing selected');
       expect(bloc.state.currentAnswer!.isOpen, isTrue);
 
-      expect(find.text(en.checkAnswer), findsOneWidget);
-      expect(find.text(en.unavailableSuffix), findsNothing);
-      expect(tester.getSemantics(find.byType(EvaButton)).label, en.checkAnswer);
+      expect(find.text(en.quizCheckAnswer), findsOneWidget);
+      expect(find.text(en.quizUnavailableSuffix), findsNothing);
+      expect(
+        tester.getSemantics(find.byType(EvaButton)).label,
+        en.quizCheckAnswer,
+      );
     });
   });
 
@@ -823,7 +825,7 @@ void main() {
       await mountQuiz(tester, bloc: bloc);
       await tester.tap(find.text(theAnsweredOption));
       await pumpQuizFrames(tester, 2);
-      await tester.tap(find.text(en.checkAnswer));
+      await tester.tap(find.text(en.quizCheckAnswer));
       await pumpQuizFrames(tester, 6);
       return bloc;
     }
@@ -865,10 +867,10 @@ void main() {
       // CTA at all.
       expect(
         ctaAccessibleName(tester),
-        en.nextQuestion,
+        en.quizNextQuestion,
         reason:
             'the label is the prototype\'s own, with nothing appended. '
-            '"${en.unavailableSuffix}" is a fact about a DEAD control and this '
+            '"${en.quizUnavailableSuffix}" is a fact about a DEAD control and this '
             'control opens the graded answer',
       );
     });
@@ -877,7 +879,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = await gradeToReadyOnTheLastQuestion(tester);
-      await tester.tap(find.text(en.nextQuestion));
+      await tester.tap(find.text(en.quizNextQuestion));
       await pumpQuizFrames(tester, 6);
 
       expect(bloc.state.cta, QuizCta.finish);
@@ -889,7 +891,7 @@ void main() {
             .toBoolOrNull(),
         isTrue,
       );
-      expect(ctaAccessibleName(tester), en.seeResults);
+      expect(ctaAccessibleName(tester), en.quizSeeResults);
     });
   });
 

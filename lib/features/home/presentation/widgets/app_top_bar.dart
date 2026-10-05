@@ -27,7 +27,7 @@ import 'streak_flame_row.dart';
 /// here because there is nowhere to put one."* There was a place to put one, and it
 /// was the widget's own `build`: `Text('Evangelion')` renders exactly the tree
 /// `Text(wordmark)` renders when the caller passes `'Evangelion'`, and
-/// `HomeStrings.of(locale).wordmark` **is** `'Evangelion'`. Measured: replacing the
+/// `AppLocalizations.homeWordmark` **is** `'Evangelion'`. Measured: replacing the
 /// parameter's use with the literal passed all 1520 tests.
 ///
 /// **Requiredness guarantees the parameter *exists* at the call site. It says nothing
@@ -142,13 +142,13 @@ class AppTopBar extends StatelessWidget {
   /// `ds.tsx:519-526`'s `<button>` has **no** label at all — §14's first row, and
   /// the reason `IconActionButton.tooltip` is required. So the name is passed, and
   /// `HomePage` passes the reader's display name, falling back to
-  /// `HomeStrings.avatarLabel` when there is no session.
+  /// `AppLocalizations.homeAvatarLabel` when there is no session.
   final String avatarSemanticLabel;
 
   /// Appended to [avatarSemanticLabel] while the avatar is inert.
   ///
   /// **A parameter and not a constant here**, because a second copy of
-  /// `HomeStrings.unavailableSuffix` in a widget would be a second place to
+  /// `AppLocalizations.homeUnavailableSuffix` in a widget would be a second place to
   /// translate one sentence and `home_strings_test.dart` only checks the table.
   /// Required, so a caller cannot leave an inert button whose name gives no reason.
   final String avatarUnavailableReason;

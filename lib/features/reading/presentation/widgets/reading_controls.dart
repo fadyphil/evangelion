@@ -1,6 +1,6 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The reading screen's top row, and the panel the `Aa` control discloses.
@@ -70,7 +70,7 @@ class ReadingControls extends StatelessWidget {
   final ReadingLanguage language;
 
   /// The bilingual strings — every control's accessible name comes from here.
-  final ReadingStrings strings;
+  final AppLocalizations strings;
 
   /// What the back control runs.
   final VoidCallback onBack;
@@ -158,7 +158,7 @@ class ReadingControls extends StatelessWidget {
             children: <Widget>[
               IconActionButton(
                 icon: Icons.arrow_back,
-                tooltip: strings.back,
+                tooltip: strings.readingBack,
                 // See [tooltipFamilyFor] — defect #2's fourth Arabic site.
                 tooltipFamily: tooltipFamily,
                 onPressed: onBack,
@@ -172,7 +172,7 @@ class ReadingControls extends StatelessWidget {
                   // button labelled `Aa` — a name that is the glyph is not a name.
                   IconActionButton(
                     icon: Icons.format_size,
-                    tooltip: strings.textSize,
+                    tooltip: strings.readingTextSize,
                     // Defect #2's fifth Arabic site.
                     tooltipFamily: tooltipFamily,
                     onPressed: onPanelToggled,
@@ -189,7 +189,7 @@ class ReadingControls extends StatelessWidget {
                   IconActionButton(
                     icon: Icons.bookmark_border,
                     tooltip:
-                        '${strings.bookmark} — ${strings.unavailableSuffix}',
+                        '${strings.readingBookmark} — ${strings.readingUnavailableSuffix}',
                     // Defect #2's sixth Arabic site, and the longest string on the
                     // screen: 19 codepoints including an em dash.
                     tooltipFamily: tooltipFamily,
@@ -221,9 +221,9 @@ class ReadingControls extends StatelessWidget {
               step: fontStep,
               onChanged: onFontStepChanged,
               labels: FontSizeStepperLabels(
-                decrease: strings.decreaseFontSize,
-                increase: strings.increaseFontSize,
-                track: strings.fontSize,
+                decrease: strings.readingDecreaseFontSize,
+                increase: strings.readingIncreaseFontSize,
+                track: strings.readingFontSize,
               ),
             ),
             const SizedBox(height: EvaSpacing.lg),
