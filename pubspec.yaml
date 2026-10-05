@@ -28,10 +28,12 @@ dependencies:
   flutter_bloc: ^9.1.1
   # Immutable states, events and entities. See AGENT_CONTEXT §2.1 decision 8a.
   freezed_annotation: ^3.1.0
-  # `equatable` is NOT a direct dependency any more. `Failure` and `Result<T>` are
-  # the last two types that needed an equality library, and both now hand-write
-  # their own `==`/`hashCode` (`core/common/`). It still arrives transitively via
-  # `flutter_bloc`; see AGENT_CONTEXT §2.1 decision 8a.
+  # `equatable` is NOT a direct dependency any more, and it is not a TRANSITIVE one
+  # either — `pubspec.lock` carried zero occurrences of it when this was verified,
+  # which contradicts the "still arrives transitively via `flutter_bloc`" line this
+  # comment used to carry. `Failure` and `Result<T>` are the last two types that
+  # needed an equality library, and both now hand-write their own
+  # `==`/`hashCode` (`core/common/`); see AGENT_CONTEXT §2.1 decision 8a.
   #
   # `Failure` keeps [kind, message, statusCode] and excludes [details] deliberately,
   # and `Result<T>` compares per arm — both contracts are pinned by
@@ -44,6 +46,40 @@ dependencies:
 
   # Local-only settings persistence (no server sync).
   shared_preferences: ^2.5.5
+
+  # Declarative animation for the routine, non-achievement motion.
+  #
+  # ## PINNED EXACTLY, NOT `^4.5.2`
+  #
+  # Every other dependency here uses a caret. This one does not, because the
+  # package's whole surface is a set of extension methods that can appear or
+  # disappear between minors, and this app's motion tokens have to keep meaning one
+  # thing across an upgrade. AGENT_CONTEXT §2.1 decision 8c.
+  #
+  # ## WHAT IT IS USED FOR, AND WHAT IT IS *NOT*
+  #
+  # Used for the standard effects — `fadeIn`, `slideY`, `scale`, `shake`,
+  # `desaturate`, `crossfade`, `then` — on `EvaButton`, `EvaToggle`,
+  # `SegmentedControl`, `FocusRing` and `QuizOptionCard`.
+  #
+  # NOT used for the achievement spring. Its complete effect surface was extracted
+  # from the 4.5.2 tarball and contains **no** `spring*`, **no** `elastic*` and
+  # **no** `*Staggered`: it animates with `Curve`s, never with physics. The
+  # achievement spring is `AnimationController.animateWith(SpringSimulation(...))`,
+  # handed to `Animate(controller: ...)` — which the package does accept, so the
+  # physics runs *through* it rather than beside it. See `EvaAnimate`.
+  #
+  # ## TWO COSTS, ACCEPTED DELIBERATELY
+  #
+  # 1. `flutter_shaders` arrives transitively, for `.shimmer()`. Nothing in this app
+  #    shimmers; the dependency is the price of the package, not a request for it.
+  # 2. It reads **no** accessibility flag — `grep -r disableAnimations` over the
+  #    whole package returns nothing. §14's "every animation checks
+  #    `MediaQuery.disableAnimationsOf(context)`" is therefore NOT satisfied by
+  #    using it directly, and every call site would be a fresh violation of the
+  #    rule decision 124 was recorded for. `EvaAnimate` is what closes that gap,
+  #    and it is mandatory rather than preferred.
+  flutter_animate: 4.5.2
 
 dev_dependencies:
   flutter_test:

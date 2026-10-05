@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 /// The Eva motion table — durations and curves in one place.
@@ -15,6 +17,18 @@ import 'package:flutter/widgets.dart';
 /// | `aurora` | 14s | `easeInOut` |
 ///
 /// and, immediately after: "All curves are ease-out. No bounce, no spring."
+///
+/// ## THAT LAST SENTENCE IS **PARTLY SUPERSEDED** — SEE BELOW
+///
+/// "No bounce, no spring" is **still true** and is kept: `grep -ri spring eva/src`
+/// over the prototype returns nothing. What was wrong is the implication that every
+/// curve is a plain `easeOut`, because the prototype's own `QuizOption`
+/// (`ds.tsx:438`) uses `cubic-bezier(0.16,1,0.3,1)`. Phase 0 adds
+/// [interactiveCurve] (that curve) and [achievementSpring] (a real spring, for
+/// achievement moments only) under the heading *"Interactive + achievement motion
+/// (Phase 0)"*. Ambient motion is untouched. Full reasoning is there; the table
+/// above stays as §5.3 transcribed it, because the audit trail is worth more than a
+/// tidy table.
 ///
 /// WHY THE AMBIENT ANIMATIONS ARE NOT `AnimationController`s HELD HERE. There
 /// are three shared controllers app-wide — float, hue, aurora
@@ -90,6 +104,228 @@ abstract final class EvaMotion {
 
   /// `easeInOut` — with [aurora].
   static const Curve auroraCurve = Curves.easeInOut;
+
+  // --- Interactive + achievement motion (Phase 0) ---------------------------
+  //
+  // ## THIS SUPERSEDES "ALL CURVES ARE EASE-OUT. NO BOUNCE, NO SPRING."
+  //
+  // That sentence is the class doc above, and it is the `docs/plans/03-design-system.md`
+  // §5.3 rule transcribed. It was the brief's wording and it was implemented
+  // literally. **It was also wrong about the prototype**, which is worth recording
+  // because the two are easy to confuse:
+  //
+  // | prototype site | curve | Flutter equivalent |
+  // | --- | --- | --- |
+  // | `ds.tsx:438` `QuizOption` — the most-tapped element in the app | `all 250ms cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] |
+  // | `ds.tsx:207` orb mouse-parallax | `transform 0.9s cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] |
+  //
+  // So `QuizOption` — the answer a child presses to answer a question — was never
+  // on a plain `easeOut` in the design this app was transcribed from. "No bounce,
+  // no spring" remains **true** of the prototype: `grep -ri spring eva/src` returns
+  // nothing. What was false was the implied "and no expo".
+  //
+  // ## TWO FAMILIES, TWO NAMES, ON PURPOSE
+  //
+  // | family | token | used for |
+  // | --- | --- | --- |
+  // | routine | [interactiveCurve] | state changes on things already on screen |
+  // | achievement | [achievementCurve] / [achievementSpring] | a cause-and-effect moment worth feeling |
+  //
+  // **Two** achievement tokens because the two are not interchangeable, and the
+  // difference is mechanical rather than stylistic: [achievementCurve] is a `Curve`
+  // and can go through `flutter_animate`, while [achievementSpring] is a
+  // `SpringSimulation` and cannot — its value leaves `[0,1]`, which that package's
+  // `Interval` asserts against. Both are matched on overshoot (~8.5%) so they read as
+  // the same family.
+  //
+  // The split is not decoration. A spring on **every** tap says nothing; a spring on
+  // *your streak went up* says the thing happened. One app-wide curve cannot
+  // distinguish those, so the token file now can.
+
+  //
+  // Ambient motion is deliberately **not** touched by any of this: the orbs run
+  // 14–28s and the aurora 14s, and a spring on a 28-second cycle would be
+  // indistinguishable from no spring at all while costing a simulation per frame.
+
+  /// `cubic-bezier(0.16, 1, 0.3, 1)` — the prototype's own interactive curve.
+  ///
+  /// [Curves.easeOutExpo] is that bezier. It leaves the gate faster than any other
+  /// curve here and then spends a long tail settling, which is why it reads as
+  /// "responsive" rather than "abrupt" — and why a 250ms `QuizOption` press felt
+  /// deliberate in the prototype.
+  ///
+  /// **No overshoot.** It is monotone. Anything that overshoots belongs to
+  /// [achievementSpring], and that is the whole reason the two are separate.
+  static const Curve interactiveCurve = Curves.easeOutExpo;
+
+  /// The physics for an achievement moment: a streak went up, a milestone landed.
+  ///
+  /// ## WHERE THIS IS USABLE, AND WHERE IT IS **NOT**
+  ///
+  /// **Usable** for an effect a widget drives itself — it owns the controller and
+  /// calls `animateWith(SpringSimulation(...))`. `StreakFlame`'s flare is that case.
+  ///
+  /// **NOT usable** through `flutter_animate`'s `Animate(controller: ...)`, which
+  /// looks like the obvious way to get physics through the package and is not. Its
+  /// `EffectEntry.buildAnimation` wraps whatever controller it is handed in
+  /// `Interval(begin / controller.duration, end / controller.duration)`, and a
+  /// spring's value **exceeds 1.0** by design. Measured: feeding an overshooting
+  /// value into that chain trips `ParametricCurve`'s own assertion —
+  /// `t >= 0.0 && t <= 1.0` — inside `Curves.transform`. A spring routed through
+  /// `Animate` does not merely lose its overshoot, it **throws** in debug.
+  ///
+  /// `Animate` animates with `Curve`s and can only overshoot by way of a `Curve` that
+  /// overshoots. That is what [achievementCurve] is for, and why there are two
+  /// achievement tokens rather than one.
+  ///
+  /// ## WHY THE TWO ARE MATCHED ON OVERSHOOT
+  ///
+  /// They are different mechanisms, so the only question that matters is whether they
+  /// *feel* like one family. Measured: the spring peaks at **8.3%**,
+  /// [Curves.easeOutBack] at **8.7%**. Paired to stay within a point of each other,
+  /// and `test/core/design_system/tokens/eva_motion_test.dart` asserts the pairing — so
+  /// a future bump to one cannot quietly desynchronise the flame from everything else.
+  ///
+  /// ## `static final`, NOT `static const`
+  ///
+  /// `SpringDescription.withDurationAndBounce` is a **factory**, so it cannot be a
+  /// const expression and this cannot be `const`. That is not a workaround, it is why
+  /// the inputs are visible: the `const` pair a reader actually tunes is
+  /// [achievementDuration] and [achievementBounce], and the three coefficients below
+  /// are what comes out.
+  static final SpringDescription achievementSpring =
+      SpringDescription.withDurationAndBounce(
+        duration: achievementDuration,
+        bounce: achievementBounce,
+      );
+
+  /// The achievement curve for effects driven through `flutter_animate`.
+  ///
+  /// [Curves.easeOutBack], picked from the measured overshoot of Flutter's catalogue
+  /// rather than by name:
+  ///
+  /// | curve | overshoot | within 1% of target at | ends at 1.0 |
+  /// | --- | --- | --- | --- |
+  /// | [Curves.easeOutExpo] | 0% | 59% | yes |
+  /// | **[Curves.easeOutBack]** | **8.7%** | **36%** | **yes** |
+  /// | [Curves.elasticOut] | 27.5% | 10% | yes |
+  /// | [Curves.fastOutSlowIn] | 0% | 87% | yes |
+  ///
+  /// `elasticOut` is the obvious candidate on the name and is **rejected at 27.5%** —
+  /// a quarter again over the target reads as a glitch on a flame meant to look like it
+  /// caught, not as a celebration. `easeOutBack` lands within a point of
+  /// [achievementSpring] and leaves the gate faster than anything monotone here.
+  ///
+  /// **Boundedness is the property that matters, not monotonicity.** Every row above
+  /// ends at exactly `1.0`, which is why `flutter_animate`'s `Interval` can carry them
+  /// safely where it cannot carry a spring.
+  static const Curve achievementCurve = Curves.easeOutBack;
+
+  /// How many times the spring passes its target before settling.
+  ///
+  /// `withDurationAndBounce` turns this into a damping ratio of `1 - bounce`, so
+  /// `0.38` means *"underdamped enough that one overshoot is unmistakable"*. At
+  /// `0.0` there is no overshoot and the whole distinction from [interactiveCurve]
+  /// disappears; past ~`0.7` it stops reading as a celebration and starts reading as
+  /// a toy.
+  ///
+  /// The gate for "the two tokens really are different animations" is
+  /// [achievementOvershoots], and this is what it reads.
+  static const double achievementBounce = 0.38;
+
+  /// The **nominal** duration handed to the spring factory.
+  ///
+  /// ## IT IS NOT HOW LONG THE SPRING TAKES, AND THE NAME SAYS SO
+  ///
+  /// This was first written as `achievementSettleHint = 420ms` with a doc claiming it
+  /// was "roughly how long the spring takes to look finished". **Measured, that was
+  /// false by nearly 2×: a 420ms nominal does not settle until ~796ms.** Renamed
+  /// rather than re-documented, because a constant called `SettleHint` holding a
+  /// number that is not the settle time is a lie that survives every future read.
+  ///
+  /// Flutter's `withDurationAndBounce` derives stiffness as `4π²/duration²`, so the
+  /// nominal is really a stiffness dial wearing a duration's clothes. What the
+  /// *measured* settle time is, is a **property of the spring** and therefore belongs
+  /// in a test, not in this file. Driven at 4ms steps:
+  ///
+  /// | nominal | stiffness | measured settle | overshoot |
+  /// | --- | --- | --- | --- |
+  /// | 120ms | 2742 | ~300ms | 8.4% |
+  /// | **180ms** | **1218** | **~344ms** | **8.3%** |
+  /// | 210ms | 895 | ~400ms | 8.3% |
+  /// | 280ms | 504 | ~536ms | 8.3% |
+  /// | 420ms | 224 | ~796ms | 8.4% |
+  ///
+  /// Read the settle column as a range, not a formula: `isDone` is tolerance-based,
+  /// so a coarse probe lands on different grid boundaries — 120ms measured 300 while
+  /// 140ms measured 268, which is not a real non-monotonicity. The trend is the only
+  /// part that means anything, and it is roughly `2×`.
+  ///
+  /// 180ms is chosen because its measured settle (~344ms) sits under the 400ms a
+  /// complex transition is allowed, with margin, while staying slow enough to read as
+  /// a celebration. The 8.3% overshoot is what makes it feel like an achievement
+  /// rather than a step; the settle time is what stops it feeling like a toy.
+  static const Duration achievementDuration = Duration(milliseconds: 180);
+
+  /// The achievement motion's **real** duration — the spring's measured settle.
+  ///
+  /// ## WHY THE SPRING NEEDS TWO NUMBERS AND THE CURVE NEEDS ONE
+  ///
+  /// [achievementDuration] is a nominal: it is a stiffness dial that happens to be
+  /// expressed as time, and the spring it configures does not finish until ~344ms.
+  /// [achievementCurve] has no such indirection — given a duration it *is* that
+  /// duration. So the two achievement mechanisms must be handed **different** numbers
+  /// to feel like the same motion, and this is the one the curve gets.
+  ///
+  /// Giving both of them 180ms would be the obvious move and would be wrong twice
+  /// over: the curve-driven pop would finish in half the time of the spring-driven
+  /// one, and [achievementExit] at 220ms would then be *slower* than the entrance it
+  /// is supposed to follow.
+  ///
+  /// ## A CONSTANT, NOT A COMPUTED VALUE
+  ///
+  /// The measured settle is a property of a simulation, so it cannot be a `const`
+  /// expression — but it is also not something to recompute at every call site. So it
+  /// is **recorded here** and checked against reality:
+  /// `test/core/design_system/tokens/eva_motion_test.dart` drives the real
+  /// `SpringSimulation` and asserts it still settles within a few milliseconds of this
+  /// number. Change [achievementDuration] or [achievementBounce] and that test is what
+  /// tells you this constant has gone stale.
+  static const Duration achievementSettle = Duration(milliseconds: 344);
+
+  /// How long an achievement moment takes to **leave**.
+  ///
+  /// 220ms against the entrance's measured ~344ms, so ~64% of it. An exit that takes
+  /// as long as its entrance makes the interface feel like it is waiting on the
+  /// animation rather than on the reader. Exits read as "already happening",
+  /// entrances as "here it comes".
+  ///
+  /// **This is a [Curve] duration, so it is honest about itself** — unlike
+  /// [achievementDuration], which is a nominal. The entrance/exit ratio is asserted
+  /// against the spring's *measured* settle in
+  /// `test/core/design_system/tokens/eva_motion_test.dart`, because comparing two
+  /// nominal numbers would prove nothing: `220 < 180` is false while `220 < ~344` is
+  /// true, and only the second is the claim being made.
+  static const Duration achievementExit = Duration(milliseconds: 220);
+
+  /// The damping ratio [achievementSpring] actually ended up with.
+  ///
+  /// `SpringDescription` stores `damping`, not the ratio, so recovering it means
+  /// dividing out `2·√(mass·stiffness)`. Exposed because [achievementOvershoots] needs
+  /// it. A doc here once said this "lands near `0.62` rather than exactly on it" —
+  /// measured, it is `0.6200` to four places, because `damping` is derived from
+  /// `1 - bounce` and `achievementBounce` is exactly `0.38`.
+  static double get achievementDampingRatio =>
+      achievementSpring.damping /
+      (2 * math.sqrt(achievementSpring.mass * achievementSpring.stiffness));
+
+  /// Whether [achievementSpring] overshoots at all.
+  ///
+  /// The distinction between [interactiveCurve] and [achievementSpring] exists only
+  /// because this is `true`. At a ratio of 1.0 or above both would be monotone and the
+  /// two tokens would be the same animation under two names — a worse outcome than
+  /// having neither.
+  static bool get achievementOvershoots => achievementDampingRatio < 1.0;
 
   /// Whether a fleck animation should run there-and-back rather than restarting.
   ///

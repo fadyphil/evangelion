@@ -3311,3 +3311,89 @@ the `runtimeType` clause (a plausible reading of `is` that covariance invalidate
 useful half of this entry is not the fixes; it is that **three of the four mutations tried
 against these `==` implementations initially survived**, and the surviving ones were only
 found by asking what the suite was failing to assert rather than by reading it.
+
+**133. `flutter_animate` IS PINNED, AND IT CANNOT DELIVER A SPRING.**
+
+Added as `flutter_animate: 4.5.2`, pinned exactly while every other dependency here uses a
+caret. Its surface is a set of extension methods that can appear or disappear between
+minors, and this app's motion tokens have to keep meaning one thing across an upgrade.
+
+Its complete effect surface was extracted from the 4.5.2 tarball rather than recalled:
+
+```
+align blur blurX blurXY blurY boxShadow callback color crossfade custom desaturate effect
+elevation fade fadeIn fadeOut flip flipH flipV followPath hide listen move moveX moveY
+rotate saturate scale scaleX scaleXY scaleY shader shake shakeX shakeY shimmer show slide
+slideX slideY swap then tint toggle untint visibility
+```
+
+**No `spring*`, no `elastic*`, no `*Staggered`.** It animates with `Curve`s and never with
+physics, which means the two mechanisms below cannot be one token and the difference is
+mechanical rather than stylistic.
+
+Two costs accepted deliberately. `flutter_shaders` arrives transitively for `.shimmer()`,
+which nothing in this app uses — the price of the package, not a request for it. And it was
+**last published 2024-11-25**.
+
+**134. "ALL CURVES ARE EASE-OUT" WAS WRONG ABOUT THE PROTOTYPE, AND THE SPRING PATH I FIRST PROPOSED DOES NOT WORK.**
+
+§5.3's *"All curves are ease-out. No bounce, no spring"* was implemented literally and is
+now **partly superseded**. "No bounce, no spring" is **still true** — `grep -ri spring
+eva/src` returns nothing. What was wrong is the implication that every curve is a plain
+`easeOut`: the prototype's own `QuizOption` (`ds.tsx:438`), the most-tapped element in the
+app, uses `all 250ms cubic-bezier(0.16,1,0.3,1)`, which is `Curves.easeOutExpo`.
+
+*Rejected: adopting a spring wholesale.* A spring on **every** tap says nothing; a spring
+on *your streak went up* says the thing happened. One curve cannot distinguish those, so
+the token file now has two families: routine (`interactiveCurve`, monotone) and achievement.
+
+*Rejected: `Curves.elasticOut` for the achievement.* Measured overshoot **27.5%** — a
+quarter again over the target reads as a glitch on a flame meant to look like it caught.
+`Curves.easeOutBack` measures **8.7%** and is what ships.
+
+*THE CLAIM THAT WAS WRONG, AND IT WAS MINE.* I proposed `Animate(controller: …)` driven by
+a `SpringSimulation` as the escape hatch for getting physics through the package. **It does
+not work.** `EffectEntry.buildAnimation` wraps whatever controller it is handed in
+`Interval(begin / controller.duration, end / controller.duration)`, and a spring's value
+leaves `[0,1]` by design — measured, that trips `ParametricCurve`'s `t >= 0.0 && t <= 1.0`
+assertion inside `Curves.transform`. A spring routed through `Animate` does not merely lose
+its overshoot, it **throws**. `EvaMotion.achievementSpring` is therefore for widgets that
+drive their own controller, and `achievementCurve` is for `Animate`-driven effects. The two
+are matched on overshoot (~8.3% vs ~8.7%) so they feel like one family, and that pairing is
+asserted.
+
+*AND A SECOND ERROR IN THE SAME TOKEN FILE.* The spring's duration was first written as
+`achievementSettleHint = 420ms` with a doc claiming it was "roughly how long the spring
+takes to look finished". **Measured, a 420ms nominal does not settle until ~796ms** —
+`withDurationAndBounce` derives stiffness as `4π²/duration²`, so the nominal is a stiffness
+dial wearing a duration's clothes. Renamed to `achievementDuration` and moved to 180ms
+(measured settle ~344ms, under the 400ms a complex transition is allowed), with the recorded
+measurement split into `achievementSettle` for the curve path — because giving both paths
+180ms would make the curve pop finish in half the time and leave `achievementExit` (220ms)
+*slower* than the entrance it follows.
+
+**135. `EvaAnimate` EXISTS BECAUSE THE PACKAGE READS NO ACCESSIBILITY FLAG.**
+
+`grep -r disableAnimations` over the whole package returns nothing. §14 requires every
+animation to check `MediaQuery.disableAnimationsOf(context)`, and decision 124 was recorded
+for a single site that forgot — so using the package directly makes *every* call site a
+fresh violation, invisibly.
+
+Its defaults are also values this app already rejected: `Animate.defaultDuration` is a
+literal `300ms` and `Animate.defaultCurve` is `Curves.linear`. `installPackageDefaults()`
+overwrites both from the composition root, before DI and before any widget exists, so even a
+forgotten wrapper degrades to the app's own curve.
+
+Timings come from `MotionMoment`'s factories rather than from parameters on the widget, so a
+literal cannot reach an effect even by accident. Reduced motion sets the controller to its
+end value rather than returning `child` bare — the same substitution decision 124 reached
+with `kAlwaysCompleteAnimation`, and for the same reason: a transitions builder's job is to
+wrap the page, and swapping the subtree for a reader who asked for *less* motion rather than
+*no* widget is the wrong trade.
+
+*Two bugs this phase's own tests caught, both invisible to reading the code.* `_play()` did
+not reset to `0` before `animateTo(1.0)`, so a trigger change replayed **nothing** — the
+animation was already at 1.0 and the call completed instantly. And `Animate.initState` ends
+in `Future.delayed(Duration.zero)`, which creates a real `Timer`, so every `Animate` left
+one pending; a bare `tester.pump()` does not drain it because a zero-length pump does not
+advance the fake clock. Both are now covered by assertions that fail on the mutation.

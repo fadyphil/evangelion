@@ -1,6 +1,7 @@
 import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
+import 'package:evangelion/core/design_system/motion/eva_animate.dart';
 import 'package:flutter/widgets.dart';
 
 /// The process bootstrap, with its one untestable step injected.
@@ -66,6 +67,14 @@ import 'package:flutter/widgets.dart';
 /// the same reasoning `injection.dart` records for `getIt.init()`.
 Future<void> bootstrapApp({required void Function(Widget) run}) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Before DI, before the router, before any widget exists — because this rewrites
+  // `flutter_animate`'s **mutable statics**, and their only job is to be the value a
+  // call site gets when it forgets a timing. Installed late it would be correct for
+  // every widget built afterwards and silently wrong for the first ones.
+  //
+  // Cheap and idempotent: two assignments. See `installPackageDefaults` for why the
+  // package's own `300ms`/`Curves.linear` defaults are not acceptable here.
+  installPackageDefaults();
   await configureDependencies();
   configureNavigation();
   run(const EvangelionApp());

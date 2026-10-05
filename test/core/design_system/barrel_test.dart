@@ -63,13 +63,22 @@ List<String> get _exportedUris => <String>[
 /// Every `.dart` file under `theme/`, `tokens/`, `effects/` and `widgets/`, as a
 /// package URI.
 ///
-/// `effects/` and `widgets/` joined the list in Phase 2. Before that they were
-/// excluded by *absence* rather than by an allowlist that would have needed
-/// editing every phase — which is exactly why a new `effects/*.dart` could land
-/// un-exported for a whole phase without a thing going red.
+/// `effects/` and `widgets/` joined the list in Phase 2, and `motion/` in Phase 0.
+/// Before that they were excluded by *absence* rather than by an allowlist that
+/// would have needed editing every phase — which is exactly why a new `effects/*.dart`
+/// could land un-exported for a whole phase without a thing going red. Phase 0 found
+/// the same gap from the other side: `motion/eva_animate.dart` **was** exported, and
+/// this test went red because `exported` had an entry `onDisk` could not see. Either
+/// half of the drift is a failure, which is the property worth having.
 List<String> get _designSystemFiles {
   final List<String> uris = <String>[
-    for (final String dir in <String>['effects', 'theme', 'tokens', 'widgets'])
+    for (final String dir in <String>[
+      'effects',
+      'motion',
+      'theme',
+      'tokens',
+      'widgets',
+    ])
       for (final FileSystemEntity entity in Directory.fromUri(
         _root.uri.resolve('lib/core/design_system/$dir/'),
       ).listSync())

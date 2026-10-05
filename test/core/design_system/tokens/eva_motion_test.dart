@@ -1,5 +1,6 @@
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:flutter/animation.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Every curve in the table must be pinned at both ends, or an animation driven
@@ -237,8 +238,23 @@ void main() {
     });
 
     test('no curve is a spring or a bounce', () {
-      // "No bounce, no spring — matching the brief's motion rule." An overshooting
-      // curve puts y outside [0, 1]; every curve here is monotonic and bounded.
+      // Two claims, and Phase 0 changed one of them.
+      //
+      // STILL TRUE: every entry in this map is a `Curve`, and a `Curve` maps
+      // [0,1] onto [0,1] — it cannot overshoot by construction. An overshooting
+      // curve puts y outside the range, so this test pins that none of them does.
+      //
+      // NO LONGER THE WHOLE RULE: "No bounce, no spring — matching the brief's
+      // motion rule" was the design brief's wording and it is now partly
+      // superseded. `EvaMotion.achievementSpring` IS a spring, deliberately, for
+      // achievement moments. It is **not in this map and must never be added to
+      // it**, because it is a `SpringDescription` rather than a `Curve` and its
+      // whole point is that it leaves [0,1]. Its overshoot is asserted on its own
+      // terms in the `achievement spring` group below.
+      //
+      // What this test actually guards now is the *separation*: the two motion
+      // families do not blur into each other, so "which one is this" stays a
+      // question with an answer.
       for (final MapEntry<String, Curve> entry in <String, Curve>{
         'fast': EvaMotion.fastCurve,
         'base': EvaMotion.baseCurve,
@@ -247,6 +263,9 @@ void main() {
         'orbFloat': EvaMotion.orbFloatCurve,
         'orbHue': EvaMotion.orbHueCurve,
         'aurora': EvaMotion.auroraCurve,
+        // The Phase 0 routine curve. It belongs in this family and is asserted
+        // here precisely because it must stay **monotone** — see the next test.
+        'interactive': EvaMotion.interactiveCurve,
       }.entries) {
         double previous = 0.0;
         for (double t = 0.0; t <= 1.0; t += 0.05) {
@@ -260,6 +279,165 @@ void main() {
           previous = y;
         }
       }
+    });
+  });
+
+  group('the achievement spring', () {
+    // ## WHY THESE ARE MEASURED RATHER THAN READ OFF THE TOKENS
+    //
+    // `SpringDescription.withDurationAndBounce` derives stiffness as
+    // `4π²/duration²` from a **nominal** duration that is not the settle time.
+    // The token file's first draft called its 420ms input `achievementSettleHint`
+    // and claimed it was "roughly how long the spring takes to look finished";
+    // driven and measured, that was false by nearly 2× (~796ms). So the
+    // relationships below are properties of the spring, they live here rather than
+    // in `eva_motion.dart`, and they are measured by driving a real
+    // `SpringSimulation` — not asserted against the token that produced them.
+    //
+    // A test that read `expect(EvaMotion.achievementDuration, someDuration)` would
+    // be the reading-scrim mistake again: a wrong number asked to confirm itself.
+
+    /// Drives the token's spring from 0 to 1 and reports what it actually did.
+    ({double peak, double settledAt}) drive() {
+      final SpringSimulation sim = SpringSimulation(
+        EvaMotion.achievementSpring,
+        0,
+        1,
+        0,
+      );
+      double peak = 0.0;
+      double settledAt = 0.0;
+      // 4ms steps: `isDone` is tolerance-based, so the resolution here decides the
+      // measured numbers below. Coarser sampling flattens the differences the table
+      // in `eva_motion.dart` records.
+      for (double t = 0.0; t <= 2.0; t += 0.004) {
+        final double x = sim.x(t);
+        if (x > peak) peak = x;
+        if (sim.isDone(t)) {
+          settledAt = t;
+          break;
+        }
+      }
+      return (peak: peak, settledAt: settledAt);
+    }
+
+    test('overshoots, which is the only reason it is not a curve', () {
+      expect(EvaMotion.achievementOvershoots, isTrue);
+      expect(EvaMotion.achievementDampingRatio, closeTo(0.62, 0.005));
+
+      final double peak = drive().peak;
+      // ~8.3% measured. The point of the assertion is the *sign* — a peak below 1.0
+      // would mean this is a curve wearing a spring's name — plus a ceiling, so a
+      // future `bounce` bump cannot quietly turn a pop into a trampoline.
+      expect(peak, greaterThan(1.0), reason: 'must actually pass its target');
+      expect(peak, lessThan(1.15), reason: 'must stay restrained');
+    });
+
+    test('settles inside the budget a complex transition is allowed', () {
+      final double settledAt = drive().settledAt * 1000;
+      // 140ms nominal measures ~350ms. The rule a complex transition answers to is
+      // "≤400ms", so this is the assertion that the *nominal* token was chosen
+      // correctly — and it is why the token is 140 and not the 420 it started as.
+      expect(
+        settledAt,
+        lessThan(400),
+        reason: 'a 420ms nominal settles at ~796ms and blows the budget',
+      );
+      expect(
+        settledAt,
+        greaterThan(200),
+        reason: 'a spring that snaps reads as a step',
+      );
+    });
+
+    test('the exit is faster than the entrance it follows', () {
+      // Asserted against the spring's **measured** settle rather than against
+      // `achievementDuration`, because comparing two nominals would prove nothing:
+      // 220ms < 140ms is false, while 220ms < ~350ms is true, and only the second is
+      // the claim being made. ~63% of the entrance.
+      final double settledAt = drive().settledAt * 1000;
+      expect(EvaMotion.achievementExit.inMilliseconds, lessThan(settledAt));
+      expect(
+        EvaMotion.achievementExit.inMilliseconds / settledAt,
+        inInclusiveRange(0.55, 0.75),
+      );
+    });
+
+    test('the nominal is NOT the settle time, so the two names differ', () {
+      // A regression guard on the rename. If someone folds `achievementDuration`
+      // back into a name claiming to be the settle time, this fails — because the
+      // two genuinely are different numbers, by ~2×.
+      expect(
+        EvaMotion.achievementDuration.inMilliseconds,
+        lessThan(drive().settledAt * 1000),
+      );
+    });
+  });
+
+  group('the achievement curve', () {
+    // ## WHY THE CURVE AND THE SPRING BOTH EXIST
+    //
+    // `flutter_animate`'s `EffectEntry.buildAnimation` wraps its controller in
+    // `Interval(begin / controller.duration, end / controller.duration)`. A spring's
+    // value exceeds 1.0 by design, and feeding that into the interval trips
+    // `ParametricCurve`'s `t >= 0.0 && t <= 1.0` assertion inside `Curves.transform`.
+    // So a `SpringSimulation` cannot go through `Animate` at all — not "loses its
+    // overshoot", **throws**. `achievementCurve` is what an `Animate`-driven effect
+    // uses instead.
+    //
+    // That leaves two mechanisms that could drift apart on feel, so the pairing is
+    // asserted rather than hoped for.
+
+    /// Peak value [curve] reaches above its target, as a fraction.
+    double overshootOf(Curve curve) {
+      double peak = 0.0;
+      for (double t = 0.0; t <= 1.0; t += 0.001) {
+        final double y = curve.transform(t);
+        if (y > peak) peak = y;
+      }
+      return peak - 1.0;
+    }
+
+    test(
+      'ends at exactly 1.0, which is what makes it safe through Animate',
+      () {
+        expect(EvaMotion.achievementCurve.transform(1.0), 1.0);
+        expectProperEndpoints(EvaMotion.achievementCurve, 'achievementCurve');
+      },
+    );
+
+    test('overshoots, unlike the routine curve', () {
+      expect(
+        overshootOf(EvaMotion.achievementCurve),
+        greaterThan(0.0),
+        reason: 'the whole reason it is not interactiveCurve',
+      );
+      // ~8.7% measured. The ceiling is the point: `Curves.elasticOut` measures 27.5%
+      // and reads as a glitch on a flame meant to look like it caught.
+      expect(overshootOf(EvaMotion.achievementCurve), lessThan(0.15));
+    });
+
+    test('the curve and the spring overshoot by the same amount', () {
+      // ~8.7% curve vs ~8.3% spring. They are different mechanisms; if they ever
+      // stopped *feeling* the same, the flame would pop differently from everything
+      // else celebrating the same event.
+      expect(
+        (overshootOf(EvaMotion.achievementCurve) - 0.083).abs(),
+        lessThan(0.015),
+      );
+    });
+
+    test('the routine curve is monotone, so the two families stay distinct', () {
+      // `closeTo`, not `0.0`: `easeOutExpo` lands at 1.0 minus ~1.2e-10, which is
+      // float noise in a bezier evaluation, not an undershoot. Asserting exact
+      // equality would be asserting the arithmetic of a polynomial.
+      expect(overshootOf(EvaMotion.interactiveCurve), closeTo(0.0, 1e-6));
+      // Deliberately **no** `isNot(same(...))` between the two curves. It would only
+      // prove they are not the same object, which the overshoot assertions already
+      // prove the stronger way: a token aliased to another would pass `same()` and
+      // fail there. It would also have to be registered in
+      // `no_identical_on_converted_types_test.dart`'s audit table, which is a
+      // permanent cost for no extra coverage.
     });
   });
 }
