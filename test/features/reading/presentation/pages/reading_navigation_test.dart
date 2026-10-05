@@ -10,8 +10,8 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -120,7 +120,7 @@ void main() {
             scripture: const Result<ScriptureText>.success(liveArabicPassage),
           );
 
-      await tester.tap(find.text(const ReadingStrings.ar().beginReflection));
+      await tester.tap(find.text(AppLocalizationsAr().readingBeginReflection));
       await pumpUntilFound(tester, find.byType(QuizPage));
 
       expect(mounted.router.currentPath, AppRoutes.quiz);

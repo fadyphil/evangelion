@@ -2,10 +2,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/auth/presentation/auth_strings.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/widgets/password_visibility_toggle.dart';
 import 'package:evangelion/features/auth/presentation/widgets/social_auth_button.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -245,7 +246,7 @@ class LoginPage extends StatelessWidget {
   ///
   /// `EvaButton.labelFamily` shipped optional and nullable; Phase 7 made it
   /// **required**, and this is one of the four call sites that has to answer. The
-  /// label is `LoginStrings.signIn`, which is `تسجيل الدخول` on the Arabic arm, and
+  /// label is `AppLocalizations.authSignIn`, which is `تسجيل الدخول` on the Arabic arm, and
   /// the fallback was `titleMedium`'s — **DM Sans**, no Arabic glyphs at all.
   ///
   /// **A per-arm family and not `EvaTypography.uiFamily`**, because the knob exists
@@ -385,7 +386,7 @@ class _LoginFormState extends State<_LoginForm> {
   @override
   Widget build(BuildContext context) {
     final Locale locale = Localizations.localeOf(context);
-    final LoginStrings strings = LoginStrings.of(locale);
+    final AppLocalizations strings = context.l10n;
     // **A getter, not a field**: `Localizations.localeOf` is an inherited-widget
     // lookup, and `ReadingLanguage.forLocale` is the one conversion of it in the
     // app. See [signInFamilyFor].
@@ -428,7 +429,7 @@ class _LoginFormState extends State<_LoginForm> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   EvaTextField(
-                    label: strings.emailLabel,
+                    label: strings.authEmailLabel,
                     controller: _email,
                     // `LoginScreen.tsx:49` — `placeholder="you@example.com"`. The
                     // prototype draws greyed text inside the empty field; until
@@ -436,7 +437,7 @@ class _LoginFormState extends State<_LoginForm> {
                     // one to, which is how a transcribed screen could render both
                     // of its fields empty for a whole phase. See that parameter's
                     // doc for the cost.
-                    hintText: strings.emailHint,
+                    hintText: strings.authEmailHint,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     errorText: state.emailError,
@@ -445,10 +446,10 @@ class _LoginFormState extends State<_LoginForm> {
                   ),
                   const SizedBox(height: LoginPage.kFormGap),
                   EvaTextField(
-                    label: strings.passwordLabel,
+                    label: strings.authPasswordLabel,
                     controller: _password,
                     // `LoginScreen.tsx:51` — `placeholder="••••••••"`.
-                    hintText: strings.passwordHint,
+                    hintText: strings.authPasswordHint,
                     obscureText: !state.isPasswordVisible,
                     textInputAction: TextInputAction.done,
                     errorText: state.passwordError,
@@ -460,8 +461,8 @@ class _LoginFormState extends State<_LoginForm> {
                     // field.
                     trailing: PasswordVisibilityToggle(
                       visible: state.isPasswordVisible,
-                      showLabel: strings.showPassword,
-                      hideLabel: strings.hidePassword,
+                      showLabel: strings.authShowPassword,
+                      hideLabel: strings.authHidePassword,
                       onPressed: () => context.read<AuthBloc>().add(
                         const AuthPasswordVisibilityToggled(),
                       ),
@@ -469,7 +470,7 @@ class _LoginFormState extends State<_LoginForm> {
                   ),
                   const SizedBox(height: LoginPage.kFormGap),
                   EvaButton(
-                    label: strings.signIn,
+                    label: strings.authSignIn,
                     // See [LoginPage.signInFamilyFor]. Required since Phase 7.
                     labelFamily: LoginPage.signInFamilyFor(language),
                     // The only live control on this screen. `null` when the form is
@@ -484,7 +485,7 @@ class _LoginFormState extends State<_LoginForm> {
                   const SizedBox(height: LoginPage.kFormGap),
                   Center(
                     child: TextLink(
-                      label: strings.forgotPassword,
+                      label: strings.authForgotPassword,
                       // Inert. See the class doc's element table.
                       onPressed: null,
                     ),
@@ -492,20 +493,20 @@ class _LoginFormState extends State<_LoginForm> {
                   const SizedBox(height: LoginPage.kFormGap),
                   _SignUpRow(strings: strings),
                   const SizedBox(height: LoginPage.kFormGap),
-                  HairlineDivider(label: strings.divider),
+                  HairlineDivider(label: strings.authDivider),
                   const SizedBox(height: LoginPage.kFormGap),
                   SocialAuthButton(
-                    label: strings.continueWithGoogle,
+                    label: strings.authContinueWithGoogle,
                     semanticLabel:
-                        '${strings.continueWithGoogle} — '
-                        '${strings.unavailableSuffix}',
+                        '${strings.authContinueWithGoogle} — '
+                        '${strings.authUnavailableSuffix}',
                   ),
                   const SizedBox(height: LoginPage.kFormGap),
                   SocialAuthButton(
-                    label: strings.continueWithApple,
+                    label: strings.authContinueWithApple,
                     semanticLabel:
-                        '${strings.continueWithApple} — '
-                        '${strings.unavailableSuffix}',
+                        '${strings.authContinueWithApple} — '
+                        '${strings.authUnavailableSuffix}',
                   ),
                   if (state.formError case final String message) ...<Widget>[
                     const SizedBox(height: LoginPage.kFormGap),
@@ -535,21 +536,21 @@ class _LoginFormState extends State<_LoginForm> {
 class _SignUpRow extends StatelessWidget {
   const _SignUpRow({required this.strings});
 
-  final LoginStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.center,
     children: <Widget>[
       Text(
-        strings.newHere,
+        strings.authNewHere,
         style: arabicAware(
           Theme.of(context).textTheme.bodyMedium!,
           Directionality.of(context),
         ).copyWith(color: context.colors.ink2),
       ),
       const SizedBox(width: LoginPage.kSignUpRowGap),
-      TextLink(label: strings.createAccount, onPressed: null),
+      TextLink(label: strings.authCreateAccount, onPressed: null),
     ],
   );
 }
@@ -558,17 +559,17 @@ class _SignUpRow extends StatelessWidget {
 class _Brand extends StatelessWidget {
   const _Brand({required this.strings});
 
-  final LoginStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
     return Column(
       children: <Widget>[
-        SealMonogram(semanticLabel: strings.sealLabel),
+        SealMonogram(semanticLabel: strings.authSealLabel),
         const SizedBox(height: LoginPage.kBrandGap),
         Text(
-          strings.wordmark,
+          strings.authWordmark,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.displaySmall!.copyWith(
             color: colors.ink,
@@ -578,7 +579,7 @@ class _Brand extends StatelessWidget {
         ),
         const SizedBox(height: LoginPage.kTaglineTopGap),
         Text(
-          strings.tagline,
+          strings.authTagline,
           textAlign: TextAlign.center,
           // Swapped for the ambient arm. `اقرأ. تأمل. تذكّر.` is the first Arabic
           // string a reader of this app ever sees and it rendered in DM Sans — three

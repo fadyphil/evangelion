@@ -1,7 +1,7 @@
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'design_system_harness.dart';
@@ -75,7 +75,7 @@ Future<void> pumpLogin(
       textDirection: textDirection ?? directionFor(locale),
       // The app's own delegate trio, so an `ar` locale is actually honoured here
       // rather than resolving back to English — see `evaPrimitiveHarness`'s note.
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       // The app's own declared pair (`app.dart`) — `ar` has to be *listed* or
       // MaterialApp resolves it back to `en_US`.
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],

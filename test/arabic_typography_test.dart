@@ -53,18 +53,18 @@ import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
-import 'package:evangelion/features/auth/presentation/auth_strings.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
+import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
-import 'package:evangelion/features/result/presentation/result_strings.dart';
+import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/features/result/presentation/result_l10n.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/arabic_typography_gate.dart';
@@ -88,31 +88,31 @@ void main() {
     /// ## BUILT FROM THE TABLES AND THE FIXTURES, **NOT** TYPED OUT
     ///
     /// The first version of this list was Arabic literals, and every one of them is a
-    /// second copy of a string that already lives in `HomeStrings` or in the live
+    /// second copy of a string that already lives in `AppLocalizations` or in the live
     /// payload. Four went wrong on the first run — a missing combining mark is
     /// invisible in a diff and the failure then reads as "the widget rendered the
     /// wrong string" rather than "the test typed the wrong string". So the UI strings
-    /// come from `HomeStrings.ar()` and the payload strings from the fixture, and
+    /// come from `AppLocalizationsAr()` and the payload strings from the fixture, and
     /// nothing here is transcribed.
     ///
     /// The one composed value, the greeting's lead-in, is `greetingLead`'s own
     /// output for the period the fixture's clock resolves to — which is exactly the
     /// derivation the panel uses, and is asserted to be a *distinct* string from the
     /// rest so a change to it cannot silently collapse two runs into one.
-    const HomeStrings ar = HomeStrings.ar();
+    final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
       ar.greetingLead(GreetingPeriod.morning, hasName: true),
-      ar.streakResting,
+      ar.homeStreakResting,
       // **`continueReading`, not `readingComplete`** — and the reason is the
       // fixture, not a slip: `liveArabicScripture.isFullyCompleted` is **false**,
       // because `home_harness.dart`'s doc says the Arabic arm must be unfinished so
       // both branches of the eyebrow are reachable. The completed branch is gated by
       // its own test below rather than being assumed here.
-      ar.continueReading,
+      ar.homeContinueReading,
       liveArabicScripture.verses.first.textClean!,
       liveArabicScripture.reference,
-      ar.continueLabel,
-      ar.startReflection,
+      ar.homeContinueLabel,
+      ar.homeStartReflection,
     ];
 
     testWidgets('the Arabic arm, with the live Arabic payload', (
@@ -154,8 +154,8 @@ void main() {
         screen: '/',
         expectedArabic: <String>[
           for (final String run in arabic)
-            if (run != ar.continueReading) run,
-          ar.readingComplete,
+            if (run != ar.homeContinueReading) run,
+          ar.homeReadingComplete,
         ],
       );
     });
@@ -179,10 +179,10 @@ void main() {
         screen: '/',
         expectedArabic: <String>[
           ar.greetingLead(GreetingPeriod.morning, hasName: true),
-          ar.streakResting,
+          ar.homeStreakResting,
           // The retry label — an Arabic run this phase's own first draft of the list
           // forgot, which the gate caught. That is the gate working.
-          ar.retry,
+          ar.homeRetry,
         ],
       );
       expect(
@@ -207,22 +207,22 @@ void main() {
     /// right, from decision 66's required `labelFamily`.
     ///
     /// Built from the string table, for the reason `/`'s list gives.
-    const LoginStrings ar = LoginStrings.ar();
+    final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
-      ar.tagline,
+      ar.authTagline,
       // `EvaTextField` renders its label as `label.toUpperCase()`, and Arabic has no
       // case — so the rendered run is the field value itself. Asserting the table's
       // value is correct *because* the transform is a no-op here, and the widget's doc
       // says so rather than leaving it to be re-derived.
-      ar.emailLabel,
-      ar.passwordLabel,
-      ar.signIn,
-      ar.forgotPassword,
-      ar.newHere,
-      ar.createAccount,
-      ar.divider,
-      ar.continueWithGoogle,
-      ar.continueWithApple,
+      ar.authEmailLabel,
+      ar.authPasswordLabel,
+      ar.authSignIn,
+      ar.authForgotPassword,
+      ar.authNewHere,
+      ar.authCreateAccount,
+      ar.authDivider,
+      ar.authContinueWithGoogle,
+      ar.authContinueWithApple,
     ];
 
     testWidgets('the Arabic arm, on the empty form', (
@@ -260,7 +260,7 @@ void main() {
       // `features/auth/domain/login_credentials.dart` — a **pure-Dart domain file**,
       // which by Gate 1 has no `Locale` and therefore cannot pick an arm. The fix is
       // a validation-*code* enum on `LoginValidation` plus a message in
-      // `LoginStrings`, which changes `AuthState`'s public shape and is a domain
+      // `AppLocalizations`, which changes `AuthState`'s public shape and is a domain
       // decision this typography gate does not own.
       //
       // **What Phase 9 inherits, stated:** two English sentences on the Arabic arm of
@@ -302,11 +302,11 @@ void main() {
     /// eleven that remain. Six of these are the verse paragraphs — whole-verse runs,
     /// which the per-site table covers by pointing at the marker inside them.
     ///
-    /// Built from the fixture and `ReadingStrings.ar()`, for `/`'s reason: a
+    /// Built from the fixture and `AppLocalizationsAr()`, for `/`'s reason: a
     /// hand-typed Arabic list in a test is a second copy of the corpus.
     /// Built from the fixture and the string table, for `/`'s reason: a hand-typed
     /// Arabic list in a test is a second copy of the corpus.
-    const ReadingStrings ar = ReadingStrings.ar();
+    final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
       // Site 1 — the metadata row: the payload's own `translation`, which is
       // **per-language** (`ReadingHeader`'s doc has the measurement) and half of it
@@ -327,16 +327,16 @@ void main() {
       // repository that a test's own wrong derivation has read as a widget defect.
       for (final Verse verse in liveArabicPassage.verses) verse.text,
       // Site 5 — the CTA label.
-      ar.beginReflection,
+      ar.readingBeginReflection,
       // Site 2 — the caption, with Arabic-Indic digits.
-      '${arabicIndicDigits(1)} ${ar.questionSingular}',
+      ar.readingCaption(1),
       // Sites 7, 8 and 9 — the three control tooltips, which have **no prototype
       // line**: `ReadingEnScreen.tsx:14-16` and `ReadingArScreen.tsx:21-29` are bare
       // `<button>`s with an inline `<svg>` and no label, so §14 forced these three
       // strings into this client. They are the 30 tofu boxes decision 71 records.
-      ar.back,
-      ar.textSize,
-      '${ar.bookmark} — ${ar.unavailableSuffix}',
+      ar.readingBack,
+      ar.readingTextSize,
+      '${ar.readingBookmark} — ${ar.readingUnavailableSuffix}',
     ];
 
     testWidgets('the Arabic arm, with the live Arabic passage', (
@@ -385,12 +385,12 @@ void main() {
         screen: '/reading',
         expectedArabic: <String>[
           ...arabic,
-          // `ReadingStrings.ar`'s own two new strings. They were
+          // `AppLocalizations.ar`'s own two new strings. They were
           // `'Decrease font size'` / `'Increase font size'` hard-coded in
           // `FontSizeStepper`, so before this phase this arm rendered two English
           // sentences in a panel on a bilingual screen.
-          const ReadingStrings.ar().decreaseFontSize,
-          const ReadingStrings.ar().increaseFontSize,
+          AppLocalizationsAr().readingDecreaseFontSize,
+          AppLocalizationsAr().readingIncreaseFontSize,
         ],
       );
     });
@@ -417,9 +417,9 @@ void main() {
     // **declared**, which is decision 79's actual mechanism: a run cannot disappear
     // and leave the gate satisfied by the ones that remain.
     //
-    // Built from the Arabic fixture and `QuizStrings.ar()`, for decision 79's reason:
+    // Built from the Arabic fixture and `AppLocalizationsAr()`, for decision 79's reason:
     // a hand-typed Arabic list in a test is a second copy of the corpus.
-    const QuizStrings ar = QuizStrings.ar();
+    final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
       // The progress label — `questionProgress` with Arabic-Indic digits.
       ar.questionProgress(1, 1),
@@ -433,13 +433,13 @@ void main() {
       ...liveArabicQuestion.options.values,
       // The close control's tooltip — a bare `<button>` around an `<svg>` cross in
       // the prototype (`QuizScreen.tsx:46-50`), so §14 forced the string into this
-      // client, exactly as it forced `ReadingStrings.back` on Phase 7.
-      ar.exit,
+      // client, exactly as it forced `AppLocalizations.readingBack` on Phase 7.
+      ar.quizExit,
     ];
-    // **`ar.progress` is DELIBERATELY NOT IN THE LIST, and that is a fact about the
+    // **`ar.quizProgress` is DELIBERATELY NOT IN THE LIST, and that is a fact about the
     // gate rather than an omission.**
     //
-    // `QuizHeader` passes `strings.progress` to `ProgressBeads.semanticLabel`, and
+    // `QuizHeader` passes `strings.quizProgress` to `ProgressBeads.semanticLabel`, and
     // `ProgressBeads` puts it in a `Semantics(label: …, excludeSemantics: true)`
     // node — it is **never rendered as text**. This gate reads *painted* runs, so a
     // semantics-only string cannot appear in the rendered set, and declaring it
@@ -471,7 +471,7 @@ void main() {
         // `Declared but NOT rendered` half. The failure said exactly that:
         // `Actual: Set:['تحقق من الإجابة']` while the rendered tree said
         // `السؤال التالي`.
-        expectedArabic: <String>[...arabic, ar.checkAnswer],
+        expectedArabic: <String>[...arabic, ar.quizCheckAnswer],
         vacuousBecause: null,
       );
     });
@@ -500,7 +500,7 @@ void main() {
       // the gate working. `liveArabicQuestion` is the one transcription.
       await tester.tap(find.text(liveArabicQuestion.options['A']!));
       await pumpQuizFrames(tester, 2);
-      await tester.tap(find.text(ar.checkAnswer));
+      await tester.tap(find.text(ar.quizCheckAnswer));
       await pumpQuizFrames(tester, 4);
 
       expect(find.byType(FeedbackBanner), findsOneWidget);
@@ -512,7 +512,11 @@ void main() {
         // label. `correctSuffix` is *not* here — like `ProgressBeads`' label it is a
         // semantics-only string, and `quiz_page_test.dart`'s spoiler group is what
         // reads it.
-        expectedArabic: <String>[...arabic, ar.verdictCorrect, ar.nextQuestion],
+        expectedArabic: <String>[
+          ...arabic,
+          ar.quizVerdictCorrect,
+          ar.quizNextQuestion,
+        ],
         vacuousBecause: null,
       );
     });
@@ -535,12 +539,12 @@ void main() {
     // fixture at all** — the plan's own cut gives it no repository, so there is
     // nothing to capture — which makes this list the purest form of decision 79's
     // rule: every run here is either the app's own chrome or an integer the client
-    // rendered, and all of it comes from `ResultStrings.ar()`.
-    const ResultStrings ar = ResultStrings.ar();
+    // rendered, and all of it comes from `AppLocalizationsAr()`.
+    final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
       // The headline sentence.
-      ar.completeMessage,
-      // The streak pill, with **Arabic-Indic digits** — `ResultStrings.streakLabelFor`
+      ar.resultCompleteMessage,
+      // The streak pill, with **Arabic-Indic digits** — `AppLocalizations.streakLabelFor`
       // runs `_countIn`, so `4` is `٤`. This is the one run on the screen whose
       // *numerals* are Arabic, and it is why `arabic_digits.dart` moved to
       // `core/domain/` in Phase 8: three features needed it.
@@ -548,12 +552,20 @@ void main() {
       // The two stat tiles' **labels**, which `StatTile` renders in mono caps — the
       // Latin-on-the-AR-arm family is `StatTile`'s own recorded Phase-10 debt and is
       // not this phase's, so only the *strings* are declared here.
-      ar.thisAnswer,
-      ar.bestRun,
+      ar.resultThisAnswer,
+      ar.resultBestRun,
       // The score's caption, and both buttons.
-      ar.totalCaption,
-      ar.reflectAgain,
-      ar.backHome,
+      //
+      // ## AND THE CAPTION IS A **PLURAL** NOW, TAKING THE SCORE
+      //
+      // It used to be the bare noun `نقطة`, which is SINGULAR and so was wrong for
+      // every score from 3 up — `٥ نقطة` instead of `٥ نقاط`. `resultTotalCaption` is
+      // an ICU plural now and the score above it is `٤٠`, which is Arabic's `many`
+      // class, so this arm still renders `نقطة`. The **wrong** arm below renders
+      // `نقاط`, and that difference is the fix being visible in this file.
+      ar.resultTotalCaption(40),
+      ar.resultReflectAgain,
+      ar.resultBackHome,
       // **The three bare numerals**, which is what the gate found missing and is
       // the reason `arabic_digits.dart` had to move to `core/domain/` in Phase 8.
       //
@@ -619,7 +631,7 @@ void main() {
     // is a fifth `SubmitResult` and a third pump, for a sentence that differs from
     // `completeMessage` only in its second clause. The family gate covers the numeral
     // rule and the two divergent headline sentences; the per-string script check that
-    // would cover the fifth state is `result_strings_test.dart`'s, over [ResultStrings.fields].
+    // would cover the fifth state is `test/l10n/app_localizations_test.dart`'s, over the ARB itself.
     //
     // **And the list below is NOT `arabic` plus two entries.** `expectArabicTypography`
     // asserts in **both** directions — nothing declared may go unrendered, and nothing
@@ -628,12 +640,17 @@ void main() {
     // half. Measured, the wrong arm renders exactly:
     ///
     /// ```text
-    /// ٠ | نقطة | ليس هذه المرة. كل سؤال يُحتسب. | اليوم ٠ | ٠ | هذه الإجابة | ٠ | أطول سلسلة
+    /// ٠ | نقاط | ليس هذه المرة. كل سؤال يُحتسب. | اليوم ٠ | ٠ | هذه الإجابة | ٠ | أطول سلسلة
     /// ```
     ///
     /// plus the two button captions. So `٠` appears **three** times on screen and the
     /// two stat labels are unchanged, while the score, the pill and the headline are
     /// all different strings from the correct arm's.
+    ///
+    /// **The caption in that line was `نقطة` and is now `نقاط`,** because
+    /// `resultTotalCaption` became a plural and `0` is Arabic's `zero` class. This is
+    /// the one place in the file where ARB changed what a reader sees rather than
+    /// only how it is spelled, and it changed it in the direction the grammar points.
     testWidgets('the WRONG arm, where every number is `٠`', (
       WidgetTester tester,
     ) async {
@@ -653,20 +670,23 @@ void main() {
         screen: '/result (wrong)',
         expectedArabic: <String>[
           // The headline sentence the correct arm never shows.
-          ar.incorrectMessage,
+          ar.resultIncorrectMessage,
           // The score — a bare `٠`, from `currentTotalPoints: 0`.
           arabicIndicDigits(0),
-          // The score's caption, unchanged by the state.
-          ar.totalCaption,
+          // The score's caption — **NOT unchanged by the state any more.** The score
+          // is `٠`, which is Arabic's `zero` class, so this arm renders `نقاط` where
+          // the correct arm's `٤٠` rendered `نقطة`. The doc block above records the
+          // measured line and has been corrected with it.
+          ar.resultTotalCaption(0),
           // The pill: **the label and a zero count**, so the string differs from the
           // correct arm's `اليوم ٤` in its numeral and nowhere else.
           ar.streakLabelFor(current: 0, longest: 0),
           // The two stat tiles — label unchanged, value `٠` in both.
-          ar.thisAnswer,
-          ar.bestRun,
+          ar.resultThisAnswer,
+          ar.resultBestRun,
           // Both buttons, unchanged by the state.
-          ar.reflectAgain,
-          ar.backHome,
+          ar.resultReflectAgain,
+          ar.resultBackHome,
         ],
         vacuousBecause: null,
       );
@@ -818,11 +838,31 @@ void main() {
     test('the Arabic predicate is a BLOCK range, and `رجوع` proves it', () {
       // The four codepoints the first version sampled. `رجوع` is none of them, which
       // is why thirty tofu boxes shipped behind a green gate.
-      expect(containsArabic('رجوع'), isTrue);
-      expect('رجوع'.runes, isNot(contains(0x0628)));
-      expect('رجوع'.runes, isNot(contains(0x0644)));
-      expect('رجوع'.runes, isNot(contains(0x064E)));
-      expect('رجوع'.runes, isNot(contains(0x0665)));
+      //
+      // ## READ OFF THE ARB, NOT TYPED HERE — and this file used to type it
+      //
+      // It was `رجوع` four times over, a hand-typed copy of `readingBack`'s Arabic
+      // value. `reading_strings_test.dart`'s own doc made the argument against that
+      // — *"a hand-typed copy of a corpus string is a second declaration; if the
+      // fixture's text is ever corrected, the assertion silently stops testing
+      // anything"* — and the string was about to be transcribed into an ARB. So the
+      // probe reads the one declaration. The test is unchanged in strength: it is
+      // still this predicate's own proof, and it is now proof about a string the app
+      // actually ships.
+      final String back = AppLocalizationsAr().readingBack;
+      expect(
+        back,
+        'رجوع',
+        reason:
+            'the ARB is the declaration now — if the translator changes this, this '
+            'probe is measuring a different string and the codepoints below may not '
+            'be absent from it any more, which is the point of the assertions',
+      );
+      expect(containsArabic(back), isTrue);
+      expect(back.runes, isNot(contains(0x0628)));
+      expect(back.runes, isNot(contains(0x0644)));
+      expect(back.runes, isNot(contains(0x064E)));
+      expect(back.runes, isNot(contains(0x0665)));
       // All four blocks, not just the one the app's own strings happen to use.
       expect(isArabicRune(0x0600), isTrue);
       expect(isArabicRune(0x0750), isTrue);
@@ -867,7 +907,7 @@ Future<void> _pumpStub(WidgetTester tester, Widget page) async {
       locale: const Locale('ar'),
       // Derived from the locale, for `login_harness.dart`'s recorded reason.
       textDirection: TextDirection.rtl,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
       child: page,
     ),

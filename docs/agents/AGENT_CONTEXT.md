@@ -42,7 +42,7 @@ agent does not re-propose what was rejected, or re-litigate what was accepted.
 |---|---|---|
 | 7 | **Keep `sealed Result<T>`.** `fp_dart`/`dartz` rejected. | `lib/core/common/result.dart` stays hand-written. |
 | 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal is **deferred**, because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7), so its last use has not gone. It becomes transitive-only, and is removed from `pubspec.yaml`, in whichever task removes those last two. |
-| 8b | **Adopt ARB + `gen_l10n`.** | The six hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/*.arb`. |
+| 8b | **Adopt ARB + `gen_l10n`.** | **Shipped** on `refactor/gen-l10n`: the **five** hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/app_en.arb` + `app_ar.arb` (72 keys). Decisions 101–111 below. Three of §2.1's own claims were corrected **by measurement** during that task and are marked there: the table and field counts, "compile-time key checking" (a missing key is a codegen *warning*, not a build error), and the locale re-dispatch (it is a corpus re-fetch and it **stays**). |
 | 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
 
 **Why `fp_dart` was rejected, with the numbers, so it is not re-proposed:**
@@ -95,21 +95,33 @@ over `DioExceptionType.values` is a recorded gate. The one real gap was
    `Text.rich`). The migration needs a gate that two structurally-equal states
    still compare equal **and** that no assertion anywhere relies on `identical()`.
 
-**What `gen_l10n` changes, and why it is worth 302 renamed test references:**
+**What `gen_l10n` changes, and why it is worth 302 renamed test references.**
+*(Written before the migration. Every bullet below was re-measured on
+`refactor/gen-l10n`; where the measurement disagreed, the correction is recorded at
+decision 111 and marked here.)*
 
-- 69 distinct string fields across the six tables, of which **3 collide** and must
-  be namespaced in one ARB: `retry` (`home`/`quiz`/`reading`), `unavailableSuffix`
+- ~~69 distinct string fields across the six tables~~ — **five** tables, **73** string
+  fields, **67** distinct bare names, **72** ARB keys. Three collide and were
+  namespaced: `retry` (`home`/`quiz`/`reading`), `unavailableSuffix`
   (`auth`/`home`/`quiz`/`reading`), `wordmark` (`auth`/`home`).
 - **ICU plurals**, which the hand-rolled tables do not have. Arabic has
   zero/one/two/few/many/other, and Phase 8 hand-wrote `1 question` /
   `5 questions` / `٠ أسئلة`. That is a correctness gap, not an ergonomic one.
-- **Compile-time key checking.** A typo becomes a build error; today it is a
-  missing sentence on a shipped screen.
-- **The manual locale re-dispatch dies.** `HomePage` and `QuizPage` each hand-roll
-  a `didChangeDependencies` re-dispatch because the tables resolve through
-  `static X of(Locale)` and bypass `Localizations`. Only the **locale** half goes —
-  Phase 6's `AutoRouteAware.didPopNext` re-entry trigger stays, and that is the half
-  that fixes the stale-streak defect.
+  **Landed**, and it paid off a recorded debt: the old `captionFor(2)` was `٢ أسئلة`
+  where correct Arabic is `٢ سؤالان`. Two counts became plurals and four were audited
+  and named as not plural-dependent — decision 104.
+- ~~**Compile-time key checking.** A typo becomes a build error~~ — **half true, and
+  the half that is false matters**: a key missing from a locale file makes
+  `flutter gen-l10n` print a hint and **exit 0**, emitting the template's **English**
+  value into the Arabic class, and `dart analyze` reports nothing. A structural test
+  over the two ARB files is what turns it red — decision 108.
+- ~~**The manual locale re-dispatch dies.**~~ **This bullet was wrong and the code was
+  left alone.** `HomePage`/`QuizPage`'s `didChangeDependencies` branch is
+  `if (_requested != _language) _load()` — a **corpus re-fetch**, not a string
+  resolution, and it reads `Localizations` directly. Emptying it fails **56** tests.
+  What died is the resolution *pattern* (`X.of(Localizations.localeOf(ctx))` in five
+  `build` methods → `context.l10n`), and `didPopNext` is untouched and still gated —
+  decision 106.
 
 ### The six routes
 
@@ -2667,6 +2679,136 @@ Verified by scan and by negative control (an `import 'package:flutter/material.d
 planted in a `core/domain` part makes Gate 1 exit 1).
 
 
+### Recorded decisions — ARB + `gen_l10n` (decision 8b)
+
+Shipped on `refactor/gen-l10n`. Five `*Strings` tables deleted; `lib/l10n/app_en.arb`
++ `app_ar.arb` (72 keys) and the three generated `app_localizations*.dart` files
+replace them. No new dependency — `flutter_localizations` and `intl` were already
+present — and `pubspec.yaml` changed by exactly one line, `generate: true`.
+
+**101. ONE ARB, AND EVERY KEY IS PREFIXED BY ITS FEATURE.** Not only the three
+colliding names; **all 72**. Rejected: prefixing only `retry` / `unavailableSuffix` /
+`wordmark`, which is the cheaper rename and leaves 66 keys that look unowned beside 6
+that do not. The next collision would then be resolved by whoever hits it, under time,
+with no rule in the file to follow. Uniform prefixing makes the ARB self-documenting
+(`homeRetry` is home's, `homeStreakLabel` is home's) and makes §3's feature ownership
+visible in the one file a translator reads. Collisions resolved as §2.1 asked:
+`homeRetry`/`quizRetry`/`readingRetry`,
+`authUnavailableSuffix`/`homeUnavailableSuffix`/`quizUnavailableSuffix`/`readingUnavailableSuffix`,
+`authWordmark`/`homeWordmark`.
+
+**102. THE NON-STRING LOGIC WENT WHERE ITS ONLY CALLERS ARE.** Each table held three
+kinds of thing and only the first was a string. Derived strings — `greetingWord`,
+`greetingLead`, `questionProgress`, `optionLabel`, `messageFor`, `streakLabelFor` —
+are composition, not translation, and each lives in
+`features/<f>/presentation/<f>_l10n.dart` as an extension on `AppLocalizations`.
+Rejected: one `lib/l10n/derived.dart`. `greetingWord` needs `GreetingPeriod`, which §3
+puts in `features/home/domain/`, so a shared file would make the shared kernel
+feature-dependent. Gate 2 would **not** have caught it (`tool/feature_import_check.dart`
+skips a path whose owner is neither `features/*` nor `core`) — it is §3 that forbids
+it, and that is worth knowing about the gate. What is in `lib/l10n/` itself
+(`l10n.dart`) is only `BuildContext.l10n`, `isArabicArm` and `digits`, and it imports
+nothing from a feature.
+
+**103. THE PLURAL TAKES TWO PLACEHOLDERS, AND THAT IS MEASURED, NOT AESTHETIC.**
+`readingCaptionFor` declares `count` (int, the ICU selector) **and** `digits` (String,
+the rendered numeral). Reason: `gen_l10n` compiles `{count, plural, …}` by
+interpolating the raw Dart `int` — the generated Arabic arm literally reads
+`'$count أسئلة'` — so a single-placeholder ARB renders **Latin digits on the Arabic
+arm**, silently undoing `arabicIndicDigits` (pinned by `arabic_digits_test.dart` and
+`font_coverage_test.dart`) and leaving every Arabic screen showing `5 questions` beside
+`٥`. The division is the honest one: agreement is a property of the WORDING and belongs
+in the ARB; the numeral system is a property of the ARM and belongs in `l10n.dart`.
+Rejected: `NumberFormat` from `intl` — the obvious spelling, and it would have made a
+translatable key carry a locale's digits with no single function the tests could pin.
+
+**104. THE PLURAL AUDIT — TWO COUNTS BECAME PLURALS, AND EVERY OTHER ONE WAS CHECKED
+AND NAMED.** Genuinely plural-dependent: the **question count**
+(`readingCaptionFor`) and the **score caption** (`resultTotalCaption`). Genuinely not,
+with the reason each: **streak days** (`resultDay`, and `homeStreakLabel`) — a *label
+form*, `Day 12` / `اليوم ١٢`, correct for every count in both arms; a plural would
+render `Days 12` in English, altering a transcribed prototype string
+(`ResultScreen.tsx:65`) to fix nothing. **verse counts** (`readingVerse`) — the marker
+names an index, it does not count a set; a plural there would select an `other` branch
+identical to its `one` branch, a test that cannot fail. **quiz progress**
+(`questionProgress`) — no noun agrees with either number; `of` / `من` is invariant.
+**`days_to_milestone`** — **not rendered anywhere**; `StreakSummary` carries it and no
+widget draws it, so there is no string to convert and the scope ends at the UI.
+Also recorded and NOT fixed, being out of scope: `progress_beads.dart:146` composes
+`': N of M complete'` in English inside `core/`, so that semantics label reaches a
+screen reader in English on the Arabic arm.
+
+**105. `isArabic` IS NOW THE LOCALE.** `AppLocalizationsArm.isArabicArm` reads
+`localeName`. The old derivation — compare one of the table's own strings against the
+Arabic arm's — was sound and has **no honest form left**: `AppLocalizationsAr` is
+generated, so the comparison would be a generated getter against a second generated
+instance, i.e. a test of the generator; and it breaks the moment a translator picks an
+Arabic value that coincides with the English one. Proven by mutation: pasting `'Streak'`
+into `app_ar.arb`'s `homeStreakLabel` fails 3 tests including `isArabicArm`'s. Rejected:
+`arabicAware` — that is the rule for **families**, it reads ambient direction, and
+`eva_typography.dart` §4 is explicit that the per-arm `*FamilyFor` switches stay beside
+it. This is a numeral/arm rule keyed on the locale, deliberately.
+
+**106. THE LOCALE RE-DISPATCH **STAYS**, AND §2.1's CLAIM THAT IT DIES WAS WRONG.**
+§2.1 said the `didChangeDependencies` re-dispatch in `HomePage` and `QuizPage` exists
+"because the tables resolve through `static X of(Locale)` and bypass `Localizations`".
+Measurement says otherwise: that branch is `if (_requested != _language) _load()`,
+where `_language` is `ReadingLanguage.forLocale(Localizations.localeOf(context))`. It
+is a **corpus re-fetch** trigger — a locale change must re-ask the API for the other
+arm's scripture and questions. It never re-resolved strings; `build` did that, on every
+rebuild. Removing it is a regression, and a measured one: emptying the branch fails
+**56** tests, including three of the six-screen Arabic gate's `/` runs. What died is the
+**resolution pattern** — `X.of(Localizations.localeOf(context))` in five `build`
+methods, now `context.l10n` — and `didPopNext`, the Phase 6 re-entry trigger, is
+untouched and still load-bearing: emptying it fails 1 test,
+`home_navigation_test.dart`'s "a push/pop re-asks, and the screen shows the NEW answer",
+with its control "a REBUILD still asks for nothing" still green beside it.
+
+**107. THE GENERATED `*.dart` FILES ARE COMMITTED, FORMATTED, AND `build_runner` DOES
+NOT PRODUCE THEM.** `gen_l10n`'s raw output is **not** `dart format`-clean (3 of 3
+files change), so the committed copies are the formatted ones or the §7 formatting gate
+is red on a fresh clone. Two corrections to the task's verify list: `dart run
+build_runner build` does **not** run `gen_l10n` (removing a generated file and running
+it leaves the file absent), and neither does `flutter test` — only `flutter gen-l10n`,
+`flutter pub get` and `flutter build` do. That is the same reason Gate 3 tracks
+`*.gr.dart` and `*.config.dart`: "so `dart analyze` is meaningful on a fresh clone".
+
+**108. A MISSING KEY IS A **WARNING**, NOT A BUILD ERROR — SO A TEST IS THE GATE.**
+§2.1 claimed "a typo becomes a build error; today it is a missing sentence on a
+shipped screen." Measured: deleting a key from `app_ar.arb` makes `flutter gen-l10n`
+print a long hint and **exit 0**, emitting the **template's English value** into the
+Arabic class. `dart analyze --fatal-infos --fatal-warnings` reports nothing. What
+catches it is `test/l10n/app_localizations_test.dart`'s "both arms carry exactly the
+same keys" — **2 failures**. The compile-time claim is half true: it moves the failure
+from a shipped screen to codegen's stderr, and a test is what makes it red.
+
+**109. `resultTotalCaption` IS A PLURAL WITH NO `{digits}`.** Selection only, because
+`result_page.dart` draws the score in `displayLarge` one line above and folding the
+numeral in would print it twice. What must agree with the number is the **noun** — and
+the old value was `نقطة`, singular, for every score, so `٥ نقطة` rendered where Arabic
+wants `٥ نقاط`. A real correctness bug, fixed by the same mechanism as 103. English
+output is unchanged: every score in this app's fixtures is greater than one, so `other`
+('points') was already what rendered and `one`('point') was the branch that was missing.
+
+**110. EVERY KEY MUST CARRY ITS REASONING, AND THE CITATIONS WITH IT.** The five tables
+carried, per string, the prototype's `file:line` where one existed, the reason it was
+written where none did, and the alternatives rejected. `gen_l10n` discards
+`@key` descriptions after using them for tooling, so the descriptions are not
+documentation — they are the record, and ARB is the only place it can live. Two gates
+hold it: every key needs a description over 40 characters, and 17 keys are pinned to the
+exact `file:line` they must still name. Proven by mutation: removing `HomeScreen.tsx:30`
+from one description fails 1 test by name.
+
+**111. §2.1's COUNTS WERE WRONG, AND THE CORRECTION IS RECORDED RATHER THAN QUIETLY
+REUSED.** There were **five** tables, not six — `LoginStrings`, `HomeStrings`,
+`QuizStrings`, `ReadingStrings`, `ResultStrings`; the sixth feature, `/settings`, has
+never had a table. They carried **73** string fields, of which **67** were distinct
+bare names before namespacing (the three collisions account for the other 6), and they
+are **72** ARB keys after `questionSingular`/`questionPlural` merge into one plural and
+`resultTotalCaption` becomes one. §2.1's "69 distinct string fields across the six
+tables" matches none of those three numbers.
+
+
 ## 7. Verification — run before reporting done
 
 ```bash
@@ -2674,7 +2816,17 @@ dart format --output=none --set-exit-if-changed lib test tool  # formatting
 dart analyze --fatal-infos --fatal-warnings                # types + lint + DEPRECATION
 flutter test                                               # full suite
 tool/verify_purity.sh                                      # architecture gates
+dart fix --dry-run                                         # Nothing to fix!
 ```
+
+**Two codegen commands, and they are not interchangeable.** `dart run build_runner
+build` produces the freezed / auto_route / injectable outputs and **does not run
+`gen_l10n`**; only `flutter gen-l10n`, `flutter pub get` and `flutter build` produce
+`lib/l10n/app_localizations*.dart`, and **not `flutter test`**. That is why the three
+generated files are committed — the same reason Gate 3 tracks `*.gr.dart` and
+`*.config.dart` — and why they are committed **formatted**, because `gen_l10n`'s raw
+output is not `dart format`-clean and the first gate above would otherwise be red on a
+fresh clone. Decision 107.
 
 ### Architecture gates — use the script, not an inline command
 

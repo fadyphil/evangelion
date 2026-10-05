@@ -86,8 +86,8 @@ class ErrorView extends StatelessWidget {
   /// `Localizations` inside `EvaButton`, is what `EvaButton`'s own doc rejects.
   ///
   /// **[retryLabel] is the app's own localized string, so this is not defensive.**
-  /// Both shipped call sites pass `ReadingStrings.of(locale).retry` /
-  /// `HomeStrings.of(locale).retry`, and on the Arabic arm that is Arabic text
+  /// Both shipped call sites pass `AppLocalizations.readingRetry` /
+  /// `AppLocalizations.homeRetry`, and on the Arabic arm that is Arabic text
   /// going into a button whose only family knob is this one.
   ///
   /// Nullable-and-[assert]ed rather than required, and that is **not** a retreat from

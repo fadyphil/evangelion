@@ -6,9 +6,11 @@ import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
+import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -335,7 +337,7 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final HomeStrings strings = HomeStrings.of(Localizations.localeOf(context));
+    final AppLocalizations strings = context.l10n;
 
     // §3 keeps `core/domain/` Flutter-free, so the `Locale` → `ReadingLanguage`
     // conversion happens **here**, at the one edge where a `Locale` exists — see
@@ -350,15 +352,15 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             AppTopBar(
-              wordmark: strings.wordmark,
+              wordmark: strings.homeWordmark,
               streakDays: state.streak?.currentStreak,
-              streakSemanticLabel: strings.streakLabel,
+              streakSemanticLabel: strings.homeStreakLabel,
               streakFailureMessage: state.streakFailure?.message,
               onRetryStreak: () =>
                   context.read<HomeBloc>().add(HomeRetried(language)),
               initials: state.readerInitials ?? '',
-              avatarSemanticLabel: state.readerName ?? strings.avatarLabel,
-              avatarUnavailableReason: strings.unavailableSuffix,
+              avatarSemanticLabel: state.readerName ?? strings.homeAvatarLabel,
+              avatarUnavailableReason: strings.homeUnavailableSuffix,
               // `null` — see [AppTopBar.onAvatarTap]: the prototype navigates to
               // `profile` and §2 decision 1 cut it.
               onAvatarTap: null,
@@ -404,7 +406,7 @@ class _Greeting extends StatelessWidget {
 
   final GreetingPeriod period;
   final String? name;
-  final HomeStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
@@ -473,7 +475,7 @@ class _Greeting extends StatelessWidget {
 /// and the distinction is the whole of this widget. The condition is the measured
 /// one: the live payload has `streak/summary.current_streak == 0`, so the
 /// prototype's unconditional literal would tell a reader their streak is glowing
-/// while the flame beside it reads `0`. See `HomeStrings.streakResting` for the
+/// while the flame beside it reads `0`. See `AppLocalizations.homeStreakResting` for the
 /// alternative that was rejected.
 ///
 /// ## WHY THE ROW IS RESERVED WHEN THERE IS NO STREAK
@@ -510,7 +512,7 @@ class _StreakSubtitle extends StatelessWidget {
   /// The streak, or `null` while it is loading or failed.
   final StreakSummary? streak;
 
-  final HomeStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
@@ -526,8 +528,8 @@ class _StreakSubtitle extends StatelessWidget {
         summary == null
             ? ''
             : summary.currentStreak > 0
-            ? strings.streakGlowing
-            : strings.streakResting,
+            ? strings.homeStreakGlowing
+            : strings.homeStreakResting,
         // `HomeScreen.tsx:30` — `F.ui 14 / 400 / ink2 / marginTop 6`.
         //
         // Swapped for the ambient arm: on the Arabic arm this run is

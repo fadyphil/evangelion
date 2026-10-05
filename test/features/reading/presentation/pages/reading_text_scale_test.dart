@@ -4,10 +4,12 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/reading_text_scale.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -48,7 +50,7 @@ void main() {
         textScale: scale,
       );
 
-      _expectNoOverflow(tester, const ReadingStrings.en());
+      _expectNoOverflow(tester, AppLocalizationsEn());
     });
 
     testWidgets('ready, Arabic — taller script and a longer caption', (
@@ -69,7 +71,7 @@ void main() {
         textScale: scale,
       );
 
-      _expectNoOverflow(tester, const ReadingStrings.ar());
+      _expectNoOverflow(tester, AppLocalizationsAr());
     });
 
     testWidgets('the failed state, whose repository message is a sentence', (
@@ -87,7 +89,7 @@ void main() {
 
       // The one state with neither a passage **nor** a CTA: there is nothing to
       // reflect on, so both are gone and what must be on screen is the error.
-      _expectNoOverflow(tester, const ReadingStrings.en(), withPassage: false);
+      _expectNoOverflow(tester, AppLocalizationsEn(), withPassage: false);
       expect(find.byType(ErrorView), findsOneWidget);
     });
 
@@ -108,7 +110,7 @@ void main() {
       // The anti-vacuity half: the disclosure has to be **on screen**, or "no
       // overflow" is a statement about the closed panel twice.
       expect(find.byType(FontSizeStepper), findsOneWidget);
-      _expectNoOverflow(tester, const ReadingStrings.en());
+      _expectNoOverflow(tester, AppLocalizationsEn());
     });
 
     testWidgets('and with the step at its smallest, where the CTA is widest', (
@@ -136,7 +138,7 @@ void main() {
       }
       expect(h.cubit.state.fontStep, kFontStepMin);
 
-      _expectNoOverflow(tester, const ReadingStrings.en());
+      _expectNoOverflow(tester, AppLocalizationsEn());
     });
   });
 
@@ -322,7 +324,7 @@ void main() {
 /// it — a column built to overflow at this scale returns a non-null exception.
 void _expectNoOverflow(
   WidgetTester tester,
-  ReadingStrings strings, {
+  AppLocalizations strings, {
   bool withPassage = true,
 }) {
   expect(tester.takeException(), isNull);
@@ -341,7 +343,7 @@ void _expectNoOverflow(
       findsOneWidget,
       reason: 'and neither did the CTA, which is the other half of the screen',
     );
-    expect(find.text(strings.beginReflection), findsOneWidget);
+    expect(find.text(strings.readingBeginReflection), findsOneWidget);
   } else {
     expect(find.byType(ScriptureBlock), findsNothing);
     expect(find.byType(StickyCta), findsNothing);

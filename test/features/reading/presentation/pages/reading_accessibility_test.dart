@@ -4,10 +4,10 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
-
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -81,7 +81,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final SemanticsHandle handle = tester.ensureSemantics();
-        final ReadingStrings strings = ReadingStrings.of(locale);
+        final AppLocalizations strings = lookupAppLocalizations(locale);
         final ReadingHarness h = readingHarness(
           scripture: Result<ScriptureText>.success(
             locale.languageCode == 'ar'
@@ -98,9 +98,9 @@ void main() {
           ))
             node.label,
         };
-        expect(labels, contains(strings.back));
-        expect(labels, contains(strings.textSize));
-        expect(labels, contains(strings.beginReflection));
+        expect(labels, contains(strings.readingBack));
+        expect(labels, contains(strings.readingTextSize));
+        expect(labels, contains(strings.readingBeginReflection));
         // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
         // measured eight failures across two suites for exactly this mistake:
         // `testWidgets` compares the live `SemanticsHandle` count against the count
@@ -117,10 +117,10 @@ void main() {
       final ReadingHarness h = readingHarness();
       await pumpReading(tester, cubit: h.cubit);
 
-      const ReadingStrings strings = ReadingStrings.en();
+      final AppLocalizations strings = AppLocalizationsEn();
       final SemanticsData? bookmark = _nodeLabelled(
         tester,
-        '${strings.bookmark} — ${strings.unavailableSuffix}',
+        '${strings.readingBookmark} — ${strings.readingUnavailableSuffix}',
       );
       expect(
         bookmark,
@@ -156,7 +156,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.format_size));
       await pumpReadingFrames(tester, 4);
 
-      // **`ReadingStrings.en().fontSize`, and it is a DIFFERENT string from
+      // **`AppLocalizationsEn().readingFontSize`, and it is a DIFFERENT string from
       // `textSize`.** `FontSizeStepper`'s slider label used to be the hard-coded
       // `'Font size'` — the language half of the defect this phase closed — so the
       // label now comes from the table.
@@ -170,7 +170,7 @@ void main() {
       // the discrimination this lookup exists to make.
       final SemanticsData? slider = _nodeLabelled(
         tester,
-        const ReadingStrings.en().fontSize,
+        AppLocalizationsEn().readingFontSize,
       );
       expect(
         slider,
@@ -256,7 +256,7 @@ void main() {
       final ReadingHarness h = readingHarness();
       await pumpReading(tester, cubit: h.cubit);
 
-      const ReadingStrings strings = ReadingStrings.en();
+      final AppLocalizations strings = AppLocalizationsEn();
       // Read off the semantics **tree** rather than with `find.bySemanticsLabel`,
       // because `getSemantics`-style finders resolve the node *nearest* the finder and
       // a `RichText` inside a labelled `Semantics` is a node of its own — the same
@@ -271,7 +271,7 @@ void main() {
         expect(
           labels.any(
             (String label) =>
-                label.startsWith('${strings.verse} ${verse.number}'),
+                label.startsWith('${strings.readingVerse} ${verse.number}'),
           ),
           isTrue,
           reason:
@@ -280,7 +280,7 @@ void main() {
         );
       }
       expect(
-        labels.any((String label) => label.contains(strings.passage)),
+        labels.any((String label) => label.contains(strings.readingPassage)),
         isFalse,
         reason:
             'the block has no string of its own — each verse is named, '

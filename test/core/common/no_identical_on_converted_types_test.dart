@@ -858,16 +858,6 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'control is the one the focus node belongs to" is not expressible '
             'by value. Untouched.',
       ),
-  'test/features/quiz/presentation/quiz_strings_test.dart#resolves from the locale, and defaults to English':
-      _Reviewed(
-        sites: 4,
-        converted: false,
-        reason:
-            'Four identity assertions on the hand-written `QuizStrings` tables, '
-            'which `gen_l10n` will replace in the next task (decision 8b). '
-            '`of(Locale)` returns THE table for an arm, so identity is the '
-            'claim.',
-      ),
   'test/features/reading/data/dio_repositories_test.dart#and the fake cannot throw either, because it is handed a Result':
       _Reviewed(
         sites: 1,
@@ -902,22 +892,5 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
         reason:
             'A `FailureKind`/`String` identity assertion in a mapper '
             'error-message test. Untouched.',
-      ),
-  'test/features/reading/presentation/reading_strings_test.dart#reads the locale, for the two the app ships':
-      _Reviewed(
-        sites: 4,
-        converted: false,
-        reason:
-            'Identity on the hand-written `ReadingStrings` arms, four sites. '
-            'Decision 8b replaces these tables; the identity claim is the same '
-            'there.',
-      ),
-  'test/features/result/presentation/result_strings_test.dart#resolves from the locale, and defaults to English':
-      _Reviewed(
-        sites: 3,
-        converted: false,
-        reason:
-            'Three identity assertions on the hand-written `ResultStrings` '
-            'arms. Same as above.',
       ),
 };

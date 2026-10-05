@@ -8,10 +8,12 @@ import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
+import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -87,7 +89,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 ///   and stays on another's is a layout a reader cannot predict;
 /// * **submit the already-answered question again** — that is the 409.
 ///
-/// So the button ships inert, labelled `QuizStrings.unavailableSuffix` — **on the
+/// So the button ships inert, labelled `AppLocalizations.quizUnavailableSuffix` — **on the
 /// caption as well as in the accessible name**, since decision 91 found that the
 /// sighted reader on this screen has no second channel. That is the shape
 /// `LoginPage`'s four social buttons and `AppTopBar`'s avatar already use (recorded
@@ -231,7 +233,7 @@ class _QuizBodyState extends State<_QuizBody> {
 
   @override
   Widget build(BuildContext context) {
-    final QuizStrings strings = QuizStrings.of(Localizations.localeOf(context));
+    final AppLocalizations strings = context.l10n;
 
     return BlocBuilder<QuizBloc, QuizState>(
       builder: (BuildContext context, QuizState state) =>
@@ -242,7 +244,7 @@ class _QuizBodyState extends State<_QuizBody> {
   /// The screen for [state]: the question, the options, the banner and the CTA.
   Widget _body(
     BuildContext context, {
-    required QuizStrings strings,
+    required AppLocalizations strings,
     required QuizState state,
   }) => switch (state.status) {
     QuizStatus.loading => const NeuralScaffold(
@@ -270,7 +272,7 @@ class _QuizBodyState extends State<_QuizBody> {
   /// The question flow. Nothing else is on this screen.
   Widget _quiz(
     BuildContext context, {
-    required QuizStrings strings,
+    required AppLocalizations strings,
     required QuizState state,
   }) {
     final QuizSession? session = state.session;
@@ -361,8 +363,8 @@ class _QuizBodyState extends State<_QuizBody> {
                           ? FeedbackTone.ok
                           : FeedbackTone.err,
                       message: answer.isCorrect == true
-                          ? strings.verdictCorrect
-                          : strings.verdictIncorrect,
+                          ? strings.quizVerdictCorrect
+                          : strings.quizVerdictIncorrect,
                     ),
                   ),
               ],
@@ -405,7 +407,7 @@ class _QuizBodyState extends State<_QuizBody> {
   /// payload says.
   Widget _optionCard(
     BuildContext context, {
-    required QuizStrings strings,
+    required AppLocalizations strings,
     required QuizAnswer? answer,
     required MapEntry<String, String> entry,
     required ReadingLanguage language,
@@ -436,7 +438,7 @@ class _QuizBodyState extends State<_QuizBody> {
           onTap: () => context.read<QuizBloc>().add(QuizOptionSelected(letter)),
           // **THE NAME, AND THE SUFFIX IS `null` UNTIL THERE IS A VERDICT.** This is
           // the semantics half of the spoiler boundary, and it is why
-          // `QuizStrings.optionLabel` takes the suffix as a parameter rather than
+          // `QuizStringsPhrases.optionLabel` takes the suffix as a parameter rather than
           // deciding it here: the decision has one home.
           semanticLabel: strings.optionLabel(
             letter: letter,
@@ -518,7 +520,7 @@ class _QuizBodyState extends State<_QuizBody> {
   /// say *why* — `correct` could mean "the reader was right" and `incorrect` "the
   /// reader was wrong", which is the second half of the announcement.
   String? _verdictSuffixFor(
-    QuizStrings strings,
+    AppLocalizations strings,
     QuizAnswer? answer,
     String letter,
   ) {
@@ -580,13 +582,13 @@ class _QuizBodyState extends State<_QuizBody> {
     // graded it, to make a string agree — the exact trade decision 88 refuses.
     if (current.isChecked) {
       return switch (_optionStateFor(current, letter)) {
-        QuizOptionState.correct => strings.correctSuffix,
-        QuizOptionState.incorrect => strings.incorrectSuffix,
+        QuizOptionState.correct => strings.quizCorrectSuffix,
+        QuizOptionState.incorrect => strings.quizIncorrectSuffix,
         QuizOptionState.idle || QuizOptionState.selected => null,
       };
     }
     if (current.question.alreadyAnswered) {
-      return strings.alreadyAnsweredSuffix;
+      return strings.quizAlreadyAnsweredSuffix;
     }
     return null;
   }
@@ -681,7 +683,7 @@ class _QuizBodyState extends State<_QuizBody> {
 /// * [label] is the whole name, and [Semantics] states it verbatim. There is no
 ///   suffix, so there is no second thing that can disagree about the state.
 /// * [label] names the **state**: the prototype's `checkAnswer` while the reader
-///   still has a pending action, and [QuizStrings.unavailableSuffix] once the session
+///   still has a pending action, and [AppLocalizations.quizUnavailableSuffix] once the session
 ///   is finished — which is decision 91's split, taken by [QuizState.isSessionFinished]
 ///   because "is the reader done" is a question about the state and not about the page.
 ///
@@ -715,7 +717,7 @@ class _Cta extends StatelessWidget {
     required this.onPressed,
   });
 
-  final QuizStrings strings;
+  final AppLocalizations strings;
   final ReadingLanguage language;
 
   /// What the button **offers** — and therefore whether it is alive.
@@ -810,13 +812,13 @@ class _Cta extends StatelessWidget {
   /// `checked` and the **enabled-ness** turns on `checked || selected`.
   ///
   /// The first version drove the label off `QuizCta` and therefore said
-  /// `QuizStrings.retry` whenever the button was dead — which is the state a reader
+  /// `AppLocalizations.quizRetry` whenever the button was dead — which is the state a reader
   /// is in **before choosing anything**, so the very first thing the quiz said was
   /// "Try again" for a question they had not attempted. `quiz_page_test.dart` found
   /// it by looking for `Check answer` on the first frame.
   ///
   /// **Three labels, not four.** `checkAnswer` is transcribed, `nextQuestion` is
-  /// transcribed, `seeResults` is **written** (`QuizStrings`'s doc has the argument:
+  /// transcribed, `seeResults` is **written** (`app_en.arb` has the argument:
   /// the prototype has no terminal state). `retry` is not a CTA label at all — it is
   /// the `ErrorView`'s label, which is where the dead end's *way out* lives if the
   /// whole screen failed. It is not offered here because the quiz has not failed.
@@ -827,15 +829,15 @@ class _Cta extends StatelessWidget {
       // is finished and nothing was submitted", where "Check answer" names the one
       // action this screen cannot perform.
       ? finished
-            ? strings.unavailableSuffix
-            : strings.checkAnswer
+            ? strings.quizUnavailableSuffix
+            : strings.quizCheckAnswer
       : switch (status) {
-          QuizStatus.complete => strings.seeResults,
+          QuizStatus.complete => strings.quizSeeResults,
           QuizStatus.ready || QuizStatus.submitting => switch (graded) {
-            true => strings.nextQuestion,
-            false => strings.checkAnswer,
+            true => strings.quizNextQuestion,
+            false => strings.quizCheckAnswer,
           },
-          QuizStatus.loading || QuizStatus.failed => strings.checkAnswer,
+          QuizStatus.loading || QuizStatus.failed => strings.quizCheckAnswer,
         };
 }
 
@@ -853,7 +855,7 @@ class _FailedOrEmpty extends StatelessWidget {
     this.empty = false,
   });
 
-  final QuizStrings strings;
+  final AppLocalizations strings;
   final VoidCallback onRetry;
 
   /// The failure's message, or `null` for the empty state.
@@ -871,13 +873,13 @@ class _FailedOrEmpty extends StatelessWidget {
       child: empty
           ? EmptyState(
               icon: Icons.help_outline,
-              title: strings.noQuestionsTitle,
-              message: strings.noQuestionsMessage,
+              title: strings.quizNoQuestionsTitle,
+              message: strings.quizNoQuestionsMessage,
             )
           : ErrorView(
               message: message ?? '',
               onRetry: onRetry,
-              retryLabel: strings.retry,
+              retryLabel: strings.quizRetry,
               // `ErrorView`'s **ambient** arm, for decision 77's reason: the
               // message is the server's own text, which may be any script, and
               // Amiri carries Latin as well as Arabic.

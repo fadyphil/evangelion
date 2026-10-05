@@ -26,7 +26,7 @@ import 'package:flutter/material.dart';
 /// ## THE LABEL IS SWAPPED FOR THE AMBIENT ARM, AND `toUpperCase` IS A NO-OP THERE
 ///
 /// [label] is a caller's string with no family parameter, for [TextLink]'s reason:
-/// `LoginPage` passes `LoginStrings.of(locale).divider` and has nothing else to
+/// `LoginPage` passes `context.l10n.authDivider` and has nothing else to
 /// pass. So `أو` rendered in **Space Mono** — one tofu box — on a bilingual screen,
 /// while the `EvaButton` two lines above it rendered its Arabic label in Amiri.
 ///

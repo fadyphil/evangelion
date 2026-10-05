@@ -1,8 +1,8 @@
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 
 /// The application's root widget.
 ///
@@ -86,14 +86,30 @@ class EvangelionApp extends StatelessWidget {
         // these delegates `MaterialApp` installs no localisations at all, so an
         // `ar` locale renders with English-only Material widgets and nothing
         // throws — the failure mode is a silently half-translated app. Phase 1
-        // adds the bilingual string table on top of this; the plumbing is here so
-        // it has something to plug into.
+        // put a hand-written bilingual table on top of that plumbing; ARB +
+        // `gen_l10n` (§2.1 decision 8b) is what moved the app's *own* strings into
+        // `Localizations` as well, which is why this list is generated now.
         //
-        // `GlobalMaterialLocalizations.delegates` is the Cupertino + Material +
-        // Widgets trio. `supportedLocales` lists only en and ar because those are
-        // the only two languages this app ships (AGENT_CONTEXT §1) — adding a
-        // third is a product decision, not a plumbing one.
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        // `AppLocalizations.localizationsDelegates` is `gen_l10n`'s own generated
+        // list: this app's `AppLocalizations.delegate` FIRST, then the
+        // `GlobalMaterialLocalizations.delegate` + Cupertino + Widgets trio it used
+        // to be. Order matters only in that the app's own strings must resolve; the
+        // trio is what supplies Arabic date, time and number formats to Material
+        // widgets, so it stays.
+        //
+        // This is the whole of what "the strings half is wired" means. Before ARB,
+        // this list carried no feature strings at all: each table resolved through
+        // its own `static X of(Locale)` against `Localizations.localeOf(context)`,
+        // which is why `/` and `/quiz` had to hand-roll a `didChangeDependencies`
+        // re-dispatch for a locale change — `Localizations` could not tell a
+        // feature widget that its own sentences had changed.
+        //
+        // `supportedLocales` lists only en and ar because those are the only two
+        // languages this app ships (AGENT_CONTEXT §1) — adding a third is a product
+        // decision, not a plumbing one. It is written out rather than taken from
+        // `AppLocalizations.supportedLocales` so the two-locale promise stays a
+        // claim in the composition root, where `app_test.dart` can read it.
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
         locale: locale,
 

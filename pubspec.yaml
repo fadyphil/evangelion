@@ -62,6 +62,10 @@ dev_dependencies:
   bloc_test: ^10.0.0
 
 flutter:
+  # ARB + `gen_l10n`. AGENT_CONTEXT §2.1 decision 8b: the hand-rolled `*Strings`
+  # tables are replaced by `lib/l10n/*.arb`. This is the ONLY pubspec change and
+  # it adds no dependency — `flutter_localizations` and `intl` were already here.
+  generate: true
   uses-material-design: true
 
   fonts:

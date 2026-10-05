@@ -4,10 +4,10 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/home/presentation/widgets/streak_flame_row.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,7 +65,7 @@ void main() {
       );
       final Iterable<SemanticsData> panel = tappable.where(
         (SemanticsData d) =>
-            d.label.contains(const HomeStrings.en().todayReading),
+            d.label.contains(AppLocalizationsEn().homeTodayReading),
       );
 
       expect(
@@ -90,7 +90,7 @@ void main() {
       final SemanticsData avatar = semanticsTree(tester).firstWhere(
         (SemanticsData d) =>
             d.label.contains(liveSession.displayName) ||
-            d.label.startsWith(const HomeStrings.en().avatarLabel),
+            d.label.startsWith(AppLocalizationsEn().homeAvatarLabel),
       );
 
       // `ds.tsx:516-524` is a `<button>` with **no label at all** — §14's first row.
@@ -109,7 +109,7 @@ void main() {
       );
       expect(
         avatar.label,
-        contains(const HomeStrings.en().unavailableSuffix),
+        contains(AppLocalizationsEn().homeUnavailableSuffix),
         reason:
             'a screen reader must be told WHY the control cannot be pressed, not '
             'only that it cannot',
@@ -120,7 +120,7 @@ void main() {
     testWidgets('with no session the avatar is still named', (
       WidgetTester tester,
     ) async {
-      // The fallback is `HomeStrings.avatarLabel` rather than an empty string — an
+      // The fallback is `AppLocalizations.avatarLabel` rather than an empty string — an
       // unnamed button is the §14 gap this whole screen had to close.
       final SemanticsHandle handle = tester.ensureSemantics();
 
@@ -130,7 +130,7 @@ void main() {
       expect(
         semanticsTree(tester).where(
           (SemanticsData d) =>
-              d.label.startsWith(const HomeStrings.en().avatarLabel),
+              d.label.startsWith(AppLocalizationsEn().homeAvatarLabel),
         ),
         hasLength(1),
       );
@@ -370,9 +370,12 @@ void main() {
       await pumpHome(tester, bloc: h.bloc);
 
       // `HomeScreen.tsx:71,72`. Derived copy for an *action* was rejected. See
-      // `HomeStrings.continueLabel`.
-      expect(find.text(const HomeStrings.en().continueLabel), findsOneWidget);
-      expect(find.text(const HomeStrings.en().startReflection), findsOneWidget);
+      // `AppLocalizations.continueLabel`.
+      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsEn().homeStartReflection),
+        findsOneWidget,
+      );
     });
   });
 }
