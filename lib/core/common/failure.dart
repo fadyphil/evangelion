@@ -65,6 +65,23 @@ enum FailureKind {
   /// The caller abandoned the request (navigation away, bloc closed).
   cancelled,
 
+  /// The device's own preference store could not be reached.
+  ///
+  /// **Not an HTTP kind, and that is the point.** Every kind above is a fact about a
+  /// response or a socket, and this app has no request to make when a reader's
+  /// preferences cannot be read: `shared_preferences` reads from disk over a platform
+  /// channel (`AGENT_CONTEXT` §2, decision 4 — settings are local only, no server
+  /// sync). Reusing [network] would be a claim about a transport this client never
+  /// uses for settings, and reusing [serialization] would claim the stored *value*
+  /// was unreadable — which `SettingsLocalDataSource.read` deliberately answers with
+  /// a default instead, precisely so a mangled preference is not an error.
+  ///
+  /// So it is a kind of its own: **the store was unreachable, and nothing inside it
+  /// was at fault.** Added in Phase 9 with the settings feature that needs it, and
+  /// `failure_test.dart`'s exhaustive `switch` stops compiling if a fourth synonym
+  /// ever appears.
+  storage,
+
   /// A fault with no better classification. Never a fallback for "success".
   unknown,
 }

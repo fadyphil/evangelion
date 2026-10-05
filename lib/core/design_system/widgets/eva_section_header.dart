@@ -87,7 +87,21 @@ class EvaSectionHeader extends StatelessWidget {
       // the glyphs, not the style, and a header that measured differently per
       // variant would be a layout surprise.
       size == EvaSectionHeaderSize.section ? label.toUpperCase() : label,
-      style: switch (size) {
+      // ## `arabicAware` WRAPS **BOTH** ARMS, AND ONLY NOW DOES IT MATTER
+      //
+      // The Arabic typography gate reads the *painted* family of every Arabic run, and
+      // for six phases this widget was only ever pumped with Latin text: `SettingsGroup`
+      // is the sole caller and `/settings` was a stub. Phase 9 wrote the screen, and the
+      // gate immediately reported `SpaceMono المظهر` — a section header painting Arabic
+      // in the mono-caps family, because `monoCaps` names SpaceMono and nothing asked
+      // for Amiri.
+      //
+      // The swap belongs **here** rather than at the call site for the same reason
+      // `reading_text_scale.dart` had to be deleted rather than composed at the call
+      // site: this widget owns the text, so it owns the family that renders it. A
+      // caller that remembered to wrap would be a per-call-site tax on a rule that is
+      // not the caller's to remember.
+      style: arabicAware(switch (size) {
         // `SettingsScreen.tsx:29` — `F.mono, 9, 700, letterSpacing 0.14em,
         // textTransform: uppercase, color: T.ink3`.
         EvaSectionHeaderSize.section => EvaTypography.monoCaps(
@@ -98,7 +112,7 @@ class EvaSectionHeader extends StatelessWidget {
         EvaSectionHeaderSize.title =>
           Theme.of(context).textTheme.titleMedium!
               .copyWith(color: colors.ink, fontWeight: FontWeight.w700),
-      },
+      }, Directionality.of(context)),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );

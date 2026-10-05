@@ -42,4 +42,26 @@ abstract final class AppConfig {
   /// How long to wait for response bytes before giving up. Must stay greater
   /// than [connectTimeout] so a slow body is not mistaken for a dead socket.
   static const Duration receiveTimeout = Duration(seconds: 15);
+
+  /// What `/settings`'s About group shows, in the prototype's `1.0.0 (42)` shape.
+  ///
+  /// ## A CONSTANT AND NOT `package_info_plus`, AND THE COST IS ZERO BECAUSE A TEST
+  /// ## HOLDS IT TO `pubspec.yaml`
+  ///
+  /// `package_info_plus` would read the real version off the bundle at runtime. It is
+  /// not added: §8.4 makes an unlisted dependency a hard stop, and this app has a
+  /// **release** build path that does not need it — the value is a label, not a
+  /// behaviour.
+  ///
+  /// What keeps the constant honest is `settings_page_test.dart`, which parses
+  /// `pubspec.yaml` and asserts this string is its `version:` with a `+N` build
+  /// suffix, so bumping the version without bumping this is red. A hard-coded version
+  /// with nothing holding it to `pubspec.yaml` would be a lie the first release after
+  /// this one.
+  ///
+  /// **The `(42)` is not carried.** `SettingsScreen.tsx:115` writes `1.0.0 (42)` and
+  /// that build number is a fabricated fixture of a React preview; this package's is
+  /// `1`, from `version: 1.0.0+1`. Transcribing `42` would show a build number this
+  /// app has never had.
+  static const String appVersion = '1.0.0 (1)';
 }

@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -144,7 +145,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quizVerdictIncorrect => 'ليس هذه المرة.';
 
   @override
-  String get quizAlreadyAnsweredSuffix => 'تمت الإجابة عنها، فلا يمكن إرسالها مجددًا';
+  String get quizAlreadyAnsweredSuffix =>
+      'تمت الإجابة عنها، فلا يمكن إرسالها مجددًا';
 
   @override
   String get quizUnavailableSuffix => 'لا توجد إجابة لعرضها';
@@ -156,7 +158,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get quizNoQuestionsTitle => 'لا شيء للتأمل فيه';
 
   @override
-  String get quizNoQuestionsMessage => 'لا تحتوي قراءة اليوم على أسئلة للإجابة عنها.';
+  String get quizNoQuestionsMessage =>
+      'لا تحتوي قراءة اليوم على أسئلة للإجابة عنها.';
 
   @override
   String get readingBack => 'رجوع';
@@ -247,4 +250,67 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get settingsTitle => 'الإعدادات';
+
+  @override
+  String get settingsBack => 'رجوع';
+
+  @override
+  String get settingsAppearance => 'المظهر';
+
+  @override
+  String get settingsTheme => 'السمة';
+
+  @override
+  String get settingsThemeLight => 'فاتح';
+
+  @override
+  String get settingsThemeDark => 'داكن';
+
+  @override
+  String get settingsThemeSystem => 'النظام';
+
+  @override
+  String get settingsFontSize => 'حجم الخط';
+
+  @override
+  String get settingsFontScale => 'مقياس حجم الخط';
+
+  @override
+  String get settingsDecreaseFontSize => 'تصغير الخط';
+
+  @override
+  String get settingsIncreaseFontSize => 'تكبير الخط';
+
+  @override
+  String get settingsReduceMotion => 'تقليل الحركة';
+
+  @override
+  String get settingsMotionOn => 'مفعّل';
+
+  @override
+  String get settingsMotionOff => 'معطّل';
+
+  @override
+  String get settingsReading => 'القراءة';
+
+  @override
+  String get settingsDefaultLanguage => 'اللغة الافتراضية';
+
+  @override
+  String get settingsLanguageSheetTitle => 'اختر اللغة';
+
+  @override
+  String get settingsLanguageEnglish => 'الإنجليزية';
+
+  @override
+  String get settingsLanguageArabic => 'العربية';
+
+  @override
+  String get settingsAbout => 'حول';
+
+  @override
+  String get settingsVersion => 'الإصدار';
 }

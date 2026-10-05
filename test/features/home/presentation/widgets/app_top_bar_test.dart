@@ -2,20 +2,22 @@
 ///
 /// ## WHY A WIDGET UNIT TEST AND NOT MORE OF `home_page_test.dart`
 ///
-/// `/` passes `onAvatarTap: null` and so can only ever render the **disabled**
-/// avatar — decision 32 records that as visible product debt, with the fix being
-/// "one argument at one call site". Which means every widget assertion on `/`
-/// covers the inert branch and **none** covers the live one: `HomePage`'s coverage
-/// of `app_top_bar.dart` stops at 81%, and the 9 uncovered lines are exactly the
-/// `Semantics` + `EvaFocusRing` + `EvaInk` subtree the enabled avatar builds.
+/// This file existed because `/` passed `onAvatarTap: null` and so could only ever
+/// render the **disabled** avatar — decision 32 records that as visible product debt,
+/// with the fix being "one argument at one call site". Which means every widget
+/// assertion on `/` covered the inert branch and **none** covered the live one:
+/// `HomePage`'s coverage of `app_top_bar.dart` stopped at 81%, and the 9 uncovered
+/// lines were exactly the `Semantics` + `EvaFocusRing` + `EvaInk` subtree the enabled
+/// avatar builds.
 ///
-/// The next screen that passes a callback inherits that subtree untested, and
-/// "it renders" is not the claim that matters about it — the claims are that it
-/// **is tappable**, that it is **announced as a button**, and that it carries a
-/// **focus ring**. All three are asserted here.
+/// **Phase 9 made `/` pass a callback** — the avatar now routes to `/settings` — so the
+/// debt this file was written to clear is paid, and this paragraph is stale about the
+/// *reason* the file exists while remaining true about the *shape* of what it asserts.
+/// `home_page_test.dart` now drives the live branch too.
 ///
-/// The disabled branch is asserted here too, in the failing direction, so this file
-/// and not only `/`'s tree is the place that says what an inert avatar does.
+/// The disabled branch is asserted here anyway, in the failing direction, because
+/// [AppTopBar.onAvatarTap] is **still nullable**: a bar with no destination must render
+/// the avatar inert and name the reason, and this is the only place that says so.
 library;
 
 import 'dart:ui' show Tristate;

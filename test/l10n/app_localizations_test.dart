@@ -89,7 +89,7 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        72,
+        93,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
@@ -155,6 +155,93 @@ void main() {
       );
     });
 
+    test('and every `settings*` key says whether it was TRANSCRIBED or WRITTEN', () {
+      // Phase 9's addition to the rule above, and it is a rule rather than 21
+      // citations.
+      //
+      // §2.1 decision 8b's whole argument for ARB is that the description is "the
+      // record" — the prototype's `file:line` where one existed, and the reason it was
+      // written where none did. Four of `/settings`' 21 keys have **no** prototype
+      // line at all, because the prototype drew no accessible name for its range
+      // input, no sheet for its language pills, no motion row at all, and no slider
+      // label. A reader auditing those four needs to be able to see that they are
+      // invented rather than transcribed, and "there is no citation in this
+      // description" does not distinguish *written on purpose* from *citation lost in
+      // a refactor*.
+      //
+      // So the split is asserted as data: every `settings*` description must contain
+      // exactly one of the two markers, and the `WRITTEN` ones must name the prototype
+      // line they are working around.
+      const Map<String, String> written = <String, String>{
+        'settingsFontScale': 'SettingsScreen.tsx:66',
+        'settingsDecreaseFontSize': 'SettingsScreen.tsx:66',
+        'settingsIncreaseFontSize': 'SettingsScreen.tsx:66',
+        'settingsReduceMotion': 'no motion row',
+        'settingsMotionOn': 'EvaToggle',
+        'settingsMotionOff': 'EvaToggle',
+        'settingsLanguageSheetTitle': 'SettingsScreen.tsx:77',
+        'settingsLanguageEnglish': 'SettingsScreen.tsx:88',
+      };
+      final List<String> keys = keysOf(
+        en,
+      ).where((String key) => key.startsWith('settings')).toList()..sort();
+
+      expect(
+        keys,
+        hasLength(21),
+        reason:
+            'the /settings ARB surface. This is a declared count so that a dropped '
+            'key is a failure rather than a smaller green, exactly as the file-level '
+            'count is above.',
+      );
+
+      final List<String> unmarked = <String>[];
+      final List<String> misfiled = <String>[];
+      for (final String key in keys) {
+        final String description =
+            (en['@$key']! as Map)['description']! as String;
+        // **A substring, not one fixed phrase**, because one key legitimately claims
+        // BOTH: `settingsLanguageEnglish` is transcribed in kind for the English arm
+        // and written for the Arabic one, in the same breath. A fixed phrase would
+        // have forced one of those two facts out of the description, which is the
+        // thing the assertion exists to keep.
+        final bool saysWritten = description.contains('Written');
+        final bool saysTranscribed = description.contains('Transcribed');
+        if (!saysWritten && !saysTranscribed) {
+          unmarked.add(key);
+          continue;
+        }
+        if (written.containsKey(key) && !saysWritten) {
+          misfiled.add(
+            '$key is declared written here but its description transcribes',
+          );
+        }
+        if (!written.containsKey(key) && saysWritten) {
+          misfiled.add(
+            '$key says it was written but the written set here does not list it — '
+            'either it was transcribed after all or the set is stale',
+          );
+        }
+        if (written.containsKey(key)) {
+          expect(
+            description,
+            contains(written[key]),
+            reason:
+                '$key is declared written here, and the note must say what the '
+                'prototype lacked. "${written[key]}"',
+          );
+        }
+      }
+      expect(
+        unmarked,
+        isEmpty,
+        reason:
+            'these `settings*` descriptions say neither "Transcribed" nor "Written, '
+            'not transcribed", so a reader cannot tell which it was',
+      );
+      expect(misfiled, isEmpty);
+    });
+
     test('and the descriptions still name the prototype where one existed', () {
       // The citations are the asset this migration was supposed to preserve, so the
       // preservation is asserted rather than asserted-by-review. These are the keys
@@ -171,6 +258,20 @@ void main() {
         'homeContinueLabel': 'HomeScreen.tsx:71',
         'homeStartReflection': 'HomeScreen.tsx:72',
         'homeAvatarLabel': 'ds.tsx:525',
+        // Phase 9, `/settings`. The full citation list, one per transcribed key.
+        'settingsTitle': 'SettingsScreen.tsx:43',
+        'settingsBack': 'SettingsScreen.tsx:39',
+        'settingsAppearance': 'SettingsScreen.tsx:47',
+        'settingsTheme': 'SettingsScreen.tsx:50',
+        'settingsThemeLight': 'SettingsScreen.tsx:52',
+        'settingsThemeDark': 'SettingsScreen.tsx:52',
+        'settingsThemeSystem': 'SettingsScreen.tsx:52',
+        'settingsFontSize': 'SettingsScreen.tsx:62',
+        'settingsReading': 'SettingsScreen.tsx:70',
+        'settingsDefaultLanguage': 'SettingsScreen.tsx:76',
+        'settingsLanguageArabic': 'SettingsScreen.tsx:88',
+        'settingsAbout': 'SettingsScreen.tsx:107',
+        'settingsVersion': 'SettingsScreen.tsx:115',
         'quizCheckAnswer': 'QuizScreen.tsx:127',
         'quizNextQuestion': 'QuizScreen.tsx:127',
         'readingBeginReflection': 'ReadingEnScreen.tsx:87',
@@ -524,7 +625,10 @@ void main() {
       // the ARB disagree about which locales the app supports, which is a
       // configuration error worth a loud failure rather than a silent English
       // screen. `app_test.dart` reads `supportedLocales` off the live `MaterialApp`
-      // and the ARB asserts 72 keys in both arms, so the two are cross-checked.
+      // and the ARB asserts 93 keys in both arms, so the two are cross-checked.
+      // (93 = the 72 the five hand-rolled tables carried, plus the 21 `settings*`
+      // keys Phase 9 added — see `settings_page.dart`'s own cut table for the four
+      // prototype rows that produced no keys at all.)
       expect(
         () => lookupAppLocalizations(const Locale('fr')),
         throwsA(isA<FlutterError>()),

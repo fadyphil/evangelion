@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'contract_payloads.dart';
 import 'design_system_harness.dart';
+import 'settings_harness.dart';
 
 /// The shared fixture for every `/reading` widget test.
 ///
@@ -173,7 +174,14 @@ Future<void> pumpReading(
           : TextDirection.ltr,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-      child: ReadingPage(cubit: cubit),
+      // **`SettingsScope`, added in Phase 9 and load-bearing for five suites.** Since
+      // the font step became `UserSettings.fontStep`, `/reading` reads it out of the
+      // installed `MediaQuery` and writes it through `SettingsScope.of(context)` — so
+      // a page pumped without a scope above it either throws out of `build` (no
+      // locator registration) or, worse, writes through the locator's singleton while
+      // nothing rebuilds. The scope is what makes the `Aa` panel honest here, and
+      // `reading_page_test.dart` asserts the write reached a **store**.
+      child: settingsScope(tester, ReadingPage(cubit: cubit)),
     ),
   );
   await pumpReadingFrames(tester, frames);

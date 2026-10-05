@@ -27,20 +27,20 @@ $ReadingStateCopyWith<ReadingState> get copyWith => _$ReadingStateCopyWithImpl<R
 @override
 bool operator ==(Object other) {
   final _this = this as ReadingState;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReadingState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.scripture, _this.scripture) || other.scripture == _this.scripture)&&(identical(other.failure, _this.failure) || other.failure == _this.failure)&&(identical(other.fontStep, _this.fontStep) || other.fontStep == _this.fontStep)&&(identical(other.textSizePanelOpen, _this.textSizePanelOpen) || other.textSizePanelOpen == _this.textSizePanelOpen));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReadingState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.scripture, _this.scripture) || other.scripture == _this.scripture)&&(identical(other.failure, _this.failure) || other.failure == _this.failure)&&(identical(other.textSizePanelOpen, _this.textSizePanelOpen) || other.textSizePanelOpen == _this.textSizePanelOpen));
 }
 
 
 @override
 int get hashCode {
   final _this = this as ReadingState;
-  return Object.hash(runtimeType,_this.status,_this.scripture,_this.failure,_this.fontStep,_this.textSizePanelOpen);
+  return Object.hash(runtimeType,_this.status,_this.scripture,_this.failure,_this.textSizePanelOpen);
 }
 
 @override
 String toString() {
   final _this = this as ReadingState;
-  return 'ReadingState(status: ${_this.status}, scripture: ${_this.scripture}, failure: ${_this.failure}, fontStep: ${_this.fontStep}, textSizePanelOpen: ${_this.textSizePanelOpen})';
+  return 'ReadingState(status: ${_this.status}, scripture: ${_this.scripture}, failure: ${_this.failure}, textSizePanelOpen: ${_this.textSizePanelOpen})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $ReadingStateCopyWith<$Res>  {
   factory $ReadingStateCopyWith(ReadingState value, $Res Function(ReadingState) _then) = _$ReadingStateCopyWithImpl;
 @useResult
 $Res call({
- ReadingStatus status, ScriptureText? scripture, Failure? failure, int fontStep, bool textSizePanelOpen
+ ReadingStatus status, ScriptureText? scripture, Failure? failure, bool textSizePanelOpen
 });
 
 
@@ -68,13 +68,12 @@ class _$ReadingStateCopyWithImpl<$Res>
 
 /// Create a copy of ReadingState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? scripture = freezed,Object? failure = freezed,Object? fontStep = null,Object? textSizePanelOpen = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? scripture = freezed,Object? failure = freezed,Object? textSizePanelOpen = null,}) {
   return _then(ReadingState(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as ReadingStatus,scripture: freezed == scripture ? _self.scripture : scripture // ignore: cast_nullable_to_non_nullable
 as ScriptureText?,failure: freezed == failure ? _self.failure : failure // ignore: cast_nullable_to_non_nullable
-as Failure?,fontStep: null == fontStep ? _self.fontStep : fontStep // ignore: cast_nullable_to_non_nullable
-as int,textSizePanelOpen: null == textSizePanelOpen ? _self.textSizePanelOpen : textSizePanelOpen // ignore: cast_nullable_to_non_nullable
+as Failure?,textSizePanelOpen: null == textSizePanelOpen ? _self.textSizePanelOpen : textSizePanelOpen // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }

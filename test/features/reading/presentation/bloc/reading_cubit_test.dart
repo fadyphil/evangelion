@@ -1,7 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
-import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -18,27 +17,30 @@ class _MockReadingRepository extends Mock implements ReadingRepository {}
 /// `ReadingCubit` — red-first (AGENT_CONTEXT §6: "**every cubit**", with
 /// `bloc_test` + `mocktail`).
 ///
-/// ## THE TWO THINGS THIS CUBIT OWNS, AND WHY ONLY TWO
+/// ## THE ONE THING THIS CUBIT OWNS, AND WHY IT IS ONE
 ///
 /// The plan says the cubit owns "font scale and verse numbers, which come from
-/// `SettingsRepository`". Phase 7 delivers **one** of those and not the other, and
-/// both omissions are decisions rather than oversights:
+/// `SettingsRepository`". Phase 7 delivered **neither** — the font scale as cubit
+/// state and no verse-number field at all — and Phase 9 settled both:
 ///
-/// * **Font scale** is real state with a real writer — the `Aa` control's
-///   [ReadingCubit.setFontStep] — and it does not survive leaving `/reading`,
-///   because `SettingsRepository` is Phase 9's. That cost is recorded on the cubit,
-///   on `readingTextScalerFor` and in `AGENT_CONTEXT` §9, and **no test in this
-///   repository claims persistence**.
+/// * **The font scale is not here any more.** It is `UserSettings.fontStep`, persisted
+///   in `shared_preferences` and installed app-wide at `MaterialApp.builder`. The
+///   `ReadingCubit.setFontStep` method and the `ReadingState.fontStep` field are
+///   **deleted**, and the group below that tested them is replaced by one that asserts
+///   they are gone — a `Cubit` that held a second copy of a preference is the
+///   "two sources of truth for one fact" defect, and it would have disagreed with
+///   `app.dart` for the one window between the reader's gesture and the store's write.
+///   The persistence claim this file used to refuse to make is now made, in
+///   `test/core/domain/repositories/settings_repository_test.dart`.
 ///
-/// * **Verse numbers are not state at all.** The prototype draws a `<sup>` on
-///   every verse of both arms (`ReadingEnScreen.tsx:48`,
-///   `ReadingArScreen.tsx:49`) and draws **no control** for turning them off. A
-///   `bool` with no writer is the defect class this repository has already deleted
-///   twice — recorded decision 15's dead `isValidUserId` branch, and decision 48's
-///   an unreachable base-class equality getter — so it is **not** shipped.
-///   `ScriptureBlock`
-///   always renders the marker, and Phase 9's `/settings` reading section is where
-///   the preference gets a real writer and a real reader.
+/// * **Verse numbers are still not state.** The prototype's reading screens draw a
+///   `<sup>` on every verse of both arms (`ReadingEnScreen.tsx:48`,
+///   `ReadingArScreen.tsx:49`) and draw **no control** for turning them off. Phase 9
+///   built `/settings`, whose prototype screen *does* have the switch
+///   (`SettingsScreen.tsx:92`), and still did not ship it — for a **scope** reason
+///   rather than a writer reason, recorded on `SettingsPage`: `ScriptureBlock` has no
+///   `showVerseNumbers` parameter and its marker is load-bearing for four gates this
+///   phase does not own.
 void main() {
   late _MockReadingRepository repository;
 
@@ -65,22 +67,24 @@ void main() {
   });
 
   group('the initial state', () {
-    test('is loading, with nothing on screen and the default step', () {
+    test('is loading, with nothing on screen', () {
       final ReadingCubit c = build();
       expect(c.state.status, ReadingStatus.loading);
       expect(c.state.scripture, isNull);
       expect(c.state.failure, isNull);
-      expect(c.state.fontStep, ReadingCubit.defaultFontStep);
+      expect(c.state.textSizePanelOpen, isFalse);
     });
 
-    test('the default step is the identity, which is 3 on the design-system table', () {
-      // `evaScalerFor(3)` is 1.00 and the table's middle. Asserted rather than
-      // assumed, because a default of 1 would mean the sanctuary renders at 0.90×
-      // on a reader who never touched it.
-      expect(ReadingCubit.defaultFontStep, 3);
-      expect(evaScalerFor(ReadingCubit.defaultFontStep).scale(1), 1.0);
-      expect(ReadingCubit.defaultFontStep, isNot(kFontStepMin));
-      expect(ReadingCubit.defaultFontStep, isNot(kFontStepMax));
+    test('and it holds **NO** font step, which is Phase 9\'s deletion', () {
+      // The failing direction, and it is the only way to assert an ABSENCE about a
+      // generated class: `ReadingState` is `freezed`, so the field cannot be read at
+      // all any more, and this file no longer compiles if it reappears.
+      //
+      // What that cannot express is "and the default is still the table's identity" —
+      // so that claim moved to `user_settings_test.dart`, where `kDefaultFontStep`
+      // lives, and it is asserted there against `evaScalerFor`.
+      final ReadingCubit c = build();
+      expect(c.state, const ReadingState());
     });
   });
 
@@ -225,67 +229,42 @@ void main() {
       ),
       isA<ReadingState>()
           .having((ReadingState s) => s.scripture, 'scripture', isNull)
-          .having((ReadingState s) => s.failure?.message, 'message', 'Gone.')
-          .having(
-            (ReadingState s) => s.fontStep,
-            'fontStep',
-            ReadingCubit.defaultFontStep,
-          ),
+          .having((ReadingState s) => s.failure?.message, 'message', 'Gone.'),
     ],
   );
 
-  group('the font step', () {
-    test('is settable to any step, and CLAMPED at both ends', () {
+  group('the font step left this cubit, and what replaced it', () {
+    test('`toggleTextSizePanel` is still the only writer of the disclosure', () {
+      // The one thing that **is** a property of this visit, and therefore still
+      // cubit state. `reading_page_test.dart` asserts it opens and closes and asserts
+      // nothing about surviving a navigation — which is now the *contrast* that makes
+      // the step's persistence legible: one flag on screen, one preference on disk.
       final ReadingCubit c = build();
-      c.setFontStep(5);
-      expect(c.state.fontStep, 5);
-      c.setFontStep(1);
-      expect(c.state.fontStep, 1);
-      // Out of range is clamped rather than stored, so the knob and the rendered
-      // size cannot tell different stories — the reason `clampFontStep` exists.
-      c.setFontStep(0);
-      expect(c.state.fontStep, kFontStepMin);
-      c.setFontStep(99);
-      expect(c.state.fontStep, kFontStepMax);
+      expect(c.state.textSizePanelOpen, isFalse);
+      c.toggleTextSizePanel();
+      expect(c.state.textSizePanelOpen, isTrue);
+      c.toggleTextSizePanel();
+      expect(c.state.textSizePanelOpen, isFalse);
     });
 
-    test('setting the step it already has emits NOTHING', () {
-      // The property that keeps the disclosure panel from rebuilding the whole
-      // passage on every drag frame of `FontSizeStepper`'s track.
-      final ReadingCubit c = build()..setFontStep(3);
-      expect(c.state.fontStep, ReadingCubit.defaultFontStep);
-      expect(
-        () => c.setFontStep(ReadingCubit.defaultFontStep),
-        returnsNormally,
-      );
-      expect(c.state.fontStep, ReadingCubit.defaultFontStep);
-    });
-
-    test(
-      'survives a load, because it is the reader\'s and not the payload\'s',
-      () async {
-        final ReadingCubit c = build();
-        c.setFontStep(4);
-        await c.load(ReadingLanguage.english);
-        expect(c.state.fontStep, 4);
-        expect(c.state.scripture, isNotNull);
-      },
-    );
-
-    test('and it is NOT cleared by a failure either', () async {
-      final ReadingCubit c = build();
-      c.setFontStep(4);
+    test('the disclosure survives a load AND a failure', () async {
+      // `ReadingState`'s doc claims it does, and the claim used to be about the step
+      // too. The step is gone; the flag is not, so the assertion stays and names the
+      // flag instead of a field that is no longer here.
+      final ReadingCubit c = build()..toggleTextSizePanel();
+      await c.load(ReadingLanguage.english);
+      expect(c.state.textSizePanelOpen, isTrue);
       when(() => repository.todayScripture(language: any(named: 'language')))
           .thenAnswer(
             (_) async => const Result<ScriptureText>.failure(
               Failure(kind: FailureKind.network, message: 'x'),
             ),
           );
-      await c.load(ReadingLanguage.english);
+      await c.retry(ReadingLanguage.english);
       expect(
-        c.state.fontStep,
-        4,
-        reason: 'a retry must not reset the reader\'s size',
+        c.state.textSizePanelOpen,
+        isTrue,
+        reason: 'opening the Aa panel must not close itself on a network fault',
       );
     });
   });
@@ -331,10 +310,13 @@ void main() {
         base.copyWith(
           failure: const Failure(kind: FailureKind.network, message: 'x'),
         ),
-        base.copyWith(fontStep: 5),
+        base.copyWith(textSizePanelOpen: true),
       ]) {
         expect(base, isNot(other), reason: '$other must differ');
       }
+      // `freezed_structural_equality_test.dart` asserts the same property over the
+      // **whole** converted set with an exhaustive per-field variant list, so this
+      // copy is the local restatement and that file is the gate.
     });
 
     test('the three statuses are exactly loading, ready and failed', () {

@@ -44,6 +44,7 @@ library;
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/arabic_digits.dart';
+import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
@@ -62,6 +63,7 @@ import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.da
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/result/presentation/result_l10n.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
+import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
@@ -74,6 +76,7 @@ import 'support/home_harness.dart' hide CountingReadingRepository;
 import 'support/login_harness.dart';
 import 'support/quiz_harness.dart';
 import 'support/reading_harness.dart';
+import 'support/settings_harness.dart';
 
 void main() {
   group('`/` — the home screen', () {
@@ -712,30 +715,161 @@ void main() {
   });
 
   group('`/settings`', () {
-    // **The one screen still vacuous**, and decision 79's rule is that saying so is
-    // what makes it a pass rather than a silence. Phase 9 writes it.
-    testWidgets('the gate is installed and reports itself VACUOUS', (
+    // ## NO LONGER VACUOUS — THE **LAST** SCREEN TO GET ITS ARABIC, IN PHASE 9
+    //
+    // Decision 79 declared `/settings` vacuous with the note "Phase 9 writes it", and
+    // this is that arm. `/quiz` was lifted in Phase 8 by the same edit shape: the
+    // `Placeholder for /settings` literal is gone, `vacuousBecause` is now `null`, and
+    // the list is **declared**, which is decision 79's whole mechanism — a run cannot
+    // disappear and leave the gate satisfied by the ones that remain.
+    //
+    // Built from `AppLocalizationsAr()`, never transcribed. A hand-typed Arabic list is
+    // the "second declaration" this gate's own doc warns against: a dropped combining
+    // mark is invisible in a diff and the failure then reads as "the widget rendered the
+    // wrong string" instead of "the test typed the wrong string".
+    final AppLocalizations ar = AppLocalizationsAr();
+    final List<String> arabic = <String>[
+      ar.settingsTitle,
+      // The three `SettingsGroup` headers.
+      ar.settingsAppearance,
+      ar.settingsReading,
+      ar.settingsAbout,
+      // The **theme** control's three options. `SegmentedControl` renders them as
+      // text, and this is the run most likely to regress: `AppThemeMode` maps to
+      // `ThemeMode` at the app root, and a wrong mapping would still render *some*
+      // label, so only the declared set catches it.
+      ar.settingsTheme,
+      ar.settingsThemeLight,
+      ar.settingsThemeDark,
+      ar.settingsThemeSystem,
+      // The font stepper's row and its two control labels.
+      ar.settingsFontSize,
+      ar.settingsDecreaseFontSize,
+      ar.settingsIncreaseFontSize,
+      // The reduce-motion row.
+      ar.settingsReduceMotion,
+      // The default-language row, and the row's **trailing value** — the language the
+      // screen is currently in. Declared as a function of the arm rather than as a
+      // literal: the setting is `null` here ("follow the platform"), so the effective
+      // language in this arm is Arabic and the row says `العربية`. That is the string
+      // the whole `ReadingLanguage` derivation exists to produce, and it is also the
+      // run that catches the setting being ignored: a page that lost the locale would
+      // render `English` here and fail the family arm as tofu-free Latin in an RTL arm.
+      ar.settingsDefaultLanguage,
+      ar.languageLabelFor(ReadingLanguage.arabic),
+      // The About group's row.
+      ar.settingsVersion,
+      // The header: the title and the back chevron's label. `AppTopBar`-style
+      // headers put the back control's name in a tooltip, and §14 forced that string
+      // into this client, so it is a painted run on a screen with a header.
+      ar.settingsTitle,
+      ar.settingsBack,
+    ];
+
+    // ## `settingsMotionOn` / `settingsMotionOff` ARE **DELIBERATELY NOT** IN THE LIST
+    //
+    // `EvaToggle` publishes its state as `Semantics(label: labels.on/off,
+    // excludeSemantics: true)` and paints **no** text: the control is a thumb and a
+    // track. A semantics label never reaches a glyph buffer, so this gate — which reads
+    // painted runs — cannot see it, and declaring either label fails the other half of
+    // the gate with `Declared but NOT rendered`. The same category error
+    // `/quiz`'s `quizProgress` group records, for the same reason.
+    //
+    // The labels are still asserted, at the layer that can see them:
+    // `settings_page_test.dart` reads the merged semantics node. Phase 9 made them
+    // **required** (`EvaToggleLabels`) precisely because they used to be the two
+    // hard-coded English words `On` and `Off`.
+
+    testWidgets('the Arabic arm, on the written screen', (
       WidgetTester tester,
     ) async {
-      await _pumpStub(tester, const SettingsPage());
+      // Built in the test body, per `settings_harness.dart`'s recorded reason: a bloc
+      // built in `setUp` runs its events outside the fake-async zone `pump` drains.
+      final SettingsHarness settings = settingsHarness();
+      await tester.pumpWidget(
+        settingsScope(
+          tester,
+          evaPrimitiveHarness(
+            theme: EvaThemeDark.theme,
+            locale: const Locale('ar'),
+            textDirection: TextDirection.rtl,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+            child: SettingsPage(cubit: settings.cubit),
+          ),
+        ),
+      );
+      await tester.pump();
+
       await expectArabicTypography(
         tester,
         screen: '/settings',
-        expectedArabic: const <String>[],
-        vacuousBecause:
-            '/settings is a stub: its whole body is the literal '
-            '`Placeholder for /settings` and the route name, both Latin. Phase 9 '
-            'writes this screen, and this gate is what will hold its Arabic runs to '
-            'Amiri from their first commit.',
+        expectedArabic: arabic,
+        vacuousBecause: null,
       );
       await expectNoTofuInAnyRun(tester, screen: '/settings');
-      expect(
-        familyOfText(tester, 'Placeholder for /settings'),
-        isNot(EvaTypography.arabicFamily),
-        reason:
-            'this screen is Latin-only today. If this ever becomes false, the screen '
-            'has been given Arabic and `vacuousBecause` is stale — which is the '
-            'failure this assertion exists to make loud.',
+    });
+
+    testWidgets('and the LANGUAGE SHEET is gated, which is the only place', (
+      WidgetTester tester,
+    ) async {
+      // The sheet is a `showModalBottomSheet` route of its own, so it is a second
+      // screen inside `/settings` and it needs its own pump — the same reason `/quiz`'s
+      // feedback banner and `/reading`'s `Aa` disclosure each have one.
+      //
+      // **`settingsLanguageSheetTitle` is the run this catches most:** the sheet is
+      // reachable only by tapping the default-language row, so a sheet that opened
+      // with no title — or with the row's label repeated — would leave this list
+      // unsatisfied, which is the assertion working rather than the test being fussy.
+      final SettingsHarness settings = settingsHarness();
+      await tester.pumpWidget(
+        settingsScope(
+          tester,
+          evaPrimitiveHarness(
+            theme: EvaThemeDark.theme,
+            locale: const Locale('ar'),
+            textDirection: TextDirection.rtl,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+            child: SettingsPage(cubit: settings.cubit),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Tapped by its rendered label, not a key: `SettingsPage` has no key on that
+      // row, and adding a test-only key to production markup to make a test easier is
+      // the coupling this repository's harnesses exist to avoid.
+      await tester.tap(find.text(ar.settingsDefaultLanguage));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+
+      await expectArabicTypography(
+        tester,
+        screen: '/settings (language sheet)',
+        // **The page's own runs are still painted behind the modal sheet**, so the
+        // declaration is the union: a modal bottom sheet covers the screen, it does not
+        // unmount it. Spreading `arabic` is also what makes this arm a *second*
+        // independent reading of the page's list — if the page's runs changed and only
+        // the first test were updated, this one would fail on the difference.
+        //
+        // Built from the same `languageLabelFor` derivation the sheet itself uses, so
+        // the list cannot disagree with the widget about what a language is called.
+        expectedArabic: <String>[
+          // **`settingsBack` is excluded here and declared in the page arm.**
+          //
+          // `IconActionButton`'s accessible name feeds a `Tooltip`, and `icon_action_
+          // button.dart` records that a `Tooltip` "paints nothing until a gesture". So
+          // whether its message is a *painted* run depends on the gesture state of the
+          // tree, and this arm's tap is a gesture: with the sheet up, the back label is
+          // not among the painted runs, and declaring it here fails the gate's
+          // `Declared but NOT rendered` half. The page arm above is where that run
+          // belongs, and it declares it — a run needs one owning arm, not two.
+          ...arabic.where((String run) => run != ar.settingsBack),
+          ar.settingsLanguageSheetTitle,
+          ...ReadingLanguage.values.map(ar.languageLabelFor),
+        ],
+        vacuousBecause: null,
       );
     });
   });
@@ -900,20 +1034,15 @@ AuthBloc _authBloc() {
   return bloc;
 }
 
-Future<void> _pumpStub(WidgetTester tester, Widget page) async {
-  await tester.pumpWidget(
-    evaPrimitiveHarness(
-      theme: EvaThemeDark.theme,
-      locale: const Locale('ar'),
-      // Derived from the locale, for `login_harness.dart`'s recorded reason.
-      textDirection: TextDirection.rtl,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-      child: page,
-    ),
-  );
-  await tester.pump();
-}
+/// ## WHY THE STUB PUMPER IS GONE
+///
+/// This file used to carry a `_pumpStub` helper for the three screens that were still
+/// `Placeholder for …` stubs. Phase 8 lifted `/quiz` and Phase 9 lifted `/settings`, so
+/// the helper had no caller left — and an unused private function in a gate file is
+/// worse than a missing one: it is a second, silently-drifting way to mount a screen
+/// for this gate, and `dart analyze --fatal-infos` (Gate 1) is what stopped it sitting
+/// there. Each screen now builds the tree it actually needs: a bloc over a real payload
+/// for `/quiz`, a real store over `shared_preferences` for `/settings`.
 
 /// No rendered run on [screen] contains an Arabic character.
 ///

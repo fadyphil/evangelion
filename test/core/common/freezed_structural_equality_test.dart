@@ -1,4 +1,5 @@
 import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
@@ -7,6 +8,7 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
@@ -15,6 +17,7 @@ import 'package:evangelion/features/quiz/domain/refreshed_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/freezed_types.dart';
@@ -442,16 +445,88 @@ void main() {
       _differsInEveryField(
         'ReadingState',
         _readingState(),
-        fields: 5,
+        fields: 4,
         variants: <({String field, ReadingState value})>[
           (field: 'status', value: _readingState(status: ReadingStatus.failed)),
           (field: 'scripture', value: _readingState(scripture: _passage())),
           (field: 'failure', value: _readingState(failure: _failure())),
-          (field: 'fontStep', value: _readingState(fontStep: 4)),
           (
             field: 'textSizePanelOpen',
             value: _readingState(textSizePanelOpen: true),
           ),
+        ],
+      );
+    });
+
+    // ## PHASE 9'S TWO, AND THE ONE THAT MATTERS MOST IS THE NULLABLE ONE
+    //
+    // `UserSettings.language` is the only nullable field in either type, and it is
+    // nullable **on purpose** — `null` means "follow the platform", a third answer
+    // rather than an absence. So it gets a variant in **both** directions: setting it
+    // and clearing it must both produce an unequal instance, and only a *generated*
+    // `copyWith` gives the clearing half. That is the §2.1 hazard this file was built
+    // for and the reason it lists a variant per field rather than sampling.
+    test('`UserSettings`', () {
+      _equalAndDistinct('UserSettings', _userSettings(), _userSettings());
+      _differsInEveryField(
+        'UserSettings',
+        _userSettings(),
+        fields: 4,
+        variants: <({String field, UserSettings value})>[
+          (
+            field: 'themeMode',
+            value: _userSettings(themeMode: AppThemeMode.light),
+          ),
+          (field: 'fontStep', value: _userSettings(fontStep: 5)),
+          (
+            field: 'language',
+            value: _userSettings(language: ReadingLanguage.arabic),
+          ),
+          (field: 'reducedMotion', value: _userSettings(reducedMotion: true)),
+        ],
+      );
+    });
+
+    test(
+      '`UserSettings.language` is clearable, and clearing it is not identity',
+      () {
+        final UserSettings arabic = _userSettings(
+          language: ReadingLanguage.arabic,
+        );
+        expect(
+          arabic.copyWith(),
+          arabic,
+          reason: 'omitting the argument keeps it',
+        );
+        expect(
+          arabic.copyWith(language: null),
+          _userSettings(),
+          reason:
+              'passing the sentinel CLEARS it. This is the half a hand-written '
+              '`copyWith` with `language ?? this.language` could not express, and it '
+              'is what makes "follow the platform" reachable after a choice.',
+        );
+      },
+    );
+
+    test('`SettingsState`', () {
+      _equalAndDistinct('SettingsState', _settingsState(), _settingsState());
+      _differsInEveryField(
+        'SettingsState',
+        _settingsState(),
+        fields: 3,
+        variants: <({String field, SettingsState value})>[
+          (
+            field: 'status',
+            value: _settingsState(status: SettingsStatus.loading),
+          ),
+          (
+            field: 'settings',
+            value: _settingsState(
+              settings: _userSettings(themeMode: AppThemeMode.system),
+            ),
+          ),
+          (field: 'failure', value: _settingsState(failure: _failure())),
         ],
       );
     });
@@ -578,11 +653,12 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(34),
+        hasLength(36),
         reason:
-            'the converted set moved. 17 classes, 14 events and 3 sealed bases is '
-            'what the migration produced; if this number moved, the migration '
-            'moved and this file has to be told',
+            'the converted set moved. 19 classes, 14 events and 3 sealed bases is '
+            'what it now holds: the migration produced 17 classes, and Phase 9 added '
+            '`UserSettings` and `SettingsState`. If this number moved, the migration '
+            'or the phase moved and this file has to be told',
       );
       for (final String name in _assertedTypeNames) {
         expect(
@@ -730,6 +806,9 @@ const Set<String> _assertedTypeNames = <String>{
   'HomeState',
   'QuizState',
   'ReadingState',
+  // Phase 9's two.
+  'UserSettings',
+  'SettingsState',
   // The 7 events with a field…
   'AuthEmailChanged',
   'AuthPasswordChanged',
@@ -1016,18 +1095,46 @@ QuizState _quizState({
   lastResult: lastResult,
 );
 
+/// `ReadingState`'s builder, with **no** font step.
+///
+/// The parameter and the variant are gone because Phase 9 deleted the field: the
+/// reader's step is `UserSettings.fontStep`, installed app-wide by `MaterialApp`,
+/// and holding a second copy in cubit state is the "two sources of truth for one
+/// fact" the class doc rejects. So `fields: 4` below is not a smaller sample — it is
+/// the field count the class actually has, and `_differsInEveryField`'s exhaustive
+/// check is what proved the fifth one is gone.
 ReadingState _readingState({
   ReadingStatus status = ReadingStatus.ready,
   ScriptureText? scripture,
   Failure? failure,
-  int fontStep = ReadingCubit.defaultFontStep,
   bool textSizePanelOpen = false,
 }) => ReadingState(
   status: status,
   scripture: scripture,
   failure: failure,
-  fontStep: _int(fontStep),
   textSizePanelOpen: _bool(textSizePanelOpen),
+);
+
+UserSettings _userSettings({
+  AppThemeMode themeMode = AppThemeMode.dark,
+  int fontStep = kDefaultFontStep,
+  ReadingLanguage? language,
+  bool reducedMotion = false,
+}) => UserSettings(
+  themeMode: themeMode,
+  fontStep: _int(fontStep),
+  language: language,
+  reducedMotion: _bool(reducedMotion),
+);
+
+SettingsState _settingsState({
+  SettingsStatus status = SettingsStatus.ready,
+  UserSettings? settings,
+  Failure? failure,
+}) => SettingsState(
+  status: status,
+  settings: settings ?? _userSettings(),
+  failure: failure,
 );
 
 // --- values --------------------------------------------------------------
