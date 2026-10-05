@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
@@ -9,6 +8,9 @@ import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questio
 import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'quiz_bloc.freezed.dart';
 
 /// Where `/quiz` is in its own lifecycle.
 ///
@@ -75,21 +77,24 @@ enum QuizCta {
 }
 
 /// Everything `/quiz` can be asked. Sealed, so an unhandled event is a compile error.
-sealed class QuizEvent extends Equatable {
-  const QuizEvent();
-
-  /// `const []` for the same reason `HomeEvent`'s is, and `home_bloc_test.dart`
-  /// gives the whole argument: every subclass below overrides this, so the base
-  /// getter is unreachable by construction rather than by omission — and
-  /// `const []` is the honest thing for it to say.
-  @override
-  List<Object?> get props => const <Object?>[];
+///
+/// ## EACH EVENT IS A `freezed` CLASS, SO NONE OF THEM CAN FORGET ITS EQUALITY
+///
+/// The base used to extend `Equatable` and answer `props` with `const []` — the
+/// same dead-by-construction getter `HomeEvent` had, defended for the same
+/// reason. Both are gone: each event below derives its `==` from its constructor,
+/// so the getter that could be forgotten does not exist. See [AuthEvent] for the
+/// sealed base's shape and the one deliberate oddity in it.
+@freezed
+sealed class QuizEvent with _$QuizEvent {
+  const QuizEvent._();
 }
 
 /// The screen is opening, in [language].
-final class QuizStarted extends QuizEvent {
+@freezed
+final class QuizStarted extends QuizEvent with _$QuizStarted {
   /// Creates the start-up request.
-  const QuizStarted(this.language);
+  const QuizStarted(this.language) : super._();
 
   /// Which arm of the corpus to ask for.
   ///
@@ -99,9 +104,6 @@ final class QuizStarted extends QuizEvent {
   /// Phase 9's language switch is a locale change, which is the second trigger
   /// this screen has to honour.
   final ReadingLanguage language;
-
-  @override
-  List<Object?> get props => <Object?>[language];
 }
 
 /// The reader asked to try again, in [language].
@@ -127,15 +129,13 @@ final class QuizStarted extends QuizEvent {
 /// flag; `QuizSession.withQuestions` is where that decision lives.
 ///
 /// [language] rides along for [QuizStarted]'s reason.
-final class QuizRetried extends QuizEvent {
+@freezed
+final class QuizRetried extends QuizEvent with _$QuizRetried {
   /// Creates the retry request.
-  const QuizRetried(this.language);
+  const QuizRetried(this.language) : super._();
 
   /// Which arm of the corpus to ask for.
   final ReadingLanguage language;
-
-  @override
-  List<Object?> get props => <Object?>[language];
 }
 
 /// The reader chose [letter] on the current question.
@@ -147,9 +147,10 @@ final class QuizRetried extends QuizEvent {
 /// the selection rather than adding to it, and `QuizOptionCard`'s `selected` state is
 /// on **at most one** card at a time. A `Set<String>` would let a reader select two
 /// options and then have to guess which one the submit sends.
-final class QuizOptionSelected extends QuizEvent {
+@freezed
+final class QuizOptionSelected extends QuizEvent with _$QuizOptionSelected {
   /// Creates the selection.
-  const QuizOptionSelected(this.letter);
+  const QuizOptionSelected(this.letter) : super._();
 
   /// The option's letter — a key of `Question.options`, sent to
   /// `POST /readings/:id/submit` verbatim.
@@ -160,9 +161,6 @@ final class QuizOptionSelected extends QuizEvent {
   /// C, D) or boolean"*, so the backend is the validator. In production this value
   /// can only be a key of the map, because the cards are built from its keys.
   final String letter;
-
-  @override
-  List<Object?> get props => <Object?>[letter];
 }
 
 /// The reader asked to grade the current question.
@@ -175,21 +173,17 @@ final class QuizOptionSelected extends QuizEvent {
 /// they cannot see. §5 trap 10's first row is the client's own fabricated id being
 /// rejected; a mismatch of this kind would be rejected too, but the reader would be
 /// told about it on the wrong question.
-final class QuizAnswerChecked extends QuizEvent {
+@freezed
+final class QuizAnswerChecked extends QuizEvent with _$QuizAnswerChecked {
   /// Creates the check request.
-  const QuizAnswerChecked();
-
-  @override
-  List<Object?> get props => const <Object?>[];
+  const QuizAnswerChecked() : super._();
 }
 
 /// The reader asked to move on.
-final class QuizAdvanced extends QuizEvent {
+@freezed
+final class QuizAdvanced extends QuizEvent with _$QuizAdvanced {
   /// Creates the advance request.
-  const QuizAdvanced();
-
-  @override
-  List<Object?> get props => const <Object?>[];
+  const QuizAdvanced() : super._();
 }
 
 /// `/quiz`'s state: a session, a cursor, and the last graded answer.
@@ -200,7 +194,23 @@ final class QuizAdvanced extends QuizEvent {
 /// is the writer. Putting the index on the session would give one class two writers
 /// — its own `withAnswerAt` and an "advance" — that would have to agree about what
 /// advancing means mid-question. `ReadingCubit`'s single-writer argument applies.
-final class QuizState extends Equatable {
+///
+/// ## NO GENERATED `copyWith`, FOR `HomeState`'s REASON
+///
+/// `@Freezed(copyWith: false)`. Every `emit` in `QuizBloc` builds the whole state
+/// through the constructor, because the session and the cursor arrive together and
+/// a partial writer could set one without the other — the shape this file's own
+/// `_emitReading` doc calls "a writer that could set one without the other is the
+/// shape that lets a cursor point at a session it was not counted from". A
+/// generated sentinel `copyWith` is exactly that partial writer, so it is switched
+/// off rather than left available and unused.
+///
+/// **`toString` is declared** so freezed does not generate one. The generated one
+/// would be harmless on this class — no field here is a secret — but this
+/// `toString` answers a question the generated one cannot (`answered:` of
+/// `questionCount`), and `bloc_test` prints a state on every mismatch.
+@Freezed(copyWith: false)
+final class QuizState with _$QuizState {
   /// The state a cold launch starts in.
   const QuizState({
     this.status = QuizStatus.loading,
@@ -367,15 +377,6 @@ final class QuizState extends Equatable {
   }
 
   @override
-  List<Object?> get props => <Object?>[
-    status,
-    session,
-    currentIndex,
-    failure,
-    lastResult,
-  ];
-
-  @override
   String toString() =>
       'QuizState(${status.name}, index: $currentIndex, '
       'answered: ${session?.answeredCount ?? 0}/${session?.questionCount ?? 0})';
@@ -485,7 +486,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     // `HomeBloc._onRetried` has the same emit-then-read shape and gets away with it
     // only because `withSection` leaves the untouched section's data on the new
     // state; here the loading emit is a whole new `QuizState`, so nothing survives
-    // it. The rule is the one `AuthState.copyWith`'s doc states about a single
+    // it. The rule is the one `AuthState`'s doc states about a single
     // writer: if the handler reads what it needs, it reads it **first**.
     final QuizSession? before = state.session;
     final int beforeIndex = state.currentIndex;

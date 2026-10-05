@@ -53,7 +53,6 @@
 /// `default` — while the form's independent fields stay plain data.
 library;
 
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
@@ -62,6 +61,9 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'auth_bloc.freezed.dart';
 
 /// Where the session is, as far as the UI is concerned.
 ///
@@ -91,11 +93,27 @@ enum AuthSessionStatus {
 
 /// Everything [AuthState] can be asked. Sealed, so adding an event is a
 /// compile error everywhere it is handled.
-sealed class AuthEvent extends Equatable {
-  const AuthEvent();
-
-  @override
-  List<Object?> get props => const <Object?>[];
+///
+/// ## EACH EVENT IS A `freezed` CLASS AND THE BASE OWNS NOTHING BUT THE
+/// ## CONSTRUCTOR
+///
+/// The base used to extend `Equatable` and return `const []` from `props`. It does
+/// not now: each event below is a `freezed` class whose `==` is derived from its
+/// constructor, so there is no `props` list for a new event to forget — which was
+/// the whole of the risk this shape carried (see [HomeEvent] for the longer
+/// version of the same argument).
+///
+/// **The generated `_$AuthEvent` mixin is deliberately unused.** `freezed` emits a
+/// mixin for the base of a `sealed` class whether or not anything mixes it in, and
+/// the alternative — leaving this base un-annotated, as `Result<T>` is in
+/// `core/common/result.dart` — trades ~15 lines of generated code nobody reads for
+/// a base that does not advertise a contract it does not honour. The cost is
+/// bounded and confined to a file marked `GENERATED CODE - DO NOT MODIFY`; the
+/// benefit is that the next event added here gets the same treatment as the ones
+/// above without a second decision.
+@freezed
+sealed class AuthEvent with _$AuthEvent {
+  const AuthEvent._();
 }
 
 /// Ask whether a session already exists, so a cold launch can restore instead of
@@ -104,64 +122,76 @@ sealed class AuthEvent extends Equatable {
 /// Dispatched once, when the composition root builds the bloc. Emits no state of
 /// its own when there is none: the form is already what is on screen, and a
 /// second emit would be a rebuild for nothing.
-final class AuthStarted extends AuthEvent {
+@freezed
+final class AuthStarted extends AuthEvent with _$AuthStarted {
   /// Creates the start-up request.
-  const AuthStarted();
+  const AuthStarted() : super._();
 }
 
 /// The email field's text changed.
-final class AuthEmailChanged extends AuthEvent {
+@freezed
+final class AuthEmailChanged extends AuthEvent with _$AuthEmailChanged {
   /// The reader typed [email].
-  const AuthEmailChanged(this.email);
+  const AuthEmailChanged(this.email) : super._();
 
   /// The whole field's text, not a delta.
   final String email;
-
-  @override
-  List<Object?> get props => <Object?>[email];
 }
 
 /// The password field's text changed.
-final class AuthPasswordChanged extends AuthEvent {
+@freezed
+final class AuthPasswordChanged extends AuthEvent with _$AuthPasswordChanged {
   /// The reader typed [password].
-  const AuthPasswordChanged(this.password);
+  const AuthPasswordChanged(this.password) : super._();
 
   /// The whole field's text, not a delta.
+  ///
+  /// **In the generated `==`, and never in a `toString`.** freezed derives the
+  /// equality from the constructor, so two events carrying different secrets are
+  /// different events — which is correct and what `Equatable.props` did. The
+  /// printing is the other half, and it is the half that must not be generated.
   final String password;
 
-  @override
-  List<Object?> get props => <Object?>[password];
-
-  /// Never prints [password].
+  /// Never prints [password], and this declaration is what stops freezed
+  /// generating one that does.
   ///
-  /// Equatable's default `toString` renders every entry in [props], so without
-  /// this the reader's typed password reaches any log line, crash report, or
-  /// failed `expect` that happens to print the event. Found by
+  /// `Equatable`'s default `toString` rendered every entry in `props`, so without
+  /// an override the reader's typed password reached any log line, crash report,
+  /// or failed `expect` that happened to print the event. Found by
   /// `test/core/common/secret_masking_test.dart`, which scans `lib/` for classes
   /// holding a `password` field — the same rule `LoginCredentials` and
-  /// `AuthState` already honour, and the reason this event had quietly become
-  /// the third class that did not.
+  /// `AuthState` already honour, and the reason this event had quietly become the
+  /// third class that did not.
+  ///
+  /// **freezed skips a member the class declares itself**, verified by generation
+  /// rather than by reading its documentation: this class's generated part contains
+  /// an `==`, a `hashCode` and a `copyWith` and **no** `toString`. Deleting these
+  /// five lines is the mutation that gate exists to catch, and it turns it red.
   @override
   String toString() => 'AuthPasswordChanged(password: ********)';
 }
 
 /// The show/hide-password control was activated.
-final class AuthPasswordVisibilityToggled extends AuthEvent {
+@freezed
+final class AuthPasswordVisibilityToggled extends AuthEvent
+    with _$AuthPasswordVisibilityToggled {
   /// Creates the toggle request.
-  const AuthPasswordVisibilityToggled();
+  const AuthPasswordVisibilityToggled() : super._();
 }
 
 /// The reader pressed "Sign in" — or submitted the form from the keyboard, which
 /// is the same act through a different control.
-final class AuthSubmitted extends AuthEvent {
+@freezed
+final class AuthSubmitted extends AuthEvent with _$AuthSubmitted {
   /// Creates the submit request.
-  const AuthSubmitted();
+  const AuthSubmitted() : super._();
 }
 
 /// The reader asked to sign out.
-final class AuthSignedOut extends AuthEvent {
+@freezed
+final class AuthSignedOut extends AuthEvent with _$AuthSignedOut {
   /// Creates the sign-out request.
-  const AuthSignedOut();
+  const AuthSignedOut() : super._();
 }
 
 /// The sign-in form, as one immutable value.
@@ -169,7 +199,44 @@ final class AuthSignedOut extends AuthEvent {
 /// Every field has a `const` default, so the bloc can emit `const AuthState()` for
 /// "nothing has happened" and a test can compare whole states without naming nine
 /// arguments.
-final class AuthState extends Equatable {
+///
+/// ## WHY THE GENERATED `copyWith` IS **SWITCHED OFF**
+///
+/// `@Freezed(copyWith: false)`, and this is the one state in the migration where
+/// freezed's `copyWith` was declined rather than adopted.
+///
+/// The hand-rolled `copyWith` it replaces took **six** parameters and carried the
+/// four nullable fields — `emailError`, `passwordError`, `formError`, `session` —
+/// by copying them verbatim. That exclusion was the point, and the argument is the
+/// one its own doc used to make: a `String? = null` parameter cannot express "clear
+/// it", so a field that must be cleared is written by exactly one writer that
+/// builds the whole state. freezed's generated `copyWith` is precisely the
+/// mechanism that doc names as rejected — **"the fix is not sentinel objects or
+/// casts"** — and it is a *wider* one: it takes all ten fields and its sentinel
+/// defaults make `copyWith(emailError: null)` **clear** the error.
+///
+/// Nothing in `lib/` or in `test/` calls it that way, so behaviour is identical
+/// either way today. The decision is about what the type permits: with
+/// `copyWith` switched off, "the four nullable fields have exactly one writer" is
+/// **mechanical** — the method physically cannot name them — rather than a
+/// convention every future caller has to remember. `withFormError` below is the
+/// second writer, and it exists precisely because `formError` is the one nullable
+/// field a second code path legitimately writes.
+///
+/// **Rejected: adopting the generated one.** It is one fewer method and it is what
+/// freezed emits for every other class here, and the answer is that the six
+/// parameters are not the value — the *exclusion* is, and it is worth more than the
+/// twelve lines it costs. See AGENT_CONTEXT §2.1 hazard 3 and decision 97.
+///
+/// ## `toString` IS DECLARED, AND THAT IS WHAT KEEPS THE SECRET OUT
+///
+/// freezed generates one for every class that does not declare its own, and its
+/// generated `toString` lists **every** property. One of the ten is [password].
+/// The override below is the whole defence, freezed honours it, and
+/// `test/core/common/secret_masking_test.dart` is the structural half that says so
+/// for every secret-holder in `lib/` rather than for this class alone.
+@Freezed(copyWith: false)
+final class AuthState with _$AuthState {
   /// A form state.
   const AuthState({
     this.status = AuthSessionStatus.unknown,
@@ -250,22 +317,23 @@ final class AuthState extends Equatable {
   bool get canSubmit =>
       !isBusy && email.trim().isNotEmpty && password.isNotEmpty && isValid;
 
-  /// [next] with the fields this state does not vary changed.
+  /// [next] with [formError] set, and nothing else changed.
   ///
-  /// ## WHY THE NULLABLE FIELDS ARE **NOT** PART OF THIS
+  /// ## WHY THIS IS A METHOD AND NOT A `copyWith` PARAMETER
   ///
-  /// A `String? emailError = null` parameter cannot express "clear it": `null`
-  /// means both "leave it" and "set it to null", so `copyWith(emailError: null)`
-  /// silently keeps the old error. That is not hypothetical — it is exactly the
-  /// bug this function's own first version had, where a field error could never
+  /// A `String? formError = null` parameter cannot express "clear it": `null`
+  /// means both "leave it" and "set it to null", so a `copyWith(formError: null)`
+  /// would silently keep the old error. That is not hypothetical — it is exactly
+  /// the bug this class's own first version had, where a field error could never
   /// be cleared and the form accused the reader of a mistake they had fixed.
   ///
-  /// The fix is not sentinel objects or casts. It is that the four nullable
-  /// fields — `emailError`, `passwordError`, `formError`, `session` — are
-  /// written by exactly one writer, [AuthBloc._revalidated], which builds
-  /// the whole state. A method that can only be wrong in one place is worth more
-  /// than a method that is right in every place it is called from.
-  /// [next] with [formError] set, and nothing else changed.
+  /// The fix is not sentinel objects or casts — see the class doc for why the
+  /// generated sentinel `copyWith` is switched off rather than adopted. It is that
+  /// the four nullable fields — `emailError`, `passwordError`, `formError`,
+  /// `session` — are written by exactly one writer, [AuthBloc._revalidated],
+  /// which builds the whole state, plus this method. A writer that can only be
+  /// wrong in one place is worth more than a writer that is right in every place
+  /// it is called from.
   ///
   /// Its own method because `formError` is the one nullable field a **second**
   /// code path legitimately writes: it is the repository's answer rather than a
@@ -284,7 +352,16 @@ final class AuthState extends Equatable {
     session: session,
   );
 
-  /// [next] with the fields this state does not vary changed.
+  /// [next] with the six fields this state does not vary changed.
+  ///
+  /// ## THE HAZARD IS STILL REAL AND THE METHOD IS STILL NEEDED
+  ///
+  /// `null` on any of these six still means "leave it", so nothing here can clear a
+  /// field — and that is the intent, not an oversight: the four nullable fields are
+  /// not parameters at all (class doc), and the six that are here are non-nullable
+  /// or have no "clear it" meaning. `AuthBloc` calls this from four handlers, all
+  /// of which vary exactly one or two of these six, so every call site is inside
+  /// what the method can express.
   AuthState copyWith({
     AuthSessionStatus? status,
     String? email,
@@ -305,27 +382,14 @@ final class AuthState extends Equatable {
     session: session,
   );
 
-  @override
-  List<Object?> get props => <Object?>[
-    status,
-    email,
-    password,
-    isPasswordVisible,
-    emailTouched,
-    passwordTouched,
-    emailError,
-    passwordError,
-    formError,
-    session,
-  ];
-
-  /// Deliberately not Equatable's default.
+  /// Deliberately not the generated one, which freezed skips precisely because
+  /// this declaration exists.
   ///
-  /// It prints every prop, and one of them is the reader's password. A bloc state
-  /// is printed by `bloc_test` on every mismatch and by `flutter_bloc`'s debug
-  /// transition logging, so the default would put a secret in a build's console as
-  /// a matter of course. This prints the shape and the address — which is the one
-  /// field a failing test usually needs.
+  /// A generated `toString` lists every property, and one of them is the reader's
+  /// password. A bloc state is printed by `bloc_test` on every mismatch and by
+  /// `flutter_bloc`'s debug transition logging, so the generated one would put a
+  /// secret in a build's console as a matter of course. This prints the shape and
+  /// the address — which is the one field a failing test usually needs.
   @override
   String toString() =>
       'AuthState(status: ${status.name}, email: $email, password: ********, '
@@ -555,7 +619,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ///
   /// A field's error appears when the reader has touched it, or when [revealAll]
   /// is set by a submit. This builds the **whole** state rather than copying, and
-  /// that is deliberate — see [AuthState.copyWith]'s doc for why the nullable
+  /// that is deliberate — see [AuthState]'s doc for why the nullable
   /// fields are not its parameters. It also means `emailError` and
   /// `passwordError` can never disagree with the values that produced them: the
   /// state *is* the rule applied, not a cached judgement a second code path could

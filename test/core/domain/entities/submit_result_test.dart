@@ -55,8 +55,10 @@ void main() {
     );
 
     // One field per case, in the interface's own order, so the omission this
-    // guards against — a field left out of `props` — is red per field rather than
-    // "two of them differ and nobody knows which".
+    // guards against — a field left out of the generated `==` — is red per field
+    // rather than "two of them differ and nobody knows which". The wording used to
+    // say `props`, which was the equatable mechanism; freezed derives `==` from
+    // the constructor and there is no list to leave a field out of.
     for (final (String name, SubmitResult Function() build)
         in <(String, SubmitResult Function())>[
           (
@@ -144,34 +146,37 @@ void main() {
             ),
           ),
         ]) {
-      test('`props` distinguishes a different $name', () {
+      test('equality distinguishes a different $name', () {
         expect(aSubmitResult, isNot(equals(build())));
       });
     }
 
-    test('a result is NOT equal to a different question with everything else the '
-        'same', () {
-      // The narrow one, and the one a `props` list built from only the numbers
-      // would fail. Two submissions of two different questions can differ in
-      // nothing else — same verdict, same points, same streaks, same completion —
-      // and `/result` is handed the last one, so "which question is this about" has
-      // to be part of the identity.
-      expect(
-        aSubmitResult,
-        isNot(
-          equals(
-            SubmitResult(
-              questionId: 'question-group-4',
-              isCorrect: aSubmitResult.isCorrect,
-              pointsEarned: aSubmitResult.pointsEarned,
-              currentTotalPoints: aSubmitResult.currentTotalPoints,
-              currentStreak: aSubmitResult.currentStreak,
-              longestStreak: aSubmitResult.longestStreak,
-              readingCompleted: aSubmitResult.readingCompleted,
+    test(
+      'a result is NOT equal to a different question with everything else the '
+      'same',
+      () {
+        // The narrow one, and the one an `==` built from only the numbers
+        // would fail. Two submissions of two different questions can differ in
+        // nothing else — same verdict, same points, same streaks, same completion —
+        // and `/result` is handed the last one, so "which question is this about" has
+        // to be part of the identity.
+        expect(
+          aSubmitResult,
+          isNot(
+            equals(
+              SubmitResult(
+                questionId: 'question-group-4',
+                isCorrect: aSubmitResult.isCorrect,
+                pointsEarned: aSubmitResult.pointsEarned,
+                currentTotalPoints: aSubmitResult.currentTotalPoints,
+                currentStreak: aSubmitResult.currentStreak,
+                longestStreak: aSubmitResult.longestStreak,
+                readingCompleted: aSubmitResult.readingCompleted,
+              ),
             ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   });
 }

@@ -1,6 +1,8 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'quiz_session.freezed.dart';
 
 /// One question as the reader has interacted with it so far.
 ///
@@ -37,7 +39,17 @@ import 'package:evangelion/core/domain/entities/submit_result.dart';
 /// `quiz_page_test.dart` holds an `already_answered` question on screen through the
 /// whole boundary and asserts `is_correct` is in neither the widget tree nor the
 /// semantics tree until the reader checks something.
-final class QuizAnswer extends Equatable {
+///
+/// ## EQUALITY IS GENERATED, AND THE GENERATED [copyWith] IS **NOT** A WRITER
+///
+/// [withSelection] and [withVerdict] are the two writers, and they are the ones a
+/// caller should reach for: they name the two transitions the type has. The
+/// generated `copyWith` exists because freezed emits it for every class it owns,
+/// it can set [question] on its own — which no writer here does, and which would
+/// make the [verdict] and the [question] disagree — and nothing calls it. See
+/// AGENT_CONTEXT §2.1.
+@freezed
+final class QuizAnswer with _$QuizAnswer {
   /// A question, untouched.
 
   const QuizAnswer({required this.question, this.selectedLetter, this.verdict});
@@ -146,9 +158,6 @@ final class QuizAnswer extends Equatable {
     selectedLetter: selectedLetter,
     verdict: result,
   );
-
-  @override
-  List<Object?> get props => <Object?>[question, selectedLetter, verdict];
 }
 
 /// Everything one visit to `/quiz` is playing against.
@@ -170,7 +179,8 @@ final class QuizAnswer extends Equatable {
 /// by it, so an id captured at session start can be stale by the time the reader
 /// submits. [withQuestions] is the writer that replaces it, and it is why
 /// `RefreshSessionQuestions` returns an id as well as a list.
-final class QuizSession extends Equatable {
+@freezed
+final class QuizSession with _$QuizSession {
   /// A session over [answers], submitting against [readingId].
 
   const QuizSession({required this.readingId, required this.answers});
@@ -363,7 +373,4 @@ final class QuizSession extends Equatable {
       ],
     );
   }
-
-  @override
-  List<Object?> get props => <Object?>[readingId, answers];
 }

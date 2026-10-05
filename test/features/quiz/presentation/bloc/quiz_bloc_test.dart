@@ -1328,17 +1328,35 @@ void main() {
 
   group('the events themselves', () {
     test('`QuizOptionSelected` is not the same request twice', () {
-      // Recorded decision 48's Equatable lesson: an event that dropped `props`
-      // would make every selection equal to every other and `bloc.add` would
-      // swallow the second. That is a **behavioural** consequence, not a
+      // Recorded decision 48's lesson: an event whose equality ignored its own
+      // fields would make every selection equal to every other and `bloc.add`
+      // would swallow the second. That is a **behavioural** consequence, not a
       // `props`-formatting one, which is why the assertion is about the events
-      // rather than about a getter.
-      expect(const QuizOptionSelected('A'), const QuizOptionSelected('A'));
+      // rather than about a getter — and `==` is now generated from each event's
+      // constructor, so there is no getter left to assert on.
+      expect(
+        const QuizOptionSelected('A'),
+        const QuizOptionSelected('A'),
+        reason:
+            'DART CANONICALISES CONST INSTANCES, so this compares one object '
+            'with itself and passes whatever `==` says. It is kept as the '
+            'documentation of what the reader of the group expects to be true; '
+            'the assertion that has teeth is the one below it.',
+      );
       expect(
         const QuizOptionSelected('A'),
         isNot(equals(const QuizOptionSelected('B'))),
+        reason:
+            'a different letter is a different request, and this one is not '
+            'canonicalised away',
       );
-      expect(const QuizAnswerChecked(), const QuizAnswerChecked());
+      expect(
+        const QuizAnswerChecked(),
+        const QuizAnswerChecked(),
+        reason:
+            'the same vacuity as above, and it is why the field-less pair gets '
+            'its own assertion in the next test rather than one here',
+      );
       expect(
         const QuizStarted(ReadingLanguage.english),
         isNot(equals(const QuizStarted(ReadingLanguage.arabic))),
@@ -1352,8 +1370,37 @@ void main() {
     test('`QuizAnswerChecked` and `QuizAdvanced` take no argument', () {
       // They act on the **current** answer, which is state. An argument would be a
       // second way to say which question, and the two could disagree.
-      expect(const QuizAnswerChecked().props, isEmpty);
-      expect(const QuizAdvanced().props, isEmpty);
+      //
+      // ## THE `props` ASSERTION IS GONE AND THIS IS WHAT REPLACES IT
+      //
+      // It used to read `expect(const QuizAnswerChecked().props, isEmpty)` — a
+      // getter that no longer exists anywhere in this codebase, because freezed
+      // derives `==` from the constructor. "Takes no argument" is now a fact about
+      // the *type* rather than about a list, and the only observable consequence is
+      // the one below: two events with no fields of their own are still told apart
+      // by what they are, so a `QuizAdvanced` cannot be swallowed behind a
+      // `QuizAnswerChecked` by `bloc`'s `distinct()` on the event stream.
+      //
+      // ## AND THERE IS **NO** "TWO `QuizAnswerChecked`s ARE EQUAL" ASSERTION
+      //
+      // Because it cannot be written without proving nothing — the same argument
+      // `home_bloc_test.dart` records for `HomeCleared`. `const QuizAnswerChecked()`
+      // is canonicalised by Dart into one instance, so two of them are `identical`
+      // and any `==` returns true on that fast path. Building two non-const
+      // instances is impossible to spell without an `// ignore:` for
+      // `prefer_const_constructors`, and this repository uses none.
+      expect(
+        const QuizAnswerChecked(),
+        isNot(equals(const QuizAdvanced())),
+        reason:
+            'no fields on either, so their types are the only thing that can '
+            'distinguish them — and it does',
+      );
+      expect(
+        const QuizAdvanced(),
+        isNot(equals(const QuizAnswerChecked())),
+        reason: 'and symmetrically, since `==` is asymmetric to assert on',
+      );
     });
   });
 }

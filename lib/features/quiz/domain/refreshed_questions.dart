@@ -1,5 +1,7 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'refreshed_questions.freezed.dart';
 
 /// A **re-read** of today's reading, reduced to the two values a quiz session can
 /// refresh.
@@ -31,7 +33,8 @@ import 'package:evangelion/core/domain/entities/question.dart';
 /// **Rejected: returning `List<Question>`.** Then the caller has nowhere to get the
 /// refreshed `reading_id` and would have to read the payload again — the exact
 /// redundancy this type removes.
-final class RefreshedQuestions extends Equatable {
+@freezed
+final class RefreshedQuestions with _$RefreshedQuestions {
   /// A re-read, narrowed to what a session can take from it.
   const RefreshedQuestions({required this.readingId, required this.questions});
 
@@ -56,7 +59,4 @@ final class RefreshedQuestions extends Equatable {
   /// with one witness.
   RefreshedQuestions copyWithReadingId(String readingId) =>
       RefreshedQuestions(readingId: readingId, questions: questions);
-
-  @override
-  List<Object?> get props => <Object?>[readingId, questions];
 }
