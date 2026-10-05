@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -6,6 +5,9 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'reading_cubit.freezed.dart';
 
 /// Where one part of `/reading` is in its own lifecycle.
 ///
@@ -57,10 +59,10 @@ enum ReadingStatus {
 /// ## AND IT IS A **`Cubit`**, NOT A `Bloc`, WHICH IS A DECISION WITH A REASON
 ///
 /// `HomeBloc` is a `Bloc` because it has four event types and `home_bloc_test.dart`
-/// spends real effort on their `props` — including recorded decision 48's account
-/// of an uncovered `HomeEvent.props` getter. This cubit has **no events**: `load`
-/// and `setFontStep` are method parameters, and `bloc.add` is not reachable from
-/// it. The Equatable mistake recorded decision 48 names — every event equal, so
+/// spends real effort on their equality — including recorded decision 48's account
+/// of an uncovered `HomeEvent` equality getter. This cubit has **no events**:
+/// `load` and `setFontStep` are method parameters, and `bloc.add` is not reachable
+/// from it. The mistake recorded decision 48 names — every event equal, so
 /// `bloc.add` swallows a duplicate — cannot happen to a type with no events.
 ///
 /// ## AND THERE IS **ONE** `load`, NOT A `LOAD` AND A `RETRY`
@@ -73,7 +75,23 @@ enum ReadingStatus {
 /// `ReadingPage` calls [retry] from the failure view and [load] from
 /// `didChangeDependencies`, and the difference between them is the reader's intent
 /// rather than a different code path.
-final class ReadingState extends Equatable {
+///
+/// ## [copyWith] IS GENERATED, AND IT **CAN** CLEAR [scripture] AND [failure]
+///
+/// The hand-rolled `copyWith` this class used to declare wrote
+/// `scripture ?? this.scripture`, so `null` meant "leave it alone" and the two
+/// nullable fields could never be cleared through it — a hazard its own doc
+/// recorded as unfixable. freezed gives every nullable field a sentinel default,
+/// so `copyWith(scripture: null)` clears and omitting the argument keeps. The two
+/// call sites below pass only [fontStep] and [textSizePanelOpen], so behaviour at
+/// every existing call site is unchanged. See AGENT_CONTEXT §2.1.
+///
+/// **`toString` is generated here**, where `Equatable`'s default used to print
+/// every prop. That is harmless on this class — none of its fields is a secret —
+/// and the five classes in this repository that *do* declare their own are what
+/// `test/core/common/secret_masking_test.dart` structurally enforces.
+@freezed
+final class ReadingState with _$ReadingState {
   /// A state with nothing loaded and the reader's default font step.
   const ReadingState({
     this.status = ReadingStatus.loading,
@@ -121,36 +139,6 @@ final class ReadingState extends Equatable {
   /// panel opens and closes and asserts **nothing** about surviving a navigation,
   /// because there is nothing to assert.
   final bool textSizePanelOpen;
-
-  @override
-  List<Object?> get props => <Object?>[
-    status,
-    scripture,
-    failure,
-    fontStep,
-    textSizePanelOpen,
-  ];
-
-  /// [other] with the named fields replaced.
-  ///
-  /// `scripture` and `failure` are nullable, so `null` means "keep the current
-  /// value" and neither can be **cleared** through this method. That is the hazard
-  /// `AuthState.copyWith`'s doc explains, and this state avoids it the way
-  /// `TodayReading.copyWith` does: there is exactly one writer, [_loading], which
-  /// rebuilds the whole state, so no nullable field is ever "left alone" by accident.
-  ReadingState copyWith({
-    ReadingStatus? status,
-    ScriptureText? scripture,
-    Failure? failure,
-    int? fontStep,
-    bool? textSizePanelOpen,
-  }) => ReadingState(
-    status: status ?? this.status,
-    scripture: scripture ?? this.scripture,
-    failure: failure ?? this.failure,
-    fontStep: fontStep ?? this.fontStep,
-    textSizePanelOpen: textSizePanelOpen ?? this.textSizePanelOpen,
-  );
 }
 
 /// `/reading`'s state machine.
@@ -219,8 +207,8 @@ class ReadingCubit extends Cubit<ReadingState> {
   ///
   /// **No emit when the step is unchanged**, which is what keeps
   /// `FontSizeStepper`'s drag from rebuilding the whole passage on every frame:
-  /// the track reports continuously, and `ReadingState` is `Equatable`, so an
-  /// identical state is not a state change.
+  /// the track reports continuously, and [ReadingState]'s `==` is generated from
+  /// its five fields, so an identical state is not a state change.
   void setFontStep(int step) {
     final int clamped = clampFontStep(step);
     if (clamped == state.fontStep) return;

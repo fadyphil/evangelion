@@ -600,11 +600,14 @@ void main() {
   });
 
   group('the events', () {
-    // `Equatable.props` is not a formality: `bloc.add` on a duplicate is a no-op
+    // Event equality is not a formality: `bloc.add` on a duplicate is a no-op
     // only if the event is equal, and both events carry the language precisely so
-    // that two `HomeRetried(english)`s are the same request. Without these the
-    // equality is untested and a `props` that returned `const []` — the classic
-    // Equatable mistake — would pass every behavioural suite here.
+    // that two `HomeRetried(english)`s are the same request.
+    //
+    // The wording used to be about `Equatable.props` returning `const []` — the
+    // classic mistake this group was written against. freezed derives `==` from
+    // each event's constructor, so there is no getter to get wrong any more; the
+    // assertions below are unchanged and still say what they said.
     test('HomeStarted and HomeRetried compare by language', () {
       expect(
         const HomeStarted(ReadingLanguage.english),
@@ -631,26 +634,25 @@ void main() {
     });
 
     test('a HomeCleared is neither a HomeStarted nor a HomeRetried', () {
-      // A `props => const []` on the base would make every event equal to every other,
-      // so a `HomeCleared` could be swallowed behind an unrelated request. Asserting
-      // the three are distinct is the cheap half of that, and it is the half that is
-      // worth asserting here.
+      // One event type comparing equal to another would let a `HomeCleared` be
+      // swallowed behind an unrelated request. Asserting the three are distinct is
+      // the cheap half of that, and it is the half that is worth asserting here.
       //
       // ## AND WHY THERE IS **NO** "two HomeCleareds are equal" ASSERTION
       //
       // Because it cannot be written here without proving nothing, and the
       // measurement is worth recording. `const HomeCleared()` is **canonicalised** by
       // Dart, so `expect(const HomeCleared(), const HomeCleared())` compares one
-      // instance with itself: `Equatable.==` returns on `identical` and `props` is
-      // never read. Building two *non-const* instances does read `props` — and
+      // instance with itself, and every `==` returns on `identical` without reading
+      // anything. Building two *non-const* instances would really compare them — and
       // `prefer_const_constructors` fires on every way of spelling that, because the
       // constructor is `const` and there is no argument that could vary.
       //
       // The remaining escape is an `// ignore:`, and **this repository uses none** —
       // a fact its own docs record. So the assertion was deleted rather than
-      // suppressed, and the underlying reachability is recorded as decision 48:
-      // `HomeCleared.props` is dead code by construction, exactly like
-      // `HomeEvent.props`, because nothing compares two clears.
+      // suppressed, and the underlying reachability is recorded as decision 48.
+      // Nothing has changed about that since the migration: `HomeCleared` has no
+      // fields, so the only equality it can carry is "same type, same nothing".
       //
       // The behaviour that *would* matter is asserted where it is observable:
       // `HomeCleared and it is idempotent, because sign-out can arrive twice`.
@@ -713,8 +715,8 @@ void main() {
         bloc.state,
         const HomeState(),
         reason:
-            'equality is the claim: `HomeState.props` lists all ten fields, so an '
-            'equality match cannot be hiding a field that was left behind',
+            'equality is the claim, and the generated `==` covers all ten fields, '
+            'so an equality match cannot be hiding a field that was left behind',
       );
       await bloc.close();
     });

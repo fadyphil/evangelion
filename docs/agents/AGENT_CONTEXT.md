@@ -41,7 +41,7 @@ agent does not re-propose what was rejected, or re-litigate what was accepted.
 | # | Decision | Consequence |
 |---|---|---|
 | 7 | **Keep `sealed Result<T>`.** `fp_dart`/`dartz` rejected. | `lib/core/common/result.dart` stays hand-written. |
-| 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | The 22 `extends Equatable` classes are converted. `equatable ^3.0.0` then becomes transitive-only, and is removed from `pubspec.yaml` in the same task that removes its last use. |
+| 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal is **deferred**, because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7), so its last use has not gone. It becomes transitive-only, and is removed from `pubspec.yaml`, in whichever task removes those last two. |
 | 8b | **Adopt ARB + `gen_l10n`.** | The six hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/*.arb`. |
 | 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
 
@@ -65,13 +65,19 @@ over `DioExceptionType.values` is a recorded gate. The one real gap was
 
 1. **`freezed` generates `toString`.** It skips the member when the class declares
    one, so the fix is available — but nothing in a green suite distinguishes
-   "freezed respected my override" from "freezed replaced it". **Six** classes
+   "freezed respected my override" from "freezed replaced it". **Five** classes
    override `toString` deliberately and **three** exist to keep a secret out of
-   logs: `LoginCredentials`, `AuthState` and `AuthPasswordChanged`. The Phase 8
-   gate `test/core/common/secret_masking_test.dart` is **structural** for exactly
-   this reason: it scans `lib/` for any class declaring a `final String password`
-   and requires a `toString` that does not interpolate it. A generated one writes
-   the reader's typed password into every log line and every failed `expect`.
+   logs: `LoginCredentials`, `AuthState` and `AuthPasswordChanged`. (A sixth
+   hand-written `toString` in this repository is `SignInParams`, which holds a
+   password, was never an `Equatable`, and is out of the migration — so the count
+   of *secret-holding* classes is four and the count of deliberate overrides
+   among *converted* classes is five. §2.1's earlier "six" counted
+   `ReadingState`, which has never declared one.) The Phase 8 gate
+   `test/core/common/secret_masking_test.dart` is **structural** for exactly this
+   reason: it scans `lib/` for any class declaring a `final String password`
+   and requires a `toString` that does not interpolate it, plus a behavioural
+   half against the running classes. A generated one writes the reader's typed
+   password into every log line and every failed `expect`.
 2. **`freezed` derives `==` from the constructor and offers no per-field
    exclusion.** `Failure` deliberately excludes `details` from equality, for a good
    reason: `equatable` deep-compares `Map`/`Set`/`Iterable` but falls through to
@@ -2581,6 +2587,86 @@ miss, and this.
 
 
 
+### Recorded decisions — the `freezed` migration (decision 8a)
+
+Shipped on `refactor/freezed-states`. **34 types** converted: 17 classes with
+fields of their own, 14 bloc events, and 3 sealed event bases. `pubspec.yaml`
+gained `freezed_annotation` ^3.1.0 and `freezed` ^4.0.1 (dev); `build.yaml`
+gained the `freezed:freezed` builder key scoped to `lib/**`, because the same
+"unknown builder key is silently ignored" rule that bit `injectable_generator`
+applies here. `equatable` **stays** — see decision 99.
+
+**96. THE DATA-CLASS FORM IS `final class X with _$X` WITH A DIRECT
+CONSTRUCTOR, NOT THE `factory` FORM.** freezed supports
+`const factory X({required T a}) = _X;`, and it is the shape most of its
+documentation uses. It is **wrong for this repository**: the factory form
+requires every field to be declared as an abstract getter (`String get a;`),
+because the generated impl `implements X` rather than extending it — declaring
+`final String a;` beside it is a `final_not_initialized` compile error, measured.
+The direct-constructor form keeps the field declarations **in the annotated
+file**, which is what keeps `secret_masking_test.dart`'s structural scan
+working unchanged. *Rejected:* "use the documented form" — it costs the structural
+secret gate its subject list, because the generated part would own the fields and
+the scan would then be reading generated code.
+
+**97. `@Freezed(copyWith: false)` ON `AuthState`, `HomeState` AND `QuizState` —
+AND `@Freezed(...)` REPLACES `@freezed` RATHER THAN ACCOMPANYING IT.** Three
+states document that every writer builds the **whole** state, because a
+`String? = null` parameter cannot express "clear it". freezed's generated
+`copyWith` is exactly the sentinel-based partial writer those docs name as
+rejected, and it is *wider*: it takes all ten fields and its sentinel defaults
+make `copyWith(emailError: null)` **clear** the error. `AuthState` keeps its
+hand-written six-field `copyWith` — the exclusion is the value, and the twelve
+lines it costs are cheaper than a convention every future caller has to
+remember. *Rejected:* adopting it everywhere (the six fields are not the point —
+the exclusion is). *Rejected:* hand-writing the base's `==` too (nothing needs
+it; `==` is where freezed is strongest).
+**The annotation-ordering trap, measured:** `@freezed` is `const freezed =
+Freezed()`, so writing **both** makes `firstAnnotationOf` read whichever comes
+first — and with `@freezed` on top, `copyWith: false` is silently ignored and a
+generated `copyWith` collides with the hand-written method
+(`conflicting_method_and_field`). `@Freezed(copyWith: false)` alone is the
+documented and only working spelling.
+
+**98. `Failure` AND `Result<T>` STAY HAND-WRITTEN, AND `equatable` STAYS IN
+`pubspec.yaml`.** §2.1 hazard 2 explains `Failure`: `details` is excluded from
+equality because `equatable` falls through to plain `==` for an untyped field,
+and freezed offers **no** per-field exclusion, so a generated `==` would put a
+decoded server body into the equality contract on purpose.
+`test/core/common/failure_equality_test.dart` pins that and is unchanged.
+`Result<T>` is sealed by hand with hand-written arms (§2.1 decision 7), so its
+`Success<T>`/`FailureResult<T>` keep `props` too. **Consequence, stated rather
+than buried: `equatable`'s last use is not gone, so §2.1 decision 8a's "removed
+in the same task" is deferred to whichever task removes the last `Equatable`.**
+Two hand-written `==`s in `lib/` depend on it and are correct to keep:
+`Failure` and `SignInParams`.
+
+**99. TWO NEW GATES, AND ONE EXISTING GATE FIXED.**
+`test/core/common/freezed_structural_equality_test.dart` (21 tests) asserts
+two equal-but-distinct instances compare equal **and that changing every single
+declared field makes them unequal**, with the field count asserted against the
+list length — the first version sampled two of `SubmitResult`'s seven fields and
+a deleted `readingCompleted` sailed through it.
+`test/core/common/no_identical_on_converted_types_test.dart` (9 tests) audits
+every `identical(` / `same(` site in `test/` against a 57-row table and fails on
+an unreviewed site, a stale row, a changed count, a drifted `converted:` flag or
+an unreasoned row. **And `secret_masking_test.dart` had a blind spot**: its own
+per-line comment stripper treated a `/*` **inside a doc comment** as a block
+comment start, so `home_bloc.dart`, `streak_summary.dart` and
+`submit_result.dart` were scanned only up to their first glob-shaped path
+(`readings/today/*`) — **five converted types invisible to the gate**. It now uses
+the shared `withoutDartComments` and carries a planted negative control.
+
+**100. THE GENERATED PARTS STAY PURE DART, AND GATE 1 IS WHAT PROVES IT.**
+Ten `.freezed.dart` files land inside `lib/core/domain/` and
+`lib/features/*/domain/`, the directories Gate 1 holds to pure Dart. A part file
+has no imports of its own, so its surface is the host library's — and the hosts
+import exactly one package, `freezed_annotation`, whose own dependencies are
+`collection`, `json_annotation` and `meta`, none of which reaches Flutter.
+Verified by scan and by negative control (an `import 'package:flutter/material.dart'`
+planted in a `core/domain` part makes Gate 1 exit 1).
+
+
 ## 7. Verification — run before reporting done
 
 ```bash
@@ -2601,6 +2687,15 @@ tool/verify_purity.sh                                      # architecture gates
    no feature at all.
 3. **Generated files stay lint-silent** — every `*.gr.dart` / `*.config.dart` keeps its
    `// ignore_for_file: type=lint` header, so hand-edits are detectable.
+   **The `.freezed.dart` parts are deliberately NOT in this list**, and the reason is
+   that freezed emits its own `ignore_for_file` header (`type=lint, type=warning,
+   unused_element, …`), which a naive `grep` for `ignore_for_file: type=lint` would
+   match on a substring. What replaces the header check for these files is
+   `dart analyze --fatal-infos --fatal-warnings` over the whole package, which
+   already fails on a hand-edit to a generated file that freezed's blanket ignore
+   does not cover — and the idempotence check, which fails on any hand-edit at all.
+   Gate 1 (§7) is what covers them where it matters: ten of them live inside the
+   pure-Dart directories.
 4. **Route inventory is readable** — every `static const String` in
    `core/navigation/app_routes.dart` has a plain-literal initialiser, so the route
    invariants can see it.

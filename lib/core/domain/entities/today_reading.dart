@@ -1,5 +1,7 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'today_reading.freezed.dart';
 
 /// Today's scheduled reading, narrowed to what `/`'s panel draws.
 ///
@@ -35,7 +37,16 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 /// live case where this flag and `streak/summary.today_completed` disagree with
 /// each other. Deriving one from the other would have quietly picked a winner in
 /// a disagreement the backend has not resolved.
-final class TodayReading extends Equatable {
+///
+/// ## [copyWith] IS GENERATED AND EVERY FIELD IS NON-NULLABLE
+///
+/// Which is why the nullable-field hazard `AuthState` still documents cannot
+/// arise here: no argument on the generated `copyWith` can be `null`, so nothing
+/// can be silently left behind and nothing can be silently cleared. The
+/// hand-rolled `copyWith` it replaced had exactly those semantics, so no call site
+/// changed. See AGENT_CONTEXT §2.1.
+@freezed
+final class TodayReading with _$TodayReading {
   /// A reading as `/`'s panel needs it.
   const TodayReading({
     required this.readingId,
@@ -162,58 +173,4 @@ final class TodayReading extends Equatable {
   /// is cheaper than removing the field and having the wrong number reintroduced
   /// from the response by a mapper that "helpfully" keeps everything.
   final int currentStreak;
-
-  @override
-  List<Object?> get props => <Object?>[
-    readingId,
-    groupId,
-    scheduledDate,
-    language,
-    reference,
-    translation,
-    verseCount,
-    firstVerseText,
-    questionCount,
-    answeredQuestionCount,
-    isFullyCompleted,
-    pointsEarnedToday,
-    currentStreak,
-  ];
-
-  /// [next] with the named fields replaced.
-  ///
-  /// Every field is non-nullable, so `null` unambiguously means "keep the
-  /// current value" and there is no sentinel object in this file. That is why the
-  /// nullable-field hazard `AuthState.copyWith` documents does not arise here:
-  /// `copyWith(isFullyCompleted: null)` is not expressible, and therefore cannot
-  /// silently fail to clear the flag.
-  TodayReading copyWith({
-    String? readingId,
-    int? groupId,
-    String? scheduledDate,
-    ReadingLanguage? language,
-    String? reference,
-    String? translation,
-    int? verseCount,
-    String? firstVerseText,
-    int? questionCount,
-    int? answeredQuestionCount,
-    bool? isFullyCompleted,
-    int? pointsEarnedToday,
-    int? currentStreak,
-  }) => TodayReading(
-    readingId: readingId ?? this.readingId,
-    groupId: groupId ?? this.groupId,
-    scheduledDate: scheduledDate ?? this.scheduledDate,
-    language: language ?? this.language,
-    reference: reference ?? this.reference,
-    translation: translation ?? this.translation,
-    verseCount: verseCount ?? this.verseCount,
-    firstVerseText: firstVerseText ?? this.firstVerseText,
-    questionCount: questionCount ?? this.questionCount,
-    answeredQuestionCount: answeredQuestionCount ?? this.answeredQuestionCount,
-    isFullyCompleted: isFullyCompleted ?? this.isFullyCompleted,
-    pointsEarnedToday: pointsEarnedToday ?? this.pointsEarnedToday,
-    currentStreak: currentStreak ?? this.currentStreak,
-  );
 }

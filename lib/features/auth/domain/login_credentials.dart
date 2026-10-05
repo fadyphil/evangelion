@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'login_credentials.freezed.dart';
 
 /// What the login form knows about one pair of credentials.
 ///
@@ -14,7 +16,19 @@ import 'package:equatable/equatable.dart';
 ///
 /// [password] is held verbatim and is never logged, compared or normalised. The
 /// only thing derived from it anywhere in this app is its length.
-final class LoginCredentials extends Equatable {
+///
+/// ## `==`, `hashCode` AND `toString` ARE **PARTLY** GENERATED, AND ONE IS NOT
+///
+/// freezed derives `==` and `hashCode` from the constructor, so [password] is in
+/// the equality contract — exactly as `Equatable.props` had it, and for the same
+/// reason: two pairs of credentials with different secrets are different
+/// credentials. `toString` is **declared here**, and freezed does not generate one
+/// for a class that has its own: the generated one would interpolate [password]
+/// into every log line and every failed `expect`. The generated part of this class
+/// is the equality and nothing else, which is the whole of what
+/// `test/core/common/secret_masking_test.dart` exists to keep true.
+@freezed
+final class LoginCredentials with _$LoginCredentials {
   /// Wraps an already-normalised email and password.
   const LoginCredentials({required this.email, required this.password});
 
@@ -37,12 +51,9 @@ final class LoginCredentials extends Equatable {
   LoginValidation validation() =>
       validateLogin(email: email, password: password);
 
-  @override
-  List<Object?> get props => <Object?>[email, password];
-
-  /// Deliberately **not** Equatable's default, which prints every prop and would
-  /// put a password into every failing bloc assertion and every log line. The
-  /// pair is compared by value through [props] and printed as a shape.
+  /// Deliberately **not** the generated one, which prints every property and would
+  /// put a password into every failing bloc assertion and every log line. The pair
+  /// is compared by value through the generated `==` and printed as a shape.
   @override
   String toString() => 'LoginCredentials(email: $email, password: ********)';
 }
@@ -74,7 +85,20 @@ const String kRequiredMessage = 'This field is required';
 /// and cost a lookup at each call site plus a cast at each render; two nullable
 /// fields carry it in a shape the compiler checks. There are exactly two fields,
 /// which is the whole reason this is not a list.
-final class LoginValidation extends Equatable {
+///
+/// ## IT HOLDS **NO SECRET**, AND THAT IS THE POINT OF THE SCAN IN
+/// ## `secret_masking_test.dart`
+///
+/// [passwordError] is a *message about* a password — `"That password's too
+/// short"` — never the password, and it is what makes this type exempt from the
+/// masking rule: the structural half of that gate scans `lib/` for a field
+/// declared `final String password` and finds nothing here, so this class is
+/// correctly absent from its offender list. The first version of that scan
+/// matched per *file* rather than per class and reported `LoginValidation` as a
+/// leak, which the file's own doc records as the failure mode of every regex
+/// gate here: right answer, unreachable reason.
+@freezed
+final class LoginValidation with _$LoginValidation {
   /// A verdict. Both `null` means valid.
   const LoginValidation({this.emailError, this.passwordError});
 
@@ -93,9 +117,6 @@ final class LoginValidation extends Equatable {
   /// above the password on screen (and in `LoginScreen.tsx:49-63`), so a summary
   /// that read password-first would name the wrong line.
   String? get firstError => emailError ?? passwordError;
-
-  @override
-  List<Object?> get props => <Object?>[emailError, passwordError];
 }
 
 /// Judges [email] and [password].
