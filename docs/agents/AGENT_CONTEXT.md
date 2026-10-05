@@ -30,6 +30,80 @@ These were decided with the user. Do not re-litigate. Do not expand scope.
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
 | 5 | **No servant/admin portal.** Those backend routes stay untested from the client. |
 | 6 | **Dark glassmorphic design system** per `docs/plans/03-design-system.md`, including the five mandatory performance mitigations in `docs/plans/09-quality-gates.md` §13. |
+| 7 | **Error handling is the hand-written `sealed Result<T>`, NOT `fp_dart`/`dartz`.** Added by amendment — §2.1. |
+| 8 | **States and entities use `freezed`; localization is ARB + `gen_l10n`.** Added by amendment — §2.1. |
+
+### 2.1 Dependency amendment — `freezed`, `gen_l10n`, and the `fp_dart` rejection
+
+Decided by the user after Phase 8, on measurement. This subsection exists so the next
+agent does not re-propose what was rejected, or re-litigate what was accepted.
+
+| # | Decision | Consequence |
+|---|---|---|
+| 7 | **Keep `sealed Result<T>`.** `fp_dart`/`dartz` rejected. | `lib/core/common/result.dart` stays hand-written. |
+| 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | The 22 `extends Equatable` classes are converted. `equatable ^3.0.0` then becomes transitive-only, and is removed from `pubspec.yaml` in the same task that removes its last use. |
+| 8b | **Adopt ARB + `gen_l10n`.** | The six hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/*.arb`. |
+| 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
+
+**Why `fp_dart` was rejected, with the numbers, so it is not re-proposed:**
+
+| measurement | value |
+|---|---|
+| `try` blocks in all of `lib/` | **3** — all three in the two Dio repositories |
+| files importing `result.dart` or `failure.dart` | 26 in `lib/`, 40 in `test/` |
+| assertions naming `Result` / `Failure` / `FailureKind` | **879** |
+
+`Result<T>` is already the either pattern, and `sealed` + exhaustive `switch`
+**expressions with no `default` arm** is strictly stronger than `dartz`'s `Either`:
+a third subtype becomes a compile error at every `switch`, which `Either` cannot
+express. That exhaustiveness is already load-bearing — `ApiErrorMapper`'s `switch`
+over `DioExceptionType.values` is a recorded gate. The one real gap was
+`AsyncEither`, and it applies to **3** call sites, which does not justify rewriting
+879 assertions and surrendering compile-time exhaustiveness at every seam.
+
+**What `freezed` changes, and the two hazards recorded before adopting it:**
+
+1. **`freezed` generates `toString`.** It skips the member when the class declares
+   one, so the fix is available — but nothing in a green suite distinguishes
+   "freezed respected my override" from "freezed replaced it". **Six** classes
+   override `toString` deliberately and **three** exist to keep a secret out of
+   logs: `LoginCredentials`, `AuthState` and `AuthPasswordChanged`. The Phase 8
+   gate `test/core/common/secret_masking_test.dart` is **structural** for exactly
+   this reason: it scans `lib/` for any class declaring a `final String password`
+   and requires a `toString` that does not interpolate it. A generated one writes
+   the reader's typed password into every log line and every failed `expect`.
+2. **`freezed` derives `==` from the constructor and offers no per-field
+   exclusion.** `Failure` deliberately excludes `details` from equality, for a good
+   reason: `equatable` deep-compares `Map`/`Set`/`Iterable` but falls through to
+   plain `==` for everything else, so an untyped field makes two logically
+   identical failures unequal, and `Failure` lives inside bloc state where that
+   costs a spurious emit and a rebuild. **`Failure` therefore keeps hand-written
+   `==`, `hashCode` and `props`**, and
+   `test/core/common/failure_equality_test.dart` pins the contract. Migrating it to
+   a generated `==` would put a decoded server body into the equality contract
+   **on purpose**.
+3. **`freezed` generates `const` constructors**, which adds new
+   `const`-canonicalisation surfaces. This project has shipped eight
+   canonicalisation bugs already (`same()` on canonicalised `bool`s, `contains`
+   accepting `240` for `24`, a `find.textContaining` that could not match a
+   `Text.rich`). The migration needs a gate that two structurally-equal states
+   still compare equal **and** that no assertion anywhere relies on `identical()`.
+
+**What `gen_l10n` changes, and why it is worth 302 renamed test references:**
+
+- 69 distinct string fields across the six tables, of which **3 collide** and must
+  be namespaced in one ARB: `retry` (`home`/`quiz`/`reading`), `unavailableSuffix`
+  (`auth`/`home`/`quiz`/`reading`), `wordmark` (`auth`/`home`).
+- **ICU plurals**, which the hand-rolled tables do not have. Arabic has
+  zero/one/two/few/many/other, and Phase 8 hand-wrote `1 question` /
+  `5 questions` / `٠ أسئلة`. That is a correctness gap, not an ergonomic one.
+- **Compile-time key checking.** A typo becomes a build error; today it is a
+  missing sentence on a shipped screen.
+- **The manual locale re-dispatch dies.** `HomePage` and `QuizPage` each hand-roll
+  a `didChangeDependencies` re-dispatch because the tables resolve through
+  `static X of(Locale)` and bypass `Localizations`. Only the **locale** half goes —
+  Phase 6's `AutoRouteAware.didPopNext` re-entry trigger stays, and that is the half
+  that fixes the stale-streak defect.
 
 ### The six routes
 
@@ -2609,6 +2683,10 @@ change a gate, plant a violation and prove it fires before reporting the gate as
 2. **Never** modify `/home/fady/Projects/EvangelionBackend` in any way.
 3. **Never** commit secrets, `.env` contents, or API keys.
 4. **Never** add a dependency that is not listed as approved in the current task.
+   **Amended:** the approved set is `pubspec.yaml`'s `dependencies` plus §2.1's
+   `freezed` + `freezed_annotation` + Flutter's own `flutter_localizations`
+   (`generate: true`). Anything else still needs the user's approval, in the task
+   that uses it. See §2.1 for the measurements behind the current set.
 5. Work on the branch you were dispatched on. Do not merge to `main`.
 6. Do not rewrite `docs/plans/` — a dedicated task owns that.
 7. Prefer editing an existing file over creating a new one. New files only where the
