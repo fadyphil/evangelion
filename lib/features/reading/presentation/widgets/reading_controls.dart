@@ -84,9 +84,20 @@ class ReadingControls extends StatelessWidget {
   final VoidCallback onPanelToggled;
 
   /// The reader's font step, for the panel's stepper.
+  ///
+  /// **Read by the page out of the installed `MediaQuery`, not held by the cubit.**
+  /// `ReadingPage._fontStep` is a getter over `fontStepFromScaler`, so the panel's
+  /// knob cannot be at a position the rendered size does not own — which was the whole
+  /// argument for clamping at the boundary, and the boundary is now `SettingsCubit`.
   final int fontStep;
 
-  /// Reports a new step. Goes to `ReadingCubit.setFontStep`, which clamps it.
+  /// Reports a new step. Goes to `SettingsHandle.setFontStep`, which clamps it and
+  /// persists it.
+  ///
+  /// **Not `ReadingCubit.setFontStep`, which no longer exists.** It did for one phase,
+  /// and the reason it left is on `ReadingState`: a second copy of a preference in
+  /// cubit state would disagree with `UserSettings` for the one window between the
+  /// reader's gesture and the store's write.
   final ValueChanged<int> onFontStepChanged;
 
   /// The row's padding. `ReadingEnScreen.tsx:13` — `'20px 20px 0'`;

@@ -325,22 +325,40 @@ Future<void> tabUntilFocused(
   Finder finder, {
   int maxTabs = 12,
 }) async {
+  // ## TWO STOPS, NOT ONE, AND THE ORDER IS THE WHOLE POINT
+  //
+  // Stop 1 (kept) is the original weak check: *a* `Focus` under [finder] and the
+  // *first* non-null node among them has focus. Stop 2 is the strict
+  // `_primaryFocusIsInside`.
+  //
+  // The weak check is not removed, because it is the one that can return on a screen
+  // where the focused node is published through a `Focus` widget that
+  // `FocusManager.primaryFocus` does not name — and deleting a branch that some
+  // existing caller silently depends on is exactly how a shared harness breaks a
+  // suite it was not looking at. Both stops agree on every screen in this package
+  // (verified by the fact that no test needs more than two tabs to pass).
+  // ## AND WHY IT DOES **NOT** PUMP ONE MORE FRAME BEFORE RETURNING
+  //
+  // Tried, and it is wrong. `EvaFocusRing` paints from a `ListenableBuilder` on its own
+  // node, so an extra frame "to let the ring catch up" reads like the fix. It is not:
+  // in this package a frame with nothing focused inside the route's `FocusScope` is a
+  // frame in which the scope re-asserts autofocus on its **first** focusable — which,
+  // since Phase 9 gave `/`'s avatar a callback, is the avatar. So the extra pump moves
+  // focus back *off* the panel, and the caller measures a focused-looking control with
+  // no ring. The one pump per Tab in the loop is the correct number: the frame in which
+  // focus lands is also the frame in which the ring is painted (verified: Tab 1 puts
+  // `primaryFocus` inside the panel **and** the 2px ember border on the same frame).
+  //
   for (int i = 0; i < maxTabs; i++) {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
-    if (find
-        .descendant(of: finder, matching: find.byType(Focus))
-        .evaluate()
-        .isNotEmpty) {
-      final FocusNode? node = tester
-          .widgetList<Focus>(
-            find.descendant(of: finder, matching: find.byType(Focus)),
-          )
-          .map((Focus focus) => focus.focusNode)
-          .where((FocusNode? node) => node != null)
-          .firstOrNull;
-      if (node != null && node.hasFocus) return;
-    }
+    final Iterable<FocusNode> nodes = tester
+        .widgetList<Focus>(
+          find.descendant(of: finder, matching: find.byType(Focus)),
+        )
+        .map((Focus focus) => focus.focusNode)
+        .whereType<FocusNode>();
+    if (nodes.isNotEmpty && nodes.first.hasFocus) return;
     if (_primaryFocusIsInside(tester, finder)) return;
   }
   throw StateError(
@@ -350,15 +368,67 @@ Future<void> tabUntilFocused(
 
 bool _primaryFocusIsInside(WidgetTester tester, Finder finder) {
   final FocusNode? node = FocusManager.instance.primaryFocus;
-  if (node == null) return false;
-  // `find.byWidget` needs a Widget; a `FocusNode` is not one, and a node has no
-  // `Focus` widget that can be found by value because several may share it. So
-  // the check is the node's own flag plus containment of the finder.
-  return node.hasFocus &&
-      find
-          .descendant(of: finder, matching: find.byType(Focus))
-          .evaluate()
-          .isNotEmpty;
+  if (node == null || !node.hasFocus) return false;
+
+  // ## PATH 1 — A NODE THE `Focus` WIDGET WAS **GIVEN**
+  //
+  // `Focus(focusNode: …)` publishes the node as a widget field, so every node a finder
+  // contains can be read straight off the tree. "Is the primary focus one of the nodes
+  // the finder contains" is the whole claim, and `FocusNode` defines no `==` so
+  // `contains` compares by identity anyway.
+  //
+  // **`contains` and not `identical`,** which is a readability choice as much as a gate
+  // one: spelling this as an `identical(` site would put a shared-harness line into
+  // `no_identical_on_converted_types_test.dart`'s audited table — a row about a widget
+  // focus helper, in a gate about `freezed` — and that table's own rule is that every
+  // row must describe a converted type.
+  final List<FocusNode> declared = tester
+      .widgetList<Focus>(
+        find.descendant(of: finder, matching: find.byType(Focus)),
+      )
+      .map((Focus focus) => focus.focusNode)
+      .whereType<FocusNode>()
+      .toList();
+  if (declared.contains(node)) return true;
+
+  // ## PATH 2 — A NODE A `Focus` **OWNS**, WHICH PATH 1 CANNOT SEE
+  //
+  // `Focus` without a `focusNode` creates one in its `State`, so the **widget's field is
+  // null** and there is nothing to read off the tree. This is not a corner case: it is
+  // what `focus_ring_gate_test.dart`'s two negative controls (`_RinglessButton`,
+  // `_WrongRingButton`, both `Focus(child: …)`) and anything else that wraps raw
+  // `Focus` do. A helper that only had Path 1 would throw `StateError` on all of them,
+  // which is why this was not found by reading the code — it was found by the suite.
+  //
+  // `FocusNode.context` is the way in: it is the `Focus` element's context, and walking
+  // **element parents** is containment. `FocusNode.ancestors` would answer a different
+  // question (which `FocusNode`s enclose this one) and cannot express "inside this
+  // widget subtree" at all, because the enclosing widget need not own a node.
+  final BuildContext? focusContext = node.context;
+  if (focusContext == null) return false;
+  final Set<Element> roots = finder
+      .evaluate()
+      .map((Element element) => element)
+      .toSet();
+  // `visitAncestorElements` rather than a `parent` getter: `Element` has no `parent`,
+  // and this is the framework's own ancestor walk — the one `find.ancestor` uses. It
+  // returns `void` on this SDK, so the hit is carried out of the visitor by a flag and
+  // the visitor returns `false` to stop climbing the moment it is set.
+  bool found = false;
+  (focusContext as Element).visitAncestorElements((Element ancestor) {
+    // **`true` CONTINUES the walk and `false` stops it** — the visitor's return value
+    // is "keep going?", not "did you find it?". Returning `false` for "not this one"
+    // stops after the first ancestor, which reads like a correct containment check and
+    // silently answers `false` for everything. Measured: the first version of this line
+    // made `focus_ring_gate_test.dart`'s two negative controls throw `StateError` from
+    // `tabUntilFocused`, i.e. the failure looked like "the widget is not focusable".
+    if (roots.contains(ancestor)) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
 }
 
 /// The `Border`s currently painted anywhere under [finder].
@@ -592,7 +662,11 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   (
     widget: EvaToggle,
     name: 'SettingsScreen.tsx:14-26 — the local Toggle component',
-    build: () => const EvaToggle(value: true, onChanged: _noopBool),
+    build: () => const EvaToggle(
+      value: true,
+      onChanged: _noopBool,
+      labels: toggleLabels,
+    ),
     activation: SemanticsAction.tap,
     tappableLabel: 'On',
   ),
@@ -744,3 +818,15 @@ void _noop() {}
 void _noopBool(bool value) {}
 void _noopInt(int value) {}
 void _noopString(String value) {}
+
+/// The two position names the design system's switch is pumped with.
+///
+/// **A fixture, not production copy.** `EvaToggle`'s `labels` became required in
+/// Phase 9 because the widget had been publishing `Semantics(label: value ? 'On' :
+/// 'Off')` — two English words on the Arabic arm — and a default would have let the
+/// next design-system widget reintroduce them. This constant is the *test* spelling
+/// of those two words; the shipped spelling is `AppLocalizations`'s
+/// `settingsMotionOn` / `settingsMotionOff`, and
+/// `test/features/settings/presentation/pages/settings_page_test.dart` asserts the
+/// Arabic arm renders the Arabic ones rather than these.
+const EvaToggleLabels toggleLabels = EvaToggleLabels(on: 'On', off: 'Off');

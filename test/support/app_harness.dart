@@ -34,10 +34,13 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
+
+import 'settings_harness.dart';
 
 /// The navigation graph plus the root widget, as one fixture.
 ///
@@ -73,6 +76,21 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
   }
   if (!getIt.isRegistered<AppRouter>()) {
     configureNavigation();
+  }
+  // **The settings pair, guarded and after the router.** `EvangelionApp.initState`
+  // resolves its `SettingsCubit` from the locator, and `/settings` resolves it again in
+  // `build` — so a suite that configures a **partial** graph (which
+  // `navigation_injection_test.dart` is about, and `auth_guard_test.dart` does for its
+  // `/settings` arm) used to throw `StateError: SettingsCubit is not registered` out of
+  // `build`, which reads as a broken route rather than as a missing fixture.
+  //
+  // **After** `configureNavigation()` on purpose: production registers both the handle and
+  // the cubit in one function, so running this first would have `settingsHarness` win and
+  // the graph under test would never be the production one. The guard means production's
+  // registrations are what this app test runs against whenever the graph was configured
+  // whole, and only a deliberately partial one is filled in here.
+  if (!getIt.isRegistered<SettingsCubit>()) {
+    settingsHarness(loadImmediately: false);
   }
   await tester.pumpWidget(EvangelionApp(locale: locale));
   await pumpUntilFound(tester, find.byType(LoginPage));
@@ -168,6 +186,22 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   // empty one.
   if (!getIt.isRegistered<QuizBloc>()) {
     registerTestQuizBloc();
+  }
+  // **The fifth registration, for the same reason, and the only one that is TWO
+  // registrations.** `SettingsPage` resolves its `SettingsCubit` from the locator, and
+  // `/reading` resolves a `SettingsHandle` through `SettingsScope.of`'s fallback — so a
+  // router test that lands on `/settings` needs the cubit *and* a handle wired to it, or
+  // it throws a `StateError` out of `build`. Both are registered by `settingsHarness()`,
+  // which is also where the subscription that rebuilds the app lives; registering them
+  // here rather than at each of the two call sites is the paragraph above's whole point.
+  //
+  // **`loadImmediately: false`**, because `routerHost` is called from a test body but the
+  // cubit has to be present *before* the route builds, and `settingsHarness`'s convenience
+  // load is `unawaited`. A router test that needs a setting in the store seeds it with
+  // `initial:`, which is the difference between "the store holds it" and "the cubit
+  // holds it" — and only the first survives a restart.
+  if (!getIt.isRegistered<SettingsCubit>()) {
+    settingsHarness(loadImmediately: false);
   }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE

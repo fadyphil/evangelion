@@ -6,11 +6,13 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/reading_harness.dart';
+import '../../../../support/settings_harness.dart';
 import '../../../../support/utf16.dart';
 
 /// `ReadingPage` — the sanctuary, in both arms.
@@ -605,34 +607,62 @@ void main() {
       await pumpReadingFrames(tester, 4);
       expect(find.byType(FontSizeStepper), findsOneWidget);
 
-      // **The behaviour, not the persistence.** `SettingsRepository` is Phase 9's,
-      // so a reader's step lives for the life of the cubit; what has to be true today
-      // is that the control *changes the rendered size*.
-      // Measured on **a scripture paragraph**, found through `ScriptureBlock` rather
-      // than as "the first `RichText` in the tree" — the tree has other `RichText`s in
-      // it, and a measurement of one of those is a measurement of chrome. Nor on the
-      // `ListView`: the block fills the `Expanded` it is given, so its box is the
-      // viewport's height whatever the type does.
+      // ## THE STEP IS A **PERSISTED PREFERENCE** AS OF PHASE 9, AND THIS IS THE
+      // ## ASSERTION THAT CHANGED WITH IT
+      //
+      // It used to read `h.cubit.state.fontStep`, and its comment said so: "**The
+      // behaviour, not the persistence.** `SettingsRepository` is Phase 9's, so a
+      // reader's step lives for the life of the cubit … and nothing claims it
+      // survives."
+      //
+      // Both halves of that are false now. The step is `UserSettings.fontStep`, the
+      // control writes it through `SettingsScope`, and the assertion below reads it
+      // **back out of a fresh `SettingsLocalDataSource`** — a second store instance
+      // over the same `shared_preferences`, so what it proves is that the value was
+      // persisted and not merely held in a cubit. That is the difference between a
+      // test that cannot fail and one that can: replacing the write with a no-op makes
+      // this red.
+      //
+      // The measurement itself is unchanged and still on **a scripture paragraph**,
+      // found through `ScriptureBlock` rather than as "the first `RichText` in the
+      // tree" — the tree has other `RichText`s in it, and a measurement of one of
+      // those is a measurement of chrome. Nor on the `ListView`: the block fills the
+      // `Expanded` it is given, so its box is the viewport's height whatever the type
+      // does.
       final double before = tester
           .getSize(find.byWidget(scriptureRichTexts(tester).first))
           .height;
       await tester.tap(find.byIcon(Icons.add).first);
       await pumpReadingFrames(tester, 4);
-      expect(h.cubit.state.fontStep, 4);
-      // 3 is the identity, 4 is 1.10x — the composed scaler, installed on the
-      // `MediaQuery` above everything so "Text size" means text size.
+      // 3 is the identity, 4 is 1.10x — and §5.2's table is what the app installs
+      // now, one `MediaQuery` above every route.
       expect(
         MediaQuery.textScalerOf(tester.element(find.byType(ScriptureBlock)))
             .scale(1),
         closeTo(1.10, 0.0001),
       );
+      expect(settingsHandleOf(tester).settings.fontStep, 4);
+
+      // **The persistence half: a FRESH store, not the same object.**
+      final SettingsLocalDataSource fresh = SettingsLocalDataSource();
+      addTearDown(fresh.resetForTest);
+      expect(
+        (await fresh.read()).fontStep,
+        4,
+        reason:
+            'a second `SettingsLocalDataSource` over the same `shared_preferences`. '
+            'If the control had only written to a cubit — or to the first store\'s '
+            'in-memory cache — this reads the default and the test is red.',
+      );
+
       final double after = tester
           .getSize(find.byWidget(scriptureRichTexts(tester).first))
           .height;
       expect(after, greaterThan(before), reason: 'the passage got taller');
 
-      // …and nothing claims it survives. There is no navigation here to survive, and
-      // `reading_cubit_test.dart` asserts no such thing either.
+      // …and now it is claimed: `test/core/domain/repositories/settings_repository_test.dart`
+      // owns the round trip and the malformed-value half, and this owns "the control
+      // on this screen is the thing that wrote it".
       await tester.tap(find.byIcon(Icons.format_size));
       await pumpReadingFrames(tester, 4);
       expect(find.byType(FontSizeStepper), findsNothing);

@@ -23,15 +23,56 @@ import 'package:flutter/material.dart';
 /// A white knob on the light palette's `#120E28`-at-12% track is *more*
 /// legible than an `ink` knob would be, and the prototype made that choice
 /// deliberately enough to write the literal.
+///
+/// ## THE `On` / `Off` LABELS WERE ENGLISH, AND PHASE 9 REMOVED THEM
+///
+/// This widget published `Semantics(label: value ? 'On' : 'Off')` — two hard-coded
+/// English words, on **both** arms, since Phase 3. Nothing caught it for six phases
+/// for the same reason `app_top_bar.dart` records at length: the string is in the
+/// **semantics** tree, no golden captures it, and the Arabic glyph gate walks the
+/// **painted** tree — and a semantics label is not painted. The Latin letters were
+/// therefore invisible to every gate this repository has.
+///
+/// It became visible only because Phase 9 built the screen the switch ships on. §14's
+/// first row is "a control with no accessible name **in the reader's own language**",
+/// and a switch that announces "On" to an Arabic reader is exactly that failure,
+/// introduced on a screen whose whole subject is bilingual.
+///
+/// [labels] is **required** for `FontSizeStepperLabels`'s reason: a default would let
+/// the next design-system widget reintroduce the same English, and
+/// `FontSizeStepper`'s doc says so in those words — "a default would let the next
+/// design-system widget reintroduce the same English, and §14's first row — a control
+/// with no name in the reader's own language — is a failure a widget-level default
+/// makes invisible."
+@immutable
+class EvaToggleLabels {
+  /// The switch's two position names.
+  const EvaToggleLabels({required this.on, required this.off});
+
+  /// The accessible name while the switch is on.
+  final String on;
+
+  /// The accessible name while the switch is off.
+  final String off;
+}
+
 class EvaToggle extends StatelessWidget {
   /// A switch whose current position is [value].
-  const EvaToggle({required this.value, required this.onChanged, super.key});
+  const EvaToggle({
+    required this.value,
+    required this.onChanged,
+    required this.labels,
+    super.key,
+  });
 
   /// Whether the switch is on.
   final bool value;
 
   /// Reports the new position.
   final ValueChanged<bool> onChanged;
+
+  /// The switch's two position names, for its semantics node. See [EvaToggleLabels].
+  final EvaToggleLabels labels;
 
   /// Track size. `SettingsScreen.tsx:16` — `width: 44, height: 24`.
   static const Size trackSize = Size(44, 24);
@@ -53,7 +94,7 @@ class EvaToggle extends StatelessWidget {
     return Semantics(
       // §14: a switch, not a button. `toggled` is what makes "on" announceable.
       toggled: value,
-      label: value ? 'On' : 'Off',
+      label: value ? labels.on : labels.off,
       excludeSemantics: true,
       // Load-bearing, and easy to lose: `excludeSemantics: true` drops the
       // `InkWell`'s tap action with the label, so without it the switch

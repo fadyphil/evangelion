@@ -89,8 +89,10 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(34),
-        reason: 'the converted set moved, so the table\'s flags are stale',
+        hasLength(36),
+        reason:
+            'the converted set moved, so the table\'s flags are stale. 34 was the '
+            'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`',
       );
     });
   });
@@ -405,6 +407,42 @@ String _relative(String path) =>
 /// Keyed `path#test name`. `converted` is the flag the fourth assertion checks
 /// against the code; `reason` is what the migration's audit concluded.
 const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
+  'test/app/app_settings_wiring_test.dart#`SettingsScope.of` resolves the app\'s own handle':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`SettingsHandle` is a plain closure holder, not a generated type, so the '
+            'flag is `false` — and the assertion is exactly that: the page and `getIt` '
+            'hold **the same handle object**, because it is one app-wide seam and a '
+            'second registration would silently split the two. This is the Phase-9 '
+            'version of the bug where `app.dart` built its own handle and the page '
+            'read the locator\'s. `same(...)` pins the wiring and no `==` override '
+            'could stand in for it.',
+      ),
+  'test/app/app_settings_wiring_test.dart#and the reduce-motion preference reaches the ambient scope':
+      _Reviewed(
+        sites: 2,
+        converted: false,
+        reason:
+            'Two `ThemeData`s, one `same(...)` each. Flutter decides whether to '
+            're-localise by comparing `theme`/`darkTheme` by identity, and this arm '
+            'asserts the preference **swapped** them — so identity is the claim. '
+            '`UserSettings` (converted) is what drives it, but the site is about '
+            '`ThemeData`.',
+      ),
+  'test/core/domain/entities/user_settings_test.dart#two identical records are equal and are two objects':
+      _Reviewed(
+        sites: 1,
+        converted: true,
+        reason:
+            'The canonicalisation probe, in the shape this repository has used eight '
+            'times: a `freezed` value type must not hand back one instance for two '
+            'equal constructions, because a client comparing `a == b` and a client '
+            'comparing `a` would then agree about two different states. '
+            '`identical(a, b), isFalse` on `UserSettings` is the property; a `==` '
+            'assertion could not express it.',
+      ),
   'test/app/app_test.dart#darkTheme is a genuinely different theme, not the same twice':
       _Reviewed(
         sites: 1,

@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/settings_harness.dart';
 
 void main() {
   // The two steps, in the order `bootstrapApp` runs them. Phase 4 needed only the
@@ -247,6 +248,13 @@ void main() {
       // without one throws `StateError` inside `HomePage.build` — and this test
       // lands on `/` deliberately, to change the session while it is on screen.
       registerTestHomeBloc();
+      // **And the settings pair, which is Phase 9's version of the two lines above.**
+      // `EvangelionApp.initState` resolves its `SettingsCubit` from the locator, so a
+      // hand-built graph that does not supply one throws out of `build` — and the
+      // failure names a *widget*, so it reads as "the app cannot start" rather than "this
+      // graph is missing a registration". That is the trap this file exists to walk into
+      // on purpose, and the registration list is where the trap is recorded.
+      settingsHarness(loadImmediately: false);
       getIt
         ..registerLazySingleton<AuthStatus>(() => status)
         ..registerLazySingleton<ReevaluateListenable>(() => changes)

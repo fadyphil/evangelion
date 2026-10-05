@@ -553,7 +553,7 @@ void main() {
       );
     });
 
-    test('the twenty-three current registrations are the ones the config names', () {
+    test('the twenty-seven current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -616,6 +616,10 @@ void main() {
           'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
           'lazySingleton<SubmitAnswer> submitAnswer',
           'lazySingleton<LoadScripture> loadScripture',
+          'lazySingleton<SettingsLocalDataSource> settingsLocalDataSource',
+          'lazySingleton<SettingsRepository> settingsRepository',
+          'lazySingleton<GetSettings> getSettings',
+          'lazySingleton<UpdateSettings> updateSettings',
           'lazySingleton<String> apiBaseUrl',
           'lazySingleton<Dio> apiClient',
           'lazySingleton<ReadingRemoteDataSource> readingRemoteDataSource',
@@ -816,6 +820,18 @@ void main() {
         // by resolving it twice and getting one `identical` object. See that file's
         // `QuizBloc` section for why it cannot be generated.
         'QuizBloc',
+        // **Phase 9's sixth and seventh**, and the pair is a *new* reason rather than
+        // the same one five times over. `SettingsCubit` hits the wall the other four
+        // do — `Cubit` arrives through `flutter_bloc`, which re-exports Flutter's
+        // widget layer. `SettingsHandle` is the sharper case: it is a
+        // `ChangeNotifier` in `lib/app/settings_scope.dart` that has **no DI
+        // annotation at all**, because it is built *from* the cubit inside
+        // `configureNavigation()` and published through an `InheritedNotifier`. A
+        // `@module` provider would have had to name `SettingsCubit` — which is the
+        // import that puts Flutter in `injection.dart`'s closure — so the handle is
+        // registered beside the cubit it wraps rather than generated from it.
+        'SettingsCubit',
+        'SettingsHandle',
       ]) {
         expect(
           config,

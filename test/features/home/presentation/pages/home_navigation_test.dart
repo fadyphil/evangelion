@@ -17,6 +17,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
@@ -24,8 +25,10 @@ import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
+import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
+import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
@@ -51,6 +54,59 @@ void main() {
 
       expect(mounted.router.currentPath, AppRoutes.reading);
     });
+
+    testWidgets(
+      'the avatar reaches /settings — the third route, added in Phase 9',
+      (WidgetTester tester) async {
+        // ## THE ROUTE `/`'s DECK NAMED FOR FOUR PHASES AND COULD NOT PUSH
+        //
+        // `08-build-phases.md` Phase 9 says "`AppTopBar`'s avatar tap now opens
+        // `/settings`", so the destination exists and the call site was `null` until now.
+        // Nothing about the avatar is special here — the point is that a control whose
+        // accessibility test says **live** has a route, because
+        // `home_accessibility_test.dart` proves the node offers `SemanticsAction.tap`
+        // and this proves the tap goes somewhere. Either claim alone is satisfiable by a
+        // control that navigates nowhere.
+        final ({AppRouter router, HomeHarness harness}) mounted =
+            await mountHomeWithAReading(tester);
+
+        // **The avatar's own control, not the bar.** `AppTopBar` is a full-width `Row`,
+        // so tapping *it* lands in the middle of the bar — nowhere near the 44x44 avatar
+        // box — and the failure reads "nothing happened", which is indistinguishable from
+        // "the route does not exist".
+        //
+        // **`EvaInk` and not `IconActionButton`,** because the avatar is not one: it is a
+        // private `_Avatar` wrapping its badge in `EvaFocusRing` + `EvaInk`, and the bar
+        // holds exactly one `EvaInk`. The first attempt looked for `IconActionButton`
+        // because the disabled-avatar arms in `app_top_bar_test.dart` name that type — the
+        // *accessible* avatar is one, the *visible* one is this.
+        final Finder avatar = find.descendant(
+          of: find.byType(AppTopBar),
+          matching: find.byType(EvaInk),
+        );
+        expect(
+          avatar,
+          findsOneWidget,
+          reason: 'the bar holds exactly one control',
+        );
+
+        await tester.tap(avatar);
+        await pumpUntilFound(tester, find.byType(SettingsPage));
+
+        expect(
+          mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+          <String>['HomeRoute', 'SettingsRoute'],
+          reason:
+              'the **stack**, not `currentPath`. `currentPath` is auto_route\'s URL '
+              'state, and for a pushed page over a route whose args are optional the URL '
+              'is the *root* path until the delegate adopts the pushed configuration — '
+              'measured here, after two settled pumps with `SettingsRoute` on the stack. '
+              'The stack is what "the avatar navigated" actually means, and the two '
+              '`/reading` and `/quiz` arms above are the ones that pinned the URL.',
+        );
+        expect(find.byType(SettingsPage), findsOneWidget);
+      },
+    );
 
     testWidgets('the secondary control reaches /quiz', (
       WidgetTester tester,

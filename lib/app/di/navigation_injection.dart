@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/app/settings_handle.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
@@ -16,6 +17,9 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
+import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 
 /// The **Flutter half** of the object graph: the auth seam and the router.
 ///
@@ -192,6 +196,32 @@ void configureNavigation() {
     submitAnswer: getIt<SubmitAnswer>(),
   );
 
+  // **Built here, not resolved from the locator** — and this is the **sixth** time a
+  // `Cubit`/`Bloc` has hit the wall `SettingsModule`'s own doc predicted before this
+  // phase existed. `SettingsCubit extends Cubit`, so the mechanism is the other four
+  // sections' verbatim: `package:bloc/bloc.dart` is unavailable because `bloc` is a
+  // transitive dependency §8.4 will not promote, and
+  // `package:flutter_bloc/flutter_bloc.dart` re-exports Flutter's widget layer.
+  //
+  // The two use cases *are* generated, so this is the hand-written half depending on
+  // the generated one — which is what makes the four `settings_module.dart`
+  // registrations reachable rather than decorative.
+  final SettingsCubit settingsCubit = SettingsCubit(
+    getSettings: getIt<GetSettings>(),
+    updateSettings: getIt<UpdateSettings>(),
+  );
+
+  // **Built here, not resolved from the locator** — see the `AppRouter` section for
+  // why this registration must be a singleton. It is a singleton for a sharper reason
+  // here than for the router, and the reason is a **reader-visible** failure: it holds
+  // a reader's palette, their language and their font size, so a second instance
+  // would be a second set of choices and `app.dart` resolving a different cubit from
+  // the one `/settings` wrote would show a toggle that springs back.
+  final SettingsHandle settingsHandle = SettingsHandle(
+    read: () => settingsCubit.state.settings,
+    write: settingsCubit.apply,
+  );
+
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
     // built, and a lazy singleton whose factory re-ran would hand out a *second*
@@ -202,6 +232,8 @@ void configureNavigation() {
     ..registerSingleton<HomeBloc>(homeBloc)
     ..registerSingleton<ReadingCubit>(readingCubit)
     ..registerSingleton<QuizBloc>(quizBloc)
+    ..registerSingleton<SettingsCubit>(settingsCubit)
+    ..registerSingleton<SettingsHandle>(settingsHandle)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(
       () => ReevaluateListenable.stream(authBloc.stream),

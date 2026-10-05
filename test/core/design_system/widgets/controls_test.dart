@@ -65,7 +65,10 @@ void main() {
     testWidgets('is 44×24 with an 18px knob, per SettingsScreen.tsx:16,24', (
       WidgetTester tester,
     ) async {
-      await pumpAt(tester, EvaToggle(value: true, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: true, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       expect(EvaToggle.trackSize, const Size(44, 24));
       expect(EvaToggle.knobSize, 18);
       expect(EvaToggle.knobInset, 3);
@@ -75,7 +78,10 @@ void main() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpAt(tester, EvaToggle(value: true, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: true, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       handle.dispose();
 
       final node = semanticsOf(tester, findToggle());
@@ -87,7 +93,10 @@ void main() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpAt(tester, EvaToggle(value: false, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: false, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       handle.dispose();
 
       final node = semanticsOf(tester, findToggle());
@@ -99,7 +108,10 @@ void main() {
       WidgetTester tester,
     ) async {
       final List<bool> seen = <bool>[];
-      await pumpAt(tester, EvaToggle(value: true, onChanged: seen.add));
+      await pumpAt(
+        tester,
+        EvaToggle(value: true, onChanged: seen.add, labels: toggleLabels),
+      );
       await tester.tap(findToggle());
       await tester.pump();
       expect(seen, <bool>[false]);
@@ -109,7 +121,10 @@ void main() {
       WidgetTester tester,
     ) async {
       Future<Alignment> knobAt({required bool on}) async {
-        await pumpAt(tester, EvaToggle(value: on, onChanged: (bool _) {}));
+        await pumpAt(
+          tester,
+          EvaToggle(value: on, onChanged: (bool _) {}, labels: toggleLabels),
+        );
         await tester.pump();
         return tester
                 .widget<AnimatedContainer>(
@@ -129,7 +144,10 @@ void main() {
     testWidgets('the knob slides over EvaMotion.base by default', (
       WidgetTester tester,
     ) async {
-      await pumpAt(tester, EvaToggle(value: false, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: false, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       expect(toggleBodyOf(tester).duration, EvaMotion.base);
     });
 
@@ -156,7 +174,7 @@ void main() {
       testWidgets('a golden per theme — $theme', (WidgetTester tester) async {
         await pumpAt(
           tester,
-          EvaToggle(value: true, onChanged: (bool _) {}),
+          EvaToggle(value: true, onChanged: (bool _) {}, labels: toggleLabels),
           theme: data,
         );
         await tester.pump();
@@ -168,7 +186,10 @@ void main() {
     }
 
     testWidgets('state golden — off', (WidgetTester tester) async {
-      await pumpAt(tester, EvaToggle(value: false, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: false, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       await tester.pump();
       await expectLater(
         findToggle(),
@@ -177,7 +198,10 @@ void main() {
     });
 
     testWidgets('state golden — focused', (WidgetTester tester) async {
-      await pumpAt(tester, EvaToggle(value: true, onChanged: (bool _) {}));
+      await pumpAt(
+        tester,
+        EvaToggle(value: true, onChanged: (bool _) {}, labels: toggleLabels),
+      );
       await tabUntilFocused(tester, findToggle());
       await tester.pump();
       await expectLater(
@@ -774,5 +798,6 @@ class _LiveToggleState extends State<_LiveToggle> {
   Widget build(BuildContext context) => EvaToggle(
     value: _value,
     onChanged: (bool next) => setState(() => _value = next),
+    labels: toggleLabels,
   );
 }

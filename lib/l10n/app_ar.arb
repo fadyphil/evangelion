@@ -1,6 +1,5 @@
 {
   "@@locale": "ar",
-
   "authWordmark": "Evangelion",
   "authTagline": "اقرأ. تأمل. تذكّر.",
   "authEmailLabel": "البريد الإلكتروني",
@@ -18,7 +17,6 @@
   "authHidePassword": "إخفاء كلمة المرور",
   "authSealLabel": "إنجيل",
   "authUnavailableSuffix": "غير متاح في هذه النسخة",
-
   "homeWordmark": "Evangelion",
   "homeGreetingMorning": "صباح الخير",
   "homeGreetingAfternoon": "نهار الخير",
@@ -37,7 +35,6 @@
   "homeContinueLabel": "متابعة",
   "homeStartReflection": "ابدأ التأمل",
   "homeRetry": "حاول مرة أخرى",
-
   "quizExit": "إغلاق",
   "quizProgress": "السؤال",
   "quizOfWord": "من",
@@ -53,7 +50,6 @@
   "quizRetry": "حاول مرة أخرى",
   "quizNoQuestionsTitle": "لا شيء للتأمل فيه",
   "quizNoQuestionsMessage": "لا تحتوي قراءة اليوم على أسئلة للإجابة عنها.",
-
   "readingBack": "رجوع",
   "readingTextSize": "حجم الخط",
   "readingFontSize": "مقياس حجم الخط",
@@ -66,7 +62,6 @@
   "readingVerse": "الآية",
   "readingRetry": "حاول مرة أخرى",
   "readingCaptionFor": "{count, plural, zero{{digits} أسئلة} one{{digits} سؤال واحد} two{{digits} سؤالان} few{{digits} أسئلة} many{{digits} سؤالًا} other{{digits} سؤال}}",
-
   "resultReflectAgain": "تأمل مرة أخرى",
   "resultBackHome": "العودة",
   "resultThisAnswer": "هذه الإجابة",
@@ -76,5 +71,26 @@
   "resultCompleteMessage": "إجابة صحيحة، وقد اكتملت قراءة اليوم.",
   "resultPartialMessage": "إجابة صحيحة. لم تكتمل القراءة بعد.",
   "resultIncorrectMessage": "ليس هذه المرة. كل سؤال يُحتسب.",
-  "resultTotalCaption": "{count, plural, zero{نقاط} one{نقطة} two{نقطتان} few{نقاط} many{نقطة} other{نقطة}}"
+  "resultTotalCaption": "{count, plural, zero{نقاط} one{نقطة} two{نقطتان} few{نقاط} many{نقطة} other{نقطة}}",
+  "settingsTitle": "الإعدادات",
+  "settingsBack": "رجوع",
+  "settingsAppearance": "المظهر",
+  "settingsTheme": "السمة",
+  "settingsThemeLight": "فاتح",
+  "settingsThemeDark": "داكن",
+  "settingsThemeSystem": "النظام",
+  "settingsFontSize": "حجم الخط",
+  "settingsFontScale": "مقياس حجم الخط",
+  "settingsDecreaseFontSize": "تصغير الخط",
+  "settingsIncreaseFontSize": "تكبير الخط",
+  "settingsReduceMotion": "تقليل الحركة",
+  "settingsMotionOn": "مفعّل",
+  "settingsMotionOff": "معطّل",
+  "settingsReading": "القراءة",
+  "settingsDefaultLanguage": "اللغة الافتراضية",
+  "settingsLanguageSheetTitle": "اختر اللغة",
+  "settingsLanguageEnglish": "الإنجليزية",
+  "settingsLanguageArabic": "العربية",
+  "settingsAbout": "حول",
+  "settingsVersion": "الإصدار"
 }

@@ -75,8 +75,15 @@ class SettingsTile extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.bodyLarge!
-                    .copyWith(fontWeight: FontWeight.w500),
+                // `arabicAware` here for the same reason as `EvaSectionHeader`: the
+                // row's title is painted by this widget, so this widget decides the
+                // family. Under LTR it is the identity function, so every existing
+                // Latin assertion is untouched.
+                style: arabicAware(
+                  Theme.of(context).textTheme.bodyLarge!
+                      .copyWith(fontWeight: FontWeight.w500),
+                  Directionality.of(context),
+                ),
               ),
             ),
             const SizedBox(width: EvaSpacing.md),

@@ -93,10 +93,9 @@ class ScriptureBlock extends StatelessWidget {
   /// The scaler the passage renders at.
   ///
   /// `null` is the framework's default, which resolves from the ambient
-  /// `MediaQuery`. The page installs [readingTextScalerFor]'s answer on a
-  /// `MediaQuery` above itself rather than threading it down here, so **every** run
-  /// on the screen moves with the reader's step — including any run a later edit
-  /// adds and forgets to pass this.
+  /// `MediaQuery`. `EvaTypeScale` installs the reader's persisted step at
+  /// `MaterialApp.builder`, so **every** run on the screen moves with it —
+  /// including any run a later edit adds and forgets to pass this.
   final TextScaler? textScaler;
 
   /// The body's family for [language].
@@ -335,8 +334,8 @@ class ScriptureBlock extends StatelessWidget {
     textAlign: TextAlign.start,
     // `RichText.textScaler` is **non-nullable** in this SDK, so the ambient value is
     // read here rather than inherited — which is the same value a `Text` would have
-    // resolved, because the page installs the composed scaler on a `MediaQuery` above
-    // this widget. `?? TextScaler.noScaling` would be the identity and would make the
+    // resolved, because `EvaTypeScale` installs the reader's step above this widget.
+    // `?? TextScaler.noScaling` would be the identity and would make the
     // parameter an opt-out from the reader's own setting, so it is not used.
     textScaler: textScaler ?? MediaQuery.textScalerOf(context),
     text: TextSpan(

@@ -40,6 +40,13 @@
 /// files on disk, so a new token file that nobody exports here is a red rather
 /// than a silent second import path.
 ///
+/// **Phase 9 added `tokens/eva_type_scale.dart`**, and the barrel is why it is a
+/// *widget* in `tokens/` rather than a private `MediaQuery` spelled three times — see
+/// that file's doc for the three sites and the reasoning. Nothing about the export
+/// policy changed; the file joined the `tokens/` list because `eva_typography.dart`'s
+/// own header has claimed "the Settings font-size scaler" as part of the type system
+/// since Phase 1, and this is the widget that installs it.
+///
 /// ## SCOPE
 ///
 /// Everything under `tokens/`, `theme/`, `effects/` and `widgets/`. Phase 1 shipped
@@ -76,6 +83,7 @@ export 'package:evangelion/core/design_system/tokens/eva_elevations.dart';
 export 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 export 'package:evangelion/core/design_system/tokens/eva_radii.dart';
 export 'package:evangelion/core/design_system/tokens/eva_spacing.dart';
+export 'package:evangelion/core/design_system/tokens/eva_type_scale.dart';
 export 'package:evangelion/core/design_system/tokens/eva_typography.dart';
 export 'package:evangelion/core/design_system/tokens/sticker_palette.dart';
 export 'package:evangelion/core/design_system/widgets/empty_state.dart';
