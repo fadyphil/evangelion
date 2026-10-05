@@ -66,10 +66,15 @@ class FeedbackBanner extends StatelessWidget {
   /// The accessible name, when it must differ from [message].
   ///
   /// `null` by default, which is right: the banner is a `Text` inside the page's own
-  /// reading order, and a screen reader already announces it. It exists because
-  /// `FocusRing`-wrapped controls in this design system take a separate label, and
-  /// **no caller needs it today** — which is recorded rather than left as a knob
-  /// nothing turns.
+  /// reading order, and the `Semantics(liveRegion: true)` below announces the banner's
+  /// **subtree** — so a caller gains nothing by restating its text as a label and
+  /// risks saying it twice. It exists because `FocusRing`-wrapped controls in this
+  /// design system take a separate label, and **no caller needs it today** — which is
+  /// recorded rather than left as a knob nothing turns.
+  ///
+  /// **It is not what makes the banner announced**, and Phase 10 corrected a comment
+  /// here that implied it was. The announcement is the live region, which is
+  /// unconditional.
   final String? semanticLabel;
 
   /// `QuizScreen.tsx:107` — `padding: '12px 16px'`.
@@ -202,8 +207,28 @@ class FeedbackBanner extends StatelessWidget {
       ),
     );
 
-    final String? label = semanticLabel;
-    if (label == null) return banner;
-    return Semantics(label: label, child: banner);
+    // ## THE `liveRegion` IS **UNCONDITIONAL**, AND IT IS THE POINT OF THE `if`
+    // ## THAT PRECEDED IT
+    //
+    // The first version was `if (label == null) return banner;` — one early return,
+    // correct for what it was asked to do, and it meant the **shipping** banner was
+    // never wrapped at all. [semanticLabel] is `null` in every call site, so the flag
+    // below existed in a widget that never rendered: `quiz_accessibility_test.dart`'s
+    // live-region group failed with `Expected: non-empty / Actual: []`, and it was
+    // right, because `/quiz` is the one screen whose **verdict arrives after the
+    // reader has pressed something** — the screen is already settled, focus is on the
+    // CTA, and nothing tells a screen-reader user that their answer was graded.
+    //
+    // §14's own words, from `ErrorView`'s comment, are the reason and they are the
+    // precedent: *"A failure that arrives after the screen has settled has to be
+    // announced, or a screen-reader user finds out from the retry button being there."*
+    // A wrong answer arriving silently is the same defect as a failure arriving
+    // silently, and `ErrorView` already sets `liveRegion: true` for it.
+    //
+    // **The `Semantics` node is a container**, so what gets announced is the banner's
+    // own subtree — the message and whatever `Icon` it draws — which is why no
+    // `label` is needed and why [semanticLabel] stays available for a caller that has
+    // a separate name to give it.
+    return Semantics(liveRegion: true, label: semanticLabel, child: banner);
   }
 }

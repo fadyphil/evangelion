@@ -171,6 +171,30 @@ class _SettingsBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
+                  // ## THE ONE PLACE `status` IS READ, AND IT IS THE REASON THIS
+                  // PHASE 10 EXISTED FOR THIS SCREEN
+                  //
+                  // `_SettingsFailureNotice` is rendered **above** the groups and the
+                  // groups are rendered regardless — deliberately, and the reasoning is
+                  // in its own doc. The short form:
+                  //
+                  // * `ErrorView` **fills** its box (`Center` → `SingleChildScrollView`),
+                  //   so it cannot sit above three groups without nesting two scroll
+                  //   views, and this screen's root already scrolls (`scrollable: true`);
+                  // * **replacing** the form with it contradicts
+                  //   `SettingsStatus.failed`'s own doc — "the defaults are still on
+                  //   screen, and the reader's next write may still succeed" — and it is
+                  //   worse than a layout objection on the **write** arm, where the
+                  //   control the reader just tapped is the thing that vanished;
+                  // * its `message` contract is `ApiErrorMapper`'s, and
+                  //   `SettingsRepositoryImpl._unreachable` is not a mapper — it
+                  //   interpolates the raw Dart exception.
+                  //
+                  // So the failure is a **notice** carrying the same four §14 properties
+                  // `ErrorView` holds: a differently-shaped `err`-coloured icon,
+                  // `Semantics(liveRegion:)`, the sentence, and an action.
+                  if (state.status == SettingsStatus.failed)
+                    _SettingsFailureNotice(strings: strings),
                   SettingsGroup(
                     label: strings.settingsAppearance,
                     children: <Widget>[
@@ -179,6 +203,14 @@ class _SettingsBody extends StatelessWidget {
                         trailing: SegmentedControl<AppThemeMode>(
                           values: AppThemeMode.values,
                           selected: state.settings.themeMode,
+                          // **The row's own title**, so the track names the control
+                          // ("Theme") and the three segments name the options
+                          // ("Light", "Dark", "System"). Without it the track's node is
+                          // named after the **selected value**, which puts two
+                          // activatable nodes on screen with the identical label —
+                          // the `readingTextSize` defect, and the whole reason this
+                          // parameter exists. See `SegmentedControl.semanticLabel`.
+                          semanticLabel: strings.settingsTheme,
                           labelOf: (AppThemeMode mode) => switch (mode) {
                             AppThemeMode.light => strings.settingsThemeLight,
                             AppThemeMode.dark => strings.settingsThemeDark,
@@ -349,6 +381,198 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The notice `/settings` shows when `SettingsState.status` is
+/// [SettingsStatus.failed].
+///
+/// ## WHY THIS IS **NOT** `ErrorView`, AND WHY THAT IS THE WHOLE ARGUMENT
+///
+/// `08-build-phases.md`'s Phase 10 line is "`EmptyState`/`ErrorView` wired into every
+/// async page". This screen is the one async page that had a failure state and
+/// nothing on screen for it, so the bullet reaches here — and the honest answer is
+/// that `ErrorView` is the wrong widget for this position. Three measured reasons,
+/// in order of how much they would have cost a reader:
+///
+/// 1. **The write arm erases the cause.** `SettingsCubit._persist` answers a
+///    `FailureResult` by emitting `status: failed, settings: _confirmed` — the
+///    control the reader just tapped springs back. An `ErrorView` *in place of* the
+///    groups would replace the screen with an error at the exact moment the reader
+///    is looking for the control they used, so the screen would stop making sense
+///    without saying why. A notice above the groups puts the failure next to the
+///    controls it is about.
+/// 2. **`ErrorView` fills its box.** `Center` → `SingleChildScrollView` → `Padding`
+///    → `Column`, and this screen's root **already scrolls** (`scrollable: true`,
+///    `SettingsScreen.tsx:36`'s `overflowY: 'auto'` on the root). Nesting the two
+///    gives two scroll views fighting over one gesture.
+/// 3. **Its message is not this failure's message.** `ErrorView.message` is required
+///    and undocumented-as-optional precisely because `ApiErrorMapper` is the single
+///    source of a displayable failure message in this app, and that claim is true of
+///    `/`, `/reading` and `/quiz`. `SettingsRepositoryImpl._unreachable` builds
+///    `'The preferences could not be reached: $error'`, interpolating the raw Dart
+///    exception — a real one on a real device is `MissingPluginException(No
+///    implementation found for method … on channel …)`. This widget therefore renders
+///    **`settingsPreferencesUnavailable`**, the app's own localised sentence, and
+///    deliberately not `state.failure!.message`. See that key's ARB description.
+///
+/// ## WHAT IT CARRIES, AND IT IS THE SAME FOUR THINGS `ErrorView` CARRIES
+///
+/// | §14 requirement | here |
+/// | --- | --- |
+/// | not colour alone | `Icons.error_outline` — the same glyph `ErrorView` uses, which is a shape that differs from `EmptyState`'s — beside the sentence, so `err` is never the only signal |
+/// | announced when it arrives | `Semantics(liveRegion: true)`, as `ErrorView` sets |
+/// | a retry | [EvaButton] running `SettingsCubit.load()` |
+/// | a localised name | `arabicAwareFamily` on the label, because `EvaButton.labelFamily` is required (decision 66) and the label is this app's own string |
+///
+/// The surface is `GlassTier.tint`, which is §13.4's row for `/settings` — "everything
+/// else → `.tint`" — and nothing on this screen blurs, so this adds no `saveLayer`
+/// and `glass_blur_budget_test.dart`'s `lib/features/` ceiling of 1 is untouched.
+///
+/// **One notice for both arms, and it is the same sentence.** The cubit reports a
+/// failed read and a failed write through one status, and the reader cannot tell from
+/// the screen which happened — "your preferences could not be saved" is true of both,
+/// because a failed read means what is on screen is not what is stored, which is the
+/// same fact from the other side. Two sentences would be a guess about a state this
+/// widget cannot see.
+class _SettingsFailureNotice extends StatelessWidget {
+  const _SettingsFailureNotice({required this.strings});
+
+  /// The ambient arm's strings. Read once so both the sentence and the retry label
+  /// come from the same lookup — the Arabic test asserts they are both Arabic.
+  final AppLocalizations strings;
+
+  /// The notice's padding. `SettingsTile.padding` is `0 16px` because a tile's
+  /// content is a centred row; this holds a sentence that wraps, so it is
+  /// [SettingsTile]'s horizontal inset with [EvaSpacing.lg] vertically.
+  static const EdgeInsets padding = EdgeInsets.symmetric(
+    horizontal: EvaSpacing.lg,
+    vertical: EvaSpacing.lg,
+  );
+
+  /// The gap between the icon and the sentence, and between the sentence and the
+  /// retry. `EvaSpacing.md` for both — the icon box is 24 and the button is 40, so
+  /// the same step reads correctly at each junction.
+  static const double gap = EvaSpacing.md;
+
+  @override
+  Widget build(BuildContext context) {
+    // `unawaited` because §4 forbids dropping a `Future` as a bare expression
+    // statement, and `load()` is the one operation that clears this status without
+    // asking the reader to change something else first. A local **function**, not a
+    // `VoidCallback` variable, because `prefer_function_declarations_over_variables`
+    // is enabled.
+    void retry() => unawaited(context.read<SettingsCubit>().load());
+
+    return Padding(
+      // `EvaSpacing.sm` above and `SettingsPage.groupGap` below: the notice is a
+      // peer of the three groups, not one of their rows, so it takes the same
+      // separation from its neighbours that they take from each other.
+      padding: const EdgeInsets.only(
+        top: EvaSpacing.sm,
+        bottom: SettingsPage.groupGap,
+      ),
+      child: GlassSurface(
+        tier: GlassTier.tint,
+        radius: SettingsTile.radius,
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // ## THE `liveRegion` WRAPS **ONLY** THE SENTENCE, AND THAT IS LOAD-BEARING
+            //
+            // The first version put the action **inside** the `Semantics(
+            // liveRegion: true)`, and it fused the two into one node. Measured on the
+            // pumped tree, not reasoned about:
+            //
+            // ```text
+            // live=true  btn=true  label="Your preferences could not be saved on this device.|Try again"
+            // ```
+            //
+            // One node that is at once the error, the sentence and a button — the
+            // retry control has **no node of its own**, so a screen reader announces
+            // a sentence as a button and the reader cannot tell what pressing it
+            // would do. `Semantics` with `container: false` merges its subtree into
+            // one node, and putting a labelled `EvaButton` under it is enough.
+            //
+            // `ErrorView` does not have this problem and the reason is worth naming,
+            // because it is the opposite construction: measured on `/reading`'s
+            // failed state, its live region is a **container** whose two children are
+            // the message and the button —
+            //
+            // ```text
+            // live=true  label=""
+            //   ├─ "Could not reach the server."
+            //   └─ "Try again"  (isButton, tap)
+            // ```
+            //
+            // — which is the shape this now takes too, with the difference that the
+            // container here is also given `label:`, so the region is not empty.
+            Semantics(
+              liveRegion: true,
+              label: strings.settingsPreferencesUnavailable,
+              child: ExcludeSemantics(
+                // The sentence is drawn by the `Text` below, and the icon is
+                // decorative — §14 has no use for a glyph announced on its own. The
+                // label on the node above carries the sentence instead, so nothing
+                // is said twice.
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Icon(
+                      // The same glyph `ErrorView` draws, and for its reason: a shape
+                      // that differs from an empty state's, so the two states are told
+                      // apart without colour.
+                      Icons.error_outline,
+                      size: ErrorView.iconSize,
+                      color: context.colors.err,
+                    ),
+                    const SizedBox(width: gap),
+                    // `Expanded`, and this is not decoration: the sentence wraps to
+                    // several lines on the Arabic arm and at 1.22×, and an
+                    // unconstrained `Text` in a `Row` is a horizontal overflow —
+                    // measured at 94 pixels on the right with a bare `Text` here. The
+                    // `*_text_scale_test.dart` for this screen is what holds it.
+                    Expanded(
+                      child: Text(
+                        strings.settingsPreferencesUnavailable,
+                        style: arabicAware(
+                          Theme.of(context).textTheme.bodyMedium!,
+                          Directionality.of(context),
+                        ).copyWith(color: context.colors.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: gap),
+            // `Align` rather than `crossAxisAlignment: start`, which is what puts
+            // `EvaButton` at its natural width in a stretched `Column`. The same
+            // shape `ErrorView`'s retry takes, for the same reason: a full-width
+            // "Try again" on a screen whose only other button is full-width reads
+            // as two primaries.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: EvaButton(
+                label: strings.settingsRetry,
+                // Required since decision 66, and this label is the app's own
+                // localised string — so on the Arabic arm it is Arabic text going
+                // into a button that names its family explicitly. `ErrorView`'s
+                // `retryFamily` is the precedent.
+                labelFamily: arabicAwareFamily(
+                  Directionality.of(context),
+                  EvaTypography.uiFamily,
+                ),
+                onPressed: retry,
+                expanded: false,
+                variant: EvaButtonVariant.secondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

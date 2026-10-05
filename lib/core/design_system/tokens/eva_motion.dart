@@ -129,8 +129,27 @@ abstract final class EvaMotion {
   ///
   /// This is a `RouteTransitionsBuilder` — the signature Flutter's
   /// `PageRoute`/`PageRouteBuilder` uses, and the one auto_route's
-  /// `RouteType.custom(transitionsBuilder:)` expects. The `BuildContext` is
-  /// taken because the typedef carries one; nothing here reads from it.
+  /// `RouteType.custom(transitionsBuilder:)` expects.
+  ///
+  /// ## THE `BuildContext` IS READ, AND §14 IS WHY
+  ///
+  /// **This sentence replaced "nothing here reads from it", which was the §14
+  /// violation written down as if it were a design note.** §14's row is "every
+  /// animation checks `MediaQuery.disableAnimationsOf(context)`; when disabled,
+  /// jump straight to the end state", and the transition was the one site of
+  /// seven that did not — so a reader who has asked their OS for reduced motion
+  /// still got a 250ms fade and an 8px slide on **every** navigation, on all six
+  /// screens, because this builder is installed app-wide.
+  ///
+  /// The reachability question is settled, not assumed: a route transition is
+  /// built inside the route's `ModalScope`, which is a descendant of the
+  /// `Overlay`, of the `Navigator`, and therefore of whatever
+  /// `MaterialApp.builder` returned. `app.dart` installs the text scale there and
+  /// `copyWith`s the ambient data, which carries `disableAnimations` through
+  /// unchanged. Contrast `neural_motion.dart:259-268`, whose scope sits **above**
+  /// `MaterialApp` and genuinely has no `MediaQuery` to read — that one recorded
+  /// its reason after checking it, and corrected an earlier comment that had
+  /// claimed the platform signal could not reach it either.
   ///
   /// [secondaryAnimation] is deliberately unused: this transition does not
   /// cross-fade with the route it is covering, so honouring it would make the
@@ -141,18 +160,32 @@ abstract final class EvaMotion {
   /// `Curves.linear`; only `MaterialPageRoute`'s own builder curves it. So a
   /// builder that used the animation raw would animate linearly and ignore
   /// §5.3's `easeOutCubic` for [screen].
+  ///
+  /// ## AND "JUMP TO THE END STATE" IS A SUBSTITUTED ANIMATION, NOT A DROPPED TREE
+  ///
+  /// [kAlwaysCompleteAnimation] replaces [animation] on both transitions, so the
+  /// fade sits at 1 and the slide at zero while `FadeTransition`,
+  /// `SlideTransition` and `FractionalTranslation` are all still built. The
+  /// cheaper `return child` also satisfies §14's end state and is one line
+  /// shorter; it is rejected because a transitions builder's job is to *wrap* the
+  /// page, and dropping the widgets changes the route's subtree for a reader who
+  /// did not ask for reduced motion at all — they simply asked for less of it.
   static Widget fadeSlide(
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    final Animation<double> progress = MediaQuery.disableAnimationsOf(context)
+        ? kAlwaysCompleteAnimation
+        : animation;
+
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         return FadeTransition(
-          opacity: animation.drive(CurveTween(curve: screenCurve)),
+          opacity: progress.drive(CurveTween(curve: screenCurve)),
           child: SlideTransition(
-            position: animation.drive(
+            position: progress.drive(
               Tween<Offset>(
                 begin: screenSlideBeginFor(constraints.maxHeight),
                 end: Offset.zero,

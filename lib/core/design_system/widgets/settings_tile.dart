@@ -73,16 +73,40 @@ class SettingsTile extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Expanded(
-              child: Text(
-                title,
-                // `arabicAware` here for the same reason as `EvaSectionHeader`: the
-                // row's title is painted by this widget, so this widget decides the
-                // family. Under LTR it is the identity function, so every existing
-                // Latin assertion is untouched.
-                style: arabicAware(
-                  Theme.of(context).textTheme.bodyLarge!
-                      .copyWith(fontWeight: FontWeight.w500),
-                  Directionality.of(context),
+              // ## `excludeSemantics` ON THE **TITLE**, AND IT IS NOT THE ROW'S
+              // `excludeSemantics: false` BEING REVERSED
+              //
+              // The row's own `Semantics` keeps `excludeSemantics: false` on purpose
+              // — the comment at the return below says why, and the reasoning stands:
+              // a tappable row *contains* a control, and dropping the subtree would
+              // leave a screen reader with a button that does nothing. What was wrong
+              // is that **this** `Text` then contributed [title] a second time. Measured
+              // on `/settings`'s language row:
+              //
+              // ```text
+              // lbl="Default language|Default language|English"  tap=true  btn=true
+              // ```
+              //
+              // A name said twice, and — worse — the row was the **only** node carrying
+              // the reader's current language, so the duplicate was not merely untidy,
+              // it was three announced words where one was needed.
+              //
+              // Excluding **only this `Text`** is the smallest fix that keeps both
+              // halves: the title's glyphs are still painted and still readable, and
+              // `trailing`'s own node — a nested control, or the current-value text —
+              // survives to be announced alongside the row's name.
+              child: ExcludeSemantics(
+                child: Text(
+                  title,
+                  // `arabicAware` here for the same reason as `EvaSectionHeader`: the
+                  // row's title is painted by this widget, so this widget decides the
+                  // family. Under LTR it is the identity function, so every existing
+                  // Latin assertion is untouched.
+                  style: arabicAware(
+                    Theme.of(context).textTheme.bodyLarge!
+                        .copyWith(fontWeight: FontWeight.w500),
+                    Directionality.of(context),
+                  ),
                 ),
               ),
             ),

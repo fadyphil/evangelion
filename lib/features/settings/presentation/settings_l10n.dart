@@ -12,11 +12,28 @@ import 'package:evangelion/l10n/app_localizations.dart';
 ///
 /// It is per-feature, beside its only callers, for the reason `greetingLead` is: a
 /// derivation that needs a domain type would otherwise drag `features/settings/`'s
-/// imports into `lib/l10n/`, and `lib/l10n/` is **not** covered by
+/// imports into `lib/l10n/`.
+///
+/// **AND THE HALF OF THAT REASON WHICH WAS "AND THE GATE DOES NOT LOOK THERE" IS NOW
+/// STALE.** This paragraph used to continue: *"`lib/l10n/` is **not** covered by
 /// `tool/verify_purity.sh` — Gate 1 and Gate 2 both key off `lib/features/*` and
 /// `lib/core`, so a file there is a structural blind spot in the purity gate rather
-/// than a checked one. Keeping the derivation inside the feature means the type it
-/// needs is in a directory the gate already watches.
+/// than a checked one."* That was **true**, it was **known to be true**, and Phase 9
+/// wrote the workaround down instead of closing the hole — which is the right call
+/// for a phase that was not the one to close it, and the reason the gap survived.
+///
+/// Phase 10 closed it (decision 123). `tool/feature_import_check.dart`'s `_ownerOf`
+/// now returns `l10n` for any path under `lib/l10n/`, at any depth, and Gate 2's
+/// `ok` line names the owners it examined. Negative-controlled on the tool itself: a
+/// probe importing `features/quiz` and `features/reading` from `lib/l10n/` exited
+/// **0** before the change and **1** after, with both lines reported.
+///
+/// **The placement decision below is unchanged, and the reason it was ever
+/// reconsiderable has gone.** Keeping the derivation inside the feature is still
+/// right — it belongs beside its only callers and it needs a type from
+/// `features/settings/domain/` — but it is now right because it is the better
+/// placement rather than the only permitted one, which is a materially different
+/// statement and worth the difference.
 ///
 /// ## AND THE RULE ITSELF: A LANGUAGE NAMES ITSELF IN ITS OWN SCRIPT
 ///

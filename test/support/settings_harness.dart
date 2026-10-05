@@ -2,18 +2,25 @@ import 'dart:async';
 
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/settings_scope.dart';
+import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:evangelion/core/domain/repositories/settings_repository.dart';
 import 'package:evangelion/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:evangelion/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
+import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'design_system_harness.dart' show evaPrimitiveHarness, kAmbientSurface;
 
 /// The shared fixture for every `/settings` and settings-affected widget test.
 ///
@@ -224,4 +231,123 @@ SettingsHandle settingsHandleOf(WidgetTester tester) {
 void unregisterSettings() {
   if (getIt.isRegistered<SettingsCubit>()) getIt.unregister<SettingsCubit>();
   if (getIt.isRegistered<SettingsHandle>()) getIt.unregister<SettingsHandle>();
+}
+
+/// A [SettingsRepository] whose every call fails with [failure].
+///
+/// **Public here rather than duplicated per suite**, because `/settings` has three
+/// of them after Phase 10 — the cubit's own, `settings_page_test.dart`'s and the
+/// accessibility suite's — and `settings_cubit_test.dart` already keeps a private
+/// copy with the same body. Two copies of a fake that decides whether a screen
+/// reports a failure is one of the two things that can silently disagree about
+/// whether this repository can fail at all.
+///
+/// The alternative is making `/settings`'s failure reachable through the **real**
+/// repository, by pointing `SettingsRepositoryImpl` at a store that throws. That is
+/// the better measurement and it is a different test: this fake is what drives a
+/// *screen*, where the question is "does the notice appear", and
+/// `settings_local_data_source_test.dart` already owns "does the real one throw".
+final class FailingSettingsRepository implements SettingsRepository {
+  /// Every `load()` and `save()` answers [failure].
+  const FailingSettingsRepository(this.failure);
+
+  /// The typed failure both methods return.
+  final Failure failure;
+
+  @override
+  Future<Result<UserSettings>> load() async =>
+      Result<UserSettings>.failure(failure);
+
+  @override
+  Future<Result<UserSettings>> save(UserSettings settings) async =>
+      Result<UserSettings>.failure(failure);
+}
+
+/// Pumps `/settings` over a [SettingsCubit] and returns it.
+///
+/// ## WHY IT LIVES HERE AND NOT IN `settings_page_test.dart`
+///
+/// `settings_page_test.dart` has held a **private** `pumpSettings` since Phase 9,
+/// written before this screen had a second suite. Phase 10 adds two more — the
+/// §14 accessibility sweep and the 1.22×/320px text-scale gate — and a private
+/// copy per suite is how the three drift apart on the two parameters that matter
+/// most here: the `MediaQuery` the page reads its font step from, and whether
+/// `SettingsScope` is actually above the page.
+///
+/// The `SettingsScope` is **not** optional here and is the whole reason this
+/// function exists: `SettingsScope.of` falls back to the locator when nothing is
+/// above the context, and that fallback is **not watched**, so a page pumped bare
+/// never rebuilds when a setting changes. That fallback is what
+/// `settings_harness.dart`'s own header records, and a suite that re-implements
+/// the pump without the scope gets a screen that looks frozen.
+///
+/// [disableAnimations] is threaded through to `evaPrimitiveHarness` rather than
+/// left at its default because §14's reduced-motion row is a standing gate and
+/// `/settings` draws a switch, a segmented control and a stepper — all three of
+/// which animate.
+Future<SettingsCubit> pumpSettings(
+  WidgetTester tester, {
+  UserSettings? stored,
+  SettingsCubit? cubit,
+  Locale locale = const Locale('en'),
+  Size size = kAmbientSurface,
+  double textScale = 1.0,
+  bool disableAnimations = false,
+  int frames = 4,
+}) async {
+  final SettingsHarness harness = settingsHarness(
+    initial: cubit == null ? stored : null,
+    loadImmediately: false,
+  );
+  // The caller's cubit when there is one — that is how a suite drives the screen
+  // into `SettingsStatus.failed` — and otherwise the harness's.
+  final SettingsCubit subject = cubit ?? harness.cubit;
+  //
+  // `load()` runs in **both** cases, and that is the contract rather than an
+  // oversight. `SettingsCubit` starts at `SettingsStatus.loading`, so a
+  // caller-supplied cubit that nobody loaded would be pumped in a state it can
+  // never actually be in — the first version of this function skipped the load
+  // for a supplied cubit and the §14 failure group failed with
+  // `Expected: SettingsStatus.failed / Actual: SettingsStatus.loading`, which is
+  // a state-machine mistake rather than the missing notice it was looking for.
+  // Loading unconditionally means the state a test sees is always one the cubit
+  // reached by itself.
+  await subject.load();
+
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      textScale: textScale,
+      disableAnimations: disableAnimations,
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      // Derived from [locale] and **not** left to the default, for
+      // `login_harness.dart`'s recorded reason: the harness wraps its child in an
+      // explicit `Directionality` that overrides the one Material installs from the
+      // locale, so an `ar` locale rendered LTR reads as "the page ignores RTL".
+      textDirection: locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+      child: settingsScope(tester, SettingsPage(cubit: subject)),
+    ),
+  );
+  await pumpSettingsFrames(tester, frames);
+  return subject;
+}
+
+/// Advances [tester] by [count] frames.
+///
+/// Not `pumpAndSettle`: the ambient clocks under `NeuralScaffold` never settle, so
+/// settling is a timeout rather than a green tick — `home_harness.dart` records the
+/// measurement.
+Future<void> pumpSettingsFrames(WidgetTester tester, int count) async {
+  for (int frame = 0; frame < count; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
 }
