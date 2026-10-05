@@ -9,9 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// * **`role` defaults to `kid`**, which is a protocol value and not a
 ///   privilege — AGENT_CONTEXT §5, trap 7 says `X-User-Role` is parsed and never
 ///   checked, so nothing in this app may gate on it.
-/// * **every field takes part in equality.** A member left out of `props` is a
-///   piece of state the app cannot see change, which for a session means a stale
-///   one that looks current.
+/// * **every field takes part in equality.** A member left out of the generated
+///   `==` is a piece of state the app cannot see change, which for a session means
+///   a stale one that looks current.
 void main() {
   /// A fixed instant, so no assertion depends on the clock.
   final DateTime created = DateTime.utc(2026, 1, 1);
@@ -43,8 +43,9 @@ void main() {
     });
 
     test('and one differing field makes them unequal', () {
-      // Enumerated rather than a single field, because a member left out of
-      // `props` is the failure this catches and one field would not find it.
+      // Enumerated rather than a single field, because a member left out of the
+      // generated `==` is the failure this catches and one field would not find
+      // it.
       final Map<String, AuthSession> others = <String, AuthSession>{
         'userId': session(userId: '22222222-2222-2222-2222-222222222222'),
         'email': session(email: 'peter@evangelion.app'),

@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'streak_summary.freezed.dart';
 
 /// Where today sits in the streak, as the streak endpoint reports it.
 ///
@@ -97,7 +99,8 @@ enum StreakTodayStatus {
 /// a widget test with the two fakes built to contradict each other —
 /// `home_page_test.dart` — because a test that only checks the fields are stored
 /// is asserting `props`.
-final class StreakSummary extends Equatable {
+@freezed
+final class StreakSummary with _$StreakSummary {
   /// A streak summary as the endpoint reports it.
   const StreakSummary({
     required this.currentStreak,
@@ -172,42 +175,4 @@ final class StreakSummary extends Equatable {
   /// Read by nothing yet; see [nextMilestone] for the same argument, and for why
   /// carrying them is recorded rather than done quietly.
   final int daysToMilestone;
-
-  @override
-  List<Object?> get props => <Object?>[
-    currentStreak,
-    longestStreak,
-    lastCompletedDate,
-    todayStatus,
-    todayCompleted,
-    todayScheduled,
-    nextMilestone,
-    daysToMilestone,
-  ];
-
-  /// [next] with the named fields replaced.
-  ///
-  /// Every field is non-nullable, so `null` means "keep the current value" and
-  /// no sentinel object is needed. The nullable-field hazard `AuthState.copyWith`
-  /// documents cannot arise here, because `copyWith(todayCompleted: null)` is
-  /// not expressible.
-  StreakSummary copyWith({
-    int? currentStreak,
-    int? longestStreak,
-    String? lastCompletedDate,
-    StreakTodayStatus? todayStatus,
-    bool? todayCompleted,
-    bool? todayScheduled,
-    int? nextMilestone,
-    int? daysToMilestone,
-  }) => StreakSummary(
-    currentStreak: currentStreak ?? this.currentStreak,
-    longestStreak: longestStreak ?? this.longestStreak,
-    lastCompletedDate: lastCompletedDate ?? this.lastCompletedDate,
-    todayStatus: todayStatus ?? this.todayStatus,
-    todayCompleted: todayCompleted ?? this.todayCompleted,
-    todayScheduled: todayScheduled ?? this.todayScheduled,
-    nextMilestone: nextMilestone ?? this.nextMilestone,
-    daysToMilestone: daysToMilestone ?? this.daysToMilestone,
-  );
 }

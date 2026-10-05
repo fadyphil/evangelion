@@ -27,7 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// `test/features/home/presentation/pages/home_page_test.dart` builds the two
 /// fakes with deliberately contradictory numbers and asserts each surface shows
 /// its own. Asserting it here would be asserting only that the fields are stored,
-/// which is `props`.
+/// which is the equality contract.
 void main() {
   // The live payload, field for field.
   const StreakSummary live = StreakSummary(
@@ -72,7 +72,7 @@ void main() {
     });
 
     test('every field participates, so no two of them can be confused', () {
-      // Walked rather than sampled, because a `props` list that dropped one
+      // Walked rather than sampled, because a generated `==` that dropped one
       // field would leave every *other* pair unequal and this test green. The
       // enumeration is what makes the omission impossible to hide.
       final List<StreakSummary> others = <StreakSummary>[

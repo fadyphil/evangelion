@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'auth_session.freezed.dart';
 
 /// Who the app currently believes it is.
 ///
@@ -28,7 +30,8 @@ import 'package:equatable/equatable.dart';
 /// (AGENT_CONTEXT §5, trap 7). It is carried because it goes on the wire, not
 /// because it grants anything: no UI in this client may hide or disable a control
 /// on it. [defaultRole] exists so the value is written down once.
-final class AuthSession extends Equatable {
+@freezed
+final class AuthSession with _$AuthSession {
   /// A session for [userId].
   const AuthSession({
     required this.userId,
@@ -80,14 +83,4 @@ final class AuthSession extends Equatable {
   /// `kid` — the value `X-User-Role` carries. See the class doc for why this is
   /// not a permission.
   static const String defaultRole = 'kid';
-
-  @override
-  List<Object?> get props => <Object?>[
-    userId,
-    email,
-    displayName,
-    initials,
-    role,
-    createdAt,
-  ];
 }

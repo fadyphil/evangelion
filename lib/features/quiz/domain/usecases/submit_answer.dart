@@ -1,8 +1,10 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'submit_answer.freezed.dart';
 
 /// What one submission needs: the reading, the question, and the letter.
 ///
@@ -43,7 +45,8 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 /// (recorded decision 15), and §5 traps 10 and 11 record that the `reading_id` it
 /// serves is a fabricated, date-dependent non-UUID — so a UUID check here would
 /// reject the only reading this client is ever given.
-final class SubmitAnswerParams extends Equatable {
+@freezed
+final class SubmitAnswerParams with _$SubmitAnswerParams {
   /// One submission.
   const SubmitAnswerParams({
     required this.readingId,
@@ -63,9 +66,6 @@ final class SubmitAnswerParams extends Equatable {
   /// The `answer` body field — *"Selected option (A, B, C, D) or boolean"*, per
   /// `submissions.routes.ts:35`. Sent verbatim, and see [SubmitAnswer]'s doc.
   final String answer;
-
-  @override
-  List<Object?> get props => <Object?>[readingId, questionId, answer];
 }
 
 /// Grades one answer.

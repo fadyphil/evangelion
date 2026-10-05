@@ -32,14 +32,13 @@
 ///
 /// ## NOTHING IS NULLABLE-THEN-CLEARED
 ///
-/// `AuthState.copyWith`'s doc records the hazard this shape avoids: a
-/// `String? = null` parameter cannot express "clear it", so a field that must be
-/// cleared is written by exactly one writer that builds the whole state. Every
-/// transition here goes through [_withSection], which rebuilds the entire state,
-/// so no nullable field is ever "left alone" by accident.
+/// [AuthState]'s doc records the hazard this shape avoids: a `String? = null`
+/// parameter cannot express "clear it", so a field that must be cleared is written
+/// by exactly one writer that builds the whole state. Every transition here goes
+/// through one of the five writers on [HomeState], each of which rebuilds the
+/// entire state, so no nullable field is ever "left alone" by accident.
 library;
 
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
@@ -51,6 +50,9 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'home_bloc.freezed.dart';
 
 /// Where one part of `/` is in its own lifecycle.
 ///
@@ -72,34 +74,30 @@ enum HomeSectionStatus {
 
 /// Everything `/` can be asked. Sealed, so an unhandled event is a compile error.
 ///
-/// ## WHY `props` IS `const []` HERE AND IS STILL RIGHT
+/// ## THE BASE DECLARES NOTHING ABOUT EQUALITY, AND EACH EVENT DECLARES **ALL** OF
+/// ## ITS OWN
 ///
-/// This is the one line Phase 6 shipped uncovered, and it was uncovered because it
-/// is **unreachable**, not because it was forgotten:
+/// The base used to override `props` with `const []`, and this section used to
+/// defend that at length: the base is unreachable, every subclass overrides
+/// `props`, so the getter was dead code by construction. The defence is gone
+/// because the shape is gone. Each event below is a `freezed` class in its own
+/// right, and freezed **derives** `==` from the constructor — so there is no
+/// `props` to forget and the classic Equatable mistake this doc used to warn about
+/// (every event equal to every other, and `bloc.add` swallowing a duplicate) is
+/// now a compile-time impossibility rather than a review item.
 ///
-/// * [HomeEvent] is `sealed` with exactly two subclasses before [HomeCleared] was
-///   added, and **both override `props`** — [HomeStarted] and [HomeRetried] each
-///   return `<Object?>[language]`;
-/// * so no instance of this base ever reaches `props`, and a base-class `props`
-///   is dead code by construction rather than by omission.
+/// What the base still owns is the private constructor. Every event below calls
+/// `super._()`, so no code outside this file can extend the set, and a fourth
+/// event cannot be added without a `sealed`-class compile error at this
+/// `on<…>`-less dispatch site — the same guarantee the `sealed` keyword gave
+/// before.
 ///
-/// `home_bloc_test.dart` pins both events' equality in the failing direction, so a
-/// subclass that dropped `props` — the classic Equatable mistake, where every
-/// event becomes equal to every other and `bloc.add` swallows a duplicate — is red
-/// immediately. **`const []` is therefore the honest base**: it says "no subclass
-/// has told me what makes it distinct", which is true, and it would be a lie to
-/// return something else.
-///
-/// Left without an `// ignore:` on purpose. An `ignore` would suppress the only
-/// signal that a third subclass arrived without `props`, which is the one event
-/// this line must be able to report. The recorded alternative — making [HomeEvent]
-/// `abstract` and dropping the getter — was rejected because it removes the
-/// Equatable contract from the base and leaves each subclass to remember it alone.
-sealed class HomeEvent extends Equatable {
-  const HomeEvent();
-
-  @override
-  List<Object?> get props => const <Object?>[];
+/// The generated `_$HomeEvent` mixin the part file emits for this declaration is
+/// **not** mixed into anything, and that is deliberate rather than an oversight.
+/// See the same note on [AuthEvent].
+@freezed
+sealed class HomeEvent with _$HomeEvent {
+  const HomeEvent._();
 }
 
 /// The reader signed out. Dispatched by the composition root, never by this feature.
@@ -118,24 +116,20 @@ sealed class HomeEvent extends Equatable {
 /// it created, and it does nothing for a process that signs out while `/` is not on
 /// screen — which is the case that actually leaks, since a route-driven clear only
 /// runs when the route is alive.
-final class HomeCleared extends HomeEvent {
+@freezed
+final class HomeCleared extends HomeEvent with _$HomeCleared {
   /// Creates the sign-out reset.
-  const HomeCleared();
-
-  /// `const []` because **every** `HomeCleared` is the same request — the same
-  /// Equatable argument [HomeStarted] makes about its language, and the reason
-  /// `home_bloc_test.dart` asserts two of these are equal.
-  @override
-  List<Object?> get props => const <Object?>[];
+  const HomeCleared() : super._();
 }
 
 /// The screen is opening. Dispatched once, from `_HomeBody`'s `initState`.
 ///
 /// Loads the greeting, the reader, the reading and the streak — in that order of
 /// *emission*, with all three requests in flight at once.
-final class HomeStarted extends HomeEvent {
+@freezed
+final class HomeStarted extends HomeEvent with _$HomeStarted {
   /// Creates the start-up request for [language].
-  const HomeStarted(this.language);
+  const HomeStarted(this.language) : super._();
 
   /// Which arm of the corpus to ask for.
   ///
@@ -153,9 +147,6 @@ final class HomeStarted extends HomeEvent {
   /// retry site is the third option, which trades a read for a field that can be
   /// empty. Carrying it on both events is one parameter and no state.
   final ReadingLanguage language;
-
-  @override
-  List<Object?> get props => <Object?>[language];
 }
 
 /// The reader asked to try again, for [language].
@@ -168,15 +159,13 @@ final class HomeStarted extends HomeEvent {
 ///
 /// [language] rides along for [HomeStarted]'s reason: the request needs it and the
 /// screen is the only thing that can resolve one.
-final class HomeRetried extends HomeEvent {
+@freezed
+final class HomeRetried extends HomeEvent with _$HomeRetried {
   /// Creates the retry request for [language].
-  const HomeRetried(this.language);
+  const HomeRetried(this.language) : super._();
 
   /// Which arm of the corpus to ask for.
   final ReadingLanguage language;
-
-  @override
-  List<Object?> get props => <Object?>[language];
 }
 
 /// `/`'s state machine.
@@ -362,7 +351,25 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 }
 
 /// `/`'s state: two independently-loaded sections, a greeting, and a name.
-final class HomeState extends Equatable {
+///
+/// ## NO GENERATED `copyWith`, AND THAT IS THE POINT
+///
+/// `@Freezed(copyWith: false)`. Every writer below builds the **whole** state, for
+/// the reason `AuthState` gives: a `String? = null` parameter cannot express
+/// "clear it", so a nullable field that must be cleared is written by a method
+/// that cannot get it wrong. freezed's generated `copyWith` is a sentinel-based
+/// *partial* writer — it can set [reading] without setting [readingStatus], and
+/// can clear [streakFailure] on its own — which is precisely the second spelling
+/// of the five writers this file already has, and the one this file's design
+/// refuses.
+///
+/// **`==`, `hashCode` and `toString` are generated**, and `toString` is declared
+/// here so freezed does not generate one. The generated `==` covers all ten
+/// fields, which is the claim `home_bloc_test.dart`'s `HomeCleared` group asserts
+/// in its `reason:` string — see that test, whose wording moved from `props` to
+/// "all ten fields".
+@Freezed(copyWith: false)
+final class HomeState with _$HomeState {
   /// The state a cold launch starts in: everything loading, nothing known.
   const HomeState({
     this.readingStatus = HomeSectionStatus.loading,
@@ -421,26 +428,14 @@ final class HomeState extends Equatable {
   // so a getter that only restates `!= null` over a nullable field is a second
   // spelling of the same question and one more thing to keep in step.
 
-  @override
-  List<Object?> get props => <Object?>[
-    readingStatus,
-    streakStatus,
-    readerStatus,
-    greetingPeriod,
-    readerName,
-    readerInitials,
-    reading,
-    readingFailure,
-    streak,
-    streakFailure,
-  ];
-
-  // --- the four writers ------------------------------------------------------
+  // --- the five writers ------------------------------------------------------
   //
-  // Each builds the **whole** state, for the reason `AuthState.copyWith` gives:
-  // a `String? = null` parameter cannot express "clear it", so a nullable field
-  // that must be cleared is written by a method that cannot get it wrong. These
-  // four are the only writers, and every one of them is total.
+  // Each builds the **whole** state, for the reason [AuthState] gives: a
+  // `String? = null` parameter cannot express "clear it", so a nullable field that
+  // must be cleared is written by a method that cannot get it wrong. These five
+  // are the only writers, every one of them is total, and `@Freezed(copyWith:
+  // false)` is what keeps that sentence true — a generated `copyWith` would be a
+  // sixth, partial, silent writer.
 
   /// [next] with [period] as the greeting's time of day.
   HomeState withGreetingPeriod(GreetingPeriod period) => HomeState(

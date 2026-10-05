@@ -10,6 +10,12 @@
 # Both are listed here. build_runner silently IGNORES options for an unknown
 # builder key (it only prints a warning), so a stale key such as the 1.x-era
 # `injectable_generator:injective_generator` would leave this file inert.
+#
+# `freezed` declares ONE builder, keyed `freezed` (not `freezed_generator:…`),
+# and its own scope is every Dart file — `generate_for` below narrows it to
+# `lib/**` so a test fixture cannot grow a stray generated part. The same
+# "unknown key is ignored, not rejected" rule applies to the spelling, which is
+# why it is written out rather than left to a default.
 targets:
   $default:
     builders:
@@ -17,6 +23,9 @@ targets:
         generate_for:
           - lib/**/*.dart
       injectable_generator:injectable_config_builder:
+        generate_for:
+          - lib/**/*.dart
+      freezed:freezed:
         generate_for:
           - lib/**/*.dart
 
