@@ -23,10 +23,12 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,7 +46,7 @@ void main() {
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
-      await tester.tap(find.text(const HomeStrings.en().continueLabel));
+      await tester.tap(find.text(AppLocalizationsEn().homeContinueLabel));
       await pumpUntilFound(tester, find.byType(ReadingPage));
 
       expect(mounted.router.currentPath, AppRoutes.reading);
@@ -56,7 +58,7 @@ void main() {
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
-      await tester.tap(find.text(const HomeStrings.en().startReflection));
+      await tester.tap(find.text(AppLocalizationsEn().homeStartReflection));
       await pumpUntilFound(tester, find.byType(QuizPage));
 
       expect(mounted.router.currentPath, AppRoutes.quiz);
@@ -81,7 +83,7 @@ void main() {
           await mountHomeWithAReading(tester);
       final int before = mounted.router.stack.length;
 
-      await tester.tap(find.text(const HomeStrings.en().startReflection));
+      await tester.tap(find.text(AppLocalizationsEn().homeStartReflection));
       await pumpUntilFound(tester, find.byType(QuizPage));
 
       expect(mounted.router.currentPath, AppRoutes.quiz);
@@ -93,7 +95,7 @@ void main() {
       WidgetTester tester,
     ) async {
       // The reason the three suites above look the labels up through
-      // `HomeStrings.en()` rather than writing literals: this one runs `/` in `ar`
+      // `AppLocalizationsEn()` rather than writing literals: this one runs `/` in `ar`
       // and finds the same two controls under Arabic labels. A hard-coded
       // `find.text('Start reflection')` would find nothing here and the failure
       // would read as "the panel did not render" instead of "the string is
@@ -101,14 +103,17 @@ void main() {
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester, locale: const Locale('ar'));
 
-      expect(find.text(const HomeStrings.ar().continueLabel), findsOneWidget);
-      expect(find.text(const HomeStrings.ar().startReflection), findsOneWidget);
+      expect(find.text(AppLocalizationsAr().homeContinueLabel), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsAr().homeStartReflection),
+        findsOneWidget,
+      );
 
       // And it is still a *navigation*, not just a localized label: the same tap
       // under `ar` reaches `/quiz`. The reading is requested in Arabic too, which
       // is the other half of the locale — a panel that renders Arabic strings
       // while asking for English scripture is half-migrated.
-      await tester.tap(find.text(const HomeStrings.ar().startReflection));
+      await tester.tap(find.text(AppLocalizationsAr().homeStartReflection));
       await pumpUntilFound(tester, find.byType(QuizPage));
 
       expect(mounted.router.currentPath, AppRoutes.quiz);
@@ -149,7 +154,7 @@ void main() {
       expect(find.text('0'), findsOneWidget);
       expect(find.text('John 3:1-5'), findsOneWidget);
 
-      await tester.tap(find.text(const HomeStrings.en().continueLabel));
+      await tester.tap(find.text(AppLocalizationsEn().homeContinueLabel));
       await pumpUntilFound(tester, find.byType(ReadingPage));
 
       // Covered, and nothing was re-fetched: the request is not the trigger, the
@@ -346,7 +351,10 @@ Future<({AppRouter router, HomeHarness harness})> mountHomeWithAReading(
   // a wait on `continueReading` is a wait for a string this screen never renders.
   // That is the first version, and it is why the first two suites failed with
   // "could not find any matching widgets" while the harness reported success.
-  await pumpUntilFound(tester, find.text(HomeStrings.of(locale).continueLabel));
+  await pumpUntilFound(
+    tester,
+    find.text(lookupAppLocalizations(locale).homeContinueLabel),
+  );
 
   // Asserted here rather than in each suite: "the tap happened on `/`" is the
   // premise of all of them, and a suite that tapped its way off some other route

@@ -3,10 +3,10 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -771,13 +771,13 @@ void main() {
       expect(find.byType(ErrorView), findsOneWidget);
       // The mapper's words, not a sentence from the table — Phase 6's precedent.
       expect(find.text(readingFailure.message), findsOneWidget);
-      expect(find.text(const ReadingStrings.en().retry), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().readingRetry), findsOneWidget);
 
       // The retry re-asks, and this is the one place a **second** request is correct.
       h.readings.scripture = const Result<ScriptureText>.success(
         liveEnglishPassage,
       );
-      await tester.tap(find.text(const ReadingStrings.en().retry));
+      await tester.tap(find.text(AppLocalizationsEn().readingRetry));
       await pumpReadingFrames(tester, 6);
       expect(h.readings.calls, 2);
       expect(find.byType(ScriptureBlock), findsOneWidget);
@@ -800,7 +800,7 @@ void main() {
       // The same principle, on the payload that satisfies it. `questions: []` is
       // **reachable**: `today_reading_mapper.dart` skips an unreadable question
       // rather than refusing the passage (recorded decision 40), so four unreadable
-      // questions report `questionCount == 0` — and `ReadingStrings.captionFor`'s
+      // questions report `questionCount == 0` — and `AppLocalizations.captionFor`'s
       // doc says so in its own words.
       //
       // Measured before the gate was added: the caption rendered as `"0 questions"`

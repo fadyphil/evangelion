@@ -37,7 +37,7 @@ import 'package:flutter/material.dart';
 ///
 /// The fix is [arabicAware] on both runs rather than an `if (isArabic)` branch,
 /// because both strings are the **app's own chrome** — a caption from
-/// `ResultStrings.ar()` and a number `arabicIndicDigits` produced — so the ambient
+/// `AppLocalizationsAr` and a number `arabicIndicDigits` produced — so the ambient
 /// direction is the only arm there is. This is exactly the case that helper's doc
 /// names ("runs that render the app's own strings"), and it is why Phase 3 could
 /// not have written it: there was no Arabic on this screen to write it for.

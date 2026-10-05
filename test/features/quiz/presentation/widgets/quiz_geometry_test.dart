@@ -35,10 +35,10 @@ library;
 
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -122,13 +122,13 @@ void main() {
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
-          child: const Scaffold(
+          child: Scaffold(
             body: QuizHeader(
               current: 1,
               total: 3,
               completed: 1,
               language: ReadingLanguage.english,
-              strings: QuizStrings.en(),
+              strings: AppLocalizationsEn(),
               onExit: _noop,
             ),
           ),

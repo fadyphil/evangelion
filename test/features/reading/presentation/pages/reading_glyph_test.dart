@@ -102,13 +102,14 @@ library;
 
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/features/reading/presentation/reading_strings.dart';
+import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -127,7 +128,7 @@ void main() {
       );
       await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
 
-      const ReadingStrings strings = ReadingStrings.ar();
+      final AppLocalizations strings = AppLocalizationsAr();
       // Site 1 — the metadata row.
       expect(
         familyOfText(tester, liveArabicPassage.translation),
@@ -136,10 +137,12 @@ void main() {
       );
       // Site 2 — the CTA caption, with Arabic-Indic digits in it.
       expect(
-        familyOfText(
-          tester,
-          '${arabicIndicDigits(1)} ${strings.questionSingular}',
-        ),
+        // The CTA caption, and this is the whole point of the line: it used to be
+        // assembled in the test out of a numeral and a bare noun key. It is now one
+        // call into a REAL ICU plural, so the string the gate measures is the string
+        // the screen renders — a hand-assembled one would have been a second
+        // declaration of a translation, which is what this migration removed.
+        familyOfText(tester, strings.readingCaption(1)),
         EvaTypography.arabicFamily,
         reason:
             'defect #2 site 2 — `ReadingArScreen.tsx:86`, and the numeral is '
@@ -178,7 +181,7 @@ void main() {
       );
       // Site 5 — the CTA label, through a *shared* component.
       expect(
-        familyOfText(tester, strings.beginReflection),
+        familyOfText(tester, strings.readingBeginReflection),
         EvaTypography.arabicFamily,
         reason:
             'defect #2 site 5 — `ds.tsx:237` sets `F.ui` on every '
@@ -209,11 +212,11 @@ void main() {
             'and §14 requires a name on each',
       );
       for (final (String site, String message) in <(String, String)>[
-        ('7 — the back control', strings.back),
-        ('8 — the `Aa` control', strings.textSize),
+        ('7 — the back control', strings.readingBack),
+        ('8 — the `Aa` control', strings.readingTextSize),
         (
           '9 — the bookmark control',
-          '${strings.bookmark} — ${strings.unavailableSuffix}',
+          '${strings.readingBookmark} — ${strings.readingUnavailableSuffix}',
         ),
       ]) {
         expect(

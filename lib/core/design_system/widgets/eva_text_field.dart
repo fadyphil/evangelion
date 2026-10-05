@@ -220,7 +220,7 @@ class EvaTextField extends StatefulWidget {
   /// ## AND ALL THREE OF THIS WIDGET'S **STRINGS** TAKE THE AMBIENT ARM
   ///
   /// [label], [hintText] and [errorText] are all caller-supplied, all localised by
-  /// `LoginStrings`, and none had a family parameter — so on the Arabic arm
+  /// `AppLocalizations`, and none had a family parameter — so on the Arabic arm
   /// `البريد الإلكتروني` and `كلمة المرور` rendered in **Space Mono** and the other
   /// two in DM Sans, on the one screen a reader reaches before any content exists.
   /// Each is wrapped in [arabicAware], which is the whole of the fix and costs no

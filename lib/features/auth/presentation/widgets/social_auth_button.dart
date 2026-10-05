@@ -74,7 +74,7 @@ import 'package:flutter/material.dart';
 ///   disabled row: a reader who activates a control announced as unusable and gets
 ///   a response has been told a lie, and only a node with the action *removed*
 ///   satisfies both halves;
-/// * the caller appends [LoginStrings.unavailableSuffix] to the label, so the
+/// * the caller appends [AppLocalizations.authUnavailableSuffix] to the label, so the
 ///   announcement says *why* rather than only that it cannot be pressed.
 class SocialAuthButton extends StatelessWidget {
   /// A social sign-in button.
@@ -97,7 +97,7 @@ class SocialAuthButton extends StatelessWidget {
   ///
   /// A separate parameter rather than a concatenation here, because the suffix
   /// belongs to the **localisation table** and not to this widget — the wording is
-  /// `LoginStrings.unavailableSuffix`, and a widget that appended English would put
+  /// `AppLocalizations.authUnavailableSuffix`, and a widget that appended English would put
   /// one English string inside the Arabic arm.
   final String semanticLabel;
 
