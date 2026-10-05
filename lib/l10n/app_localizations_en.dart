@@ -290,6 +290,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMotionOff => 'Off';
 
   @override
+  String get settingsPreferencesUnavailable =>
+      'Your preferences could not be saved on this device.';
+
+  @override
+  String get settingsRetry => 'Try again';
+
+  @override
   String get settingsReading => 'Reading';
 
   @override

@@ -60,15 +60,21 @@ void main(List<String> args) {
 
   var violations = 0;
 
+  // Every owner this pass actually reached a file in. See the "what the clean
+  // line reports" section below for why this is collected rather than trusted.
+  final Set<String> ownersSeen = <String>{};
+
   for (final File file in sources) {
     final String path = _packageRelative(file.path);
     final String? owner = _ownerOf(path);
 
-    // Only these two shapes are gate-2 subjects. `lib/app/` is the composition
-    // root, which is *supposed* to reach into features to wire them up.
+    // Only these three shapes are gate-2 subjects: a feature, `core/` and
+    // `lib/l10n/`. `lib/app/` is the composition root, which is *supposed* to
+    // reach into features to wire them up — see [_ownerOf].
     if (owner == null) {
       continue;
     }
+    ownersSeen.add(owner);
 
     final String source = file.readAsStringSync();
     final Uri importer = Uri.parse(path);
@@ -85,8 +91,10 @@ void main(List<String> args) {
         continue;
       }
 
-      // `core/` owns no feature, so it may import none; two features may only
-      // reach their own.
+      // `core/` and `l10n/` own no feature, so they may import none; a feature may
+      // only reach its own. The `owner != 'core'` arm is unreachable —
+      // [_featureOf] only ever returns a segment under `lib/features/` — and is
+      // kept so that widening that function cannot silently widen this one.
       if (owner == targetFeature && owner != 'core') {
         continue;
       }
@@ -103,6 +111,31 @@ void main(List<String> args) {
   if (violations > 0) {
     exit(1);
   }
+
+  // ## WHAT THE CLEAN LINE REPORTS, AND WHY IT IS NOT A GATE
+  //
+  // `verify_purity.sh` reads this as the gate's `ok` message, and it names the
+  // owners the pass actually reached. That is the whole point of it: the failure
+  // mode that produced the `lib/l10n/` hole above is a **directory nobody
+  // claimed**, and a directory nobody claimed produces no output at all — which
+  // is indistinguishable from a clean tree until someone notices the missing
+  // name.
+  //
+  // It is deliberately **not** an exit-code failure. AGENT_CONTEXT §7 draws the
+  // line exactly here: "a scope of a gate that nothing has examined yet is
+  // neither a violation nor a vacuous gate, and inflating `skipped` would misname
+  // it as the latter." `lib/app/` is excluded on purpose and would fail such a
+  // check forever. So the excluded set is made *visible* rather than enforced,
+  // and a new directory under `lib/` shows up as a name that is conspicuously
+  // absent from this line — which is a question for the next agent, asked at the
+  // moment they run the gate.
+  //
+  // Sorted so the output is reproducible, which is what lets a reviewer diff two
+  // runs and see a name appear.
+  stdout.writeln(
+    '${ownersSeen.length} owner(s) examined, none reaching another: '
+    '${(ownersSeen.toList()..sort()).join(', ')}',
+  );
 }
 
 /// Every `.dart` file under `lib/`, sorted so output is reproducible.
@@ -127,11 +160,69 @@ String _packageRelative(String path) {
   return path.startsWith(prefix) ? path.substring(prefix.length) : path;
 }
 
-/// The feature that *owns* [path], or null when no gate-2 rule applies.
+/// The segment under `lib/` that owns [path], or null when no gate-2 rule applies.
 ///
-/// `lib/features/<f>/…` → `<f>`; `lib/core/…` → `core`.
+/// | path | owner | may import a feature? |
+/// | --- | --- | --- |
+/// | `lib/features/<f>/…` | `<f>` | only itself |
+/// | `lib/core/…` | `core` | **never** |
+/// | `lib/l10n/…` | `l10n` | **never** |
+/// | `lib/app/…`, `lib/main.dart` | — | yes: the composition root |
+///
+/// ## WHY `lib/l10n/` IS AN OWNER, AND THE HOLE THAT PUT IT HERE
+///
+/// It was not, and the gap was measurable rather than theoretical. `_ownerOf`
+/// returned `null` for every path whose second segment was not `features` or
+/// `core`, and a `null` owner means `main` `continue`s — so **any** file under
+/// `lib/l10n/` could import **any** feature and this check exited `0`.
+///
+/// Negative control, run on this file before the fix (a probe importing
+/// `features/quiz` and `features/reading`, the two callers the architecture
+/// forbids reaching across):
+///
+/// ```text
+/// # probe at lib/l10n/_phase10_probe.dart
+/// $ dart run tool/feature_import_check.dart      # exit 0   ← the hole
+/// # the identical probe at lib/core/_probe/_probe.dart
+/// $ dart run tool/feature_import_check.dart      # exit 1, both lines reported
+/// ```
+///
+/// So it was not that the rule was wrong for `lib/l10n/`; it was that nothing
+/// reached the rule. `lib/l10n/` is generated `gen_l10n` output plus one
+/// hand-written `l10n.dart`, and it is the directory a future helper is most
+/// likely to be parked in by accident — a `settings_l10n.dart`-style extension
+/// that reads `UserSettings` and drifts into `features/settings/` because the
+/// import compiles. `features/*/presentation/*_l10n.dart` already exists as the
+/// home for those, three times over.
+///
+/// The **depth** rule is deliberately different for `l10n` than for `core`:
+/// `lib/l10n/l10n.dart` is three segments and would have been skipped by the
+/// four-segment guard that `features/` and `core/` need, so the `l10n` arm is
+/// checked before the depth guard and takes any depth. A shorter file is not a
+/// less-imported file.
+///
+/// ## AND WHY `lib/app/` AND `lib/main.dart` ARE **NOT** OWNERS
+///
+/// Because reaching into features from the composition root is the whole job of
+/// the composition root: `lib/app/di/injection.dart` registers every feature's
+/// factories and `lib/app/router/app_router.gr.dart` names every route page.
+/// Gating those would be gating the requirement, not enforcing it.
+///
+/// That is a claim about *this* exclusion being deliberate rather than
+/// accidental, which is why the paths are named below instead of falling out of
+/// a `segments[1] == 'core'` test that never mentioned them. `lib/main.dart`
+/// imports no feature today (it reaches `app/bootstrap.dart`), so closing the
+/// exclusion would assert a property nothing needs — but the exclusion now has a
+/// reason attached, and the next directory added under `lib/` has to make the
+/// same decision explicitly rather than inherit silence.
 String? _ownerOf(String path) {
   final List<String> segments = path.split('/');
+
+  // `lib/l10n/` first and at any depth: see the section above. Three segments is
+  // enough for the directory's own `l10n.dart`.
+  if (segments.length >= 2 && segments[0] == _lib && segments[1] == 'l10n') {
+    return 'l10n';
+  }
 
   // `lib/features/quiz/domain/x.dart` needs four segments; `lib/features/` on
   // its own is a directory, not a file with an owner.

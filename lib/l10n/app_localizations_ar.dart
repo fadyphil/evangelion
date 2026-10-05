@@ -294,6 +294,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsMotionOff => 'معطّل';
 
   @override
+  String get settingsPreferencesUnavailable =>
+      'تعذّر حفظ تفضيلاتك على هذا الجهاز.';
+
+  @override
+  String get settingsRetry => 'حاول مرة أخرى';
+
+  @override
   String get settingsReading => 'القراءة';
 
   @override

@@ -183,6 +183,115 @@ const Size kNarrowSurface = Size(320, 568);
 /// The text scale §14 names, as a plain double for readability at call sites.
 const double kEvaRequiredTextScale = 1.22;
 
+/// ## THE THREE SURFACES `08-build-phases.md`'s PHASE 10 VERIFY LINE NAMES
+///
+/// *"the app renders correctly at 320×568, 390×844, and 430×932"* — and all three
+/// numbers were **already declared** before Phase 10, which is why the gap was never
+/// a missing constant. They were three separate answers to three separate questions:
+///
+/// | constant | size | what it was for |
+/// | --- | --- | --- |
+/// | `kNarrowSurface` | 320×568 | §14's overflow requirement, "text scales to 1.22× without overflow at 320px width" |
+/// | `kAmbientSurface` | 390×844 | the ambient goldens — "a phone at 390 so the orb offsets land where the prototype put them" |
+/// | `kGeometrySurface` | 430×932 | `/reading`'s and `/quiz`'s geometry suites, at the width `ds.tsx` was drawn at |
+///
+/// So the three screens each had **one** viewport asserted against it, and no
+/// viewport had all six. `viewport_matrix_test.dart` is what turns three constants
+/// into a matrix, and it is the phase's verify line rather than a new property.
+///
+/// [kNarrowSurface] and [kAmbientSurface] are here; `kGeometrySurface` lives in
+/// `reading_harness.dart` because §13.2's orb geometry is measured with it.
+///
+/// **Why the matrix is six screens by three sizes and not one screen by three.** The
+/// three numbers are the whole of "renders correctly" as a *reader* experiences it,
+/// and a screen that overflows at 320 but is never mounted at 320 has not been
+/// checked. Before Phase 10 `/login` and `/settings` were only ever pumped at 320,
+/// `/` only at 320, and `/result` and `/quiz` only at 430 — so `/result` had never
+/// been rendered at the width §14 names.
+const Size kPhase10Narrowest = kNarrowSurface;
+const Size kPhase10Middle = kAmbientSurface;
+
+/// Asserts that nothing overflowed the surface, and that the screen is actually there.
+///
+/// ## WHY THIS EXISTS RATHER THAN BEING SPELLED IN THE CALLER, AND WHY IT IS NOT
+/// ## VACUOUS
+///
+/// **`testWidgets` does not fail on overflow.** `RenderFlex` paints the
+/// yellow-and-black banner and *reports* it — `paintOverflowIndicator` calls
+/// `_reportOverflow`, which goes through `FlutterError.reportError` — so the
+/// diagnostic reaches `testWidgets`' own collector and surfaces as a **pending
+/// exception**. A test that renders three sizes and asserts nothing about it is a
+/// green test about nothing, and this repository has four recorded cases of exactly
+/// that shape.
+///
+/// **Drained in a loop, not one `takeException()`.** `takeException` removes one
+/// pending exception per call, so a single call can hide the second overflow on a
+/// page that has two. Collecting them all means the failure message names every
+/// offending widget rather than the first.
+///
+/// **The anti-vacuity half is a parameter and not optional.** A screen that rendered
+/// nothing cannot overflow, so "no exception" over an empty tree is trivially true.
+/// [somethingRendered] must find at least one widget, and the callers pass the
+/// screen's own landmark rather than `find.byType(Scaffold)`, which every page has.
+///
+/// ## AND THE FIVE EXISTING PRIVATE COPIES ARE **DELIBERATELY NOT** MIGRATED
+///
+/// `reading_text_scale_test.dart`, `result_text_scale_test.dart`,
+/// `quiz_text_scale_test.dart`, `home_text_scale_test.dart` and
+/// `login_text_scale_test.dart` each hold a private `_expectNoOverflow`. They are
+/// §14's overflow gates for **one screen each**, they predate this helper, and each
+/// carries screen-specific extras — `reading_text_scale_test.dart`'s takes
+/// `withPassage` so the failed state can assert the absence of a passage **and** its
+/// CTA. Editing five suites to call one helper is a refactor this phase did not
+/// measure, and §7's rule about two implementations of one invariant is about
+/// *writing* a second copy, not about declining to unify five first-party ones.
+///
+/// [somethingRendered] is evaluated **before** [drainOverflowErrors], so a caller
+/// whose landmark is missing gets that failure rather than a confusing one about an
+/// exception from an unrelated cause.
+void expectNoOverflow(
+  WidgetTester tester, {
+  required bool Function() somethingRendered,
+  required String surface,
+}) {
+  expect(
+    somethingRendered(),
+    isTrue,
+    reason:
+        'nothing was rendered at $surface, so "no overflow" would be trivially true '
+        'here. Assert the screen\'s own landmark — not `find.byType(Scaffold)`, '
+        'which every page in the app has.',
+  );
+
+  final List<Object> overflows = drainOverflowErrors(tester);
+  expect(
+    overflows,
+    isEmpty,
+    reason:
+        'something overflowed at $surface. `RenderFlex` reports overflow through '
+        '`FlutterError.reportError` rather than throwing, so a render test that '
+        'asserts nothing about it stays green — which is why this helper exists and '
+        'why the negative control in `viewport_matrix_test.dart` plants a widget '
+        'that overflows on purpose.',
+  );
+}
+
+/// Every pending overflow [tester] is holding, and none left behind.
+///
+/// **A public function, not a private helper inside `expectNoOverflow`.** The
+/// negative control needs the raw list to assert that a planted overflow is
+/// *detected*, and asserting it is detected needs the same instrument the real
+/// assertions use — a second, weaker check would not prove anything about the first.
+List<Object> drainOverflowErrors(WidgetTester tester) {
+  final List<Object> found = <Object>[];
+  Object? pending = tester.takeException();
+  while (pending != null) {
+    found.add(pending);
+    pending = tester.takeException();
+  }
+  return found;
+}
+
 /// Wraps [child] in the composition a Phase-3 primitive is pumped inside.
 ///
 /// Narrower than [kAmbientSurface] and deliberately so: the ambient goldens want

@@ -99,6 +99,7 @@ class SegmentedControl<T> extends StatefulWidget {
     required this.selected,
     required this.labelOf,
     required this.onChanged,
+    this.semanticLabel,
     super.key,
   });
 
@@ -111,6 +112,49 @@ class SegmentedControl<T> extends StatefulWidget {
   /// The label for an option. A function rather than a `labelBuilder` callback
   /// taking an index, so a caller cannot read the wrong element of [values].
   final String Function(T) labelOf;
+
+  /// The **track's** accessible name, or `null` for [labelOf] of the selected value.
+  ///
+  /// ## WHY A CALLER STRING, AND WHAT IT FIXES
+  ///
+  /// Phase 10 measured the default's result on `/settings`' theme picker, and it put
+  /// **two activatable nodes on screen with the identical label**:
+  ///
+  /// ```text
+  /// lbl="Dark"  tap=true  btn=false  sel=none     <- the track
+  /// lbl="Dark"  tap=true  btn=true   sel=isTrue   <- the selected segment
+  /// ```
+  ///
+  /// That is §14's failure in the one form this repository has already had once: one
+  /// string naming two focusable, activatable nodes, which is what
+  /// `reading_accessibility_test.dart` caught when `readingTextSize` described both
+  /// the `Aa` disclosure and the slider it reveals and
+  /// `app_localizations_test.dart` then forced apart into two keys. A screen reader
+  /// reaches the track and hears the name of one of the track's own options.
+  ///
+  /// **The fix is a distinct string, not the removal of the track's node.** The
+  /// comment at the `Semantics` below gives the measured reason the node has to exist
+  /// at all — it is the only thing binding `EvaFocusRing`'s node into the focus tree —
+  /// so it cannot be dropped, and a node with no name is the failure that comment says
+  /// it already fixed once.
+  ///
+  /// ## AND WHY IT IS **OPTIONAL** RATHER THAN REQUIRED
+  ///
+  /// Unlike `EvaButton.labelFamily` (decision 66, required) and
+  /// `FontSizeStepperLabels` (also required), requiring it here would make every
+  /// caller name the control **and** its options, and [labelOf] already covers the
+  /// options. The duplicate only exists because the track's fallback is drawn from
+  /// that same list. A caller with a noun gets the correct shape; a caller without one
+  /// still gets a **named** track — a duplicate, which is the state this repository
+  /// shipped for nine phases, rather than an unnamed control, which is what the
+  /// parameter's absence used to risk reintroducing.
+  ///
+  /// `SettingsPage` is the caller that passes it, with the row title it already draws
+  /// — so the track is named "Theme", the segments are named "Light", "Dark" and
+  /// "System", and no two activatable nodes collide. The row's painted title repeats
+  /// "Theme" once, and that node is **not** activatable, which is the distinction
+  /// `home_accessibility_test.dart`'s "the streak is ONE node, not two" turns on.
+  final String? semanticLabel;
 
   /// Reports the new selection, already resolved through [nextSelection].
   final ValueChanged<T> onChanged;
@@ -198,19 +242,23 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
     final EvaColors colors = context.colors;
 
     // The name of the whole control, for the track's own node. See the return
-    // below for why it needs one.
+    // below for why it needs one, and [semanticLabel] for why it is a caller's
+    // string whenever the caller has one.
     //
-    // Guarded, because `nextSelection`'s doc records that an out-of-list
+    // The fallback is guarded, because `nextSelection`'s doc records that an
+    // out-of-list
     // `selected` is reachable — a persisted setting naming a value a rebuilt enum
     // no longer has — and `labelOf` is the caller's function over `values`, so
     // calling it with a value the list does not contain is a crash in `build`.
     // The first option is the fallback, and it is the same end a forward step
     // snaps to.
-    final String controlLabel = widget.labelOf(
-      widget.values.contains(widget.selected)
-          ? widget.selected
-          : widget.values.first,
-    );
+    final String controlLabel =
+        widget.semanticLabel ??
+        widget.labelOf(
+          widget.values.contains(widget.selected)
+              ? widget.selected
+              : widget.values.first,
+        );
 
     final Widget track = Container(
       // `SettingsScreen.tsx:51` —

@@ -89,12 +89,19 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        93,
+        95,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
-            'manifest and a silent drop would leave them passing.',
+            'manifest and a silent drop would leave them passing.\n\n'
+            '**93 → 95 in Phase 10**, for `settingsPreferencesUnavailable` and '
+            '`settingsRetry`: the notice `/settings` renders when `SettingsCubit` '
+            'reports `SettingsStatus.failed`, which was a reachable state the app '
+            'reached and displayed nothing about. Neither key is a plural and '
+            'neither holds a placeholder, so the two ICU-plural groups below are '
+            'unaffected — which is why this suite went red on exactly two numbers '
+            'and on nothing else.',
       );
       expect(keysOf(ar), isNotEmpty);
     });
@@ -181,6 +188,19 @@ void main() {
         'settingsMotionOff': 'EvaToggle',
         'settingsLanguageSheetTitle': 'SettingsScreen.tsx:77',
         'settingsLanguageEnglish': 'SettingsScreen.tsx:88',
+        // Both added in Phase 10, and both are working around the same absence:
+        // `SettingsScreen.tsx` cannot fail, because every value on it is a
+        // `useState` in a file with no data layer, so the prototype has no error
+        // state and nothing to transcribe. `settingsRetry` carries the same words the
+        // *other three* retry keys carry for the same reason — see `homeRetry`.
+        //
+        // The phrase is `no error state` rather than `no data layer` because that is
+        // what the two descriptions actually say, and the assertion below is a
+        // substring match on the description. It is deliberately strict: a `written`
+        // entry that drifts from the wording it is checking is a manifest that no
+        // longer describes anything, which is the failure this test exists to catch.
+        'settingsPreferencesUnavailable': 'no error state',
+        'settingsRetry': 'no error state',
       };
       final List<String> keys = keysOf(
         en,
@@ -188,11 +208,13 @@ void main() {
 
       expect(
         keys,
-        hasLength(21),
+        hasLength(23),
         reason:
             'the /settings ARB surface. This is a declared count so that a dropped '
             'key is a failure rather than a smaller green, exactly as the file-level '
-            'count is above.',
+            'count is above. **21 → 23 in Phase 10**, for the failure notice; the '
+            'two added keys are in the `written` map above with the reason they were '
+            'invented.',
       );
 
       final List<String> unmarked = <String>[];

@@ -86,6 +86,8 @@
   "settingsReduceMotion": "تقليل الحركة",
   "settingsMotionOn": "مفعّل",
   "settingsMotionOff": "معطّل",
+  "settingsPreferencesUnavailable": "تعذّر حفظ تفضيلاتك على هذا الجهاز.",
+  "settingsRetry": "حاول مرة أخرى",
   "settingsReading": "القراءة",
   "settingsDefaultLanguage": "اللغة الافتراضية",
   "settingsLanguageSheetTitle": "اختر اللغة",

@@ -2809,6 +2809,242 @@ are **72** ARB keys after `questionSingular`/`questionPlural` merge into one plu
 tables" matches none of those three numbers.
 
 
+### Recorded decisions — Phase 10 review
+
+Shipped on `feat/phase-10-polish`. **2215 → 2311 tests, coverage 98.17% → 98.21%.**
+The phase's own framing was measured before anything was built and **three of the four
+scope bullets were already satisfied**; the work that was actually missing is below,
+together with the two recorded decisions that are not "what I built".
+
+**123. THE FOUR PLAN BULLETS, MEASURED — THREE WERE ALREADY DONE**
+
+| `08-build-phases.md` Phase 10 scope line | measured state on entry |
+| --- | --- |
+| `TextScaler` from the font step | **done in Phase 9.** `app.dart:320-327` installs `evaScalerFor(settings.fontStep)` at `MaterialApp.builder`; `app_settings_wiring_test.dart:322-384` holds it (five steps → five rendered sizes, no dead zone). Verified, not rebuilt. |
+| reduced-motion honours `MediaQuery.disableAnimationsOf` | **6 of 7 animation sites honoured it. One did not** — decision 124. |
+| `EmptyState`/`ErrorView` wired into every async page | **`/`, `/reading`, `/quiz` wired. `/login` and `/result` have no failure state to wire (measured, below). `/settings` HAD one and drew nothing** — decision 125. |
+| semantics pass over all 6 pages | **3 of 6.** `login`, `/`, `/reading` had `*_accessibility_test.dart`. `/quiz`, `/result`, `/settings` had none — three new suites, and four §14 defects they found (decisions 126–129). |
+
+Two exclusions are measurements, not omissions, and are recorded so a later reader does
+not "fix" them:
+
+* **`/login` has no failure status.** `AuthSessionStatus` is
+  `unknown | signedOut | signingIn | signedIn` and `AuthBloc` maps a failed session
+  check to `signedOut` on purpose (`auth_bloc.dart:492-508`). Auth is a header, not an
+  endpoint (§2 decision 3), so there is no server failure for `ErrorView` to render.
+  Field-level `errorText` is the whole of `/login`'s error vocabulary and it is drawn.
+* **`/result` cannot be empty and cannot fail.** `SubmitResult` is a **required**
+  constructor parameter, so the screen does not exist without a result — compile-enforced,
+  which `result_page.dart:26-31` states. There is no empty state to design and no second
+  shape for the page to have.
+* **`EmptyState` is N/A on `/` and `/reading`.** `HomeSectionStatus` and `ReadingStatus`
+  have no `empty` arm. `EmptyState` ships and is wired on `/quiz`, whose
+  `questions: []` really is reachable (recorded decision 70).
+
+**THE VERIFY LINE WAS THE REAL GAP.** *"the app renders correctly at 320×568, 390×844,
+and 430×932."* A grep found **one** viewport mention in the whole suite before Phase 10 —
+`Size(430, 2400)` in `reading_geometry_test.dart` — and all three numbers **already
+existed** as house constants (`kNarrowSurface`, `kAmbientSurface`, `kGeometrySurface`).
+The gap was never a missing constant; it was three separate answers to three separate
+questions and no matrix. `/result` had never been rendered at 320, and `/settings` had
+never been rendered at 320 at any text scale. `test/viewport_matrix_test.dart` is 48
+render tests (6 screens × their states × 3 viewports) plus a three-test negative control
+on the detector. It also found that `/settings` had **no** `*_text_scale_test.dart` at
+all, so §14's "1.22× at 320px" was unverified for the one screen a reader opens to change
+their text size — closed by `settings_text_scale_test.dart`.
+
+**124. THE GLOBAL ROUTE TRANSITION DID NOT HONOUR REDUCED MOTION**
+
+Seven animation sites; six already read the flag. The seventh is
+`EvaMotion.fadeSlide` (`eva_motion.dart:144`), installed **app-wide** by
+`AppRouter.defaultRouteType`, so every one of the six screens arrived with a 250ms fade
+and an 8px slide whether or not the reader had asked for reduced motion. §14's row is
+"every animation checks `MediaQuery.disableAnimationsOf(context)`; when disabled, jump
+straight to the end state", and this file's doc read *"nothing here reads from it"* — the
+violation written down as though it were a design note.
+
+*Measured reachability, not assumed.* A route transition is built inside the route's
+`ModalScope`, a descendant of the `Overlay`, of the `Navigator`, and therefore of what
+`MaterialApp.builder` returned — so the flag **is** readable, which the old doc never
+checked. Contrast `neural_motion.dart:259-268`, whose scope sits **above** `MaterialApp`
+and genuinely has no `MediaQuery`: that one verified its reason first and corrected its
+own earlier comment when it found the reason was wrong.
+
+*Rejected: `return child` when animations are off.* One line shorter and it satisfies
+§14's end state, but a transitions builder's job is to *wrap* the page, and it changes
+the route's subtree for a reader who did not ask for reduced motion at all — they asked
+for less of it. `kAlwaysCompleteAnimation` is substituted for `animation` instead, so
+`FadeTransition` / `SlideTransition` / `FractionalTranslation` are all still built and
+the existing shape assertions still hold.
+
+*`AppRouter.defaultRouteType` is unchanged*, so `app_router_test.dart:294`'s
+`same(EvaMotion.fadeSlide)` still passes; the signature is the framework's and the tear-off
+is the same object.
+
+**125. `/settings` HAD A FAILURE STATE AND NO SURFACE FOR IT**
+
+`SettingsStatus.failed` is reachable on **both** a read and a write, `SettingsState.failure`
+is non-null, and `_SettingsFailureNotice` is what the screen now draws above its three
+groups. `settings_state.dart:50-52` had already **named the cost** — "a reader whose store
+is unreachable sees the app in its default palette and is never told" — and cross-referenced
+"see its page for why". `settings_page.dart` contained no such reason: a dangling
+cross-reference, which is worse than an admitted gap because it reads as settled.
+
+**The write arm is the one that matters, and it is why this is a notice and not an
+`ErrorView`.** A failed read happens once at launch while the reader is on `/`. A failed
+write happens *because of something the reader just did*: they tap the theme switch,
+`_persist` answers a `FailureResult`, `settings_cubit.dart:188-194` emits
+`status: failed, settings: _confirmed`, and the control visibly springs back with nothing
+said — the exact failure `login_page.dart`'s doc records for its four inert social
+buttons. Replacing the form with an `ErrorView` would erase the control the reader just
+used at the moment it springs back, so the screen would stop making sense without saying
+why.
+
+Three further reasons, all recorded in `_SettingsFailureNotice`'s doc:
+
+* `ErrorView` **fills** its box (`Center` → `SingleChildScrollView`) and `/settings`' root
+  already scrolls (`SettingsScreen.tsx:36`'s `overflowY: 'auto'`), so dropping it above
+  three groups either nests two scroll views or eats the form.
+* `ErrorView.message` is required and its contract is `ApiErrorMapper`'s — true of `/`,
+  `/reading` and `/quiz`. `/settings` is the first **non-network** failure surface, and
+  `SettingsRepositoryImpl._unreachable` builds
+  `'The preferences could not be reached: $error'`, interpolating the raw Dart exception.
+  A real one on a real device is
+  `MissingPluginException(No implementation found for method … on channel …)`. So the
+  notice renders **`settingsPreferencesUnavailable`**, the app's own localised sentence,
+  and deliberately not `failure.message`. `error_view.dart`'s claim that "the failure
+  messages this app shows come from `ApiErrorMapper`" is now true of three of four call
+  sites and its doc says so.
+* The retry runs `SettingsCubit.load()` — the one operation that clears the status without
+  asking the reader to change something else first. `_persist`'s success path also clears
+  it, but reaching that means asking someone whose settings just failed to save to change a
+  setting.
+
+**Rejected: a new design-system widget.** AGENT_CONTEXT §8.7 — a new file only where the
+task specifies a path. The notice is assembled in the page from tokens that already exist:
+`GlassTier.tint` (§13.4 puts `/settings` in tint, so no `saveLayer` and
+`glass_blur_budget_test.dart`'s `lib/features/` ceiling of 1 is untouched), `EvaButton`,
+`ErrorView.iconSize`, and `context.colors.err`.
+
+**126. `/quiz` PUBLISHED TWO TAPPABLE NODES PER OPTION CARD, ONE OF THEM UNNAMED**
+
+`QuizOptionCard` nested `Semantics(…, excludeSemantics: true)` *inside* `EvaFocusRing` →
+`EvaInk`. `excludeSemantics` drops a node's **descendants**, never its ancestors, and
+`Semantics(button: true)` forms a boundary so the `InkWell` could not merge the labelled
+node up into itself either. Measured on the pumped tree:
+
+```
+lbl="A. Nicodemus"  acts=[tap]         <- the Semantics
+lbl=""              acts=[tap, focus]   <- the InkWell, and it has no name
+```
+
+Four such nodes per screen — §14's first row verbatim, met *before* the one that was
+named. The `Semantics` is now the outermost widget; `EvaInk`'s focus node is untouched,
+because focus and semantics are separate mechanisms and `focus_ring_gate_test.dart` still
+sees its Tab stop. `quiz_option_card_test.dart`'s comment had already recorded that
+"`EvaFocusRing` and `EvaInk` add nodes of their own" without following it anywhere; a sweep
+over `/quiz`'s whole tree is what followed it.
+
+**127. `/quiz`'s CORRECT/INCORRECT VERDICT PAIRED A COLOUR AND A LABEL BUT NOT AN ICON**
+
+§14's last row: *"Colour-only state (quiz correct/incorrect) — pair the colour with an
+icon and a semantics label."* The **label** half shipped in Phase 7
+(`quizCorrectSuffix` / `quizIncorrectSuffix`) and `quiz_option_card_test.dart` holds it.
+The **icon** half did not exist: the card drew the accent border, the accent fill and the
+accent glow and nothing with a shape, so a reader who cannot separate `ok` from `err` was
+told nothing. `QuizOptionCard.verdictGlyphFor` is an exhaustive `switch` over
+`QuizOptionState` — so a fifth state is a compile error there rather than a missing glyph
+at runtime — and the glyph is derived from `state` alone, which is what makes it
+spoiler-safe: `quiz_page_test.dart`'s "the widget tree carries nothing that says which
+option is right" asserts every card is `idle` from that one field, so a leak would have to
+change `state` first and would be caught there before it reached an icon.
+
+`Icons.cancel_outlined`, not `Icons.close`: a bare `×` reads as "dismiss this card", and
+this card dismisses nothing.
+
+**128. `/quiz`'s VERDICT BANNER WAS NOT A LIVE REGION**
+
+`FeedbackBanner` ended at `if (semanticLabel == null) return banner;` — and
+`semanticLabel` is `null` in **every** call site, so the flag below it existed in a widget
+that never rendered. `/quiz` is the one screen whose verdict arrives **after** the reader
+has pressed something: the screen is settled, focus is on the CTA, and nothing announced
+that the answer had been graded. `ErrorView`'s own comment is the reason and the
+precedent — *"A failure that arrives after the screen has settled has to be announced."* A
+wrong answer arriving silently is the same defect as a failure arriving silently. The
+`Semantics` is now unconditional and is a **container**, so what is announced is the
+banner's subtree.
+
+**129. TWO PLACES NAMED THE SAME ACTIVATABLE NODE — BOTH ON `/settings`**
+
+Both are §14's failure in the one form this repository has already had once: one string
+describing two focusable, activatable nodes. `reading_accessibility_test.dart` caught that
+once, when `readingTextSize` named both the `Aa` disclosure and the slider it reveals, and
+`app_localizations_test.dart` then forced two keys apart.
+
+* **`SettingsTile` announced its own title twice.** The row's `Semantics` keeps
+  `excludeSemantics: false` on purpose — the comment there is right, a tappable row
+  *contains* a control — and the title `Text` then contributed `title` a second time.
+  Measured: `lbl="Default language|Default language|English"`, where the language row was
+  the **only** node carrying the reader's current language. Fixed by excluding **only** the
+  title `Text`, so `trailing`'s node survives. Now `lbl="Default language|English"`.
+* **`SegmentedControl`'s track was named after the SELECTED VALUE**, so on `/settings`
+  there were two activatable nodes labelled `Dark` — the track and the selected segment.
+  The track's node **cannot** be dropped: `EvaFocusRing` inserts no `Focus` and
+  `EvaInk` is the only thing binding its `FocusNode` into the focus tree, so a track with
+  no `onPressed` is a control Tab cannot reach. **Rejected: dropping the tap**, for that
+  measured reason. So the fix is a **distinct string**: `SegmentedControl.semanticLabel`,
+  a caller-supplied name for the track, which `/settings` fills with the row title it
+  already draws. The track is now "Theme" and the segments "Light" / "Dark" / "System";
+  the row's painted title repeats "Theme" once, and that node is **not** activatable,
+  which is the distinction `home_accessibility_test.dart`'s "the streak is ONE node, not
+  two" turns on.
+
+  `semanticLabel` is **optional** rather than required, unlike `EvaButton.labelFamily`
+  (decision 66) and `FontSizeStepperLabels`. Requiring it would make every caller name the
+  control *and* its options when `labelOf` already covers the options. A caller with a noun
+  gets the correct shape; a caller without one still gets a **named** track — a duplicate,
+  which is what shipped for nine phases, rather than an unnamed control.
+
+**130. `lib/l10n/` WAS NOT COVERED BY GATE 2, AND PHASE 9 KNEW IT**
+
+`feature_import_check.dart`'s `_ownerOf` returned `null` for every path whose second
+segment was neither `features` nor `core`, and a `null` owner means `main` `continue`s —
+so **any** file under `lib/l10n/` could import **any** feature and the check exited `0`.
+Negative-controlled on the tool itself, before the fix:
+
+```text
+# a probe at lib/l10n/_phase10_probe.dart importing features/quiz and features/reading
+$ dart run tool/feature_import_check.dart      # exit 0   <- the hole
+# the IDENTICAL probe at lib/core/_probe/_probe.dart
+$ dart run tool/feature_import_check.dart      # exit 1, both lines reported
+```
+
+After: exit `1`, both lines, and `export` at three segments is caught too.
+
+**Phase 9 had recorded the gap and worked around it rather than closing it** —
+`settings_l10n.dart` cites "a structural blind spot in the purity gate rather than a
+checked one" as the reason its derivation lives in the feature. That was the right call
+for a phase that was not the one to close it, and it is the reason the gap survived nine
+phases. That paragraph is now rewritten: the placement is unchanged and the reason it was
+ever reconsiderable has gone, which is a materially different statement.
+
+Gate 2's `ok` line now **names the owners it examined**, because a directory nobody claimed
+produces no output at all and is therefore indistinguishable from a clean tree until
+someone notices the missing name. It is deliberately **not** an exit-code failure — §7
+draws the line there, and `lib/app/` is excluded on purpose because reaching into features
+from the composition root is its job.
+
+#### Two test bugs this phase found in itself, recorded because both were instructive
+
+* `find.bySemanticsLabel` returns **widgets**, and one `SemanticsNode` can be contributed
+  to by several. `findsOneWidget` on it answers "how many widgets carry this label".
+  `settingsTitle` matched two widgets for one node. Counting `SemanticsData` from
+  `semanticsTree` is the instrument; every new sweep here counts nodes.
+* `/settings`' language row reports the **ambient** arm (`selectedLanguageOf(context)`),
+  not the stored setting — so a test that stored `language: arabic`, pumped `locale: en`
+  and asserted the row said "Arabic" was asking the wrong question, and the row was right.
+  An app rendering in English has English in force.
+
 ## 7. Verification — run before reporting done
 
 ```bash
@@ -2817,7 +3053,37 @@ dart analyze --fatal-infos --fatal-warnings                # types + lint + DEPR
 flutter test                                               # full suite
 tool/verify_purity.sh                                      # architecture gates
 dart fix --dry-run                                         # Nothing to fix!
+flutter test --coverage                                    # must not drop
+flutter build linux --release                             # the app still builds
 ```
+
+**Two gates Phase 10 added that are really two *instruments*, not two commands.**
+`test/support/design_system_harness.dart`'s `expectNoOverflow(tester, …)` and
+`drainOverflowErrors(tester)` are how a render test claims "nothing overflowed", and
+`viewport_matrix_test.dart`'s negative-control group is what makes that claim mean
+something:
+
+* **`testWidgets` does not fail on overflow.** `RenderFlex` paints the banner and
+  *reports* it — `paintOverflowIndicator` → `_reportOverflow` →
+  `FlutterError.reportError`, inside an `assert`, so debug builds only, which is what
+  `flutter test` is. The diagnostic becomes a **pending exception** on the `WidgetTester`.
+  A render test that renders and asserts nothing about it is green about nothing, and
+  this repository has four recorded cases of that shape.
+* **Drain in a loop.** `takeException()` removes one pending exception per call, so one
+  call can hide the second overflow on a page that has two.
+* **The landmark check runs first.** A screen that rendered nothing cannot overflow, so
+  `somethingRendered` is a required parameter and is evaluated before the drain. That is
+  the other half of vacuous, and a render test hits it by accident when a landmark is
+  renamed.
+* **The negative control is pinned from both sides**: a planted 480px row at 320 **must**
+  be reported, and a planted 320px row at 390 **must not**. The first pins that the
+  detector fires; the second pins that it is not simply firing on everything, which would
+  make every assertion in the matrix pass for the wrong reason.
+* **One `testWidgets` per (screen, state, viewport), never a loop over viewports in one
+  test.** `_reportOverflow` reports **once** per render object and only
+  `reassemble` restores it. Re-pumping the *same* tree at a second size paints the
+  banner — visibly — and reports nothing, so a three-sizes-in-one-test would be blind to
+  every overflow after the first and green.
 
 **Two codegen commands, and they are not interchangeable.** `dart run build_runner
 build` produces the freezed / auto_route / injectable outputs and **does not run
@@ -2835,8 +3101,15 @@ fresh clone. Decision 107.
 1. **Domain purity** — `core/domain/`, every `features/*/domain/`, `core/common/`
    and `core/navigation/` reach no `package:flutter/`, `package:dio/`, or
    `package:http/`.
-2. **Feature independence** — no feature imports another feature, and `lib/core/` imports
-   no feature at all.
+2. **Feature independence** — no feature imports another feature, and `lib/core/`
+   **and `lib/l10n/`** import no feature at all. `verify_purity.sh` Gate 2's `ok`
+   line names every owner the pass actually reached, because a directory *nobody
+   claimed* produces no output at all — which is how `lib/l10n/` sat outside the
+   gate through Phase 9 while a probe importing `features/quiz` and
+   `features/reading` from it exited `0`. Fixed in Phase 10 (decision 123); the
+   excluded `lib/app/` and `lib/main.dart` are the composition root, named in
+   `tool/feature_import_check.dart`'s `_ownerOf` rather than falling out of a test
+   that never mentioned them.
 3. **Generated files stay lint-silent** — every `*.gr.dart` / `*.config.dart` keeps its
    `// ignore_for_file: type=lint` header, so hand-edits are detectable.
    **The `.freezed.dart` parts are deliberately NOT in this list**, and the reason is
