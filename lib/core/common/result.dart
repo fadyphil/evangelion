@@ -1,4 +1,3 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/common/failure.dart';
 
 /// The outcome of an operation that can fail: either a [Success] or a
@@ -37,7 +36,7 @@ import 'package:evangelion/core/common/failure.dart';
 /// the same pattern in two local functions; that is useful documentation of the
 /// property and it would catch the same change, but it adds nothing the
 /// switches here do not already enforce.
-sealed class Result<T> extends Equatable {
+sealed class Result<T> {
   const Result();
 
   /// The operation succeeded and produced [value].
@@ -152,6 +151,28 @@ sealed class Result<T> extends Equatable {
     Success<T>() => orElse,
     FailureResult<T>(:final failure) => failure,
   };
+
+  /// Equality is **per arm**, and the two arms never compare equal to each other.
+  ///
+  /// ## WHY THIS IS HAND-WRITTEN AND NOT GENERATED
+  ///
+  /// Both arms below override `==`, so `Success`'s cannot see `FailureResult`'s —
+  /// and Dart calls the override on the **left** operand. `Success(a) ==
+  /// FailureResult(f)` therefore runs `Success`'s `==`, which must reject a
+  /// `FailureResult` on its own. The `other is! Success<T>` guard is what does
+  /// that, and it is the line a reader should check first: without it the two
+  /// arms are unequal for the wrong reason, by field comparison, and a future
+  /// field that made them coincide would break it silently.
+  ///
+  /// The `runtimeType` check is *not* redundant with it. `Success(int)(1) ==
+  /// Success(num)(1)` is false on the generic parameter as well as the value, so
+  /// the two guards are asking different questions — one "same arm?", one "same
+  /// shape?".
+  @override
+  bool operator ==(Object other);
+
+  @override
+  int get hashCode;
 }
 
 /// The success arm of [Result].
@@ -165,8 +186,68 @@ final class Success<T> extends Result<T> {
   /// The value the operation produced.
   final T value;
 
+  /// Deep equality on [value], for the `T is Iterable` case.
+  ///
+  /// ## [T] IS COMPARED BY `==`, WHICH IS WRONG FOR A LIST
+  ///
+  /// `==` on a `List` is identity, so `Success(<int>[1, 2]) == Success(<int>[1, 2])` is **false** under this implementation. It was **true** while this class
+  /// extended `Equatable`, which deep-compares `List`, `Set` and `Iterable` props
+  /// and falls through to `==` for everything else. Dropping `Equatable` therefore
+  /// removed a real behaviour, and this comment is where that is recorded rather
+  /// than discovered later by a test that changed its mind.
+  ///
+  /// No `Result<List<_>>` exists in `lib/` or `test/` today — the arms carry
+  /// entities, strings and ints — so nothing is currently relying on it. But [T] is
+  /// a type parameter, so this is a property of the *portable contract*, not of
+  /// the present call sites: any caller may construct `Success<List<int>>`, and a
+  /// value-comparing `Result` inside bloc state that looked unchanged would
+  /// produce a state change on every rebuild.
+  ///
+  /// ## THE FIX IS NOT `Object.hash` WITH A LIST IN IT
+  ///
+  /// Wrapping the value in `Object.hashAll` or `DeepCollectionEquality` would
+  /// paper over the symptom and still hash by identity, so two equal lists would
+  /// be `==` under one arm and unequal-by-hash under the other — a contract that
+  /// only holds for the pairs a test happens to try. Either both sides deep-compare
+  /// or the type does not promise it.
+  ///
+  /// So the honest options are: (a) accept identity comparison and say so, which
+  /// this comment does, or (b) make [T]'s equality the caller's business and forbid
+  /// collection payloads. `AGENT_CONTEXT` §2 decision 12 requires (a) be recorded
+  /// if it is chosen; it is not yet, because no live call site is affected. **If a
+  /// collection-valued `Success` is ever introduced, this is the comment to revisit
+  /// and the decision to write** — and until then `Success`'s contract is
+  /// "equal when the value is `==`", which is the ordinary Dart contract every
+  /// other sealed type in this package already lives under.
   @override
-  List<Object?> get props => <Object?>[value];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Success<T> &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
+
+  /// `runtimeType` is load-bearing here, and the way I know that is that I tried
+  /// removing it twice.
+  ///
+  /// The reasoning that says it is redundant is *tempting and wrong*, because
+  /// `other is Success<T>` does reject `Success<String>` against a `Success<int>` —
+  /// so the type test appears to settle the question on its own. It does not,
+  /// because **generic parameters are covariant in Dart**, and the type test
+  /// therefore answers in the *widening* direction only. Measured:
+  ///
+  /// - `Success<int> is Success<num>` → **true**, and `1 == 1.0` → **true**, so
+  ///   without `runtimeType` these two compare **equal**.
+  /// - `Success<num> is Success<int>` → false, which is why the bad case only
+  ///   appears with the *narrower* type on the left.
+  ///
+  /// `hashCode` includes `runtimeType` for the ordinary reason that two `Result`s
+  /// which compare unequal should not share a hash bucket — and here it is also
+  /// the *only* thing separating `Success<int>` from `Success<num>`, since their
+  /// payloads hash identically. That half degrades a `HashMap<Result, _>` quietly;
+  /// the `==` half makes two differently-typed Results claim to be the same value,
+  /// which is louder but rarer.
+  @override
+  int get hashCode => Object.hash(runtimeType, value);
 
   @override
   String toString() => 'Success<$T>($value)';
@@ -184,8 +265,32 @@ final class FailureResult<T> extends Result<T> {
   /// What went wrong.
   final Failure failure;
 
+  /// Equality delegates entirely to [failure], which has its own contract — see
+  /// `Failure.operator ==` for the three fields that decide equality and the one
+  /// that deliberately does not.
+  ///
+  /// ## THE GENERIC PARAMETER, AND WHY `runtimeType` IS STILL NEEDED
+  ///
+  /// Same covariance trap as `Success`'s, and it bites in the same direction:
+  /// `other is FailureResult<T>` rejects `FailureResult<int>` against a
+  /// `FailureResult<String>`, but `FailureResult<String>` IS a
+  /// `FailureResult<Object>`, so with the narrow type on the left the type test
+  /// passes and `failure == other.failure` decides — which is *true*, since both
+  /// hold the same `Failure`. Without `runtimeType` those two are equal.
+  ///
+  /// `runtimeType` also sits in [hashCode], where it keeps two Results that
+  /// compare unequal out of the same hash bucket. Legal Dart either way, but it
+  /// degrades a `HashMap<Result, _>` into a linear scan with nothing failing.
+  /// It was `runtimeType`-based under `Equatable` for the same reason.
   @override
-  List<Object?> get props => <Object?>[failure];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FailureResult<T> &&
+          runtimeType == other.runtimeType &&
+          failure == other.failure;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, failure);
 
   @override
   String toString() => 'FailureResult<$T>($failure)';

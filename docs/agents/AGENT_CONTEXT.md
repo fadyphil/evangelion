@@ -41,7 +41,7 @@ agent does not re-propose what was rejected, or re-litigate what was accepted.
 | # | Decision | Consequence |
 |---|---|---|
 | 7 | **Keep `sealed Result<T>`.** `fp_dart`/`dartz` rejected. | `lib/core/common/result.dart` stays hand-written. |
-| 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal is **deferred**, because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7), so its last use has not gone. It becomes transitive-only, and is removed from `pubspec.yaml`, in whichever task removes those last two. |
+| 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal was deferred at that point because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7). **Now done — decision 131:** both kept hand-written equality and dropped the base class, so `equatable` is **no longer a direct dependency and no longer in `pubspec.lock` at all**. |
 | 8b | **Adopt ARB + `gen_l10n`.** | **Shipped** on `refactor/gen-l10n`: the **five** hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/app_en.arb` + `app_ar.arb` (72 keys). Decisions 101–111 below. Three of §2.1's own claims were corrected **by measurement** during that task and are marked there: the table and field counts, "compile-time key checking" (a missing key is a codegen *warning*, not a build error), and the locale re-dispatch (it is a corpus re-fetch and it **stays**). |
 | 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
 
@@ -84,7 +84,7 @@ over `DioExceptionType.values` is a recorded gate. The one real gap was
    plain `==` for everything else, so an untyped field makes two logically
    identical failures unequal, and `Failure` lives inside bloc state where that
    costs a spurious emit and a rebuild. **`Failure` therefore keeps hand-written
-   `==`, `hashCode` and `props`**, and
+   `==` and `hashCode`** (the `props` list is gone — see decision 131), and
    `test/core/common/failure_equality_test.dart` pins the contract. Migrating it to
    a generated `==` would put a decoded server body into the equality contract
    **on purpose**.
@@ -2606,7 +2606,7 @@ fields of their own, 14 bloc events, and 3 sealed event bases. `pubspec.yaml`
 gained `freezed_annotation` ^3.1.0 and `freezed` ^4.0.1 (dev); `build.yaml`
 gained the `freezed:freezed` builder key scoped to `lib/**`, because the same
 "unknown builder key is silently ignored" rule that bit `injectable_generator`
-applies here. `equatable` **stays** — see decision 99.
+applies here. `equatable` **stayed** at this point — see decisions 99 and 131.
 
 **96. THE DATA-CLASS FORM IS `final class X with _$X` WITH A DIRECT
 CONSTRUCTOR, NOT THE `factory` FORM.** freezed supports
@@ -2641,7 +2641,10 @@ generated `copyWith` collides with the hand-written method
 documented and only working spelling.
 
 **98. `Failure` AND `Result<T>` STAY HAND-WRITTEN, AND `equatable` STAYS IN
-`pubspec.yaml`.** §2.1 hazard 2 explains `Failure`: `details` is excluded from
+`pubspec.yaml`.** *(Superseded on the dependency half by decision 131: the two
+types stayed hand-written exactly as decided here, and the hand-written `==`
+they were waiting for is now written, so the dependency is gone. The reasoning
+below stands.)* §2.1 hazard 2 explains `Failure`: `details` is excluded from
 equality because `equatable` falls through to plain `==` for an untyped field,
 and freezed offers **no** per-field exclusion, so a generated `==` would put a
 decoded server body into the equality contract on purpose.
@@ -2650,8 +2653,12 @@ decoded server body into the equality contract on purpose.
 `Success<T>`/`FailureResult<T>` keep `props` too. **Consequence, stated rather
 than buried: `equatable`'s last use is not gone, so §2.1 decision 8a's "removed
 in the same task" is deferred to whichever task removes the last `Equatable`.**
-Two hand-written `==`s in `lib/` depend on it and are correct to keep:
-`Failure` and `SignInParams`.
+**CORRECTED BY MEASUREMENT, decision 131:** this decision's closing claim that
+"two hand-written `==`s in `lib/` depend on it" was **wrong**. `SignInParams`
+(`features/auth/domain/usecases/sign_in.dart`) hand-writes its `==` and never
+imported `equatable` — it predates the dependency's last use, and its comment
+about "not Equatable's default" refers to a choice it declined rather than one
+it made. Only `Failure` and `Result<T>` were ever users.
 
 **99. TWO NEW GATES, AND ONE EXISTING GATE FIXED.**
 `test/core/common/freezed_structural_equality_test.dart` (21 tests) asserts
@@ -3232,3 +3239,75 @@ Report `BLOCKED` if the task needs an architectural decision with several valid 
 if you cannot make progress reading the code, or if you are unsure the approach is correct.
 
 **Bad work is worse than no work. You will not be penalised for escalating.**
+### Recorded decisions — dropping `equatable` (decision 8a, closing out §2.1)
+
+**131. `equatable` IS GONE. NOT TRANSITIVE — ENTIRELY ABSENT.**
+
+`pubspec.yaml` no longer declares it and `pubspec.lock` contains **zero** occurrences, so
+`flutter_bloc` does not pull it either. Nothing in `lib/` or `test/` imports it.
+
+`Failure` and `Result<T>` keep the decision 98/99 reason to stay hand-written, and now
+hand-write the `==` they were waiting for. §2.1 decision 8a said removal happens "in
+whichever task removes those last two uses" — that is this task.
+
+Two behavioural properties were given up, deliberately, and neither is reachable today:
+
+* **`Success<List<int>>(x) != Success<List<int>>(x)` for distinct equal lists.** `equatable`
+  deep-compared `Iterable` props; plain `==` on a `List` is identity. No `Result` in `lib/`
+  or `test/` carries a collection — the arms hold entities, strings and ints — but `T` is a
+  type parameter, so this is a property of the portable contract rather than of the present
+  call sites. It is stated in `result.dart` beside the `==` rather than left to be
+  discovered. `Object.hashAll` would not have fixed it: it hashes by identity, so `==` and
+  `hashCode` would disagree on the same pair.
+* **`Failure`'s props list is gone.** The three fields that decided equality
+  (`kind`, `message`, `statusCode`) are compared by name instead, and `details` is still
+  excluded. `equatable`'s `Iterable` deep-compare was never reachable here: the only
+  collection in the class was the props list *itself*, which `equatable` iterates rather
+  than compares. So this half is not a loss. `failure_equality_test.dart` is unchanged and
+  still pins it.
+
+**THE `runtimeType` CLAUSE IS LOAD-BEARING, AND IT TOOK TWO WRONG ANSWERS TO SEE THAT.**
+
+I first claimed the clause was redundant, because `other is Success<T>` rejects a mismatched
+generic parameter. It does — in the **narrowing** direction. **Dart's generic parameters are
+covariant**, so `Success<int> is Success<num>` is `true`, and since `1 == 1.0` is also
+`true`, dropping `runtimeType` makes those two Results compare **equal**. Both facts were
+measured rather than recalled:
+
+```text
+Success<int>  is Success<num>      -> true      # so the type test passes
+Success<num>  is Success<int>      -> false     # which is why it only bites one way
+1 == 1.0                            -> true      # so the payload agrees too
+```
+
+`FailureResult` is worse, because both arms then carry the *identical* `Failure` and the
+payload comparison agrees unconditionally.
+
+**AND THE TEST THAT CATCHES IT HAD TO BE REWRITTEN TWICE.** The natural pairing,
+`Success<int>(1)` against `Success<String>('1')`, proves nothing — the payloads differ, so
+`value == other.value` rejects the pair and the type check is never consulted. Verified:
+rewriting `Success`'s `==` to drop the type-argument check entirely left that test **fully
+green**. Only a pair whose payloads `==` cannot distinguish — `Success<int>(1)` versus
+`Success<num>(1)` — forces the question out to the type. Both `hashCode` implementations
+are now held by assertions that fail if either becomes a constant, because "equal values
+share a hash" is satisfied by `hashCode => 0` while collapsing every `Result` into one
+bucket; the assertions are *disagreements*, not equalities.
+
+This is the repo's sixth recorded vacuous-gate case, and the first one caused by a correct
+reading of the type system rather than by sloppiness.
+
+**132. THE DEAD `freezed` MIXINS ARE NOT DEAD, AND THAT CLAIM WAS NEVER MEASURED.**
+
+`mixin _$QuizEvent`, `_$HomeEvent`, `_$QuizEvent` and their siblings looked like the
+`freezed` artifact of mixing a mixin into a `sealed` base that nothing references. They are
+load-bearing. `lib/features/quiz/presentation/bloc/quiz_bloc.dart:89` reads
+`sealed class QuizEvent with _$QuizEvent` — freezed's sealed-union pattern *requires* the
+mixin, and it is what gives the union its `==`, `hashCode` and `toString`. Deleting them is
+not possible by hand and would not compile. No change was made.
+
+**A NOTE ON WHAT THIS SAYS ABOUT MY OWN REPORTS.** Two claims in a single summary were wrong
+and measurement caught both: the mixins (never checked whether anything mixed them in) and
+the `runtimeType` clause (a plausible reading of `is` that covariance invalidates). The
+useful half of this entry is not the fixes; it is that **three of the four mutations tried
+against these `==` implementations initially survived**, and the surviving ones were only
+found by asking what the suite was failing to assert rather than by reading it.

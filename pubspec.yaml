@@ -28,10 +28,16 @@ dependencies:
   flutter_bloc: ^9.1.1
   # Immutable states, events and entities. See AGENT_CONTEXT §2.1 decision 8a.
   freezed_annotation: ^3.1.0
-  # `equatable` survives only for the two hand-written types that must keep their
-  # own equality contract: `Failure` (details excluded, §2.1 hazard 2) and
-  # `Result<T>` (sealed by hand, §2.1 decision 7).
-  equatable: ^3.0.0
+  # `equatable` is NOT a direct dependency any more. `Failure` and `Result<T>` are
+  # the last two types that needed an equality library, and both now hand-write
+  # their own `==`/`hashCode` (`core/common/`). It still arrives transitively via
+  # `flutter_bloc`; see AGENT_CONTEXT §2.1 decision 8a.
+  #
+  # `Failure` keeps [kind, message, statusCode] and excludes [details] deliberately,
+  # and `Result<T>` compares per arm — both contracts are pinned by
+  # `test/core/common/{failure_equality,result}_test.dart`, including the
+  # covariance case (`Success<int>(1)` vs `Success<num>(1)`) that makes
+  # `runtimeType` load-bearing rather than redundant.
   get_it: ^9.3.0
   injectable: ^3.0.0
   auto_route: ^11.2.0

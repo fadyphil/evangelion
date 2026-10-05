@@ -1,5 +1,3 @@
-import 'package:equatable/equatable.dart';
-
 /// The closed vocabulary of everything that can go wrong at a repository seam.
 ///
 /// A Dart enum is sealed by construction: `values` is exhaustive, so a
@@ -98,7 +96,7 @@ enum FailureKind {
 ///
 /// Instances are immutable and `const`-constructible; see
 /// `failure_test.dart` for the equality and nullability guarantees.
-final class Failure extends Equatable {
+final class Failure {
   /// Creates a failure.
   ///
   /// [message] is shown to the player as-is. [statusCode] is present only when
@@ -125,14 +123,15 @@ final class Failure extends Equatable {
   /// A decoded error body the mapper wanted to attach, such as the second of
   /// AGENT_CONTEXT §5's two error shapes (`{statusCode, code, error, message}`).
   ///
-  /// Typed rather than `Object?` on purpose. `equatable ^3.0.0` deep-compares
-  /// `Map`, `Set` and `Iterable` props but falls through to plain `==` for
-  /// everything else, so an untyped field makes two logically identical
-  /// `Failure`s unequal the moment the attached value has no `==` override.
-  /// [Failure] lives inside bloc state, where Equatable compares the whole
-  /// state graph: a mapper that rebuilt an equivalent body would then look like
-  /// a state change and cost a spurious emit and a rebuild. The field still
-  /// rides along — it is there for the mapper, not to be compared.
+  /// Typed rather than `Object?` on purpose, so the intent is legible even though
+  /// nothing compares it. An `Object?` invites a mapper to attach something whose
+  /// `==` is identity, which would make two logically identical `Failure`s look
+  /// distinct the day anyone *did* put the field in an equality contract.
+  ///
+  /// [Failure] lives inside bloc state, where an identity-based comparison of the
+  /// whole state graph makes a mapper that rebuilt an equivalent body look like a
+  /// state change, costing a spurious emit and a rebuild. The field rides along —
+  /// it is there for the mapper, not to be compared.
   final Map<String, Object?>? details;
 
   /// [kind], [message] and [statusCode] decide equality. [details] does not.
@@ -140,13 +139,44 @@ final class Failure extends Equatable {
   /// Nothing in that list is diagnostic noise: `message` is the player's only
   /// clue, and `statusCode` is what separates [FailureKind.conflict] from
   /// [FailureKind.validation] when both carry the same message.
-  ///
-  /// Leaving [details] out also *satisfies* `test_types_in_equals` rather than
+  ///  /// Leaving [details] out also *satisfies* `test_types_in_equals` rather than
   /// hiding from it. That lint exists to keep runtime-type-varying values out
-  /// of an equality contract, and an `Object?` field is precisely such a value —
-  /// but `List<Object?> get props` erased its type, so the lint never saw it.
+  /// of an equality contract, and an `Object?` field is precisely such a value.
+  ///
+  /// ## WHAT CHANGED WHEN `Equatable` WENT, AND WHY IT IS SAFE
+  ///
+  /// This was `List<Object?> get props => <Object?>[kind, message, statusCode]`
+  /// and `equatable` walked it. Two properties came from `Equatable` that are now
+  /// written out, and both are load-bearing:
+  ///
+  /// - **Deep comparison of the `statusCode` value.** `int?` compares by `==` like
+  ///   any other Dart value, so nothing is lost. The `Iterable`/`Map` deep-compare
+  ///   that `equatable` provided was never reachable here, because the only
+  ///   collection in this class was the *props list itself*, which `equatable`
+  ///   iterates rather than compares as a value.
+  /// - **A `runtimeType` guard.** `equatable` rejected `other.runtimeType !=
+  ///   runtimeType` before comparing props. It is preserved below, and it is what
+  ///   keeps `Failure` from equalling a hypothetical other `Failure`-shaped type.
+  ///
+  /// So the three props keep exactly the contract they had, and the `props` list
+  /// that named them is gone. `failure_equality_test.dart` is the gate on this
+  /// file's half of that claim — it pins all three fields in, [details] out, and
+  /// the `runtimeType` guard, and it is why this rewrite is not a behaviour change
+  /// that only the test suite would have noticed.
   @override
-  List<Object?> get props => <Object?>[kind, message, statusCode];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Failure &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          message == other.message &&
+          statusCode == other.statusCode;
+
+  /// Agrees with `==` on the same three fields, for the same reason
+  /// [FailureResult]'s does: including `runtimeType` keeps the hash of a
+  /// cross-type pair distinct from the pair `==` already rejects.
+  @override
+  int get hashCode => Object.hash(kind, message, statusCode);
 
   /// Renders kind, status and message, and **deliberately omits [details]**.
   ///
