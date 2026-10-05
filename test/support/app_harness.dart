@@ -34,8 +34,8 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
@@ -202,7 +202,7 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
       // [locale] null the app resolves the platform locale, which is every existing
       // caller's situation, so the default changes nothing for them.
       locale: locale,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
     ),
   );

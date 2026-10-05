@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
-import 'package:evangelion/features/result/presentation/result_strings.dart';
+import 'package:evangelion/features/result/presentation/result_l10n.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 
 /// `/result` — the screen after a graded answer. `ResultScreen.tsx:33-80`.
@@ -151,9 +152,7 @@ class ResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ResultStrings strings = ResultStrings.of(
-      Localizations.localeOf(context),
-    );
+    final AppLocalizations strings = context.l10n;
 
     return NeuralScaffold(
       // `QuizScreen.tsx:42` is `<NeuralBackground variant={4} />` and
@@ -175,7 +174,7 @@ class ResultPage extends StatelessWidget {
   }
 
   /// The screen's content, in the prototype's order.
-  Widget _body(BuildContext context, ResultStrings strings) => Column(
+  Widget _body(BuildContext context, AppLocalizations strings) => Column(
     // ## `mainAxisSize.min` AND **NOT** `MainAxisAlignment.center`
     //
     // `ResultScreen.tsx:34` is `minHeight: 844` on a non-scrolling flex column, so
@@ -244,18 +243,18 @@ class ResultPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             EvaButton(
-              label: strings.reflectAgain,
+              label: strings.resultReflectAgain,
               labelFamily: _ctaFamily(context),
               onPressed: () =>
                   unawaited(context.router.replacePath(AppRoutes.quiz)),
             ),
             const SizedBox(height: buttonGap),
             EvaButton(
-              label: strings.backHome,
+              label: strings.resultBackHome,
               labelFamily: _ctaFamily(context),
               variant: EvaButtonVariant.secondary,
               // **To `/`, and not to a library.** §2 decision 1 cut the library, and
-              // `ResultStrings.backHome`'s doc records why the prototype's label is
+              // `resultBackHome`'s description records why the prototype's label is
               // not transcribed: a button reading "Back to library" that goes to `/`
               // would be a lie about where it leads.
               onPressed: () =>
@@ -302,7 +301,7 @@ class _Score extends StatelessWidget {
   const _Score({required this.result, required this.strings});
 
   final SubmitResult result;
-  final ResultStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -343,7 +342,17 @@ class _Score extends StatelessWidget {
       ),
       const SizedBox(height: EvaSpacing.xs),
       Text(
-        strings.totalCaption,
+        // ## AND THE CAPTION IS PLURALISED **WITHOUT** THE NUMBER
+        //
+        // `resultTotalCaption` is an ICU plural that selects the NOUN and carries no
+        // `{digits}`, because the score is drawn one line above in `displayLarge` and
+        // folding the numeral in here would print it twice. It takes the same integer
+        // that line draws, so there is one count and one source for it.
+        //
+        // This is the half of the migration that is a CORRECTNESS FIX rather than a
+        // refactor: the value was `نقطة` — singular — for every score, so `٥ نقطة`
+        // rendered where Arabic wants `٥ نقاط`. `test/l10n/` holds the six classes.
+        strings.resultTotalCaption(result.currentTotalPoints),
         style: arabicAware(
           Theme.of(context).textTheme.bodySmall!,
           Directionality.of(context),
@@ -371,7 +380,7 @@ class _Score extends StatelessWidget {
 ///
 /// So it is a **private** widget in this file rather than
 /// `features/result/presentation/widgets/streak_pill.dart`. The derived label is
-/// [ResultStrings.streakLabelFor], which is a **pure function on the string table**
+/// [ResultStringsPhrases.streakLabelFor], which is a **pure function on the string table**
 /// and so is unit-tested without a widget — which is the half of the coverage a
 /// separate file would have bought.
 ///
@@ -386,7 +395,7 @@ class _StreakPill extends StatelessWidget {
   const _StreakPill({required this.result, required this.strings});
 
   final SubmitResult result;
-  final ResultStrings strings;
+  final AppLocalizations strings;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +446,7 @@ class _StreakPill extends StatelessWidget {
                 size: ResultPage.pillFlameHeight,
                 // The pill's label already says the streak; a second node saying
                 // "Streak" would be two names for one number.
-                semanticLabel: strings.day,
+                semanticLabel: strings.resultDay,
               ),
             ),
           ),
@@ -505,7 +514,7 @@ class _StatRow extends StatelessWidget {
       );
 
   final SubmitResult result;
-  final ResultStrings strings;
+  final AppLocalizations strings;
 
   /// The three tiles, built in the **initializer list** so the constructor can stay
   /// `const`.
@@ -569,24 +578,38 @@ class _StatRow extends StatelessWidget {
   static List<(String, String)> tilesFor({
     required int pointsEarned,
     required int longestStreak,
-    required ResultStrings strings,
+    required AppLocalizations strings,
   }) => <(String, String)>[
-    (_countIn(strings, pointsEarned), strings.thisAnswer),
-    (_countIn(strings, longestStreak), strings.bestRun),
+    (_countIn(strings, pointsEarned), strings.resultThisAnswer),
+    (_countIn(strings, longestStreak), strings.resultBestRun),
   ];
 
   /// [value] in [strings]' numerals.
   ///
-  /// **A static and not [ResultStrings]'s private one**, for decision 77's reason
-  /// inverted: the tiles are drawn by [StatTile] in `headlineSmall`, so *this file*
-  /// decides what string reaches it, and the rule has to be reachable from here. On
-  /// the Arabic arm that is the Arabic-Indic form, because Amiri carries Arabic
+  /// **A one-line delegate and not the arm's own `_count`** — decision 77's reason
+  /// inverted. The tiles are drawn by [StatTile] in `headlineSmall`, so *this file*
+  /// decides what string reaches it, and the rule has to be reachable from here. The
+  /// rule itself is [AppLocalizationsArm.digits], shared with `/quiz` and `/reading`
+  /// because three features need it and §3 puts that in shared code.
+  ///
+  /// On the Arabic arm that is the Arabic-Indic form, because Amiri carries Arabic
   /// **and** Latin — so a Western digit would render, but beside an Arabic streak pill
   /// it would be the only Western numeral on the screen.
   ///
   /// `StatTile` resolves both of its runs through `arabicAware` (decision 84), so
   /// the family question is settled at the widget and this method only decides the
   /// **numerals**.
-  static String _countIn(ResultStrings strings, int value) =>
-      strings.isArabic ? arabicIndicDigits(value) : '$value';
+  ///
+  /// ## AND THIS IS WHERE `ResultStrings.isArabic` USED TO BE READ
+  ///
+  /// It was derived by comparing `backHome` against the Arabic arm's `backHome`,
+  /// which had a real argument behind it — a stored `bool` would have been a second
+  /// source of truth for the same fact as the nouns being Arabic. With ARB that
+  /// comparison has no honest form left: it would compare a generated getter against
+  /// a second generated instance, which tests the generator rather than the arm and
+  /// breaks the moment a translator picks an Arabic value that coincides with the
+  /// English one. [AppLocalizationsArm.isArabicArm] reads the locale instead, which
+  /// is the fact the question was asking.
+  static String _countIn(AppLocalizations strings, int value) =>
+      strings.digits(value);
 }

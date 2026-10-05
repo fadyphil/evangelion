@@ -2,8 +2,8 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,10 +76,10 @@ void main() {
       // timed out at five minutes each with no error at all.
       await pumpPrimitive(
         tester,
-        const TodayReadingPanel(
+        TodayReadingPanel(
           reading: null,
           failure: null,
-          strings: HomeStrings.en(),
+          strings: AppLocalizationsEn(),
           onOpenReading: null,
           onStartReflection: null,
           onRetry: null,

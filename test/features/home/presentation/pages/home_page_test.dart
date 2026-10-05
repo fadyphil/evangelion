@@ -28,12 +28,13 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/features/home/domain/preview_text.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/home_strings.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -169,8 +170,11 @@ void main() {
 
       // `is_fully_completed: true` on the reading, `today_completed: false` on the
       // summary. The eyebrow comes from the reading.
-      expect(find.text(const HomeStrings.en().readingComplete), findsOneWidget);
-      expect(find.text(const HomeStrings.en().continueReading), findsNothing);
+      expect(
+        find.text(AppLocalizationsEn().homeReadingComplete),
+        findsOneWidget,
+      );
+      expect(find.text(AppLocalizationsEn().homeContinueReading), findsNothing);
     });
 
     testWidgets('and neither number is reconciled anywhere on screen', (
@@ -196,7 +200,7 @@ void main() {
 
       expect(find.text('0'), findsOneWidget, reason: 'the flame');
       expect(
-        find.text(const HomeStrings.en().readingComplete),
+        find.text(AppLocalizationsEn().homeReadingComplete),
         findsOneWidget,
         reason: 'the panel',
       );
@@ -213,8 +217,11 @@ void main() {
       expect(h.readings.asked, <ReadingLanguage>[ReadingLanguage.arabic]);
       expect(find.text(liveArabicReading.reference), findsOneWidget);
       // Unfinished, so the **other** eyebrow arm.
-      expect(find.text(const HomeStrings.ar().continueReading), findsOneWidget);
-      expect(find.text(const HomeStrings.ar().readingComplete), findsNothing);
+      expect(
+        find.text(AppLocalizationsAr().homeContinueReading),
+        findsOneWidget,
+      );
+      expect(find.text(AppLocalizationsAr().homeReadingComplete), findsNothing);
     });
   });
 
@@ -305,7 +312,10 @@ void main() {
         expect(find.text('0'), findsOneWidget);
         // And the streak's own failure never happened, so its subtitle is the
         // "glowing" arm… no: the streak is 0, so it is the *resting* one.
-        expect(find.text(const HomeStrings.en().streakResting), findsOneWidget);
+        expect(
+          find.text(AppLocalizationsEn().homeStreakResting),
+          findsOneWidget,
+        );
       },
     );
 
@@ -345,7 +355,7 @@ void main() {
       // `ensureVisible` first: at 320x568 the panel is below the fold, and a tap on
       // an off-screen widget throws a hit-test warning rather than pressing the
       // button — which reads as "the retry does not work".
-      final Finder retry = find.text(const HomeStrings.en().retry);
+      final Finder retry = find.text(AppLocalizationsEn().homeRetry);
       await tester.ensureVisible(retry);
       await pumpFrames(tester, 2);
       await tester.tap(retry);
@@ -380,7 +390,7 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc);
 
-      final Finder retry = find.text(const HomeStrings.en().retry);
+      final Finder retry = find.text(AppLocalizationsEn().homeRetry);
       await tester.ensureVisible(retry);
       await pumpFrames(tester, 2);
       await tester.tap(retry);
@@ -425,7 +435,10 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc);
 
-      expect(find.text(const HomeStrings.en().readingComplete), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsEn().homeReadingComplete),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the retry re-fetches ONLY the streak', (
@@ -516,7 +529,7 @@ void main() {
 
         expect(find.byType(ProgressBeads), findsNothing);
         expect(
-          find.text(const HomeStrings.en().noQuestionsToday),
+          find.text(AppLocalizationsEn().homeNoQuestionsToday),
           findsOneWidget,
         );
       },
@@ -618,13 +631,19 @@ void main() {
       expect(find.byType(TodayReadingPanel), findsOneWidget);
       // …**with both destinations still reachable.** These two are the whole point:
       // they are the controls that used to vanish.
-      expect(find.text(const HomeStrings.en().continueLabel), findsOneWidget);
-      expect(find.text(const HomeStrings.en().startReflection), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsEn().homeStartReflection),
+        findsOneWidget,
+      );
       // The rest of the panel is intact too — a heading, a bead row, and the status
       // line — so "it did not throw" is not satisfied by a blank frame.
       expect(find.text('John 3:1-5'), findsOneWidget);
       expect(find.byType(ProgressBeads), findsOneWidget);
-      expect(find.text(const HomeStrings.en().readingComplete), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsEn().homeReadingComplete),
+        findsOneWidget,
+      );
       // And the preview itself is an empty paragraph rather than an absent widget.
       expect(find.byType(PassageDropCap), findsNothing);
     });
@@ -639,8 +658,11 @@ void main() {
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
       expect(tester.takeException(), isNull);
-      expect(find.text(const HomeStrings.ar().continueLabel), findsOneWidget);
-      expect(find.text(const HomeStrings.ar().startReflection), findsOneWidget);
+      expect(find.text(AppLocalizationsAr().homeContinueLabel), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsAr().homeStartReflection),
+        findsOneWidget,
+      );
     });
   });
 
@@ -744,8 +766,11 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(TodayReadingPanel), findsOneWidget);
-      expect(find.text(const HomeStrings.en().continueLabel), findsOneWidget);
-      expect(find.text(const HomeStrings.en().startReflection), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
+      expect(
+        find.text(AppLocalizationsEn().homeStartReflection),
+        findsOneWidget,
+      );
       expect(find.text('John 3:1-5'), findsOneWidget);
     });
 
@@ -808,8 +833,11 @@ void main() {
         final HomeHarness h = harness();
         await pumpHome(tester, bloc: h.bloc);
 
-        expect(find.text(const HomeStrings.en().streakResting), findsOneWidget);
-        expect(find.text(const HomeStrings.en().streakGlowing), findsNothing);
+        expect(
+          find.text(AppLocalizationsEn().homeStreakResting),
+          findsOneWidget,
+        );
+        expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsNothing);
       },
     );
 
@@ -825,8 +853,8 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc);
 
-      expect(find.text(const HomeStrings.en().streakGlowing), findsOneWidget);
-      expect(find.text(const HomeStrings.en().streakResting), findsNothing);
+      expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().homeStreakResting), findsNothing);
     });
 
     testWidgets(
@@ -837,11 +865,11 @@ void main() {
         // number substituted, both English tests would still pass and this one would
         // not.
         expect(
-          const HomeStrings.ar().streakGlowing,
-          isNot(const HomeStrings.ar().streakResting),
+          AppLocalizationsAr().homeStreakGlowing,
+          isNot(AppLocalizationsAr().homeStreakResting),
         );
-        expect(const HomeStrings.ar().streakGlowing, isNotEmpty);
-        expect(const HomeStrings.ar().streakResting, isNotEmpty);
+        expect(AppLocalizationsAr().homeStreakGlowing, isNotEmpty);
+        expect(AppLocalizationsAr().homeStreakResting, isNotEmpty);
       },
     );
 
@@ -889,8 +917,8 @@ void main() {
       expect(h.bloc.state.streak, isNull);
       expect(h.bloc.state.streakStatus, HomeSectionStatus.failed);
       // Nothing is claimed, so nothing is said…
-      expect(find.text(const HomeStrings.en().streakResting), findsNothing);
-      expect(find.text(const HomeStrings.en().streakGlowing), findsNothing);
+      expect(find.text(AppLocalizationsEn().homeStreakResting), findsNothing);
+      expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsNothing);
       // …but the row still occupies its line.
       expect(
         _subtitleRow(tester),
@@ -961,7 +989,7 @@ void main() {
       expect(tester.takeException(), isNull);
       // The wordmark is what gives way, and it gives way by ellipsis rather than by
       // overflowing — which is the property, so it is the assertion.
-      expect(find.text(const HomeStrings.en().wordmark), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().homeWordmark), findsOneWidget);
     });
   });
 
@@ -1013,7 +1041,7 @@ void main() {
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
           child: HomePage(bloc: h.bloc),
         ),

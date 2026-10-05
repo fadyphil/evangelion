@@ -70,7 +70,7 @@ enum ReadingLanguage {
   /// nothing else, so a code reaching this function is one of those two unless
   /// the app has been misconfigured — and `MaterialApp` resolves an unlisted
   /// locale back to the first supported one before a screen ever reads it. The
-  /// fallback is therefore the same one `LoginStrings.of` already makes, for the
+  /// fallback is therefore the same one `gen_l10n` already makes, for the
   /// same reason, with the same wording in its doc: it exists for a widget pumped
   /// outside a `MaterialApp`, which several suites do.
   ///

@@ -57,7 +57,7 @@ class FeedbackBanner extends StatelessWidget {
   /// Which way it went.
   final FeedbackTone tone;
 
-  /// What it says. The **caller's** string — `QuizStrings.verdictCorrect` or
+  /// What it says. The **caller's** string — `AppLocalizations.quizVerdictCorrect` or
   /// `verdictIncorrect`, and §14's rule plus decision 78's precedent are why: a
   /// hard-coded English string in `core/` is the half-translated UI this app exists
   /// not to ship.

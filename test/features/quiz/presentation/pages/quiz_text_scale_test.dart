@@ -50,9 +50,10 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
-import 'package:evangelion/features/quiz/presentation/quiz_strings.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,7 +79,7 @@ void main() {
       _expectNoOverflow(tester, screen: 'ready (en)');
       // The visible part of the question, and the CTA beside it.
       expect(find.byType(QuizOptionCard), findsWidgets);
-      expect(find.text(const QuizStrings.en().checkAnswer), findsOneWidget);
+      expect(find.text(AppLocalizationsEn().quizCheckAnswer), findsOneWidget);
     });
 
     testWidgets('ready, Arabic — a taller script for the same box', (
@@ -204,7 +205,7 @@ void main() {
         );
 
         expect(
-          find.text(const QuizStrings.en().unavailableSuffix),
+          find.text(AppLocalizationsEn().quizUnavailableSuffix),
           findsOneWidget,
         );
         _expectNoOverflow(tester, screen: 'dead end (en)');
@@ -227,7 +228,7 @@ void main() {
       );
 
       expect(
-        find.text(const QuizStrings.ar().unavailableSuffix),
+        find.text(AppLocalizationsAr().quizUnavailableSuffix),
         findsOneWidget,
       );
       _expectNoOverflow(tester, screen: 'dead end (ar)');
