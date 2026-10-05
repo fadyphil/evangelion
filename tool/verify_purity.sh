@@ -257,7 +257,17 @@ else
   dart run tool/feature_import_check.dart >"$TMP_CAPTURE" || gate2_rc=$?
   case $gate2_rc in
     0)
-      ok "no feature imports another feature"
+      # The tool's own line, which names every owner the pass actually reached.
+      # `lib/app/` is excluded on purpose (see `feature_import_check.dart`'s
+      # `_ownerOf`), so a directory nobody claimed cannot fail this gate — it can
+      # only be *absent from this line*, which is what makes it reviewable.
+      # Relayed the way Gate 4 relays its own summary, rather than restated, so
+      # the two cannot disagree.
+      if [[ ! -s "$TMP_CAPTURE" ]]; then
+        printf 'FATAL: gate 2 reported clean but printed no owner summary\n' >&2
+        exit 2
+      fi
+      ok "$(tr -d '\n' <"$TMP_CAPTURE")"
       ;;
     1)
       # Exit 1 means "violations found", so there must be something to report.

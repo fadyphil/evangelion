@@ -148,6 +148,32 @@ class QuizOptionCard extends StatelessWidget {
   /// `ds.tsx:435` — `border: '1.5px solid …'`.
   static const double rimBorderWidth = 1.5;
 
+  /// The glyph for a graded verdict, or `null` — see the call site.
+  ///
+  /// **A method rather than two constants inline**, for `reading_geometry_test.dart`'s
+  /// argument: `ds.tsx` has no icon here to transcribe — `ds.tsx:437` and `:440` carry
+  /// only the border, the fill and the glow — so both glyphs are **written**, and
+  /// written as *shapes* rather than as colours for the reason in the call site's
+  /// comment. A method also keeps this widget's vocabulary of verdicts in one
+  /// exhaustive `switch` over the enum, so a fifth state is a compile error here
+  /// rather than a missing glyph at runtime.
+  ///
+  /// `Icons.cancel_outlined` for the wrong answer rather than `Icons.close`, because a
+  /// bare `×` reads as "dismiss this card" and this card dismisses nothing.
+  static IconData? verdictGlyphFor(QuizOptionState state) => switch (state) {
+    QuizOptionState.correct => Icons.check_circle_outline,
+    QuizOptionState.incorrect => Icons.cancel_outlined,
+    QuizOptionState.idle || QuizOptionState.selected => null,
+  };
+
+  /// The verdict glyph's size.
+  ///
+  /// `EvaSpacing.xxl` (24) — the letter badge's `30` is that badge's own box, and this
+  /// glyph sits beside it rather than inside it. **No prototype number**, and the card
+  /// keeps its 64px minimum height, so the glyph cannot grow it: 24 against a 64 row
+  /// leaves the option text's own line box dominant.
+  static const double verdictGlyphSize = EvaSpacing.xxl;
+
   /// The letter's size. `ds.tsx:450` — `fontSize: 12`.
   static const double letterFontSize = 12;
 
@@ -288,85 +314,126 @@ class QuizOptionCard extends StatelessWidget {
     final Color? accent = accentFor(state, colors);
     final bool interactive = enabled && onTap != null;
 
+    // ## THE `Semantics` IS **ABOVE** `EvaFocusRing`, AND IT WAS NOT
+    //
+    // The first version nested it *inside* — `Semantics(…) > DecoratedBox`, with
+    // `EvaFocusRing > EvaInk` wrapping that. Measured on the pumped tree, the result
+    // was **two tappable nodes per card**, one of them unnamed:
+    //
+    // ```text
+    // lbl="A. Nicodemus"  acts=[tap]              ← the Semantics
+    // lbl=""              acts=[tap, focus]        ← the InkWell, and it has no name
+    // ```
+    //
+    // `excludeSemantics: true` drops a node's **descendants**, never its ancestors, so
+    // it could not reach the `InkWell` above it. And `Semantics(button: true)` forms
+    // a boundary, so the `InkWell` could not merge the labelled node up into itself
+    // either — leaving an unnamed activatable node per option, which is §14's first
+    // row verbatim and the thing a screen-reader user meets *before* the one that is
+    // named. A sweep over `/quiz`'s tree is what found it; no existing assertion on
+    // this widget looked at the whole tree, and `quiz_option_card_test.dart`'s own
+    // comment had already recorded that "`EvaFocusRing` and `EvaInk` add nodes of
+    // their own" without following it anywhere.
+    //
+    // Hoisting the `Semantics` above the ring makes `excludeSemantics: true` mean what
+    // it says — one node, carrying the name, the `enabled` flag and the tap action —
+    // while `EvaInk`'s **focus** node is untouched, because focus and semantics are
+    // separate mechanisms and `focus_ring_gate_test.dart` still sees its Tab stop.
     final Widget surface = Opacity(
       // `ds.tsx:437` — the dimming is on the whole card, including its badge.
       opacity: dimmed ? dimmedOpacity : 1,
-      child: Semantics(
-        // §14's disabled row, `SocialAuthButton`'s shape: `enabled` is stated,
-        // `onTap` is **absent** rather than present-and-flagged, and the name
-        // carries the reason (built by `QuizStringsPhrases.optionLabel`).
-        button: true,
-        enabled: enabled,
-        label: semanticLabel,
-        excludeSemantics: true,
-        onTap: interactive ? onTap : null,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            // `ds.tsx:425` — accent at 0.09, else the resting tint.
-            color: accent == null
-                ? colors.glassFill
-                : accent.withValues(alpha: accentFillAlpha),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              // `ds.tsx:426` — the accent, else the resting rim.
-              color: accent ?? colors.glassBorder,
-              width: rimBorderWidth,
-            ),
-            boxShadow: <BoxShadow>[
-              // `ds.tsx:440` — the accent glow plus an inset highlight. The
-              // resting card has the weaker inset only, so the two are the same
-              // expression with a different second term rather than two branches.
-              if (accent != null)
-                BoxShadow(
-                  color: accent.withValues(alpha: accentGlowAlpha),
-                  blurRadius: accentGlowBlur,
-                ),
-              BoxShadow(
-                color: colors.canvas.withValues(
-                  alpha: accent == null
-                      ? restingInsetHighlightAlpha
-                      : insetHighlightAlpha,
-                ),
-                offset: const Offset(0, 1),
-              ),
-            ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          // `ds.tsx:425` — accent at 0.09, else the resting tint.
+          color: accent == null
+              ? colors.glassFill
+              : accent.withValues(alpha: accentFillAlpha),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            // `ds.tsx:426` — the accent, else the resting rim.
+            color: accent ?? colors.glassBorder,
+            width: rimBorderWidth,
           ),
-          child: Padding(
-            padding: padding,
-            child: ConstrainedBox(
-              // `ds.tsx:434` — `minHeight: 64`. A constraint and not a `SizedBox`,
-              // so a two-line Arabic label at 1.22× grows the card instead of
-              // overflowing it — §14's requirement, and the reason this is not
-              // transcribed as a fixed height.
-              constraints: const BoxConstraints(minHeight: minHeight),
-              child: Row(
-                children: <Widget>[
-                  _Badge(
-                    letter: letter,
-                    state: state,
-                    accent: accent,
-                    colors: colors,
-                    brightness: Theme.of(context).brightness,
-                  ),
-                  const SizedBox(width: gap),
-                  Expanded(
-                    child: Text(
-                      text,
-                      // `ds.tsx:455` — `F.ui, 15, 400, lineHeight 1.4`.
-                      //
-                      // **The family is the PAYLOAD arm, not the ambient one.** The
-                      // option text is the server's scripture, fetched in the
-                      // language the session was opened in, and decision 75's table
-                      // says a payload run's arm comes from the payload. So this
-                      // takes [language] rather than reading
-                      // `Directionality.of(context)` — which is what
-                      // `SocialAuthButton`'s `arabicAware` does, correctly, for a
-                      // chrome label with no payload behind it.
-                      style: optionStyleFor(context, language),
-                    ),
-                  ),
-                ],
+          boxShadow: <BoxShadow>[
+            // `ds.tsx:440` — the accent glow plus an inset highlight. The
+            // resting card has the weaker inset only, so the two are the same
+            // expression with a different second term rather than two branches.
+            if (accent != null)
+              BoxShadow(
+                color: accent.withValues(alpha: accentGlowAlpha),
+                blurRadius: accentGlowBlur,
               ),
+            BoxShadow(
+              color: colors.canvas.withValues(
+                alpha: accent == null
+                    ? restingInsetHighlightAlpha
+                    : insetHighlightAlpha,
+              ),
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: padding,
+          child: ConstrainedBox(
+            // `ds.tsx:434` — `minHeight: 64`. A constraint and not a `SizedBox`,
+            // so a two-line Arabic label at 1.22× grows the card instead of
+            // overflowing it — §14's requirement, and the reason this is not
+            // transcribed as a fixed height.
+            constraints: const BoxConstraints(minHeight: minHeight),
+            child: Row(
+              children: <Widget>[
+                _Badge(
+                  letter: letter,
+                  state: state,
+                  accent: accent,
+                  colors: colors,
+                  brightness: Theme.of(context).brightness,
+                ),
+                const SizedBox(width: gap),
+                Expanded(
+                  child: Text(
+                    text,
+                    // `ds.tsx:455` — `F.ui, 15, 400, lineHeight 1.4`.
+                    //
+                    // **The family is the PAYLOAD arm, not the ambient one.** The
+                    // option text is the server's scripture, fetched in the
+                    // language the session was opened in, and decision 75's table
+                    // says a payload run's arm comes from the payload. So this
+                    // takes [language] rather than reading
+                    // `Directionality.of(context)` — which is what
+                    // `SocialAuthButton`'s `arabicAware` does, correctly, for a
+                    // chrome label with no payload behind it.
+                    style: optionStyleFor(context, language),
+                  ),
+                ),
+                // ## §14'S "PAIR THE COLOUR WITH AN ICON", WHICH WAS THE HALF
+                // ## `/quiz` NEVER HAD
+                //
+                // §14's last row reads: *"Colour-only state (quiz correct/incorrect) —
+                // pair the colour with an icon and a semantics label."* The
+                // **semantics label** half has been here since Phase 7
+                // (`quizCorrectSuffix` / `quizIncorrectSuffix`, composed by
+                // `AppLocalizations.optionLabel`), and `quiz_option_card_test.dart`
+                // holds it. The **icon** half did not exist: the card drew the accent
+                // border, the accent fill and the accent glow, and nothing with a
+                // shape. A reader who cannot separate `ok` from `err` — a
+                // colour-blind reader, or one on a greyscale panel — was told nothing,
+                // and §14's row is about exactly that reader.
+                //
+                // **Derived from [state], which is what makes it spoiler-safe.**
+                // `state` is this widget's own field and nothing else, so the glyph
+                // can appear only where the accent already appears; and
+                // `quiz_page_test.dart`'s "the widget tree carries nothing that says
+                // which option is right" asserts every card is `idle` from that one
+                // field, so a leak would have to change `state` first and would be
+                // caught there before it could reach an icon.
+                if (verdictGlyphFor(state)
+                    case final IconData glyph) ...<Widget>[
+                  const SizedBox(width: gap),
+                  Icon(glyph, size: verdictGlyphSize, color: accent),
+                ],
+              ],
             ),
           ),
         ),
@@ -392,16 +459,32 @@ class QuizOptionCard extends StatelessWidget {
     // is `null` because this card's **resting** border is already painted by the
     // `DecoratedBox` above — drawing it twice would be the same defect `GlassSurface`
     // records in its own comment.
-    if (!interactive) return surface;
-    return EvaFocusRing(
-      enabled: true,
-      idleBorder: null,
-      radius: radius,
-      child: EvaInk(
-        onPressed: onTap,
-        borderRadius: BorderRadius.circular(radius),
-        child: surface,
-      ),
+    final Widget pressable = interactive
+        ? EvaFocusRing(
+            enabled: true,
+            idleBorder: null,
+            radius: radius,
+            child: EvaInk(
+              onPressed: onTap,
+              borderRadius: BorderRadius.circular(radius),
+              child: surface,
+            ),
+          )
+        : surface;
+
+    return Semantics(
+      // §14's disabled row, `SocialAuthButton`'s shape: `enabled` is stated,
+      // `onTap` is **absent** rather than present-and-flagged, and the name
+      // carries the reason (built by `AppLocalizations.optionLabel`).
+      button: true,
+      enabled: enabled,
+      label: semanticLabel,
+      // The whole point of the hoist: this drops the card's **entire** subtree — the
+      // badge, the option text, and the ring's and the ink's own nodes — so the one
+      // node that survives is the one with the name on it.
+      excludeSemantics: true,
+      onTap: interactive ? onTap : null,
+      child: pressable,
     );
   }
 

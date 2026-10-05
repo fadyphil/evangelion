@@ -30,6 +30,20 @@ const List<double> _probeHeights = <double>[568, 844];
 /// and an `Align` inside the default 800×600 test window silently clamps a
 /// taller page to 600.
 ///
+/// ## THE `MediaQuery` IS INSTALLED UNCONDITIONALLY, AND THAT IS THE POINT
+///
+/// [disableAnimations] defaults to `false`, which is what the platform's own
+/// default is, so every pre-existing probe in this file is unchanged by its
+/// presence — but the wrapper is not conditional on the flag. A `MediaQuery`
+/// that appears only when the test wants it to see one is a probe that cannot
+/// distinguish "the flag is off" from "there was nothing to read", which is the
+/// same shape as a gate that cannot fail. The reduced-motion group below needs
+/// the off case to be a *measurement*, not an absence.
+///
+/// The [MediaQueryData] carries the real [size] rather than `MediaQueryData()`'s
+/// `Size.zero`, because a zero-sized `MediaQuery` is a second, unrelated way for
+/// a layout to be wrong and this file measures layouts.
+///
 /// ## THIS CALL IS ALSO THE SIGNATURE CHECK `AppRouter` DEPENDS ON
 ///
 /// `fadeSlide` is invoked here through the framework's own four-parameter shape,
@@ -51,6 +65,7 @@ Future<Offset> _pumpProbe(
   WidgetTester tester, {
   required double height,
   required double value,
+  bool disableAnimations = false,
   Widget child = const SizedBox.expand(),
 }) async {
   tester.view.devicePixelRatio = 1;
@@ -58,17 +73,23 @@ Future<Offset> _pumpProbe(
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    Directionality(
-      textDirection: TextDirection.ltr,
-      child: SizedBox(
-        height: height,
-        width: 400,
-        child: Builder(
-          builder: (BuildContext context) => EvaMotion.fadeSlide(
-            context,
-            AlwaysStoppedAnimation<double>(value),
-            const AlwaysStoppedAnimation<double>(0),
-            child,
+    MediaQuery(
+      data: MediaQueryData(
+        size: const Size(400, 568),
+        disableAnimations: disableAnimations,
+      ),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: SizedBox(
+          height: height,
+          width: 400,
+          child: Builder(
+            builder: (BuildContext context) => EvaMotion.fadeSlide(
+              context,
+              AlwaysStoppedAnimation<double>(value),
+              const AlwaysStoppedAnimation<double>(0),
+              child,
+            ),
           ),
         ),
       ),
@@ -314,6 +335,185 @@ void main() {
       await _pumpProbe(tester, height: 844, value: 0);
 
       expect(find.byType(FractionalTranslation), findsOneWidget);
+    });
+  });
+
+  /// §14's row for this transition: *"Animations ignore reduced-motion — every
+  /// animation checks `MediaQuery.disableAnimationsOf(context)`; when disabled,
+  /// jump straight to the end state."*
+  ///
+  /// ## WHY THIS GROUP IS **THE** GAP AND NOT ONE OF SEVEN
+  ///
+  /// `09-quality-gates.md` §14's row is universal, so Phase 10 enumerated every
+  /// animation site rather than assuming. Seven sites, six of which already
+  /// honoured the flag before this phase:
+  ///
+  /// | site | file:line | honoured |
+  /// | --- | --- | --- |
+  /// | orb float / hue / aurora clocks | `neural_motion.dart:324` | yes — `platformDispatcher`, because the scope sits **above** `MaterialApp` and there is no `MediaQuery` to read |
+  /// | `NeuralBackground` painting | `neural_background.dart:110` | yes |
+  /// | `GoldFlecks` painting | `gold_flecks.dart:68` | yes |
+  /// | `EvaButton` pressed fill | `eva_button.dart:308` | yes |
+  /// | `EvaToggle` knob | `eva_toggle.dart:92` | yes |
+  /// | `SegmentedControl` track | `segmented_control.dart:135` | yes |
+  /// | **the global route transition** | **`eva_motion.dart:144`** | **no** |
+  ///
+  /// And it is the one a reader meets most: `AppRouter.defaultRouteType` installs
+  /// this builder **app-wide**, so every one of the six screens arrives with a
+  /// 250ms fade and an 8px slide whether or not the reader asked for reduced
+  /// motion. The other six sites are per-widget or per-clock; this one is the
+  /// transition *between* screens, which is the first thing that moves on every
+  /// navigation the reader makes.
+  ///
+  /// ## THE IMPLEMENTATION'S OWN DOC STATED THE VIOLATION AS ITS REASON
+  ///
+  /// `fadeSlide`'s doc read: *"The `BuildContext` is taken because the typedef
+  /// carries one; nothing here reads from it."* That sentence is what §14's row
+  /// forbids, written down as if it were a design note. The `BuildContext` is
+  /// there because a `RouteTransitionsBuilder` receives one, and a route
+  /// transition **is** below `MaterialApp.builder` — so
+  /// `MediaQuery.disableAnimationsOf` is reachable from it, which the previous
+  /// doc never checked. Contrast `neural_motion.dart:259-268`, which *did* check
+  /// reachability before recording a reason, and corrected its own earlier claim
+  /// when it found the reason was wrong.
+  group('reduced motion — §14\'s row, and the one site that did not', () {
+    testWidgets('with the flag on, t=0 is already the END state', (
+      WidgetTester tester,
+    ) async {
+      // ## RED-FIRST, AND THE MUTATION IS THE WHOLE ARGUMENT
+      //
+      // This was written before the implementation changed and failed on both
+      // assertions, with the real numbers: travel `8.0` where `0.0` was
+      // required, and opacity `0.0` where `1.0` was required. An implementation
+      // that simply returned `child` when animations are off would pass these
+      // two — and would break `emits exactly one FractionalTranslation` and
+      // `wraps the page rather than replacing it` in the group above, which is
+      // why the end state is reached by substituting the animation instead of by
+      // dropping the widgets.
+      await _pumpProbe(tester, height: 844, value: 0, disableAnimations: true);
+
+      expect(
+        _renderedTravelPx(tester),
+        0.0,
+        reason:
+            '§14 says "jump straight to the end state". At t=0 with animations '
+            'off the page must already be where it is at t=1, which is no '
+            'travel at all.',
+      );
+      expect(
+        tester
+            .widget<FadeTransition>(find.byType(FadeTransition))
+            .opacity
+            .value,
+        1.0,
+        reason: 'and fully opaque — an invisible page is the other end state',
+      );
+    });
+
+    testWidgets('and it is the SAME end state the animation reaches at t=1', (
+      WidgetTester tester,
+    ) async {
+      // Not "close to zero" — the identical numbers. A version that snapped the
+      // slide to `Offset.zero` but left a residual opacity, or eased to a
+      // different point on the curve, would pass the first test and fail here.
+      await _pumpProbe(tester, height: 844, value: 1);
+      final double restingOpacity = tester
+          .widget<FadeTransition>(find.byType(FadeTransition))
+          .opacity
+          .value;
+      final double restingTravel = _renderedTravelPx(tester);
+
+      await _pumpProbe(tester, height: 844, value: 0, disableAnimations: true);
+
+      expect(
+        tester
+            .widget<FadeTransition>(find.byType(FadeTransition))
+            .opacity
+            .value,
+        restingOpacity,
+      );
+      expect(_renderedTravelPx(tester), restingTravel);
+      expect(restingOpacity, 1.0, reason: 'sanity: a completed fade is opaque');
+      expect(
+        restingTravel,
+        0.0,
+        reason: 'sanity: a completed slide is at rest',
+      );
+    });
+
+    testWidgets(
+      'the widget shape is unchanged — it still wraps and still slides',
+      (WidgetTester tester) async {
+        // The negative control on the implementation choice. "Jump straight to the
+        // end state" is satisfied by `return child`, and that version throws away
+        // the transition widgets — which `emits exactly one FractionalTranslation`
+        // and `wraps the page rather than replacing it` above would both catch, but
+        // only for the flag-OFF case, so they do not cover this branch on their
+        // own. Asserted here so the reduced-motion branch is held to the same
+        // shape as the animated one.
+        await _pumpProbe(
+          tester,
+          height: 844,
+          value: 0,
+          disableAnimations: true,
+          child: const Text('the page', textDirection: TextDirection.ltr),
+        );
+
+        expect(find.text('the page'), findsOneWidget);
+        expect(find.byType(FadeTransition), findsOneWidget);
+        expect(find.byType(SlideTransition), findsOneWidget);
+        expect(find.byType(FractionalTranslation), findsOneWidget);
+      },
+    );
+
+    testWidgets('and the flag OFF is unchanged — the control', (
+      WidgetTester tester,
+    ) async {
+      // The anti-vacuity half, and the test that would go red if the fix were
+      // made by ignoring [animation] unconditionally. `value: 0` with the flag off
+      // must still be the **beginning** of the transition: all eight pixels of
+      // travel, fully transparent. A builder that substituted
+      // `kAlwaysCompleteAnimation` outside the `if` would render the end state
+      // here too and pass the three tests above.
+      await _pumpProbe(tester, height: 844, value: 0);
+
+      expect(
+        _renderedTravelPx(tester),
+        closeTo(EvaMotion.screenSlidePixels, 1e-9),
+      );
+      expect(
+        tester
+            .widget<FadeTransition>(find.byType(FadeTransition))
+            .opacity
+            .value,
+        0.0,
+      );
+    });
+
+    testWidgets('and it follows the flag when the flag changes', (
+      WidgetTester tester,
+    ) async {
+      // Read from the **ambient** `MediaQuery` rather than from a parameter, so
+      // this also asserts the value is re-read per build. A `final bool` captured
+      // once in a `State` — or a value cached on the builder's closure — would
+      // keep rendering the old answer after a reader toggles the OS setting
+      // mid-session, which is the case `neural_motion.dart:270-280` is explicit
+      // about ("a reader toggling the OS setting mid-session is honoured without
+      // a restart").
+      await _pumpProbe(tester, height: 844, value: 0);
+      expect(
+        _renderedTravelPx(tester),
+        closeTo(EvaMotion.screenSlidePixels, 1e-9),
+      );
+
+      await _pumpProbe(tester, height: 844, value: 0, disableAnimations: true);
+      expect(_renderedTravelPx(tester), 0.0);
+
+      await _pumpProbe(tester, height: 844, value: 0);
+      expect(
+        _renderedTravelPx(tester),
+        closeTo(EvaMotion.screenSlidePixels, 1e-9),
+      );
     });
   });
 }
