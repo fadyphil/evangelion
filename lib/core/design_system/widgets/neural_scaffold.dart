@@ -245,23 +245,60 @@ class NeuralScaffold extends StatelessWidget {
 
 /// How tall the sticky-CTA scrim is for [constraints].
 ///
-/// `ReadingEnScreen.tsx:26` gives the content `padding: '28px 24px 130px'`, and
-/// `:80-86` puts a `20px 24px 32px` CTA over the bottom of it. The two together
-/// are 182px on a 390-wide screen — the number the prototype's scrim actually
-/// covers. A constant would be wrong on every other screen, so this scales the
-/// prototype's 130px content reserve with the viewport and adds the CTA's own
-/// `20 + 52 + 32 = 104`.
+/// `ReadingEnScreen.tsx:79-86` sets the sticky CTA's `background` to the gradient,
+/// so **the scrim's extent is that CTA** — `20` top padding, the button, the
+/// caption's `marginTop: 8`, and `32` bottom padding — which is `20 + 52 + 8 + 10 +
+/// 32`, recorded here as `104`. It is **not** the content's `130px` bottom padding
+/// from `:26`; that lives on the sibling scroll div and is a *reserve for the
+/// reader*, not the height of anything the prototype paints. Summing the two is
+/// what made the shade reach opaque over the last line of the passage.
 ///
-/// The `0.4` factor is `130 / (130 + 52 + 8)`: the prototype's screen is 390 wide
-/// and its `ds.tsx` numbers are the only ones that exist, so 390 is the width the
-/// transcription is calibrated against and other widths are interpolated from it
-/// rather than measured.
+/// A constant would be wrong on every other screen, so it scales with the
+/// viewport. The prototype's screen is 390 wide and its `ds.tsx` numbers are the
+/// only ones that exist, so 390 is the width the transcription is calibrated
+/// against and other widths are interpolated from it rather than measured.
+///
+/// **What must hold at every width**, and is what `neural_scaffold_test.dart` now
+/// asserts rather than this function's own arithmetic: because `stops: [0, 0.40]`
+/// makes the scrim opaque `60%` of its own height above the bottom edge,
+/// `kNeuralScaffoldFadeHeight(w) * 0.60` has to stay **inside** the content's
+/// reserve or the last verses are painted over.
 double kNeuralScaffoldFadeHeight(BoxConstraints constraints) {
   const double prototypeWidth = 390;
-  const double contentReserve = 130;
   const double ctaBlock = 104;
   final double scale = constraints.maxWidth > 0
       ? constraints.maxWidth / prototypeWidth
       : 1.0;
-  return (contentReserve * scale) + ctaBlock;
+  // ## THE CONTENT RESERVE IS **NOT** PART OF THIS SUM, AND ADDING IT WAS A BUG
+  //
+  // This used to be `(contentReserve * scale) + ctaBlock`, reading its own doc's
+  // phrase "the CTA's height plus that padding" as a licence to sum the content's
+  // 130px bottom padding into the scrim. Those are two different quantities and
+  // the prototype keeps them apart: `ReadingEnScreen.tsx:79-86` puts the gradient
+  // in the `background` of the sticky-CTA `<div>` itself, so the gradient's extent
+  // is **that div** — `20px` top padding, the button, the caption's `marginTop: 8`,
+  // and `32px` bottom padding — and never the content's reserve. The content's
+  // `padding: '28px 24px 130px'` lives on the *sibling* scroll div at `:26`.
+  //
+  // ## WHAT THE OLD SUM ACTUALLY DID TO A READER
+  //
+  // `stops: [0, 0.40]` means the scrim is **fully opaque 60% of its own height
+  // above the bottom edge**, so a taller scrim does not merely fade further up —
+  // it reaches opaque *higher*, and it reached opaque higher than the content is
+  // reserved. At the prototype's own 390×844 the old answer was 234, so the
+  // opaque region began 140px above the bottom while the content stopped at 130:
+  // **the last 10px of the passage sat under solid canvas**, and the verse the
+  // reader had just reached was the verse that disappeared. At 320 the deficit
+  // widens to ~20px, because both terms shrink but the opaque fraction does not.
+  //
+  // The correct sum is the CTA block alone. At 390 that is 104, opaque from 62px,
+  // comfortably inside the 130 the content reserves — which is the relationship
+  // the prototype has and this one did not.
+  //
+  // `neural_scaffold_test.dart` could not catch it: it asserts `wide > narrow` and
+  // that the rendered height equals this function's answer. Both hold for the old
+  // formula, because a wrong answer asked of itself is always consistent. The gate
+  // now pins the *relationship* — opaque start must stay inside the content
+  // reserve — rather than this number's provenance.
+  return ctaBlock * scale;
 }
