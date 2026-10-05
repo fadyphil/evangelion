@@ -420,6 +420,38 @@ class _EvaTextFieldState extends State<EvaTextField> {
                           TextEditingValue value,
                           Widget? inner,
                         ) => Stack(
+                          // ## WHY `StackFit.expand`, AND WHY IT IS THE WHOLE FIX
+                          //
+                          // A reader reported that a typed run sat at the TOP of the
+                          // field while the placeholder it replaced sat in the
+                          // middle. Measured on the 52px shell: the placeholder
+                          // centres at y=433 and the typed run at y=419 — 14px
+                          // apart, the difference you see.
+                          //
+                          // The cause is not `contentPadding`, and fixing that alone
+                          // would have hidden the symptom rather than the cause.
+                          // `_FieldShell` hands its child a
+                          // `SizedBox(height: kEvaTextFieldHeight)`, but a `Stack`
+                          // **sizes itself to its largest non-positioned child** — so
+                          // the 52px was discarded and the row collapsed to its
+                          // intrinsic 24px line height, pinned to the top by the
+                          // `Stack`'s default `topStart` alignment. The
+                          // placeholder was unaffected because it centres itself
+                          // with `Align(centerStart)` inside whatever box it is
+                          // given, and the box it was given was the full 52.
+                          //
+                          // `expand` makes the row fill that same 52, which is what
+                          // `TextAlignVertical.center` on the `TextField` below
+                          // needs in order to mean anything: centring inside a 24px
+                          // row and centring inside the 52px field are different
+                          // answers, and only the second one matches the hint.
+                          //
+                          // Without this, `textAlignVertical: center` is a no-op in
+                          // practice — it centres within a box that was already the
+                          // wrong box. VERIFIED: restoring `StackFit.loose` puts the
+                          // typed run back at y=419 and turns both new assertions
+                          // red.
+                          fit: StackFit.expand,
                           children: <Widget>[
                             if (value.text.isEmpty)
                               _Placeholder(

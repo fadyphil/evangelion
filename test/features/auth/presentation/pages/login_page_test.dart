@@ -13,6 +13,7 @@ import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/auth/presentation/widgets/password_visibility_toggle.dart';
 import 'package:evangelion/features/auth/presentation/widgets/social_auth_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -572,6 +573,130 @@ void main() {
       handle.dispose();
     });
   });
+
+  group('a typed run sits where the placeholder was', () {
+    // A READER REPORTED THIS, and no assertion in this file would have caught it.
+    // `EvaTextField` sets `contentPadding: EdgeInsets.zero` with `isDense: true`,
+    // which leaves the `RenderEditable` no vertical inset at all, so a typed line
+    // sat at the TOP of the row — while `_Placeholder`, which draws the hint through
+    // `Align(AlignmentDirectional.centerStart)`, was centred. Empty fields looked
+    // correct because an empty row is one line tall and there is no gap to see; the
+    // moment a character arrived, the two disagreed.
+    //
+    // So this compares the SAME field before and after typing. That framing is the
+    // whole point: two rules that are each individually plausible can disagree, and
+    // an assertion about the field in isolation ("roughly centred in the viewport")
+    // would pass with the bug present on a taller row.
+    testWidgets('in the email field', (WidgetTester tester) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc);
+
+      // The hint's distance from the field's own centre, taken first.
+      final double hintOffset = _runOffsetFromFieldCentre(
+        tester,
+        find.text('you@example.com'),
+        _emailFinder,
+      );
+
+      await tester.enterText(_emailFinder, 'reader@example.com');
+      await tester.pump();
+
+      expect(
+        _typedRunOffsetFromFieldCentre(tester, _emailFinder),
+        closeTo(hintOffset, 1.0),
+        reason:
+            'the typed run and the hint it replaced must share a vertical '
+            'position inside the field, which is '
+            '${tester.getSize(_emailFinder).height}px tall here',
+      );
+    });
+
+    testWidgets('in the password field, whose row carries a trailing toggle', (
+      WidgetTester tester,
+    ) async {
+      // One field is not the other: the password row is taller because of the
+      // visibility toggle, so the two have separate geometry.
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc);
+
+      final double hintOffset = _runOffsetFromFieldCentre(
+        tester,
+        find.text('••••••••'),
+        _passwordFinder,
+      );
+
+      await tester.enterText(_passwordFinder, 'correct-horse');
+      await tester.pump();
+
+      expect(
+        _typedRunOffsetFromFieldCentre(tester, _passwordFinder),
+        closeTo(hintOffset, 1.0),
+      );
+    });
+  });
+}
+
+/// [run]'s distance from the vertical centre of the [field] containing it.
+///
+/// Measured from the FIELD's centre rather than as an absolute position, so the
+/// number is meaningful without knowing the field's height, and so one helper can
+/// describe both a hint and a typed value for comparison.
+double _runOffsetFromFieldCentre(
+  WidgetTester tester,
+  Finder run,
+  Finder field,
+) => (tester.getRect(run).center.dy - tester.getRect(field).center.dy).abs();
+
+/// The same distance for a **typed** value, which `find.text` cannot locate.
+///
+/// Both plain and obscured runs are painted by `RenderEditable` rather than by a
+/// `Text` widget, so asking for the bullets of an obscured field finds zero
+/// widgets — that was the first version of this test and it failed on the
+/// password field exactly that way. The caret rect is the honest instrument: it is
+/// drawn at the run's own line box, so its position *is* where a reader sees the
+/// glyphs, in either obscuring state.
+/// The [RenderEditable] inside [editable], which is not the one its finder returns.
+///
+/// `tester.renderObject(find.byType(EditableText))` yields a
+/// `_RenderCompositionCallback`, so casting it to `RenderEditable` throws a
+/// `_TypeError` instead of returning null — and `find.byType(RichText)` finds
+/// **nothing**, because the run is painted by the editable's own paragraph rather
+/// than by a `RichText` widget. Both were tried.
+///
+/// The real object is a **descendant**: Flutter wraps the editable in a chain of
+/// input and semantics layers between the widget and its render object — walked
+/// here as `_RenderCompositionCallback → RenderTapRegion → RenderMouseRegion →
+/// RenderPointerListener(×2) → RenderSemanticsAnnotations → RenderIgnorePointer →
+/// RenderLeaderLayer → _RenderSizeChangedWithCallback → RenderEditable`. The chain
+/// is walked rather than hard-coded to a depth, because a hard-coded depth is
+/// another number that goes stale when Flutter inserts a layer.
+RenderEditable _findRenderEditable(WidgetTester tester, Finder editable) {
+  RenderObject? node = tester.renderObject(editable.first);
+  while (node != null && node is! RenderEditable) {
+    final List<RenderObject> children = <RenderObject>[];
+    node.visitChildren(children.add);
+    node = children.isEmpty ? null : children.first;
+  }
+  expect(
+    node,
+    isA<RenderEditable>(),
+    reason: 'no RenderEditable below $editable',
+  );
+  return node! as RenderEditable;
+}
+
+double _typedRunOffsetFromFieldCentre(WidgetTester tester, Finder field) {
+  final RenderEditable editable = _findRenderEditable(
+    tester,
+    find.descendant(of: field, matching: find.byType(EditableText)),
+  );
+  // The caret ahead of the first character; it shares the run's vertical
+  // position, which is the property under test.
+  final Rect caret = editable.getLocalRectForCaret(
+    const TextPosition(offset: 0),
+  );
+  final Offset centre = editable.localToGlobal(caret.center);
+  return (centre.dy - tester.getRect(field).center.dy).abs();
 }
 
 /// A port a test can disagree with.

@@ -361,6 +361,53 @@ void main() {
         reason: "the rendered height is the resolver's answer, not a constant",
       );
     });
+
+    testWidgets('the OPAQUE part stays inside the content reserve', (
+      WidgetTester tester,
+    ) async {
+      // THE TEST THAT WAS MISSING, and the reason the shade covered the verses.
+      //
+      // `stops: [0, 0.40]` means the gradient reaches full opacity 60% of its OWN
+      // height above the bottom edge — so the height of the scrim and the height
+      // at which it becomes opaque are two different numbers, and only the second
+      // one decides whether a reader can read the last line of the passage.
+      //
+      // The test directly above cannot see any of this. It asserts `wide > narrow`
+      // and that the rendered height equals `kNeuralScaffoldFadeHeight(...)` — and
+      // both hold for the *wrong* formula too, because a function asked to confirm
+      // its own output is always self-consistent. That formula added the content's
+      // 130px reserve into the scrim's extent, giving 234px at 390 wide, so the
+      // opaque region began 140.4px above the bottom while the content stopped at
+      // 130: the final ~10px of scripture sat under solid `canvas`. VERIFIED —
+      // restoring the old sum makes this test red at all three widths below.
+      //
+      // The assertion is the RELATIONSHIP, not a number, so it holds at any width
+      // and cannot be satisfied by re-deriving the same mistake.
+      const double contentReserve = 130; // ReadingEnScreen.tsx:26
+      const double opaqueFraction = 1 - 0.40; // stops: [0, 0.40]
+
+      for (final double width in <double>[320, 390, 430]) {
+        await pumpAt(
+          tester,
+          scaffold(bottomFade: true),
+          size: Size(width, width == 320 ? 568 : (width == 390 ? 844 : 932)),
+        );
+        final double height = kNeuralScaffoldFadeHeight(
+          BoxConstraints(maxWidth: width),
+        );
+        final double opaqueStart = height * opaqueFraction;
+
+        expect(
+          opaqueStart,
+          lessThanOrEqualTo(contentReserve),
+          reason:
+              'at ${width.toInt()}px wide the scrim is ${height.toStringAsFixed(1)}px '
+              'tall and is fully opaque from ${opaqueStart.toStringAsFixed(1)}px '
+              'above the bottom, but the content only reserves '
+              '${contentReserve.toInt()}px — the last verses would be painted over',
+        );
+      }
+    });
   });
 
   group('ambient layering', () {
