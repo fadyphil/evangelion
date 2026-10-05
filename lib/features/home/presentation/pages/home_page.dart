@@ -361,9 +361,17 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
               initials: state.readerInitials ?? '',
               avatarSemanticLabel: state.readerName ?? strings.homeAvatarLabel,
               avatarUnavailableReason: strings.homeUnavailableSuffix,
-              // `null` — see [AppTopBar.onAvatarTap]: the prototype navigates to
-              // `profile` and §2 decision 1 cut it.
-              onAvatarTap: null,
+              // **Live since Phase 9.** It was `null` for four phases, with
+              // [AppTopBar.onAvatarTap]'s doc saying "When a profile route exists the
+              // fix is one argument here and nothing else changes" — and Phase 9 is
+              // what made a destination exist, `/settings`, without re-litigating
+              // decision 1's cut of the profile screen.
+              //
+              // So the avatar is the **only** entry point to `/settings` on `/`, which
+              // is why `app_top_bar_test.dart`'s header had to be rewritten: it said
+              // "`/` passes `onAvatarTap: null` and so can only ever render the
+              // **disabled** avatar", which was true when written and is false now.
+              onAvatarTap: () => context.router.pushPath(AppRoutes.settings),
             ),
             const SizedBox(height: HomePage.topGap),
             if (state.greetingPeriod case final GreetingPeriod period)

@@ -155,17 +155,25 @@ class AppTopBar extends StatelessWidget {
 
   /// What to run when the reader presses the avatar.
   ///
-  /// **Nullable, and `HomePage` passes `null`.** The prototype navigates to
-  /// `profile` and AGENT_CONTEXT §2 decision 1 **cut** the profile screen, so there
-  /// is no destination. Inventing one — `/settings` is the nearest live route — would
-  /// be a product decision this phase may not make, and a live control that reports
-  /// nothing teaches a reader that a button here sometimes answers with a message
-  /// about the app rather than about the task, which is exactly the reasoning
-  /// `LoginPage`'s four inert controls record.
+  /// ## IT WAS `null` FOR FOUR PHASES AND **PHASE 9 MADE IT LIVE**
   ///
-  /// So the avatar is **rendered and disabled**, with [avatarUnavailableReason]
-  /// appended to its accessible name so a screen-reader user is told *why*. When a
-  /// profile route exists the fix is one argument here and nothing else changes.
+  /// The prototype navigates to `profile` and AGENT_CONTEXT §2 decision 1 **cut** the
+  /// profile screen, so for four phases this was `null`, the avatar was rendered
+  /// **disabled**, and [avatarUnavailableReason] was appended to its accessible name
+  /// so a screen-reader user was told why. The parameter stays nullable — the
+  /// disabled arm is still the correct rendering for a control with no destination,
+  /// and `app_top_bar_test.dart` still exercises it.
+  ///
+  /// What changed is that **`HomePage` now passes a destination**: `/settings`, which
+  /// is the nearest live route and the one the phase plan names ("`AppTopBar`'s avatar
+  /// tap now opens `/settings`"). The earlier text here said inventing that would "be a
+  /// product decision this phase may not make" — correct then, because there was no
+  /// `/settings` to navigate to; the decision was made by the phase plan and this is
+  /// its implementation, not a fresh product call.
+  ///
+  /// **The unavailable-reason suffix stops being appended** while the control is
+  /// enabled, which is `build`'s `enabled ? avatarSemanticLabel : '… — …'` — so a
+  /// reader who taps the avatar and is told "unavailable in this build" cannot happen.
   final VoidCallback? onAvatarTap;
 
   /// `ds.tsx:514` — `gap: 14` between the streak group and the avatar.

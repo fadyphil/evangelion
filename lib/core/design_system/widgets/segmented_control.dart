@@ -337,9 +337,16 @@ class _Segment<T> extends StatelessWidget {
           textAlign: TextAlign.center,
           // `SettingsScreen.tsx:54-55` — `F.mono, 9, 700, letterSpacing 0.08em,
           // textTransform: uppercase, color: theme === opt ? hex.ember : T.ink3`.
-          style: EvaTypography.monoCaps(colors).copyWith(
-            color: selected ? colors.ember : colors.ink3,
-            fontWeight: FontWeight.w700,
+          // `arabicAware` for `/settings`'s theme control, whose three options are the
+          // first Arabic ever to pass through `monoCaps`: without it the gate reported
+          // `SpaceMono فاتح` — a Latin-only face asked for Arabic. `label.toUpperCase()`
+          // above is a no-op on Arabic (it has no case), so the string is untouched.
+          style: arabicAware(
+            EvaTypography.monoCaps(colors).copyWith(
+              color: selected ? colors.ember : colors.ink3,
+              fontWeight: FontWeight.w700,
+            ),
+            Directionality.of(context),
           ),
         ),
       ),

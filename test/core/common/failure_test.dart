@@ -16,6 +16,9 @@ const Set<String> _expectedKinds = <String>{
   'server',
   'serialization',
   'cancelled',
+  // Phase 9, with the settings feature: the local preference store, not a
+  // transport. See `FailureKind.storage`'s doc for why `network` was rejected.
+  'storage',
   'unknown',
 };
 
@@ -94,6 +97,7 @@ void main() {
         FailureKind.server => 'server',
         FailureKind.serialization => 'serialization',
         FailureKind.cancelled => 'cancelled',
+        FailureKind.storage => 'storage',
         FailureKind.unknown => 'unknown',
       };
 
