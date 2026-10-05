@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
@@ -13,6 +14,7 @@ import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/quiz/domain/refreshed_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
@@ -161,6 +163,94 @@ void main() {
           (field: 'alreadyAnswered', value: _question(alreadyAnswered: true)),
           (field: 'userAnswer', value: _question(userAnswer: 'A')),
           (field: 'isCorrect', value: _question(isCorrect: true)),
+        ],
+      );
+    });
+
+    test('`LeaderboardRow`', () {
+      _equalAndDistinct('LeaderboardRow', _row(), _row());
+      _differsInEveryField(
+        'LeaderboardRow',
+        _row(),
+        fields: 3,
+        variants: <({String field, LeaderboardRow value})>[
+          (field: 'rank', value: _row(rank: 2)),
+          (field: 'score', value: _row(score: 120)),
+          (field: 'initials', value: _row(initials: 'DM')),
+        ],
+      );
+    });
+
+    test('`LeaderboardStanding`', () {
+      _equalAndDistinct('LeaderboardStanding', _standing(), _standing());
+      _differsInEveryField(
+        'LeaderboardStanding',
+        _standing(),
+        fields: 2,
+        variants: <({String field, LeaderboardStanding value})>[
+          (field: 'rank', value: _standing(rank: 4)),
+          (field: 'score', value: _standing(score: 90)),
+        ],
+      );
+    });
+
+    test(
+      '`LeaderboardStanding`, and a null `rank` is a value not an absence',
+      () {
+        // The one field in `core/domain` whose equality has to distinguish "rank 0" from
+        // "no rank". If `rank` were dropped from `==`, a `Standing` with no position would
+        // compare equal to one in 0th place — which is the bug its doc names.
+        const LeaderboardStanding unranked = LeaderboardStanding(
+          rank: null,
+          score: 0,
+        );
+        expect(unranked, isNot(const LeaderboardStanding(rank: 0, score: 0)));
+        expect(unranked, const LeaderboardStanding(rank: null, score: 0));
+      },
+    );
+
+    test('`LeaderboardBoard`, and its `rows` compares by CONTENT', () {
+      // `LeaderboardBoard` is the **first entity in `core/domain` with a `List` field.**
+      // `result.dart` records that dropping Equatable made `Success<List<_>>` compare by
+      // identity, and warns that a collection-valued type is where the decision has to
+      // be written. freezed generates `DeepCollectionEquality` for collection fields, so
+      // the board compares by content — and the first two assertions below are what
+      // makes that a fact about this type rather than an assumption about freezed.
+      _equalAndDistinct('LeaderboardBoard', _board(), _board());
+      expect(_board(), _board());
+      expect(
+        _board(rows: <LeaderboardRow>[_row(), _row(rank: 2)]),
+        isNot(_board(rows: <LeaderboardRow>[_row()])),
+        reason: 'two rows and one row are different boards',
+      );
+      _differsInEveryField(
+        'LeaderboardBoard',
+        _board(),
+        fields: 4,
+        variants: <({String field, LeaderboardBoard value})>[
+          (field: 'window', value: _board(window: LeaderboardWindow.monthly)),
+          (field: 'groupId', value: _board(groupId: 4)),
+          (
+            field: 'rows',
+            value: _board(rows: <LeaderboardRow>[_row(), _row(rank: 2)]),
+          ),
+          (
+            field: 'standing',
+            value: _board(standing: _standing(rank: 1, score: 80)),
+          ),
+        ],
+      );
+    });
+
+    test('`LeaderboardQuery`, the params object, with no nullable field', () {
+      _equalAndDistinct('LeaderboardQuery', _query(), _query());
+      _differsInEveryField(
+        'LeaderboardQuery',
+        _query(),
+        fields: 2,
+        variants: <({String field, LeaderboardQuery value})>[
+          (field: 'window', value: _query(window: LeaderboardWindow.allTime)),
+          (field: 'limit', value: _query(limit: 50)),
         ],
       );
     });
@@ -653,12 +743,14 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(36),
+        hasLength(40),
         reason:
-            'the converted set moved. 19 classes, 14 events and 3 sealed bases is '
-            'what it now holds: the migration produced 17 classes, and Phase 9 added '
-            '`UserSettings` and `SettingsState`. If this number moved, the migration '
-            'or the phase moved and this file has to be told',
+            'the converted set moved. 23 classes, 14 events and 3 sealed bases is '
+            'what it now holds: the migration produced 17 classes, Phase 9 added '
+            '`UserSettings` and `SettingsState`, and Phase 1 added '
+            '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard` and '
+            '`LeaderboardQuery`. If this number moved, the migration or the phase '
+            'moved and this file has to be told',
       );
       for (final String name in _assertedTypeNames) {
         expect(
@@ -794,6 +886,12 @@ const Set<String> _assertedTypeNames = <String>{
   'TodayReading',
   'Question',
   'StreakSummary',
+  // Phase 1's four. `LeaderboardBoard` is the first entity in `core/domain` with a
+  // `List` field, so its `==` is asserted over list *contents* rather than assumed.
+  'LeaderboardRow',
+  'LeaderboardStanding',
+  'LeaderboardBoard',
+  'LeaderboardQuery',
   'SubmitResult',
   'AuthSession',
   'QuizAnswer',
@@ -955,6 +1053,34 @@ StreakSummary _streak({
   nextMilestone: _int(nextMilestone),
   daysToMilestone: _int(daysToMilestone),
 );
+
+/// A row whose initials come from `'Peter George (Grade 6)'`, the seeded name.
+LeaderboardRow _row({int rank = 1, int score = 80, String initials = 'PG'}) =>
+    LeaderboardRow(
+      rank: _int(rank),
+      score: _int(score),
+      initials: _text(initials),
+    );
+
+LeaderboardStanding _standing({int? rank = 2, int score = 50}) =>
+    LeaderboardStanding(rank: rank, score: _int(score));
+
+LeaderboardBoard _board({
+  LeaderboardWindow window = LeaderboardWindow.weekly,
+  int groupId = 3,
+  List<LeaderboardRow>? rows,
+  LeaderboardStanding? standing,
+}) => LeaderboardBoard(
+  window: window,
+  groupId: _int(groupId),
+  rows: rows ?? <LeaderboardRow>[_row()],
+  standing: standing,
+);
+
+LeaderboardQuery _query({
+  LeaderboardWindow window = LeaderboardWindow.weekly,
+  int limit = 3,
+}) => LeaderboardQuery(window: window, limit: _int(limit));
 
 SubmitResult _submit({
   String questionId = 'question-1',
