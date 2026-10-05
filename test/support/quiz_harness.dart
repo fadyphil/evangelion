@@ -162,6 +162,21 @@ ScriptureText arabicPassageWith(List<Question> questions) => ScriptureText(
   currentStreak: liveArabicQuizPassage.currentStreak,
 );
 
+/// [liveEnglishQuizPassage] carrying [verdictCarryingQuestion].
+///
+/// **Moved here from `quiz_page_test.dart` in Phase 10**, and the reason is that the
+/// fixture now has **two** callers in two files: the spoiler boundary there, and
+/// `quiz_accessibility_test.dart`'s "nothing carries the verdict before the reader
+/// commits" group. A sweep that walks the whole semantics tree is precisely the kind
+/// of read that can turn a label into a leak, so the boundary has to be asserted from
+/// there too — and a private fixture would have meant two transcriptions of "the
+/// open question that carries the answer key", which is the failure this fixture's
+/// own doc is about.
+Result<ScriptureText> get answerBearingQuizPassage =>
+    Result<ScriptureText>.success(
+      englishPassageWith(<Question>[verdictCarryingQuestion]),
+    );
+
 /// A passage whose **first** question is already answered and whose second is open.
 ///
 /// ## WHY THIS NEEDS TWO QUESTIONS TO EXIST

@@ -86,6 +86,8 @@
   "settingsReduceMotion": "Reduce motion",
   "settingsMotionOn": "On",
   "settingsMotionOff": "Off",
+  "settingsPreferencesUnavailable": "Your preferences could not be saved on this device.",
+  "settingsRetry": "Try again",
   "settingsReading": "Reading",
   "settingsDefaultLanguage": "Default language",
   "settingsLanguageSheetTitle": "Choose a language",
@@ -384,6 +386,12 @@
   },
   "@settingsAbout": {
     "description": "The third section label. Transcribed: SettingsScreen.tsx:107 writes `About` through the same local `SectionLabel`.\n\nThe group ships ONE row of the prototype's two: `SettingsScreen.tsx:118`'s Privacy policy is cut because it is a legal document with no URL, no screen and no endpoint, and an inert row that answers \"unavailable in this build\" is worse than no row at all for that particular question."
+  },
+  "@settingsPreferencesUnavailable": {
+    "description": "The notice shown when `SettingsStatus` is `failed`. **Written, not transcribed**, because the prototype has nothing to transcribe from: `eva/src` has no data layer and therefore no error state anywhere, and `SettingsScreen.tsx` cannot fail because every value on it is a `useState` in the same file. `homeRetry` makes the same argument for the same reason.\n\nTHE SENTENCE IS **NOT** `Failure.message`, and that is the point of this key existing. Every other `ErrorView` in this app shows the mapper's wording — `error_view.dart` states that `ApiErrorMapper` is the only source of a displayable failure message, and that claim is true of all three of them. `/settings` is the fourth call site and the first **non-network** one: `SettingsRepositoryImpl._unreachable` builds `'The preferences could not be reached: $error'`, which interpolates the raw Dart exception, so rendering it would put a `MissingPluginException` on a reader's screen. A developer string and a reader's sentence are different things and only one of them is translated here.\n\nWRITTEN AS ONE SENTENCE COVERING BOTH FAILURE ARMS, because the cubit reports a failed READ and a failed WRITE through one status and the reader cannot tell from the screen which happened. 'Your preferences could not be saved' is true of both — the read failed, so what is on screen is not what is stored, which is the same fact from the other side."
+  },
+  "@settingsRetry": {
+    "description": "The notice's action, which re-runs `SettingsCubit.load()`. **Written, not transcribed** — `SettingsScreen.tsx` has no error state and therefore no retry control, exactly as `homeRetry`, `quizRetry` and `readingRetry` do not.\n\nDeliberately the same sentence as those three, which is a pattern rather than a coincidence: `settingsBack` and `readingBack` share their wording for the same reason, and four independently-written keys saying 'Try again' in two languages is four translation decisions nobody made.\n\nNAMESPACED `settings*` because five features now carry this field name."
   },
   "@settingsVersion": {
     "description": "The version row's title. Transcribed: SettingsScreen.tsx:115 writes `Version`, with the value beside it.\n\nThe **value** is `AppConfig.appVersion`, not an ARB key, because it is not prose: it is `pubspec.yaml`'s own `version:` with a build suffix, and `settings_page_test.dart` parses `pubspec.yaml` and asserts the two agree. Putting it in this file would have been a number a translator could edit and nothing would check."

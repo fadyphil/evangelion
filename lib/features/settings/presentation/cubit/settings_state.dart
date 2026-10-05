@@ -47,9 +47,24 @@ enum SettingsStatus {
 ///
 /// So [settings] carries the **defaults** while loading and keeps them after a
 /// failure, and [status] says which of the two the reader is looking at. The cost is
-/// named: a reader whose store is unreachable sees the app in its default palette and
-/// is never told, because there is no surface on this screen for it (the failure is in
-/// [failure], which `/settings` does not draw — see its page for why).
+/// named: a reader whose store is unreachable sees the app in its default palette,
+/// and [failure] is the only record that it happened.
+///
+/// **AND THE COST IS PAID, SINCE PHASE 10 — [SettingsPage] reads `status`.** This
+/// paragraph used to end "and is never told, because there is no surface on this
+/// screen for it (the failure is in [failure], which `/settings` does not draw — see
+/// its page for why)", and the page it pointed at had no such reason: it is a
+/// dangling cross-reference, which is worse than an admitted gap because it reads as
+/// a settled decision. `/settings` drew nothing for [SettingsStatus.failed] through
+/// Phase 9, which was the one genuinely unwired async page of the six — `/`, `/reading`
+/// and `/quiz` each had an `ErrorView`, `/login` has no failure status at all, and
+/// `/result` cannot exist without a result.
+///
+/// [SettingsPage] now renders `_SettingsFailureNotice` above its groups when
+/// [status] is [SettingsStatus.failed], and that widget's doc gives the three measured
+/// reasons it is a notice and not an `ErrorView` — the load-bearing one being that a
+/// **failed write** springs the control the reader just tapped back to where it was,
+/// and replacing the form would have erased the cause of its own error.
 @freezed
 final class SettingsState with _$SettingsState {
   /// The reader's current preferences, with [status] saying whether they came from

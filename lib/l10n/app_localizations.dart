@@ -718,7 +718,7 @@ abstract class AppLocalizations {
   /// **'Font size'**
   String get settingsFontSize;
 
-  /// The stepper track's slider label, announced as a slider. The prototype has no accessible name for its `<input type="range">` at all (SettingsScreen.tsx:66), so this is §14's first row applied to a control the row does not name.
+  /// The stepper track's slider label, announced as a slider. **Written, not transcribed**: SettingsScreen.tsx:66 is the prototype's `<input type="range" min={1} max={5}>` and it carries **no accessible name at all**, so this is §14's first row applied to a control the row does not name.
   ///
   /// A distinct string from `settingsFontSize` because the two name the control from two positions — a row title and a slider — and `FontSizeStepperLabels`'s doc argues for exactly one value for its own three strings for the opposite reason.
   ///
@@ -726,7 +726,7 @@ abstract class AppLocalizations {
   /// **'Font scale'**
   String get settingsFontScale;
 
-  /// The stepper's decrement button's tooltip and accessible name. **Written, not transcribed** — the prototype's range input supplies its own stepper affordances with no labels of its own, so §14 required two names here that the prototype never wrote.
+  /// The stepper's decrement button's tooltip and accessible name. **Written, not transcribed**: SettingsScreen.tsx:66 supplies its own stepper affordances on a native `<input type="range">`, and a native input brings its own buttons with **no labels of its own**, so §14 required two names here that the prototype never wrote.
   ///
   /// Deliberately the same sentence as `readingDecreaseFontSize`: two screens draw the same control and a second wording would be a translation decision nobody made.
   ///
@@ -734,7 +734,7 @@ abstract class AppLocalizations {
   /// **'Decrease font size'**
   String get settingsDecreaseFontSize;
 
-  /// The stepper's increment button's tooltip and accessible name. Written, as `settingsDecreaseFontSize` says.
+  /// The stepper's increment button's tooltip and accessible name. **Written, not transcribed**, for `settingsDecreaseFontSize`'s reason: SettingsScreen.tsx:66's native range input carries its own `+` with no label.
   ///
   /// Deliberately the same sentence as `readingIncreaseFontSize`, for the same reason.
   ///
@@ -742,7 +742,7 @@ abstract class AppLocalizations {
   /// **'Increase font size'**
   String get settingsIncreaseFontSize;
 
-  /// The switch's row title. **NOT IN THE PROTOTYPE** — `SettingsScreen.tsx` has no motion row, and this control exists because AGENT_CONTEXT §14 asks for reduced motion and `app.dart` recorded that a later phase would replace the platform-only default with the persisted `UserSettings` value. This is that phase.
+  /// The switch's row title. **Written, not transcribed — and there is no prototype row to transcribe from**: `SettingsScreen.tsx` has no motion row at all. This control exists because AGENT_CONTEXT §14 asks for reduced motion and `app.dart` recorded that a later phase would replace the platform-only default with the persisted `UserSettings` value. This is that phase.
   ///
   /// Placed under APPEARANCE rather than READING because what it changes is how the app moves, not what it says.
   ///
@@ -750,7 +750,7 @@ abstract class AppLocalizations {
   /// **'Reduce motion'**
   String get settingsReduceMotion;
 
-  /// The switch's accessible name while it is on. Written, not transcribed: `EvaToggle` shipped hard-coding the English words `On` and `Off` for six phases, and no gate could see it because a semantics label is not painted — the Arabic glyph gate walks the painted tree. Phase 9 made the switch's labels required and this is the shipped spelling.
+  /// The switch's accessible name while it is on. **Written, not transcribed**: `EvaToggle` shipped hard-coding the English words `On` and `Off` into its `Semantics` node for six phases, and no gate could see it because a semantics label is not painted — the Arabic glyph gate walks the painted tree, and a golden captures no semantics. Phase 9 made the switch's labels required and this is the shipped spelling.
   ///
   /// The Arabic is a participle rather than a transliterated `On`, so the Arabic arm holds no Latin script and `app_localizations_test.dart`'s exception list does not grow.
   ///
@@ -758,13 +758,33 @@ abstract class AppLocalizations {
   /// **'On'**
   String get settingsMotionOn;
 
-  /// The switch's accessible name while it is off. Written, as `settingsMotionOn` says.
+  /// The switch's accessible name while it is off. **Written, not transcribed**, as `settingsMotionOn` says — and `EvaToggle` is the widget that used to hard-code the English.
   ///
   /// `Off` and `On` are the words a screen reader has to distinguish to answer "is animation on?", so neither value may be empty and neither may be the other's translation of itself.
   ///
   /// In en, this message translates to:
   /// **'Off'**
   String get settingsMotionOff;
+
+  /// The notice shown when `SettingsStatus` is `failed`. **Written, not transcribed**, because the prototype has nothing to transcribe from: `eva/src` has no data layer and therefore no error state anywhere, and `SettingsScreen.tsx` cannot fail because every value on it is a `useState` in the same file. `homeRetry` makes the same argument for the same reason.
+  ///
+  /// THE SENTENCE IS **NOT** `Failure.message`, and that is the point of this key existing. Every other `ErrorView` in this app shows the mapper's wording — `error_view.dart` states that `ApiErrorMapper` is the only source of a displayable failure message, and that claim is true of all three of them. `/settings` is the fourth call site and the first **non-network** one: `SettingsRepositoryImpl._unreachable` builds `'The preferences could not be reached: $error'`, which interpolates the raw Dart exception, so rendering it would put a `MissingPluginException` on a reader's screen. A developer string and a reader's sentence are different things and only one of them is translated here.
+  ///
+  /// WRITTEN AS ONE SENTENCE COVERING BOTH FAILURE ARMS, because the cubit reports a failed READ and a failed WRITE through one status and the reader cannot tell from the screen which happened. 'Your preferences could not be saved' is true of both — the read failed, so what is on screen is not what is stored, which is the same fact from the other side.
+  ///
+  /// In en, this message translates to:
+  /// **'Your preferences could not be saved on this device.'**
+  String get settingsPreferencesUnavailable;
+
+  /// The notice's action, which re-runs `SettingsCubit.load()`. **Written, not transcribed** — `SettingsScreen.tsx` has no error state and therefore no retry control, exactly as `homeRetry`, `quizRetry` and `readingRetry` do not.
+  ///
+  /// Deliberately the same sentence as those three, which is a pattern rather than a coincidence: `settingsBack` and `readingBack` share their wording for the same reason, and four independently-written keys saying 'Try again' in two languages is four translation decisions nobody made.
+  ///
+  /// NAMESPACED `settings*` because five features now carry this field name.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get settingsRetry;
 
   /// The second section label. Transcribed: SettingsScreen.tsx:70 writes `Reading` through the same local `SectionLabel`.
   ///
@@ -782,7 +802,7 @@ abstract class AppLocalizations {
   /// **'Default language'**
   String get settingsDefaultLanguage;
 
-  /// The sheet's own heading. **Written, not transcribed** — the prototype draws its language pills inline (SettingsScreen.tsx:77-90) and defines no sheet, no heading and no dismiss affordance at all. A bottom sheet needs a name for §14's first row, and inventing a row for it inside the screen is this client's own contribution.
+  /// The sheet's own heading. **Written, not transcribed** — SettingsScreen.tsx:77-90 draws the language pills inline and defines no sheet, no heading and no dismiss affordance at all. A bottom sheet needs a name for §14's first row, and inventing a row for it inside the screen is this client's own contribution.
   ///
   /// The sentence is an instruction rather than a noun phrase because the sheet's two rows are both languages and neither can be named "the language".
   ///
@@ -790,7 +810,7 @@ abstract class AppLocalizations {
   /// **'Choose a language'**
   String get settingsLanguageSheetTitle;
 
-  /// The English row in the language sheet. Transcribed in **kind** from SettingsScreen.tsx:88, which writes the pill's own label as `l === 'EN' ? 'English' : 'العربية'` — so the prototype already draws one end of this pair in Arabic, which is where the Arabic form of `العربية` comes from.
+  /// The English row in the language sheet. Transcribed in **kind** from SettingsScreen.tsx:88, which writes the pill's own label as `l === 'EN' ? 'English' : 'العربية'` — so the prototype already draws one end of this pair in Arabic, which is where the Arabic form of `العربية` comes from. **Written** for the other end: the prototype has no `الإنجليزية` string anywhere, so that half is this client's own.
   ///
   /// The Arabic value here is `الإنجليزية` and not `English`, deliberately: an Arabic reader who cannot read Latin would otherwise be unable to choose English, which is the one choice whose absence locks them out of the other arm. That decision also keeps `app_localizations_test.dart`'s `latinIsCorrect` exception list from growing, which an earlier draft of `settings_l10n.dart` claimed was not the case.
   ///
@@ -798,9 +818,9 @@ abstract class AppLocalizations {
   /// **'English'**
   String get settingsLanguageEnglish;
 
-  /// The Arabic row in the language sheet. **Same word in both arms**, and that is the whole of its rule: a language names itself in its own script, and the prototype's own `العربية` pill label is the evidence.
+  /// The Arabic row in the language sheet. **Transcribed**: SettingsScreen.tsx:88 writes the pill's label as `l === 'EN' ? 'English' : 'العربية'`, so `العربية` is the prototype's own string for this row and it is the evidence for the rule the whole file follows — a language names itself in its own script.
   ///
-  /// `SettingsScreen.tsx:88` writes the two-letter codes `EN` and `AR` on the pill and the full names beside them; this client draws the **names only**, because `EN` and `AR` are Latin script on the Arabic arm and the two codes are also exactly what `ReadingLanguage.code` already holds for the API path — so they are rendered from the domain enum rather than translated.
+  /// The prototype draws the two-letter codes `EN` and `AR` beside the names; this client draws the **names only**, because `EN` and `AR` are Latin script on the Arabic arm and the two codes are also exactly what `ReadingLanguage.code` already holds for the API path — so they are rendered from the domain enum rather than translated.
   ///
   /// In en, this message translates to:
   /// **'Arabic'**
