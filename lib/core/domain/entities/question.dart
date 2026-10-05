@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'question.freezed.dart';
 
 /// One reflection question, as `GET /api/v1/readings/today/{lang}` sends it.
 ///
@@ -43,7 +45,19 @@ import 'package:equatable/equatable.dart';
 /// **Rejected: a `Question` that does not carry them.** It would make Phase 8
 /// re-parse the raw body, which is the "second place where the wire's meaning is
 /// decided" §3's DIP row forbids.
-final class Question extends Equatable {
+///
+/// ## [copyWith] IS GENERATED, AND IT CAN CLEAR THE TWO NULLABLE FIELDS
+///
+/// The hand-rolled `copyWith` this class used to declare wrote
+/// `userAnswer ?? this.userAnswer` and `isCorrect ?? this.isCorrect`, so
+/// `copyWith(isCorrect: null)` kept the old value and the class doc recorded that
+/// as a hazard it could not solve. The generated `copyWith` gives every nullable
+/// field a sentinel default, so `copyWith(isCorrect: null)` **clears it** — which
+/// is the answer the hazard wanted, arrived at by a mechanism (`freezed`'s
+/// sentinel) that [AuthState] explicitly refuses. No caller used either
+/// behaviour. See AGENT_CONTEXT §2.1.
+@freezed
+final class Question with _$Question {
   /// A question as the wire describes it.
   const Question({
     required this.id,
@@ -137,46 +151,4 @@ final class Question extends Equatable {
   /// **different facts** and a `bool` would have to invent one of them. A
   /// non-`bool` maps to `null` on the same terms as [userAnswer].
   final bool? isCorrect;
-
-  /// [other] with the named fields replaced.
-  ///
-  /// Not needed by any caller today, and that is why it is here anyway: the three
-  /// nullable fields make this the one entity in the kernel where `copyWith`
-  /// cannot express "clear it" (`copyWith(isCorrect: null)` keeps the old value),
-  /// and having the hazard visible in the type is cheaper than a caller
-  /// discovering it.
-  Question copyWith({
-    String? id,
-    int? sortOrder,
-    String? type,
-    String? prompt,
-    Map<String, String>? options,
-    int? pointsValue,
-    bool? alreadyAnswered,
-    String? userAnswer,
-    bool? isCorrect,
-  }) => Question(
-    id: id ?? this.id,
-    sortOrder: sortOrder ?? this.sortOrder,
-    type: type ?? this.type,
-    prompt: prompt ?? this.prompt,
-    options: options ?? this.options,
-    pointsValue: pointsValue ?? this.pointsValue,
-    alreadyAnswered: alreadyAnswered ?? this.alreadyAnswered,
-    userAnswer: userAnswer ?? this.userAnswer,
-    isCorrect: isCorrect ?? this.isCorrect,
-  );
-
-  @override
-  List<Object?> get props => <Object?>[
-    id,
-    sortOrder,
-    type,
-    prompt,
-    options,
-    pointsValue,
-    alreadyAnswered,
-    userAnswer,
-    isCorrect,
-  ];
 }

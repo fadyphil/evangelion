@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'submit_result.freezed.dart';
 
 /// The response to `POST /api/v1/readings/:id/submit` — one answer, graded.
 ///
@@ -58,7 +60,8 @@ import 'package:equatable/equatable.dart';
 /// `ResultPage` shows a streak, so a screen that drew it without reading this flag
 /// would be drawing a number the backend did not change. It is carried for exactly
 /// that reason, and `result_page_test.dart` pins both arms.
-final class SubmitResult extends Equatable {
+@freezed
+final class SubmitResult with _$SubmitResult {
   /// A graded answer, as the backend's own interface declares it.
   const SubmitResult({
     required this.questionId,
@@ -122,15 +125,4 @@ final class SubmitResult extends Equatable {
   ///
   /// **The gate on the streak**, §5 trap 4. See [currentStreak].
   final bool readingCompleted;
-
-  @override
-  List<Object?> get props => <Object?>[
-    questionId,
-    isCorrect,
-    pointsEarned,
-    currentTotalPoints,
-    currentStreak,
-    longestStreak,
-    readingCompleted,
-  ];
 }

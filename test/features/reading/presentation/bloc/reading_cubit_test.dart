@@ -35,7 +35,8 @@ class _MockReadingRepository extends Mock implements ReadingRepository {}
 ///   `ReadingArScreen.tsx:49`) and draws **no control** for turning them off. A
 ///   `bool` with no writer is the defect class this repository has already deleted
 ///   twice — recorded decision 15's dead `isValidUserId` branch, and decision 48's
-///   unreachable `HomeEvent.props` — so it is **not** shipped. `ScriptureBlock`
+///   an unreachable base-class equality getter — so it is **not** shipped.
+///   `ScriptureBlock`
 ///   always renders the marker, and Phase 9's `/settings` reading section is where
 ///   the preference gets a real writer and a real reader.
 void main() {
@@ -291,7 +292,7 @@ void main() {
 
   group('the cubit is a Cubit and not a Bloc, and here is why that is load-bearing', () {
     test('there is no event type, so there is no event equality to get wrong', () {
-      // Recorded decision 48 is about `HomeEvent.props` being uncovered because it
+      // Recorded decision 48 is about `HomeEvent`'s base equality being uncovered because it
       // was unreachable. The way this phase avoids that class entirely is to have
       // no events: `ReadingCubit` is a `Cubit`, its inputs are method parameters,
       // and `bloc.add` — which swallows a duplicate when every event is equal —

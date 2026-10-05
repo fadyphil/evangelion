@@ -1,7 +1,9 @@
-import 'package:equatable/equatable.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'scripture_verse.freezed.dart';
 
 /// Which of a verse's two `text` fields to show.
 ///
@@ -62,7 +64,20 @@ String verseDisplayText({required String text, required String? textClean}) =>
 /// is the sanctuary and draws every verse in full. One endpoint, two projections,
 /// and §3's rule is that a second consumer promotes a type into the kernel — which
 /// is what `core/domain/repositories/reading_repository.dart`'s second method does.
-final class Verse extends Equatable {
+///
+/// ## `copyWith` IS GENERATED, AND IT **CAN** CLEAR [textClean]
+///
+/// The hand-rolled `copyWith` this class used to declare wrote
+/// `textClean ?? this.textClean`, so an explicit `null` was indistinguishable
+/// from an omitted argument and "clear it back to absent" — a *meaningful* wire
+/// state here, per the class doc's table — was inexpressible. The generated
+/// `copyWith` takes a sentinel default per field, so `copyWith(textClean: null)`
+/// **sets `null`** and omitting the argument leaves the value alone. That is a
+/// strict widening of what the type can do and the reason the old hazard note is
+/// gone rather than reworded; no caller used either behaviour yet, so nothing
+/// moved. See AGENT_CONTEXT §2.1 for why `copyWith` is generated at all.
+@freezed
+final class Verse with _$Verse {
   /// A verse as the wire describes it.
   const Verse({
     required this.bookNumber,
@@ -135,37 +150,6 @@ final class Verse extends Equatable {
   /// This is what `/`'s panel reads, through `ScriptureText.toTodayReading()`.
   /// `/reading` reads [text] and its own doc says why.
   String get displayText => verseDisplayText(text: text, textClean: textClean);
-
-  /// [other] with the named fields replaced.
-  Verse copyWith({
-    int? bookNumber,
-    int? chapter,
-    int? number,
-    String? text,
-    String? textClean,
-  }) => Verse(
-    bookNumber: bookNumber ?? this.bookNumber,
-    chapter: chapter ?? this.chapter,
-    number: number ?? this.number,
-    text: text ?? this.text,
-    // `textClean ?? this.textClean`, so omitting the argument keeps the current
-    // value and an explicit `''` sets `''` — which means `copyWith` **cannot**
-    // express "clear it back to absent". That is the nullable-field hazard
-    // `AuthState.copyWith` documents, reached from a different direction: here the
-    // absence is a *meaningful* wire state (§5, trap 2), so "no clean text" is not
-    // the same as "leave it alone". There is no caller today, which is the honest
-    // reason the hazard is written down rather than solved.
-    textClean: textClean ?? this.textClean,
-  );
-
-  @override
-  List<Object?> get props => <Object?>[
-    bookNumber,
-    chapter,
-    number,
-    text,
-    textClean,
-  ];
 }
 
 /// Today's passage **in full** — the wide projection of
@@ -185,12 +169,21 @@ final class Verse extends Equatable {
 /// the other way: `home` depending on five verse objects and a four-entry options
 /// map to read three integers.
 ///
+/// ## [copyWith] REPLACES THE TWO LISTS WHOLESALE, AND ITS EQUALITY IS DEEP
+///
+/// `verses` and `questions` are compared with `DeepCollectionEquality`, which is
+/// what `equatable` already did for `Iterable` props — so a passage rebuilt from
+/// the same two lists compares equal, as it did. The generated `copyWith` swaps a
+/// list rather than appending to it, and every field is non-nullable, so there is
+/// no "clear it" question on this type at all.
+///
 /// ## AND THE PORT NAMES IT, WHICH IS WHY IT IS HERE
 ///
 /// `core/domain/repositories/reading_repository.dart` returns it from a signature,
 /// so it cannot live in `features/reading/`: Gate 2 fails a `core/` → `features/`
 /// import on the line. See `question.dart`'s doc for the whole argument.
-final class ScriptureText extends Equatable {
+@freezed
+final class ScriptureText with _$ScriptureText {
   /// A passage as the wire describes it.
   const ScriptureText({
     required this.readingId,
@@ -313,51 +306,4 @@ final class ScriptureText extends Equatable {
     pointsEarnedToday: pointsEarnedToday,
     currentStreak: currentStreak,
   );
-
-  /// [other] with the named fields replaced.
-  ///
-  /// The two lists are **replaced wholesale** rather than appended to. Every field
-  /// is non-nullable, so `null` unambiguously means "keep the current value" and
-  /// there is no sentinel in this file — which is why the nullable-field hazard
-  /// `AuthState.copyWith` documents does not arise here either.
-  ScriptureText copyWith({
-    String? readingId,
-    int? groupId,
-    String? scheduledDate,
-    ReadingLanguage? language,
-    String? reference,
-    String? translation,
-    List<Verse>? verses,
-    List<Question>? questions,
-    bool? isFullyCompleted,
-    int? pointsEarnedToday,
-    int? currentStreak,
-  }) => ScriptureText(
-    readingId: readingId ?? this.readingId,
-    groupId: groupId ?? this.groupId,
-    scheduledDate: scheduledDate ?? this.scheduledDate,
-    language: language ?? this.language,
-    reference: reference ?? this.reference,
-    translation: translation ?? this.translation,
-    verses: verses ?? this.verses,
-    questions: questions ?? this.questions,
-    isFullyCompleted: isFullyCompleted ?? this.isFullyCompleted,
-    pointsEarnedToday: pointsEarnedToday ?? this.pointsEarnedToday,
-    currentStreak: currentStreak ?? this.currentStreak,
-  );
-
-  @override
-  List<Object?> get props => <Object?>[
-    readingId,
-    groupId,
-    scheduledDate,
-    language,
-    reference,
-    translation,
-    verses,
-    questions,
-    isFullyCompleted,
-    pointsEarnedToday,
-    currentStreak,
-  ];
 }

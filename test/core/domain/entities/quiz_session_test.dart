@@ -173,7 +173,7 @@ void main() {
     });
 
     test(
-      '`props` distinguishes the question, the selection and the verdict',
+      'equality distinguishes the question, the selection and the verdict',
       () {
         const QuizAnswer open = QuizAnswer(question: anOpenQuestion);
         expect(
@@ -370,7 +370,7 @@ void main() {
       expect(rebased.answers.first.isOpen, isFalse);
     });
 
-    test('`props` distinguishes the reading id and the answers', () {
+    test('equality distinguishes the reading id and the answers', () {
       expect(
         aSession,
         isNot(

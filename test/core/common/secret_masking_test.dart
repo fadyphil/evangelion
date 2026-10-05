@@ -4,6 +4,8 @@ import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/project_import_graph.dart';
+
 /// A gate on a **structural** property, so it survives code generation.
 ///
 /// ## WHAT IT FORBIDS
@@ -11,11 +13,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// Any class in `lib/` that holds a `password` field must declare its own
 /// `toString`, and that `toString` must not interpolate the password.
 ///
-/// Two classes do this today and both say why: `LoginCredentials`
-/// (`login_credentials.dart`) and `AuthState` (`auth_bloc.dart`). Equatable's
-/// default `toString` prints every entry in `props`, so a secret-holding class
-/// without an override writes the secret into every log line, every crash
-/// report, and every failed `expect` that prints the value.
+/// **Four classes hold a password today**, and each declares its own: three
+/// converted — `LoginCredentials` (`login_credentials.dart`), `AuthState` and
+/// `AuthPasswordChanged` (`auth_bloc.dart`) — and `SignInParams`
+/// (`sign_in.dart`), which was never an `Equatable` at all and carries its own
+/// hand-written `==`, `hashCode` and `toString`.
+///
+/// The default is the same in both worlds and that is why this gate survived the
+/// migration unchanged: Equatable's default `toString` printed every entry in
+/// `props`, and **freezed's generated one lists every property**. Either way a
+/// secret-holding class without an override writes the secret into every log
+/// line, every crash report, and every failed `expect` that prints the value.
 ///
 /// ## WHY IT IS A SOURCE SCAN AND NOT A BEHAVIOURAL TEST
 ///
@@ -110,6 +118,50 @@ void main() {
       );
     });
 
+    // The negative control for the stripper fix, and the reason the stripper is
+    // the shared one. A scan improvement with no control is indistinguishable
+    // from a scan that was never blind.
+    test('a class hidden behind a `/*` in a doc comment is still found', () {
+      // Exactly the shape that used to be invisible: a doc comment containing a
+      // glob-shaped path, then — further down the same file — a class that holds
+      // a password and prints it.
+      final Directory dir = Directory.systemTemp.createTempSync('secret_gate');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final File planted = File('${dir.path}/planted.dart')
+        ..writeAsStringSync('''
+/// The reading endpoint's own copy, per `readings/today/*.current_streak`.
+library;
+
+final class PlantedHolder {
+  const PlantedHolder({required this.password});
+
+  final String password;
+
+  @override
+  String toString() => 'PlantedHolder(password: \$password)';
+}
+''');
+
+      final Map<String, String> found = _classesHolding(<File>[
+        planted,
+      ], 'password');
+      expect(
+        found.keys,
+        contains('PlantedHolder'),
+        reason:
+            'the scan read past the `/*` inside the doc comment. Before the '
+            'shared stripper it saw an empty file and reported nothing, '
+            'which is the silent-pass shape this gate has to avoid',
+      );
+      expect(
+        RegExp(r'\$\{?password\b').hasMatch(found['PlantedHolder']!),
+        isTrue,
+        reason:
+            'and the body it reports is the class body, so the '
+            'interpolation check below can see the leak',
+      );
+    });
+
     test('every masking class masks — the behavioural half', () {
       // A structural check cannot tell a correct override from an empty one, so
       // the property is asserted against the running classes too. Same file, so
@@ -158,6 +210,26 @@ List<File> _dartSourcesIn(String root) {
 /// Map of class name to that class's source text, for every class in [sources]
 /// that declares a field of type `String` named [field].
 ///
+/// ## COMMENTS ARE STRIPPED WITH THE **SHARED** STRIPPER, AND THAT IS A FIX
+///
+/// This scan used its own per-line `//` + `/* … */` cut. `lib/` is prose-heavy
+/// and writes glob-shaped paths in prose — `home_bloc.dart:8` says
+/// `` `readings/today/*.current_streak` ``, `streak_summary.dart:119` says
+/// `` `readings/today/*` ``, and `submit_result.dart:44` says the same — so for
+/// each of those files the first `/*` **inside a doc comment** opened a block
+/// comment that ran to the end of the file, and every class below it became
+/// invisible to this scan.
+///
+/// Measured: the naive stripper found **none** of `HomeEvent`, `HomeCleared`,
+/// `HomeStarted`, `HomeRetried` and `HomeState`. None of them holds a password
+/// today, so the gate was green over a hole — which is the worst state a gate can
+/// be in, because a leak planted in one of those classes would have shipped with
+/// a green run behind it.
+///
+/// [withoutDartComments] decides `//` before `/*`, handles nested blocks and
+/// apostrophes, and **throws** on an unbalanced scan rather than returning a
+/// plausible answer. `no_colour_literals_test.dart` holds its behavioural tests.
+///
 /// Comments are stripped first. Without that, `class\s+(\w+)` matches prose —
 /// this repository's doc comments say "class doc" and "the class rule" often
 /// enough to invent classes named `doc` and `rule`, and the scan then reports
@@ -178,7 +250,7 @@ Map<String, String> _classesHolding(List<File> sources, String field) {
   );
 
   for (final File file in sources) {
-    final String text = _stripComments(file.readAsStringSync());
+    final String text = withoutDartComments(file.readAsStringSync());
     final List<RegExpMatch> classes = classStart.allMatches(text).toList();
 
     for (int i = 0; i < classes.length; i++) {
@@ -199,40 +271,4 @@ Map<String, String> _classesHolding(List<File> sources, String field) {
   }
 
   return found;
-}
-
-/// Removes `//` and `/* */` comments, preserving line structure so a
-/// `multiLine` pattern still sees one logical line per source line.
-String _stripComments(String source) {
-  final StringBuffer out = StringBuffer();
-  bool inBlock = false;
-
-  for (final String line in source.split('\n')) {
-    String result = line;
-    if (inBlock) {
-      final int close = result.indexOf('*/');
-      if (close == -1) {
-        result = '';
-      } else {
-        result = result.substring(close + 2);
-        inBlock = false;
-      }
-    }
-    final int blockStart = result.indexOf('/*');
-    if (blockStart != -1) {
-      final int blockEnd = result.indexOf('*/', blockStart);
-      if (blockEnd == -1) {
-        result = result.substring(0, blockStart);
-        inBlock = true;
-      } else {
-        result =
-            result.substring(0, blockStart) + result.substring(blockEnd + 2);
-      }
-    }
-    final int lineComment = result.indexOf('//');
-    if (lineComment != -1) result = result.substring(0, lineComment);
-    out.writeln(result);
-  }
-
-  return out.toString();
 }

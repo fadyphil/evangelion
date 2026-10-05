@@ -50,7 +50,7 @@ void main() {
     });
 
     test('every field participates, so no two of them can be confused', () {
-      // Walked rather than sampled: a `props` list that dropped one field would
+      // Walked rather than sampled: a generated `==` that dropped one field would
       // leave every *other* pair unequal and this test green.
       final List<TodayReading> others = <TodayReading>[
         live.copyWith(readingId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
