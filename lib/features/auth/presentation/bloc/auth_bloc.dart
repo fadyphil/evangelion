@@ -131,6 +131,18 @@ final class AuthPasswordChanged extends AuthEvent {
 
   @override
   List<Object?> get props => <Object?>[password];
+
+  /// Never prints [password].
+  ///
+  /// Equatable's default `toString` renders every entry in [props], so without
+  /// this the reader's typed password reaches any log line, crash report, or
+  /// failed `expect` that happens to print the event. Found by
+  /// `test/core/common/secret_masking_test.dart`, which scans `lib/` for classes
+  /// holding a `password` field — the same rule `LoginCredentials` and
+  /// `AuthState` already honour, and the reason this event had quietly become
+  /// the third class that did not.
+  @override
+  String toString() => 'AuthPasswordChanged(password: ********)';
 }
 
 /// The show/hide-password control was activated.
