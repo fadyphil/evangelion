@@ -22,11 +22,16 @@ Failure _builtFailure(FailureKind kind, String message, {int? statusCode}) =>
     Failure(kind: kind, message: message, statusCode: statusCode);
 
 /// [Success] via a parameter, for the same reason as [_builtFailure].
-Success<int> _builtSuccess(int value) => Success<int>(value);
+///
+/// Generic in [T] rather than fixed at `int` because the hash-agreement test
+/// needs `Success<String>` — and building that through an `int`-only helper is
+/// how the generic-parameter check would have been written by accident.
+Success<T> _builtSuccess<T>(T value) => Success<T>(value);
 
-/// [FailureResult] via a parameter, for the same reason as [_builtFailure].
-FailureResult<int> _builtFailureResult(Failure failure) =>
-    FailureResult<int>(failure);
+/// [FailureResult] via a parameter, for the same reason as [_builtFailure], and
+/// generic in [T] for the same reason as [_builtSuccess].
+FailureResult<T> _builtFailureResult<T>(Failure failure) =>
+    FailureResult<T>(failure);
 
 void main() {
   group('construction', () {
@@ -69,17 +74,36 @@ void main() {
     test('each arm puts its payload in props — that is what equality rests on', () {
       // The cross-arm equality tests cannot fail: `Equatable.operator ==`
       // compares `runtimeType` before `props`, so `Success<int>` and
-      // `FailureResult<int>` are unequal whatever their props hold, an empty
-      // list included. What makes equality meaningful is that each arm's props
-      // carry its payload, so two instances of the *same* arm with different
-      // payloads differ. Asserted here directly, because that is the fact the
-      // cross-arm relation cannot express — emptying both props lists used to
-      // leave the suite green.
-      final Success<int> success = _builtSuccess(4);
-      final FailureResult<int> failure = _builtFailureResult(boom);
+      // `FailureResult<int>` are unequal whatever they hold, an empty payload
+      // included. What makes equality meaningful is that each arm compares its
+      // payload, so two instances of the *same* arm with different payloads
+      // differ. Asserted through `==` rather than a `props` list, because
+      // `Equatable` is gone and the arms now own their `==` — asserting on
+      // `props` would have been asserting on an API that no longer exists, and
+      // the cross-arm relation above cannot express this fact on its own:
+      // emptying both arms' comparison used to leave the suite green.
+      // `T` given EXPLICITLY at every call site in this test, and that is the
+      // fix for a failure this test hit while being written: with `_builtSuccess`
+      // inferred from its argument, `_builtFailureResult<int>(someFailure)` resolved
+      // `T` to `dynamic`, so the arm compared unequal to a `FailureResult<int>` on
+      // the *type* rather than on the payload it exists to test. The assertion
+      // passed for the wrong reason — which is the failure mode this very test
+      // was written to catch.
+      const Failure boomWithStatus = Failure(
+        kind: FailureKind.unknown,
+        message: 'boom',
+        statusCode: 500,
+      );
+      final Success<int> success = _builtSuccess<int>(4);
+      final FailureResult<int> failure = _builtFailureResult<int>(boom);
 
-      expect(success.props, <Object?>[4]);
-      expect(failure.props, <Object?>[boom]);
+      expect(success, isNot(_builtSuccess<int>(5)));
+      // Same [Failure] fields but a different `statusCode` — which IS one of the
+      // three fields that decide `Failure` equality, so the two genuinely differ.
+      expect(failure, isNot(_builtFailureResult<int>(boomWithStatus)));
+      // Same payload, therefore equal — the other half of the claim.
+      expect(success, _builtSuccess<int>(4));
+      expect(failure, _builtFailureResult<int>(boom));
     });
   });
 
@@ -359,23 +383,23 @@ void main() {
     // against any implementation — including `props => []`.
 
     test('two successes with equal values are equal — as distinct objects', () {
-      final Success<int> a = _builtSuccess(4);
-      final Success<int> b = _builtSuccess(4);
+      final Success<int> a = _builtSuccess<int>(4);
+      final Success<int> b = _builtSuccess<int>(4);
 
       expect(identical(a, b), isFalse, reason: 'otherwise this is vacuous');
       expect(a, b);
     });
 
     test('equal successes share a hash code', () {
-      final Success<int> a = _builtSuccess(4);
-      final Success<int> b = _builtSuccess(4);
+      final Success<int> a = _builtSuccess<int>(4);
+      final Success<int> b = _builtSuccess<int>(4);
 
       expect(identical(a, b), isFalse, reason: 'otherwise this is vacuous');
       expect(a.hashCode, b.hashCode);
     });
 
     test('successes with different values are NOT equal', () {
-      expect(_builtSuccess(4), isNot(_builtSuccess(5)));
+      expect(_builtSuccess<int>(4), isNot(_builtSuccess(5)));
     });
 
     test('two failures carrying structurally equal Failures are equal', () {
@@ -383,10 +407,10 @@ void main() {
       // built separately. Reusing the `const` `boom` on both sides would
       // compare one `Failure` instance with itself and prove nothing about
       // `Failure`'s own equality.
-      final FailureResult<int> a = _builtFailureResult(
+      final FailureResult<int> a = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
-      final FailureResult<int> b = _builtFailureResult(
+      final FailureResult<int> b = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
 
@@ -396,10 +420,10 @@ void main() {
     });
 
     test('equal failure results share a hash code', () {
-      final FailureResult<int> a = _builtFailureResult(
+      final FailureResult<int> a = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
-      final FailureResult<int> b = _builtFailureResult(
+      final FailureResult<int> b = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
 
@@ -409,9 +433,9 @@ void main() {
 
     test('failures carrying different Failures are NOT equal', () {
       expect(
-        _builtFailureResult(_builtFailure(FailureKind.server, 'boom')),
+        _builtFailureResult<int>(_builtFailure(FailureKind.server, 'boom')),
         isNot(
-          _builtFailureResult(
+          _builtFailureResult<int>(
             _builtFailure(FailureKind.conflict, 'already answered'),
           ),
         ),
@@ -424,11 +448,11 @@ void main() {
         // The other discriminating field, so `props` cannot be reduced to
         // `[kind, message]` without this failing.
         expect(
-          _builtFailureResult(
+          _builtFailureResult<int>(
             _builtFailure(FailureKind.validation, 'bad request'),
           ),
           isNot(
-            _builtFailureResult(
+            _builtFailureResult<int>(
               _builtFailure(
                 FailureKind.validation,
                 'bad request',
@@ -440,20 +464,140 @@ void main() {
       },
     );
 
-    test('a success is NEVER equal to a failure', () {
-      // KEPT, but stated honestly about its own strength: `Equatable.operator ==`
-      // compares `runtimeType` before `props`, so the two arms can never be equal
-      // for ANY props — including an empty list. It is a guard against someone
-      // collapsing the two arms onto a shared supertype, not evidence that props
-      // carry anything. The tests that do carry that evidence are
-      // "successes with different values are NOT equal", "failures carrying
-      // different Failures are NOT equal" and the `props` test in `construction`.
+    test('a success is NEVER equal to a failure, in EITHER order', () {
+      // BOTH ORDERS ARE ASSERTED, and that is the whole point of this test.
+      //
+      // `==` is called on the LEFT operand, so `Success == FailureResult` runs
+      // `Success`'s override and `FailureResult == Success` runs
+      // `FailureResult`'s. Two independent `==` implementations are therefore
+      // doing the rejecting, and asserting one order exercises exactly one of
+      // them. The old version asserted both orders but proved nothing: while this
+      // class extended `Equatable`, BOTH arms inherited ONE implementation, so a
+      // single `runtimeType` check in the base class answered both directions and
+      // the suite was green no matter what each arm did.
+      //
+      // Now that each arm owns its `==`, the cross-arm guard is per-arm code, and
+      // dropping either one is invisible to a one-directional test. VERIFIED: with
+      // `Success`'s `other is Success<T>` guard replaced by a bare
+      // `runtimeType` comparison plus an unchecked cast, this file stayed fully
+      // green — because `runtimeType` happened to answer it anyway. Both
+      // directions are asserted below precisely so that mutation cannot hide
+      // behind the base-class comparison it used to rely on.
       final Result<int> success = _builtSuccess(0);
-      final Result<int> failure = _builtFailureResult(boom);
+      final Result<int> failure = _builtFailureResult<int>(boom);
 
       expect(success, isNot(failure));
       expect(failure, isNot(success));
+      // Stated as a fact about the *type*, not about equality: this is what the two
+      // `==` overrides lean on, and it holds independently of either of them.
       expect(success.runtimeType, isNot(failure.runtimeType));
+    });
+
+    test('the two arms do not equal each other when a payload would match', () {
+      // The adversarial half of the test above. `Success(0)` and
+      // `FailureResult(someFailure)` cannot have equal payloads by construction —
+      // one holds an `int`, the other a `Failure` — so the natural assertions pass
+      // for the wrong reason: any `==` that compares payloads finds them
+      // different and never reaches the arm check.
+      //
+      // This test manufactures the coincidence the type system normally prevents,
+      // by comparing two Results whose payload is the SAME value on both sides.
+      // A `==` that has *lost* its arm guard and fallen back to payload comparison
+      // would report these equal; a correct one reports unequal because the arms
+      // differ, which is what the runtimeType assertion below establishes
+      // independently of the `==` implementations.
+      //
+      // The `Failure` here is compared against itself, so the only thing that can
+      // make the two Results differ is the arm.
+      final Result<Failure> asSuccess = _builtSuccess<Failure>(boom);
+      final Result<Failure> asFailure = _builtFailureResult<Failure>(boom);
+
+      expect(asSuccess, isNot(asFailure));
+      expect(asFailure, isNot(asSuccess));
+      expect(asSuccess.runtimeType, isNot(asFailure.runtimeType));
+    });
+
+    test('a narrow generic does not equal a wider one holding an equal value', () {
+      // THE TEST THAT HOLDS `runtimeType` IN `==`, and it exists because two
+      // successive attempts to remove that clause both needed correcting.
+      //
+      // ## WHY THE OBVIOUS REASONING IS WRONG
+      //
+      // "The clause is redundant: `other is Success<T>` already rejects a
+      // mismatched generic." It does — in the NARROWING direction.
+      // `Success<String> is Success<int>` is false. So that half of the argument
+      // is right, which is exactly what makes it convincing and exactly what makes
+      // it wrong: **Dart's generic parameters are covariant**, so
+      // `Success<int> is Success<num>` is **true**. With `int` on the left the
+      // type test passes, and since `1 == 1.0` is also true, `value == other.value`
+      // says yes as well. Without `runtimeType` these two compare EQUAL.
+      //
+      // Both facts are measured, not recalled — `is` on the widened pair, and `==`
+      // on the two numeric literals — because the whole claim turns on them.
+      //
+      // ## WHY THIS PAIRED PAYLOAD IS THE ONLY ONE THAT WORKS
+      //
+      // The natural test, `Success<int>(1)` against `Success<String>('1')`, proves
+      // nothing about the generic parameter: the payloads differ, so `value ==
+      // other.value` rejects the pair on its own and the type check is never
+      // consulted. VERIFIED — rewriting `Success`'s `==` to drop the type-argument
+      // check entirely left that version of the test fully green. Two payloads
+      // that `==` *cannot* distinguish are the only pair that forces the question
+      // out to the type.
+      final Success<int> narrow = _builtSuccess<int>(1);
+      final Success<num> wide = _builtSuccess<num>(1);
+
+      expect(narrow, isNot(wide));
+      // Both directions, because `==` dispatches on the LEFT operand and the
+      // covariance trap only opens in one of them.
+      expect(wide, isNot(narrow));
+
+      // The hash is the quieter half of the same clause. Two Results that compare
+      // unequal and share a bucket is legal Dart; it degrades a `HashMap<Result>`
+      // into a linear scan and fails nothing. Since the payloads are `==`-equal,
+      // `runtimeType` is the only thing that can separate these hashes at all.
+      expect(narrow.hashCode, isNot(wide.hashCode));
+
+      // And the widening direction is checked for real rather than assumed:
+      // `narrow is Success<num>` is what makes the mutation above reachable, so
+      // this asserts the premise the whole test rests on.
+      expect(narrow, isA<Success<num>>());
+    });
+
+    test('a narrow generic does not equal a wider failure arm', () {
+      // The same covariance trap on `FailureResult`, where it is *worse*: both
+      // arms carry the IDENTICAL `Failure`, so once the type test is passed the
+      // payload comparison agrees unconditionally. Dropping `runtimeType` here
+      // makes two differently-typed Results equal on every payload there is.
+      final FailureResult<int> narrow = _builtFailureResult<int>(boom);
+      final FailureResult<Object> wide = _builtFailureResult<Object>(boom);
+
+      expect(narrow, isNot(wide));
+      expect(wide, isNot(narrow));
+      expect(narrow.hashCode, isNot(wide.hashCode));
+      // Premise, asserted: the payload really is the same object, so nothing but
+      // the type can be doing the work.
+      expect(narrow.failure, wide.failure);
+      expect(narrow, isA<FailureResult<Object>>());
+    });
+
+    test('a hash separates arms of different generic parameters', () {
+      // The plain version, for the case where the payloads differ outright — and
+      // the half that fails if a `hashCode` is replaced by a constant, which
+      // "equal values share a hash" would NOT catch. VERIFIED: `Success`'s
+      // `hashCode` replaced with the literal `0` makes exactly this fail while
+      // every equality assertion in the file stays green.
+      final Success<int> intArm = _builtSuccess<int>(1);
+      final Success<String> stringArm = _builtSuccess<String>('1');
+
+      expect(intArm, isNot(stringArm));
+      expect(intArm.hashCode, isNot(stringArm.hashCode));
+
+      final FailureResult<int> fInt = _builtFailureResult<int>(boom);
+      final FailureResult<String> fString = _builtFailureResult<String>(boom);
+
+      expect(fInt, isNot(fString));
+      expect(fInt.hashCode, isNot(fString.hashCode));
     });
   });
 
@@ -463,12 +607,12 @@ void main() {
     // drops the value cannot pass unnoticed.
 
     test('Success names its value', () {
-      expect(_builtSuccess(4).toString(), 'Success<int>(4)');
+      expect(_builtSuccess<int>(4).toString(), 'Success<int>(4)');
     });
 
     test('FailureResult names the failure it carries', () {
       expect(
-        _builtFailureResult(boom).toString(),
+        _builtFailureResult<int>(boom).toString(),
         'FailureResult<int>(Failure(kind: server, statusCode: 500, '
         'message: internal server error))',
       );
@@ -477,8 +621,8 @@ void main() {
     test('a Success is distinguishable from a FailureResult in a log', () {
       // The whole reason these renderings exist: two adjacent log lines must be
       // tellable apart without knowing which call produced them.
-      expect(_builtSuccess(4).toString(), isNot(contains('Failure')));
-      expect(_builtFailureResult(boom).toString(), contains('Failure'));
+      expect(_builtSuccess<int>(4).toString(), isNot(contains('Failure')));
+      expect(_builtFailureResult<int>(boom).toString(), contains('Failure'));
     });
   });
 
