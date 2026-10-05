@@ -2,9 +2,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/reading/presentation/reading_text_scale.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
@@ -15,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/reading_harness.dart';
+import '../../../../support/settings_harness.dart';
 
 /// §14: "text scales to 1.22× without overflow at 320px width" — for `/reading`.
 ///
@@ -132,169 +131,167 @@ void main() {
       await tester.tap(find.byIcon(Icons.format_size));
       await pumpReadingFrames(tester, 4);
 
-      for (int i = 0; i < ReadingCubit.defaultFontStep - kFontStepMin; i++) {
+      // **The initial step is read from the injected scaler**, which this harness
+      // sets to `scale` (1.22) — and 1.22 is §5.2's *fifth* row, so the page opens on
+      // step 5 here rather than step 3. That is the single-input world showing through
+      // a test seam: the harness's `textScale` is now the app's step, not a second
+      // factor, so the loop below runs from wherever the page actually is.
+      final int opened = fontStepFromScaler(const TextScaler.linear(scale));
+      for (int i = 0; i < opened - kFontStepMin; i++) {
         await tester.tap(find.byIcon(Icons.remove));
         await pumpReadingFrames(tester, 2);
       }
-      expect(h.cubit.state.fontStep, kFontStepMin);
+      expect(
+        settingsHandleOf(tester).settings.fontStep,
+        kFontStepMin,
+        reason:
+            'four taps from step 5, because the page really did open on step 5',
+      );
 
       _expectNoOverflow(tester, AppLocalizationsEn());
     });
   });
 
-  group('the two scalers compose rather than replace one another', () {
-    // ## AND THE NUMBERS COME FROM §5.2's OWN TABLE, WHICH HAS STEP 3 AT **1.00**
+  group('ONE input, and the dead zone Phase 7 recorded is **gone**', () {
+    // ## WHAT THIS GROUP REPLACED, AND WHY THE REPLACEMENT IS THE POINT
     //
-    // `evaScalerFor` is 0.90 / 0.95 / **1.00** / 1.10 / 1.22, so the default step
-    // changes nothing on its own and every assertion below pairs the default with a
-    // step that *does*. That is why the first test reads `closeTo(19 × 1.22)` and
-    // looks like it is asserting nothing happened: at the default the composed scaler
-    // and the platform scaler agree **exactly**, and a `max` rule would too — so the
-    // interesting pairings are 1 and 5.
-    testWidgets('at the default step the platform scale passes through', (
+    // The group it displaces was called "the two scalers compose rather than replace
+    // one another", and it had **two** assertions that only a two-input rule can
+    // satisfy:
+    //
+    // * "a raised OS font size survives even the smallest step" — at step 1 with the
+    //   platform at 1.22, `body × 0.90 × 1.22`;
+    // * "the documented dead zone is REAL at 1.22, not a guess" — steps 3, 4 and 5 all
+    //   rendering `hasLength(1)`, i.e. **one** rendered size for three distinct
+    //   positions.
+    //
+    // Both are gone because the composition is. `readingTextScalerFor` is deleted;
+    // `MaterialApp.builder` installs `evaScalerFor(step)` and nothing multiplies it by
+    // anything. Phase 9's author wrote that the fix "is not another rule: one
+    // persisted preference replaces two inputs, so there is one scale and nothing to
+    // compose", and this group is that claim's proof in both directions: five
+    // positions, five sizes, and **no platform input at all**.
+    testWidgets('the platform scale is not an input any more', (
       WidgetTester tester,
     ) async {
       final ReadingHarness h = readingHarness();
-      await pumpReading(
-        tester,
-        cubit: h.cubit,
-        size: surface,
-        textScale: scale,
-      );
+      // **1.5 is the interesting number**: above §14's 1.22, above the 1.109 the old
+      // rule collapsed above, and a value the old composition would have capped.
+      await pumpReading(tester, cubit: h.cubit, size: surface, textScale: 1.5);
 
-      // The **number**, read from the `MediaQuery` the block is actually inside.
-      // `readingTextScale.dart`'s doc says the composed scaler is installed on a
-      // `MediaQuery` subtree rather than threaded through constructors, so this is the
-      // only probe that reads what a reader's eye meets — `RichText.style.fontSize`
-      // would still be the unscaled token and would pass for an unwired subtree.
-      expect(evaScalerFor(ReadingCubit.defaultFontStep).scale(1), 1.0);
       expect(
-        _effectiveScriptureSize(tester),
-        closeTo(
-          ScriptureBlock.fontSizeFor(ReadingLanguage.english) * scale,
-          0.001,
-        ),
+        MediaQuery.textScalerOf(tester.element(find.byType(ScriptureBlock)))
+            .scale(1),
+        1.0,
         reason:
-            '§14 requires 1.22× and step 3 is the table\'s 1.00 row, so the '
-            'composed value and the platform value are the same number here',
+            'the harness injects 1.5 through the platform `MediaQuery`, and the '
+            'scaler the scripture renders at is step 3 — the table identity. Under '
+            'the deleted rule this would have been 1.5.',
+      );
+      expect(
+        // The table, read directly: `SettingsHandle.fontScale` no longer exists because
+        // the handle is pure Dart and `evaScalerFor` is not (`settings_handle.dart`
+        // records why). The claim is unchanged — the *stored* step and the *rendered*
+        // scale are the same number — and it is read from the table rather than through
+        // a getter that could agree with itself.
+        evaScalerFor(settingsHandleOf(tester).settings.fontStep).scale(1),
+        1.0,
+        reason:
+            'and the persisted preference is the same number from the other side, so '
+            'the rendered scale and the stored step cannot disagree',
       );
     });
 
     testWidgets(
-      'and the step multiplies it — on a device that does NOT scale',
+      'all FIVE positions are distinct, and they are the table\'s rows',
       (WidgetTester tester) async {
-        // Platform **1.0**, which is the ordinary install, and the only place the two
-        // inputs can be told apart: `max` would render all of steps 1, 2 and 3 at 1.00×
-        // here and the reader's drag toward "smallest" would do nothing for three of
-        // five positions. The product renders 0.90× at step 1.
         final ReadingHarness h = readingHarness();
         await pumpReading(tester, cubit: h.cubit, size: surface);
-        final double body = ScriptureBlock.fontSizeFor(ReadingLanguage.english);
 
-        h.cubit.setFontStep(kFontStepMin);
-        await pumpReadingFrames(tester, 2);
-        expect(_effectiveScriptureSize(tester), closeTo(body * 0.90, 0.001));
+        final Map<int, double> byStep = <int, double>{};
+        for (int step = kFontStepMin; step <= kFontStepMax; step++) {
+          await settingsHandleOf(tester).setFontStep(step);
+          await pumpReadingFrames(tester, 3);
+          byStep[step] = MediaQuery.textScalerOf(
+            tester.element(find.byType(ScriptureBlock)),
+          ).scale(1);
+        }
 
-        h.cubit.setFontStep(kFontStepMax);
-        await pumpReadingFrames(tester, 2);
         expect(
-          _effectiveScriptureSize(tester),
-          closeTo(body * 1.22, 0.001),
+          byStep.values.toSet(),
+          hasLength(kFontStepMax),
           reason:
-              'and 1.22 is §14\'s requirement, reached through the control rather '
-              'than through the platform setting',
+              'five positions, five rendered sizes. THIS is the assertion the old dead '
+              'zone failed: at a platform above 1.109 the old rule gave steps 3, 4 and '
+              '5 the same number, and a reader who had raised their OS font size found '
+              'the control\'s top half inert. The dead zone is gone because there is '
+              'no ceiling to collapse into.',
+        );
+        expect(
+          byStep,
+          <int, double>{1: 0.90, 2: 0.95, 3: 1.00, 4: 1.10, 5: 1.22},
+          reason:
+              'and each one is §5.2\'s own row, read through the table rather than '
+              'restated — `eva_typography.dart` refuses to have the numbers in prose '
+              'because a copy is a copy',
         );
       },
     );
 
-    testWidgets('the ceiling stops it there', (WidgetTester tester) async {
+    testWidgets('§14\'s 1.22 is reached THROUGH THE CONTROL, which is what the '
+        'requirement now means', (WidgetTester tester) async {
+      // §14 asks the app to survive 1.22× without overflow. Under the deleted rule
+      // that number could arrive from the OS; now it can only arrive from step 5,
+      // which makes the requirement **testable at the control** rather than at a
+      // platform setting this client does not own.
       final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit, size: surface, textScale: 2.0);
+      await pumpReading(tester, cubit: h.cubit, size: surface);
 
-      expect(
-        _effectiveScriptureSize(tester),
-        closeTo(
-          ScriptureBlock.fontSizeFor(ReadingLanguage.english) *
-              kEvaScaleCeiling,
-          0.001,
-        ),
-        reason:
-            '1.00 × 2.0 is past the only size this app has ever been laid out '
-            'for, so the top of §5.2\'s table caps it',
-      );
-    });
-
-    testWidgets('a raised OS font size survives even the smallest step', (
-      WidgetTester tester,
-    ) async {
-      // The rule `reading_text_scale.dart` rejects, mounted so the rejection is
-      // visible. At step 1 with the platform at 1.22, "the step replaces the
-      // platform" renders 0.90× and the sanctuary ignores the reader's own
-      // accessibility setting; the product renders 1.098×, which is 22% larger.
-      final ReadingHarness h = readingHarness();
-      await pumpReading(
-        tester,
-        cubit: h.cubit,
-        size: surface,
-        textScale: scale,
-      );
-
-      h.cubit.setFontStep(kFontStepMin);
-      await pumpReadingFrames(tester, 2);
+      await settingsHandleOf(tester).setFontStep(kFontStepMax);
+      await pumpReadingFrames(tester, 4);
 
       final double body = ScriptureBlock.fontSizeFor(ReadingLanguage.english);
       expect(
         _effectiveScriptureSize(tester),
-        closeTo(body * 0.90 * scale, 0.001),
-      );
-      expect(
-        _effectiveScriptureSize(tester),
-        greaterThan(body * 0.90),
+        closeTo(body * scale, 0.001),
         reason:
-            'and a replacing rule would put `body × 0.90` here — 22% below what '
-            'the reader\'s own OS setting asks for, in the one screen where reading '
-            'is hardest',
+            '§14\'s number, reached by the reader\'s own hand rather than by their '
+            'OS, and rendered at the top of the table the app was laid out for',
       );
+      _expectNoOverflow(tester, AppLocalizationsEn());
     });
 
-    testWidgets('and the documented dead zone is REAL at 1.22, not a guess', (
-      WidgetTester tester,
-    ) async {
-      // `reading_text_scale.dart` states the cost of the cap in a table: above a
-      // platform scale of 1.109 the top three steps all render at the ceiling,
-      // because 1.10 × 1.109 already reaches 1.22. §14's own 1.22 is above 1.109, so
-      // this is the requirement's own surface — and the assertion is that the dead
-      // zone is **present**, so a change to the table cannot silently remove a cost
-      // the file still claims in prose.
-      final ReadingHarness h = readingHarness();
-      await pumpReading(
-        tester,
-        cubit: h.cubit,
-        size: surface,
-        textScale: scale,
-      );
+    testWidgets(
+      'and the stepper\'s knob and the rendered size cannot disagree',
+      (WidgetTester tester) async {
+        // The property `fontStepFromScaler` exists for, asserted in the running app:
+        // the page reads the step **back out of the installed scaler** rather than
+        // holding a second copy, so a mismatch between the knob and the type is
+        // unexpressible.
+        final ReadingHarness h = readingHarness();
+        await pumpReading(tester, cubit: h.cubit, size: surface);
+        await tester.tap(find.byIcon(Icons.format_size));
+        await pumpReadingFrames(tester, 4);
 
-      final Set<double> sizes = <double>{};
-      for (int step = 3; step <= kFontStepMax; step++) {
-        h.cubit.setFontStep(step);
-        await pumpReadingFrames(tester, 2);
-        sizes.add(_effectiveScriptureSize(tester));
-      }
-      expect(
-        sizes,
-        hasLength(1),
-        reason:
-            'three distinct steps, one rendered size — which is the cost §14 '
-            'pays, and Phase 9 owns',
-      );
-      expect(
-        sizes.single,
-        closeTo(
-          ScriptureBlock.fontSizeFor(ReadingLanguage.english) * scale,
-          0.001,
-        ),
-      );
-    });
+        for (int step = kFontStepMin; step <= kFontStepMax; step++) {
+          await settingsHandleOf(tester).setFontStep(step);
+          await pumpReadingFrames(tester, 3);
+          final TextScaler installed = MediaQuery.textScalerOf(
+            tester.element(find.byType(ScriptureBlock)),
+          );
+          expect(
+            fontStepFromScaler(installed),
+            step,
+            reason: 'the slider announces the step the tree is actually rendering at',
+          );
+          expect(
+            _sliderValue(tester, AppLocalizationsEn().readingFontSize),
+            step.toString(),
+            reason: 'and the slider node\'s own value agrees with it',
+          );
+        }
+      },
+    );
   });
 
   group('the geometry that is fixed rather than scaled', () {
@@ -357,6 +354,24 @@ void _expectNoOverflow(
 /// `RenderParagraph`, so the `TextStyle` a test can read from a widget is the
 /// **unscaled token** — asserting on it would pass for `MediaQuery` never having
 /// been installed at all, which is the defect this group exists to catch.
+/// The slider node's own announced value.
+///
+/// Read through the **shared** `semanticsTree` walk rather than a private one, for
+/// `design_system_harness.dart`'s stated reason: one copy of the fixture, so the
+/// copies cannot drift — and this walk has a fail-closed assertion built into it that
+/// a hand-rolled one would lose.
+String _sliderValue(WidgetTester tester, String trackLabel) {
+  for (final SemanticsData node in semanticsTree(tester)) {
+    if (node.label == trackLabel && node.flagsCollection.isSlider) {
+      return node.value;
+    }
+  }
+  throw StateError(
+    'no slider node labelled "$trackLabel" in the tree — the `Aa` disclosure is '
+    'closed, so there is no track to announce.',
+  );
+}
+
 double _effectiveScriptureSize(WidgetTester tester) {
   final TextScaler scaler = MediaQuery.textScalerOf(
     tester.element(find.byType(ScriptureBlock)),

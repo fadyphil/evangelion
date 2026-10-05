@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
-import 'package:evangelion/features/reading/presentation/reading_text_scale.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_controls.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
@@ -46,6 +46,42 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// + `map` over unbounded data" is why it is a `ListView.builder` and not the
 /// prototype's `<div>` with five `<p>`s in it, and why the header travels **inside**
 /// it rather than above it.
+///
+/// ## THE TEXT SCALE IS **NOT** INSTALLED HERE, AND THAT IS PHASE 9'S CHANGE
+///
+/// Phase 7 wrapped this screen in a `MediaQuery` carrying `readingTextScalerFor`'s
+/// composed scaler — the reader's step times the platform's, capped at
+/// `03-design-system.md` §5.2's top row. That function is **deleted**, and this
+/// paragraph is what replaced the wrapper.
+///
+/// The step is one persisted preference now (`UserSettings.fontStep`), it is installed
+/// app-wide at `MaterialApp.builder`, and it reaches every widget on every screen —
+/// which is what removed the two recorded costs:
+///
+/// * the **dead zone**. Steps 3, 4 and 5 all rendered at 1.22× once the platform was
+///   above 1.109, so a reader who had raised their OS font size and then wanted Eva's
+///   larger steps got three identical positions. With one input there is one scale and
+///   the five positions are five distinct sizes on **every** device;
+/// * the **nonlinear platform scaler**. Composing across two `TextScaler`
+///   implementations has no `max`, so the product was forced linear and Android's
+///   curve was lost for this subtree only. There is no composition left to lose.
+///
+/// **What this screen still owns is the reading of it**: the `Aa` panel needs to know
+/// *where* the reader is on the table, which is `fontStepFromScaler` over the scaler
+/// `MediaApp` installed. So the step is read back out of the `MediaQuery` rather than
+/// held as a second copy, and the write goes through the app's settings handle — see
+/// `_fontStep` and `_onFontStepChanged`.
+///
+/// **And the reversal, stated plainly because it contradicts a recorded decision.**
+/// `eva_typography.dart` rejected "wrapping the platform's scaler in a way that
+/// ignores it" for the reason that it "would silently override a user who has raised
+/// the OS font size". That reason was scoped to **one screen**: "the one screen where
+/// reading is hardest is the one screen that ignores their accessibility setting."
+/// It dies when the control is app-wide, because there is no second screen to disagree
+/// with — every screen now honours the same one preference. What survives is the
+/// trade, and it is a real one: a reader who wants text larger than 1.22× has no
+/// control for it in this app, and `eva_typography.dart`'s table is where that ceiling
+/// is published rather than invented here.
 ///
 /// ## DIRECTION IS THE **LOCALE**'S, AND NOTHING IN THIS FILE DECIDES IT
 ///
@@ -191,6 +227,34 @@ class _ReadingBodyState extends State<_ReadingBody> {
 
   ReadingLanguage? _requested;
 
+  /// The reader's font step, **read back out of the installed scaler**.
+  ///
+  /// ## WHY A GETTER AND NOT A FIELD
+  ///
+  /// A field would have to be kept in step with `UserSettings`, and there is one
+  /// writer of that value in the process (`SettingsCubit`). Reading it means this
+  /// screen cannot hold a stale copy: `MediaApp`'s `builder` installs
+  /// `evaScalerFor(step)`, and `fontStepFromScaler` is the table's own inverse — the
+  /// function `font_size_stepper.dart` wrote for exactly this question, which is why
+  /// it exists and why this is not a lookup written here.
+  int get _fontStep => fontStepFromScaler(MediaQuery.textScalerOf(context));
+
+  /// Reports a new step, through the app's settings.
+  ///
+  /// **`SettingsHandle` and not the settings cubit**, and the reason is §3's
+  /// feature-independence rule read from the other direction: `features/reading` may
+  /// not name `features/settings`, and `tool/verify_purity.sh` Gate 2 fails on the
+  /// line. `lib/app/settings_scope.dart` is the composition-root seam that exists for
+  /// exactly this case, and its doc records the alternatives — a port reached directly
+  /// from here would give one store three writers.
+  void _onFontStepChanged(int step) {
+    // `unawaited` because §4 forbids dropping a `Future` as a bare expression
+    // statement, and the write is genuinely fire-and-forget from here: the optimistic
+    // emit in `SettingsCubit.apply` has already moved the app's scale by the time the
+    // next frame runs.
+    unawaited(SettingsScope.of(context).setFontStep(step));
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -269,60 +333,56 @@ class _ReadingBodyState extends State<_ReadingBody> {
     final AppLocalizations strings = context.l10n;
     final ReadingCubit cubit = context.read<ReadingCubit>();
 
-    // ## THE COMPOSED SCALER IS INSTALLED ON A **`MediaQuery`**, NOT THREADED
+    // ## NO `MediaQuery` HERE ANY MORE, AND THE SENTENCE IT REPLACED WAS **TRUE**
     //
-    // `readingTextScalerFor`'s doc is the whole argument: it is the product of the
-    // reader's step and their platform setting, capped at the design system's top row.
-    // Installing it here — above **everything** on the screen, controls and CTA
-    // included — is what makes "Text size" mean *text size* rather than "passage
-    // size", and it is why no widget below takes a `textScaler` it could forget to
-    // honour. §14's 1.22× requirement is then a single assertion about this line.
-    final TextScaler scaler = readingTextScalerFor(
-      step: state.fontStep,
-      platform: MediaQuery.textScalerOf(context),
-    );
-
-    return MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: scaler),
-      child: NeuralScaffold(
-        // `NeuralScaffold`'s doc: `variant` is also "which language the reading
-        // screens are in", so this is the **only** place the language reaches the
-        // background and nothing re-derives it.
-        variant: switch (language) {
-          ReadingLanguage.english => NeuralVariant.readingEn,
-          ReadingLanguage.arabic => NeuralVariant.readingAr,
-        },
-        // The body owns its own scrollable — see [ReadingPage]'s doc.
-        scrollable: false,
-        bottomFade: true,
-        // Each row owns its own gutter; see [ReadingPage.contentPadding]'s doc.
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (language == ReadingLanguage.arabic) const _ArabicBand(),
-            ReadingControls(
-              language: language,
-              strings: strings,
-              onBack: widget.onBack,
-              panelOpen: state.textSizePanelOpen,
-              onPanelToggled: cubit.toggleTextSizePanel,
-              fontStep: state.fontStep,
-              onFontStepChanged: cubit.setFontStep,
-            ),
-            Expanded(
-              child: Padding(
-                padding: ReadingPage.contentPadding,
-                child: _passage(
-                  context,
-                  language: language,
-                  state: state,
-                  strings: strings,
-                ),
+    // The wrapper this call site used to carry said: "Installing it here — above
+    // **everything** on the screen, controls and CTA included — is what makes 'Text
+    // size' mean *text size* rather than 'passage size', and it is why no widget below
+    // takes a `textScaler` it could forget to honour."
+    //
+    // That is still true, and it is now true of **one** install instead of one per
+    // screen: `MaterialApp.builder` puts the same `MediaQuery` above every route, so
+    // the wrapper here was a second statement of a fact `app.dart` already states, and
+    // a second one with a second rule. The `NeuralScaffold` is therefore the direct
+    // child of `_scaffold`'s stack slot again.
+    return NeuralScaffold(
+      // `NeuralScaffold`'s doc: `variant` is also "which language the reading
+      // screens are in", so this is the **only** place the language reaches the
+      // background and nothing re-derives it.
+      variant: switch (language) {
+        ReadingLanguage.english => NeuralVariant.readingEn,
+        ReadingLanguage.arabic => NeuralVariant.readingAr,
+      },
+      // The body owns its own scrollable — see [ReadingPage]'s doc.
+      scrollable: false,
+      bottomFade: true,
+      // Each row owns its own gutter; see [ReadingPage.contentPadding]'s doc.
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (language == ReadingLanguage.arabic) const _ArabicBand(),
+          ReadingControls(
+            language: language,
+            strings: strings,
+            onBack: widget.onBack,
+            panelOpen: state.textSizePanelOpen,
+            onPanelToggled: cubit.toggleTextSizePanel,
+            fontStep: _fontStep,
+            onFontStepChanged: _onFontStepChanged,
+          ),
+          Expanded(
+            child: Padding(
+              padding: ReadingPage.contentPadding,
+              child: _passage(
+                context,
+                language: language,
+                state: state,
+                strings: strings,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

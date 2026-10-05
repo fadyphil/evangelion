@@ -1,6 +1,5 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
-import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
@@ -56,6 +55,19 @@ enum ReadingStatus {
 /// `Aa` control *changes* the rendered size and asserts nothing about surviving a
 /// navigation, because there is nothing to assert.
 ///
+/// ## [ReadingState.copyWith] IS GENERATED AND IT NOW HAS **FOUR** FIELDS
+///
+/// The hand-written `copyWith` this class used to declare wrote
+/// `scripture ?? this.scripture`, so `null` meant "leave it alone" and the two
+/// nullable fields could never be cleared through it — a hazard its own doc
+/// recorded as unfixable. freezed gives every nullable field a sentinel default,
+/// so `copyWith(scripture: null)` clears and omitting the argument keeps.
+///
+/// `toString` is generated here, where `Equatable`'s default used to print
+/// every prop. That is harmless on this class — none of its fields is a secret —
+/// and the five classes in this repository that *do* declare their own are what
+/// `test/core/common/secret_masking_test.dart` structurally enforces.
+///
 /// ## AND IT IS A **`Cubit`**, NOT A `Bloc`, WHICH IS A DECISION WITH A REASON
 ///
 /// `HomeBloc` is a `Bloc` because it has four event types and `home_bloc_test.dart`
@@ -92,12 +104,11 @@ enum ReadingStatus {
 /// `test/core/common/secret_masking_test.dart` structurally enforces.
 @freezed
 final class ReadingState with _$ReadingState {
-  /// A state with nothing loaded and the reader's default font step.
+  /// A state with nothing loaded and the `Aa` disclosure closed.
   const ReadingState({
     this.status = ReadingStatus.loading,
     this.scripture,
     this.failure,
-    this.fontStep = ReadingCubit.defaultFontStep,
     this.textSizePanelOpen = false,
   });
 
@@ -114,13 +125,6 @@ final class ReadingState with _$ReadingState {
   /// Why the last request failed, or `null`.
   final Failure? failure;
 
-  /// The reader's font step, `kFontStepMin`…`kFontStepMax`.
-  ///
-  /// Survives a load and survives a failure, because it is the reader's setting and
-  /// not the payload's — a retry that reset the text size would be the third way
-  /// this screen could lose a reader's input to a network problem.
-  final int fontStep;
-
   /// Whether the `Aa` disclosure is showing.
   ///
   /// ## WHY IT IS STATE AND NOT A `StatefulWidget`'s FIELD
@@ -133,11 +137,12 @@ final class ReadingState with _$ReadingState {
   ///
   /// ## AND IT IS DELIBERATELY **NOT** A PREFERENCE
   ///
-  /// `textSizePanelOpen` is a property of this visit and nothing more, and keeping it
-  /// in the same state object as [fontStep] — which *would* be a preference in Phase
-  /// 9 — is the reason that boundary is visible. `reading_page_test.dart` asserts the
-  /// panel opens and closes and asserts **nothing** about surviving a navigation,
-  /// because there is nothing to assert.
+  /// `textSizePanelOpen` is a property of **this visit** and nothing more, and the
+  /// class doc's first section is what makes the boundary visible now that the step it
+  /// used to sit beside is a persisted preference: a disclosure is a property of the
+  /// screen and a font size is a property of the reader, and `reading_page_test.dart`
+  /// asserts both claims in opposite directions — that the panel opens and closes
+  /// here, and that the step survives leaving.
   final bool textSizePanelOpen;
 }
 
@@ -158,15 +163,6 @@ class ReadingCubit extends Cubit<ReadingState> {
 
   /// The seam. See the class doc.
   final LoadScripture loadScripture;
-
-  /// The step a reader who has never touched the control gets.
-  ///
-  /// **3, and asserted rather than assumed.** `03-design-system.md` §5.2's table
-  /// maps `3 → 1.00`, so the identity: the default install renders at the
-  /// platform's own size and the `Aa` control moves away from it in both
-  /// directions. A default of `1` would mean the sanctuary opens at `0.90×` for
-  /// everyone.
-  static const int defaultFontStep = 3;
 
   /// Loads today's passage in [language].
   ///
@@ -198,38 +194,18 @@ class ReadingCubit extends Cubit<ReadingState> {
   /// instead of being inferred from which method the page happened to be in.
   Future<void> retry(ReadingLanguage language) => load(language);
 
-  /// Reports a new font step.
-  ///
-  /// **Clamped** through `clampFontStep`, so a corrupted value cannot reach
-  /// `evaScalerFor`'s `_` arm as something the stepper's knob does not own — the
-  /// boundary's own doc states that requirement and Phase 9's persisted setting is
-  /// the input it exists for.
-  ///
-  /// **No emit when the step is unchanged**, which is what keeps
-  /// `FontSizeStepper`'s drag from rebuilding the whole passage on every frame:
-  /// the track reports continuously, and [ReadingState]'s `==` is generated from
-  /// its five fields, so an identical state is not a state change.
-  void setFontStep(int step) {
-    final int clamped = clampFontStep(step);
-    if (clamped == state.fontStep) return;
-    emit(state.copyWith(fontStep: clamped));
-  }
-
-  /// The state while [load] is in flight: nothing on screen, same font step.
+  /// The state while [load] is in flight: nothing on screen, same disclosure.
   /// Opens or closes the `Aa` disclosure. See [ReadingState.textSizePanelOpen].
   void toggleTextSizePanel() =>
       emit(state.copyWith(textSizePanelOpen: !state.textSizePanelOpen));
 
-  ReadingState _loading() => ReadingState(
-    fontStep: state.fontStep,
-    textSizePanelOpen: state.textSizePanelOpen,
-  );
+  ReadingState _loading() =>
+      ReadingState(textSizePanelOpen: state.textSizePanelOpen);
 
   /// The state once [passage] is in hand.
   ReadingState _ready(ScriptureText passage) => ReadingState(
     status: ReadingStatus.ready,
     scripture: passage,
-    fontStep: state.fontStep,
     textSizePanelOpen: state.textSizePanelOpen,
   );
 
@@ -237,7 +213,6 @@ class ReadingCubit extends Cubit<ReadingState> {
   ReadingState _failed(Failure failure) => ReadingState(
     status: ReadingStatus.failed,
     failure: failure,
-    fontStep: state.fontStep,
     textSizePanelOpen: state.textSizePanelOpen,
   );
 }

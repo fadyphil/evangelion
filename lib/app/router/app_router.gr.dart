@@ -30,6 +30,8 @@ import 'package:evangelion/features/reading/presentation/pages/reading_page.dart
     as _i4;
 import 'package:evangelion/features/result/presentation/pages/result_page.dart'
     as _i5;
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart'
+    as _i14;
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart'
     as _i6;
 import 'package:flutter/material.dart' as _i8;
@@ -286,16 +288,49 @@ class ResultRouteArgs {
 
 /// generated route for
 /// [_i6.SettingsPage]
-class SettingsRoute extends _i7.PageRouteInfo<void> {
-  const SettingsRoute({List<_i7.PageRouteInfo>? children})
-    : super(SettingsRoute.name, initialChildren: children);
+class SettingsRoute extends _i7.PageRouteInfo<SettingsRouteArgs> {
+  SettingsRoute({
+    _i8.Key? key,
+    _i14.SettingsCubit? cubit,
+    List<_i7.PageRouteInfo>? children,
+  }) : super(
+         SettingsRoute.name,
+         args: SettingsRouteArgs(key: key, cubit: cubit),
+         initialChildren: children,
+       );
 
   static const String name = 'SettingsRoute';
 
   static _i7.PageInfo page = _i7.PageInfo(
     name,
     builder: (data) {
-      return const _i6.SettingsPage();
+      final args = data.argsAs<SettingsRouteArgs>(
+        orElse: () => const SettingsRouteArgs(),
+      );
+      return _i6.SettingsPage(key: args.key, cubit: args.cubit);
     },
   );
+}
+
+class SettingsRouteArgs {
+  const SettingsRouteArgs({this.key, this.cubit});
+
+  final _i8.Key? key;
+
+  final _i14.SettingsCubit? cubit;
+
+  @override
+  String toString() {
+    return 'SettingsRouteArgs{key: $key, cubit: $cubit}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! SettingsRouteArgs) return false;
+    return key == other.key && cubit == other.cubit;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ cubit.hashCode;
 }

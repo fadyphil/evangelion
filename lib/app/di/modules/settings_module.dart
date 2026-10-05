@@ -1,32 +1,47 @@
+import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/repositories/settings_repository.dart';
+import 'package:evangelion/features/settings/data/datasources/settings_local_data_source.dart';
+import 'package:evangelion/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
+import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:injectable/injectable.dart';
 
 /// The `settings` feature's registrations.
 ///
-/// **THIS MODULE REGISTERS NOTHING TODAY.** That is the honest state, not an
-/// oversight: Phase 9 owns `SettingsRepository` over `shared_preferences` and the cubit that drives appearance, reading and about, so until that phase lands there is nothing to
-/// put here. The module exists now, empty and named, because a container whose
-/// shape appears one feature at a time is one feature at a time.
+/// **THIS MODULE REGISTERS FOUR THINGS, ALL GENERATED.** It registered **nothing**
+/// until this phase — the file existed as an empty `@module` with a doc explaining
+/// that Phase 9 was coming, and the prediction in that doc was that the *cubit* would
+/// have to be hand-registered rather than generated. That prediction was right and
+/// half the module's registrations still are not here; see the paragraph below.
 ///
-/// A `@module` with no providers emits no registration at all, so an empty one
-/// costs nothing at runtime. The record of what the graph actually contains is
-/// `injection.config.dart`, which is committed on purpose: it names `CoreModule`
-/// alone, and a reviewer reading a diff sees this module for the empty shell it is
-/// rather than trusting the file name.
-///
-/// ## WHY IT IS PURE DART, AND WHY THAT IS A CONSTRAINT RATHER THAN A COINCIDENCE
-///
-/// Everything reachable from `injection.dart` has to stay Flutter-free: the
-/// composition root's whole transitive project-local import graph is walked by
-/// `injection_test.dart`, and AGENT_CONTEXT §6 recorded decision 4 makes that
-/// walk part of the contract. A `@module` here is therefore reachable from that
-/// walk, and so is anything it names.
-///
-/// Phase Phase 9 will break that, because {@code SettingsCubit} is a Flutter type in
-/// practice — `flutter_bloc` re-exports the framework's widget layer alongside
-/// the bloc, and `bloc` itself is a transitive dependency this project may not
-/// promote to a direct one. The fix is the one already taken for the router:
-/// register it from `lib/app/di/navigation_injection.dart`, the Flutter-permitted
-/// composition root, rather than moving `injection.dart`'s imports. Recorded here
-/// now so the next phase rediscovers it as a decision instead of as a puzzle.
+/// The four that *are* here are the pure-Dart half and they are here rather than in
+/// `navigation_injection.dart` precisely because they are pure Dart: `injection.dart`'s
+/// whole transitive project-local import graph is walked by `injection_test.dart` and
+/// anything in that closure may not import Flutter, which `SettingsLocalDataSource`
+/// could not do — it names `shared_preferences`.
 @module
-abstract class SettingsModule {}
+abstract class SettingsModule {
+  /// The preference store.
+  ///
+  /// `@lazySingleton`, and the lifetime is load-bearing for the reason
+  /// `AuthLocalDataSource`'s is: the store **is** the state. A factory would hand out
+  /// a second store whose memoised platform instance is its own, so a reader's write
+  /// through one repository would not be visible through another.
+  @lazySingleton
+  SettingsLocalDataSource get settingsLocalDataSource =>
+      SettingsLocalDataSource();
+
+  /// The one [SettingsRepository] that ships. Typed as the port; see the class doc.
+  @lazySingleton
+  SettingsRepository get settingsRepository =>
+      SettingsRepositoryImpl(getIt<SettingsLocalDataSource>());
+
+  /// Reads the reader's preferences.
+  @lazySingleton
+  GetSettings get getSettings => GetSettings(getIt<SettingsRepository>());
+
+  /// Writes them.
+  @lazySingleton
+  UpdateSettings get updateSettings =>
+      UpdateSettings(getIt<SettingsRepository>());
+}

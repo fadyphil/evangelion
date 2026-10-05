@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -78,7 +79,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeStreakGlowing => 'Your streak is glowing. Keep it alive.';
 
   @override
-  String get homeStreakResting => 'Start a streak today. One reading is all it takes.';
+  String get homeStreakResting =>
+      'Start a streak today. One reading is all it takes.';
 
   @override
   String get homeStreakLabel => 'Streak';
@@ -144,7 +146,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quizVerdictIncorrect => 'Not this time.';
 
   @override
-  String get quizAlreadyAnsweredSuffix => 'already answered, so it cannot be submitted again';
+  String get quizAlreadyAnsweredSuffix =>
+      'already answered, so it cannot be submitted again';
 
   @override
   String get quizUnavailableSuffix => 'there is no answer to show';
@@ -156,7 +159,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quizNoQuestionsTitle => 'Nothing to reflect on';
 
   @override
-  String get quizNoQuestionsMessage => 'Today\'s reading came with no questions to answer.';
+  String get quizNoQuestionsMessage =>
+      'Today\'s reading came with no questions to answer.';
 
   @override
   String get readingBack => 'Back';
@@ -222,10 +226,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultLongestYet => 'your longest yet';
 
   @override
-  String get resultCompleteMessage => 'Correct, and today\'s reading is complete.';
+  String get resultCompleteMessage =>
+      'Correct, and today\'s reading is complete.';
 
   @override
-  String get resultPartialMessage => 'Correct. The reading is not finished yet.';
+  String get resultPartialMessage =>
+      'Correct. The reading is not finished yet.';
 
   @override
   String get resultIncorrectMessage => 'Not this time. Every question counts.';
@@ -240,4 +246,67 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsBack => 'Back';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsThemeSystem => 'System';
+
+  @override
+  String get settingsFontSize => 'Font size';
+
+  @override
+  String get settingsFontScale => 'Font scale';
+
+  @override
+  String get settingsDecreaseFontSize => 'Decrease font size';
+
+  @override
+  String get settingsIncreaseFontSize => 'Increase font size';
+
+  @override
+  String get settingsReduceMotion => 'Reduce motion';
+
+  @override
+  String get settingsMotionOn => 'On';
+
+  @override
+  String get settingsMotionOff => 'Off';
+
+  @override
+  String get settingsReading => 'Reading';
+
+  @override
+  String get settingsDefaultLanguage => 'Default language';
+
+  @override
+  String get settingsLanguageSheetTitle => 'Choose a language';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageArabic => 'Arabic';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsVersion => 'Version';
 }

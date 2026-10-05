@@ -3,7 +3,7 @@ import 'dart:ui' show Tristate;
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
 import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
@@ -178,7 +178,10 @@ void main() {
         reason: 'the track\'s own name, not the button\'s',
       );
       expect(slider!.flagsCollection.isSlider, isTrue);
-      expect(slider.value, '${ReadingCubit.defaultFontStep}');
+      // **`kDefaultFontStep` and not `ReadingCubit.defaultFontStep`, which Phase 9
+      // deleted.** The value moved to `UserSettings`, and the constant moved with it;
+      // the constant is asserted against `evaScalerFor` in `user_settings_test.dart`.
+      expect(slider.value, '$kDefaultFontStep');
       // Both directions are offered, so a reader who cannot drag can still press.
       expect(slider.hasAction(SemanticsAction.increase), isTrue);
       expect(slider.hasAction(SemanticsAction.decrease), isTrue);

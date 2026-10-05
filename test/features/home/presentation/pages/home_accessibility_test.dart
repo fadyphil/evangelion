@@ -79,9 +79,23 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('the avatar is a button with a name, and it is DISABLED', (
+    testWidgets('the avatar is a button with a name, and it is LIVE', (
       WidgetTester tester,
     ) async {
+      // ## THIS ASSERTION FLIPPED IN PHASE 9, AND THE DOC COMMENT ABOVE IT WAS
+      // ## THE THING THAT FLIPPED
+      //
+      // It used to read `hasAction(SemanticsAction.tap), isFalse` and
+      // `flagsCollection.isEnabled, Tristate.isFalse`, with the reason "the prototype
+      // navigates to `profile` and §2 decision 1 cut it". §2 decision 1 still cuts
+      // `/profile`; **`/settings` is a route that exists**, and `08-build-phases.md`'s
+      // Phase-9 scope note says "`AppTopBar`'s avatar tap now opens `/settings`". So
+      // the control is live and the unavailable suffix is gone.
+      //
+      // The three-way assertion below is the point: name, tap action, and **no**
+      // unavailable reason. A bar that stayed inert would fail the second; a bar that
+      // became live while keeping the reason would fail the third, and that is the
+      // combination `AppTopBar.build`'s `enabled ? … : '… — …'` exists to prevent.
       final SemanticsHandle handle = tester.ensureSemantics();
 
       final HomeHarness h = harness();
@@ -96,23 +110,27 @@ void main() {
       // `ds.tsx:516-524` is a `<button>` with **no label at all** — §14's first row.
       // The name is the session's display name, not a monogram.
       expect(avatar.label, contains(liveSession.displayName));
-      // **No tap action**, because the prototype navigates to `profile` and §2
-      // decision 1 cut it. The reason is in the name, per `LoginPage`'s four inert
-      // controls.
-      expect(avatar.hasAction(SemanticsAction.tap), isFalse);
       expect(
-        avatar.flagsCollection.isEnabled,
-        Tristate.isFalse,
+        avatar.hasAction(SemanticsAction.tap),
+        isTrue,
         reason:
-            '`enabled: false` is announced as a tristate, so a reader is told '
-            'the control is there and inert rather than being offered a dead end',
+            'the avatar opens `/settings`. `home_navigation_test.dart` drives the '
+            'route; this is about the node offering the action at all, which is the '
+            'half a navigation test cannot see.',
       );
+      // **`isNot(Tristate.isFalse)` and not `Tristate.isTrue`.** `Semantics` publishes
+      // `enabled` only when a widget states it, so a control that is simply not disabled
+      // comes back as `Tristate.none` — which is the correct reading of "there is no
+      // `enabled: false` here". Asserting `isTrue` would be asserting an annotation the
+      // widget does not make; the disabled branch below is the discriminating one.
+      expect(avatar.flagsCollection.isEnabled, isNot(Tristate.isFalse));
       expect(
         avatar.label,
-        contains(AppLocalizationsEn().homeUnavailableSuffix),
+        isNot(contains(AppLocalizationsEn().homeUnavailableSuffix)),
         reason:
-            'a screen reader must be told WHY the control cannot be pressed, not '
-            'only that it cannot',
+            'and the unavailable reason is NOT appended, because the control is no '
+            'longer inert. `AppTopBar.build` appends it only on the disabled branch, '
+            'so a reader is never told a working button does nothing.',
       );
       handle.dispose();
     });
@@ -322,26 +340,41 @@ void main() {
       await tabUntilFocused(tester, row);
     });
 
-    testWidgets('and the disabled avatar is NOT a tab stop', (
+    testWidgets('and the avatar IS a tab stop, because it is live again', (
       WidgetTester tester,
     ) async {
-      // A disabled control that still takes focus is a focus trap with a dead end.
-      // This is why `AppTopBar` passes `enabled: false` to the ring — see its doc.
+      // ## THIS ASSERTION FLIPPED TOO, AND IT IS THE ONE THAT MATTERS
+      //
+      // It used to read `expect(stops, 0)` — "the **disabled** avatar is NOT a tab
+      // stop" — on the reasoning that "a disabled control that still takes focus is a
+      // focus trap with a dead end". §14's row is about focus, and it is still right
+      // about an inert control; it stopped being the case about this control in
+      // Phase 9, when it started opening `/settings`.
+      //
+      // The flip matters because the inverse is now the defect: a **live** button that
+      // cannot be reached with a keyboard is a control that exists only for a finger.
+      // And the third case is asserted in `app_top_bar_test.dart`, where a bar with
+      // `onAvatarTap: null` still has to be inert — so both branches are pinned.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
       final Finder avatar = find.byType(AppTopBar);
       int stops = 0;
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 6; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
         if (_focusInside(tester, avatar)) {
           stops++;
         }
       }
-      // The bar's only focusable child is the panel, which is **not** inside the
-      // bar. So four tabs cannot land on the avatar.
-      expect(stops, 0);
+      expect(
+        stops,
+        greaterThan(0),
+        reason:
+            'Tab reaches the avatar within six presses. The bar holds three focusable '
+            'children at most — the streak retry is absent on a successful load — so '
+            'six is a bound and not a search limit.',
+      );
     });
   });
 

@@ -62,7 +62,8 @@ import 'app_localizations_en.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,17 +84,18 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
-    Locale('en')
+    Locale('en'),
   ];
 
   /// The product's name, above the tagline. Transcribed: LoginScreen.tsx:29.
@@ -650,9 +653,178 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, one{point} other{points}}'**
   String resultTotalCaption(int count);
+
+  /// The screen's title, beside the back chevron. Transcribed: SettingsScreen.tsx:43 writes `Settings` in `F.display 26 / 600 / ink`.
+  ///
+  /// The prototype is English-only — `eva/src` has one `SettingsScreen.tsx` and no Arabic variant — so the Arabic value is written, not transcribed.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// The header row's chevron's accessible name. Transcribed by position from SettingsScreen.tsx:39-42, which draws a bare `<button>` around an inline `<svg>` with **no label at all** — §14's first row, and the reason the name is a caller string rather than a design-system default.
+  ///
+  /// Deliberately the same word `readingBack` uses. Two features, one sentence: a back control is called Back in both, and a second wording would be a translation decision nobody made.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get settingsBack;
+
+  /// The first section label. Transcribed: SettingsScreen.tsx:47 writes `Appearance` through its local `SectionLabel`, which `EvaSectionHeader` now renders.
+  ///
+  /// The prototype's third group is `Account` (`:93`) and is CUT with the profile screen, so this screen has three groups where the prototype has four.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// The theme picker's row title. Transcribed: SettingsScreen.tsx:50 writes `Theme`.
+  ///
+  /// The prototype's picker is a `useState<'Light' | 'Dark' | 'System'>` whose initial value is `'Dark'`, which is why `UserSettings.themeMode`'s default is `dark` and not `system` — see `app_theme_mode.dart`'s doc.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `Light`.
+  ///
+  /// The prototype renders the labels through `textTransform: 'uppercase'`, which Flutter has no equivalent for; `SegmentedControl` uppercases each label itself and is asserted on that. So the ARB value is the prototype's own casing and the widget changes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `Dark`.
+  ///
+  /// This is the prototype's initial value (`useState<…>('Dark')`), so it is also the value a reader who has never opened this screen is in.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
+  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `System`.
+  ///
+  /// `System` is NOT the app's default: `app_theme_mode.dart` records why it is dark instead, and this segment is the reader's way to ask for the OS's answer rather than the app's.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsThemeSystem;
+
+  /// The stepper's row title. Transcribed: SettingsScreen.tsx:62 writes `Font size`.
+  ///
+  /// NAMESPACED `settings*` rather than reused from `readingTextSize`, which is the `Aa` disclosure's tooltip on `/reading`. Same control, two positions on two screens, and the two widgets ask for their own string so a translator can move one without the other.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get settingsFontSize;
+
+  /// The stepper track's slider label, announced as a slider. The prototype has no accessible name for its `<input type="range">` at all (SettingsScreen.tsx:66), so this is §14's first row applied to a control the row does not name.
+  ///
+  /// A distinct string from `settingsFontSize` because the two name the control from two positions — a row title and a slider — and `FontSizeStepperLabels`'s doc argues for exactly one value for its own three strings for the opposite reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Font scale'**
+  String get settingsFontScale;
+
+  /// The stepper's decrement button's tooltip and accessible name. **Written, not transcribed** — the prototype's range input supplies its own stepper affordances with no labels of its own, so §14 required two names here that the prototype never wrote.
+  ///
+  /// Deliberately the same sentence as `readingDecreaseFontSize`: two screens draw the same control and a second wording would be a translation decision nobody made.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease font size'**
+  String get settingsDecreaseFontSize;
+
+  /// The stepper's increment button's tooltip and accessible name. Written, as `settingsDecreaseFontSize` says.
+  ///
+  /// Deliberately the same sentence as `readingIncreaseFontSize`, for the same reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase font size'**
+  String get settingsIncreaseFontSize;
+
+  /// The switch's row title. **NOT IN THE PROTOTYPE** — `SettingsScreen.tsx` has no motion row, and this control exists because AGENT_CONTEXT §14 asks for reduced motion and `app.dart` recorded that a later phase would replace the platform-only default with the persisted `UserSettings` value. This is that phase.
+  ///
+  /// Placed under APPEARANCE rather than READING because what it changes is how the app moves, not what it says.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce motion'**
+  String get settingsReduceMotion;
+
+  /// The switch's accessible name while it is on. Written, not transcribed: `EvaToggle` shipped hard-coding the English words `On` and `Off` for six phases, and no gate could see it because a semantics label is not painted — the Arabic glyph gate walks the painted tree. Phase 9 made the switch's labels required and this is the shipped spelling.
+  ///
+  /// The Arabic is a participle rather than a transliterated `On`, so the Arabic arm holds no Latin script and `app_localizations_test.dart`'s exception list does not grow.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get settingsMotionOn;
+
+  /// The switch's accessible name while it is off. Written, as `settingsMotionOn` says.
+  ///
+  /// `Off` and `On` are the words a screen reader has to distinguish to answer "is animation on?", so neither value may be empty and neither may be the other's translation of itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingsMotionOff;
+
+  /// The second section label. Transcribed: SettingsScreen.tsx:70 writes `Reading` through the same local `SectionLabel`.
+  ///
+  /// This group ships ONE row of the prototype's two. `SettingsScreen.tsx:92`'s verse-numbers switch is cut for scope reasons recorded at length on `SettingsPage`, because `ScriptureBlock` has no `showVerseNumbers` parameter and its marker is load-bearing for four gates this phase does not own.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading'**
+  String get settingsReading;
+
+  /// The language row's title, and the row that opens the sheet. Transcribed: SettingsScreen.tsx:76 writes `Default language`.
+  ///
+  /// This row is where **defect #7** is fixed, and the fix is not the row — the prototype's row was never broken. It is that the control writes `UserSettings.language` and `app.dart` installs it as `MaterialApp.locale`. The sheet is `features/settings/presentation/widgets/language_sheet.dart` and its doc records that the FAB this defect names was cut with the profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Default language'**
+  String get settingsDefaultLanguage;
+
+  /// The sheet's own heading. **Written, not transcribed** — the prototype draws its language pills inline (SettingsScreen.tsx:77-90) and defines no sheet, no heading and no dismiss affordance at all. A bottom sheet needs a name for §14's first row, and inventing a row for it inside the screen is this client's own contribution.
+  ///
+  /// The sentence is an instruction rather than a noun phrase because the sheet's two rows are both languages and neither can be named "the language".
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a language'**
+  String get settingsLanguageSheetTitle;
+
+  /// The English row in the language sheet. Transcribed in **kind** from SettingsScreen.tsx:88, which writes the pill's own label as `l === 'EN' ? 'English' : 'العربية'` — so the prototype already draws one end of this pair in Arabic, which is where the Arabic form of `العربية` comes from.
+  ///
+  /// The Arabic value here is `الإنجليزية` and not `English`, deliberately: an Arabic reader who cannot read Latin would otherwise be unable to choose English, which is the one choice whose absence locks them out of the other arm. That decision also keeps `app_localizations_test.dart`'s `latinIsCorrect` exception list from growing, which an earlier draft of `settings_l10n.dart` claimed was not the case.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// The Arabic row in the language sheet. **Same word in both arms**, and that is the whole of its rule: a language names itself in its own script, and the prototype's own `العربية` pill label is the evidence.
+  ///
+  /// `SettingsScreen.tsx:88` writes the two-letter codes `EN` and `AR` on the pill and the full names beside them; this client draws the **names only**, because `EN` and `AR` are Latin script on the Arabic arm and the two codes are also exactly what `ReadingLanguage.code` already holds for the API path — so they are rendered from the domain enum rather than translated.
+  ///
+  /// In en, this message translates to:
+  /// **'Arabic'**
+  String get settingsLanguageArabic;
+
+  /// The third section label. Transcribed: SettingsScreen.tsx:107 writes `About` through the same local `SectionLabel`.
+  ///
+  /// The group ships ONE row of the prototype's two: `SettingsScreen.tsx:118`'s Privacy policy is cut because it is a legal document with no URL, no screen and no endpoint, and an inert row that answers "unavailable in this build" is worse than no row at all for that particular question.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// The version row's title. Transcribed: SettingsScreen.tsx:115 writes `Version`, with the value beside it.
+  ///
+  /// The **value** is `AppConfig.appVersion`, not an ARB key, because it is not prose: it is `pubspec.yaml`'s own `version:` with a build suffix, and `settings_page_test.dart` parses `pubspec.yaml` and asserts the two agree. Putting it in this file would have been a number a translator could edit and nothing would check.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsVersion;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -661,25 +833,26 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['ar', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['ar', 'en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'ar': return AppLocalizationsAr();
-    case 'en': return AppLocalizationsEn();
+    case 'ar':
+      return AppLocalizationsAr();
+    case 'en':
+      return AppLocalizationsEn();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
+    'that was used.',
   );
 }

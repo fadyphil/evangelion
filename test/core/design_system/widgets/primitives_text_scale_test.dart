@@ -140,7 +140,11 @@ void main() {
       tooltip: 'Back',
       onPressed: _noopVoid,
     ),
-    'EvaToggle': () => const EvaToggle(value: true, onChanged: _noopBool),
+    'EvaToggle': () => const EvaToggle(
+      value: true,
+      onChanged: _noopBool,
+      labels: toggleLabels,
+    ),
     'FontSizeStepper': () => const FontSizeStepper(
       labels: stepperLabels,
       step: 3,
