@@ -28,6 +28,7 @@ final class _RecordingRepository implements LeaderboardRepository {
             groupId: 3,
             rows: <LeaderboardRow>[],
             standing: null,
+            cohortSize: 0,
           ),
         );
   }
@@ -39,6 +40,7 @@ void main() {
     groupId: 3,
     rows: <LeaderboardRow>[],
     standing: null,
+    cohortSize: 12,
   );
 
   group('LoadLeaderboard', () {
@@ -89,14 +91,20 @@ void main() {
       await LoadLeaderboardPreview(repository)();
       expect(repository.calls, hasLength(1));
       expect(repository.calls.single.window, LeaderboardWindow.weekly);
-      expect(repository.calls.single.limit, 3);
+      expect(repository.calls.single.limit, kLeaderboardPreviewLimit);
     });
 
-    test('and 3 is a wire number, so it is a named constant', () async {
-      // Not "whatever the card happens to fit". Asserting the constant's value keeps a
-      // later change to the card from silently changing the request.
-      expect(kLeaderboardPreviewLimit, 3);
-    });
+    test(
+      'and it asks for more than it shows, so the cohort size is provable',
+      () {
+        // `cohortSizeOf` can only prove the size when `limit` did not bind. A card that
+        // asked for exactly the three rows it draws would get `rowsReturned == limit` —
+        // the ambiguous case — and could render no total at all.
+        expect(kLeaderboardPreviewLimit, greaterThan(kLeaderboardPreviewRows));
+        expect(kLeaderboardPreviewLimit, 50);
+        expect(kLeaderboardPreviewRows, 3);
+      },
+    );
 
     test("returns the repository's board unchanged", () async {
       final _RecordingRepository repository = _RecordingRepository(

@@ -59,6 +59,17 @@ void main() {
     test('settings is /settings', () {
       expect(AppRoutes.settings, '/settings');
     });
+
+    test(
+      'leaderboard is /leaderboard, and is slash-prefixed like the rest',
+      () {
+        // The slash-prefix invariant is structural (`app_routes_test.dart`'s first group),
+        // so this row is only here for the value. The seventh route is the first one
+        // whose path was **not** locked by AGENT_CONTEXT §2 — which is why it needed a
+        // value row at all rather than arriving with the other six.
+        expect(AppRoutes.leaderboard, '/leaderboard');
+      },
+    );
   });
 
   group('the inventory is the declaration site', () {
@@ -84,7 +95,7 @@ void main() {
       );
     });
 
-    test('the inventory is exactly the seven declared route names', () {
+    test('the inventory is exactly the eight declared route names', () {
       expect(declared, <String>[
         'login',
         'home',
@@ -92,16 +103,22 @@ void main() {
         'quiz',
         'result',
         'settings',
+        // Phase 1's seventh screen. The count in this test's name and in its docs is
+        // the thing that had to move, which is the cost of spelling the inventory out
+        // rather than comparing against `AppRoutes`' own members — the parser exists so
+        // a **deleted** constant fails, and an inventory cannot be written that avoids
+        // both halves of that trade.
+        'leaderboard',
         'fallback',
       ]);
-      expect(inventory, hasLength(7));
+      expect(inventory, hasLength(8));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
       // all seven entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
       // `whereType<String>()` is the identity — it returned all seven elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(7)` above already implies seven strings.
+      // state, and `hasLength(8)` above already implies seven strings.
     });
   });
 

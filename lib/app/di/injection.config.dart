@@ -15,6 +15,7 @@ import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 
 import '../../core/domain/repositories/auth_repository.dart' as _i497;
+import '../../core/domain/repositories/leaderboard_repository.dart' as _i307;
 import '../../core/domain/repositories/reading_repository.dart' as _i499;
 import '../../core/domain/repositories/settings_repository.dart' as _i896;
 import '../../core/domain/repositories/streak_repository.dart' as _i682;
@@ -25,8 +26,12 @@ import '../../features/auth/domain/usecases/get_current_session.dart' as _i606;
 import '../../features/auth/domain/usecases/sign_in.dart' as _i920;
 import '../../features/auth/domain/usecases/sign_out.dart' as _i568;
 import '../../features/home/domain/usecases/get_reader_session.dart' as _i806;
+import '../../features/home/domain/usecases/load_leaderboard_preview.dart'
+    as _i611;
 import '../../features/home/domain/usecases/load_streak_summary.dart' as _i605;
 import '../../features/home/domain/usecases/load_today_reading.dart' as _i1067;
+import '../../features/leaderboard/domain/usecases/load_leaderboard.dart'
+    as _i964;
 import '../../features/quiz/domain/usecases/refresh_session_questions.dart'
     as _i788;
 import '../../features/quiz/domain/usecases/start_session.dart' as _i521;
@@ -47,6 +52,7 @@ import '../../features/settings/domain/usecases/update_settings.dart' as _i986;
 import 'modules/auth_module.dart' as _i4;
 import 'modules/core_module.dart' as _i134;
 import 'modules/home_module.dart' as _i443;
+import 'modules/leaderboard_module.dart' as _i820;
 import 'modules/quiz_module.dart' as _i697;
 import 'modules/reading_module.dart' as _i768;
 import 'modules/settings_module.dart' as _i145;
@@ -61,6 +67,7 @@ extension GetItInjectableX on _i174.GetIt {
     final authModule = _$AuthModule();
     final coreModule = _$CoreModule();
     final homeModule = _$HomeModule();
+    final leaderboardModule = _$LeaderboardModule();
     final quizModule = _$QuizModule();
     final readingModule = _$ReadingModule();
     final settingsModule = _$SettingsModule();
@@ -95,6 +102,15 @@ extension GetItInjectableX on _i174.GetIt {
       () => homeModule.loadStreakSummary,
     );
     gh.lazySingleton<_i806.GetReaderSession>(() => homeModule.getReaderSession);
+    gh.lazySingleton<_i307.LeaderboardRepository>(
+      () => leaderboardModule.leaderboardRepository,
+    );
+    gh.lazySingleton<_i964.LoadLeaderboard>(
+      () => leaderboardModule.loadLeaderboard,
+    );
+    gh.lazySingleton<_i611.LoadLeaderboardPreview>(
+      () => leaderboardModule.loadLeaderboardPreview,
+    );
     gh.lazySingleton<_i521.StartSession>(() => quizModule.startSession);
     gh.lazySingleton<_i788.RefreshSessionQuestions>(
       () => quizModule.refreshSessionQuestions,
@@ -131,6 +147,8 @@ class _$AuthModule extends _i4.AuthModule {}
 class _$CoreModule extends _i134.CoreModule {}
 
 class _$HomeModule extends _i443.HomeModule {}
+
+class _$LeaderboardModule extends _i820.LeaderboardModule {}
 
 class _$QuizModule extends _i697.QuizModule {}
 

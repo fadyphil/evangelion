@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
@@ -9,9 +10,11 @@ import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -54,6 +57,7 @@ final class HomeHarness {
     required this.bloc,
     required this.readings,
     required this.streaks,
+    required this.leaderboard,
     required this.auth,
   });
 
@@ -66,8 +70,41 @@ final class HomeHarness {
   /// `GET /streak/summary`.
   final CountingStreakRepository streaks;
 
+  /// `GET /leaderboard`.
+  final CountingLeaderboardRepository leaderboard;
+
   /// The session the greeting's name comes from.
   final CountingAuthRepository auth;
+}
+
+/// [LeaderboardRepository] that answers [answer] and counts its calls.
+///
+/// The card is a fourth section on the same footing as the reading and the streak, so
+/// the harness counts its calls too: `home_bloc_test.dart` asserts that `HomeStarted`
+/// issues all four requests, and a card that silently stopped being requested would
+/// leave a spinner on every Home with the suite green.
+final class CountingLeaderboardRepository implements LeaderboardRepository {
+  /// Starts out answering [answer].
+  CountingLeaderboardRepository({required this.answer});
+
+  /// What the next call answers.
+  Result<LeaderboardBoard> answer;
+
+  /// How many times [board] has been called.
+  int calls = 0;
+
+  /// The window and limit of the most recent call, for asserting what was asked for.
+  ({LeaderboardWindow window, int limit})? lastRequest;
+
+  @override
+  Future<Result<LeaderboardBoard>> board({
+    required LeaderboardWindow window,
+    required int limit,
+  }) async {
+    calls++;
+    lastRequest = (window: window, limit: limit);
+    return answer;
+  }
 }
 
 /// [ReadingRepository] that answers [scripture] and counts its calls.
@@ -544,6 +581,7 @@ const Failure streakFailure = Failure(
 HomeHarness harness({
   Result<ScriptureText>? reading,
   Result<StreakSummary>? streak,
+  Result<LeaderboardBoard>? leaderboardAnswer,
   AuthSession? session,
   // **Not `session: null`.** A nullable parameter with a default cannot tell "the
   // caller passed null" from "the caller passed nothing", and the default here is
@@ -564,15 +602,31 @@ HomeHarness harness({
   final CountingAuthRepository auth = CountingAuthRepository(
     session: signedIn ? (session ?? liveSession) : null,
   );
+  final CountingLeaderboardRepository leaderboard =
+      CountingLeaderboardRepository(
+        answer:
+            leaderboardAnswer ??
+            const Result<LeaderboardBoard>.success(
+              LeaderboardBoard(
+                window: LeaderboardWindow.weekly,
+                groupId: 3,
+                rows: <LeaderboardRow>[],
+                standing: null,
+                cohortSize: 0,
+              ),
+            ),
+      );
   final HomeBloc bloc = HomeBloc(
     loadTodayReading: LoadTodayReading(readings),
     loadStreakSummary: LoadStreakSummary(streaks),
     getReaderSession: GetReaderSession(auth),
+    loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
     now: () => at ?? DateTime(2026, 10, 3, 9, 30),
   );
   addTearDown(bloc.close);
   return HomeHarness(
     bloc: bloc,
+    leaderboard: leaderboard,
     readings: readings,
     streaks: streaks,
     auth: auth,

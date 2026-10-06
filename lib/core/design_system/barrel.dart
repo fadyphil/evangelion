@@ -99,6 +99,7 @@ export 'package:evangelion/core/design_system/widgets/font_size_stepper.dart';
 export 'package:evangelion/core/design_system/widgets/glass_surface.dart';
 export 'package:evangelion/core/design_system/widgets/hairline_divider.dart';
 export 'package:evangelion/core/design_system/widgets/icon_action_button.dart';
+export 'package:evangelion/core/design_system/widgets/leaderboard_row_tile.dart';
 export 'package:evangelion/core/design_system/widgets/neural_scaffold.dart';
 export 'package:evangelion/core/design_system/widgets/passage_drop_cap.dart';
 export 'package:evangelion/core/design_system/widgets/progress_beads.dart';

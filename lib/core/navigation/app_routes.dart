@@ -60,6 +60,19 @@ abstract final class AppRoutes {
   /// `/settings` — appearance, reading, about. Local only, never synced.
   static const String settings = '/settings';
 
+  /// `/leaderboard` — the cohort's standings over a chosen window.
+  ///
+  /// ## WHY IT IS A **SEVENTH** ROUTE AND NOT A TAB
+  ///
+  /// It is pushed, not a destination in the bottom bar, because it is reached from
+  /// Home's card and from nowhere else — a tab would promise an equal place in the app
+  /// for a screen two of six screens can reach.
+  ///
+  /// Behind `_guards` like every screen after `/login`, so it cannot be entered by a
+  /// deep link while signed out. See `auth_guard.dart` for what the guard actually
+  /// checks — and for why that is a UX gate and **not** an authorisation one.
+  static const String leaderboard = '/leaderboard';
+
   /// The wildcard catch-all, `'*'`. Unmatched paths redirect through this. See
   /// the file doc for what is and is not true about the value — in particular,
   /// `'/*'` would work too, and `'*'` is here because it is the documented

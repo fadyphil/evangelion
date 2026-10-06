@@ -25,9 +25,19 @@ Failure expectFailure<T>(Result<T> result) {
   }
 }
 
-void main() {
-  const LeaderboardMapper mapper = LeaderboardMapper();
+/// The limit every fixture below is read at, so the twenty-odd `mapper.map` calls do
+/// not each carry it.
+///
+/// [LeaderboardMapper.cohortSizeOf] is the only thing that reads it, and 50 is the
+/// server's own default for the querystring parameter — so a fixture read at 50 is "an
+/// unspecified request". The one test about a binding cap passes its own.
+const int kFixtureLimit = 50;
 
+/// [LeaderboardMapper.map] at [kFixtureLimit], for the same reason.
+Result<LeaderboardBoard> mapped(Object? body) =>
+    const LeaderboardMapper().map(body, limit: kFixtureLimit);
+
+void main() {
   /// The payload the live endpoint returns with nothing scored, copied from
   /// `GET /api/v1/leaderboard?window=weekly` with `X-Group-Id: 3`.
   const Map<String, Object?> emptyBoard = <String, Object?>{
@@ -107,7 +117,7 @@ void main() {
 
   group('the seeded empty board is a success, not a failure', () {
     test('and carries no rows', () {
-      final LeaderboardBoard parsed = expectSuccess(mapper.map(emptyBoard));
+      final LeaderboardBoard parsed = expectSuccess(mapped(emptyBoard));
       expect(parsed.rows, isEmpty);
       expect(parsed.window, LeaderboardWindow.weekly);
       expect(parsed.groupId, 3);
@@ -118,13 +128,13 @@ void main() {
       // The regression this forbids: treating "no rows" as an error puts an error
       // panel on every Home in the seeded environment, which is *every* screen for
       // as long as submissions cannot complete.
-      expect(mapper.map(emptyBoard), isA<Result<LeaderboardBoard>>());
+      expect(mapped(emptyBoard), isA<Result<LeaderboardBoard>>());
     });
   });
 
   group('a populated board', () {
     test('maps rows in order, with rank and score from the payload', () {
-      final LeaderboardBoard parsed = expectSuccess(mapper.map(board()));
+      final LeaderboardBoard parsed = expectSuccess(mapped(board()));
       expect(parsed.rows, hasLength(2));
       expect(parsed.rows.first.rank, 1);
       expect(parsed.rows.first.score, 80);
@@ -136,7 +146,7 @@ void main() {
       // Echoing is the only place the two can be compared; a client that assumed its
       // own request was honoured would label a monthly board "this week".
       final LeaderboardBoard parsed = expectSuccess(
-        mapper.map(board(window: 'monthly')),
+        mapped(board(window: 'monthly')),
       );
       expect(parsed.window, LeaderboardWindow.monthly);
     });
@@ -144,17 +154,14 @@ void main() {
     test('and drops `total_ranked`, which is the returned count and not the cohort', () {
       // The board has no field to render "3 of N" from. Asserted structurally: the
       // entity has no such member, and this test fails if one is added.
-      expect(
-        mapper.map(board(totalRanked: 2)),
-        isA<Result<LeaderboardBoard>>(),
-      );
+      expect(mapped(board(totalRanked: 2)), isA<Result<LeaderboardBoard>>());
       // There is deliberately **no** `expect(parsed.totalRanked, …)` here, and the
       // absence is the test: Dart will not compile a reference to a member the entity
       // does not have. A "the field is not mapped" assertion cannot be written in a
       // statically typed language — which is exactly why dropping the field beats
       // mapping it and documenting what it really means.
       final LeaderboardBoard parsed = expectSuccess(
-        mapper.map(board(totalRanked: 2)),
+        mapped(board(totalRanked: 2)),
       );
       expect(
         parsed.toString(),
@@ -167,9 +174,7 @@ void main() {
   group('`my_standing`: two different absences, kept apart', () {
     test('a null rank is a standing with no position, not no standing', () {
       final LeaderboardBoard parsed = expectSuccess(
-        mapper.map(
-          board(myStanding: <String, Object?>{'rank': null, 'score': 0}),
-        ),
+        mapped(board(myStanding: <String, Object?>{'rank': null, 'score': 0})),
       );
       final LeaderboardStanding standing = parsed.standing!;
       expect(standing.rank, isNull);
@@ -178,16 +183,14 @@ void main() {
 
     test('a null object is no standing at all', () {
       final LeaderboardBoard parsed = expectSuccess(
-        mapper.map(board(myStanding: null)),
+        mapped(board(myStanding: null)),
       );
       expect(parsed.standing, isNull);
     });
 
     test('and a real position is carried through', () {
       final LeaderboardBoard parsed = expectSuccess(
-        mapper.map(
-          board(myStanding: <String, Object?>{'rank': 2, 'score': 50}),
-        ),
+        mapped(board(myStanding: <String, Object?>{'rank': 2, 'score': 50})),
       );
       expect(parsed.standing!.rank, 2);
       expect(parsed.standing!.score, 50);
@@ -197,14 +200,14 @@ void main() {
       // Absent and present-but-null are different payloads. Only the second is the
       // server's way of saying "unranked"; the first means the shape changed.
       final Failure failure = expectFailure(
-        mapper.map(board(myStanding: <String, Object?>{'score': 0})),
+        mapped(board(myStanding: <String, Object?>{'score': 0})),
       );
       expect(failure.kind, FailureKind.serialization);
       expect(failure.message, contains('rank'));
     });
 
     test('and a non-object `my_standing` is refused', () {
-      final Failure failure = expectFailure(mapper.map(board(myStanding: 7)));
+      final Failure failure = expectFailure(mapped(board(myStanding: 7)));
       expect(failure.kind, FailureKind.serialization);
       expect(failure.message, contains('null or a JSON object'));
     });
@@ -215,7 +218,7 @@ void main() {
       // Skipping row 2 would leave ranks 1, 3 — a ranking with a hole in it, which
       // reads as authoritative while being wrong. See the mapper's class doc.
       final Failure failure = expectFailure(
-        mapper.map(
+        mapped(
           board(
             rows: <Object?>[
               row(),
@@ -233,7 +236,7 @@ void main() {
 
     test('and the message names the index, so the bad row can be found', () {
       final Failure failure = expectFailure(
-        mapper.map(
+        mapped(
           board(
             rows: <Object?>[
               row(),
@@ -248,7 +251,7 @@ void main() {
 
     test('a row that is not an object is refused too', () {
       final Failure failure = expectFailure(
-        mapper.map(board(rows: <Object?>['Peter'])),
+        mapped(board(rows: <Object?>['Peter'])),
       );
       expect(failure.message, contains('leaderboard[0]'));
     });
@@ -257,7 +260,7 @@ void main() {
       // JSON `6.0` decodes to a Dart `double`. Accepting it means silently
       // truncating a number the server sent.
       final Failure failure = expectFailure(
-        mapper.map(board(rows: <Object?>[row(score: 6.0)])),
+        mapped(board(rows: <Object?>[row(score: 6.0)])),
       );
       expect(failure.message, contains('an int'));
     });
@@ -265,14 +268,14 @@ void main() {
 
   group('an unreadable body', () {
     test('null names the proxy that swallowed it', () {
-      final Failure failure = expectFailure(mapper.map(null));
+      final Failure failure = expectFailure(mapped(null));
       expect(failure.kind, FailureKind.serialization);
       expect(failure.message, contains('empty'));
     });
 
     test('an HTML document is named as one, with its length', () {
       final Failure failure = expectFailure(
-        mapper.map('<!DOCTYPE html><html>502</html>'),
+        mapped('<!DOCTYPE html><html>502</html>'),
       );
       expect(failure.message, contains('HTML'));
       expect(failure.message, contains('31'));
@@ -282,21 +285,19 @@ void main() {
       // The dangerous version of this test asserts `weekly`: a server that grew a
       // fourth window would then be reported as "this week", which is a wrong answer
       // presented confidently.
-      final Failure failure = expectFailure(
-        mapper.map(board(window: 'yearly')),
-      );
+      final Failure failure = expectFailure(mapped(board(window: 'yearly')));
       expect(failure.kind, FailureKind.serialization);
       expect(failure.message, contains('weekly, monthly, all_time'));
     });
 
     test('a missing `leaderboard` key is a failure', () {
       final Map<String, Object?> body = board()..remove('leaderboard');
-      final Failure failure = expectFailure(mapper.map(body));
+      final Failure failure = expectFailure(mapped(body));
       expect(failure.message, contains('leaderboard'));
     });
 
     test('a non-object body names its runtime type', () {
-      final Failure failure = expectFailure(mapper.map(<Object?>[]));
+      final Failure failure = expectFailure(mapped(<Object?>[]));
       expect(failure.message, contains('not a JSON object'));
     });
   });
@@ -361,16 +362,116 @@ void main() {
     });
   });
 
+  group('cohortSize — the size rule that survives the ZCARD change', () {
+    test(
+      'is exact when the cap did not bind, and the cap is `rows < limit`',
+      () {
+        // 5 children, `limit=50`: ZREVRANGE returned all of them, so the cohort is 5.
+        expect(
+          LeaderboardMapper.cohortSizeOf(
+            reportedTotal: 5,
+            rowsReturned: 5,
+            limit: 50,
+          ),
+          5,
+        );
+      },
+    );
+
+    test('is null when the rows exactly fill the limit', () {
+      // 50 rows for `limit=50` is ambiguous: the cohort is 50, or 500. Saying 50 would
+      // be a guess, and a guess here becomes "3rd of 3" on a cohort of sixty.
+      expect(
+        LeaderboardMapper.cohortSizeOf(
+          reportedTotal: 50,
+          rowsReturned: 50,
+          limit: 50,
+        ),
+        isNull,
+      );
+    });
+
+    test(
+      "is today's server: a cohort of 60 at limit 50 answers null, not 50",
+      () {
+        // `total_ranked` is `enrichedEntries.length` today, so it reports 50 and there
+        // is no way to tell 50 from 600.
+        expect(
+          LeaderboardMapper.cohortSizeOf(
+            reportedTotal: 50,
+            rowsReturned: 50,
+            limit: 50,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test('and is the TRUE 60 the moment the route sends a ZCARD', () {
+      // Same 50 rows, same limit. The only difference is that `total_ranked` now
+      // exceeds the rows returned, which is the proof that it is counting something
+      // the page does not contain. No line of this mapper changes when the backend
+      // fixes the route.
+      expect(
+        LeaderboardMapper.cohortSizeOf(
+          reportedTotal: 60,
+          rowsReturned: 50,
+          limit: 50,
+        ),
+        60,
+      );
+    });
+
+    test('a cohort of 3 answers 3 under BOTH server versions', () {
+      for (final int reported in <int>[3, 3]) {
+        expect(
+          LeaderboardMapper.cohortSizeOf(
+            reportedTotal: reported,
+            rowsReturned: 3,
+            limit: 50,
+          ),
+          3,
+        );
+      }
+    });
+
+    test('an empty cohort is 0, not null — nobody scoring IS a known size', () {
+      // The distinction that keeps the empty state honest: 0 ranked children is a fact
+      // about the cohort, while `null` is a fact about the response.
+      expect(
+        LeaderboardMapper.cohortSizeOf(
+          reportedTotal: 0,
+          rowsReturned: 0,
+          limit: 50,
+        ),
+        0,
+      );
+    });
+
+    test('and it rides through `map`, on the seeded empty board', () {
+      expect(expectSuccess(mapped(emptyBoard)).cohortSize, 0);
+    });
+
+    test('a board whose rows fill the limit reports no size at all', () {
+      final List<Object?> rows = <Object?>[
+        for (int i = 1; i <= 3; i++) row(rank: i, score: 100 - i),
+      ];
+      final LeaderboardBoard parsed = expectSuccess(
+        const LeaderboardMapper().map(board(rows: rows), limit: 3),
+      );
+      expect(parsed.rows, hasLength(3));
+      expect(parsed.cohortSize, isNull);
+    });
+  });
+
   group('rows never carry a name, a streak or an id', () {
     test('a mapped row exposes exactly three members', () {
       // The privacy requirement is structural, not a convention: `fullName`,
       // `currentStreak` and `userId` are not on the entity, so no widget can render
       // them. A field added later breaks this test.
-      final LeaderboardRow mapped = expectSuccess(mapper.map(board()))
-          .rows
-          .first;
+      final LeaderboardRow row = expectSuccess(mapped(board())).rows.first;
       expect(
-        mapped.toString(),
+        row.toString(),
         allOf(
           contains('initials'),
           isNot(contains('Peter')),

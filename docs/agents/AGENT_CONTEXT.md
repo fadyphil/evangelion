@@ -3397,3 +3397,111 @@ animation was already at 1.0 and the call completed instantly. And `Animate.init
 in `Future.delayed(Duration.zero)`, which creates a real `Timer`, so every `Animate` left
 one pending; a bare `tester.pump()` does not drain it because a zero-length pump does not
 advance the fake clock. Both are now covered by assertions that fail on the mutation.
+
+**136. THE COHORT SIZE IS **PROVABLE TODAY**, SO THE `ZCARD` IS A NO-OP AND NOT A
+FOLLOW-UP TASK.**
+
+Phase 1's plan was to leave `cohortSize` `null` until the backend grew a `ZCARD`, and to
+stub it meanwhile. Both halves were wrong, and measuring the endpoint showed it.
+
+The route sends `total_ranked: enrichedEntries.length` — **rows returned, after `limit`**.
+That is not the cohort size: with `limit=50`, a cohort of 60 answers `50` and a cohort
+of 3 also answers 3. Reading it as the size is how "3rd of 3" appears on a cohort of
+sixty.
+
+But `ZREVRANGE(key, 0, limit - 1)` returns `min(members, limit)` rows, which makes the
+true size recoverable **whenever the cap did not bind**:
+
+```dart
+if (reportedTotal > rowsReturned) return reportedTotal;   // a true ZCARD
+if (rowsReturned < limit)        return rowsReturned;    // cap did not bind
+return null;                                             // genuinely unknown
+```
+
+* today, `limit=50`, cohort 60 → 50 rows, `50 > 50` false, `50 < 50` false → **`null`**,
+  the honest answer;
+* after the route switches to `ZCARD`, the same cohort sends `total_ranked: 60` with 50
+  rows → `60 > 50` → **`60`**, and **not one line of the mapper changes**;
+* a cohort of 3 answers `3` under both versions, which is right under both.
+
+So the backend fix costs one line in a Fastify route, and the value is not stubbed,
+not faked, and not gated behind a flag. A version that trusted `total_ranked` would have
+had to be *edited* to become correct; a version that only inferred would have silently
+begun under-reporting the moment the field became truthful. The rule is written as a
+comparison against the rows so that neither is true.
+
+Four mutations against it, all red — including **deleting the `reportedTotal >
+rowsReturned` arm**, which is the post-`ZCARD` regression and would be invisible until
+the backend shipped.
+
+**137. THE CARD ASKS FOR FIFTY AND DRAWS THREE, AND THAT GAP IS THE FEATURE.**
+
+`kLeaderboardPreviewLimit = 50` (the request) against `kLeaderboardPreviewRows = 3`
+(the drawing). The first draft had one constant of `3` on both sides, which made
+`cohortSize` **permanently unknowable** on the card: `rowsReturned == limit` is exactly
+the ambiguous case. The card would have been silently less informative than the screen
+it links to.
+
+A few kilobytes of leaderboard JSON is not a close call against a card that can never say
+how many children there are.
+
+**138. THE STUB REPOSITORY IS A `--dart-define`, NOT A DEBUG FLAG, AND THE PURITY GATE
+IS WHY.**
+
+`StubLeaderboardRepository` exists because the leaderboard is empty **and cannot be
+otherwise**: scores only enter Redis via `leaderboardService.recordScore`, called from
+`submissions.service.ts:105` on a *successful* submission, and submission cannot succeed
+against the memory fallback — `POST /submissions` validates `reading_id` and
+`question_id` as UUIDs while the fallback mints `reading-group-3-2026-10-004`. Measured:
+`{"group_id":3,"window":"weekly","total_ranked":0,"my_standing":null,"leaderboard":[]}`.
+
+Switched on with `--dart-define=USE_STUB_LEADERBOARD=true`, read through
+`bool.fromEnvironment` in `leaderboard_module.dart`. **`kDebugMode` was rejected:** it
+lives in `package:flutter/foundation.dart`, `leaderboard_module.dart` is reachable from
+`injection.dart`, and recorded decision 4 makes that graph's Flutter-freedom a gate. The
+framework would have been imported to ask a yes/no question about a stub.
+
+`DioLeaderboardRepository` is the **default** and the stub is unreachable unless a build
+names the flag, so the whole pipeline to the real endpoint is what ships.
+
+**139. `LeaderboardRowTile` LIVES IN THE DESIGN SYSTEM, AND THAT IS A REAL COST.**
+
+`injection_test.dart` Gate 2 refused Home's card importing `features/leaderboard/` for
+`LeaderboardRowTile` — correctly, and symmetrically, since the page was importing
+`features/home/` for the empty state. Two features, one widget.
+
+`core/design_system/widgets/` is the only shared widget home in this repo, so it went
+there — which makes a design-system widget name `core/domain/entities/leaderboard_board.dart`,
+i.e. a design system that knows about one product type. Recorded rather than hidden; the
+alternative was two copies of one row design drifting apart. `EmptyState` was already in
+the design system, so the empty state needed no new shared widget at all.
+
+**140. THE RENDER TEST FOUND A CRASH THE BUILD COULD NOT, AND ITS OWN LOOP WAS
+VACUOUS FOR TWO RUNS.**
+
+`ErrorView` asserts `onRetry == null || retryFamily != null`. `/leaderboard` and Home's
+card both passed `onRetry` with no family. `flutter build` succeeded, `dart analyze` was
+clean, and the screen would have thrown **on the failure path only** — which is the path
+no successful launch reaches. `leaderboard_overflow_test.dart` renders the failure state
+and it fired.
+
+Then the same file's surface loop was wrong for two runs: `evaPrimitiveHarness`'s `size`
+parameter is documented as **retained but unused**, the surface being fixed by
+`pumpPrimitive`. So all three "surfaces" rendered at the default 800x600 and the overflow
+claim was true of a surface nobody ships. `dart analyze`'s *unused local variable* on the
+destructured `size` is what exposed it — a lint, not a test. The fix sets
+`tester.view.physicalSize`, and the loop now asserts the laid-out width so a harness that
+ignores the size again fails here rather than silently.
+
+**141. `HomeState.toString()` IS HAND-WRITTEN, AND A NEW FIELD IS INVISIBLE IN IT UNTIL
+SOMEONE ADDS IT.**
+
+`@Freezed(copyWith: false)` plus whole-state writers means adding `leaderboardStatus`
+required editing **every** writer — `withReading`, `withStreak`, `withReader` — because a
+writer that forgets the new fields silently clears them. That is the cost of the
+discipline working, and it is why the card survived: a reading update no longer wipes it.
+
+The `toString()` is the same trap in miniature. Two frames in `home_bloc_test.dart` were
+indistinguishable in a failure message until it learned to print `board: ready 3`. It
+counts rows rather than printing the board, because a failure message that renders a
+twelve-field entity stops being readable.

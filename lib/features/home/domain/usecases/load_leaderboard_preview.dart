@@ -3,22 +3,33 @@ import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
 
-/// The three rows Home's card shows.
+/// How many rows the **request** asks for.
 ///
-/// ## WHY `3` AND NOT "ENOUGH TO FILL THE CARD"
+/// A wire number, not a display one: the card draws [kLeaderboardPreviewRows] and asks
+/// for this. The gap is the whole point.
 ///
-/// It is a request to the server, so it changes bytes on the wire and the size of the
-/// JSON decoded — not a number the card clamps to afterwards. The seeded endpoint
-/// returns `total_ranked: 0` and an empty array, so today both values produce the same
-/// empty body; the difference shows up the first time a cohort has more than three
-/// scorers, and asking then would mean the card's `limit` was never the thing anyone
-/// measured.
+/// ## WHY THE REQUEST OVER-FETCHES, WHICH COSTS BYTES AND BUYS HONESTY
 ///
-/// Three is also the number the card can show without the reader scrolling, which is
-/// the actual constraint. It is one constant rather than a field on `UserSettings`,
-/// because a setting for it would be a preference about the design of a widget, not
-/// about the reader.
-const int kLeaderboardPreviewLimit = 3;
+/// `LeaderboardMapper.cohortSizeOf` can only prove the cohort's size when the server's
+/// `limit` did not bind. A card that asked for three rows in a cohort of twelve would
+/// receive three rows and learn nothing — `rowsReturned == limit` is precisely the
+/// ambiguous case, and the card could only ever render "3rd" with no total. Asking for
+/// the server's own default of fifty makes the size provable for any cohort under
+/// fifty, which is every cohort there is.
+///
+/// Fifty rows of a leaderboard is a few kilobytes on a screen already carrying a neural
+/// background. Spending that to never print a wrong total is not a close call; the
+/// alternative defect — a card silently less informative than the screen it links to —
+/// is worse.
+const int kLeaderboardPreviewLimit = 50;
+
+/// How many of those rows the **card** draws.
+///
+/// Three is the number the card shows without the reader scrolling, which is the actual
+/// constraint. A display constant rather than a field on `UserSettings`, because a
+/// setting for it would be a preference about the design of a widget, not about the
+/// reader.
+const int kLeaderboardPreviewRows = 3;
 
 /// The weekly top rows for Home's card.
 ///
@@ -35,7 +46,14 @@ const int kLeaderboardPreviewLimit = 3;
 /// and the constant moves with it.
 ///
 /// **Weekly** is also the server's own default for the parameter, so this asks for what
-/// an unspecified request would have got.
+/// an unspecified request would have got — which is why the limit is the server's default
+/// too.
+///
+/// ## IT STILL ASKS FOR MORE THAN IT SHOWS
+///
+/// [kLeaderboardPreviewLimit] is 50 and [kLeaderboardPreviewRows] is 3. The card draws
+/// three; it asks for fifty so that `cohortSizeOf` can prove how many children there
+/// are. See that constant for why the split is deliberate.
 final class LoadLeaderboardPreview
     implements NoParamsUseCase<LeaderboardBoard> {
   /// Loads the preview through [repository].

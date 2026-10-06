@@ -587,14 +587,14 @@ mixin _$HomeState {
 @override
 bool operator ==(Object other) {
   final _this = this as HomeState;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HomeState&&(identical(other.readingStatus, _this.readingStatus) || other.readingStatus == _this.readingStatus)&&(identical(other.streakStatus, _this.streakStatus) || other.streakStatus == _this.streakStatus)&&(identical(other.readerStatus, _this.readerStatus) || other.readerStatus == _this.readerStatus)&&(identical(other.greetingPeriod, _this.greetingPeriod) || other.greetingPeriod == _this.greetingPeriod)&&(identical(other.readerName, _this.readerName) || other.readerName == _this.readerName)&&(identical(other.readerInitials, _this.readerInitials) || other.readerInitials == _this.readerInitials)&&(identical(other.reading, _this.reading) || other.reading == _this.reading)&&(identical(other.readingFailure, _this.readingFailure) || other.readingFailure == _this.readingFailure)&&(identical(other.streak, _this.streak) || other.streak == _this.streak)&&(identical(other.streakFailure, _this.streakFailure) || other.streakFailure == _this.streakFailure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HomeState&&(identical(other.readingStatus, _this.readingStatus) || other.readingStatus == _this.readingStatus)&&(identical(other.streakStatus, _this.streakStatus) || other.streakStatus == _this.streakStatus)&&(identical(other.readerStatus, _this.readerStatus) || other.readerStatus == _this.readerStatus)&&(identical(other.leaderboardStatus, _this.leaderboardStatus) || other.leaderboardStatus == _this.leaderboardStatus)&&(identical(other.leaderboard, _this.leaderboard) || other.leaderboard == _this.leaderboard)&&(identical(other.leaderboardFailure, _this.leaderboardFailure) || other.leaderboardFailure == _this.leaderboardFailure)&&(identical(other.greetingPeriod, _this.greetingPeriod) || other.greetingPeriod == _this.greetingPeriod)&&(identical(other.readerName, _this.readerName) || other.readerName == _this.readerName)&&(identical(other.readerInitials, _this.readerInitials) || other.readerInitials == _this.readerInitials)&&(identical(other.reading, _this.reading) || other.reading == _this.reading)&&(identical(other.readingFailure, _this.readingFailure) || other.readingFailure == _this.readingFailure)&&(identical(other.streak, _this.streak) || other.streak == _this.streak)&&(identical(other.streakFailure, _this.streakFailure) || other.streakFailure == _this.streakFailure));
 }
 
 
 @override
 int get hashCode {
   final _this = this as HomeState;
-  return Object.hash(runtimeType,_this.readingStatus,_this.streakStatus,_this.readerStatus,_this.greetingPeriod,_this.readerName,_this.readerInitials,_this.reading,_this.readingFailure,_this.streak,_this.streakFailure);
+  return Object.hash(runtimeType,_this.readingStatus,_this.streakStatus,_this.readerStatus,_this.leaderboardStatus,_this.leaderboard,_this.leaderboardFailure,_this.greetingPeriod,_this.readerName,_this.readerInitials,_this.reading,_this.readingFailure,_this.streak,_this.streakFailure);
 }
 
 

@@ -336,6 +336,106 @@ abstract class AppLocalizations {
   /// **'No reflection questions today'**
   String get homeNoQuestionsToday;
 
+  /// App bar / section title for `/leaderboard`. The cohort's ranking over a chosen window.
+  ///
+  /// In en, this message translates to:
+  /// **'Cohort standings'**
+  String get leaderboardTitle;
+
+  /// Segmented-control option for `LeaderboardWindow.weekly`.
+  ///
+  /// NOT the enum's wire code. The wire sends `weekly`, `monthly`, `all_time`; those are identifiers in `leaderboard_board.dart`, not words to put in front of a reader. `all_time` in particular would need a space and a lowercase 't' to read as English.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get leaderboardWindowWeekly;
+
+  /// Segmented-control option for `LeaderboardWindow.monthly`. See `leaderboardWindowWeekly` for why this is not the wire code.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get leaderboardWindowMonthly;
+
+  /// Segmented-control option for `LeaderboardWindow.allTime`. See `leaderboardWindowWeekly` for why this is not the wire code `all_time`.
+  ///
+  /// In en, this message translates to:
+  /// **'All time'**
+  String get leaderboardWindowAllTime;
+
+  /// Shown when the cohort has nobody ranked.
+  ///
+  /// A REAL STATE, NOT AN ERROR. Measured against the live endpoint: `{"group_id":3,"window":"weekly","total_ranked":0,"my_standing":null,"leaderboard":[]}`. Scores only enter Redis via `leaderboardService.recordScore`, called from `submissions.service.ts:105` on a *successful* submission, and submission cannot succeed against the memory fallback because the schemas require UUIDs the fallback does not mint. So the empty board is currently the ONLY reachable state in development.
+  ///
+  /// This is why the copy explains what will fill it instead of apologising for a failure.
+  ///
+  /// In en, this message translates to:
+  /// **'No scores yet'**
+  String get leaderboardEmptyTitle;
+
+  /// Body under `leaderboardEmptyTitle`. Says what will populate the list, because the reader cannot tell whether the cohort is new or the app is broken.
+  ///
+  /// In en, this message translates to:
+  /// **'Once the cohort starts answering, the standings appear here.'**
+  String get leaderboardEmptyBody;
+
+  /// Label on the reader's own row. NOT the reader's name and NOT their initials — the top bar already shows both, and repeating the initials next to the flame would be a second copy of the same identity.
+  ///
+  /// A reader must find their own row in a list of other children's monograms without their name appearing anywhere, which is the whole point of `LeaderboardRow` having no `fullName`.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get leaderboardYourRank;
+
+  /// Shown instead of a position when `LeaderboardStanding.rank` is `null`.
+  ///
+  /// NEVER AN ARITHMETIC RESULT. `rank: null` with `score: 0` is the server's measured answer for a child who has not scored. Rendering it as `0` or `1` would put a fabricated position on someone who has none — the defect `LeaderboardStanding`'s doc is named for.
+  ///
+  /// In en, this message translates to:
+  /// **'Not ranked yet'**
+  String get leaderboardUnranked;
+
+  /// Unit caption under a score. Lowercase and plural-invariant because the unit is fixed and the number is not; 'pts' was rejected as too terse to read as a word in Arabic, where a two-letter abbreviation carries no meaning.
+  ///
+  /// In en, this message translates to:
+  /// **'points'**
+  String get leaderboardScoreLabel;
+
+  /// Link from Home's compact card to `/leaderboard`.
+  ///
+  /// Phrased as an action rather than a count, because the card cannot honestly say how many there are — `cohortSize` is `null` whenever the request's `limit` bound. 'See all' stays true whether there are four children or four hundred.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get leaderboardOpenFull;
+
+  /// Title on Home's compact card.
+  ///
+  /// FIXED TO THE WEEK on purpose. The card always requests `LeaderboardWindow.weekly` — `LoadLeaderboardPreview` takes no window — so a title that varied with the data would be claiming a precision the request does not have.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get leaderboardCardTitle;
+
+  /// The screen-reader sentence for one ranked row.
+  ///
+  /// A REAL ICU PLURAL, and the reason this key exists rather than four separate strings. A row is four numbers and a monogram; a screen reader announcing "3, PG, 80, points" gives a reader four fragments and no sentence, so this composes one. The plural is over `count` with the digits interpolated separately, which is the same shape `readingCaptionFor` uses.
+  ///
+  /// `isReader` is a `select`, not a second plural: "that is you" is a clause, not a quantity, and folding it into the plural would multiply the arms for no gain.
+  ///
+  /// NEVER A NAME. `initials` is the monogram and nothing else can reach this string, which is the accessibility half of `LeaderboardRow` having no `fullName` — a voice-over user must not be able to hear a name the screen cannot show.
+  ///
+  /// `rank` and `digits` are **String** while `count` is **int**, and that split is load-bearing rather than fussy: `count` is what the plural selects on, and `digits` is what the reader sees. Passing the numeral twice means the shape does not have to change when a locale's digits are not ASCII — the Arabic arm renders U+0660…U+0669, and `intl`'s formatting would otherwise be a second source of truth about numerals. `readingCaptionFor` does the same thing.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, zero{no points} one{1 point} other{{digits} points}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}'**
+  String leaderboardRowSemantics(
+    int count,
+    String digits,
+    String initials,
+    String rank,
+    String isReader,
+  );
+
   /// The primary CTA. Transcribed: HomeScreen.tsx:71 — `ButtonPrimary`.
   ///
   /// KEPT AS THE PROTOTYPE'S, DELIBERATELY: it names an ACTION (open today's reading) and that action is available whether or not the reading is finished. The state-dependent string is the eyebrow above, which is what actually changes.

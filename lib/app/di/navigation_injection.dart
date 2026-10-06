@@ -8,9 +8,12 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
+import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
@@ -182,10 +185,21 @@ void configureNavigation() {
     loadTodayReading: getIt<LoadTodayReading>(),
     loadStreakSummary: getIt<LoadStreakSummary>(),
     getReaderSession: getIt<GetReaderSession>(),
+    loadLeaderboardPreview: getIt<LoadLeaderboardPreview>(),
   );
   // **Built here, not resolved from the locator** — see the `ReadingCubit` section.
   final ReadingCubit readingCubit = ReadingCubit(
     loadScripture: getIt<LoadScripture>(),
+  );
+  // Hand-registered for the same reason `ReadingCubit` is: `flutter_bloc` re-exports
+  // the widget layer, so a `@module` naming a cubit would drag `package:flutter` into
+  // `injection.dart`'s import graph and `injection_test.dart` would fail on it.
+  //
+  // `registerSingleton`, not `registerLazySingleton`: the cubit holds state, so two
+  // instances would be two rankings, and `/leaderboard` re-entering must see the one
+  // that is live.
+  final LeaderboardCubit leaderboardCubit = LeaderboardCubit(
+    loadLeaderboard: getIt<LoadLeaderboard>(),
   );
 
   // **Built here, not resolved from the locator** — see the `QuizBloc` section for
@@ -231,6 +245,7 @@ void configureNavigation() {
     ..registerSingleton<AuthBloc>(authBloc)
     ..registerSingleton<HomeBloc>(homeBloc)
     ..registerSingleton<ReadingCubit>(readingCubit)
+    ..registerSingleton<LeaderboardCubit>(leaderboardCubit)
     ..registerSingleton<QuizBloc>(quizBloc)
     ..registerSingleton<SettingsCubit>(settingsCubit)
     ..registerSingleton<SettingsHandle>(settingsHandle)

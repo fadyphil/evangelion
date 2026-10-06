@@ -160,6 +160,7 @@ final class LeaderboardBoard with _$LeaderboardBoard {
     required this.groupId,
     required this.rows,
     required this.standing,
+    required this.cohortSize,
   });
 
   /// Which window [rows] ranks over.
@@ -180,6 +181,23 @@ final class LeaderboardBoard with _$LeaderboardBoard {
   /// state is a real product state here, not an error. What *is* refused is a missing
   /// or non-list `leaderboard` key, and a first row that cannot be read.
   final List<LeaderboardRow> rows;
+
+  /// How many children in this cohort have a score in this window — or `null` when
+  /// that number cannot be known from what was returned.
+  ///
+  /// ## WHY IT IS NULLABLE, AND WHY IT IS NOT SIMPLY ABSENT
+  ///
+  /// A leaderboard that says "3rd" and one that says "3rd of 12" are different claims,
+  /// and only the second is safe when the list is capped. [LeaderboardMapper] derives
+  /// this from `ZREVRANGE`'s own semantics — see its `cohortSizeOf` for the rule and
+  /// for why the answer is correct today *and* stays correct when the backend adds a
+  /// `ZCARD`.
+  ///
+  /// `null` means **"more exist, and here is where the list stops"** — the one case a
+  /// screen must not paper over. It is a first-class value rather than a fallback of
+  /// `rows.length`, because `rows.length` is exactly the number that makes "3rd of 3"
+  /// look true when it is not.
+  final int? cohortSize;
 
   /// The reader's own position, or `null` when the request carried no `X-User-Id`.
   ///

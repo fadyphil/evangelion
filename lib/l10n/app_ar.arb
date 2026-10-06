@@ -32,6 +32,18 @@
   "homeReadingComplete": "اكتملت القراءة",
   "homeReflectionProgress": "أسئلة التأمل المجابة",
   "homeNoQuestionsToday": "لا توجد أسئلة تأمل اليوم",
+  "leaderboardTitle": "ترتيب المجموعة",
+  "leaderboardWindowWeekly": "الأسبوع",
+  "leaderboardWindowMonthly": "الشهر",
+  "leaderboardWindowAllTime": "منذ البداية",
+  "leaderboardEmptyTitle": "لا توجد نتائج بعد",
+  "leaderboardEmptyBody": "عند بدء إجابات المجموعة سيظهر الترتيب هنا.",
+  "leaderboardYourRank": "أنت",
+  "leaderboardUnranked": "غير مصنّف بعد",
+  "leaderboardScoreLabel": "نقطة",
+  "leaderboardOpenFull": "عرض الكل",
+  "leaderboardCardTitle": "هذا الأسبوع",
+  "leaderboardRowSemantics": "{count, plural, zero{لا نقاط} one{نقطة واحدة} two{نقطتان} few{نقاط} many{نقطة} other{نقطة}}، {initials}، المركز {rank}{isReader, select, true{، هذا أنت} other{}}",
   "homeContinueLabel": "متابعة",
   "homeStartReflection": "ابدأ التأمل",
   "homeRetry": "حاول مرة أخرى",
@@ -94,5 +106,8 @@
   "settingsLanguageEnglish": "الإنجليزية",
   "settingsLanguageArabic": "العربية",
   "settingsAbout": "حول",
-  "settingsVersion": "الإصدار"
+  "settingsVersion": "الإصدار",
+  "@leaderboardRowSemantics": {
+    "description": "Placeholder types are declared in the EN file only; gen-l10n reads them from there for both locales. This entry exists so the ARB pair stays symmetrical."
+  }
 }

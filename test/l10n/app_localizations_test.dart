@@ -89,7 +89,7 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        95,
+        107,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
@@ -101,7 +101,17 @@ void main() {
             'reached and displayed nothing about. Neither key is a plural and '
             'neither holds a placeholder, so the two ICU-plural groups below are '
             'unaffected — which is why this suite went red on exactly two numbers '
-            'and on nothing else.',
+            'and on nothing else.\n\n'
+            '**95 → 107 in Phase 1**, for the twelve `leaderboard*` keys: the '
+            'cohort ranking\'s title, three window labels, its empty state\'s title '
+            'and body, the reader\'s own row, the unranked sentence, the score unit, '
+            'the link to `/leaderboard`, and Home\'s card title. None is a plural and '
+            'none holds a placeholder — the ranks and scores are rendered as numbers '
+            'beside their labels rather than inside them, precisely so this step did '
+            'not have to touch an ICU group.\n\n'
+            'The three window labels are **not** the wire codes. `all_time` is an '
+            'identifier in `leaderboard_board.dart`, and a reader needs the words '
+            '"All time" instead.',
       );
       expect(keysOf(ar), isNotEmpty);
     });
@@ -543,12 +553,24 @@ void main() {
     });
 
     test('and no OTHER key claims to be a plural', () {
-      // The manifest the two plural tests above depend on. If a third key became a
-      // `plural` — or if one of these two stopped being one — this fails, so the
+      // The manifest the plural tests above depend on. If a fourth key became a
+      // `plural` — or if one of these three stopped being one — this fails, so the
       // per-class assertions cannot pass vacuously against a key that has collapsed
       // to a single arm.
+      //
+      // Phase 1 added `leaderboardRowSemantics` as the third. It pluralises a score for
+      // the same reason the other two pluralise counts: a row is four numbers, and a
+      // screen reader announcing them separately gives fragments rather than a
+      // sentence. The per-class assertions for it live in
+      // `leaderboard_row_tile_test.dart`, which is where the string is actually used —
+      // a plural asserted only here would be a claim about the ARB and not about the
+      // app.
       final Set<String> plurals = _pluralKeys(en);
-      expect(plurals, <String>{'readingCaptionFor', 'resultTotalCaption'});
+      expect(plurals, <String>{
+        'readingCaptionFor',
+        'resultTotalCaption',
+        'leaderboardRowSemantics',
+      });
       for (final String key in plurals) {
         expect(
           ar[key],

@@ -410,20 +410,20 @@ $LeaderboardBoardCopyWith<LeaderboardBoard> get copyWith => _$LeaderboardBoardCo
 @override
 bool operator ==(Object other) {
   final _this = this as LeaderboardBoard;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardBoard&&(identical(other.window, _this.window) || other.window == _this.window)&&(identical(other.groupId, _this.groupId) || other.groupId == _this.groupId)&&const DeepCollectionEquality().equals(other.rows, _this.rows)&&(identical(other.standing, _this.standing) || other.standing == _this.standing));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardBoard&&(identical(other.window, _this.window) || other.window == _this.window)&&(identical(other.groupId, _this.groupId) || other.groupId == _this.groupId)&&const DeepCollectionEquality().equals(other.rows, _this.rows)&&(identical(other.cohortSize, _this.cohortSize) || other.cohortSize == _this.cohortSize)&&(identical(other.standing, _this.standing) || other.standing == _this.standing));
 }
 
 
 @override
 int get hashCode {
   final _this = this as LeaderboardBoard;
-  return Object.hash(runtimeType,_this.window,_this.groupId,const DeepCollectionEquality().hash(_this.rows),_this.standing);
+  return Object.hash(runtimeType,_this.window,_this.groupId,const DeepCollectionEquality().hash(_this.rows),_this.cohortSize,_this.standing);
 }
 
 @override
 String toString() {
   final _this = this as LeaderboardBoard;
-  return 'LeaderboardBoard(window: ${_this.window}, groupId: ${_this.groupId}, rows: ${_this.rows}, standing: ${_this.standing})';
+  return 'LeaderboardBoard(window: ${_this.window}, groupId: ${_this.groupId}, rows: ${_this.rows}, cohortSize: ${_this.cohortSize}, standing: ${_this.standing})';
 }
 
 
@@ -434,7 +434,7 @@ abstract mixin class $LeaderboardBoardCopyWith<$Res>  {
   factory $LeaderboardBoardCopyWith(LeaderboardBoard value, $Res Function(LeaderboardBoard) _then) = _$LeaderboardBoardCopyWithImpl;
 @useResult
 $Res call({
- LeaderboardWindow window, int groupId, List<LeaderboardRow> rows, LeaderboardStanding? standing
+ LeaderboardWindow window, int groupId, List<LeaderboardRow> rows, LeaderboardStanding? standing, int? cohortSize
 });
 
 
@@ -451,13 +451,14 @@ class _$LeaderboardBoardCopyWithImpl<$Res>
 
 /// Create a copy of LeaderboardBoard
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? window = null,Object? groupId = null,Object? rows = null,Object? standing = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? window = null,Object? groupId = null,Object? rows = null,Object? standing = freezed,Object? cohortSize = freezed,}) {
   return _then(LeaderboardBoard(
 window: null == window ? _self.window : window // ignore: cast_nullable_to_non_nullable
 as LeaderboardWindow,groupId: null == groupId ? _self.groupId : groupId // ignore: cast_nullable_to_non_nullable
 as int,rows: null == rows ? _self.rows : rows // ignore: cast_nullable_to_non_nullable
 as List<LeaderboardRow>,standing: freezed == standing ? _self.standing : standing // ignore: cast_nullable_to_non_nullable
-as LeaderboardStanding?,
+as LeaderboardStanding?,cohortSize: freezed == cohortSize ? _self.cohortSize : cohortSize // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 

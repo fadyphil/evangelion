@@ -2,14 +2,17 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -57,11 +60,21 @@ class MockStreakRepository extends Mock implements StreakRepository {}
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
+class MockLeaderboardRepository extends Mock implements LeaderboardRepository {}
+
 void main() {
-  setUpAll(() => registerFallbackValue(ReadingLanguage.english));
+  setUpAll(() {
+    registerFallbackValue(ReadingLanguage.english);
+    // The leaderboard mock is stubbed with `any(named: 'window')`, and mocktail
+    // refuses an unregistered enum in an `any()`. Registering the enum itself is the
+    // fix mocktail documents — and it is one line that would otherwise be rediscovered
+    // the first time a fourth port took an enum parameter.
+    registerFallbackValue(LeaderboardWindow.weekly);
+  });
 
   late MockReadingRepository readings;
   late MockStreakRepository streaks;
+  late MockLeaderboardRepository leaderboard;
   late MockAuthRepository auth;
 
   // 09:30 local, so [GreetingPeriod.morning].
@@ -104,6 +117,17 @@ void main() {
     createdAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
   );
 
+  /// The card's answer: the seeded **empty** board, which is the measured state of
+  /// this endpoint — scores enter Redis only through a successful submission, and
+  /// submission cannot succeed against the memory fallback.
+  const LeaderboardBoard liveLeaderboard = LeaderboardBoard(
+    window: LeaderboardWindow.weekly,
+    groupId: 3,
+    rows: <LeaderboardRow>[],
+    standing: null,
+    cohortSize: 0,
+  );
+
   const Failure networkFailure = Failure(
     kind: FailureKind.network,
     message: 'Could not reach the server.',
@@ -118,12 +142,14 @@ void main() {
     loadTodayReading: LoadTodayReading(readings),
     loadStreakSummary: LoadStreakSummary(streaks),
     getReaderSession: GetReaderSession(auth),
+    loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
     now: clock,
   );
 
   setUp(() {
     readings = MockReadingRepository();
     streaks = MockStreakRepository();
+    leaderboard = MockLeaderboardRepository();
     auth = MockAuthRepository();
 
     when(() => readings.today(language: any(named: 'language')))
@@ -133,6 +159,23 @@ void main() {
     ).thenAnswer((_) async => const Result<StreakSummary>.success(liveStreak));
     when(auth.getCurrentSession)
         .thenAnswer((_) async => Result<AuthSession>.success(session));
+    // The seeded **empty** board, which is the measured state of this endpoint.
+    when(
+      () => leaderboard.board(
+        window: any(named: 'window'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer(
+      (_) async => const Result<LeaderboardBoard>.success(
+        LeaderboardBoard(
+          window: LeaderboardWindow.weekly,
+          groupId: 3,
+          rows: <LeaderboardRow>[],
+          standing: null,
+          cohortSize: 0,
+        ),
+      ),
+    );
   });
 
   group('before anything has been asked', () {
@@ -155,7 +198,7 @@ void main() {
 
   group('HomeStarted — the successful launch', () {
     blocTest<HomeBloc, HomeState>(
-      'emits the greeting first, then the three answers in a fixed order',
+      'emits the greeting first, then the four answers in a fixed order',
       build: build,
       act: (HomeBloc bloc) =>
           bloc.add(const HomeStarted(ReadingLanguage.english)),
@@ -192,6 +235,24 @@ void main() {
           reading: liveReading,
           streakStatus: HomeSectionStatus.ready,
           streak: liveStreak,
+        ),
+        // 5. The leaderboard card, **last**. `_onStarted` starts all four requests
+        //    before its first `await` and then awaits them in a fixed order, so the
+        //    emission order is a property of that method rather than of which future
+        //    happens to resolve first. A fifth frame appearing here is the card being
+        //    requested; a fifth frame NOT appearing would mean it silently stopped
+        //    being.
+        HomeState(
+          greetingPeriod: GreetingPeriod.morning,
+          readerName: 'David Mina',
+          readerInitials: 'DM',
+          readerStatus: HomeSectionStatus.ready,
+          readingStatus: HomeSectionStatus.ready,
+          reading: liveReading,
+          streakStatus: HomeSectionStatus.ready,
+          streak: liveStreak,
+          leaderboardStatus: HomeSectionStatus.ready,
+          leaderboard: liveLeaderboard,
         ),
       ],
     );
@@ -233,7 +294,7 @@ void main() {
       verify: (_) {},
       // `HomeStarted` is dispatched once; a second read of the clock would be a
       // second chance for the greeting to change under the reader.
-      expect: () => hasLength(4),
+      expect: () => hasLength(5),
     );
   });
 
@@ -267,7 +328,7 @@ void main() {
           expect(bloc.state.readingStatus, HomeSectionStatus.ready);
           expect(bloc.state.streakStatus, HomeSectionStatus.ready);
         },
-        expect: () => hasLength(4),
+        expect: () => hasLength(5),
       );
     },
   );
@@ -310,6 +371,22 @@ void main() {
           readingFailure: serializationFailure,
           streakStatus: HomeSectionStatus.ready,
           streak: liveStreak,
+        ),
+        // 5. The card resolves **independently** of the reading's failure. This is the
+        //    whole argument for a fourth `HomeSectionStatus`: a failed reading must not
+        //    leave the leaderboard card spinning, and a card stuck on this frame while
+        //    `ready` would be a silent regression rather than a visible one.
+        const HomeState(
+          greetingPeriod: GreetingPeriod.morning,
+          readerName: 'David Mina',
+          readerInitials: 'DM',
+          readerStatus: HomeSectionStatus.ready,
+          readingStatus: HomeSectionStatus.failed,
+          readingFailure: serializationFailure,
+          streakStatus: HomeSectionStatus.ready,
+          streak: liveStreak,
+          leaderboardStatus: HomeSectionStatus.ready,
+          leaderboard: liveLeaderboard,
         ),
       ],
     );
@@ -740,14 +817,17 @@ void main() {
 
   group('the constructor', () {
     test('needs every collaborator, so a half-wired bloc cannot be built', () {
-      // Not a test of behaviour — a statement that the three use cases are
+      // Not a test of behaviour — a statement that the **four** use cases are
       // required, so the object graph cannot be assembled with one missing and
-      // discovered at the first `HomeStarted`.
+      // discovered at the first `HomeStarted`. Three when this was written; Phase 1
+      // added `loadLeaderboardPreview` and the count in that sentence had to move,
+      // which is the whole reason it is written as words rather than a number.
       expect(
         () => HomeBloc(
           loadTodayReading: LoadTodayReading(readings),
           loadStreakSummary: LoadStreakSummary(streaks),
           getReaderSession: GetReaderSession(auth),
+          loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
           now: clock,
         ),
         returnsNormally,

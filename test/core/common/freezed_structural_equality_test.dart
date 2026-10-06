@@ -15,6 +15,7 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
+import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/refreshed_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
@@ -226,7 +227,7 @@ void main() {
       _differsInEveryField(
         'LeaderboardBoard',
         _board(),
-        fields: 4,
+        fields: 5,
         variants: <({String field, LeaderboardBoard value})>[
           (field: 'window', value: _board(window: LeaderboardWindow.monthly)),
           (field: 'groupId', value: _board(groupId: 4)),
@@ -238,6 +239,9 @@ void main() {
             field: 'standing',
             value: _board(standing: _standing(rank: 1, score: 80)),
           ),
+          // `null` and a number must differ, or a screen could not tell "there are 12"
+          // from "there are more than this page holds".
+          (field: 'cohortSize', value: _board(cohortSize: null)),
         ],
       );
     });
@@ -251,6 +255,48 @@ void main() {
         variants: <({String field, LeaderboardQuery value})>[
           (field: 'window', value: _query(window: LeaderboardWindow.allTime)),
           (field: 'limit', value: _query(limit: 50)),
+        ],
+      );
+    });
+
+    test('`LeaderboardState`, and `failure`/`board` are independent', () {
+      // The cubit state a fourth section slots into. `window` is the field with the
+      // most surprising equality: two states differing **only** in window must not be
+      // equal, because that is what stops the previous window's rows being drawn under
+      // a new window's heading — the confusion `LeaderboardCubit.load` empties first
+      // to prevent, and this asserts the state can represent the difference.
+      _equalAndDistinct(
+        'LeaderboardState',
+        _leaderboardState(),
+        _leaderboardState(),
+      );
+      _differsInEveryField(
+        'LeaderboardState',
+        _leaderboardState(),
+        fields: 4,
+        variants: <({String field, LeaderboardState value})>[
+          (
+            field: 'status',
+            value: _leaderboardState(status: LeaderboardStatus.failed),
+          ),
+          (
+            field: 'window',
+            value: _leaderboardState(window: LeaderboardWindow.allTime),
+          ),
+          (
+            field: 'board',
+            value: _leaderboardState(board: _board(rows: <LeaderboardRow>[])),
+          ),
+          (
+            field: 'failure',
+            value: _leaderboardState(
+              status: LeaderboardStatus.failed,
+              failure: const Failure(
+                kind: FailureKind.network,
+                message: 'Could not reach the server.',
+              ),
+            ),
+          ),
         ],
       );
     });
@@ -743,7 +789,7 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(40),
+        hasLength(41),
         reason:
             'the converted set moved. 23 classes, 14 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
@@ -892,6 +938,7 @@ const Set<String> _assertedTypeNames = <String>{
   'LeaderboardStanding',
   'LeaderboardBoard',
   'LeaderboardQuery',
+  'LeaderboardState',
   'SubmitResult',
   'AuthSession',
   'QuizAnswer',
@@ -1070,11 +1117,25 @@ LeaderboardBoard _board({
   int groupId = 3,
   List<LeaderboardRow>? rows,
   LeaderboardStanding? standing,
+  int? cohortSize = 5,
 }) => LeaderboardBoard(
   window: window,
   groupId: _int(groupId),
   rows: rows ?? <LeaderboardRow>[_row()],
   standing: standing,
+  cohortSize: cohortSize,
+);
+
+LeaderboardState _leaderboardState({
+  LeaderboardStatus status = LeaderboardStatus.ready,
+  LeaderboardWindow window = LeaderboardWindow.weekly,
+  LeaderboardBoard? board,
+  Failure? failure,
+}) => LeaderboardState(
+  status: status,
+  window: window,
+  board: board,
+  failure: failure,
 );
 
 LeaderboardQuery _query({

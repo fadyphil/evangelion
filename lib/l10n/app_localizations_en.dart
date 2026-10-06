@@ -107,6 +107,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeNoQuestionsToday => 'No reflection questions today';
 
   @override
+  String get leaderboardTitle => 'Cohort standings';
+
+  @override
+  String get leaderboardWindowWeekly => 'Week';
+
+  @override
+  String get leaderboardWindowMonthly => 'Month';
+
+  @override
+  String get leaderboardWindowAllTime => 'All time';
+
+  @override
+  String get leaderboardEmptyTitle => 'No scores yet';
+
+  @override
+  String get leaderboardEmptyBody =>
+      'Once the cohort starts answering, the standings appear here.';
+
+  @override
+  String get leaderboardYourRank => 'You';
+
+  @override
+  String get leaderboardUnranked => 'Not ranked yet';
+
+  @override
+  String get leaderboardScoreLabel => 'points';
+
+  @override
+  String get leaderboardOpenFull => 'See all';
+
+  @override
+  String get leaderboardCardTitle => 'This week';
+
+  @override
+  String leaderboardRowSemantics(
+    int count,
+    String digits,
+    String initials,
+    String rank,
+    String isReader,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$digits points',
+      one: '1 point',
+      zero: 'no points',
+    );
+    String _temp1 = intl.Intl.selectLogic(isReader, {
+      'true': ', that is you',
+      'other': '',
+    });
+    return '$_temp0, $initials, rank $rank$_temp1';
+  }
+
+  @override
   String get homeContinueLabel => 'Continue';
 
   @override

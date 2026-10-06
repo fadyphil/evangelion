@@ -106,6 +106,65 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeNoQuestionsToday => 'لا توجد أسئلة تأمل اليوم';
 
   @override
+  String get leaderboardTitle => 'ترتيب المجموعة';
+
+  @override
+  String get leaderboardWindowWeekly => 'الأسبوع';
+
+  @override
+  String get leaderboardWindowMonthly => 'الشهر';
+
+  @override
+  String get leaderboardWindowAllTime => 'منذ البداية';
+
+  @override
+  String get leaderboardEmptyTitle => 'لا توجد نتائج بعد';
+
+  @override
+  String get leaderboardEmptyBody =>
+      'عند بدء إجابات المجموعة سيظهر الترتيب هنا.';
+
+  @override
+  String get leaderboardYourRank => 'أنت';
+
+  @override
+  String get leaderboardUnranked => 'غير مصنّف بعد';
+
+  @override
+  String get leaderboardScoreLabel => 'نقطة';
+
+  @override
+  String get leaderboardOpenFull => 'عرض الكل';
+
+  @override
+  String get leaderboardCardTitle => 'هذا الأسبوع';
+
+  @override
+  String leaderboardRowSemantics(
+    int count,
+    String digits,
+    String initials,
+    String rank,
+    String isReader,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'نقطة',
+      many: 'نقطة',
+      few: 'نقاط',
+      two: 'نقطتان',
+      one: 'نقطة واحدة',
+      zero: 'لا نقاط',
+    );
+    String _temp1 = intl.Intl.selectLogic(isReader, {
+      'true': '، هذا أنت',
+      'other': '',
+    });
+    return '$_temp0، $initials، المركز $rank$_temp1';
+  }
+
+  @override
   String get homeContinueLabel => 'متابعة';
 
   @override

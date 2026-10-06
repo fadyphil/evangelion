@@ -553,7 +553,7 @@ void main() {
       );
     });
 
-    test('the twenty-seven current registrations are the ones the config names', () {
+    test('the thirty current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -593,6 +593,11 @@ void main() {
       // `ReadingRepository.submitAnswer`, is asserted by *method* in
       // `submit_result_mapper_test.dart`, not by a registration here, because adding
       // a method to an existing port must not move a single line of this list.
+      //
+      // `LeaderboardCubit` is **not** in this list either, and for `ReadingCubit`'s
+      // reason: it is hand-registered in `navigation_injection.dart` because
+      // `flutter_bloc` re-exports the widget layer and a `@module` naming a cubit
+      // would drag `package:flutter` into `injection.dart`'s graph.
       expect(
         configuredRegistrations(File(configPath).readAsStringSync())
             .map((ConfiguredRegistration r) => r.toString()),
@@ -612,6 +617,15 @@ void main() {
           'lazySingleton<LoadTodayReading> loadTodayReading',
           'lazySingleton<LoadStreakSummary> loadStreakSummary',
           'lazySingleton<GetReaderSession> getReaderSession',
+          // **Phase 1 added three**, and their position is the evidence again:
+          // `leaderboardRepository` lands directly after `getReaderSession` — beside
+          // the other two repository providers, because that is where injectable puts
+          // a provider whose only dependency is `ApiErrorMapper` plus the injected
+          // `Dio` — and the two leaderboard use cases follow it, newest-last. The
+          // generator chose this; this test asserts *which* providers exist.
+          'lazySingleton<LeaderboardRepository> leaderboardRepository',
+          'lazySingleton<LoadLeaderboard> loadLeaderboard',
+          'lazySingleton<LoadLeaderboardPreview> loadLeaderboardPreview',
           'lazySingleton<StartSession> startSession',
           'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
           'lazySingleton<SubmitAnswer> submitAnswer',

@@ -42,11 +42,13 @@ library;
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -187,11 +189,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required LoadTodayReading loadTodayReading,
     required LoadStreakSummary loadStreakSummary,
     required GetReaderSession getReaderSession,
+    required LoadLeaderboardPreview loadLeaderboardPreview,
     DateTime Function()? now,
   }) : this._(
          loadTodayReading,
          loadStreakSummary,
          getReaderSession,
+         loadLeaderboardPreview,
          now ?? DateTime.now,
        );
 
@@ -200,6 +204,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     this._loadTodayReading,
     this._loadStreakSummary,
     this._getReaderSession,
+    this._loadLeaderboardPreview,
     this._now,
   ) : super(const HomeState()) {
     on<HomeStarted>(_onStarted);
@@ -210,6 +215,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final LoadTodayReading _loadTodayReading;
   final LoadStreakSummary _loadStreakSummary;
   final GetReaderSession _getReaderSession;
+  final LoadLeaderboardPreview _loadLeaderboardPreview;
   final DateTime Function() _now;
 
   /// Loads everything, and emits each answer as it lands.
@@ -243,10 +249,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       event.language,
     );
     final Future<Result<StreakSummary>> streak = _loadStreakSummary();
+    // The card's request, started alongside the other three rather than after them.
+    // All four are launched before the first `await` so the emission order below is a
+    // property of this method and not of which future happens to resolve first — the
+    // same reason `home_bloc_test.dart` can assert a frame count.
+    final Future<Result<LeaderboardBoard>> leaderboard =
+        _loadLeaderboardPreview();
 
     _emitReader(await reader, emit);
     _emitReading(await reading, emit);
     _emitStreak(await streak, emit);
+    _emitLeaderboard(await leaderboard, emit);
   }
 
   /// Re-runs only the failed sections, and **emits nothing** when none failed.
@@ -257,7 +270,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Future<void> _onRetried(HomeRetried event, Emitter<HomeState> emit) async {
     final bool retryReading = state.readingStatus == HomeSectionStatus.failed;
     final bool retryStreak = state.streakStatus == HomeSectionStatus.failed;
-    if (!retryReading && !retryStreak) {
+    // A fourth section with the same rule. It is here rather than folded into
+    // `withSection` because that method re-derives only the reading and streak
+    // failures; widening it would make a name that says "section" mean three of four.
+    final bool retryLeaderboard =
+        state.leaderboardStatus == HomeSectionStatus.failed;
+    if (!retryReading && !retryStreak && !retryLeaderboard) {
       return;
     }
 
@@ -277,6 +295,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     if (retryStreak) {
       _emitStreak(await _loadStreakSummary(), emit);
     }
+    if (retryLeaderboard) {
+      _emitLeaderboard(await _loadLeaderboardPreview(), emit);
+    }
   }
 
   void _emitReader(Result<AuthSession> result, Emitter<HomeState> emit) {
@@ -295,6 +316,32 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           status: HomeSectionStatus.ready,
           name: null,
           initials: null,
+        ),
+      ),
+    );
+  }
+
+  /// Emits the card's section.
+  ///
+  /// The two arms are the same shape as [\_emitReading] and [\_emitStreak], and the
+  /// failure arm **clears** the board rather than keeping stale rows under an error —
+  /// a card showing last week's ranking beside this week's failure is worse than an
+  /// empty card, because it looks like data.
+  void _emitLeaderboard(
+    Result<LeaderboardBoard> result,
+    Emitter<HomeState> emit,
+  ) {
+    emit(
+      result.fold<HomeState>(
+        onSuccess: (LeaderboardBoard board) => state.withLeaderboard(
+          status: HomeSectionStatus.ready,
+          board: board,
+          failure: null,
+        ),
+        onFailure: (Failure failure) => state.withLeaderboard(
+          status: HomeSectionStatus.failed,
+          board: null,
+          failure: failure,
         ),
       ),
     );
@@ -375,6 +422,7 @@ final class HomeState with _$HomeState {
     this.readingStatus = HomeSectionStatus.loading,
     this.streakStatus = HomeSectionStatus.loading,
     this.readerStatus = HomeSectionStatus.loading,
+    this.leaderboardStatus = HomeSectionStatus.loading,
     this.greetingPeriod,
     this.readerName,
     this.readerInitials,
@@ -382,6 +430,8 @@ final class HomeState with _$HomeState {
     this.readingFailure,
     this.streak,
     this.streakFailure,
+    this.leaderboard,
+    this.leaderboardFailure,
   });
 
   /// Where today's-reading panel is.
@@ -392,6 +442,20 @@ final class HomeState with _$HomeState {
 
   /// Where the greeting's name is. **`ready` on both arms** — see the class doc.
   final HomeSectionStatus readerStatus;
+
+  /// Where the leaderboard card is.
+  ///
+  /// A fourth independent status rather than a share of [readingStatus], for the reason
+  /// the class doc gives for the first three: the backend's four sections fail
+  /// independently, and a card stuck spinning because *today's reading* failed would be
+  /// a lie about a request that succeeded.
+  final HomeSectionStatus leaderboardStatus;
+
+  /// The weekly ranking for the card, or `null` while loading and after a failure.
+  final LeaderboardBoard? leaderboard;
+
+  /// Why the card's request failed, or `null`.
+  final Failure? leaderboardFailure;
 
   /// The time of day, or `null` before the clock has been read.
   ///
@@ -449,6 +513,9 @@ final class HomeState with _$HomeState {
     readingFailure: readingFailure,
     streak: streak,
     streakFailure: streakFailure,
+    leaderboardStatus: leaderboardStatus,
+    leaderboard: leaderboard,
+    leaderboardFailure: leaderboardFailure,
   );
 
   /// [next] with the reader resolved to [name] and [initials], or to neither.
@@ -467,6 +534,9 @@ final class HomeState with _$HomeState {
     readingFailure: readingFailure,
     streak: streak,
     streakFailure: streakFailure,
+    leaderboardStatus: leaderboardStatus,
+    leaderboard: leaderboard,
+    leaderboardFailure: leaderboardFailure,
   );
 
   /// [next] with today's-reading panel in [status], carrying [reading] or
@@ -486,6 +556,42 @@ final class HomeState with _$HomeState {
     readerInitials: readerInitials,
     streak: streak,
     streakFailure: streakFailure,
+    leaderboardStatus: leaderboardStatus,
+    leaderboard: leaderboard,
+    leaderboardFailure: leaderboardFailure,
+  );
+
+  /// [next] with the leaderboard card in [status], carrying [board] or [failure] —
+  /// exactly one of which is non-null.
+  ///
+  /// ## WHY IT IS A SEPARATE WRITER AND NOT A PARAMETER ON `withSection`
+  ///
+  /// `withSection` exists to move the reading and streak sections between `loading`
+  /// and `failed` **together** when a retry is dispatched, and it re-derives exactly
+  /// those two failures. Widening it to also carry the leaderboard would give a method
+  /// named "section" that handles three of four, and a reader could not tell from the
+  /// name which sections a call site can move. So the card gets its own writer and its
+  /// own status, and `HomeState` grows a fourth independent one — which the class doc
+  /// already argued for on the strength of the backend's four independently-failing
+  /// endpoints.
+  HomeState withLeaderboard({
+    required HomeSectionStatus status,
+    required LeaderboardBoard? board,
+    required Failure? failure,
+  }) => HomeState(
+    leaderboardStatus: status,
+    leaderboard: board,
+    leaderboardFailure: failure,
+    readingStatus: readingStatus,
+    reading: reading,
+    readingFailure: readingFailure,
+    streakStatus: streakStatus,
+    streak: streak,
+    streakFailure: streakFailure,
+    readerStatus: readerStatus,
+    readerName: readerName,
+    readerInitials: readerInitials,
+    greetingPeriod: greetingPeriod,
   );
 
   /// [next] with the streak flame in [status], carrying [streak] or [failure] —
@@ -540,8 +646,21 @@ final class HomeState with _$HomeState {
   }
 
   @override
+  /// ## WHY `board` IS COUNTED AND NOT PRINTED
+  ///
+  /// `leaderboard` is a whole entity — a window, a group, a list and a standing — and
+  /// a failure message that renders all of it stops being readable. `leaderboardStatus`
+  /// plus the row count is enough to tell "the card is ready and empty" from "the card
+  /// is ready with twelve rows", which is the only question a failing assertion is
+  /// asking of it.
+  ///
+  /// Phase 1 added the fourth pair. Two earlier frames in `home_bloc_test.dart` were
+  /// indistinguishable in a failure message until this did, which is the cost of a
+  /// hand-written `toString` that has to be *remembered* — as against the generated
+  /// one freezed would write, which would print all twelve fields and be unreadable.
   String toString() =>
       'HomeState(reading: ${readingStatus.name}, streak: ${streakStatus.name}, '
       'reader: ${readerStatus.name} ${readerName ?? '-'}, '
+      'board: ${leaderboardStatus.name} ${leaderboard?.rows.length ?? '-'}, '
       'period: ${greetingPeriod?.name ?? '-'})';
 }

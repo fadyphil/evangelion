@@ -9,11 +9,13 @@ import 'package:evangelion/core/design_system/effects/neural_motion.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_light.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
@@ -25,6 +27,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
+import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -401,12 +404,37 @@ AuthBloc registerTestAuthBloc() {
 ///
 /// No `Dio`, so this file stays importable from a suite that must not pull the
 /// network stack into the graph it is asserting on.
+/// A [LeaderboardRepository] answering the seeded **empty** board.
+///
+/// The real state of this endpoint, measured: scores only enter Redis through
+/// `recordScore` on a successful submission, and submission cannot succeed against the
+/// memory fallback. So an empty board is what a test graph gets unless it asks for
+/// more — and asking for more is `StubLeaderboardRepository`'s job, not this file's.
+final class _FakeLeaderboardRepository implements LeaderboardRepository {
+  @override
+  Future<Result<LeaderboardBoard>> board({
+    required LeaderboardWindow window,
+    required int limit,
+  }) async => Result<LeaderboardBoard>.success(
+    LeaderboardBoard(
+      window: window,
+      groupId: 3,
+      rows: const <LeaderboardRow>[],
+      standing: null,
+      cohortSize: 0,
+    ),
+  );
+}
+
 HomeBloc registerTestHomeBloc() {
   final HomeBloc bloc = HomeBloc(
     loadTodayReading: LoadTodayReading(_FakeReadingRepository()),
     loadStreakSummary: LoadStreakSummary(_FakeStreakRepository()),
     getReaderSession: GetReaderSession(
       FakeAuthRepository(AuthLocalDataSource()),
+    ),
+    loadLeaderboardPreview: LoadLeaderboardPreview(
+      _FakeLeaderboardRepository(),
     ),
   );
   getIt.registerSingleton<HomeBloc>(bloc);

@@ -254,6 +254,13 @@ class AppRouter extends RootStackRouter {
       page: SettingsRoute.page,
       guards: _guards,
     ),
+    AutoRoute(
+      path: AppRoutes.leaderboard,
+      page: LeaderboardRoute.page,
+      guards: _guards,
+    ),
+    // `*` stays LAST. auto_route matches in declaration order, so moving the wildcard
+    // up turns every path into `/` — measured at 46 tests when it was tried.
     RedirectRoute(path: AppRoutes.fallback, redirectTo: AppRoutes.home),
   ];
 

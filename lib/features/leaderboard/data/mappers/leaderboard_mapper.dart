@@ -70,7 +70,7 @@ final class LeaderboardMapper {
   /// Never throws, and the [Failure.message] on every rejection names the key and what
   /// was expected — so the message a reader sees is a statement about the response
   /// rather than a Dart type error.
-  Result<LeaderboardBoard> map(Object? body) {
+  Result<LeaderboardBoard> map(Object? body, {required int limit}) {
     if (body is! Map<Object?, Object?>) {
       return Result<LeaderboardBoard>.failure(_notAnObject(body));
     }
@@ -79,6 +79,9 @@ final class LeaderboardMapper {
     // reader meets first in the JSON.
     final Result<int> groupId = _int(body, 'group_id');
     final Result<LeaderboardWindow> window = _window(body, 'window');
+    // Read, but not trusted on its own — see [cohortSizeOf], which needs it *and* the
+    // row count to tell "the cohort is bigger than this page" from "this is all of it".
+    final Result<int> totalRanked = _int(body, 'total_ranked');
     final Result<List<Object?>> rawRows = _list(body, 'leaderboard');
     final Result<LeaderboardStanding?> standing = _standing(
       body,
@@ -88,6 +91,7 @@ final class LeaderboardMapper {
     final Result<void> scalars = _firstFailure(<Result<Object?>>[
       groupId,
       window,
+      totalRanked,
       rawRows,
       standing,
     ]);
@@ -111,8 +115,72 @@ final class LeaderboardMapper {
         groupId: groupId.valueOrElse(0),
         rows: rows.valueOrElse(const <LeaderboardRow>[]),
         standing: standing.valueOrElse(null),
+        cohortSize: cohortSizeOf(
+          reportedTotal: totalRanked.valueOrElse(0),
+          rowsReturned: rows.valueOrElse(const <LeaderboardRow>[]).length,
+          limit: limit,
+        ),
       ),
     );
+  }
+
+  /// How many children are ranked, or `null` when the response cannot say.
+  ///
+  /// ## THE BACKEND'S `total_ranked` IS **NOT** THE COHORT SIZE, AND ONE RULE
+  /// HANDLES BOTH ITS CURRENT VALUE AND THE `ZCARD` THAT WILL REPLACE IT
+  ///
+  /// Today the route sends `total_ranked: enrichedEntries.length` — rows **returned**.
+  /// So a cohort of 60 with `limit=50` answers `50`, and a cohort of 3 also answers 3.
+  /// Reading it as the cohort size gives "3rd of 3" for a cohort of sixty.
+  ///
+  /// But `ZREVRANGE(key, 0, limit - 1)` returns `min(members, limit)` rows, which
+  /// makes the true size recoverable whenever the cap did **not** bind:
+  ///
+  /// | condition | inference |
+  /// | --- | --- |
+  /// | `rowsReturned < limit` | the cap did not bind, so **every** ranked member is present: the size is exactly `rowsReturned` |
+  /// | `rowsReturned == limit` | the cap may or may not have bound: `>= limit` members, exact size unknown → `null` |
+  ///
+  /// ## WHY THE `ZCARD` CHANGE IS A **NO-OP** HERE, AND NEEDS NO CODE EDIT
+  ///
+  /// When the route starts sending `ZCARD`, `total_ranked` becomes the true cohort
+  /// size. The rule that reads a value **larger** than the rows returned catches it
+  /// first:
+  ///
+  /// ```dart
+  /// if (reportedTotal > rowsReturned) return reportedTotal;   // a true ZCARD
+  /// if (rowsReturned < limit) return rowsReturned;            // cap did not bind
+  /// return null;                                              // genuinely unknown
+  /// ```
+  ///
+  /// With `limit=50`: a cohort of 60 under today's server returns 50 rows, so
+  /// `50 > 50` is false and `50 < 50` is false → `null`, the honest answer. The same
+  /// cohort after the `ZCARD` fix sends `total_ranked: 60` with 50 rows → `60 > 50` →
+  /// `60`, without a line here changing. A cohort of 3 answers `3` under both, which
+  /// is right under both.
+  ///
+  /// So the backend fix costs **one line in a Fastify route** and nothing here. That
+  /// is the whole reason the rule is written as a comparison against the rows rather
+  /// than as `total_ranked` or as an inference: a version that trusted the field
+  /// would have to be edited to become correct, and a version that inferred only would
+  /// silently start under-reporting once the field became truthful.
+  ///
+  /// ## WHY IT IS NOT `rows.length` WITH A DEFAULT
+  ///
+  /// Because that is the number which makes a truncated board lie. A `null` here is
+  /// what lets a screen render "3rd" instead of "3rd of 3".
+  static int? cohortSizeOf({
+    required int reportedTotal,
+    required int rowsReturned,
+    required int limit,
+  }) {
+    if (reportedTotal > rowsReturned) {
+      return reportedTotal;
+    }
+    if (rowsReturned < limit) {
+      return rowsReturned;
+    }
+    return null;
   }
 
   /// The monogram for [fullName].

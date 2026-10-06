@@ -53,7 +53,7 @@ final class DioLeaderboardRepository implements LeaderboardRepository {
   }) async {
     try {
       final Object? body = await dataSource.board(window: window, limit: limit);
-      return mapper.map(body);
+      return mapper.map(body, limit: limit);
     } on DioException catch (error) {
       return Result<LeaderboardBoard>.failure(errors.fromDioException(error));
     }
