@@ -1,7 +1,13 @@
-/// The six route paths the app ships, plus the wildcard the router falls back
+/// The route paths this app declares, plus the wildcard the router falls back
 /// to. Named constants rather than bare string literals at call sites, because
 /// `context.router.pushNamed('/quiz')` is a typo the compiler cannot see and a
 /// renamed route cannot find.
+///
+/// Six of the paths are locked by AGENT_CONTEXT §2. Two more are declared here
+/// and not by it — [leaderboard] and [servant] — and each carries its own
+/// paragraph saying so, because "the six" was this file's own headline and a
+/// reader who stopped reading there would have believed the seventh and eighth
+/// routes were §2's too.
 ///
 /// PURE DART. `core/navigation` is not `core/domain`, so a `package:flutter`
 /// import would be permitted here — but it is not needed, and staying
@@ -72,6 +78,56 @@ abstract final class AppRoutes {
   /// deep link while signed out. See `auth_guard.dart` for what the guard actually
   /// checks — and for why that is a UX gate and **not** an authorisation one.
   static const String leaderboard = '/leaderboard';
+
+  /// `/servant` — where both servant roles land. **Declared, not yet routed.**
+  ///
+  /// ## WHY IT EXISTS NOW, AND WHAT IT IS NOT YET
+  ///
+  /// `core/navigation/landing_route.dart` has to name a destination for
+  /// `UserRole.viewerServant` and `UserRole.adminServant`, and a function cannot
+  /// return a route this file does not declare. So the constant arrives one task
+  /// ahead of the screen: the portal routes themselves are registered in
+  /// `app_router.dart` by the task that builds them, and AGENT_CONTEXT §2
+  /// decision 5 keeps them out of this client — "No servant/admin portal. Those
+  /// backend routes stay untested from the client."
+  ///
+  /// **The honest consequence, which a reader will otherwise have to discover by
+  /// pushing it: no `AutoRoute` names this path yet.** `AppRouter`'s table
+  /// declares seven routes and then `'*'`, so a navigation to `/servant` matches
+  /// nothing and the wildcard redirects it to [home]. A servant therefore lands on
+  /// `/` today, which is the correct *outcome* for a role with nothing extra to
+  /// see, and is a coincidence rather than a design: it is what the fallback does
+  /// with an unknown path.
+  ///
+  /// **Measured, not reasoned:** driving the live matcher —
+  /// `router.matcher.match('/servant')` and `router.matcher.match('/')` — returns
+  /// `['/']` for **both**, on `AppRouter(FakeAuthStatus(), _SilentAuthChanges())`.
+  /// No test in this repository asserts it, deliberately: pinning "a path that is
+  /// declared but not routed lands on `/`" would ratify a placeholder as a
+  /// finished screen, which is recorded decision 8's failure in its purest form.
+  /// The probe is therefore cited here and thrown away, and the successor that
+  /// registers the portal route replaces this paragraph.
+  ///
+  /// It is recorded here rather than left to be found because the alternative is
+  /// worse. The day this constant is used by something other than
+  /// `landingRouteFor`, the reader who has not read this paragraph will believe a
+  /// servant screen exists.
+  ///
+  /// ## WHY IT IS NOT ONE OF THE SIX LOCKED PATHS, AND WHY IT STILL GETS A ROW
+  ///
+  /// §2 locks six route paths; this is the eighth declaration and the second one
+  /// whose value §2 does not fix — `/leaderboard` was the first, and it is why
+  /// `app_routes_test.dart` carries a value row for it rather than leaving it to
+  /// arrive silently. The row exists so a reader has one place to look for what
+  /// each declared path is, not because the value is in doubt.
+  ///
+  /// ## AND IT IS NOT A PERMISSION
+  ///
+  /// The backend parses `X-User-Role` at `identity.middleware.ts:24`, assigns it
+  /// at `:31`, and never reads it again — see `core/domain/entities/user_role.dart`
+  /// for the two zero-match greps that settle it. A route constant is a path in
+  /// this client, not an access control on anyone.
+  static const String servant = '/servant';
 
   /// The wildcard catch-all, `'*'`. Unmatched paths redirect through this. See
   /// the file doc for what is and is not true about the value — in particular,

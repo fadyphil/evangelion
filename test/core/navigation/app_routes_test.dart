@@ -70,6 +70,21 @@ void main() {
         expect(AppRoutes.leaderboard, '/leaderboard');
       },
     );
+
+    test('servant is /servant, and is slash-prefixed like the rest', () {
+      // The eighth declared route and the second whose path §2 does not fix, so it
+      // follows `leaderboard` rather than arriving with the six. Its value row is
+      // here for the same reason as that one's: a reader who opens this file has
+      // just been told there are eight paths, and this is where each one is named.
+      //
+      // `/servant` is **declared but not routed** — no `AutoRoute` in
+      // `app_router.dart` names it, so a push to it falls through the `'*'`
+      // wildcard. `landing_route_test.dart` records that; this row is only the
+      // value, and it is the value `landingRouteFor` returns for both servant
+      // roles, so a rename here and a stale string there would be two names for
+      // one route.
+      expect(AppRoutes.servant, '/servant');
+    });
   });
 
   group('the inventory is the declaration site', () {
@@ -78,9 +93,9 @@ void main() {
     // every `expect` in the group below would be iterating nothing and the
     // suite would pass while asserting nothing. That is the self-comparing
     // tautology the Phase 0b mutation audit removed from `failure_test.dart`, so
-    // the shape of the claim is asserted first, and the seven names are spelled
+    // the shape of the claim is asserted first, and the eight names are spelled
     // out rather than merely counted: a parser that quietly returned the wrong
-    // seven would otherwise sail through.
+    // eight would otherwise sail through.
     test('the parser sees every declaration, including ones it cannot read', () {
       // Anti-vacuity for the whole group below. A declaration whose initialiser
       // is not a plain literal is reported rather than dropped, because an
@@ -95,7 +110,7 @@ void main() {
       );
     });
 
-    test('the inventory is exactly the eight declared route names', () {
+    test('the inventory is exactly the nine declared route names', () {
       expect(declared, <String>[
         'login',
         'home',
@@ -109,16 +124,22 @@ void main() {
         // a **deleted** constant fails, and an inventory cannot be written that avoids
         // both halves of that trade.
         'leaderboard',
+        // The role mechanism's eighth, added with `core/navigation/landing_route.dart`
+        // and **before** `fallback` so the wildcard stays last. This test is what
+        // made that a decision rather than an accident: it failed on the missing
+        // name before anything else in the suite did, which is the whole reason the
+        // inventory is spelled out instead of counted.
+        'servant',
         'fallback',
       ]);
-      expect(inventory, hasLength(8));
+      expect(inventory, hasLength(9));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
-      // all seven entries were real strings. It could not fail: `inventory` is a
+      // all eight entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
-      // `whereType<String>()` is the identity — it returned all seven elements
+      // `whereType<String>()` is the identity — it returned all eight elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(8)` above already implies seven strings.
+      // state, and `hasLength(9)` above already implies eight strings.
     });
   });
 
