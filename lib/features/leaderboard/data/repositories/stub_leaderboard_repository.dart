@@ -12,24 +12,42 @@ import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.
 /// monograms on screen are the ones real data produces. Everything else is invented:
 /// the scores, the ranks, the cohort size.
 ///
-/// ## WHY IT EXISTS, WHICH IS NOT "THE BACKEND IS DOWN"
+/// ## WHY IT EXISTS — AND A CORRECTION
 ///
-/// The endpoint is **up and wired** — `DioLeaderboardRepository` is the default and
-/// this class is opt-in. The leaderboard is empty because scores only enter Redis via
-/// `leaderboardService.recordScore`, called from `submissions.service.ts:105` on a
-/// *successful* submission — and submission cannot succeed against the memory
-/// fallback, because `POST /submissions` validates `reading_id` and `question_id` as
-/// UUIDs while the fallback mints `reading-group-3-2026-10-04`. Measured empty board:
+/// **First draft of this file claimed the leaderboard "is empty and always will be in
+/// dev"**, on the grounds that scores only enter Redis via `recordScore` on a
+/// successful submission, and submission cannot succeed against the memory fallback
+/// because the schemas require UUIDs the fallback does not mint.
+///
+/// **That was wrong.** `InMemoryRedisFallback`'s **constructor** pre-seeds three
+/// children into group 3's weekly, monthly and all-time ZSETs unless `NODE_ENV` is
+/// exactly `test` (`src/redis/client.ts:5-33`) — `seedUsers` is Peter George 80, David
+/// Mina 50, Mark Anton 30, i.e. the seeded identity at **rank 2 with 50 points**. So a
+/// normally-started dev server answers with three real rows, and the earlier empty
+/// response this claim was built on came from a process running in a mode that skips the
+/// seed.
+///
+/// The claim was load-bearing twice over: it justified this file *and* it was the stated
+/// reason `cohortSize` looked untestable. Measured against a running server:
 ///
 /// ```json
-/// {"group_id":3,"window":"weekly","total_ranked":0,"my_standing":null,"leaderboard":[]}
+/// {"group_id":3,"window":"weekly","total_ranked":3,
+///  "my_standing":{"rank":2,"score":50},
+///  "leaderboard":[{"userId":"2222…","score":80,"rank":1,…}]}
 /// ```
 ///
-/// So the empty state is not an edge case to be developed around — it is the **only**
-/// state reachable until the submission path is fixed, and a screen designed solely
-/// against it would never show a rank, a monogram or a `cohortSize`. This class makes
-/// those states reviewable now.
+/// Three rows against `limit=50`, so `rowsReturned < limit` and **`cohortSize` is 3** —
+/// the card prints `2 / 3` off live data, which is the case the ZCARD rule exists for.
 ///
+/// ## WHAT IT IS STILL FOR
+///
+/// The seed is **group 3 only** and it is **frozen** — the scores cannot move without a
+/// working submission path, so the reader's rank is always 2 and the app can never show
+/// the states that matter most: someone dropping in rank, a tie, a `rank: null`
+/// unranked reader, or a cohort larger than `limit`. This class answers all of those on
+/// demand, which is what makes the screens reviewable before the submission path is
+/// fixed.
+
 /// ## HOW IT IS SWITCHED ON, AND WHY IT CANNOT LEAK INTO A RELEASE
 ///
 /// By `--dart-define=USE_STUB_LEADERBOARD=true` only, read through `bool.fromEnvironment`

@@ -3597,3 +3597,70 @@ FAIL: the bundle is OLDER than the newest Dart source.
 
 A gate added to stop a false green, itself shipping a false green and an unreachable
 assertion, is the strongest argument this file has for mutation-testing the gates.
+
+**143. THE LEADERBOARD IS **NOT** EMPTY IN DEVELOPMENT, AND I SAID IT WAS — TWICE.**
+
+Decisions 136 and 138, and both of my commit messages for Phase 1, rest on this claim:
+
+> "scores only enter Redis via `recordScore`, called on a *successful* submission, and
+> submission cannot succeed against the memory fallback … the empty board is currently
+> the **only** reachable state"
+
+**It is false.** `InMemoryRedisFallback`'s **constructor** pre-seeds the ZSETs
+(`src/redis/client.ts:5-33`):
+
+```ts
+constructor(seed: boolean = process.env.NODE_ENV !== 'test') {
+  if (!seed) return;
+  // Pre-seed sample weekly, monthly, and all-time scores for Group 3 demo
+  const seedUsers = [
+    { id: '2222…', score: 80 },   // Peter George (Grade 6)
+    { id: '1111…', score: 50 },   // David Mina (Grade 5)  ← the seeded identity
+    { id: '3333…', score: 30 }    // Mark Anton (Grade 5)
+  ];
+  … `leaderboard:group:3:{weekly,monthly,all_time}`
+}
+```
+
+Measured against a `npm run dev` server:
+
+```json
+{"group_id":3,"window":"weekly","total_ranked":3,"my_standing":{"rank":2,"score":50},
+ "leaderboard":[{"userId":"2222…","score":80,"rank":1,"full_name":"Peter George (Grade 6)","current_streak":7}, …]}
+```
+
+Three rows against `limit=50` ⇒ `rowsReturned < limit` ⇒ **`cohortSize` is 3**, and the
+card prints `2 / 3` off live data. That is precisely the case decision 136's rule exists
+for, and I had written the rule while asserting it could not yet be observed.
+
+**HOW THE FALSE CLAIM GOT IN, WHICH IS THE PART WORTH KEEPING.** The first probe in this
+phase returned `{"total_ranked":0,…}`. I took that one response as the endpoint's
+behaviour and **never re-probed**, because the argument built on it was already written
+and re-reading it would have cost more than one `curl`. A single observation became a
+permanent property of the backend in three commits and in this file.
+
+The likely explanation is `NODE_ENV`: the seed is skipped **only** when it is exactly
+`test`, so any process started that way — a test harness, a CI shell, an earlier
+`NODE_ENV=test npm run dev` — answers empty, and one such process is enough to make
+"always empty" look true.
+
+**THE RULE THAT FOLLOWS, AND IT IS NOT SPECIFIC TO LEADERBOARDS:** an empty response is
+a **fact about a process**, never a property of a system. Before writing "this endpoint
+cannot return X", the claim needs a second observation from a **restarted** server, and
+the restart condition has to be stated. Every other live measurement in this file —
+`current_streak` 4-vs-0, the mixed key casings, the `window` 400, the missing
+`x-group-id` — was taken from source or from a re-probe, and those still hold.
+
+**WHAT SURVIVES UNCHANGED, WHICH I CHECKED RATHER THAN ASSUMED.** The three dropped
+fields (`full_name`, `current_streak`, `userId`) were dropped on *structural* grounds and
+the payload still carries all three. `total_ranked` is still `enrichedEntries.length`, and
+`cohortSizeOf` is still correct on this body: `3 > 3` is false, `3 < 50` is true, so the
+answer is `3`. The `ZCARD` no-op claim is unaffected — it is a statement about what
+happens when `total_ranked` starts exceeding the row count, and that is still unobserved.
+
+**AND THE STUB IS STILL WORTH HAVING, FOR A REASON I HAD THE WRONG VERSION OF.** The seed
+is **group 3 only**, it is **frozen** — no score can move without a working submission
+path — and so the reader is permanently rank 2. The states worth reviewing (a rank
+*dropping*, a tie, `rank: null` unranked, a cohort larger than `limit`) are all
+**unreachable** from the seed. That is the honest justification, and it is a different
+one from the one I shipped.
