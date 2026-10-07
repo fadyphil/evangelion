@@ -1,4 +1,5 @@
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 
 /// The in-memory stand-in for a stored session, and the seeded identity.
@@ -68,11 +69,21 @@ const String kSeedUserId = '11111111-1111-1111-1111-111111111111';
 /// the session cannot drift.
 const int kSeedGroupId = 3;
 
-/// `X-User-Role` for the seeded user.
+/// The role the seeded user holds.
 ///
-/// Parsed by the backend and **never enforced** (AGENT_CONTEXT §5, trap 7), so
-/// it is decorative and nothing may gate UI on it.
-const String kSeedUserRole = 'kid';
+/// Parsed by the backend and **never enforced** — `identity.middleware.ts:29`
+/// assigns `request.user.role` and no route ever reads it back, so nothing here
+/// is a permission. See `core/domain/entities/user_role.dart` for the whole
+/// argument and for what a role gate in this client does and does not buy.
+///
+/// A [UserRole] and not the wire string, because the seed is a **role**: the one
+/// place that speaks the wire converts it with [UserRole.wireValue], so the
+/// literal `'kid'` exists exactly once in the client instead of once per
+/// caller. `IdentityHeadersInterceptor.defaultRole` is still a `String` and is
+/// still asserted equal to this by `fake_auth_repository_test.dart` — that
+/// assertion is what keeps the seeded role and the sent header from drifting,
+/// and it is now made on [UserRole.wireValue] rather than on the role itself.
+const UserRole kSeedUserRole = UserRole.kid;
 
 /// The address the seeded session reports.
 ///

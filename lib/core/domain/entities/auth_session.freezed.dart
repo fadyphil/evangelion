@@ -51,7 +51,7 @@ abstract mixin class $AuthSessionCopyWith<$Res>  {
   factory $AuthSessionCopyWith(AuthSession value, $Res Function(AuthSession) _then) = _$AuthSessionCopyWithImpl;
 @useResult
 $Res call({
- String userId, String email, String displayName, String initials, DateTime createdAt, String role
+ String userId, String email, String displayName, String initials, DateTime createdAt, UserRole role
 });
 
 
@@ -76,7 +76,7 @@ as String,displayName: null == displayName ? _self.displayName : displayName // 
 as String,initials: null == initials ? _self.initials : initials // ignore: cast_nullable_to_non_nullable
 as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
-as String,
+as UserRole,
   ));
 }
 

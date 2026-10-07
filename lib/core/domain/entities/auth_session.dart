@@ -1,3 +1,4 @@
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_session.freezed.dart';
@@ -24,12 +25,38 @@ part 'auth_session.freezed.dart';
 /// implementation" — and this file is the reason that sentence is true rather
 /// than aspirational.
 ///
-/// ## [role] IS NOT A CAPABILITY
+/// ## [role] IS TYPED, AND IT NOW DRIVES CLIENT-SIDE NAVIGATION
 ///
-/// `X-User-Role` is parsed by the backend and **never enforced**
-/// (AGENT_CONTEXT §5, trap 7). It is carried because it goes on the wire, not
-/// because it grants anything: no UI in this client may hide or disable a control
-/// on it. [defaultRole] exists so the value is written down once.
+/// [role] was a `String`, and this section used to forbid the UI from gating on
+/// it at all. That is **no longer the rule**, and the rule that replaced it is
+/// narrower and more useful:
+///
+/// * role is a [UserRole] — three named members rather than an equality guess
+///   against a literal, and `grantsFor` answers "may this role open that
+///   screen" as a **named capability** rather than as a comparison;
+/// * a role gate **may** choose a landing route and **may** refuse a navigation.
+///   That is what `grantsFor` is for;
+/// * a role gate still **may not** be described, anywhere, as authorisation.
+///
+/// **And it is not a security boundary — the backend is the reason, and it is
+/// one line of evidence.** `src/middleware/identity.middleware.ts:29` assigns
+/// `request.user.role` and nothing ever reads it: `rg 'user\??\.role' src/`
+/// returns no matches and `rg '403' src/` returns no matches, so there are zero
+/// role guards and zero forbidden responses across all eighteen routes. Every
+/// endpoint is callable by anyone who sends a user id. **This prevents a child
+/// being dropped onto a scheduling screen that makes no sense for them; it
+/// prevents nothing else.** A role gate here is advisory UX — it is right that
+/// the reader never sees it fire, and it must not be mistaken for a wall.
+///
+/// The role is also not *known*. The backend has no `/auth`, no `/me` and no
+/// `/login` endpoint (§2, decision 3), so the client cannot ask who anyone is
+/// and the role is **chosen locally on the login screen**. See [UserRole] for
+/// that and for the grant table.
+///
+/// [defaultRole] exists so the value is written down once, and it is
+/// [UserRole.kid] because that is what `identity.middleware.ts:24` defaults to
+/// when the header is absent — a client that defaulted to anything else would
+/// disagree with the server about an empty header.
 @freezed
 final class AuthSession with _$AuthSession {
   /// A session for [userId].
@@ -71,8 +98,14 @@ final class AuthSession with _$AuthSession {
   /// string operation. Deriving it here would fix both answers at once.
   final String initials;
 
-  /// The value this client sends as `X-User-Role`. Decorative; see the class doc.
-  final String role;
+  /// The role this reader holds, as a [UserRole].
+  ///
+  /// Typed rather than a `String` because every question about a `String` role
+  /// is an equality guess that fails silently — see [UserRole]'s own doc. It
+  /// goes on the wire as [UserRole.wireValue], and the client gates navigation
+  /// on [grantsFor]. **Advisory, not a security boundary**: the backend parses
+  /// this header and never reads it again.
+  final UserRole role;
 
   /// When the session was established.
   ///
@@ -80,7 +113,11 @@ final class AuthSession with _$AuthSession {
   /// in, and nothing on the server records it.
   final DateTime createdAt;
 
-  /// `kid` — the value `X-User-Role` carries. See the class doc for why this is
-  /// not a permission.
-  static const String defaultRole = 'kid';
+  /// [UserRole.kid] — the role this client seeds, and the one
+  /// `identity.middleware.ts:24` falls back to when the header is absent.
+  ///
+  /// A [UserRole] rather than the wire string: this is the **role**, and the
+  /// wire spelling is one call away ([UserRole.wireValue]). Naming the wire
+  /// value here would make the constant a second place a role is spelled.
+  static const UserRole defaultRole = UserRole.kid;
 }
