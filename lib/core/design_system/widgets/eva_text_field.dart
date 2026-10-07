@@ -587,7 +587,7 @@ class _ErrorText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(Icons.error_outline, size: EvaSpacing.lg, color: colors.err),
+        Icon(Icons.error_outline, size: EvaSpacing.lg, color: colors.errInk),
         const SizedBox(width: EvaSpacing.xs),
         Expanded(
           child: Text(
@@ -595,7 +595,7 @@ class _ErrorText extends StatelessWidget {
             style: arabicAware(
               Theme.of(context).textTheme.bodySmall!,
               Directionality.of(context),
-            ).copyWith(color: colors.err),
+            ).copyWith(color: colors.errInk),
           ),
         ),
       ],

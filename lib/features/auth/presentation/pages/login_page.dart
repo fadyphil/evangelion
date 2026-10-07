@@ -623,7 +623,7 @@ class _FormError extends StatelessWidget {
             style: arabicAware(
               Theme.of(context).textTheme.bodySmall!,
               Directionality.of(context),
-            ).copyWith(color: context.colors.err),
+            ).copyWith(color: context.colors.errInk),
           ),
         ),
       ],

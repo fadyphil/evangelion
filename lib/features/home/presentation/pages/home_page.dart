@@ -462,7 +462,9 @@ class _Greeting extends StatelessWidget {
                 TextSpan(
                   text: reader,
                   style: TextStyle(
-                    color: colors.ember,
+                    // `emberInk`, not `ember` — decision 153. This is the
+                    // reader's own name, and light `ember` measures 2.05:1 here.
+                    color: colors.emberInk,
                     // `HomeScreen.tsx:27` —
                     // `textShadow: 0 0 24px rgba(ember, 0.5)`.
                     shadows: <Shadow>[

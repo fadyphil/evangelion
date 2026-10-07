@@ -391,7 +391,7 @@ class _Segment<T> extends StatelessWidget {
           // above is a no-op on Arabic (it has no case), so the string is untouched.
           style: arabicAware(
             EvaTypography.monoCaps(colors).copyWith(
-              color: selected ? colors.ember : colors.ink2,
+              color: selected ? colors.emberInk : colors.ink2,
               fontWeight: FontWeight.w700,
             ),
             Directionality.of(context),

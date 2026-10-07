@@ -527,7 +527,7 @@ class _SettingsFailureNotice extends StatelessWidget {
                       // apart without colour.
                       Icons.error_outline,
                       size: ErrorView.iconSize,
-                      color: context.colors.err,
+                      color: context.colors.errInk,
                     ),
                     const SizedBox(width: gap),
                     // `Expanded`, and this is not decoration: the sentence wraps to

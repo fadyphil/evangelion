@@ -369,7 +369,7 @@ class _EvaButtonState extends State<EvaButton> {
               // carried by the icon's own optical weight instead.
               Icons.chevron_right,
               size: kEvaButtonChevronSize,
-              color: colors.ember,
+              color: colors.emberInk,
             ),
           )
         : null;

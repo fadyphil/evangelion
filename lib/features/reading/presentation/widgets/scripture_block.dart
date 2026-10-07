@@ -270,7 +270,7 @@ class ScriptureBlock extends StatelessWidget {
           // helper, because `no_colour_literals_test.dart` requires the token to be
           // visible **on the line** — which is the right requirement and the reason
           // the helper is gone rather than kept with a suppression.
-          color: colors.ember,
+          color: colors.emberInk,
         );
 
         return Padding(
@@ -412,7 +412,7 @@ class ScriptureBlock extends StatelessWidget {
     return PassageDropCap(
       letter: cap.letter,
       lines: dropCapLines,
-      color: colors.ember,
+      color: colors.emberInk,
       // The only arm that reaches here is the Latin one, so the direction is LTR
       // and is stated rather than inherited — `PassageDropCap`'s own doc says the
       // parameter is defensive and unobservable for a one-glyph box, and a caller

@@ -122,7 +122,7 @@ class TextLink extends StatelessWidget {
             child: Icon(
               Icons.chevron_right,
               size: EvaSpacing.lg,
-              color: colors.ember,
+              color: colors.emberInk,
             ),
           ),
       ],

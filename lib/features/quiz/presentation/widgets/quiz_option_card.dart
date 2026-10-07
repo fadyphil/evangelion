@@ -265,9 +265,9 @@ class QuizOptionCard extends StatelessWidget {
   static Color? accentFor(QuizOptionState state, EvaColors colors) =>
       switch (state) {
         QuizOptionState.idle => null,
-        QuizOptionState.selected => colors.ember,
-        QuizOptionState.correct => colors.ok,
-        QuizOptionState.incorrect => colors.err,
+        QuizOptionState.selected => colors.emberInk,
+        QuizOptionState.correct => colors.okInk,
+        QuizOptionState.incorrect => colors.errInk,
       };
 
   /// The ink the letter is drawn in. `ds.tsx:450`.

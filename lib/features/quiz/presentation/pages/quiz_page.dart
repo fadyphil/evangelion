@@ -327,7 +327,7 @@ class _QuizBodyState extends State<_QuizBody> {
                       ReadingLanguage.english => EvaTypography.monoFamily,
                       ReadingLanguage.arabic => EvaTypography.arabicFamily,
                     },
-                    color: context.colors.ember,
+                    color: context.colors.emberInk,
                   ),
                 ),
                 const SizedBox(height: QuizPage.questionGap),

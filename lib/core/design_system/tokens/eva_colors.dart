@@ -37,6 +37,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     required this.ink,
     required this.ink2,
     required this.ink3,
+    required this.emberInk,
+    required this.okInk,
+    required this.errInk,
     required this.line,
     required this.ember,
     required this.emberDeep,
@@ -66,6 +69,13 @@ class EvaColors extends ThemeExtension<EvaColors> {
       ink3 = const Color(0xFF424669),
       line = const Color(0xFF1C2238),
       ember = const Color(0xFFE8A33D),
+      // Decision 153 — in **dark** the accent inks are the accents. `ember` already
+      // measures 6.97:1 on the worst dark surface, so a separate ink would be a second
+      // name for the same value. The tokens exist for the *light* theme, where the fill
+      // and the ink pull in opposite directions.
+      emberInk = const Color(0xFFE8A33D),
+      okInk = const Color(0xFF4ECCA3),
+      errInk = const Color(0xFFFF6B6B),
       emberDeep = const Color(0xFFC77F1F),
       onEmber = const Color(0xFF0D0A04),
       ok = const Color(0xFF4ECCA3),
@@ -107,6 +117,15 @@ class EvaColors extends ThemeExtension<EvaColors> {
       ink3 = const Color(0xFF9B97B8),
       line = const Color(0xFFD5D0EF),
       ember = const Color(0xFFD4891A),
+      // Decision 153 — in **light** these are darker, and they are the whole reason the
+      // tokens exist. `ember` has to stay light enough for `onEmber` to read on it as a
+      // button fill, while the same hue has to be dark enough to read as *text* on a
+      // pale surface. One value cannot do both: `ember` at 2.05:1 and a fill dark enough
+      // for text would put `onEmber` at 2.70:1. So the roles get separate names, and
+      // only this theme's values differ.
+      emberInk = const Color(0xFF845610),
+      okInk = const Color(0xFF146C52),
+      errInk = const Color(0xFFB72626),
       emberDeep = const Color(0xFFB56C0C),
       onEmber = const Color(0xFF3A1E00),
       ok = const Color(0xFF1A8C6A),
@@ -182,6 +201,40 @@ class EvaColors extends ThemeExtension<EvaColors> {
 
   /// Translucent white on dark / translucent black on light — the tint behind a
   /// glass panel.
+
+  /// The accent as **ink** — for text, meaningful glyphs and focus rings.
+  ///
+  /// ## WHY THIS IS A SEPARATE TOKEN AND NOT A DARKER `ember`
+  ///
+  /// Because `ember` does two jobs that pull in opposite directions, and the
+  /// disagreement only appears in the light theme. As a **fill** it must stay light
+  /// enough that `onEmber` reads on it: `EvaButton`'s whole label is `onEmber` on
+  /// `ember`. As **text** on a pale surface it must be dark enough to clear 4.5:1, and
+  /// in light `ember` measures **2.05:1** — which is the reader's own name in the
+  /// greeting on `/`.
+  ///
+  /// There is no single value that does both. Darkening `ember` to reach the text floor
+  /// gives `#8E5C11`, and `onEmber` (`#3A1E00`) on that is **2.70:1** — the button label
+  /// becomes the illegible thing instead. That is not a tuning miss, it is two
+  /// contradictory requirements on one token.
+  ///
+  /// So: **`ember` fills, `emberInk` writes.** In **dark** the two are the same value,
+  /// because there the accent already clears 6.97:1 and nothing is being solved. In
+  /// **light** they differ, and that difference is the fix.
+  final Color emberInk;
+
+  /// `ok` as ink — the same split as [emberInk], for "correct" text and glyphs.
+  ///
+  /// Light `ok` measures 3.39:1 as text, which reads as *dimmed* rather than *broken*,
+  /// which is exactly why nobody caught it by eye.
+  final Color okInk;
+
+  /// `err` as ink — the same split as [emberInk], for error text and glyphs.
+  ///
+  /// Light `err` measures 3.73:1 as text: the error copy on `/login` and `/settings`,
+  /// and the "both arms" state of every text field.
+  final Color errInk;
+
   final Color glassFill;
 
   /// The glass panel's 1px rim.
@@ -208,6 +261,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     Color? onEmber,
     Color? ok,
     Color? err,
+    Color? emberInk,
+    Color? okInk,
+    Color? errInk,
     double? orbOpacity,
     double? auroraOpacity,
     Color? glassFill,
@@ -227,6 +283,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     onEmber: onEmber ?? this.onEmber,
     ok: ok ?? this.ok,
     err: err ?? this.err,
+    emberInk: emberInk ?? this.emberInk,
+    okInk: okInk ?? this.okInk,
+    errInk: errInk ?? this.errInk,
     orbOpacity: orbOpacity ?? this.orbOpacity,
     auroraOpacity: auroraOpacity ?? this.auroraOpacity,
     glassFill: glassFill ?? this.glassFill,
@@ -264,6 +323,11 @@ class EvaColors extends ThemeExtension<EvaColors> {
       ink3: c(ink3, other.ink3),
       line: c(line, other.line),
       ember: c(ember, other.ember),
+      // Decision 153 — the inks interpolate with the palette they belong to, so an
+      // animated theme transition carries them rather than snapping at the end.
+      emberInk: c(emberInk, other.emberInk),
+      okInk: c(okInk, other.okInk),
+      errInk: c(errInk, other.errInk),
       emberDeep: c(emberDeep, other.emberDeep),
       onEmber: c(onEmber, other.onEmber),
       ok: c(ok, other.ok),

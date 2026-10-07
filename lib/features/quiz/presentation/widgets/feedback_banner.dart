@@ -118,7 +118,7 @@ class FeedbackBanner extends StatelessWidget {
 
   /// The ink for [tone]. `ds.tsx`'s `ok` / `err`, which `EvaColors` publishes.
   static Color inkFor(FeedbackTone tone, EvaColors colors) =>
-      tone == FeedbackTone.ok ? colors.ok : colors.err;
+      tone == FeedbackTone.ok ? colors.okInk : colors.errInk;
 
   /// The fill alpha on [brightness]. `QuizScreen.tsx:107`.
   ///

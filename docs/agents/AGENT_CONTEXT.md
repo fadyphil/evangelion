@@ -3900,3 +3900,82 @@ can hide an unintended change, the result was verified rather than trusted:
 A colour-token change should produce exactly this signature: tiny, bounded, and confined
 to the runs that were recoloured. A golden diff that moved a layout edge would have meant
 something else had changed, and would have been caught here rather than merged.
+
+**153. THE ACCENT SPLITS INTO A FILL AND AN INK, AND ONLY THE LIGHT VALUES DIFFER.**
+
+The answer to "can dark and light have different values?" is that they **already did** —
+`EvaColors.dark()` and `EvaColors.light()` are two independent sets, and light `ember` was
+already `#D4891A` against dark's `#E8A33D`. The problem was never a shared value. It is
+that **the light value itself is wrong for the job it was doing**, and one value cannot do
+two jobs that pull opposite ways:
+
+* as a **fill**, `ember` must stay light enough that `onEmber` reads on it — an
+  `EvaButton`'s entire label is `onEmber` on `ember`;
+* as **text** on a pale surface it must be dark enough to clear 4.5:1, and light `ember`
+  measured **2.11:1**.
+
+There is no single value that does both. Darkening `ember` to reach the text floor gives
+`#8E5B11`, and `onEmber` (`#3A1E00`) on that is **2.70:1** — the button label becomes the
+illegible thing instead. That is not a tuning miss; it is two contradictory requirements
+on one token, and it is why "just darken it" was never the answer.
+
+So the accent gets two names per role, and **only the light values differ**:
+
+| token | dark | light | used for |
+|---|---|---|---|
+| `ember` | `#E8A33D` | `#D4891A` | fills: buttons, chips, beads, toggles, flame, cursor, glows |
+| `emberInk` | `#E8A33D` | **`#845610`** | text, drop caps, verse numbers, meaningful icons |
+| `ok` / `okInk` | `#4ECCA3` | `#1A8C6A` / **`#146C52`** | fills / correct-answer text |
+| `err` / `errInk` | `#FF6B6B` | `#D63B3B` / **`#B72626`** | fills / error text and icons |
+
+**In dark the pairs are identical on purpose.** The accent already clears 6.97:1 there and
+nothing is being solved, so a second name would be a second way to change the same thing.
+The **three light goldens are the proof**: switching the ink usages moved `eva_chip_toggle_light`,
+`segmented_control_light` and `eva_button_ghost_light`, and **every dark golden stayed
+byte-identical**. A token pair that is equal in one theme and different in the other
+cannot accidentally change the theme that was already right.
+
+20 usages moved: the greeting's reader name on `/`, `TextLink`, the selected segment and
+language pill, the selected chip label, both drop caps, the verse-number `<sup>`, the
+quiz question label, the leaderboard row's rank / initials / score and the "You" label,
+the ghost button's chevron, the error copy on `/login`, `/settings` and every text field's
+error arm, `ErrorView`'s icon, and the quiz option accent. **44 fill usages were left on
+the fill token** — the flame painter, the toggle knob, the cursor, progress beads, chip and
+pill borders, avatar rims and every glow. The split is by role, not by widget.
+
+**154. MY CONTRAST GATE MEASURED THE DARK THEME'S GLASS IN THE LIGHT THEME.**
+
+Two bugs, both mine, and the second one is the interesting kind.
+
+The gate composited `glassFill` over each surface to model `GlassSurface`. It hardcoded the
+alpha as `0x0D / 255` — which is the **dark** theme's fill, a 5% **white** overlay. Light's
+is `Color(0x0A000000)`, a 4% **black** overlay. So the two themes disagree about the
+**direction** glass moves a surface, not merely the amount: compositing white at 5%
+*lightens* `#E8E4FF`, while composposing black at 4% *darkens* it to `#DFDBF5`.
+
+**That made the gate clear values the screen never renders.** With the wrong alpha, light
+`glass/raised` measured lighter than any real light surface, so the gate reported
+`emberInk` at **4.69:1** where the real surface measures **4.18:1** — and the ink values I
+had just computed from a spreadsheet passed a gate that was measuring the wrong pixels.
+
+The fix reads the alpha off `colors.glassFill` rather than assuming it. Three rounds of
+"compute by hand, be contradicted by the gate" produced values I was confident about and
+which were wrong, and the third round was wrong **because the gate itself was wrong** —
+which is the point at which the spreadsheet stopped being evidence.
+
+**AND THE DRIFT ASSERTION CAUGHT THE CORRECTION.** Fixing the alpha moved four ledger
+entries — `ink3` 2.02→**2.08**, `ember` 2.05→**2.11**, `ok` 3.03→**3.12**, `err`
+3.33→**3.43** — and `no recorded ratio has drifted` failed on every one. A ledger is only
+worth having if it notices when the *measurement* changes underneath it, and that is
+precisely what happened: no token moved, the surface model did.
+
+Four new mutations confirm the added assertions bite: reverting light `emberInk` to the
+fill value; hardcoding the dark alpha again; making **dark** `emberInk` diverge from dark
+`ember` (15 failures — the dark arm is now covered too); and promoting a fill token into
+`approvedForText`. Three light goldens updated, diffs **0.06%–0.14%** each, bounded to the
+accent run — the chip label, the segment label, and a 13×12 chevron.
+
+**AND A THIRD OF THE GATE'S FAILURES WERE FOUND BY THE GATE.** `ink3` was reported
+(147) by reading the palette by hand. `ember`, `ok` and `err` were found by the ledger
+asserting that no sub-AA pair had gone unrecorded. The hand-read found the first defect;
+the mechanical check found the next three.

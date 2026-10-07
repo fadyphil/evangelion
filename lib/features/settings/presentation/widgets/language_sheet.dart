@@ -263,7 +263,7 @@ class _LanguageRow extends StatelessWidget {
                           Theme.of(context).textTheme.bodyLarge!,
                           Directionality.of(context),
                         ).copyWith(
-                          color: selected ? colors.ember : colors.ink2,
+                          color: selected ? colors.emberInk : colors.ink2,
                           fontWeight: selected
                               ? FontWeight.w600
                               : FontWeight.w400,

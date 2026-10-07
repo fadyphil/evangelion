@@ -253,8 +253,10 @@ class _StandingFooter extends StatelessWidget {
           child: Text(
             context.l10n.leaderboardYourRank,
             style: arabicAware(
-              Theme.of(context).textTheme.bodyMedium!
-                  .copyWith(color: colors.ember, fontWeight: FontWeight.w700),
+              Theme.of(context).textTheme.bodyMedium!.copyWith(
+                color: colors.emberInk,
+                fontWeight: FontWeight.w700,
+              ),
               direction,
             ),
           ),

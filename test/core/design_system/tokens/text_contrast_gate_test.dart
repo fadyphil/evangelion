@@ -91,28 +91,38 @@ int composite(int source, int backdrop, double alpha) {
   return (0xFF << 24) | (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }
 
-/// The glass fill's alpha, `EvaColors.glassFill` = `#0DFFFFFF`.
-const double _glassAlpha = 0x0D / 255;
+/// The alpha channel of [argb], as a 0–1 fraction.
+double alphaOf(int argb) => ((argb >> 24) & 0xFF) / 255;
 
 /// Every surface a text run can land on, per theme, as a name → colour pair.
 ///
-/// `glass/*` is `glassFill` composited over the named surface, which is what
-/// `GlassSurface` actually paints.
-Map<String, int> surfacesOf(EvaColors colors) => <String, int>{
-  'canvas': colors.canvas.toARGB32(),
-  'surface': colors.surface.toARGB32(),
-  'raised': colors.raised.toARGB32(),
-  'glass/canvas': composite(
-    colors.glassFill.toARGB32(),
-    colors.canvas.toARGB32(),
-    _glassAlpha,
-  ),
-  'glass/raised': composite(
-    colors.glassFill.toARGB32(),
-    colors.raised.toARGB32(),
-    _glassAlpha,
-  ),
-};
+/// `glass/*` is **that theme's own** `glassFill` composited over the named surface,
+/// which is what `GlassSurface` actually paints.
+///
+/// ## WHY THE ALPHA IS READ AND NOT ASSUMED
+///
+/// The first version hardcoded `0x0D / 255` — which is the **dark** theme's fill, a
+/// 5% white overlay. Light's is `0x0A000000`, a 4% **black** overlay, and the
+/// difference is not cosmetic: compositing black at 4% *darkens* `#E8E4FF` to
+/// `#DCD8F2`, while compositing white at 5% would have *lightened* it. Using the dark
+/// alpha for the light theme produced surfaces that were lighter than any the light
+/// theme can render, which made `glass/raised` measure **4.69:1** for a token that the
+/// real surface measures **4.18:1** — the gate cleared a value the screen never showed.
+///
+/// So the two themes disagree about the **direction** glass moves a surface, not just
+/// the amount. Reading the alpha off the colour is the only way to get both right, and
+/// hardcoding it was the same class of mistake as typing the ledger from a spreadsheet.
+Map<String, int> surfacesOf(EvaColors colors) {
+  final int fill = colors.glassFill.toARGB32();
+  final double alpha = alphaOf(fill);
+  return <String, int>{
+    'canvas': colors.canvas.toARGB32(),
+    'surface': colors.surface.toARGB32(),
+    'raised': colors.raised.toARGB32(),
+    'glass/canvas': composite(fill, colors.canvas.toARGB32(), alpha),
+    'glass/raised': composite(fill, colors.raised.toARGB32(), alpha),
+  };
+}
 
 /// Every token the gate measures, and the role each is expected to serve.
 Map<String, int> textTokensOf(EvaColors colors) => <String, int>{
@@ -122,6 +132,9 @@ Map<String, int> textTokensOf(EvaColors colors) => <String, int>{
   'ember': colors.ember.toARGB32(),
   'ok': colors.ok.toARGB32(),
   'err': colors.err.toARGB32(),
+  'emberInk': colors.emberInk.toARGB32(),
+  'okInk': colors.okInk.toARGB32(),
+  'errInk': colors.errInk.toARGB32(),
 };
 
 /// WCAG 2.1 AA for body text.
@@ -138,36 +151,43 @@ const double bodyFloor = 4.5;
 /// fails in the light theme and is the subject of an open decision. They are in
 /// [knownSubstandard] instead, which is the honest place for a token that is used as
 /// text and does not yet qualify.
-const Set<String> approvedForText = <String>{'ink', 'ink2'};
+const Set<String> approvedForText = <String>{
+  'ink',
+  'ink2',
+  'emberInk',
+  'okInk',
+  'errInk',
+};
 
 /// Every measured pair below [bodyFloor], with the ratio that was measured.
 ///
 /// Values are the **worst** surface for that token in that theme, so one entry per
 /// token per theme rather than one per surface.
 const List<Contrast> knownSubstandard = <Contrast>[
-  // **Every value below was read out of this gate, not computed by hand.** The first
-  // version of this list was calculated in a spreadsheet against `canvas` and
-  // `glass/canvas`, and the gate disagreed with **every entry** — the worst surface is
-  // `glass/raised` in both themes, and in light `glass/raised` is *lighter* than plain
-  // `raised` so it wins by more than rounding. `ember` in light came out 2.30 by hand
-  // and 2.05 by measurement.
+  // **Every value below was read out of this gate, and the light column changed twice
+  // before it was right.** The first list was computed by hand against `canvas` and
+  // `glass/canvas`; the gate disagreed with all of it. The second used the dark theme's
+  // glass alpha for the light theme, which made light glass *lighter* than any surface
+  // the light theme can render.
   //
-  // That gap is the argument for the whole file: a contrast number nobody re-derives
-  // from the token table is a number that drifts, and the tokens are the thing that
-  // changed, not the arithmetic.
+  // Both mistakes pointed the same way — a hand-computed surface that reads brighter
+  // than the real one, so the gate cleared tokens the screen never shows. The light
+  // numbers moved `2.02 → 2.08`, `2.05 → 2.11`, `3.03 → 3.12`, `3.33 → 3.43` when the
+  // alpha bug was fixed, and the drift assertion caught every one of them, which is
+  // precisely what it is for: a stale ledger is worse than none.
   //
-  // `ember` in light is the one that matters. **2.05:1**, and it is the reader's own
-  // name in the greeting on `/` — the app's warmest moment, illegible in one of its two
-  // themes. Open decision, deliberately not fixed here.
+  // `ember`, `ok` and `err` remain here because they are still **fills** — an
+  // `EvaButton` label is `onEmber` on `ember`, and a fill is not held to the text floor.
+  // Their ink counterparts (`emberInk`, `okInk`, `errInk`) are in `approvedForText` and
+  // clear 4.5:1 on every surface in both themes.
   //
-  // `ok` and `err` fail in light for the same reason and are worse than they look:
-  // `ok` at 3.03:1 and `err` at 3.33:1 are below 4.5:1 but **above** 3:1, so they read
-  // as "dimmed" rather than "broken", which is exactly why nothing caught them by eye.
+  // `ember` in light is the one that mattered: **2.11:1** for the fill token that used
+  // to paint the reader's own name in the greeting on `/`.
   (token: 'ink3', surface: 'dark glass/raised', ratio: 1.65),
-  (token: 'ink3', surface: 'light glass/raised', ratio: 2.02),
-  (token: 'ember', surface: 'light glass/raised', ratio: 2.05),
-  (token: 'ok', surface: 'light glass/raised', ratio: 3.03),
-  (token: 'err', surface: 'light glass/raised', ratio: 3.33),
+  (token: 'ink3', surface: 'light glass/raised', ratio: 2.08),
+  (token: 'ember', surface: 'light glass/raised', ratio: 2.11),
+  (token: 'ok', surface: 'light glass/raised', ratio: 3.12),
+  (token: 'err', surface: 'light glass/raised', ratio: 3.43),
 ];
 
 /// The measured worst ratio for [token] across every surface in [colors].

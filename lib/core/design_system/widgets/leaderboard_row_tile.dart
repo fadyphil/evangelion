@@ -63,7 +63,7 @@ class LeaderboardRowTile extends StatelessWidget {
   /// The reader's own row's colour: [EvaColors.ember], the streak flame's.
   ///
   ///
-  /// **Inlined as `colors.ember` at each use rather than behind a helper.** A private
+  /// **Inlined as `colors.emberInk` at each use rather than behind a helper.** A private
   /// `_readerColor()` was tried and `no_colour_literals_test.dart` refused it: the gate
   /// exists to make sure every colour under `lib/` resolves through a published token
   /// table, and a one-line alias is exactly the shape that would let a future colour
@@ -93,7 +93,7 @@ class LeaderboardRowTile extends StatelessWidget {
                 '${row.rank}',
                 textAlign: TextAlign.center,
                 style: EvaTypography.monoCaps(colors)
-                    .copyWith(color: isReader ? colors.ember : colors.ink2),
+                    .copyWith(color: isReader ? colors.emberInk : colors.ink2),
               ),
             ),
             const SizedBox(width: EvaSpacing.md),
@@ -101,7 +101,7 @@ class LeaderboardRowTile extends StatelessWidget {
               row.initials,
               textAlign: TextAlign.center,
               style: text.labelLarge!.copyWith(
-                color: isReader ? colors.ember : colors.ink2,
+                color: isReader ? colors.emberInk : colors.ink2,
                 fontWeight: isReader ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -111,7 +111,7 @@ class LeaderboardRowTile extends StatelessWidget {
                 isReader ? strings.leaderboardYourRank : '',
                 style: arabicAware(
                   text.bodyMedium!.copyWith(
-                    color: colors.ember,
+                    color: colors.emberInk,
                     fontWeight: FontWeight.w700,
                   ),
                   direction,

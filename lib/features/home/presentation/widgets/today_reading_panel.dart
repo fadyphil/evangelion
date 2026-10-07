@@ -466,7 +466,7 @@ class _Preview extends StatelessWidget {
     final PassageDropCap cap = PassageDropCap(
       letter: split.letter,
       lines: TodayReadingPanel.dropCapLines,
-      color: colors.ember,
+      color: colors.emberInk,
     );
     return cap.paragraph(
       rest: split.rest,
