@@ -146,6 +146,16 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
     final TextTheme text = Theme.of(context).textTheme;
+    // Read once for both runs below, for the reason `LeaderboardRowTile` records:
+    // these are the **app's own** strings — a caption from the table and a rank the
+    // reader is looking for — so the ambient direction is the only arm there is.
+    //
+    // **Without this the Arabic arm renders tofu.** `monoCaps` is `SpaceMono`, a
+    // Latin-only face, so the card's title came out as one box per character; the
+    // two `bodySmall`/`bodyMedium` runs below it came out in `DMSans`, which is not
+    // the Arabic face either. `arabic_typography_test.dart` caught all four the
+    // moment this card was placed on `/`.
+    final TextDirection direction = Directionality.of(context);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: EvaSpacing.md),
@@ -157,8 +167,10 @@ class _Header extends StatelessWidget {
               children: <Widget>[
                 Text(
                   context.l10n.leaderboardCardTitle,
-                  style: EvaTypography.monoCaps(colors)
-                      .copyWith(color: colors.ink3),
+                  style: arabicAware(
+                    EvaTypography.monoCaps(colors).copyWith(color: colors.ink3),
+                    direction,
+                  ),
                 ),
                 const SizedBox(height: EvaSpacing.xs),
                 Text(
@@ -167,7 +179,11 @@ class _Header extends StatelessWidget {
                   // invent one whenever `cohortSize` is `null`, which is precisely when
                   // the list is capped and the total is unknown.
                   _standingLine(context),
-                  style: text.bodyMedium?.copyWith(color: colors.ink2),
+                  style: arabicAware(
+                    text.bodyMedium?.copyWith(color: colors.ink2) ??
+                        DefaultTextStyle.of(context).style,
+                    direction,
+                  ),
                 ),
               ],
             ),
@@ -208,17 +224,27 @@ class _EmptyStandIn extends StatelessWidget {
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
     final TextTheme text = Theme.of(context).textTheme;
+    // Same reason as `_Header`: these two runs were `DMSans` on the Arabic arm.
+    final TextDirection direction = Directionality.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           context.l10n.leaderboardEmptyTitle,
-          style: text.bodyMedium?.copyWith(color: colors.ink2),
+          style: arabicAware(
+            text.bodyMedium?.copyWith(color: colors.ink2) ??
+                DefaultTextStyle.of(context).style,
+            direction,
+          ),
         ),
         const SizedBox(height: EvaSpacing.xs),
         Text(
           context.l10n.leaderboardEmptyBody,
-          style: text.bodySmall?.copyWith(color: colors.ink3),
+          style: arabicAware(
+            text.bodySmall?.copyWith(color: colors.ink3) ??
+                DefaultTextStyle.of(context).style,
+            direction,
+          ),
         ),
       ],
     );

@@ -519,7 +519,20 @@ void main() {
       await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
 
       final Rect button = tester.getRect(find.byType(EvaButton));
-      final Rect link = tester.getRect(find.byType(TextLink));
+      // **Scoped to the reading panel**, because `/` now has a second `TextLink`: the
+      // leaderboard card's "See all". A bare `find.byType(TextLink)` matched both and
+      // `getRect` refused to guess — which is the failure mode that a type-based
+      // finder acquires the moment a screen grows a second instance of the type, and
+      // the reason this test names the panel rather than the widget class.
+      //
+      // The claim under test is the panel's two halves, so scoping to the panel is
+      // also the more honest statement of it.
+      final Rect link = tester.getRect(
+        find.descendant(
+          of: find.byType(TodayReadingPanel),
+          matching: find.byType(TextLink),
+        ),
+      );
 
       // **Centre to centre, not edge to edge.** The prototype's second half is
       // `<div flex: 1, display: flex, alignItems: center, justifyContent: center>`

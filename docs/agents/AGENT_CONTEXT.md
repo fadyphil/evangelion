@@ -3664,3 +3664,114 @@ path — and so the reader is permanently rank 2. The states worth reviewing (a 
 *dropping*, a tie, `rank: null` unranked, a cohort larger than `limit`) are all
 **unreachable** from the seed. That is the honest justification, and it is a different
 one from the one I shipped.
+
+**144. `LeaderboardCard` WAS NEVER RENDERED, AND `5f53eb5` SAID IT WAS.**
+
+`5f53eb5`'s message claims "leaderboard card → Home". It did not. `LeaderboardCard` was
+written, given a DI seam, a five-surface overflow matrix and a 21-test view suite — and
+**no page instantiated it.** `HomeBloc` fetched `LoadLeaderboardPreview` on every load,
+`HomeState.leaderboard` held the answer, and `HomePage` dropped it.
+
+Every §7 gate was green throughout. The reason is worth recording, because it is not a
+gap any of the gates was looking for:
+
+* `home_page_test.dart` asserts the greeting, the wordmark, the flame and the panel. It
+  never asserted **which sections `/` has**.
+* `leaderboard_view_test.dart` proved the card renders — by instantiating it directly.
+* `home_bloc_test.dart` proved the bloc fetches it.
+
+A widget no page instantiates is exercised perfectly well by a test that instantiates
+it, and a state field nothing reads is written without complaint. **The two halves were
+each verified and the join between them was not.** The missing thing is not a gate, it
+is one assertion: `leaderboard_on_home_test.dart` says the card is in `/`'s tree, in
+order, drawing the rows the bloc fetched. When it was written it failed with
+`Found 0 widgets with type "LeaderboardCard"` while the companion assertion on the
+*request* (`limit: 50`, `window: weekly`) passed — which located the defect to rendering
+alone, with the data path already proven.
+
+**THE LESSON IS ABOUT WHAT A SUITE CANNOT SEE.** Three suites, all green, all correct
+about their own subject, and together they could not tell whether the feature shipped.
+A "does the screen have this section" assertion is the cheapest test in the package and
+the only one that notices a whole component class being orphaned.
+
+**145. THE CARD GOES BELOW TODAY'S READING, AND HOME GETS NO STAT TILES.**
+
+Both are product decisions, taken by the user rather than inferred:
+
+* **Below the reading.** Today's reading is what the reader came to do; a rank is a
+  reward glance taken afterwards. Above, the card pushes the reading panel toward the
+  fold on 320×568, the smallest supported surface. Reused `HomePage.panelGap` rather
+  than inventing a second number for the same visual relationship.
+* **No stat tiles on Home.** The prototype puts `StatTile` on `ProfileScreen` and
+  `ResultScreen` and **nowhere else** — `HomeScreen.tsx` has none. And `ProfileScreen`
+  is a cut screen: the backend has no profile/stats module (`admin, ai, leaderboard,
+  readings, streak, submissions`). So "stat tiles on Home" traces back to a screen that
+  does not exist, and the figures would have had to be invented. Nothing is missing:
+  the streak is in the subtitle and the reader's rank is now in the card directly below.
+
+`StatTile` stays used on `/result` only, which is where the prototype puts it.
+
+**146. PLACING THE CARD EXPOSED ARABIC TOFU ON THE SCREEN EVERY READER LANDS ON.**
+
+`arabic_typography_test.dart` failed the moment the card entered `/`, and its output
+named the families rather than the symptom:
+
+```
+SpaceMono   هذا الأسبوع
+DMSans      غير مصنّف بعد
+DMSans      لا توجد نتائج بعد
+DMSans      عند بدء إجابات المجموعة سيظهر الترتيب هنا.
+```
+
+Four strings in Latin-only faces. `monoCaps` is `SpaceMono` and `titleMedium`/`bodyMedium`
+/`bodySmall` are `DMSans`; neither carries Arabic, so each was one box per character.
+`LeaderboardRowTile` already resolved both its runs through `arabicAware` — decision 84's
+argument — but `_Header`, `_EmptyStandIn`, the page's heading and `_StandingFooter` did
+not, because **they were never built, only tested**. Testing a widget in English never
+renders a glyph the face lacks.
+
+This is the same defect decision 84 records for `StatTile`, found again by the same
+mechanism, and it is the strongest argument in this file for the Arabic gate existing at
+all: it fires on the **first screen the component reaches**, not on the screen someone
+remembered to check. Four runs now resolve through `arabicAware`, and the five new
+strings are declared in `expectedArabic` for both the ready and failed Home arms — the
+card renders independently of the reading, so its strings are present even when the
+reading panel is an `ErrorView`.
+
+**147. `ink3` FAILS CONTRAST AS TEXT, IN BOTH THEMES, AND NO GATE LOOKS.**
+
+Measured, WCAG 2.1 relative luminance against `glassFill` (`#0DFFFFFF`) composited over
+each theme's `canvas`:
+
+| run | on dark glass | on light glass |
+|---|---|---|
+| `ink` `#EAE8F5` / `#120E28` | **14.95:1** | **16.56:1** |
+| `ink2` `#8A8FAD` / `#5A5480` | **5.70:1** | **6.15:1** |
+| `ink3` `#424669` / `#9B97B8` | **1.99:1** | **2.47:1** |
+
+`ink3` fails even the **3:1 large-text** floor, let alone 4.5:1 for body text, and it is
+used as a text colour in **15 runs across 13 files** — the leaderboard card's title, every
+row's rank column and "points" label, `StatTile`'s caption, `EvaSectionHeader`,
+`EmptyState`, `EvaTextField`'s hint, `StickyCta`, `ReadingHeader`,
+`TodayReadingPanel`, `PasswordVisibilityToggle`, `FontSizeStepper`, and the leaderboard
+page's unranked line. There is **no contrast gate anywhere in `test/`**.
+
+**This is reported, not fixed, and the reason is that the fix is a redesign.** Every one
+of those 15 runs is a transcription of `T.ink3` in `ds.tsx`, so changing them means
+restyling the app's entire secondary-text level — which is a different task from placing
+a card, and would replace rather than refine. It also needs a decision this repo has no
+default for: raise `ink3` toward `ink2` (one token, 15 sites fixed, the prototype's own
+`T.ink3` no longer matched) or leave the palette and demote `ink3` to hairlines only,
+promoting those 15 runs to `ink2`. The first is a one-line change with a visual
+consequence across every screen; the second is a deliberate deviation from `ds.tsx`. Both
+belong to the user.
+
+**148. `GlassSurface`'s RIM **AND** SHADOW ARE THE PROTOTYPE'S, NOT A GHOST CARD.**
+
+An external craft floor asks that elevation be declared once, calling a 1px border under
+a wide soft shadow a "ghost card". `GlassSurface` does both, and that is not the defect
+the phrase describes — `ds.tsx:380-387` writes the rim (`1px solid rgba(…, 0.08)`) **and**
+the shadow (`0 4px 24px rgba(0,0,0,0.35)`) **and** `backdropFilter: blur(20px)` on the
+same element. In a glass idiom the rim is what makes the surface legible against a busy
+background and the shadow is what lifts it off the canvas; they are not two competing
+elevations. A committed world overrides a category default, so this stays.

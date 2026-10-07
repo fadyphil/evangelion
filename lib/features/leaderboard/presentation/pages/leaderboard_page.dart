@@ -148,6 +148,9 @@ class _LeaderboardBodyState extends State<_LeaderboardBody> {
       );
     }
 
+    // For the Arabic arm, for the reason `LeaderboardRowTile` records: the heading is
+    // the app's own string and `titleMedium` is `DMSans`, which cannot render Arabic.
+    final TextDirection direction = Directionality.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -156,7 +159,10 @@ class _LeaderboardBodyState extends State<_LeaderboardBody> {
           // with the rows under it — the failure `LeaderboardBoard.window` exists to
           // prevent, and it is prevented here rather than trusted from the request.
           _titleFor(context, window),
-          style: Theme.of(context).textTheme.titleMedium,
+          style: arabicAware(
+            Theme.of(context).textTheme.titleMedium!,
+            direction,
+          ),
         ),
         const SizedBox(height: EvaSpacing.md),
         for (final LeaderboardRow row in board.rows)
@@ -229,11 +235,14 @@ class _StandingFooter extends StatelessWidget {
     final LeaderboardStanding? standing = board.standing;
     final EvaColors colors = context.colors;
 
+    final TextDirection direction = Directionality.of(context);
     if (standing == null || standing.rank == null) {
       return Text(
         context.l10n.leaderboardUnranked,
-        style: Theme.of(context).textTheme.bodyMedium
-            ?.copyWith(color: colors.ink3),
+        style: arabicAware(
+          Theme.of(context).textTheme.bodyMedium!.copyWith(color: colors.ink3),
+          direction,
+        ),
       );
     }
 
@@ -243,8 +252,11 @@ class _StandingFooter extends StatelessWidget {
         Expanded(
           child: Text(
             context.l10n.leaderboardYourRank,
-            style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(color: colors.ember, fontWeight: FontWeight.w700),
+            style: arabicAware(
+              Theme.of(context).textTheme.bodyMedium!
+                  .copyWith(color: colors.ember, fontWeight: FontWeight.w700),
+              direction,
+            ),
           ),
         ),
         Text(

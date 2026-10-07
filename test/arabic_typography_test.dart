@@ -116,6 +116,18 @@ void main() {
       liveArabicScripture.reference,
       ar.homeContinueLabel,
       ar.homeStartReflection,
+      // The leaderboard card's five runs, which arrived when the card was placed on
+      // `/`. **Three of them were rendering in Latin-only faces** — the title in
+      // `SpaceMono` (via `monoCaps`) and the unranked line and both empty-state runs
+      // in `DMSans` — so on the Arabic arm this card was four strings of tofu per
+      // state, on the screen every reader lands on first. The gate named them as
+      // `SpaceMono هذا الأسبوع` and `DMSans غير مصنّف بعد` before the widget was
+      // fixed; `arabicAware` on all four runs is the fix.
+      ar.leaderboardCardTitle,
+      ar.leaderboardUnranked,
+      ar.leaderboardOpenFull,
+      ar.leaderboardEmptyTitle,
+      ar.leaderboardEmptyBody,
     ];
 
     testWidgets('the Arabic arm, with the live Arabic payload', (
@@ -186,6 +198,15 @@ void main() {
           // The retry label — an Arabic run this phase's own first draft of the list
           // forgot, which the gate caught. That is the gate working.
           ar.homeRetry,
+          // The card renders independently of the reading, so its five runs are here
+          // too. The reading's own failure does **not** remove the leaderboard's
+          // state, which is the four-independent-sections property — and the reason
+          // these strings appear on a screen whose reading panel is an `ErrorView`.
+          ar.leaderboardCardTitle,
+          ar.leaderboardUnranked,
+          ar.leaderboardOpenFull,
+          ar.leaderboardEmptyTitle,
+          ar.leaderboardEmptyBody,
         ],
       );
       expect(

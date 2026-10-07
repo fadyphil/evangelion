@@ -8,6 +8,7 @@ import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
+import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
@@ -390,6 +391,31 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
                   context.read<HomeBloc>().add(HomeRetried(language)),
               onOpenReading: () => context.router.pushPath(AppRoutes.reading),
               onStartReflection: () => context.router.pushPath(AppRoutes.quiz),
+            ),
+            const SizedBox(height: HomePage.panelGap),
+            // ## AND THIS WAS MISSING FOR A WHOLE PHASE
+            //
+            // `LeaderboardCard` shipped in `5f53eb5` with its own suite, its own
+            // overflow matrix and a DI seam — and **nothing rendered it**. `HomeBloc`
+            // fetched the preview, `HomeState.leaderboard` held it, and the screen
+            // dropped it. Every gate was green: a widget no page instantiates is
+            // tested perfectly well by tests that instantiate it directly.
+            //
+            // Placed **below** the reading rather than above it, and that is a product
+            // decision rather than a layout one: today's reading is what the reader
+            // came to do, and a rank is a reward glance you take afterwards. Above, it
+            // would push the reading panel toward the fold on a 320×568 screen — the
+            // smallest surface this app supports.
+            //
+            // `panelGap` is the gap the panel already has above it, reused rather than
+            // inventing a second number for the same visual relationship.
+            LeaderboardCard(
+              status: state.leaderboardStatus,
+              board: state.leaderboard,
+              failure: state.leaderboardFailure,
+              onOpen: () => context.router.pushPath(AppRoutes.leaderboard),
+              onRetry: () =>
+                  context.read<HomeBloc>().add(HomeRetried(language)),
             ),
             const SizedBox(height: HomePage.bottomSpacer),
           ],
