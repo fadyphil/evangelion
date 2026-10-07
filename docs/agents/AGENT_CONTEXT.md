@@ -3979,3 +3979,81 @@ accent run — the chip label, the segment label, and a 13×12 chevron.
 (147) by reading the palette by hand. `ember`, `ok` and `err` were found by the ledger
 asserting that no sub-AA pair had gone unrecorded. The hand-read found the first defect;
 the mechanical check found the next three.
+
+**155. `SealFab` COMES BACK TO `/` WITH TWO ITEMS, AND FOUR GATES ARGUED ABOUT IT.**
+
+`ds.tsx:533-573` defines a 56×56 glass circle carrying the display-serif `E`, outlined in
+ember, expanding into pill destinations. `ds.tsx:541` places it `bottom: 28, right: 20`, on
+`HomeScreen.tsx:100` and **nowhere else**. It was cut, and the reason was sound: its menu
+was Profile, Settings and Language, and by then Profile had no endpoint, Settings was
+already the avatar's job on `/`, and Language was already a row inside `/settings`.
+
+**TWO ITEMS, NOT THREE, AND GATE 2 IS WHY.** The third destination would be Language, and
+`showLanguageSheet` lives in `features/settings/` — so the import was written, and
+`injection_test.dart` Gate 2 named it: *"a feature depends on the PORTS only, and
+`lib/app/di/` is where an adapter is chosen."* It was removed rather than suppressed, and
+**there is deliberately no `sealFabLanguage` key**: a getter with no call site is a string
+in the bilingual surface no reader can reach. Leaderboard took Profile's slot, because it
+is the one prototype destination with **no other entry point on `/`**.
+
+The two ways to get a third item back are both larger than placing a dial, so neither is
+taken: promote `language_sheet.dart` into the shared kernel — it is app chrome rather than
+settings, and this FAB was its **original** entry point before it was cut — or give `/`
+another live route. Both are the user's.
+
+**`NeuralScaffold` GAINS `overlay`, AND THE GATE THAT FORCED IT IS THE REASON IT IS
+SAFE.** The content is inside a `SingleChildScrollView` on five of six screens, so a
+caller placing a floating control in its own column produces one that **scrolls away** —
+which is not a floating control. The `Stack` this widget already owns is the prototype's
+`position: absolute; inset: 0` container (`ds.tsx:162`), so the overlay is the shape the
+prototype had rather than a mechanism invented for Flutter. It sits **after** the content
+and **before** `bottomFade`'s scrim, so a scrolling screen's CTA gradient still covers a
+bottom-right overlay. `null` on the five screens that have none.
+
+**§13.4's BLUR BUDGET IS ONE SITE PER SCREEN, AND `/` HAS SPENT IT.** The prototype blurs
+the dial at `blur(20px)` and the pill at `blur(16px)`. Both are dropped, and the gate
+refused twice: first for two raw `BackdropFilter`s, then for two *accounted*
+`GlassTier.blur` ones. A `BackdropFilter` is a save layer, two more on the screen a reader
+spends the most time on is a real price on low-end hardware, and §13.4 is a decision with
+a number in it rather than a preference. The dial reads as glass from what remains — a
+translucent fill, the prototype's hairline rim, the ember bloom — and costs no save layer.
+**Raising the budget to three was available and not taken:** a floating affordance is a
+poor reason to spend it on.
+
+**THE PROTOTYPE'S 40ms STAGGER IS NOT REPRODUCED.** `ds.tsx:548` writes
+`screen-in 200ms ease-out ${i * 40}ms both`. Reproducing it needs a **delay**, and
+`EvaAnimate` has none by design — its doc says timings are the enum's job and "there is no
+`duration` or `curve` argument anywhere below, so a literal cannot reach an effect even by
+accident." A per-index delay is `40ms * i` at a call site. So the pills run
+`MotionMoment.screen` together: one authored moment, and three pills at once reads as one
+control opening where three 40ms apart read as a sequence.
+
+**AND THE SEMANTICS STORY HAD THREE FALSE STARTS, ALL RECORDED IN THE CODE.**
+
+* *The label.* The prototype gives the trigger **no** accessible name — its content is the
+  letter `E` — which is the defect `SegmentedControl`'s track shipped with. Declared.
+* *`container: true`.* Added while chasing the next fault, which turned out to be
+  something else entirely. **Deleting it leaves every test green**, so the comment now
+  says so and gives the honest defensive reason instead of claiming a test caught it.
+* *The real fault.* `EvaAnimate` sets its controller to `0.0` and calls `_play()` from a
+  **post-frame callback**, so the frame that creates a pill draws it at **opacity 0** — and
+  `RenderOpacity` **drops semantics for a fully transparent subtree**. A hand-counted
+  three-pump sequence found nothing and a four-pump one found everything, because each
+  `pump(duration)` lands on the controller's *first* tick rather than advancing past it.
+  The same widget needed four pumps under a bare `SealFab` and **five** under `/`. The
+  test now uses a bounded loop that states the claim ("the animation finishes") instead of
+  a magic count that passes for the wrong reason on a different frame budget.
+  `pumpAndSettle` is **not** the answer here: `/`'s orbs animate forever, so it times out
+  with a message about the background rather than the dial.
+
+**AND TWO OF MY OWN MUTATIONS SURVIVED THE FIRST VERSION OF THIS TEST.** `semanticsOf(…)`
+resolves to whatever node the tree merged the trigger into, so it reported a non-empty
+label even with the label deleted; the assertion now reads `Semantics.properties` off the
+widget. And the "pill's label deleted" mutation needed the **text kept and the label
+removed** to be the interesting case — a pill that still reads "Settings" on screen and
+is anonymous to a screen reader is precisely the defect §14 is about.
+
+`seal_fab_test.dart`'s first assertion is deliberately `find.byType(SealFab)` on `/`. That
+is not boilerplate: `5f53eb5`'s "leaderboard card → Home" was claimed and the card was
+never rendered, and **a component that is built, tested and never placed is invisible to
+every assertion that does not look for it on the screen.**

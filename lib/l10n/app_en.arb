@@ -465,5 +465,21 @@
   },
   "@settingsVersion": {
     "description": "The version row's title. Transcribed: SettingsScreen.tsx:115 writes `Version`, with the value beside it.\n\nThe **value** is `AppConfig.appVersion`, not an ARB key, because it is not prose: it is `pubspec.yaml`'s own `version:` with a build suffix, and `settings_page_test.dart` parses `pubspec.yaml` and asserts the two agree. Putting it in this file would have been a number a translator could edit and nothing would check."
+  },
+  "sealFabOpen": "Open menu",
+  "@sealFabOpen": {
+    "description": "`ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is."
+  },
+  "sealFabClose": "Close menu",
+  "@sealFabClose": {
+    "description": "The same trigger while the dial is open. A toggling button needs two names, or the announcement describes the current state and not the action — which is the defect `SegmentedControl` shipped with."
+  },
+  "sealFabSettings": "Settings",
+  "@sealFabSettings": {
+    "description": "A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away."
+  },
+  "sealFabLeaderboard": "Leaderboard",
+  "@sealFabLeaderboard": {
+    "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
   }
 }

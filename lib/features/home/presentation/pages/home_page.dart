@@ -9,6 +9,7 @@ import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
 import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
@@ -121,6 +122,28 @@ class HomePage extends StatelessWidget {
       // that do not scroll own their own scrollables; this is not one of them.
       scrollable: true,
       padding: scaffoldPadding,
+      // `ds.tsx:100` puts `SealFAB` on this screen and nowhere else, in the scaffold's
+      // own overlay layer so it does not scroll with the passage. Its menu is Settings,
+      // Language and **Leaderboard** — the prototype's Profile slot, which was cut for
+      // want of an endpoint and is asserted absent by `seal_fab_test.dart` so it cannot
+      // creep back as a duplicate of another control's job.
+      overlay: SealFab(
+        items: <SealFabItem>[
+          SealFabItem(
+            label: context.l10n.sealFabSettings,
+            onTap: () => context.router.pushPath(AppRoutes.settings),
+          ),
+          SealFabItem(
+            // **Why this item exists at all.** The dial's other two destinations were
+            // already one tap away — Settings is the avatar's job and Language is a row
+            // inside `/settings`. Leaderboard is the only one of the four that had no
+            // other entry point on `/`, and without it this control is two duplicates
+            // and one dead route, which is why it was cut in the first place.
+            label: context.l10n.sealFabLeaderboard,
+            onTap: () => context.router.pushPath(AppRoutes.leaderboard),
+          ),
+        ],
+      ),
       child: BlocProvider<HomeBloc>.value(
         value: resolved,
         child: const _HomeBody(),

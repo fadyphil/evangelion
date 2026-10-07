@@ -89,7 +89,7 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        107,
+        111,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
@@ -111,7 +111,24 @@ void main() {
             'not have to touch an ICU group.\n\n'
             'The three window labels are **not** the wire codes. `all_time` is an '
             'identifier in `leaderboard_board.dart`, and a reader needs the words '
-            '"All time" instead.',
+            '"All time" instead.\n\n'
+            '**107 → 111 for `SealFab`**, the four keys decision 155 brought back: the '
+            'trigger\'s two names (`sealFabOpen` / `sealFabClose`, which differ because '
+            'a button that toggles must say which way it will go — the defect '
+            '`SegmentedControl`\'s track had) and two destination labels. None is a '
+            'plural and none holds a placeholder, so both ICU groups below are '
+            'untouched — which is why this suite went red on exactly one number and on '
+            'nothing else.\n\n'
+            '**There is no `sealFabLanguage` key, and that is a decision.** The dial\'s '
+            'third destination would be Language, but `showLanguageSheet` lives in '
+            '`features/settings/` and Gate 2 forbids one feature importing another, so a '
+            '`sealFabLanguage` getter with no call site would be a string in the '
+            'bilingual surface that no reader can reach. `seal_fab_test.dart` asserts '
+            'Language is absent from the dial for the same reason.\n\n'
+            '`sealFabLeaderboard` occupies the prototype\'s `Profile` slot: Profile is a '
+            'cut screen with no endpoint, and a dial offering a dead route is why the '
+            'component was cut. `seal_fab_test.dart` asserts Profile is absent so it '
+            'cannot creep back.',
       );
       expect(keysOf(ar), isNotEmpty);
     });

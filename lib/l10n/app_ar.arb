@@ -109,5 +109,21 @@
   "settingsVersion": "الإصدار",
   "@leaderboardRowSemantics": {
     "description": "Placeholder types are declared in the EN file only; gen-l10n reads them from there for both locales. This entry exists so the ARB pair stays symmetrical."
+  },
+  "sealFabOpen": "افتح القائمة",
+  "@sealFabOpen": {
+    "description": "`ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is."
+  },
+  "sealFabClose": "أغلق القائمة",
+  "@sealFabClose": {
+    "description": "The same trigger while the dial is open. A toggling button needs two names, or the announcement describes the current state and not the action — which is the defect `SegmentedControl` shipped with."
+  },
+  "sealFabSettings": "الإعدادات",
+  "@sealFabSettings": {
+    "description": "A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away."
+  },
+  "sealFabLeaderboard": "الترتيب",
+  "@sealFabLeaderboard": {
+    "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
   }
 }

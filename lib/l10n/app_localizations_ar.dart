@@ -379,4 +379,16 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsVersion => 'الإصدار';
+
+  @override
+  String get sealFabOpen => 'افتح القائمة';
+
+  @override
+  String get sealFabClose => 'أغلق القائمة';
+
+  @override
+  String get sealFabSettings => 'الإعدادات';
+
+  @override
+  String get sealFabLeaderboard => 'الترتيب';
 }

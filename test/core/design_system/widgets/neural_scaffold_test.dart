@@ -244,12 +244,24 @@ void main() {
           'padding',
           'bottomfade',
           'tier',
+          'overlay',
           'key',
         },
         reason:
             'D2 — the language arrives inside `variant`, not beside it, and every '
             'parameter this widget accepts is listed. A new one is a deliberate '
-            'act on the screen root: add it here with the reason it is allowed.',
+            'act on the screen root: add it here with the reason it is allowed.\n\n'
+            '**`overlay` is the sixth, added for `SealFab`.** It is a viewport-fixed '
+            'widget placed above the content and below `bottomFade`\'s scrim, and the '
+            'gate that caught it is the reason it is worth stating: the content is '
+            'inside a `SingleChildScrollView` on five of the six screens, so a caller '
+            'placing a floating control in its own column produces one that scrolls '
+            'away — which is not a floating control. The `Stack` this widget already '
+            'owns is the prototype\'s `position: absolute; inset: 0` container '
+            '(`ds.tsx:162`), so an overlay is the shape the prototype had rather than a '
+            'second mechanism invented for Flutter. `null` on the five screens that '
+            'have none, and `bottomFade` still paints over it so a scrolling screen\'s '
+            'CTA gradient covers a bottom-right overlay instead of the other way round.',
       );
       expect(
         _scaffoldConstructorParameters(),

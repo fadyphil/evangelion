@@ -101,6 +101,7 @@ class NeuralScaffold extends StatelessWidget {
     required this.child,
     this.scrollable = false,
     this.padding = const EdgeInsets.symmetric(horizontal: EvaSpacing.lg),
+    this.overlay,
     this.bottomFade = false,
     this.tier,
     super.key,
@@ -131,6 +132,28 @@ class NeuralScaffold extends StatelessWidget {
   /// divergence from the prototype**, because "the gutter" is the kind of number
   /// nobody notices until two screens disagree.
   final EdgeInsets padding;
+
+  /// A viewport-fixed widget above the content and below [bottomFade]'s scrim.
+  ///
+  /// ## WHY IT IS HERE AND NOT IN THE CALLER'S COLUMN
+  ///
+  /// Because the content is inside a [SingleChildScrollView] when [scrollable] is set,
+  /// so anything a caller places **in** its column scrolls away with the content. A
+  /// floating affordance that scrolls off is not a floating affordance — it is the last
+  /// thing on the page until you scroll back. `SealFab` is the reason this exists.
+  ///
+  /// The `Stack` here is already the prototype's `position: absolute; inset: 0`
+  /// container (`ds.tsx:162`), so an overlay is the shape the prototype actually had
+  /// rather than a second one introduced for Flutter.
+  ///
+  /// It is placed **after** the content and **before** [bottomFade]'s scrim, so a
+  /// scrolling screen's CTA gradient still covers a bottom-right overlay — which is the
+  /// honest result, because a scrim that did not cover the overlay would leave a
+  /// floating control sitting on top of a fading-out button.
+  ///
+  /// `null` on every screen that has none, so the five screens without an overlay are
+  /// byte-identical in layout.
+  final Widget? overlay;
 
   /// Whether to draw the sticky-CTA scrim along the bottom edge.
   ///
@@ -206,6 +229,7 @@ class NeuralScaffold extends StatelessWidget {
                       : child,
                 ),
               ),
+              if (overlay case final Widget over) Positioned.fill(child: over),
               if (bottomFade)
                 Positioned(
                   left: 0,

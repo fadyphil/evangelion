@@ -941,6 +941,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get settingsVersion;
+
+  /// `ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is.
+  ///
+  /// In en, this message translates to:
+  /// **'Open menu'**
+  String get sealFabOpen;
+
+  /// The same trigger while the dial is open. A toggling button needs two names, or the announcement describes the current state and not the action — which is the defect `SegmentedControl` shipped with.
+  ///
+  /// In en, this message translates to:
+  /// **'Close menu'**
+  String get sealFabClose;
+
+  /// A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get sealFabSettings;
+
+  /// A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaderboard'**
+  String get sealFabLeaderboard;
 }
 
 class _AppLocalizationsDelegate

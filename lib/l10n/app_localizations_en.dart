@@ -372,4 +372,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsVersion => 'Version';
+
+  @override
+  String get sealFabOpen => 'Open menu';
+
+  @override
+  String get sealFabClose => 'Close menu';
+
+  @override
+  String get sealFabSettings => 'Settings';
+
+  @override
+  String get sealFabLeaderboard => 'Leaderboard';
 }
