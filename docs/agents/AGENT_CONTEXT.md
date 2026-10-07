@@ -3061,8 +3061,24 @@ flutter test                                               # full suite
 tool/verify_purity.sh                                      # architecture gates
 dart fix --dry-run                                         # Nothing to fix!
 flutter test --coverage                                    # must not drop
-flutter build linux --release                             # the app still builds
+tool/verify_linux_build.sh                                 # the app REALLY builds
 ```
+
+**`flutter build linux --release` WAS A GATE THAT COULD NOT FAIL, AND WAS REPLACED.**
+See recorded decision 142. `tool/verify_linux_build.sh` runs `flutter doctor`, clears
+the native build state so CMake must regenerate, builds, and asserts the bundle is not
+older than the newest `lib/**.dart`. The old line is kept below only as the thing that
+was wrong:
+
+```bash
+flutter build linux --release                             # DO NOT TRUST THIS ALONE
+```
+
+It reported `✓ Built` on 2026-10-07 with a **2026-10-04** `CMakeCache.txt` and
+`libgtk-3-dev` not installed, because every native output was already present and CMake
+was never asked to regenerate. That false green was reported as a passing gate in three
+consecutive commit messages. `flutter doctor` — absent from this list for ten phases —
+names the missing package in one line.
 
 **Two gates Phase 10 added that are really two *instruments*, not two commands.**
 `test/support/design_system_harness.dart`'s `expectNoOverflow(tester, …)` and
@@ -3505,3 +3521,79 @@ The `toString()` is the same trap in miniature. Two frames in `home_bloc_test.da
 indistinguishable in a failure message until it learned to print `board: ready 3`. It
 counts rows rather than printing the board, because a failure message that renders a
 twelve-field entity stops being readable.
+
+**142. `flutter build linux --release` REPORTED SUCCESS WITHOUT BUILDING ANYTHING, AND
+`flutter doctor` WAS NOT IN §7.**
+
+Measured on 2026-10-07, after ten phases of "release build green" in this file and in
+three consecutive commit messages.
+
+The command printed
+
+```
+Building Linux application...
+✓ Built build/linux/x64/release/bundle/evangelion
+```
+
+while `build/linux/x64/release/CMakeCache.txt` was dated **2026-10-04** and the
+`libgtk-3-dev` package the Linux toolchain needs was **not installed**. Every native
+output was already present, so CMake was never asked to regenerate anything, nothing was
+compiled, and the command reported success. Deleting the cache produced the real answer
+in seconds:
+
+```
+CMake Error at FindPkgConfig.cmake:1093 (message):  - gtk+-3.0
+  flutter/CMakeLists.txt:25 (pkg_check_modules)
+```
+
+**A MISSING TOOLCHAIN FAILS LOUDLY; A STALE CACHE DOES NOT.** That asymmetry is what
+made it survive: `flutter doctor` had been saying `✗ GTK 3.0 development libraries are
+required` the whole time, and §7 never ran it. The list of gates grew four times across
+ten phases and nobody added the one command that checks the *build environment* rather
+than the *source*. Every other line in §7 is about the code; this one is about the
+machine, and it was the only one that could report a false green for reasons no amount
+of reading the diff would reveal.
+
+**AND THE FAILURE WAS CACHED, WHICH MADE IT WORSE.** Once `libgtk-3-dev` was installed,
+the build still failed:
+
+```
+Imported target "PkgConfig::GTK" includes non-existent path "/usr/include/webp"
+```
+
+`/usr/include/webp` exists in **no current `.pc` file** — `grep -rl webp
+/usr/lib/x86_64-linux-gnu/pkgconfig/` returns nothing. The path was baked into the stale
+cache's `GTK_CFLAGS` and CMake validates an imported target's include directories at
+*generate* time, so a header with no relationship to the code blocked the build.
+Deleting `build/linux/x64/{debug,release}` fixed it. The remedy for a missing toolchain
+was therefore not one `apt install` but *that* plus a wipe — which is not something a
+reader can infer from the error text.
+
+`tool/verify_linux_build.sh` replaces the bare build with four steps: `flutter doctor`,
+the four tools `doctor` does not check (`clang`, `cmake`, `ninja`, `pkg-config`), a
+wipe of `build/linux/x64/*` so CMake **must** regenerate, and the timestamp assertion.
+
+**AND TWO OF THE SCRIPT'S OWN BUGS ARE THE POINT OF THE TWO ABOVE.**
+
+Its first version matched the doctor's status line with `^\[.\] Linux toolchain`. The
+glyph is `✓` — **three bytes of UTF-8** — so `.` matches one *byte* under the C locale
+and the pattern never matched. The script then reported `FAIL` on a perfectly healthy
+toolchain, which is the safe direction, but it was wrong for a reason invisible in the
+pattern. The check now matches `Linux toolchain` and compares the glyph as an explicit
+`printf '\xe2\x9c\x93'` / `\xe2\x9c\x97'` byte pair.
+
+**AND STEP 4 WAS UNREACHABLE, PROVED BY A MUTATION THAT "FAILED" TO FAIL.** The
+timestamp comparison sits after a step that deletes `build/linux/x64/*` and rebuilds, so
+the bundle is always fresh by the time it runs — a check that cannot fail is not a
+check. Setting the bundle's mtime to 2020 and running the whole script returned
+**PASSED**, because step 3 relinked it first. So the script takes `--check-only`, which
+skips the build, and the negative control passes: a 2020 bundle now fails with
+
+```
+FAIL: the bundle is OLDER than the newest Dart source.
+      bundle:     2020-01-01 00:00:00
+      newest src: 2026-10-06 20:25:06  lib/features/leaderboard/presentation/pages/leaderboard_page.dart
+```
+
+A gate added to stop a false green, itself shipping a false green and an unreachable
+assertion, is the strongest argument this file has for mutation-testing the gates.
