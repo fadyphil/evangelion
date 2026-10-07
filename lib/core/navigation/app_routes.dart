@@ -86,24 +86,48 @@ abstract final class AppRoutes {
   /// `core/navigation/landing_route.dart` has to name a destination for
   /// `UserRole.viewerServant` and `UserRole.adminServant`, and a function cannot
   /// return a route this file does not declare. So the constant arrives one task
-  /// ahead of the screen: the portal routes themselves are registered in
-  /// `app_router.dart` by the task that builds them, and AGENT_CONTEXT §2
-  /// decision 5 keeps them out of this client — "No servant/admin portal. Those
-  /// backend routes stay untested from the client."
+  /// ahead of the screen.
+  ///
+  /// ## AND IT IS STILL UNREGISTERED — STATED WITHOUT CITING DECISION 5
+  ///
+  /// **This paragraph deliberately cites no authority, because there is none to
+  /// cite.** AGENT_CONTEXT §2 decision 5 (`AGENT_CONTEXT.md:31`, under "Locked
+  /// decisions — NOT up for renegotiation") reads "**No servant/admin portal.**
+  /// Those backend routes stay untested from the client", so it is the *reason
+  /// the registration has not happened yet* and it is emphatically **not** a
+  /// permission. An earlier draft of this comment spent one sentence doing both
+  /// jobs — promising that "the portal routes themselves are registered in
+  /// `app_router.dart` by the task that builds them" and citing decision 5 as
+  /// the reason — which is a decision cited in support of the exact thing it
+  /// forbids.
+  ///
+  /// The user has approved amending decision 5, and **that amendment is task 6's
+  /// to write.** So the honest position for this file is the two facts that do not
+  /// depend on either version of the decision:
+  ///
+  ///  1. `/servant` is **declared here and not registered in `app_router.dart`**.
+  ///  2. **Registering it is task 5's job**, not this file's, and nothing in this
+  ///     paragraph is a retroactive justification for the gap either way.
   ///
   /// **The honest consequence, which a reader will otherwise have to discover by
-  /// pushing it: no `AutoRoute` names this path yet.** `AppRouter`'s table
-  /// declares seven routes and then `'*'`, so a navigation to `/servant` matches
-  /// nothing and the wildcard redirects it to [home]. A servant therefore lands on
-  /// `/` today, which is the correct *outcome* for a role with nothing extra to
-  /// see, and is a coincidence rather than a design: it is what the fallback does
-  /// with an unknown path.
+  /// pushing it:** `AppRouter`'s table declares seven routes and then `'*'`, and
+  /// none of the seven names this path — so a navigation to `/servant` matches
+  /// nothing and the wildcard redirects it to [home]. A servant therefore lands
+  /// on `/` today. That is the *correct outcome* for a role with nothing extra to
+  /// see, and it is a **coincidence rather than a design**: it is what the
+  /// fallback does with an unknown path.
   ///
-  /// **Measured, not reasoned:** driving the live matcher —
-  /// `router.matcher.match('/servant')` and `router.matcher.match('/')` — returns
-  /// `['/']` for **both**, on `AppRouter(FakeAuthStatus(), _SilentAuthChanges())`.
-  /// No test in this repository asserts it, deliberately: pinning "a path that is
-  /// declared but not routed lands on `/`" would ratify a placeholder as a
+  /// **Measured, not reasoned:** driving the live matcher on
+  /// `AppRouter(FakeAuthStatus(), _SilentAuthChanges())`,
+  /// `router.matcher.match('/servant')` yields `name=HomeRoute`,
+  /// `path=/`, **`redirectedFrom=*`** — field-for-field identical to
+  /// `router.matcher.match('/not-a-route')`. It is *not* identical to
+  /// `router.matcher.match('/')`, which yields the same `path` with
+  /// `redirectedFrom=null`; the `*` is precisely the evidence that `/servant` is
+  /// being handled by the catch-all rather than matched.
+  ///
+  /// No test in this repository asserts any of it, deliberately: pinning "a path
+  /// that is declared but not routed lands on `/`" would ratify a placeholder as a
   /// finished screen, which is recorded decision 8's failure in its purest form.
   /// The probe is therefore cited here and thrown away, and the successor that
   /// registers the portal route replaces this paragraph.

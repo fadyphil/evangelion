@@ -5,8 +5,18 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 ///
 /// ## WHY ONE FUNCTION AND NOT TWO CALL SITES
 ///
-/// There are two moments in this app that have to answer "where does this reader
-/// land?", and they are **the same question**:
+/// **Neither call site exists yet at this commit, and that is stated first
+/// because the argument below is about the future.** Nothing in `lib/` calls
+/// this, for the same reason `user_role.dart` records about its two
+/// conversions: the screens and the role picker that would ask belong to later
+/// tasks, and the absence is the task boundary rather than dead code.
+///
+/// What is *not* deferred is the function — the value it computes is fixed,
+/// testable, and worth fixing now precisely because the two call sites will
+/// arrive **separately**, and a separation is what lets them drift.
+///
+/// Two moments in this app will have to answer "where does this reader land?",
+/// and they are **the same question**:
 ///
 ///  * **the login result handler** — the reader signs in, `AuthBloc` reaches
 ///    `signedIn`, and the router resumes the navigation the guard interrupted;
@@ -20,20 +30,14 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 /// single source both call, which is also the argument for the **exhaustive**
 /// `switch` below rather than a table anyone can extend.
 ///
-/// **Neither call site exists yet at this commit.** Nothing in `lib/` calls this,
-/// for the same reason `user_role.dart` records about its two conversions: the
-/// screens and the role picker that would ask belong to later tasks, and the
-/// absence is the task boundary rather than dead code. What is *not* deferred is
-/// the function — the value it computes is fixed, testable, and worth fixing now
-/// precisely because the two call sites will arrive separately.
-///
 /// ## ADVISORY UX, NOT A BOUNDARY — THE SAME ANSWER [RoleAccess] GIVES
 ///
 /// Choosing where a reader lands is a **product** decision, and this function is
 /// where it is written down so there is one of it. It is not access control and
 /// nothing downstream treats it as such: the backend parses `X-User-Role` at
-/// `identity.middleware.ts:24`, assigns it at `:31`, and never reads it again, so
-/// `rg 'user??\.role' src/` and `rg '403' src/` both return **no matches** across
+/// `src/middleware/identity.middleware.ts:24`, assigns it at `:31`, and never
+/// reads it again, so
+/// `rg 'user\??\.role' src/` and `rg '403' src/` both return **no matches** across
 /// all **seventeen** route registrations (`core/domain/entities/user_role.dart`
 /// has the full measurement). A reader who reaches a path by hand reaches
 /// whatever is registered there.
@@ -42,10 +46,14 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 /// **declared but not routed** — no `AutoRoute` in `app_router.dart` names it
 /// yet, so today a servant lands on [AppRoutes.home] through the `'*'`
 /// wildcard. **Measured** through the live matcher rather than reasoned:
-/// `router.matcher.match('/servant')` returns `['/']`, identically to
-/// `router.matcher.match('/')`. That is a placeholder state, not this
-/// function's answer, and it is recorded in both files rather than left to be
-/// discovered.
+/// `router.matcher.match('/servant')` yields `name=HomeRoute`, `path=/`,
+/// **`redirectedFrom=*`** — identical field-for-field to
+/// `router.matcher.match('/not-a-route')`, and **not** to
+/// `router.matcher.match('/')`, whose `redirectedFrom` is `null`. The `*` is the
+/// evidence that the wildcard handled the path rather than any route matching
+/// it. That is a placeholder state, not this function's answer, and it is
+/// recorded in both files rather than left to be discovered; registering it is
+/// task 5's job.
 ///
 /// ## WHY A `kid` LANDS ON `/` AND NOT ON A SERVANT SCREEN
 ///

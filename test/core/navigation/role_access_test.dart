@@ -274,14 +274,68 @@ void main() {
       // gate in this repository uses) because both files *document* the
       // prohibition — a bare `contains('catch')` would fail on their own doc
       // comments.
+      //
+      // BOTH files, not just `role_access.dart`. `landingRouteFor` is reached
+      // from the same navigation code as `allows`, and a `catch` there would be
+      // the same defect with the same failure mode — a silent `AppRoutes.home`
+      // for a role whose landing could not be computed. The obligation is on
+      // the seam, and the seam is both files.
+      for (final String path in <String>[_roleAccessPath, _landingRoutePath]) {
+        expect(
+          _executableSourceOf(path).contains('catch'),
+          isFalse,
+          reason:
+              '$path must have no handler at all: the never-throw obligation '
+              'then holds structurally instead of by every call site '
+              'remembering not to catch',
+        );
+      }
+    });
+
+    test('and both `catch` scans are looking at executable code, not at '
+        'comments', () {
+      // The anti-vacuity half that the cross-file positive control below does
+      // NOT supply. That control proves the *helper* can still find a `catch`
+      // somewhere; it cannot prove this particular file retained code after
+      // stripping, because both files are **over 90% documentation by bytes**
+      // (`withoutDartComments` leaves ~5% and ~7% of them respectively). A
+      // helper regression that over-stripped *these two files* specifically would
+      // return an empty string, `contains('catch')` would be `false`, and both
+      // gates above would go green while looking at nothing at all.
+      //
+      // So each file is checked directly: non-empty after stripping, and still
+      // carrying a token that can only survive in executable source. The marker
+      // is per-file because the two differ in shape — `role_access.dart`
+      // declares classes, `landing_route.dart` is a bare `switch` expression
+      // with no `class` token at all, so a single `contains('class')` would
+      // have gone red on the file it is meant to protect.
       expect(
-        _executableSourceOf(_roleAccessPath).contains('catch'),
-        isFalse,
-        reason:
-            '`role_access.dart` must have no handler at all: the never-throw '
-            'obligation then holds structurally instead of by every call site '
-            'remembering not to catch',
+        _executableMarkerOf,
+        hasLength(2),
+        reason: 'every file in the `catch` scan needs its own marker',
       );
+
+      for (final MapEntry<String, String> entry
+          in _executableMarkerOf.entries) {
+        final String source = _executableSourceOf(entry.key);
+
+        expect(
+          source.trim(),
+          isNotEmpty,
+          reason:
+              '${entry.key} is empty after comment stripping, so the `catch` '
+              'scan beside it is reading an empty string and passing for a '
+              'reason that has nothing to do with handlers',
+        );
+        expect(
+          source,
+          contains(entry.value),
+          reason:
+              '${entry.key} kept no `${entry.value}` after stripping, so the '
+              'scan is provably not looking at its executable code — this is '
+              'the assertion that stops the gate being green on nothing',
+        );
+      }
     });
 
     test('and that `catch` scan is not vacuous: it still sees one where there '
@@ -300,18 +354,14 @@ void main() {
       );
     });
 
-    test('a hand-written throwing implementation is the documented counter '
-        'example, and it does throw', () {
-      // The reason `auth_guard_test.dart` hand-writes `ThrowingAuthStatus`
-      // rather than reusing the shared fake: this class exists to BE the one
-      // thing a conforming implementation is forbidden to be, so the obligation
-      // has a counter-example with a name. Sharing the working implementation
-      // here would defeat the point.
-      const _ThrowingRoleAccess access = _ThrowingRoleAccess();
-
-      expect(() => access.role, throwsStateError);
-      expect(() => access.allows(UserCapability.submitQuiz), throwsStateError);
-    });
+    // A hand-written `_ThrowingRoleAccess` used to stand here, asserted to throw
+    // on both members. It is deleted rather than repaired: its body was a literal
+    // `throw StateError`, so nothing but editing the fixture could turn the
+    // assertions red — it proved that a class written to throw throws. The
+    // counter-example it was reaching for is already played above by
+    // "a throwing role read PROPAGATES rather than being swallowed", which
+    // throws through the *shipped* implementation instead of a second one kept
+    // alive only to be broken.
   });
 
   group('the seam cannot express an async read', () {
@@ -362,6 +412,47 @@ void main() {
             'the scanner must be able to find a `Future` where one exists, or '
             'the assertion beside it proves nothing',
       );
+    });
+
+    test('and the token scan is looking at executable code in BOTH files, not '
+        'at comments', () {
+      // The same gap the `catch` scan has, and for the same reason: the
+      // `usecase.dart` control above proves the HELPER works, not that these
+      // two files kept code through it. Both are **over 90% documentation by
+      // bytes**, so an over-stripping regression would hand the loop above an
+      // empty string and turn a green gate into a claim about nothing.
+      //
+      // Reuses `_executableMarkerOf` rather than restating the tokens, so the
+      // two gates cannot drift apart about which files they are protecting.
+      expect(
+        <String>{_roleAccessPath, _landingRoutePath},
+        _executableMarkerOf.keys.toSet(),
+        reason:
+            'the token scan walks these two files, so the marker table must '
+            'cover exactly them — a tenth entry here would assert on a file no '
+            'gate reads, and a missing one would leave it unprotected',
+      );
+
+      for (final MapEntry<String, String> entry
+          in _executableMarkerOf.entries) {
+        final String source = _executableSourceOf(entry.key);
+
+        expect(
+          source.trim(),
+          isNotEmpty,
+          reason:
+              '${entry.key} is empty after comment stripping, so the token scan '
+              'beside it is reading an empty string',
+        );
+        expect(
+          source,
+          contains(entry.value),
+          reason:
+              '${entry.key} kept no `${entry.value}` after stripping, so the '
+              '`Future`/`Stream`/`async`/`await` loop is provably not looking at '
+              'its executable code',
+        );
+      }
     });
   });
 
@@ -440,24 +531,6 @@ final class _MutableRoleAccess implements RoleAccess {
       UserRole.grantsFor(role).contains(capability);
 }
 
-/// The one thing a conforming [RoleAccess] is forbidden to be.
-///
-/// NOT a duplicate of [_MutableRoleAccess] and not a second seam: it exists so
-/// `role_access.dart`'s never-throw paragraph has a counter-example with a
-/// name, which is what `auth_guard_test.dart`'s `ThrowingAuthStatus` is for.
-/// Sharing the working implementation here would defeat the point — the class
-/// has to be broken on purpose.
-final class _ThrowingRoleAccess implements RoleAccess {
-  const _ThrowingRoleAccess();
-
-  @override
-  UserRole get role => throw StateError('role is undefined behaviour');
-
-  @override
-  bool allows(UserCapability capability) =>
-      throw StateError('role is undefined behaviour');
-}
-
 /// The seam file, named once so a rename is a two-line diff.
 const String _roleAccessPath = 'lib/core/navigation/role_access.dart';
 
@@ -468,6 +541,34 @@ const String _landingRoutePath = 'lib/core/navigation/landing_route.dart';
 /// control that is not a comment.
 const String _dioRepositoryPath =
     'lib/features/reading/data/repositories/dio_reading_repository.dart';
+
+/// Each file the two structural scans walk, mapped to a token that can only
+/// survive comment stripping if executable code is still there.
+///
+/// **This is the anti-vacuity table for both source gates in this suite.** The
+/// cross-file positive controls (`_dioRepositoryPath`, `usecase.dart`) prove the
+/// *helper* works; they cannot prove these two files retained code through it,
+/// and both are overwhelmingly documentation (over 90% by bytes each), so a
+/// helper regression that over-stripped them would return `''`, make every
+/// `contains(...)` assertion below false, and turn both gates green while
+/// scanning nothing.
+///
+/// The markers are **per file** rather than one shared token because the two
+/// files have different shapes: `role_access.dart` declares classes, while
+/// `landing_route.dart` is a single `switch` expression with no `class` token at
+/// all. A single `contains('class')` would have gone red on one of the two files
+/// it is meant to protect — measured, not assumed.
+///
+/// The percentages are deliberately **not** written as byte counts: this table
+/// lives in a test file, and any statement of the form "this file has N bytes"
+/// placed in a comment inside the file being measured is invalidated by the act
+/// of writing it. The share of each file that is executable — currently ~5% and
+/// ~7%, so over 90% documentation each — is the property that matters here, and
+/// it is the one that survives being restated.
+const Map<String, String> _executableMarkerOf = <String, String>{
+  _roleAccessPath: 'class',
+  _landingRoutePath: 'landingRouteFor',
+};
 
 /// [path]'s source with every Dart comment removed.
 String _executableSourceOf(String path) =>

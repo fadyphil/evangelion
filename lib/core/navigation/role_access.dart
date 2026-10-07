@@ -26,6 +26,28 @@ import 'package:evangelion/core/domain/entities/user_role.dart';
 /// table reachable from a seam whose whole documented contract is that it holds
 /// no role, so the next reader has to re-derive whether the two are related.
 ///
+/// ## AND DECISION 75 IS PRECISELY THE PRECEDENT FOR KEEPING THEM APART
+///
+/// This is not only an SRP argument invented here. Recorded decision 75
+/// (`AGENT_CONTEXT.md:2055-2056`) exists in this repository **to keep two
+/// mechanisms apart** that look like the dual-source shape, and it names the
+/// rule in its own words:
+///
+/// > THE SEAM IS TWO DIFFERENT QUESTIONS, NOT A DUPLICATE SOURCE OF TRUTH.
+///
+/// The two arms decision 75 kept are a payload's language and the ambient locale.
+/// These two are "is there a session" and "what may this reader be offered".
+/// Both halves of decision 75's test are met, which is why it applies rather than
+/// merely rhymes:
+///
+///  * **They are different facts, not two names for one.** `AuthStatus` holds a
+///    `bool` the bloc publishes; `RoleAccess` reads a role and a grant table.
+///    Nothing in either can be derived from the other.
+///  * **They survive each other disagreeing.** A signed-in `kid` answers
+///    `isAuthenticated == true` and `allows(manageQuestions) == false` in the
+///    same instant. One seam says yes while the other says no, and collapsing
+///    them would delete the distinction rather than the redundancy.
+///
 /// ## THIS IS **NOT** A SECURITY BOUNDARY, AND THE BACKEND IS WHY
 ///
 /// Read this before adding a check anywhere on the strength of it. It is the
@@ -34,7 +56,7 @@ import 'package:evangelion/core/domain/entities/user_role.dart';
 ///
 /// The backend parses `X-User-Role` at `src/middleware/identity.middleware.ts:24`
 /// and assigns it to `request.user.role` at `:31`, **and never reads it again**.
-/// Measured against `HEAD = 4a1c834`: `rg 'user??\.role' src/` returns **no
+/// Measured against `HEAD = 4a1c834`: `rg 'user\??\.role' src/` returns **no
 /// matches** and `rg '403' src/` returns **no matches** — zero role guards and
 /// zero forbidden responses across all **seventeen** route registrations in
 /// `src/` — fourteen `fastify.<verb>(` calls under the `/api/v1` prefix
@@ -112,6 +134,17 @@ import 'package:evangelion/core/domain/entities/user_role.dart';
 /// `tool/verify_purity.sh` Gate 1, and that is not decoration: the screens that
 /// will consult this seam live in features, and a Flutter type here would put a
 /// `BuildContext` inside the shared kernel.
+///
+/// **Gate 1 was negative-controlled against this file specifically**, because it
+/// is the pure-Dart thing the gate exists to protect. Planting
+/// `import 'package:flutter/material.dart';` as line 1 of a scratch copy under
+/// `/tmp/opencode/purity/` and running the script there printed
+/// `VIOLATION lib/core/navigation/role_access.dart:1` and exited **1**; the
+/// unplanted copy printed `9 pure-Dart dir(s) reach no flutter/dio/http` and
+/// exited 0. §7's rule that "a gate has to be able to fail before you may
+/// believe it passes" is recorded here rather than in a commit message,
+/// because this file is the first thing a reader will check and the evidence
+/// should travel with it.
 abstract interface class RoleAccess {
   /// The role the app currently believes this reader holds.
   ///
@@ -159,13 +192,65 @@ abstract interface class RoleAccess {
 /// composition time would capture the role that did not exist yet.
 ///
 /// *Rejected: a mutable `UserRole role` field with a setter.* It satisfies every
-/// test in `role_access_test.dart`, and it is the shape this repository has
-/// rejected three times for the same reason — decisions 5, 68 and 75 each removed
-/// a second copy of one value in favour of a single source. A writable role field
-/// would hand every caller the ability to disagree with `AuthSession.role` and
-/// nothing to catch it.
+/// test in `role_access_test.dart`, and it is a shape this repository has
+/// rejected before for exactly this reason — decisions **5** and **68** each
+/// removed a second copy of one value in favour of a single source. Decision 75
+/// is deliberately **not** in that list: it is the counter-example, the record of
+/// a seam that looks like the same shape and was kept anyway (see the section on
+/// `AuthStatus` above, which is what it is precedent for). Decision 68's own
+/// wording is the dual-source removal — "the 'dual source of truth for one value'
+/// shape that defect 5 already removed from the design system"
+/// (`AGENT_CONTEXT.md:1822-1823`) — and decision 75 confirms the pair by name
+/// (`AGENT_CONTEXT.md:2063-2064`). So it is **twice**, not three times. A
+/// writable role field would hand every caller the ability to disagree with
+/// `AuthSession.role` and nothing to catch it.
 /// *Rejected: naming the parameter `role` and passing it by value.* A reader is
 /// one word longer and the difference is the entire point of the class.
+///
+/// ## TWO HAZARDS THE CONSTRUCTOR DOES **NOT** RULE OUT
+///
+/// Everything above is about rejecting shapes. These two hazards are the ones a
+/// reader *does* keep, so they are named here rather than left to be discovered.
+///
+/// **1. A reader that captures a session is a frozen seam wearing this class's
+/// name.** [LiveRoleAccess] rejects a mutable *field*, which is a different
+/// thing entirely — nothing stops the composition root from writing a perfectly
+/// legal closure:
+///
+/// ```dart
+/// final AuthSession? s = bloc.state.session;
+/// LiveRoleAccess(() => s!.role); // compiles, and is frozen forever
+/// ```
+///
+/// `AuthSession` is `freezed` with `final UserRole role`, so the snapshot can
+/// never go stale *and* never updates: the field is immutable, so no setter
+/// exists to fix it, and no compiler warning appears because `s!.role` is a
+/// perfectly valid read. This is **exactly** the defect decision 9 contract 4
+/// records, in a form the mutable-field argument above would wave through. The
+/// reader must close over the **bloc or locator**, never over a session value
+/// pulled out of one; `() => bloc.state.session?.role ?? UserRole.kid` is live,
+/// `() => s!.role` is not.
+///
+/// **2. [allows] re-reads the role on every call, so two calls in one decision
+/// are NOT a consistent snapshot.** This is the property the class is *for* —
+/// see "WHY IT TAKES A READER AND NOT A `UserRole`" above — and it has a
+/// consequence worth stating: a caller that reads `role` once and then reads it
+/// again within a single navigation decision can be handed **two different
+/// roles**, because the bloc emitted in between. A guard that must reason about
+/// one reader consistently has to capture `final UserRole role = access.role;`
+/// once and pass that to `UserRole.grantsFor` itself. The seam guarantees
+/// liveness; it does not guarantee atomicity across two reads, and no seam built
+/// on a reader can.
+///
+/// The freeze-at-construction contract this paragraph defends is already pinned
+/// where the eventual registration lives:
+/// `test/app/di/navigation_injection_test.dart:393` drives the bloc and re-reads
+/// the seam, and the `same()` post-mortem above it (`:371-392`) records how a
+/// freeze there shipped with all 1200 tests green. [RoleAccess]'s analogue is in
+/// `role_access_test.dart`, which holds it by **counting reads** rather than
+/// comparing answers. When a `RoleAccess` is hand-registered in
+/// `lib/app/di/navigation_injection.dart`, those are the assertions its reader
+/// has to keep passing.
 ///
 /// ## THE COMPOSITION ROOT IS WHERE THE READER COMES FROM
 ///
