@@ -17,11 +17,25 @@ import 'package:flutter/material.dart';
 ///
 /// ## WHY THE CARD HAS NO EMPTY STATE OF ITS OWN
 ///
-/// It renders [LeaderboardEmptyState] — the same widget `/leaderboard` uses — because
-/// the empty board is the **only** reachable state in development (scores enter Redis
-/// only through a successful submission, and submission cannot succeed against the
-/// memory fallback). Two copies of that copy would be two things to keep in step while
-/// being read constantly.
+/// Because a card three rows tall cannot afford a screen's worth of furniture — see
+/// [_EmptyStandIn] for what it draws instead.
+///
+/// ## A CORRECTION: THIS DOC ONCE CLAIMED THE EMPTY BOARD WAS THE ONLY REACHABLE STATE
+///
+/// It said the card renders "the same widget `/leaderboard` uses", naming a class
+/// called `LeaderboardEmptyState` that **does not exist anywhere in `lib/`**, and
+/// justified itself by asserting the leaderboard is always empty in development.
+///
+/// Both halves were wrong. `/leaderboard` uses the design system's `EmptyState`, not
+/// this card's private `_EmptyStandIn`, so the two were never the same widget. And the
+/// backend's `InMemoryRedisFallback` **constructor pre-seeds three children into group
+/// 3** unless `NODE_ENV` is exactly `test` (`src/redis/client.ts:5-33`), so a dev
+/// server answers with three real rows and the reader at **rank 2**.
+///
+/// The claim survived because it was written from **one** `curl` that returned
+/// `total_ranked: 0` and never re-probed — see AGENT_CONTEXT decision 143. The lesson
+/// generalises past this widget: *an empty response is a fact about a process, never a
+/// property of a system.*
 class LeaderboardCard extends StatelessWidget {
   /// The card's body for [status], [board] and [failure].
   const LeaderboardCard({

@@ -527,6 +527,127 @@ void _widgetTests() {
       );
     });
   });
+  group('EvaButtonStyle compares by value', () {
+    // `==` and `hashCode` were never invoked by any test, so both overrides shipped
+    // unexercised. They matter: an `AnimatedContainer` that receives an unequal style
+    // restarts its animation, and a suite that rebuilt a button on every frame would
+    // see a control that never settles.
+    test('two styles with the same fields are equal and hash alike', () {
+      const EvaButtonStyle a = EvaButtonStyle(
+        background: Color(0xFF111111),
+        pressedBackground: Color(0xFF222222),
+        foreground: Color(0xFF333333),
+        border: null,
+        glow: <BoxShadow>[BoxShadow(color: Color(0xFF444444))],
+        pressedGlow: <BoxShadow>[],
+      );
+      const EvaButtonStyle b = EvaButtonStyle(
+        background: Color(0xFF111111),
+        pressedBackground: Color(0xFF222222),
+        foreground: Color(0xFF333333),
+        border: null,
+        glow: <BoxShadow>[BoxShadow(color: Color(0xFF444444))],
+        pressedGlow: <BoxShadow>[],
+      );
+      expect(a, b);
+      // Equal objects must hash equally, or a `Set` or `Map` keyed by style silently
+      // holds duplicates — the failure mode `hashCode` exists to prevent.
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('a different glow makes them unequal', () {
+      // The glow lists are compared with `listEquals`, not `==`, because `BoxShadow`
+      // has no value equality of its own.
+      //
+      // **The two styles here differ in the glow and nothing else.** That is the whole
+      // point, and the first version of this test compared a `primary` against a
+      // `ghost` — which differ in background, foreground and border as well, so it
+      // still passed with `listEquals(other.glow, glow)` deleted. A mutation that
+      // removed the glow comparison ran green; this pair cannot.
+      const EvaButtonStyle dim = EvaButtonStyle(
+        background: Color(0xFF111111),
+        pressedBackground: Color(0xFF222222),
+        foreground: Color(0xFF333333),
+        border: null,
+        glow: <BoxShadow>[],
+        pressedGlow: <BoxShadow>[],
+      );
+      const EvaButtonStyle lit = EvaButtonStyle(
+        background: Color(0xFF111111),
+        pressedBackground: Color(0xFF222222),
+        foreground: Color(0xFF333333),
+        border: null,
+        glow: <BoxShadow>[BoxShadow(color: Color(0xFF444444))],
+        pressedGlow: <BoxShadow>[],
+      );
+      expect(dim, isNot(lit));
+
+      // The same for the pressed glow, which is the other list-compared field.
+      const EvaButtonStyle pressedLit = EvaButtonStyle(
+        background: Color(0xFF111111),
+        pressedBackground: Color(0xFF222222),
+        foreground: Color(0xFF333333),
+        border: null,
+        glow: <BoxShadow>[],
+        pressedGlow: <BoxShadow>[BoxShadow(color: Color(0xFF555555))],
+      );
+      expect(dim, isNot(pressedLit));
+    });
+
+    test('a style is not equal to an unrelated object', () {
+      expect(
+        resolveButtonStyle(
+          variant: EvaButtonVariant.primary,
+          colors: const EvaColors.dark(),
+        ),
+        isNot(equals(Object())),
+      );
+    });
+  });
+
+  group('the icon slot', () {
+    testWidgets('a leading glyph renders beside the label, not instead', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'See all',
+          icon: Icons.chevron_right,
+          onPressed: _noop,
+        ),
+      );
+
+      // Both. The icon arm wraps the glyph in padding and tints it with the style's
+      // own foreground, so asserting the glyph alone would pass even if the label had
+      // been replaced by it.
+      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+      expect(find.text('See all'), findsOneWidget);
+      // The two live in one `Row`, which is the layout the arm exists to produce.
+      expect(
+        find.descendant(of: find.byType(EvaButton), matching: find.byType(Row)),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('with no icon the label is a bare Text, not a Row', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.uiFamily,
+          label: 'See all',
+          onPressed: _noop,
+        ),
+      );
+      // The `leading == null && trailing == null` arm skips the `Row` entirely, so a
+      // label-only button costs no extra node. Asserted because the icon arm and this
+      // arm are the two branches of one conditional.
+      expect(find.text('See all'), findsOneWidget);
+    });
+  });
 }
 
 void _noop() {}

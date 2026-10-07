@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
+import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -191,6 +192,41 @@ final class PlantedHolder {
       expect(state.toString(), contains('reader@example.com'));
       expect(state.toString(), isNot(contains(secret)));
       expect(state.toString(), contains('********'));
+
+      // `SignInParams` — the fourth subject, and the one this test **omitted**.
+      //
+      // The file's own doc names it ("`SignInParams` (`sign_in.dart`), which was
+      // never an `Equatable` at all and carries its own hand-written `==`,
+      // `hashCode` and `toString`") and the scan above covers it, but the behavioural
+      // half asserted against the other three only. So the rule was half-enforced: the
+      // scan proved `SignInParams` declares a `toString`, and nothing proved the
+      // declared one masks. A body that interpolated `password` would have kept every
+      // test in this file green.
+      const SignInParams params = SignInParams(
+        email: 'reader@example.com',
+        password: secret,
+      );
+      expect(params.toString(), contains('reader@example.com'));
+      expect(params.toString(), isNot(contains(secret)));
+      expect(params.toString(), contains('********'));
+
+      // And its equality, which is the other half of what it hand-wrote. Without it
+      // the class cannot be compared in a `Set` or matched by `Bloc` state, and a
+      // careless `==` would make two different passwords equal.
+      expect(
+        params,
+        const SignInParams(email: 'reader@example.com', password: secret),
+      );
+      expect(
+        params,
+        isNot(
+          const SignInParams(
+            email: 'reader@example.com',
+            password: 'a-different-secret-entirely',
+          ),
+        ),
+      );
+      expect(params, isNot(equals(Object())));
     });
   });
 }

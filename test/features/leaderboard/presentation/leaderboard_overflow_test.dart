@@ -45,7 +45,14 @@ const LeaderboardBoard _board = LeaderboardBoard(
   cohortSize: 5,
 );
 
-/// The seeded empty board, the only state development can currently reach.
+/// An empty board.
+///
+/// **Not** the state development reaches — the backend's `InMemoryRedisFallback`
+/// pre-seeds three rows for group 3 unless `NODE_ENV` is exactly `test`. This fixture
+/// once carried a comment calling itself "the only state development can currently
+/// reach", which was a fact about one `curl`, not about the endpoint; see AGENT_CONTEXT
+/// decision 143. It is here because the empty board is still reachable — a cohort with
+/// no scored children yet, or any group other than the seeded 3.
 const LeaderboardBoard _empty = LeaderboardBoard(
   window: LeaderboardWindow.weekly,
   groupId: 3,
@@ -147,8 +154,7 @@ void main() {
           ),
         );
         await tester.pump(const Duration(milliseconds: 16));
-        // The empty state is the only state development reaches today, so it is the one
-        // that has to be overflow-free at every size rather than only the happy one.
+        // Both arms have to be overflow-free at every size, not only the happy one.
         expectNoOverflow(tester, somethingRendered: () => true, surface: name);
       });
     }

@@ -99,4 +99,44 @@ void main() {
       );
     });
   });
+
+  /// `EvaFocusRingSpec` compares by value, and nothing in the suite ever compared two.
+  ///
+  /// This is the **third** class in the package to hand-write `==`, `hashCode` and
+  /// `toString` with no test touching them — after `EvaButtonStyle` and
+  /// `SignInParams`. All three overrides compiled, analysed and formatted clean while
+  /// being dead code, and a value class whose `==` is never exercised is a value class
+  /// nobody has checked compares the way it claims to.
+  ///
+  /// It matters for more than tidiness: `evaFocusRingSpec` is called on every
+  /// rebuild of every focusable control, so its result is compared constantly at
+  /// runtime. An `==` that returned `false` for identical specs would rebuild every
+  /// ring on every frame — the kind of defect that renders as "the app feels sluggish"
+  /// and never as a failing test.
+  group('EvaFocusRingSpec compares by value', () {
+    test('the same colours produce equal specs that hash alike', () {
+      const EvaColors dark = EvaColors.dark();
+      final EvaFocusRingSpec a = evaFocusRingSpec(dark);
+      final EvaFocusRingSpec b = evaFocusRingSpec(dark);
+
+      expect(a, b);
+      // Equal objects must hash equally, or a `Set` of specs silently accumulates
+      // duplicates across rebuilds.
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('it is not equal to an unrelated object', () {
+      expect(evaFocusRingSpec(const EvaColors.dark()), isNot(equals(Object())));
+    });
+
+    test('toString names the width and the colour', () {
+      final EvaFocusRingSpec spec = evaFocusRingSpec(const EvaColors.dark());
+      final String printed = spec.toString();
+      // Asserted on the width, because that is the field a reader needs to diagnose a
+      // ring that is the wrong thickness — and a `toString` that returned only
+      // `Instance of` would satisfy a test that merely checked it was a string.
+      expect(printed, contains('${spec.width}'));
+      expect(printed, contains('EvaFocusRingSpec'));
+    });
+  });
 }
