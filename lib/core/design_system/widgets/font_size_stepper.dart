@@ -201,7 +201,7 @@ class _ScaleLetter extends StatelessWidget {
     style: TextStyle(
       fontFamily: EvaTypography.uiFamily,
       fontSize: size,
-      color: colors.ink3,
+      color: colors.ink2,
     ),
   );
 }

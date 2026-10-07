@@ -365,7 +365,7 @@ class _EvaTextFieldState extends State<EvaTextField> {
             padding: const EdgeInsets.only(right: EvaSpacing.sm),
             child: IconTheme.merge(
               // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
-              data: IconThemeData(color: colors.ink3),
+              data: IconThemeData(color: colors.ink2),
               child: control,
             ),
           ),
@@ -560,7 +560,7 @@ class _Placeholder extends StatelessWidget {
                 // `colors.ink3`, the same de-emphasised ink `ds.tsx:315` gives the
                 // field's own `rightIcon` and this project's token table gives any
                 // text that is present but not the content.
-                color: colors.ink3,
+                color: colors.ink2,
               ),
         ),
       ),

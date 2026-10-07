@@ -166,7 +166,7 @@ class StickyCta extends StatelessWidget {
               letterSpacing: captionLetterSpacingFor(language),
               // `T.ink3` on both arms — `ReadingEnScreen.tsx:88`,
               // `ReadingArScreen.tsx:86`.
-              color: colors.ink3,
+              color: colors.ink2,
             ),
           ),
         ],

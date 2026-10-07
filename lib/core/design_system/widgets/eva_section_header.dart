@@ -106,7 +106,7 @@ class EvaSectionHeader extends StatelessWidget {
         // textTransform: uppercase, color: T.ink3`.
         EvaSectionHeaderSize.section => EvaTypography.monoCaps(
           colors,
-        ).copyWith(color: colors.ink3, fontWeight: FontWeight.w700),
+        ).copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
         // `ProfileScreen.tsx:53` — `F.ui, 16, 700, color: T.ink`. `titleMedium`
         // is Material 3's 16sp slot, so the prototype's 16 lands exactly.
         EvaSectionHeaderSize.title =>

@@ -356,7 +356,7 @@ class _Score extends StatelessWidget {
         style: arabicAware(
           Theme.of(context).textTheme.bodySmall!,
           Directionality.of(context),
-        ).copyWith(color: context.colors.ink3),
+        ).copyWith(color: context.colors.ink2),
       ),
     ],
   );

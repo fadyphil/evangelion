@@ -279,7 +279,7 @@ class _Avatar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[colors.ink.withValues(alpha: 0.92), colors.ink3],
+          colors: <Color>[colors.ink.withValues(alpha: 0.92), colors.ink2],
         ),
         border: Border.all(
           color: colors.ember.withValues(alpha: AppTopBar.avatarRimAlpha),

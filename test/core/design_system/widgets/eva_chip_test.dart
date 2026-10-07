@@ -93,11 +93,17 @@ void main() {
   });
 
   group('toggle — the App.tsx chips and the Settings pills', () {
-    test('unselected is transparent with a faint rim and ink3', () {
+    test('unselected is transparent with a faint rim and ink2', () {
       // `App.tsx:75-76` — `1.5px solid rgba(#fff | #000, 0.1)`, transparent
-      // background, `ink3`-class ink. The prototype's literal `'#6B6F94'` /
-      // `'#7A75A0'` are not token values; `ink3` is the token that means
-      // "disabled text and the faintest decoration" (`eva_colors.dart`).
+      // background, and an `ink3`-class ink. The prototype's literal `'#6B6F94'` /
+      // `'#7A75A0'` are not token values.
+      //
+      // **`ink2`, not `ink3`, and that is decision 149.** `ink3` is the token that
+      // means "inactive control and the faintest decoration" — the two cases WCAG
+      // 1.4.3 exempts, and `eva_colors_test.dart` asserts it stays sub-AA so the
+      // exemption stays the reason it passes. A chip's **label** is neither: it is
+      // live, selectable text, and `ink3` measures 1.65:1 on dark glass. The rim
+      // above it stays `glassBorder`, which is where the "faint" reading belongs.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
         EvaColors.light(),
@@ -111,7 +117,7 @@ void main() {
         expect(style.background, Colors.transparent);
         expect(style.border.top.width, 1.5);
         expect(style.border.top.color, colors.glassBorder);
-        expect(style.foreground, colors.ink3);
+        expect(style.foreground, colors.ink2);
       }
     });
 

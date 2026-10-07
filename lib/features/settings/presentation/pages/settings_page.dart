@@ -290,7 +290,7 @@ class _SettingsBody extends StatelessWidget {
                           style: EvaTypography.monoCaps(context.colors)
                               .copyWith(
                                 fontSize: EvaSpacing.sm + 2,
-                                color: context.colors.ink3,
+                                color: context.colors.ink2,
                               ),
                         ),
                       ),

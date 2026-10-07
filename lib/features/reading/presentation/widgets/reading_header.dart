@@ -220,7 +220,7 @@ class ReadingHeader extends StatelessWidget {
             letterSpacing: metadataLetterSpacingFor(language),
             // `T.ink3` on both arms — `ReadingEnScreen.tsx:30`,
             // `ReadingArScreen.tsx:35`.
-            color: colors.ink3,
+            color: colors.ink2,
           ),
         ),
         const SizedBox(height: metadataGap),

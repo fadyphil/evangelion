@@ -62,7 +62,10 @@ void main() {
       await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
       final Text caption = tester.widget<Text>(find.text('READ'));
       expect(caption.style!.fontFamily, EvaTypography.monoFamily);
-      expect(caption.style!.color, const EvaColors.dark().ink3);
+      // `ink2`, not `ink3` — decision 149. A tile's caption is content, and `ink3`
+      // measures 1.65:1 on dark glass. `ink3` is reserved for inactive controls and
+      // decoration, the two things WCAG 1.4.3 exempts by name.
+      expect(caption.style!.color, const EvaColors.dark().ink2);
     });
 
     testWidgets('the value is the display serif at the prototype\'s 24', (
@@ -262,7 +265,9 @@ void main() {
       await pumpAt(tester, const EvaSectionHeader(label: 'Reading'));
       final Text header = tester.widget<Text>(find.text('READING'));
       expect(header.style!.fontFamily, EvaTypography.monoFamily);
-      expect(header.style!.color, const EvaColors.dark().ink3);
+      // `ink2`, not `ink3` — decision 149, same reason as `StatTile`'s caption: a
+      // heading that names a section is content, not decoration.
+      expect(header.style!.color, const EvaColors.dark().ink2);
     });
 
     testWidgets('the title size is the bold UI form', (

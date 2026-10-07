@@ -102,7 +102,7 @@ class PasswordVisibilityToggle extends StatelessWidget {
               visible ? Icons.visibility : Icons.visibility_off,
               size: glyphSize,
               // `ds.tsx:315-316` — `right: 14, color: T.ink3`.
-              color: colors.ink3,
+              color: colors.ink2,
             ),
           ),
         ),

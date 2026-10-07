@@ -175,7 +175,7 @@ EvaChipStyle _toggle({required EvaColors colors, required bool selected}) {
     // literal is a token; `ink3` is the token whose documented role is
     // "disabled text and the faintest decoration" (`eva_colors.dart`), which is
     // what an unselected option's ink is.
-    foreground: selected ? colors.ember : colors.ink3,
+    foreground: selected ? colors.ember : colors.ink2,
     // `App.tsx:75-76` — `active ? 1.5px solid ember : 1.5px solid rgba(#fff | #000, 0.1)`.
     // `glassBorder` *is* that 10% white/black (`eva_colors.dart:76,117`).
     border: Border.all(

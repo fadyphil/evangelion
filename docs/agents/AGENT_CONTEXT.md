@@ -3775,3 +3775,128 @@ the shadow (`0 4px 24px rgba(0,0,0,0.35)`) **and** `backdropFilter: blur(20px)` 
 same element. In a glass idiom the rim is what makes the surface legible against a busy
 background and the shadow is what lifts it off the canvas; they are not two competing
 elevations. A committed world overrides a category default, so this stays.
+
+**149. `ink3` IS DEMOTED TO THE TWO THINGS WCAG EXEMPTS, AND 21 RUNS MOVED TO `ink2`.**
+
+Decision 147 reported `ink3` at **1.65:1 on dark glass / 2.02:1 on light glass** — below
+even the 3:1 large-text floor — colouring 21 text and icon runs. The chosen fix was the
+conservative one: **leave the token alone, move the runs.** `ink3` keeps its value; its
+documented role narrows to the two cases WCAG 1.4.3 exempts **by name** — inactive
+components and pure decoration.
+
+**AND THE REPO HAD ALREADY DECIDED THIS, WHICH IS WHY IT WAS CHEAP.** `eva_colors_test.dart`
+carries a test called *"the WCAG-exempt pairings are exempt by name, not by
+convenience"*, which declares `ink3` the **disabled ink** (it is `ThemeData.disabledColor`)
+and asserts it must stay **sub-AA** — "if it clears AA, that exemption is no longer the
+reason it passes." So `ink3`-as-disabled-ink was the recorded position all along; 21 runs
+were using a disabled-ink token for live content. Nothing about the palette changed.
+
+Promoted to `ink2` (worst surface: **4.73:1 dark, 5.02:1 light** — clears 4.5:1 in both):
+
+| widget | what moved |
+|---|---|
+| `leaderboard_row_tile` | rank column, "points" label |
+| `stat_tile` | caption |
+| `eva_section_header` | the header label |
+| `segmented_control` | unselected segment label |
+| `eva_chip` | unselected chip label |
+| `font_size_stepper` | the "A" preview |
+| `eva_text_field` | helper text, and the reveal-icon `IconThemeData` |
+| `empty_state` | the state icon (WCAG 1.4.11, 3:1 for meaningful icons) |
+| `leaderboard_card` | title, empty-state body |
+| `today_reading_panel` | status eyebrow, "no questions today" |
+| `app_top_bar` | the wordmark's gradient end-stop |
+| `reading_header`, `sticky_cta`, `result_page`, `settings_page` | metadata and captions |
+| `password_visibility_toggle` | the eye icon |
+
+Left on `ink3`, each with its exemption named:
+
+* `eva_text_field`'s `foreground: enabled ? ink : ink3` — inactive control, 1.4.3.
+* `icon_action_button` and `eva_theme.disabledColor` — inactive controls.
+* `hairline_divider` — a separator carrying no information.
+* `eva_chip`'s `dot` — decoration.
+* `eva_theme`'s `outline` — a border that conveys no state.
+
+**150. CONTRAST IS NOW A GATE, AND THE LEDGER IS MEASURED, NOT TYPED.**
+
+`test/core/design_system/tokens/text_contrast_gate_test.dart`. Two halves, and they
+**bracket the palette against `eva_colors_test.dart`'s existing one**:
+
+* that test asserts `ink3` and `line` stay **sub-AA** — the exemption premise;
+* this one asserts `approvedForText` (`ink`, `ink2`) clears **4.5:1 on every surface in
+  both themes** — and requires the *worst* surface, not the nominal one.
+
+That last requirement is the whole gate. Checking each token against `canvas` reports
+`ink2` at 6.26:1, which reads like a pass; `GlassSurface` composites `#0DFFFFFF` over
+whatever is beneath, so a run on a card sits on a **lighter** surface and the real number
+is 4.73:1. A token that passes on `canvas` and fails on glass is the common failure,
+because glass always moves a dark theme lighter.
+
+**AND THE FIRST VERSION OF THE LEDGER WAS WRONG IN EVERY ENTRY.** I computed it by hand
+against `canvas` and `glass/canvas`; the gate disagreed with all of them. The worst
+surface is `glass/raised` in **both** themes, and in light `glass/raised` is *lighter*
+than plain `raised`, so it wins by more than rounding — `ember` in light came out 2.30 by
+hand and **2.05** by measurement. A contrast number nobody re-derives from the token
+table is a number that drifts, and the tokens are what changed, not the arithmetic. The
+ledger now carries a comment saying so, and every value in it was read out of the gate.
+
+`knownSubstandard` cannot **grow** (a new illegible pair fails) and no recorded ratio can
+**change** (quietly darkening `ember` to "improve" it fails too). A gate with an unbounded
+allowlist is a gate with no allowlist. Four mutations confirm each assertion bites:
+darkening `ink2`; making `composite()` ignore alpha; deleting a ledger entry; and
+promoting `ink3` into `approvedForText` without fixing it.
+
+Anchored against WCAG's own examples so a bug in `_luminance` cannot make the file pass
+for the wrong reason: black/white is 21:1, white/white is 1:1, and `#767676` on white is
+4.54:1. Compositing is done in **8-bit with the compositor's rounding**, because measuring
+in float would report 12.75 for a pixel that is 13.
+
+**AND A HEX-SHAPED LITERAL READS AS A FRACTION ONLY TO THE AUTHOR.** The rounding test
+first read `composite(0xFFFFFFFF, 0xFF000000, 0x05)` — `0x05` is the **integer five**, so
+alpha arrived as 5.0, every channel clamped, and the helper returned opaque white. The
+comment in the file now names the trap.
+
+**151. `ember`, `ok` AND `err` AS TEXT ARE UNRESOLVED, AND `ember` IS THE READER'S OWN NAME.**
+
+The gate's ledger is what surfaced these, and they are worse than `ink3` was:
+
+| token | worst surface (light) | used as text for |
+|---|---|---|
+| `ember` | **2.05:1** | the reader's name in the greeting on `/`, `leaderboardYourRank`, the reader's row |
+| `ok` | 3.03:1 | correct answers |
+| `err` | 3.33:1 | incorrect answers |
+
+`ember` in the light theme is the **greeting**: `Good morning, <name>` with the name in
+ember, at 2.05:1. That is the app's warmest moment and it is illegible in one of its two
+themes. `ok` and `err` sit between 3:1 and 4.5:1, which is why nothing caught them by eye
+— they read as "dimmed" rather than "broken".
+
+All three pass in **dark** (6.97 / 7.50 / 5.41), so this is a light-theme problem and the
+fix is not "make ember darker" — that would break the dark arm, where it is comfortable.
+The candidates are a **light-only accent token**, promoting text uses to `ink`/`ink2` and
+keeping `ember` for fills and glyphs, or accepting it as a documented theme asymmetry.
+
+**Not taken here.** All three are in the ledger, so none of it can regress unnoticed and
+none of it can be quietly edited. `ember` is the brand accent and changing it is a
+different decision from changing a disabled ink — it is the user's, and it should be made
+with the light theme on screen.
+
+**152. FIFTEEN GOLDENS CHANGED, AND EVERY ONE IS A TEXT OR ICON BAND.**
+
+The `ink2` promotion broke 18 tests: 4 that assert a token **by name** and 14 goldens.
+The by-name assertions were *correct to break* — `StatTile`'s caption, `EvaSectionHeader`'s
+label and the chip's foreground were pinned to `ink3` deliberately — and their names and
+reasons were rewritten rather than their values silently swapped.
+
+The goldens were regenerated, and because "regenerate the goldens" is exactly the move that
+can hide an unintended change, the result was verified rather than trusted:
+
+* **15** files changed, **0** new files. All 15 belong to the 7 widgets the promotion
+  touched (`settings_group` transitively, because it embeds an `EvaSectionHeader`).
+* Pixel diffs against `HEAD`: **0.12%–0.42%** of each frame, each inside an 8px-tall text
+  band or a 34×33 icon box. **No bounding box moved and no image changed size**, so the
+  change is colour-only and nothing reflowed.
+
+A colour-token change should produce exactly this signature: tiny, bounded, and confined
+to the runs that were recoloured. A golden diff that moved a layout edge would have meant
+something else had changed, and would have been caught here rather than merged.

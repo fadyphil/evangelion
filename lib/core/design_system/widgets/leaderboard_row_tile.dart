@@ -93,7 +93,7 @@ class LeaderboardRowTile extends StatelessWidget {
                 '${row.rank}',
                 textAlign: TextAlign.center,
                 style: EvaTypography.monoCaps(colors)
-                    .copyWith(color: isReader ? colors.ember : colors.ink3),
+                    .copyWith(color: isReader ? colors.ember : colors.ink2),
               ),
             ),
             const SizedBox(width: EvaSpacing.md),
@@ -126,7 +126,7 @@ class LeaderboardRowTile extends StatelessWidget {
             Text(
               strings.leaderboardScoreLabel,
               style: EvaTypography.monoCaps(colors)
-                  .copyWith(color: colors.ink3),
+                  .copyWith(color: colors.ink2),
             ),
           ],
         ),

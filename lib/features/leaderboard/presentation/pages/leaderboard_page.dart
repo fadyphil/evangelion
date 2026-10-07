@@ -240,7 +240,7 @@ class _StandingFooter extends StatelessWidget {
       return Text(
         context.l10n.leaderboardUnranked,
         style: arabicAware(
-          Theme.of(context).textTheme.bodyMedium!.copyWith(color: colors.ink3),
+          Theme.of(context).textTheme.bodyMedium!.copyWith(color: colors.ink2),
           direction,
         ),
       );

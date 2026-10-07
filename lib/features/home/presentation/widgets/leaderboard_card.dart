@@ -168,7 +168,7 @@ class _Header extends StatelessWidget {
                 Text(
                   context.l10n.leaderboardCardTitle,
                   style: arabicAware(
-                    EvaTypography.monoCaps(colors).copyWith(color: colors.ink3),
+                    EvaTypography.monoCaps(colors).copyWith(color: colors.ink2),
                     direction,
                   ),
                 ),
@@ -241,7 +241,7 @@ class _EmptyStandIn extends StatelessWidget {
         Text(
           context.l10n.leaderboardEmptyBody,
           style: arabicAware(
-            text.bodySmall?.copyWith(color: colors.ink3) ??
+            text.bodySmall?.copyWith(color: colors.ink2) ??
                 DefaultTextStyle.of(context).style,
             direction,
           ),

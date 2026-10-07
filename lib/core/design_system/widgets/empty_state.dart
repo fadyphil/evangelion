@@ -88,7 +88,7 @@ class EmptyState extends StatelessWidget {
               SizedBox(
                 width: iconBox,
                 height: iconBox,
-                child: Icon(icon, size: iconSize, color: colors.ink3),
+                child: Icon(icon, size: iconSize, color: colors.ink2),
               ),
               const SizedBox(height: stackGap),
               Text(

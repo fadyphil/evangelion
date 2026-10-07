@@ -319,7 +319,7 @@ class TodayReadingPanel extends StatelessWidget {
           style: arabicAware(
             EvaTypography.monoCaps(colors),
             Directionality.of(context),
-          ).copyWith(fontWeight: FontWeight.w700, color: colors.ink3),
+          ).copyWith(fontWeight: FontWeight.w700, color: colors.ink2),
         ),
         const SizedBox(height: eyebrowGap),
         _Preview(reading: today, strings: strings),
@@ -494,7 +494,7 @@ class _Beads extends StatelessWidget {
       return Text(
         strings.homeNoQuestionsToday,
         style: EvaTypography.monoCaps(context.colors)
-            .copyWith(color: context.colors.ink3),
+            .copyWith(color: context.colors.ink2),
       );
     }
     return ProgressBeads(

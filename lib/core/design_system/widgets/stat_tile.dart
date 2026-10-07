@@ -112,7 +112,7 @@ class StatTile extends StatelessWidget {
             textAlign: TextAlign.center,
             style: arabicAware(
               EvaTypography.monoCaps(colors)
-                  .copyWith(color: colors.ink3, fontWeight: FontWeight.w700),
+                  .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
               direction,
             ),
           ),
