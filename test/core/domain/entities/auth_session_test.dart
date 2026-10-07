@@ -1,4 +1,5 @@
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// [AuthSession] — red-first (AGENT_CONTEXT §6: domain entities).
@@ -6,9 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 /// The field list is the plan's, so what is pinned here is the two properties
 /// that are not visible in it:
 ///
-/// * **`role` defaults to `kid`**, which is a protocol value and not a
-///   privilege — AGENT_CONTEXT §5, trap 7 says `X-User-Role` is parsed and never
-///   checked, so nothing in this app may gate on it.
+/// * **`role` defaults to [UserRole.kid]**, and the default is asserted against
+///   the enum rather than against the string `'kid'`. The wire spelling is now a
+///   separate claim living in `user_role_test.dart`; keeping it here too would
+///   be a second place the wire is transcribed, and this suite's subject is the
+///   *field*, not the protocol.
 /// * **every field takes part in equality.** A member left out of the generated
 ///   `==` is a piece of state the app cannot see change, which for a session means
 ///   a stale one that looks current.
@@ -21,7 +24,7 @@ void main() {
     String email = 'david@evangelion.app',
     String displayName = 'David Mina',
     String initials = 'DM',
-    String role = 'kid',
+    UserRole role = UserRole.kid,
     DateTime? createdAt,
   }) => AuthSession(
     userId: userId,
@@ -33,9 +36,13 @@ void main() {
   );
 
   group('AuthSession', () {
-    test('role defaults to kid, which is the role this backend parses', () {
-      expect(AuthSession.defaultRole, 'kid');
-      expect(session().role, 'kid');
+    test('role defaults to UserRole.kid, which is the role this backend parses', () {
+      // The **enum**, not the string. `AuthSession.defaultRole` is a `UserRole`
+      // now, and asserting it against `'kid'` would be asserting the wire
+      // spelling in a file whose subject is the field's default — see the file
+      // doc.
+      expect(AuthSession.defaultRole, UserRole.kid);
+      expect(session().role, UserRole.kid);
     });
 
     test('two sessions with the same values are equal', () {
@@ -51,7 +58,11 @@ void main() {
         'email': session(email: 'peter@evangelion.app'),
         'displayName': session(displayName: 'Peter George'),
         'initials': session(initials: 'PG'),
-        'role': session(role: 'leader'),
+        // A different **role**, and one that is a member of the enum rather than
+        // a string the field could not hold: a freezed `==` derives from the
+        // constructor, so a field whose type cannot carry the variant would
+        // make this entry untestable rather than informative.
+        'role': session(role: UserRole.adminServant),
         'createdAt': session(createdAt: created.add(const Duration(days: 1))),
       };
 

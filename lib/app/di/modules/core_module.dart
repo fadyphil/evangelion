@@ -128,6 +128,22 @@ abstract class CoreModule {
   /// question. The alternative, a second module, would move the meeting point
   /// somewhere less obvious without making it any safer.
   ///
+  /// **`.wireValue` IS CALLED HERE, AND NOWHERE ELSE IN `lib/`.** The seed is a
+  /// `UserRole` (`kSeedUserRole`) and `IdentityHeadersInterceptor` still takes a
+  /// `String`; this registration is the seam between the two, so the wire
+  /// spelling of a role is written once here instead of once per caller. When
+  /// the interceptor takes the enum, this line loses the call and nothing else
+  /// moves.
+  ///
+  /// **AND THE `const` GONE FROM THE INTERCEPTOR IS A CONSTRAINT, NOT A TIDYING.**
+  /// A constant expression cannot read an enum's field, so
+  /// `const IdentityHeadersInterceptor(role: kSeedUserRole.wireValue)` does not
+  /// compile. The instance is built when this provider runs — once, for a
+  /// `@lazySingleton` — and the cost is that the identity is no longer
+  /// canonicalised, which is invisible because nothing compares it by identity.
+  /// Restoring the `const` is the obvious "cleanup" a future reader will try,
+  /// and it is the one change that cannot compile.
+  ///
   /// ## AND IT IS EXERCISED, WHICH IT WAS NOT
   ///
   /// `injection_test.dart` resolved the **string** `lazySingleton<Dio> apiClient` in
@@ -149,10 +165,10 @@ abstract class CoreModule {
   @lazySingleton
   Dio apiClient(@Named('apiBaseUrl') String baseUrl) => buildApiDio(
     baseUrl: baseUrl,
-    identity: const IdentityHeadersInterceptor(
+    identity: IdentityHeadersInterceptor(
       userId: kSeedUserId,
       groupId: kSeedGroupId,
-      role: kSeedUserRole,
+      role: kSeedUserRole.wireValue,
     ),
     connectTimeout: AppConfig.connectTimeout,
     receiveTimeout: AppConfig.receiveTimeout,

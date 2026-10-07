@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
@@ -51,7 +52,10 @@ void main() {
       // that `POST /readings/:id/submit` then rejects with 400.
       expect(kSeedUserId, '11111111-1111-1111-1111-111111111111');
       expect(kSeedGroupId, 3);
-      expect(kSeedUserRole, 'kid');
+      // The seeded role, as a role. It is no longer a `String`, so `'kid'` is not
+      // what this constant is any more — the wire spelling it sends is asserted
+      // in the next test against the interceptor that sends it.
+      expect(kSeedUserRole, UserRole.kid);
     });
 
     test('has a user id the client is willing to send', () {
@@ -69,7 +73,13 @@ void main() {
       // seeded session whose group the interceptor would not send, and nothing
       // else in the app would notice.
       expect(kSeedGroupId, IdentityHeadersInterceptor.defaultGroupId);
-      expect(kSeedUserRole, IdentityHeadersInterceptor.defaultRole);
+      // On [UserRole.wireValue] and not on the role, because
+      // `IdentityHeadersInterceptor.defaultRole` is still the wire `String` this
+      // client hands it. The invariant is unchanged — "the role the session
+      // holds is the role the request carries" — and it is now made across the
+      // one conversion that stands between them rather than across two constants
+      // that happened to spell the same thing.
+      expect(kSeedUserRole.wireValue, IdentityHeadersInterceptor.defaultRole);
     });
   });
 

@@ -9,6 +9,7 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
@@ -358,7 +359,7 @@ void main() {
           (field: 'email', value: _session(email: 'other@example.com')),
           (field: 'displayName', value: _session(displayName: 'Someone')),
           (field: 'initials', value: _session(initials: 'XX')),
-          (field: 'role', value: _session(role: 'adult')),
+          (field: 'role', value: _session(role: UserRole.adminServant)),
           // A different **instant**. `DateTime`'s `==` is by value, so this field
           // was never identity-compared — `equatable` used plain `==` and freezed
           // does the same. Worth saying, because "a `DateTime` field" is the one
@@ -1166,14 +1167,19 @@ AuthSession _session({
   String email = 'reader@example.com',
   String displayName = 'David Mina',
   String initials = 'DM',
-  String role = 'kid',
+  UserRole role = UserRole.kid,
   DateTime? createdAt,
 }) => AuthSession(
   userId: _text(userId ?? _userId()),
   email: _text(email),
   displayName: _text(displayName),
   initials: _text(initials),
-  role: _text(role),
+  // NOT `_text(role)`. Every other field runs through the `_text` salt because
+  // they are all `String`s and the salt makes "same value" and "same literal"
+  // distinguishable; a `UserRole` has no literal to salt, and enums are already
+  // canonicalised. Passing it through unchanged is what keeps this variant a
+  // different *value* rather than the same one.
+  role: role,
   createdAt: createdAt ?? _firstInstant(),
 );
 
