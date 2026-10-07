@@ -47,6 +47,108 @@ import 'package:flutter_test/flutter_test.dart';
 /// the negative case assertion and the positive mapping assertion are what
 /// close the loop between them, and neither is redundant: a set comparison
 /// alone would be satisfied by an implementation that decodes nothing.
+///
+/// ## THE WIDENING GAP, AND WHY THE OLD NEGATIVES COULD NOT SEE IT
+///
+/// `user_role.dart` argues at length that accepting a wider set than the
+/// protocol declares "is the wrong direction for a fallback to fail". The first
+/// version of this suite could not check that argument, because both of its
+/// space-bearing negatives (`'kid '` and `'viewer servant'`) are **satisfied by
+/// the fallback**: `'kid '` is trimmed to `'kid'` by a buggy `switch
+/// (wire.trim())` and still answers `kid`, and `'viewer servant'` has no
+/// normalisation that reconstructs a declared role at all. Measured against the
+/// pre-fix suite, all three of these left **every test green**:
+///
+/// | mutation to `fromWire` | red tests, before the fix |
+/// | --- | --- |
+/// | `switch (wire.trim())` | 0 |
+/// | `switch (wire.replaceAll(' ', ''))` | 0 |
+/// | extra arm `'admin-servant' => UserRole.adminServant` | 0 |
+///
+/// The fix is [_wideningCases] plus its test, and the same three mutations are
+/// the ones it is measured against. **Every case there is a spelling of a
+/// non-kid role**, which is the load-bearing property: the fallback answer and a
+/// fold of `'kid'` are the same answer, so a case that can only be laundered
+/// into `'kid'` proves nothing.
+///
+/// ## THE ROUND TRIP IS BLIND TO AN ENCODER TYPO, AND SAYS SO
+///
+/// `every role survives its own wire value` closes over its own output:
+/// mutating `kid('kid')` to `kid('kid ')` leaves it green, because
+/// `fromWire('kid ')` answers `kid` by the fallback and the loop compares that
+/// against the `kid` it just read. Only the encoder-direction test beside it
+/// — which asserts no `wireValue` contains whitespace — turns that mutation
+/// red. The round trip is kept, because the property it does check is real and
+/// is the reason both functions exist; what it cannot check is now written down
+/// next to it instead of being claimed.
+///
+/// ## [_wideningCases]: A SPELLING AND THE NORMALISATION THAT WOULD ABSORB IT
+///
+/// Every entry is a spelling of a **non-kid** role that at least one plausible
+/// widening launders into a declared one. The `fault` is that laundering, written
+/// out, so a red test names its own mutation in the failure message instead of
+/// printing a string a reader has to reverse-engineer.
+///
+/// Entries are ordered by the normalisation they isolate. `trim()` and
+/// `replaceAll(' ', '')` are *different* faults and neither subsumes the other:
+/// `trim()` leaves an internal space alone, and `replaceAll(' ', '')` leaves a
+/// tab alone. One case for each, so deleting any single case loses exactly the
+/// mutation it was written for.
+const List<({String wire, String fault})> _wideningCases =
+    <({String wire, String fault})>[
+      (
+        wire: ' admin_servant',
+        fault:
+            'leading space — trim() or replaceAll(\' \', \'\') reads it as'
+            ' admin_servant',
+      ),
+      (
+        wire: 'admin_servant ',
+        fault:
+            'trailing space — trim() or replaceAll(\' \', \'\') reads it as'
+            ' admin_servant',
+      ),
+      (
+        wire: '\tadmin_servant',
+        // The only case a plain replaceAll(' ', '') cannot catch: a tab is
+        // whitespace but not a space, so this one isolates trim() on its own.
+        fault:
+            'leading tab — trim() reads it as admin_servant, and'
+            ' replaceAll(\' \', \'\') cannot, which is why this case exists',
+      ),
+      (
+        wire: 'admin _servant',
+        // The counterpart: trim() cannot catch this one, so the internal-space
+        // case is not redundant with the padding cases either.
+        fault:
+            'internal space — replaceAll(\' \', \'\') reads it as'
+            ' admin_servant, and trim() cannot',
+      ),
+      (
+        wire: 'admin_s ervant',
+        fault:
+            'internal space inside the second token —'
+            ' replaceAll(\' \', \'\') reads it as admin_servant',
+      ),
+      (
+        wire: 'admin-servant',
+        fault:
+            'hyphen instead of underscore — an added'
+            " 'admin-servant' => adminServant arm absorbs it",
+      ),
+      (
+        wire: 'viewer-servant',
+        fault:
+            'hyphen instead of underscore on the other non-kid role — an added'
+            " 'viewer-servant' => viewerServant arm absorbs it",
+      ),
+      (
+        wire: 'admin  servant',
+        fault:
+            'a doubled internal space — replaceAll(\' \', \'\') reads it as'
+            ' admin_servant',
+      ),
+    ];
 void main() {
   group('the three roles, and no fourth', () {
     test('UserRole.values is exactly kid, viewerServant, adminServant, in order', () {
@@ -87,15 +189,55 @@ void main() {
     });
 
     test('every role survives its own wire value', () {
-      // The round trip is the property the pair of functions actually exists
-      // for, and it is checked in both directions by the enumeration: a typo in
-      // `wireValue` fails here, and so does a `fromWire` that forgets a member.
+      // The round trip is the property the pair of functions exists for: the
+      // enumeration means a `fromWire` that forgets a member fails here, and it
+      // means a *misspelt* wire value fails here too — as long as the misspelling
+      // is not one the decoder happens to accept.
+      //
+      // ## WHAT IT IS BLIND TO, MEASURED
+      //
+      // It does **not** catch a typo in the encoder. Mutating `kid('kid')` to
+      // `kid('kid ')` left this test GREEN: `fromWire('kid ')` answers `kid` by
+      // the fallback, and the loop then compares that against the very `kid` it
+      // read the wrong wire value from — the round trip closes over its own
+      // output. The earlier comment here claimed it caught exactly that; it did
+      // not. The encoder-side guard is the test below, and this one is kept
+      // because the property it does check is real.
       for (final UserRole role in UserRole.values) {
         expect(
           UserRole.fromWire(role.wireValue),
           role,
           reason:
               'the wire value ${role.wireValue} did not decode back to $role',
+        );
+      }
+    });
+
+    test('no wire value carries whitespace, so an encoder typo fails', () {
+      // The direction the round trip cannot supply, and the one that turns
+      // `kid('kid ')` red. Asserted against every member over the enumeration
+      // rather than as a literal list, because the list spelling is already held
+      // by the wire-names assertion above and this is about a *property* of the
+      // spelling, not about which three strings they are: a fourth member typed
+      // as `kid('kid  ')` is caught by this, and by no literal list that
+      // somebody remembered to update.
+      for (final UserRole role in UserRole.values) {
+        expect(
+          role.wireValue,
+          role.wireValue.trim(),
+          reason:
+              '${role.wireValue} is padded, and a decoder that trims would'
+              ' hide it',
+        );
+        // Padding is what `trim()` catches; an internal space survives `trim()`
+        // and is what `replaceAll(' ', '')` would absorb, so the guard has to be
+        // the wider "contains no whitespace at all".
+        expect(
+          role.wireValue.contains(RegExp(r'\s')),
+          isFalse,
+          reason:
+              '${role.wireValue} contains whitespace, which no wire value'
+              ' this backend mints contains',
         );
       }
     });
@@ -108,11 +250,46 @@ void main() {
       expect(UserRole.fromWire('admin_servant'), UserRole.adminServant);
     });
 
-    test('a string no role declares falls back to kid', () {
+    test('a widening normalisation is rejected, not silently absorbed', () {
+      // THE MUTATION-CATCHING HALF, and the test the file doc's widening table
+      // is measured against. One expectation per case rather than one set, so
+      // the `reason` can name the specific normalisation that was accepted — a
+      // set comparison would report only "\{kid\} != \{kid, adminServant\}" and
+      // leave the reader to work out which case widened.
+      //
+      // Looped rather than written out eight times so a future normaliser adds
+      // one row here rather than one copy of a block, and so the enumeration
+      // cannot drift from the doc's claim about which normalisation each row
+      // isolates.
+      for (final ({String wire, String fault}) widening in _wideningCases) {
+        expect(
+          UserRole.fromWire(widening.wire),
+          UserRole.kid,
+          reason:
+              'fromWire accepted "${widening.wire}", which is not one of the'
+              ' three declared spellings: ${widening.fault}',
+        );
+      }
+    });
+
+    test('a spelling a human types from memory is not a role', () {
+      // THE CONFORMANCE HALF, and it is deliberately a separate test. Every
+      // case below is a real thing a person or a caller can produce, and each
+      // must decode to the fallback — but **none of them can detect a widening
+      // decoder**, because no normalisation reconstructs a declared role from
+      // any of them. They are kept for the contract they do hold, and split out
+      // so that no reader mistakes them for evidence about trimming.
+      //
+      // `'kid '` is the instructive one: it is the case this file's earlier
+      // revision used as its padding coverage, and it was worth nothing for
+      // that purpose, because `switch (wire.trim())` answers `kid` to it too.
       expect(UserRole.fromWire('teacher'), UserRole.kid);
       expect(UserRole.fromWire('kid '), UserRole.kid);
+      expect(UserRole.fromWire(' kid'), UserRole.kid);
       // The underscore is the separator, not a space and not a hyphen — the two
-      // spellings a human writes when typing a role from memory.
+      // spellings a human writes when typing a role from memory. The hyphen one
+      // is also a widening case; it sits here with its sibling for readability
+      // and is duplicated in [_wideningCases], where it can fail.
       expect(UserRole.fromWire('viewer servant'), UserRole.kid);
       expect(UserRole.fromWire('viewer-servant'), UserRole.kid);
     });
@@ -159,14 +336,14 @@ void main() {
     });
   });
 
-  group('grantsFor', () {
+  group('UserRole.grantsFor', () {
     test('a kid reads, answers and sees the cohort board — and nothing else', () {
       // The exact set, not three `isNot(contains(…))` assertions: an exact set
       // fails on a grant that was *added* as well as one that was removed,
       // where the negatives catch only the addition. Three roles times three
       // negatives would be nine assertions covering one mutation each, and the
       // set is the same nine claims in nine lines.
-      expect(grantsFor(UserRole.kid), <UserCapability>{
+      expect(UserRole.grantsFor(UserRole.kid), <UserCapability>{
         UserCapability.readOwnReading,
         UserCapability.submitQuiz,
         UserCapability.viewCohortLeaderboard,
@@ -174,7 +351,7 @@ void main() {
     });
 
     test('a viewer servant adds the servant report to a kid', () {
-      expect(grantsFor(UserRole.viewerServant), <UserCapability>{
+      expect(UserRole.grantsFor(UserRole.viewerServant), <UserCapability>{
         UserCapability.readOwnReading,
         UserCapability.submitQuiz,
         UserCapability.viewCohortLeaderboard,
@@ -185,7 +362,7 @@ void main() {
     test(
       'an admin servant is granted exactly the six declared capabilities',
       () {
-        expect(grantsFor(UserRole.adminServant), <UserCapability>{
+        expect(UserRole.grantsFor(UserRole.adminServant), <UserCapability>{
           UserCapability.readOwnReading,
           UserCapability.submitQuiz,
           UserCapability.viewCohortLeaderboard,
@@ -203,7 +380,7 @@ void main() {
       // refused a verse-number flag for exactly this reason — a capability with
       // no consumer is state nobody reads.
       expect(
-        grantsFor(UserRole.adminServant),
+        UserRole.grantsFor(UserRole.adminServant),
         containsAll(UserCapability.values),
       );
     });
@@ -214,12 +391,12 @@ void main() {
       // fourth role added beside them would break it if the ladder were not
       // actually a ladder.
       expect(
-        grantsFor(UserRole.adminServant),
-        containsAll(grantsFor(UserRole.viewerServant)),
+        UserRole.grantsFor(UserRole.adminServant),
+        containsAll(UserRole.grantsFor(UserRole.viewerServant)),
       );
       expect(
-        grantsFor(UserRole.viewerServant),
-        containsAll(grantsFor(UserRole.kid)),
+        UserRole.grantsFor(UserRole.viewerServant),
+        containsAll(UserRole.grantsFor(UserRole.kid)),
       );
     });
 
@@ -231,9 +408,9 @@ void main() {
         // [UserRole.values] so a fourth role is covered by writing nothing.
         for (final UserRole role in UserRole.values) {
           expect(
-            () => grantsFor(role).add(UserCapability.manageQuestions),
+            () => UserRole.grantsFor(role).add(UserCapability.manageQuestions),
             throwsUnsupportedError,
-            reason: 'grantsFor($role) handed out a mutable set',
+            reason: 'UserRole.grantsFor($role) handed out a mutable set',
           );
         }
       },

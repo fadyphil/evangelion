@@ -93,8 +93,21 @@ final class IdentityHeadersInterceptor extends Interceptor {
   /// values are strings and `int` would rely on dio to stringify it.
   final int groupId;
 
-  /// The value of `X-User-Role`. Decorative: the backend parses it and never
-  /// enforces it, so **nothing in this client may gate UI on it**.
+  /// The value of `X-User-Role`.
+  ///
+  /// Decorative **on the wire**: the backend parses this header
+  /// (`identity.middleware.ts:24`), assigns it to `request.user.role` at `:31`,
+  /// and never reads it again — so it decides nothing about what this request may
+  /// do. See `core/domain/entities/user_role.dart` for the measurements.
+  ///
+  /// **It is still not to be ignored.** Because the server enforces nothing, a
+  /// client-side check on the role is the *only* place the value is ever used,
+  /// and it is what stops this client putting a reader on a screen that makes no
+  /// sense for them. So the field is advisory UX — it prevents accidents, and it
+  /// is never authorisation: the header is set by the client, so a client that
+  /// refused to set it would refuse to set the identity too. Treating this value
+  /// as meaningful is correct; describing what a role gate here buys as
+  /// *permission* is not.
   final String role;
 
   /// The header names, spelled once.

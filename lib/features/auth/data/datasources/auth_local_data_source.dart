@@ -71,18 +71,25 @@ const int kSeedGroupId = 3;
 
 /// The role the seeded user holds.
 ///
-/// Parsed by the backend and **never enforced** — `identity.middleware.ts:29`
+/// Parsed by the backend and **never enforced** — `identity.middleware.ts:31`
 /// assigns `request.user.role` and no route ever reads it back, so nothing here
 /// is a permission. See `core/domain/entities/user_role.dart` for the whole
 /// argument and for what a role gate in this client does and does not buy.
 ///
-/// A [UserRole] and not the wire string, because the seed is a **role**: the one
-/// place that speaks the wire converts it with [UserRole.wireValue], so the
-/// literal `'kid'` exists exactly once in the client instead of once per
-/// caller. `IdentityHeadersInterceptor.defaultRole` is still a `String` and is
-/// still asserted equal to this by `fake_auth_repository_test.dart` — that
-/// assertion is what keeps the seeded role and the sent header from drifting,
-/// and it is now made on [UserRole.wireValue] rather than on the role itself.
+/// A [UserRole] and not the wire string, because the seed is a **role**, and the
+/// guarantee that buys is narrower than "the literal appears once" — it was
+/// never that, and an earlier draft of this comment claiming it was wrong:
+/// `'kid'` is written literally in `user_role.dart`'s own `kid('kid')`, in
+/// `identity_headers.dart`'s `defaultRole`, and in several tests. What is
+/// actually held is **one conversion point**: the only place in `lib/` that turns
+/// a role into a wire string is `core_module.dart`'s single
+/// `kSeedUserRole.wireValue` in the `buildApiDio` registration, so a caller
+/// cannot send the Dart spelling by accident.
+/// `IdentityHeadersInterceptor.defaultRole` is still a `String` and is still
+/// asserted equal to `kSeedUserRole.wireValue` by
+/// `fake_auth_repository_test.dart` — that assertion, not a literal count, is
+/// what keeps the seeded role and the sent header from drifting, and it is made
+/// on [UserRole.wireValue] rather than on the role itself.
 const UserRole kSeedUserRole = UserRole.kid;
 
 /// The address the seeded session reports.
