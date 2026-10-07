@@ -29,11 +29,19 @@
 /// Read this section before adding a check anywhere on the strength of it.
 ///
 /// The backend parses `X-User-Role` at `src/middleware/identity.middleware.ts:24`
-/// and assigns it to `request.user.role` at `:29`, **and never reads it again**.
+/// and assigns it to `request.user.role` at `:31`, **and never reads it again**.
 /// Measured against `HEAD = 4a1c834`: `rg 'user\??\.role' src/` returns **no
 /// matches**, and `rg '403' src/` returns **no matches** — zero role guards and
-/// zero forbidden responses across all eighteen registered routes. Every
+/// zero forbidden responses across all **seventeen** route registrations in
+/// `src/` — fourteen under `/api/v1`, plus `/json`, `/documentation` and
+/// `/health` in `app.ts`, counted by grepping the `.get(`/`.post(`/… calls in
+/// `src/` and cross-checked against `app.ts`'s own route registrations. Every
 /// endpoint is callable by anyone who sends a user id.
+///
+/// The count is stated because it was **measured**, and because the previous
+/// draft of this comment said *eighteen* without measuring it. The number is
+/// load-bearing here only as evidence that the sweep was total; the argument it
+/// supports is the two zero-match greps beside it, not the tally.
 ///
 /// So a role gate in this client prevents **accidents**, never **attacks**. What
 /// it buys is that a child is not dropped onto a scheduling screen that makes no
@@ -54,12 +62,23 @@
 /// a seeded session. The role is **chosen locally on the login screen** until
 /// the backend ships real authentication.
 ///
-/// That is worth stating plainly because it is the one fact that would make
+/// This is worth stating plainly because it is the one fact that would make
 /// this file look like fiction: nothing here is a claim about a user the server
 /// has told us about. It is a claim about a button someone pressed. When
 /// authentication lands, the choice moves from the login screen to a real
 /// response, and this file's job does not change — but every value in
-/// [grantsFor] becomes a claim about the server rather than about the form.
+/// [UserRole.grantsFor] becomes a claim about the server rather than about the
+/// form.
+///
+/// ## AND BOTH CONVERSIONS ARE CURRENTLY UNREFERENCED
+///
+/// [UserRole.fromWire] and [UserRole.grantsFor] have **no caller in `lib/`** at
+/// this commit, by design: this is the mechanism, and the screens that would
+/// ask either question belong to a later task. So a reader who greps for a
+/// caller, finds none, and reads that as dead code should read the opposite —
+/// the absence is the task boundary, and these are the two seams it hands
+/// forward. The [UserRole] enum itself is live: `AuthSession.role` and the seed
+/// both name it. Only the two functions are unreferenced.
 ///
 /// ## AND NOTHING HERE RENDERS, SO NOTHING HERE IS TRANSLATED
 ///
@@ -69,8 +88,10 @@
 /// reader ever sees, and `gen_l10n` would then carry a key with no consumer.
 ///
 /// The cost is recorded rather than hidden: if a future screen ever *shows* a
-/// capability, that name has to move to the ARB, and `no_colour_literals`-style
-/// gates will not catch the mistake because the mechanism is a different one.
+/// capability, that name has to move to the ARB. **No gate in this suite scans
+/// for an untranslated identifier** — the design-system gates are structural and
+/// colour-literal based, so a capability name drawn on screen would reach a
+/// reader verbatim and nothing would turn red.
 ///
 /// PURE DART — `core/domain/` is held to no Flutter, Dio or http by Gate 1.
 enum UserRole {
@@ -119,7 +140,7 @@ enum UserRole {
   /// decision 14's defect class, where a fixture describes a state the system
   /// cannot produce and deleting the code turns nothing red.
   ///
-  /// ## WHY THE MATCH IS EXACT, WITH NO CASE FOLDING
+  /// ## WHY THE MATCH IS EXACT: NO FOLDING, NO TRIMMING, NO SPACE STRIPPING
   ///
   /// Folding would make this function accept a **wider** set of values than the
   /// backend's TypeScript union declares. `identity.middleware.ts:5` types the
@@ -129,6 +150,18 @@ enum UserRole {
   /// strictly more permissive than the protocol it decodes, which is the
   /// wrong direction for a fallback to fail.
   ///
+  /// **The same argument rules out normalising whitespace, and it is the reason
+  /// the test pins padding rather than only capitals.** `switch (wire.trim())`
+  /// accepts `' admin_servant'`, and `switch (wire.replaceAll(' ', ''))` accepts
+  /// `'admin _servant'` — each a value outside the union, and each one the
+  /// decoder would silently launder into a real role. Neither is assumed
+  /// harmless: both were applied to the implementation and measured against the
+  /// suite before this paragraph was written, and they are why
+  /// `user_role_test.dart` holds a whitespace and separator negative set rather
+  /// than a single `'kid '` case. An arm for `'admin-servant'` is the third
+  /// widening fault this file has to survive, and it is a spelling fault rather
+  /// than a normalisation — see that negative set.
+  ///
   /// `'kid'` is spelled out as an arm even though `_` would catch it, because
   /// the three recognised values are the ones a reader of this function is
   /// checking and the fallback should not have to be reasoned about to see them.
@@ -137,6 +170,68 @@ enum UserRole {
     'viewer_servant' => UserRole.viewerServant,
     'admin_servant' => UserRole.adminServant,
     _ => UserRole.kid,
+  };
+
+  /// The capabilities [role] grants.
+  ///
+  /// ## WHY IT IS A STATIC AND NOT A TOP-LEVEL FUNCTION
+  ///
+  /// [fromWire] above is the file's other conversion, and it is a static on this
+  /// enum; a free `grantsFor` beside it made this the only entity file in
+  /// `core/domain/entities/` with one, against the sibling
+  /// `reading_language.dart`, which puts both of its conversions on the enum.
+  /// Both directions of the role conversation are now reached the same way.
+  ///
+  /// A **static taking the role** rather than an instance getter, because the
+  /// argument is a `UserRole` either way and the grant table is policy over the
+  /// whole enum: `role.grants` would read as a property of one value, and the
+  /// ladder property below is a statement about all three tables together.
+  ///
+  /// ## THE TABLE IS A LADDER, AND THE LADDER IS ASSERTED
+  ///
+  /// Three literal sets rather than one composed from another, because a `const`
+  /// set cannot spread and a runtime composition would either allocate on every
+  /// call or hide the table behind three private constants a reader has to chase.
+  /// Three literals keep the whole grant policy visible in one expression.
+  ///
+  /// The cost of literals is that nothing *structurally* keeps them nested, so
+  /// this function's tests assert it: admin ⊇ viewer servant ⊇ kid, and admin
+  /// granted every [UserCapability] the enum declares. Both are properties no
+  /// per-role exact-set assertion can express, and either one failing means the
+  /// ladder stopped being a ladder.
+  ///
+  /// ## AND WHY THE SET IS UNMODIFIABLE
+  ///
+  /// A capability table that a caller can widen is a table no longer describing
+  /// this file's policy — it describes whatever the last caller added, in one
+  /// screen's lifetime, with no record. `const` set literals are unmodifiable by
+  /// construction rather than by convention, so the guarantee survives someone
+  /// writing `UserRole.grantsFor(r).add(…)` and finding out.
+  ///
+  /// **Neither the narrowest nor the widest table is a security control.** See the
+  /// file's opening section: the server enforces nothing, so a grant that is
+  /// accidentally too wide is a UI bug and one that is too narrow is a UI bug.
+  /// What unmodifiability buys is that the *policy* stays the policy.
+  static Set<UserCapability> grantsFor(UserRole role) => switch (role) {
+    UserRole.kid => const <UserCapability>{
+      UserCapability.readOwnReading,
+      UserCapability.submitQuiz,
+      UserCapability.viewCohortLeaderboard,
+    },
+    UserRole.viewerServant => const <UserCapability>{
+      UserCapability.readOwnReading,
+      UserCapability.submitQuiz,
+      UserCapability.viewCohortLeaderboard,
+      UserCapability.viewServantReport,
+    },
+    UserRole.adminServant => const <UserCapability>{
+      UserCapability.readOwnReading,
+      UserCapability.submitQuiz,
+      UserCapability.viewCohortLeaderboard,
+      UserCapability.viewServantReport,
+      UserCapability.scheduleReading,
+      UserCapability.manageQuestions,
+    },
   };
 }
 
@@ -150,7 +245,9 @@ enum UserRole {
 /// section at the top of this file.
 ///
 /// The six are named for what a screen would need in order to make sense for
-/// the reader holding the role:
+/// the reader holding the role, and the table itself is
+/// [UserRole.grantsFor] on the enum rather than a top-level function beside
+/// this one:
 ///
 /// | capability | the kid / servant / admin reading |
 /// | --- | --- |
@@ -184,52 +281,3 @@ enum UserCapability {
   /// Write, edit and commit reflection questions.
   manageQuestions,
 }
-
-/// The capabilities [role] grants.
-///
-/// ## THE TABLE IS A LADDER, AND THE LADDER IS ASSERTED
-///
-/// Three literal sets rather than one composed from another, because a `const`
-/// set cannot spread and a runtime composition would either allocate on every
-/// call or hide the table behind three private constants a reader has to chase.
-/// Three literals keep the whole grant policy visible in one expression.
-///
-/// The cost of literals is that nothing *structurally* keeps them nested, so
-/// `grantsFor`'s tests assert it: admin ⊇ viewer servant ⊇ kid, and admin
-/// granted every [UserCapability] the enum declares. Both are properties no
-/// per-role exact-set assertion can express, and either one failing means the
-/// ladder stopped being a ladder.
-///
-/// ## AND WHY THE SET IS UNMODIFIABLE
-///
-/// A capability table that a caller can widen is a table no longer describing
-/// this file's policy — it describes whatever the last caller added, in one
-/// screen's lifetime, with no record. `const` set literals are unmodifiable by
-/// construction rather than by convention, so the guarantee survives someone
-/// writing `grantsFor(r).add(…)` and finding out.
-///
-/// **Neither the narrowest nor the widest table is a security control.** See the
-/// file's opening section: the server enforces nothing, so a grant that is
-/// accidentally too wide is a UI bug and one that is too narrow is a UI bug.
-/// What unmodifiability buys is that the *policy* stays the policy.
-Set<UserCapability> grantsFor(UserRole role) => switch (role) {
-  UserRole.kid => const <UserCapability>{
-    UserCapability.readOwnReading,
-    UserCapability.submitQuiz,
-    UserCapability.viewCohortLeaderboard,
-  },
-  UserRole.viewerServant => const <UserCapability>{
-    UserCapability.readOwnReading,
-    UserCapability.submitQuiz,
-    UserCapability.viewCohortLeaderboard,
-    UserCapability.viewServantReport,
-  },
-  UserRole.adminServant => const <UserCapability>{
-    UserCapability.readOwnReading,
-    UserCapability.submitQuiz,
-    UserCapability.viewCohortLeaderboard,
-    UserCapability.viewServantReport,
-    UserCapability.scheduleReading,
-    UserCapability.manageQuestions,
-  },
-};

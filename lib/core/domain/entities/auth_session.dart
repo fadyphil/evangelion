@@ -32,17 +32,19 @@ part 'auth_session.freezed.dart';
 /// narrower and more useful:
 ///
 /// * role is a [UserRole] — three named members rather than an equality guess
-///   against a literal, and `grantsFor` answers "may this role open that
-///   screen" as a **named capability** rather than as a comparison;
+///   against a literal, and [UserRole.grantsFor] answers "may this role open
+///   that screen" as a **named capability** rather than as a comparison;
 /// * a role gate **may** choose a landing route and **may** refuse a navigation.
-///   That is what `grantsFor` is for;
+///   That is what [UserRole.grantsFor] is for;
 /// * a role gate still **may not** be described, anywhere, as authorisation.
 ///
 /// **And it is not a security boundary — the backend is the reason, and it is
-/// one line of evidence.** `src/middleware/identity.middleware.ts:29` assigns
+/// one line of evidence.** `src/middleware/identity.middleware.ts:31` assigns
 /// `request.user.role` and nothing ever reads it: `rg 'user\??\.role' src/`
 /// returns no matches and `rg '403' src/` returns no matches, so there are zero
-/// role guards and zero forbidden responses across all eighteen routes. Every
+/// role guards and zero forbidden responses across all **seventeen** route
+/// registrations in `src/` (measured against `HEAD = 4a1c834`: fourteen under
+/// `/api/v1`, plus `/json`, `/documentation` and `/health` in `app.ts`). Every
 /// endpoint is callable by anyone who sends a user id. **This prevents a child
 /// being dropped onto a scheduling screen that makes no sense for them; it
 /// prevents nothing else.** A role gate here is advisory UX — it is right that
@@ -103,8 +105,8 @@ final class AuthSession with _$AuthSession {
   /// Typed rather than a `String` because every question about a `String` role
   /// is an equality guess that fails silently — see [UserRole]'s own doc. It
   /// goes on the wire as [UserRole.wireValue], and the client gates navigation
-  /// on [grantsFor]. **Advisory, not a security boundary**: the backend parses
-  /// this header and never reads it again.
+  /// on [UserRole.grantsFor]. **Advisory, not a security boundary**: the backend
+  /// parses this header and never reads it again.
   final UserRole role;
 
   /// When the session was established.

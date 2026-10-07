@@ -138,11 +138,13 @@ abstract class CoreModule {
   /// **AND THE `const` GONE FROM THE INTERCEPTOR IS A CONSTRAINT, NOT A TIDYING.**
   /// A constant expression cannot read an enum's field, so
   /// `const IdentityHeadersInterceptor(role: kSeedUserRole.wireValue)` does not
-  /// compile. The instance is built when this provider runs — once, for a
-  /// `@lazySingleton` — and the cost is that the identity is no longer
-  /// canonicalised, which is invisible because nothing compares it by identity.
-  /// Restoring the `const` is the obvious "cleanup" a future reader will try,
-  /// and it is the one change that cannot compile.
+  /// compile — verified, not assumed. The instance is built when this provider
+  /// runs, once, for a `@lazySingleton`, so the identity is not canonicalised.
+  /// **No cost from that has been observed**: nothing in the client compares two
+  /// interceptors by identity, and this paragraph previously claimed the
+  /// canonicalisation was worth giving up, which was a prediction dressed as a
+  /// measurement. Restoring the `const` is the obvious "cleanup" a future reader
+  /// will try, and it is the one change that cannot compile.
   ///
   /// ## AND IT IS EXERCISED, WHICH IT WAS NOT
   ///
