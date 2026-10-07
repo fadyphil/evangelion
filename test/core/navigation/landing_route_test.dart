@@ -1,7 +1,16 @@
+import 'dart:io';
+
 import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/landing_route.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+// Not a `package:` import: `tool/` is not a library, it is the body Gate 4 runs.
+// Sharing the parser is the point — it reads the declaration site with the same
+// pattern the gate does, so this suite's completeness claim and the gate's
+// `9 route declaration(s)` cannot be counting different things. §2.1 decision 8c
+// sanctions a source scan over the declaration site for exactly this reason.
+import '../../../tool/route_check.dart';
 
 /// [landingRouteFor] — the ONE place a role turns into a route.
 ///
@@ -44,6 +53,18 @@ import 'package:flutter_test/flutter_test.dart';
 /// exists now because [landingRouteFor] needs one value to name. The "the
 /// landing is a DECLARED route" group below is the half that is true today and
 /// must stay true.
+///
+/// ## AND THE ONE TEST THIS SUITE DROPPED
+///
+/// "and the servant route is slash-prefixed like every real route" is deleted,
+/// not repaired. It asserted `AppRoutes.servant.startsWith('/')` — a property of
+/// a **constant owned by another file**, restated in a suite about
+/// [landingRouteFor]. `app_routes_test.dart` already holds that invariant over
+/// the declaration site ("every route except the fallback starts with a slash"),
+/// it applies it to all nine declarations rather than to the one this suite
+/// happens to name, and it fails for the identical reason. Two implementations
+/// of one invariant are two things to keep in step, which is §7's own note on
+/// Gate 4 and this file's opening argument against hand-written mirrors.
 void main() {
   group('a kid lands on home', () {
     test('because a kid is a reader, and the reading lives on /', () {
@@ -120,17 +141,28 @@ void main() {
     // what `app_routes_test.dart`'s seven structural invariants apply to. A
     // hand-typed `'/servant'` inside the `switch` would compile, would answer
     // every assertion above, and would be invisible to all of them.
-    test('every landing is one of the declared route constants', () {
-      const Set<String> declared = <String>{
-        AppRoutes.login,
-        AppRoutes.home,
-        AppRoutes.reading,
-        AppRoutes.quiz,
-        AppRoutes.result,
-        AppRoutes.settings,
-        AppRoutes.servant,
-      };
+    //
+    // COMPLETE, all nine, and asserted complete against the declaration site
+    // below. An earlier version named seven of the nine and omitted
+    // `leaderboard` and `fallback`, which made the failure message factually
+    // wrong: a landing on `/leaderboard` would have been reported as "an
+    // undeclared path" when `/leaderboard` is very much declared. An incomplete
+    // hand-written mirror of another file is the same second-source-of-truth
+    // shape this file's own doc argues against, and a tenth constant would have
+    // landed in the gap unnoticed.
+    const Set<String> declared = <String>{
+      AppRoutes.login,
+      AppRoutes.home,
+      AppRoutes.reading,
+      AppRoutes.quiz,
+      AppRoutes.result,
+      AppRoutes.settings,
+      AppRoutes.leaderboard,
+      AppRoutes.servant,
+      AppRoutes.fallback,
+    };
 
+    test('every landing is one of the declared route constants', () {
       for (final UserRole role in UserRole.values) {
         expect(
           declared,
@@ -140,13 +172,50 @@ void main() {
       }
     });
 
-    test('and the servant route is slash-prefixed like every real route', () {
-      // The one structural property of the new constant worth repeating here,
-      // because this file is where a reader looks for what `/servant` is. The
-      // full set of seven invariants lives in `app_routes_test.dart` and runs
-      // over the declaration site, so this is a restatement rather than a
-      // second implementation — it fails for the same reason that one does.
-      expect(AppRoutes.servant.startsWith('/'), isTrue);
+    test('and the declared set is COMPLETE — read from the declaration site, '
+        'not from the list above', () {
+      // WHY A SOURCE SCAN. The list above is still a hand-written mirror; this
+      // is what stops it drifting. Dart has no reflection, so nothing can
+      // enumerate a class's statics, and `AppRoutes.values` in `lib/` would only
+      // move the drift into production code — a constant declared outside that
+      // list would still be missing. §2.1 decision 8c makes a source scan the
+      // sanctioned technique for exactly this, and `tool/route_check.dart` is the
+      // same parser Gate 4 runs, so the gate and this suite cannot disagree
+      // about what is declared. It is imported the same way
+      // `app_routes_test.dart` imports it, for the same reason: one extraction,
+      // one pattern.
+      final Map<String, String> inventory = declaredRouteValues(
+        File(routesFile).readAsStringSync(),
+      );
+
+      // Every declared route must be *reachable as a landing candidate* in the
+      // set above. This is deliberately NOT "every declared route is a landing" —
+      // `/login` and `*` are not, and asserting that they are would be false.
+      // The claim is one-directional and it is the one that matters: nothing may
+      // be declared that this suite would then call undeclared.
+      for (final MapEntry<String, String> route in inventory.entries) {
+        expect(
+          declared,
+          contains(route.value),
+          reason:
+              '`AppRoutes.${route.key}` is "${route.value}" and is declared in '
+              '`app_routes.dart`, but it is missing from the set above — add it, '
+              'or a landing on it would be reported as undeclared',
+        );
+      }
+
+      // And the reverse, so neither side can hide: no entry in the set that the
+      // declaration site does not have. Without this, deleting a constant would
+      // leave the mirror naming a path that no longer exists.
+      for (final String path in declared) {
+        expect(
+          inventory.values,
+          contains(path),
+          reason:
+              'the set above names "$path", which no `static const String` in '
+              '`app_routes.dart` declares',
+        );
+      }
     });
   });
 }
