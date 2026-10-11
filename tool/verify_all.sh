@@ -58,7 +58,7 @@
 #
 # It exits 0 whether or not there is anything to fix; when there is, it prints
 # the `dart fix --apply --code=...` line you should run instead of a count. So
-# gate 4 greps for the literal `Nothing to fix!`, which was measured to appear
+# gate 5 greps for the literal `Nothing to fix!`, which was measured to appear
 # exactly once on a clean tree and not at all on a dirty one.
 #
 # If that behaviour ever changes, this gate fails loudly rather than quietly
@@ -68,7 +68,7 @@
 # ## THE BASELINE IS ENFORCED, NEVER SELF-UPDATED
 #
 # `flutter test --coverage` is documented as "must not drop". Without a recorded
-# number that is a wish, so `tool/baseline/gates.txt` holds the floor and gate 6
+# number that is a wish, so `tool/baseline/gates.txt` holds the floor and gate 7
 # compares against it. Two rules:
 #
 #   - it is changed ONLY by --update-baseline, which prints the old and new
@@ -79,7 +79,7 @@
 #
 # ## USAGE
 #
-#     tool/verify_all.sh                    # the six fast gates
+#     tool/verify_all.sh                    # the seven fast gates
 #     tool/verify_all.sh --with-build       # + the Linux build gate
 #     tool/verify_all.sh --update-baseline  # re-record after a deliberate change
 #
@@ -127,7 +127,7 @@ fatal() {
 # A missing tool must be FATAL before any gate runs, not discovered halfway
 # through as a confusing failure of whichever gate happened to need it.
 printf '%sGate preflight%s\n' "$B" "$N"
-for tool in dart flutter rg; do
+for tool in dart flutter rg python3; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     fatal "preflight: '$tool' is not on PATH — no gate that needs it was run"
   fi
@@ -146,7 +146,7 @@ if [[ $fatal -gt 0 ]]; then
   printf '\n%sFATAL%s — preflight failed, no gate was run.\n' "$R" "$N"
   exit 2
 fi
-printf '  %s%-6s%s dart, flutter, rg all present and rg can match\n\n' "$G" "ok" "$N"
+printf '  %s%-6s%s dart, flutter, rg, python3 present; rg can match\n\n' "$G" "ok" "$N"
 
 # --- 1. format ---------------------------------------------------------------
 printf '%s1. format%s\n' "$B" "$N"
@@ -178,10 +178,36 @@ else
   fi
 fi
 
-# --- 4. dart fix -------------------------------------------------------------
+# --- 4. citation + orphan gates ---------------------------------------------
+# Two gates added after the fp_dart work, both derived from recorded decisions:
+#   citation  every `X.tsx:NNN` claim resolves to a real prototype line
+#             (decision 8: "every transcription claim is a claim a human verified
+#             by reading eva/" — and decision 8's own harness found 3 of its own
+#             citations wrong on first run)
+#   orphan    every widget is reachable from a page (decision 144:
+#             LeaderboardCard was built, DI-wired, given a 5-surface overflow
+#             matrix and a 21-test suite, and no page instantiated it)
+printf '\n%s4. prototype citations and widget reachability%s\n' "$B" "$N"
+for g in citation_check orphan_widget_check; do
+  script="tool/gates/$g.py"
+  if [[ ! -f "$script" ]]; then
+    fatal "$g — $script not found"
+  elif out=$(python3 "$script" 2>&1); then
+    pass "$g — $(printf '%s' "$out" | grep -E 'PASSED' | tail -1 | sed 's/\x1b\[[0-9;]*m//g')"
+  else
+    rc=$?
+    if [[ $rc -eq 2 ]]; then
+      fatal "$g — could not run: $(printf '%s' "$out" | grep -i fatal | head -1)"
+    else
+      fail "$g — $(printf '%s' "$out" | grep -E '^\s+(BROKEN|ORPHAN)' | head -3 | tr '\n' ';')"
+    fi
+  fi
+done
+
+# --- 5. dart fix -------------------------------------------------------------
 # See the header: this exits 0 even when there is work to do, so the OUTPUT is
 # the check. Grepping for the literal is load-bearing, not decoration.
-printf '\n%s4. deprecated / fixable APIs%s\n' "$B" "$N"
+printf '\n%s5. deprecated / fixable APIs%s\n' "$B" "$N"
 if out=$(dart fix --dry-run 2>&1); then
   if printf '%s' "$out" | grep -qF 'Nothing to fix!'; then
     pass "dart fix --dry-run — nothing to fix"
@@ -196,7 +222,7 @@ else
 fi
 
 # --- 5. test -----------------------------------------------------------------
-printf '\n%s5. test suite%s\n' "$B" "$N"
+printf '\n%s6. test suite%s\n' "$B" "$N"
 if out=$(flutter test 2>&1); then
   pass "flutter test — $(printf '%s' "$out" | grep -oE '\+[0-9]+.*All tests passed' | tail -1 | sed 's/^ *//' | sed 's/[0-9]\+ms.*//')"
   ACTUAL_TESTS=$(printf '%s' "$out" | grep -oE '\+[0-9]+: All tests passed' | tail -1 | grep -oE '\+[0-9]+' | tr -d '+')
@@ -206,7 +232,7 @@ else
 fi
 
 # --- 6. coverage + baseline --------------------------------------------------
-printf '\n%s6. coverage and the recorded floor%s\n' "$B" "$N"
+printf '\n%s7. coverage and the recorded floor%s\n' "$B" "$N"
 if [[ ! -f "$BASELINE" ]]; then
   fatal "baseline file missing: $BASELINE"
 elif ! grep -qE '^test_count[[:space:]]+[0-9]+' "$BASELINE" || ! grep -qE '^coverage_pct[[:space:]]+[0-9.]+' "$BASELINE"; then
@@ -266,7 +292,7 @@ fi
 
 # --- 7. linux build (opt-in) -------------------------------------------------
 if [[ $WITH_BUILD -eq 1 ]]; then
-  printf '\n%s7. linux build%s\n' "$B" "$N"
+  printf '\n%s8. linux build%s\n' "$B" "$N"
   printf '         %s\n' "this wipes build/linux/x64/{debug,release} and rebuilds — it is slow by design"
   if out=$(tool/verify_linux_build.sh 2>&1); then
     pass "verify_linux_build.sh — $(printf '%s' "$out" | grep -iE '^\s*(PASS|OK)' | tail -1 | sed 's/\x1b\[[0-9;]*m//g' || echo 'clean')"
@@ -279,7 +305,7 @@ if [[ $WITH_BUILD -eq 1 ]]; then
     fi
   fi
 else
-  printf '\n%s7. linux build%s  %sskipped (--with-build to run; it wipes and rebuilds)%s\n' "$B" "$N" "$Y" "$N"
+  printf '\n%s8. linux build%s  %sskipped (--with-build to run; it wipes and rebuilds)%s\n' "$B" "$N" "$Y" "$N"
 fi
 
 # --- summary -----------------------------------------------------------------
