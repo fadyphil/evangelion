@@ -11,6 +11,7 @@ import 'package:evangelion/features/settings/data/datasources/settings_local_dat
 import 'package:evangelion/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A store whose future fails the way an unregistered plugin's does.
@@ -44,8 +45,8 @@ SettingsLocalDataSource unreachableStore() {
 /// `valueOrElse` exists but takes a **value**, so the honest spelling is this
 /// exhaustive `switch` over the sealed type: a third arm would not compile.
 UserSettings unwrap(Result<UserSettings> result) => switch (result) {
-  Success<UserSettings>(:final UserSettings value) => value,
-  FailureResult<UserSettings>(:final Failure failure) => throw StateError(
+  Right<Failure, UserSettings>(:final UserSettings value) => value,
+  Left<Failure, UserSettings>(value: final failure) => throw StateError(
     'expected a success and got ${failure.kind}',
   ),
 };
@@ -165,7 +166,7 @@ void main() {
             freshStore(),
           ).save(entry.value);
           expect(
-            saved.isSuccess,
+            saved.isRight(),
             isTrue,
             reason: 'the write itself must succeed',
           );
@@ -370,12 +371,12 @@ void main() {
       ).load();
 
       expect(
-        loaded.isFailure,
+        loaded.isLeft(),
         isTrue,
         reason: 'a store that cannot be read must not be an exception',
       );
-      expect(loaded, isA<FailureResult<UserSettings>>());
-      final Failure failure = (loaded as FailureResult<UserSettings>).failure;
+      expect(loaded, isA<Left<Failure, UserSettings>>());
+      final Failure failure = (loaded as Left<Failure, UserSettings>).value;
       expect(
         failure.kind,
         FailureKind.storage,
@@ -395,9 +396,9 @@ void main() {
           unreachableStore(),
         ).save(const UserSettings(fontStep: 4));
 
-        expect(saved.isFailure, isTrue);
+        expect(saved.isLeft(), isTrue);
         expect(
-          (saved as FailureResult<UserSettings>).failure.kind,
+          (saved as Left<Failure, UserSettings>).value.kind,
           FailureKind.storage,
         );
       },

@@ -1,5 +1,4 @@
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
@@ -24,6 +23,7 @@ import 'package:evangelion/features/settings/presentation/pages/settings_page.da
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import 'support/design_system_harness.dart';
 import 'support/home_harness.dart';
@@ -186,7 +186,7 @@ void main() {
         pump: (WidgetTester tester) => pumpHome(
           tester,
           bloc: harness(
-            reading: const Result<ScriptureText>.failure(homeReadingFailure),
+            reading: const Left<Failure, ScriptureText>(homeReadingFailure),
           ).bloc,
           size: _currentSurface,
         ),
@@ -197,7 +197,7 @@ void main() {
         pump: (WidgetTester tester) => pumpHome(
           tester,
           bloc: harness(
-            streak: const Result<StreakSummary>.failure(streakFailure),
+            streak: const Left<Failure, StreakSummary>(streakFailure),
           ).bloc,
           size: _currentSurface,
         ),
@@ -221,7 +221,7 @@ void main() {
         pump: (WidgetTester tester) => pumpReading(
           tester,
           cubit: readingHarness(
-            scripture: const Result<ScriptureText>.success(liveArabicPassage),
+            scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
           ).cubit,
           locale: const Locale('ar'),
           size: _currentSurface,
@@ -233,7 +233,7 @@ void main() {
         pump: (WidgetTester tester) => pumpReading(
           tester,
           cubit: readingHarness(
-            scripture: const Result<ScriptureText>.failure(readingFailure),
+            scripture: const Left<Failure, ScriptureText>(readingFailure),
           ).cubit,
           size: _currentSurface,
         ),
@@ -261,7 +261,7 @@ void main() {
         pump: (WidgetTester tester) => pumpQuiz(
           tester,
           bloc: quizBloc(
-            const Result<ScriptureText>.success(liveEnglishQuizPassage),
+            const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
           ),
           size: _currentSurface,
         ),
@@ -273,7 +273,7 @@ void main() {
           await pumpQuiz(
             tester,
             bloc: quizBloc(
-              const Result<ScriptureText>.success(liveEnglishQuizPassage),
+              const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
               submission: defaultSubmission,
             ),
             size: _currentSurface,
@@ -290,7 +290,7 @@ void main() {
         pump: (WidgetTester tester) => pumpQuiz(
           tester,
           bloc: quizBloc(
-            const Result<ScriptureText>.failure(
+            const Left<Failure, ScriptureText>(
               Failure(kind: FailureKind.network, message: 'offline'),
             ),
           ),

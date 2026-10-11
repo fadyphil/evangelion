@@ -1,5 +1,4 @@
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
@@ -14,6 +13,7 @@ import 'package:evangelion/features/auth/presentation/widgets/social_auth_button
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -409,7 +409,7 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer(
-        (_) async => const Result<AuthSession>.failure(
+        (_) async => const Left<Failure, AuthSession>(
           Failure(
             kind: FailureKind.unauthorized,
             message: 'No such user in this build.',
@@ -417,12 +417,12 @@ void main() {
         ),
       );
       when(refusing.getCurrentSession).thenAnswer(
-        (_) async => const Result<AuthSession>.failure(
+        (_) async => const Left<Failure, AuthSession>(
           Failure(kind: FailureKind.unauthorized, message: 'Not signed in.'),
         ),
       );
       when(refusing.signOut)
-          .thenAnswer((_) async => const Result<void>.success(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
       final AuthBloc bloc = AuthBloc(
         signIn: SignIn(refusing),
         getCurrentSession: GetCurrentSession(refusing),

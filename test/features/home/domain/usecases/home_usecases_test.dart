@@ -11,6 +11,7 @@ import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 /// Home's three use cases — red-first (AGENT_CONTEXT §6: use cases).
@@ -97,11 +98,11 @@ void main() {
     auth = MockAuthRepository();
 
     when(() => readings.today(language: any(named: 'language')))
-        .thenAnswer((_) async => Result<TodayReading>.success(today));
+        .thenAnswer((_) async => Result<TodayReading>.of(today));
     when(streaks.summary)
-        .thenAnswer((_) async => Result<StreakSummary>.success(summary));
+        .thenAnswer((_) async => Result<StreakSummary>.of(summary));
     when(auth.getCurrentSession)
-        .thenAnswer((_) async => Result<AuthSession>.success(session));
+        .thenAnswer((_) async => Result<AuthSession>.of(session));
   });
 
   group('LoadTodayReading', () {
@@ -114,7 +115,7 @@ void main() {
           ReadingLanguage.arabic,
         );
 
-        expect(result, Result<TodayReading>.success(today));
+        expect(result, Result<TodayReading>.of(today));
         verify(() => readings.today(language: ReadingLanguage.arabic))
             .called(1);
       },
@@ -130,11 +131,11 @@ void main() {
         message: 'Could not reach the server.',
       );
       when(() => readings.today(language: any(named: 'language')))
-          .thenAnswer((_) async => const Result<TodayReading>.failure(failure));
+          .thenAnswer((_) async => const Left<Failure, TodayReading>(failure));
 
       expect(
         await LoadTodayReading(readings)(ReadingLanguage.english),
-        const Result<TodayReading>.failure(failure),
+        const Left<Failure, TodayReading>(failure),
       );
     });
 
@@ -149,7 +150,7 @@ void main() {
     test('returns what the port answered', () async {
       expect(
         await LoadStreakSummary(streaks)(),
-        Result<StreakSummary>.success(summary),
+        Result<StreakSummary>.of(summary),
       );
     });
 
@@ -159,13 +160,12 @@ void main() {
         message:
             'Could not read the streak summary: `current_streak` is absent',
       );
-      when(
-        streaks.summary,
-      ).thenAnswer((_) async => const Result<StreakSummary>.failure(failure));
+      when(streaks.summary)
+          .thenAnswer((_) async => const Left<Failure, StreakSummary>(failure));
 
       expect(
         await LoadStreakSummary(streaks)(),
-        const Result<StreakSummary>.failure(failure),
+        const Left<Failure, StreakSummary>(failure),
       );
     });
 
@@ -183,10 +183,7 @@ void main() {
 
   group('GetReaderSession', () {
     test('returns the session the port answered', () async {
-      expect(
-        await GetReaderSession(auth)(),
-        Result<AuthSession>.success(session),
-      );
+      expect(await GetReaderSession(auth)(), Result<AuthSession>.of(session));
     });
 
     test('and "no session" is a failure, which the bloc turns into no name', () async {
@@ -196,14 +193,14 @@ void main() {
       // failed" — and the thing `/` draws from this is a **name**, so both arms
       // render the greeting without one.
       when(auth.getCurrentSession).thenAnswer(
-        (_) async => const Result<AuthSession>.failure(
+        (_) async => const Left<Failure, AuthSession>(
           Failure(kind: FailureKind.unauthorized, message: 'Not signed in.'),
         ),
       );
 
       final Result<AuthSession> result = await GetReaderSession(auth)();
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
         result
             .failureOrElse(

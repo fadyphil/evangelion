@@ -307,15 +307,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // handles rather than an error the screen reports.
     emit(
       result.fold<HomeState>(
-        onSuccess: (AuthSession session) => state.withReader(
-          status: HomeSectionStatus.ready,
-          name: session.displayName,
-          initials: session.initials,
-        ),
-        onFailure: (Failure _) => state.withReader(
+        (Failure _) => state.withReader(
           status: HomeSectionStatus.ready,
           name: null,
           initials: null,
+        ),
+        (AuthSession session) => state.withReader(
+          status: HomeSectionStatus.ready,
+          name: session.displayName,
+          initials: session.initials,
         ),
       ),
     );
@@ -333,15 +333,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   ) {
     emit(
       result.fold<HomeState>(
-        onSuccess: (LeaderboardBoard board) => state.withLeaderboard(
-          status: HomeSectionStatus.ready,
-          board: board,
-          failure: null,
-        ),
-        onFailure: (Failure failure) => state.withLeaderboard(
+        (Failure failure) => state.withLeaderboard(
           status: HomeSectionStatus.failed,
           board: null,
           failure: failure,
+        ),
+        (LeaderboardBoard board) => state.withLeaderboard(
+          status: HomeSectionStatus.ready,
+          board: board,
+          failure: null,
         ),
       ),
     );
@@ -350,15 +350,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   void _emitReading(Result<TodayReading> result, Emitter<HomeState> emit) {
     emit(
       result.fold<HomeState>(
-        onSuccess: (TodayReading reading) => state.withReading(
-          status: HomeSectionStatus.ready,
-          reading: reading,
-          failure: null,
-        ),
-        onFailure: (Failure failure) => state.withReading(
+        (Failure failure) => state.withReading(
           status: HomeSectionStatus.failed,
           reading: null,
           failure: failure,
+        ),
+        (TodayReading reading) => state.withReading(
+          status: HomeSectionStatus.ready,
+          reading: reading,
+          failure: null,
         ),
       ),
     );
@@ -367,15 +367,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   void _emitStreak(Result<StreakSummary> result, Emitter<HomeState> emit) {
     emit(
       result.fold<HomeState>(
-        onSuccess: (StreakSummary streak) => state.withStreak(
-          status: HomeSectionStatus.ready,
-          streak: streak,
-          failure: null,
-        ),
-        onFailure: (Failure failure) => state.withStreak(
+        (Failure failure) => state.withStreak(
           status: HomeSectionStatus.failed,
           streak: null,
           failure: failure,
+        ),
+        (StreakSummary streak) => state.withStreak(
+          status: HomeSectionStatus.ready,
+          streak: streak,
+          failure: null,
         ),
       ),
     );

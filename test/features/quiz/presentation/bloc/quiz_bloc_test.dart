@@ -13,6 +13,7 @@ import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/contract_payloads.dart';
 import '../../../../support/reading_harness.dart';
@@ -211,7 +212,7 @@ void main() {
     // went dead under a reader's finger.
     test('and it CARRIES `lastResult` across a reload, so the CTA stays live', () async {
       final QuizBloc bloc = blocOver(
-        const Result<ScriptureText>.success(threeOpen),
+        const Right<Failure, ScriptureText>(threeOpen),
       );
 
       bloc.add(const QuizStarted(ReadingLanguage.english));
@@ -278,7 +279,7 @@ void main() {
 
     blocTest<QuizBloc, QuizState>(
       'goes loading → ready, with the session and the reader at question one',
-      build: () => blocOver(const Result<ScriptureText>.success(twoQuestions)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(twoQuestions)),
       act: (QuizBloc bloc) =>
           bloc.add(const QuizStarted(ReadingLanguage.english)),
       expect: () => <Matcher>[
@@ -301,7 +302,7 @@ void main() {
     blocTest<QuizBloc, QuizState>(
       'goes loading → failed, and keeps the FAILURE\'S MESSAGE verbatim',
       build: () => blocOver(
-        const Result<ScriptureText>.failure(
+        const Left<Failure, ScriptureText>(
           Failure(
             kind: FailureKind.network,
             message: 'Could not reach the server.',
@@ -330,7 +331,7 @@ void main() {
     blocTest<QuizBloc, QuizState>(
       'a reading with NO questions is **ready**, not failed, and the CTA says so',
       build: () => blocOver(
-        const Result<ScriptureText>.success(
+        const Right<Failure, ScriptureText>(
           ScriptureText(
             readingId: 'reading-group-3-2026-10-04',
             groupId: 3,
@@ -365,7 +366,7 @@ void main() {
   group('SELECT → CHECK → NEXT → COMPLETE, the plan\'s own sequence', () {
     blocTest<QuizBloc, QuizState>(
       'the whole path, on a three-question reading',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -413,7 +414,7 @@ void main() {
       // 409 §5 trap 3 is about. `zeroCheckTwice` below is the finer assertion; this
       // one is the summary.
       final QuizBloc bloc = blocOver(
-        const Result<ScriptureText>.success(threeOpen),
+        const Right<Failure, ScriptureText>(threeOpen),
       );
       bloc.add(const QuizStarted(ReadingLanguage.english));
       await settle();
@@ -433,7 +434,7 @@ void main() {
   group('select', () {
     blocTest<QuizBloc, QuizState>(
       'records the letter and issues NO request',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -448,7 +449,7 @@ void main() {
 
     blocTest<QuizBloc, QuizState>(
       'and a second tap **replaces** the letter rather than adding one',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -466,7 +467,7 @@ void main() {
       // on an option from repainting the screen, and what keeps
       // `ReadingCubit.setFontStep`'s drag from repainting the passage.
       final QuizBloc bloc = blocOver(
-        const Result<ScriptureText>.success(threeOpen),
+        const Right<Failure, ScriptureText>(threeOpen),
       );
       bloc.add(const QuizStarted(ReadingLanguage.english));
       await settle();
@@ -487,7 +488,7 @@ void main() {
       // card's `enabled: false` is the visible half; this is the half that holds
       // when the event arrives from somewhere the card does not govern.
       final QuizBloc bloc = blocOver(
-        const Result<ScriptureText>.success(firstAnswered),
+        const Right<Failure, ScriptureText>(firstAnswered),
       );
       bloc.add(const QuizStarted(ReadingLanguage.english));
       await settle();
@@ -505,7 +506,7 @@ void main() {
   group('check — and the 409 the client must PREVENT', () {
     blocTest<QuizBloc, QuizState>(
       'emits submitting, then ready with the verdict and the last result',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -544,7 +545,7 @@ void main() {
     // it was dead for exactly as long as this assertion was missing.
     test('sends exactly the contract triple, in the session\'s arm', () async {
       final CountingReadingRepository readings = CountingReadingRepository(
-        scripture: const Result<ScriptureText>.success(threeOpen),
+        scripture: const Right<Failure, ScriptureText>(threeOpen),
       );
       final QuizBloc bloc = QuizBloc(
         startSession: StartSession(readings),
@@ -586,7 +587,7 @@ void main() {
         // the two differ, and the difference is the second bug the first test cannot
         // see.
         final CountingReadingRepository readings = CountingReadingRepository(
-          scripture: const Result<ScriptureText>.success(threeOpen),
+          scripture: const Right<Failure, ScriptureText>(threeOpen),
         );
         final QuizBloc bloc = QuizBloc(
           startSession: StartSession(readings),
@@ -619,7 +620,7 @@ void main() {
       'WITHOUT a selection it emits nothing — no request, no state change',
       () async {
         final QuizBloc bloc = blocOver(
-          const Result<ScriptureText>.success(threeOpen),
+          const Right<Failure, ScriptureText>(threeOpen),
         );
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -640,7 +641,7 @@ void main() {
         // way to produce the 409 the plan says must be prevented — so the second tap
         // is not merely harmless, it is the defect.
         final CountingReadingRepository readings = CountingReadingRepository(
-          scripture: const Result<ScriptureText>.success(threeOpen),
+          scripture: const Right<Failure, ScriptureText>(threeOpen),
         );
         final QuizBloc bloc = QuizBloc(
           startSession: StartSession(readings),
@@ -682,7 +683,7 @@ void main() {
         // keyboard shortcut. A repository cannot do it: by the time a request exists
         // the reader has pressed the button.
         final CountingReadingRepository readings = CountingReadingRepository(
-          scripture: const Result<ScriptureText>.success(firstAnswered),
+          scripture: const Right<Failure, ScriptureText>(firstAnswered),
         );
         final QuizBloc bloc = QuizBloc(
           startSession: StartSession(readings),
@@ -712,8 +713,8 @@ void main() {
     blocTest<QuizBloc, QuizState>(
       'a 409 goes to `failed` and KEEPS the session, so the reader sees why',
       build: () => blocOver(
-        const Result<ScriptureText>.success(threeOpen),
-        submission: const Result<SubmitResult>.failure(
+        const Right<Failure, ScriptureText>(threeOpen),
+        submission: const Left<Failure, SubmitResult>(
           Failure(
             kind: FailureKind.conflict,
             message: 'This question has already been submitted by this user.',
@@ -752,8 +753,8 @@ void main() {
     blocTest<QuizBloc, QuizState>(
       'and a WRONG answer is a verdict too — `false`, not absent',
       build: () => blocOver(
-        const Result<ScriptureText>.success(threeOpen),
-        submission: const Result<SubmitResult>.success(
+        const Right<Failure, ScriptureText>(threeOpen),
+        submission: const Right<Failure, SubmitResult>(
           contractWrongAnswerFixture,
         ),
       ),
@@ -777,7 +778,7 @@ void main() {
   group('next — and it must not SKIP a question', () {
     blocTest<QuizBloc, QuizState>(
       'advances by exactly **one**, and only after the current one is closed',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -801,7 +802,7 @@ void main() {
         // reader past a question they had not answered, and `answeredCount` would be
         // short at the end with nothing on screen to explain it.
         final QuizBloc bloc = blocOver(
-          const Result<ScriptureText>.success(threeOpen),
+          const Right<Failure, ScriptureText>(threeOpen),
         );
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -820,7 +821,7 @@ void main() {
       'and refused when the reader has chosen but not yet checked',
       () async {
         final QuizBloc bloc = blocOver(
-          const Result<ScriptureText>.success(threeOpen),
+          const Right<Failure, ScriptureText>(threeOpen),
         );
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -844,7 +845,7 @@ void main() {
     blocTest<QuizBloc, QuizState>(
       'but IS allowed past a question the wire already answers — there is nothing '
       'to do with it',
-      build: () => blocOver(const Result<ScriptureText>.success(firstAnswered)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(firstAnswered)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -867,7 +868,7 @@ void main() {
       // an empty screen. The honest answer is a dead button whose accessible name
       // says why, and an X control that works.
       build: () => blocOver(
-        const Result<ScriptureText>.success(
+        const Right<Failure, ScriptureText>(
           ScriptureText(
             readingId: 'reading-group-3-2026-10-04',
             groupId: 3,
@@ -911,7 +912,7 @@ void main() {
 
     blocTest<QuizBloc, QuizState>(
       'off the end it emits `complete` and **keeps the index on the last question**',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -941,7 +942,7 @@ void main() {
 
     test('`complete` is idempotent — a second `next` emits nothing', () async {
       final QuizBloc bloc = blocOver(
-        const Result<ScriptureText>.success(threeOpen),
+        const Right<Failure, ScriptureText>(threeOpen),
       );
       bloc.add(const QuizStarted(ReadingLanguage.english));
       await settle();
@@ -974,7 +975,7 @@ void main() {
       'and the finished screen is not editable — a selection is refused',
       () async {
         final QuizBloc bloc = blocOver(
-          const Result<ScriptureText>.success(threeOpen),
+          const Right<Failure, ScriptureText>(threeOpen),
         );
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -1010,7 +1011,7 @@ void main() {
       // the silence is a decision rather than a missing handler: same event, same
       // use case, one request and none.
       final CountingReadingRepository readings = CountingReadingRepository(
-        scripture: const Result<ScriptureText>.failure(
+        scripture: const Left<Failure, ScriptureText>(
           Failure(
             kind: FailureKind.network,
             message: 'Could not reach the server.',
@@ -1034,7 +1035,7 @@ void main() {
       // *after* the test — so the retry read the same payload and the assertion
       // below could not have told a re-fetch from a re-read. Recorded decision 15's
       // lesson, arriving as a fixture bug: the check passed for the wrong reason.
-      readings.scripture = const Result<ScriptureText>.success(bothAnswered);
+      readings.scripture = const Right<Failure, ScriptureText>(bothAnswered);
 
       bloc.add(const QuizRetried(ReadingLanguage.english));
       await settle();
@@ -1056,7 +1057,7 @@ void main() {
         // refresh that re-fetched but kept the old question entities would also fail
         // it. Only "the second payload's entity" passes.
         final CountingReadingRepository readings = CountingReadingRepository(
-          scripture: const Result<ScriptureText>.success(threeOpen),
+          scripture: const Right<Failure, ScriptureText>(threeOpen),
         );
         final QuizBloc bloc = QuizBloc(
           startSession: StartSession(readings),
@@ -1067,7 +1068,7 @@ void main() {
 
         // A submit that fails, so there is a failure to retry from and a selection to
         // keep — the case where re-reading and rebasing is doing real work.
-        readings.submission = const Result<SubmitResult>.failure(
+        readings.submission = const Left<Failure, SubmitResult>(
           Failure(
             kind: FailureKind.conflict,
             message: 'This question has already been submitted by this user.',
@@ -1086,8 +1087,8 @@ void main() {
 
         // The server now says question one is answered — as it would after the very
         // 409 above.
-        readings.scripture = const Result<ScriptureText>.success(bothAnswered);
-        readings.submission = const Result<SubmitResult>.success(
+        readings.scripture = const Right<Failure, ScriptureText>(bothAnswered);
+        readings.submission = const Right<Failure, SubmitResult>(
           contractSubmitAnswerFixture,
         );
 
@@ -1119,7 +1120,7 @@ void main() {
       'and it re-reads `reading_id` too, because that value moves (§5 trap 11)',
       () async {
         final CountingReadingRepository readings = CountingReadingRepository(
-          scripture: const Result<ScriptureText>.success(threeOpen),
+          scripture: const Right<Failure, ScriptureText>(threeOpen),
         );
         final QuizBloc bloc = QuizBloc(
           startSession: StartSession(readings),
@@ -1127,7 +1128,7 @@ void main() {
           submitAnswer: SubmitAnswer(readings),
         );
         addTearDown(bloc.close);
-        readings.submission = const Result<SubmitResult>.failure(
+        readings.submission = const Left<Failure, SubmitResult>(
           Failure(kind: FailureKind.server, message: 'Internal Server Error'),
         );
 
@@ -1146,10 +1147,10 @@ void main() {
         await settle();
         expect(bloc.state.status, QuizStatus.failed);
 
-        readings.submission = const Result<SubmitResult>.success(
+        readings.submission = const Right<Failure, SubmitResult>(
           contractSubmitAnswerFixture,
         );
-        readings.scripture = const Result<ScriptureText>.success(
+        readings.scripture = const Right<Failure, ScriptureText>(
           ScriptureText(
             readingId: 'reading-group-3-2026-10-05',
             groupId: 3,
@@ -1191,7 +1192,7 @@ void main() {
       // companion test above is what makes the silence a decision: same event, one
       // request and none.
       final CountingReadingRepository readings = CountingReadingRepository(
-        scripture: const Result<ScriptureText>.success(threeOpen),
+        scripture: const Right<Failure, ScriptureText>(threeOpen),
       );
       final QuizBloc bloc = QuizBloc(
         startSession: StartSession(readings),
@@ -1223,7 +1224,7 @@ void main() {
       // `already_answered` on it is exactly what we cannot vouch for any more. That
       // is `ReadingCubit`'s rule and it is the right one here.
       final CountingReadingRepository readings = CountingReadingRepository(
-        scripture: const Result<ScriptureText>.success(threeOpen),
+        scripture: const Right<Failure, ScriptureText>(threeOpen),
       );
       final QuizBloc bloc = QuizBloc(
         startSession: StartSession(readings),
@@ -1231,7 +1232,7 @@ void main() {
         submitAnswer: SubmitAnswer(readings),
       );
       addTearDown(bloc.close);
-      readings.submission = const Result<SubmitResult>.failure(
+      readings.submission = const Left<Failure, SubmitResult>(
         Failure(
           kind: FailureKind.conflict,
           message: 'This question has already been submitted by this user.',
@@ -1247,7 +1248,7 @@ void main() {
       expect(bloc.state.status, QuizStatus.failed);
       expect(bloc.state.session, isNotNull, reason: 'a failed submit keeps it');
 
-      readings.scripture = const Result<ScriptureText>.failure(
+      readings.scripture = const Left<Failure, ScriptureText>(
         Failure(
           kind: FailureKind.network,
           message: 'Could not reach the server.',
@@ -1265,7 +1266,7 @@ void main() {
   group('the CTA, which is the whole of the screen\'s affordances', () {
     blocTest<QuizBloc, QuizState>(
       'every arm, in the order a reader meets them',
-      build: () => blocOver(const Result<ScriptureText>.success(threeOpen)),
+      build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
         await settle();
@@ -1294,7 +1295,7 @@ void main() {
       // assertion is made on the **emit** instead: the `submitting` state is
       // observed as it passes, which needs no held request at all.
       final CountingReadingRepository readings = CountingReadingRepository(
-        scripture: const Result<ScriptureText>.success(threeOpen),
+        scripture: const Right<Failure, ScriptureText>(threeOpen),
       );
       final QuizBloc bloc = QuizBloc(
         startSession: StartSession(readings),

@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/common/app_config.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../support/project_import_graph.dart';
@@ -30,7 +32,7 @@ final class ProbeNoParamsUseCase implements NoParamsUseCase<String> {
   const ProbeNoParamsUseCase();
 
   @override
-  Future<Result<String>> call() async => const Result<String>.success('wired');
+  Future<Result<String>> call() async => const Right<Failure, String>('wired');
 }
 
 /// A type nothing registers, used to assert get_it's failure mode.
@@ -382,7 +384,7 @@ void main() {
         final NoParamsUseCase<String> usecase =
             getIt<NoParamsUseCase<String>>();
 
-        expect(await usecase(), const Result<String>.success('wired'));
+        expect(await usecase(), const Right<Failure, String>('wired'));
       },
     );
   });

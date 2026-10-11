@@ -48,6 +48,7 @@ library;
 
 import 'dart:io';
 
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
@@ -59,6 +60,7 @@ import 'package:evangelion/features/reading/presentation/widgets/scripture_block
 import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/reading_harness.dart';
 
@@ -857,7 +859,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result.success(
+          scripture: Result.of(
             arm == ReadingLanguage.english
                 ? liveEnglishPassage
                 : liveArabicPassage,
@@ -889,7 +891,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result.success(
+          scripture: Result.of(
             arm == ReadingLanguage.english
                 ? liveEnglishPassage
                 : liveArabicPassage,
@@ -906,7 +908,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result.success(
+          scripture: Result.of(
             arm == ReadingLanguage.english
                 ? liveEnglishPassage
                 : liveArabicPassage,
@@ -933,7 +935,7 @@ void main() {
         '${arm.name}: the controls row starts at the prototype padding',
         (WidgetTester tester) async {
           final ReadingHarness h = readingHarness(
-            scripture: Result.success(
+            scripture: Result.of(
               arm == ReadingLanguage.english
                   ? liveEnglishPassage
                   : liveArabicPassage,
@@ -981,7 +983,7 @@ void main() {
       );
 
       final ReadingHarness ar = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
       final DecoratedBox? bandBox = bandDecoratedBox(tester);
@@ -1039,7 +1041,7 @@ void main() {
         );
 
         final ReadingHarness ar = readingHarness(
-          scripture: const Result<ScriptureText>.success(liveArabicPassage),
+          scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
         );
         await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
         final double arBack = tester

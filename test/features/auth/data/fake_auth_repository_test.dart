@@ -129,7 +129,7 @@ void main() {
         password: goodPassword,
       );
 
-      final AuthSession session = result.valueOrElse(_impossible);
+      final AuthSession session = result.getOrElse((_) => _impossible);
       expect(session.userId, kSeedUserId);
       expect(session.role, kSeedUserRole);
       // NOT the address that was typed. There is no server that accepted it, so
@@ -153,8 +153,8 @@ void main() {
 
       expect(
         identical(
-          first.valueOrElse(_impossible),
-          second.valueOrElse(_impossible),
+          first.getOrElse((_) => _impossible),
+          second.getOrElse((_) => _impossible),
         ),
         isTrue,
       );
@@ -166,7 +166,7 @@ void main() {
         password: goodPassword,
       );
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
         result.failureOrElse(_impossibleFailure).kind,
         FailureKind.validation,
@@ -198,7 +198,7 @@ void main() {
         password: 'short',
       );
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
         result.failureOrElse(_impossibleFailure).message,
         kShortPasswordMessage,
@@ -211,7 +211,7 @@ void main() {
       final Result<AuthSession> current = await repository.getCurrentSession();
 
       expect(
-        current.isFailure,
+        current.isLeft(),
         isTrue,
         reason: 'a refused sign-in must leave the app exactly as it was',
       );
@@ -243,7 +243,7 @@ void main() {
         password: goodPassword,
       );
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
     });
   });
 
@@ -255,11 +255,11 @@ void main() {
     test(
       'getCurrentSession fails before a sign-in and succeeds after',
       () async {
-        expect((await repository.getCurrentSession()).isFailure, isTrue);
+        expect((await repository.getCurrentSession()).isLeft(), isTrue);
 
         await repository.signIn(email: goodEmail, password: goodPassword);
 
-        expect((await repository.getCurrentSession()).isSuccess, isTrue);
+        expect((await repository.getCurrentSession()).isRight(), isTrue);
       },
     );
 
@@ -274,8 +274,8 @@ void main() {
             .getCurrentSession();
 
         expect(
-          current.valueOrElse(_impossible),
-          signedIn.valueOrElse(_impossible),
+          current.getOrElse((_) => _impossible),
+          signedIn.getOrElse((_) => _impossible),
         );
       },
     );
@@ -284,8 +284,8 @@ void main() {
       await repository.signIn(email: goodEmail, password: goodPassword);
       final Result<void> result = await repository.signOut();
 
-      expect(result.isSuccess, isTrue);
-      expect((await repository.getCurrentSession()).isFailure, isTrue);
+      expect(result.isRight(), isTrue);
+      expect((await repository.getCurrentSession()).isLeft(), isTrue);
     });
 
     test(
@@ -294,7 +294,7 @@ void main() {
         // A sign-out with nothing to end is not an error. Failing it would make
         // `AuthBloc`'s sign-out path report a problem the reader can do nothing
         // about, and the session is already in the state it is asking for.
-        expect((await repository.signOut()).isSuccess, isTrue);
+        expect((await repository.signOut()).isRight(), isTrue);
       },
     );
 
@@ -306,7 +306,7 @@ void main() {
       final FakeAuthRepository other = FakeAuthRepository();
       await repository.signIn(email: goodEmail, password: goodPassword);
 
-      expect((await other.getCurrentSession()).isFailure, isTrue);
+      expect((await other.getCurrentSession()).isLeft(), isTrue);
     });
   });
 }

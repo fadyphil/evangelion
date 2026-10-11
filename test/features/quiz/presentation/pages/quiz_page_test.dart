@@ -49,6 +49,7 @@ library;
 
 import 'dart:io';
 
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
@@ -64,6 +65,7 @@ import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/quiz_harness.dart';
 import '../../../../support/reading_harness.dart';
@@ -95,7 +97,7 @@ String get theAnsweredOption => liveEnglishQuestion.options[theAnsweredLetter]!;
 ///
 /// The **open** question that nevertheless holds the server's answer key — see that
 /// fixture's doc for why the capture-based passage cannot test the spoiler boundary.
-Result<ScriptureText> get aSpoilerFixture => Result<ScriptureText>.success(
+Result<ScriptureText> get aSpoilerFixture => Result<ScriptureText>.of(
   englishPassageWith(<Question>[verdictCarryingQuestion]),
 );
 
@@ -104,9 +106,8 @@ Result<ScriptureText> get aSpoilerFixture => Result<ScriptureText>.success(
 /// §5 trap 3's 2026-10-03 shape. A single closed question is what makes the last two
 /// groups reachable: it is simultaneously "there is nothing to submit" and "there is
 /// no question after this one", which is the dead end `QuizCta.none` exists for.
-Result<ScriptureText> get aClosedFixture => Result<ScriptureText>.success(
-  englishPassageWith(<Question>[answeredQuestion]),
-);
+Result<ScriptureText> get aClosedFixture =>
+    Result<ScriptureText>.of(englishPassageWith(<Question>[answeredQuestion]));
 
 /// Renders [QuizPage] at [pumpQuiz]'s default surface and returns nothing.
 ///
@@ -135,7 +136,7 @@ void main() {
       // than "some other app bar": a future `AppBar` titled `Quiz` would satisfy the
       // old test and violate the prototype.
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
@@ -150,7 +151,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
@@ -173,7 +174,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
@@ -275,7 +276,7 @@ void main() {
     /// setup's own bugs as the behaviour's.
     Future<QuizBloc> gradeTheAnsweredOption(WidgetTester tester) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         submission: defaultSubmission,
       );
       await mountQuiz(tester, bloc: bloc);
@@ -362,7 +363,7 @@ void main() {
       // than dressed up.
       Future<void> runWith({required bool disableAnimations}) async {
         final QuizBloc bloc = quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
           submission: defaultSubmission,
         );
         // **Unmount first.** `QuizPage` is published through `BlocProvider.value`, so
@@ -543,7 +544,7 @@ void main() {
       // The graded arm, because that is where a third string enters the name and a
       // duplicated option text would be least noticeable behind it.
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         submission: defaultSubmission,
       );
       await mountQuiz(tester, bloc: bloc);
@@ -677,7 +678,7 @@ void main() {
       // answer" is the only action this control can perform on this screen and there
       // is nothing to check.
       final QuizBloc bloc = quizBloc(
-        Result<ScriptureText>.success(mixedQuizPassage),
+        Result<ScriptureText>.of(mixedQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
@@ -774,7 +775,7 @@ void main() {
       // the reader chooses. Naming the absence here would be wrong — there is an
       // answer to show, the reader has not asked for it yet.
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
@@ -819,7 +820,7 @@ void main() {
     /// other use asserts nothing about the frame it leaves behind.
     Future<QuizBloc> gradeToReadyOnTheLastQuestion(WidgetTester tester) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         submission: defaultSubmission,
       );
       await mountQuiz(tester, bloc: bloc);

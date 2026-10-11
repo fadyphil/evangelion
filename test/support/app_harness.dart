@@ -41,6 +41,7 @@ import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.d
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:get_it/get_it.dart';
 
 import 'settings_harness.dart';
@@ -415,7 +416,7 @@ final class _FakeLeaderboardRepository implements LeaderboardRepository {
   Future<Result<LeaderboardBoard>> board({
     required LeaderboardWindow window,
     required int limit,
-  }) async => Result<LeaderboardBoard>.success(
+  }) async => Result<LeaderboardBoard>.of(
     LeaderboardBoard(
       window: window,
       groupId: 3,
@@ -493,7 +494,7 @@ final class _FakeReadingRepository implements ReadingRepository {
   @override
   Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
-  }) async => const Result<ScriptureText>.failure(
+  }) async => const Left<Failure, ScriptureText>(
     Failure(
       kind: FailureKind.network,
       message: 'No reading: this harness does not open a socket.',
@@ -519,7 +520,7 @@ final class _FakeReadingRepository implements ReadingRepository {
     required String readingId,
     required String questionId,
     required String answer,
-  }) async => const Result<SubmitResult>.failure(
+  }) async => const Left<Failure, SubmitResult>(
     Failure(
       kind: FailureKind.network,
       message: 'No submit: this harness does not open a socket.',
@@ -531,7 +532,7 @@ final class _FakeReadingRepository implements ReadingRepository {
 final class _FakeStreakRepository implements StreakRepository {
   @override
   Future<Result<StreakSummary>> summary() async =>
-      const Result<StreakSummary>.failure(
+      const Left<Failure, StreakSummary>(
         Failure(
           kind: FailureKind.network,
           message: 'No streak: this harness does not open a socket.',

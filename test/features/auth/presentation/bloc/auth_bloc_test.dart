@@ -11,6 +11,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 /// [AuthBloc] — red-first with `bloc_test` (AGENT_CONTEXT §6: every cubit).
@@ -74,14 +75,14 @@ void main() {
         email: any(named: 'email'),
         password: any(named: 'password'),
       ),
-    ).thenAnswer((_) async => Result<AuthSession>.success(session));
+    ).thenAnswer((_) async => Result<AuthSession>.of(session));
     when(repository.getCurrentSession).thenAnswer(
-      (_) async => const Result<AuthSession>.failure(
+      (_) async => const Left<Failure, AuthSession>(
         Failure(kind: FailureKind.unauthorized, message: 'Not signed in.'),
       ),
     );
     when(repository.signOut)
-        .thenAnswer((_) async => const Result<void>.success(null));
+        .thenAnswer((_) async => const Right<Failure, void>(null));
   });
 
   group('the cold launch', () {
@@ -115,7 +116,7 @@ void main() {
       'AuthStarted with a session goes straight to signed in',
       setUp: () {
         when(repository.getCurrentSession)
-            .thenAnswer((_) async => Result<AuthSession>.success(session));
+            .thenAnswer((_) async => Result<AuthSession>.of(session));
       },
       build: build,
       act: (AuthBloc bloc) => bloc.add(const AuthStarted()),
@@ -131,7 +132,7 @@ void main() {
       // about it.
       setUp: () {
         when(repository.getCurrentSession)
-            .thenAnswer((_) async => Result<AuthSession>.success(session));
+            .thenAnswer((_) async => Result<AuthSession>.of(session));
       },
       build: build,
       act: (AuthBloc bloc) => bloc.add(const AuthStarted()),
@@ -369,7 +370,7 @@ void main() {
             password: any(named: 'password'),
           ),
         ).thenAnswer(
-          (_) async => const Result<AuthSession>.failure(
+          (_) async => const Left<Failure, AuthSession>(
             Failure(
               kind: FailureKind.validation,
               message: "That password's too short",
@@ -432,7 +433,7 @@ void main() {
             password: any(named: 'password'),
           ),
         ).thenAnswer(
-          (_) async => const Result<AuthSession>.failure(
+          (_) async => const Left<Failure, AuthSession>(
             Failure(kind: FailureKind.validation, message: 'refused'),
           ),
         );
@@ -538,7 +539,7 @@ void main() {
       'clears the session and empties the form',
       setUp: () {
         when(repository.getCurrentSession)
-            .thenAnswer((_) async => Result<AuthSession>.success(session));
+            .thenAnswer((_) async => Result<AuthSession>.of(session));
       },
       build: build,
       act: (AuthBloc bloc) => bloc
@@ -608,7 +609,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
         bloc.add(const AuthSignedOut());
         await Future<void>.delayed(Duration.zero);
-        pending.complete(Result<AuthSession>.success(session));
+        pending.complete(Result<AuthSession>.of(session));
       },
       expect: () => <AuthState>[
         const AuthState(email: email, emailTouched: true),

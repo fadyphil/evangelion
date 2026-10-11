@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Turns one `POST /api/v1/readings/:id/submit` body into a [SubmitResult].
 ///
@@ -102,7 +103,7 @@ final class SubmitResultMapper {
   /// §3's LSP row and `failure.dart`'s vocabulary for that kind.
   Result<SubmitResult> map(Object? body) {
     if (body is! Map<Object?, Object?>) {
-      return Result<SubmitResult>.failure(_notAnObject(body));
+      return Result<SubmitResult>.left(_notAnObject(body));
     }
 
     // Read in **wire order**, for `TodayReadingMapper`'s reason: the message on a
@@ -126,8 +127,8 @@ final class SubmitResultMapper {
       longestStreak,
       readingCompleted,
     ]);
-    if (gate case FailureResult<void>(:final Failure failure)) {
-      return Result<SubmitResult>.failure(failure);
+    if (gate case Left<Failure, void>(value: final failure)) {
+      return Result<SubmitResult>.left(failure);
     }
 
     // `valueOrElse` from here, not `!`: [gate] has proved there is no failure arm to
@@ -148,15 +149,15 @@ final class SubmitResultMapper {
     // `!` (which §4 forbids without a proof the compiler cannot see) or a second gate,
     // and the honest statement of "this is unreachable" belongs in a comment where the
     // next reader is about to change it.
-    return Result<SubmitResult>.success(
+    return Result<SubmitResult>.of(
       SubmitResult(
-        questionId: questionId.valueOrElse(''),
-        isCorrect: isCorrect.valueOrElse(false),
-        pointsEarned: pointsEarned.valueOrElse(0),
-        currentTotalPoints: currentTotalPoints.valueOrElse(0),
-        currentStreak: currentStreak.valueOrElse(0),
-        longestStreak: longestStreak.valueOrElse(0),
-        readingCompleted: readingCompleted.valueOrElse(false),
+        questionId: questionId.getOrElse((_) => ''),
+        isCorrect: isCorrect.getOrElse((_) => false),
+        pointsEarned: pointsEarned.getOrElse((_) => 0),
+        currentTotalPoints: currentTotalPoints.getOrElse((_) => 0),
+        currentStreak: currentStreak.getOrElse((_) => 0),
+        longestStreak: longestStreak.getOrElse((_) => 0),
+        readingCompleted: readingCompleted.getOrElse((_) => false),
       ),
     );
   }
@@ -166,15 +167,15 @@ final class SubmitResultMapper {
   Result<String> _string(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is String
-        ? Result<String>.success(value)
-        : Result<String>.failure(_bad(key, value, 'a String'));
+        ? Result<String>.of(value)
+        : Result<String>.left(_bad(key, value, 'a String'));
   }
 
   Result<bool> _bool(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is bool
-        ? Result<bool>.success(value)
-        : Result<bool>.failure(_bad(key, value, 'a bool'));
+        ? Result<bool>.of(value)
+        : Result<bool>.left(_bad(key, value, 'a bool'));
   }
 
   /// An `int` that cannot be negative — a score or a total of them.
@@ -200,23 +201,23 @@ final class SubmitResultMapper {
   ) {
     final Object? value = body[key];
     if (value is! int) {
-      return Result<int>.failure(_bad(key, value, 'an int'));
+      return Result<int>.left(_bad(key, value, 'an int'));
     }
     if (value < 0) {
-      return Result<int>.failure(_bad(key, value, expected));
+      return Result<int>.left(_bad(key, value, expected));
     }
-    return Result<int>.success(value);
+    return Result<int>.of(value);
   }
 
   /// The first failure among [results], as a `Result<void>` so the caller
   /// pattern-matches once instead of checking seven locals.
   Result<void> _firstFailure(List<Result<Object?>> results) {
     for (final Result<Object?> result in results) {
-      if (result case FailureResult<Object?>(:final Failure failure)) {
-        return Result<void>.failure(failure);
+      if (result case Left<Failure, Object?>(value: final failure)) {
+        return Result<void>.left(failure);
       }
     }
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 
   /// Why a body that is not an object is named by *what it was*.

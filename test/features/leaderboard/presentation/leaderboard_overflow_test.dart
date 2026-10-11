@@ -13,6 +13,7 @@ import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_p
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../support/design_system_harness.dart';
 import '../../../support/reading_harness.dart';
@@ -107,7 +108,7 @@ final class _AnsweringRepo implements LeaderboardRepository {
   Future<Result<LeaderboardBoard>> board({
     required LeaderboardWindow window,
     required int limit,
-  }) async => Result<LeaderboardBoard>.success(answer);
+  }) async => Result<LeaderboardBoard>.of(answer);
 }
 
 void main() {
@@ -260,7 +261,7 @@ final class _FailingRepo implements LeaderboardRepository {
   Future<Result<LeaderboardBoard>> board({
     required LeaderboardWindow window,
     required int limit,
-  }) async => const Result<LeaderboardBoard>.failure(
+  }) async => const Left<Failure, LeaderboardBoard>(
     Failure(
       kind: FailureKind.validation,
       message:

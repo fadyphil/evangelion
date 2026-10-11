@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Turns the leaderboard response body into a [LeaderboardBoard].
 ///
@@ -72,7 +73,7 @@ final class LeaderboardMapper {
   /// rather than a Dart type error.
   Result<LeaderboardBoard> map(Object? body, {required int limit}) {
     if (body is! Map<Object?, Object?>) {
-      return Result<LeaderboardBoard>.failure(_notAnObject(body));
+      return Result<LeaderboardBoard>.left(_notAnObject(body));
     }
 
     // Wire order, so the message on a body with several problems names the key a
@@ -95,28 +96,28 @@ final class LeaderboardMapper {
       rawRows,
       standing,
     ]);
-    if (scalars case FailureResult<void>(:final Failure failure)) {
-      return Result<LeaderboardBoard>.failure(failure);
+    if (scalars case Left<Failure, void>(value: final failure)) {
+      return Result<LeaderboardBoard>.left(failure);
     }
 
     final Result<List<LeaderboardRow>> rows = _rows(
-      rawRows.valueOrElse(<Object?>[]),
+      rawRows.getOrElse((_) => <Object?>[]),
     );
-    if (rows case FailureResult<List<LeaderboardRow>>(:final Failure failure)) {
-      return Result<LeaderboardBoard>.failure(failure);
+    if (rows case Left<Failure, List<LeaderboardRow>>(value: final failure)) {
+      return Result<LeaderboardBoard>.left(failure);
     }
 
     // `valueOrElse` rather than `!`: the gate above has proved there is no failure
     // arm, so the fallback cannot be reached, and §4 forbids a `!` that is not
     // provably non-null.
-    return Result<LeaderboardBoard>.success(
+    return Result<LeaderboardBoard>.of(
       LeaderboardBoard(
-        window: window.valueOrElse(LeaderboardWindow.weekly),
-        groupId: groupId.valueOrElse(0),
-        rows: rows.valueOrElse(const <LeaderboardRow>[]),
-        standing: standing.valueOrElse(null),
+        window: window.getOrElse((_) => LeaderboardWindow.weekly),
+        groupId: groupId.getOrElse((_) => 0),
+        rows: rows.getOrElse((_) => const <LeaderboardRow>[]),
+        standing: standing.getOrElse((_) => null),
         cohortSize: cohortSizeOf(
-          reportedTotal: totalRanked.valueOrElse(0),
+          reportedTotal: totalRanked.getOrElse((_) => 0),
           rowsReturned: rows.valueOrElse(const <LeaderboardRow>[]).length,
           limit: limit,
         ),
@@ -246,19 +247,21 @@ final class LeaderboardMapper {
     for (int index = 0; index < raw.length; index++) {
       final Object? entry = raw[index];
       if (entry is! Map<Object?, Object?>) {
-        return Result<List<LeaderboardRow>>.failure(
+        return Result<List<LeaderboardRow>>.left(
           _bad('leaderboard[$index]', entry, 'a JSON object'),
         );
       }
       final Result<LeaderboardRow> row = _row(entry, index);
-      if (row case FailureResult<LeaderboardRow>(:final Failure failure)) {
-        return Result<List<LeaderboardRow>>.failure(failure);
+      if (row case Left<Failure, LeaderboardRow>(value: final failure)) {
+        return Result<List<LeaderboardRow>>.left(failure);
       }
-      if (row case Success<LeaderboardRow>(:final LeaderboardRow value)) {
+      if (row case Right<Failure, LeaderboardRow>(
+        :final LeaderboardRow value,
+      )) {
         mapped.add(value);
       }
     }
-    return Result<List<LeaderboardRow>>.success(mapped);
+    return Result<List<LeaderboardRow>>.of(mapped);
   }
 
   /// One row, read under [label] so a failure names **which** row was wrong.
@@ -281,15 +284,15 @@ final class LeaderboardMapper {
       score,
       fullName,
     ]);
-    if (fields case FailureResult<void>(:final Failure failure)) {
-      return Result<LeaderboardRow>.failure(failure);
+    if (fields case Left<Failure, void>(value: final failure)) {
+      return Result<LeaderboardRow>.left(failure);
     }
 
-    return Result<LeaderboardRow>.success(
+    return Result<LeaderboardRow>.of(
       LeaderboardRow(
-        rank: rank.valueOrElse(0),
-        score: score.valueOrElse(0),
-        initials: initialsOf(fullName.valueOrElse('')),
+        rank: rank.getOrElse((_) => 0),
+        score: score.getOrElse((_) => 0),
+        initials: initialsOf(fullName.getOrElse((_) => '')),
       ),
     );
   }
@@ -303,10 +306,10 @@ final class LeaderboardMapper {
   ) {
     final Object? value = body[key];
     if (value == null) {
-      return const Result<LeaderboardStanding?>.success(null);
+      return const Right<Failure, LeaderboardStanding?>(null);
     }
     if (value is! Map<Object?, Object?>) {
-      return Result<LeaderboardStanding?>.failure(
+      return Result<LeaderboardStanding?>.left(
         _bad(key, value, 'null or a JSON object'),
       );
     }
@@ -314,11 +317,11 @@ final class LeaderboardMapper {
     final Result<int?> rank = _nullableInt(value, 'rank');
     final Result<int> score = _int(value, 'score');
     final Result<void> fields = _firstFailure(<Result<Object?>>[rank, score]);
-    if (fields case FailureResult<void>(:final Failure failure)) {
-      return Result<LeaderboardStanding?>.failure(failure);
+    if (fields case Left<Failure, void>(value: final failure)) {
+      return Result<LeaderboardStanding?>.left(failure);
     }
 
-    return Result<LeaderboardStanding?>.success(
+    return Result<LeaderboardStanding?>.of(
       LeaderboardStanding(
         // The nullable one, and `valueOrElse(null)` is honest here rather than a
         // fabrication: [valueOrElse] is typed `[T]`, so on a `Result<int?>` the
@@ -328,8 +331,8 @@ final class LeaderboardMapper {
         // The version this replaces read `rank` as a plain `int` and fell back to `0`,
         // which is the exact failure [LeaderboardStanding] exists to prevent: a child
         // with no score would have been rendered in 0th place.
-        rank: rank.valueOrElse(null),
-        score: score.valueOrElse(0),
+        rank: rank.getOrElse((_) => null),
+        score: score.getOrElse((_) => 0),
       ),
     );
   }
@@ -342,8 +345,8 @@ final class LeaderboardMapper {
   }) {
     final Object? value = body[key];
     return value is String
-        ? Result<String>.success(value)
-        : Result<String>.failure(_bad(_at(key, where), value, 'a String'));
+        ? Result<String>.of(value)
+        : Result<String>.left(_bad(_at(key, where), value, 'a String'));
   }
 
   /// An `int`, and not a `num`.
@@ -353,8 +356,8 @@ final class LeaderboardMapper {
   Result<int> _int(Map<Object?, Object?> body, String key, {String? where}) {
     final Object? value = body[key];
     return value is int
-        ? Result<int>.success(value)
-        : Result<int>.failure(_bad(_at(key, where), value, 'an int'));
+        ? Result<int>.of(value)
+        : Result<int>.left(_bad(_at(key, where), value, 'an int'));
   }
 
   /// `key`, or `<where>.<key>` — the path a reader needs to find the bad field.
@@ -370,14 +373,14 @@ final class LeaderboardMapper {
   Result<LeaderboardWindow> _window(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     if (value is! String) {
-      return Result<LeaderboardWindow>.failure(_bad(key, value, 'a String'));
+      return Result<LeaderboardWindow>.left(_bad(key, value, 'a String'));
     }
     final LeaderboardWindow? window = LeaderboardWindow.fromCode(value);
     return window == null
-        ? Result<LeaderboardWindow>.failure(
+        ? Result<LeaderboardWindow>.left(
             _bad(key, value, 'one of weekly, monthly, all_time'),
           )
-        : Result<LeaderboardWindow>.success(window);
+        : Result<LeaderboardWindow>.of(window);
   }
 
   /// An `int`, or an explicit `null` that means "unranked".
@@ -402,33 +405,31 @@ final class LeaderboardMapper {
   /// [FailureKind.serialization] and the reader is offered a retry.
   Result<int?> _nullableInt(Map<Object?, Object?> body, String key) {
     if (!body.containsKey(key)) {
-      return Result<int?>.failure(
-        _bad(key, null, 'an int, or an explicit null'),
-      );
+      return Result<int?>.left(_bad(key, null, 'an int, or an explicit null'));
     }
     final Object? value = body[key];
     if (value == null) {
-      return const Result<int?>.success(null);
+      return const Right<Failure, int?>(null);
     }
     return value is int
-        ? Result<int?>.success(value)
-        : Result<int?>.failure(_bad(key, value, 'an int or null'));
+        ? Result<int?>.of(value)
+        : Result<int?>.left(_bad(key, value, 'an int or null'));
   }
 
   Result<List<Object?>> _list(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is List<Object?>
-        ? Result<List<Object?>>.success(value)
-        : Result<List<Object?>>.failure(_bad(key, value, 'a list'));
+        ? Result<List<Object?>>.of(value)
+        : Result<List<Object?>>.left(_bad(key, value, 'a list'));
   }
 
   Result<void> _firstFailure(List<Result<Object?>> results) {
     for (final Result<Object?> result in results) {
-      if (result case FailureResult<Object?>(:final Failure failure)) {
-        return Result<void>.failure(failure);
+      if (result case Left<Failure, Object?>(value: final failure)) {
+        return Result<void>.left(failure);
       }
     }
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 
   Failure _notAnObject(Object? body) => Failure(

@@ -5,6 +5,7 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/renderable_text.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Turns one `GET /api/v1/readings/today/{lang}` body into a [TodayReading].
 ///
@@ -148,7 +149,7 @@ final class TodayReadingMapper {
   /// would be showing a reader with its first line missing and nothing saying so.
   Result<ScriptureText> mapScripture(Object? body) {
     if (body is! Map<Object?, Object?>) {
-      return Result<ScriptureText>.failure(_notAnObject(body));
+      return Result<ScriptureText>.left(_notAnObject(body));
     }
 
     // Read in **wire order**, so the message on a body with several problems names
@@ -183,37 +184,37 @@ final class TodayReadingMapper {
       verses,
       questions,
     ]);
-    if (scalars case FailureResult<void>(:final Failure failure)) {
-      return Result<ScriptureText>.failure(failure);
+    if (scalars case Left<Failure, void>(value: final failure)) {
+      return Result<ScriptureText>.left(failure);
     }
 
     final Result<List<Verse>> mappedVerses = _verses(
-      verses.valueOrElse(<Object?>[]),
+      verses.getOrElse((_) => <Object?>[]),
     );
-    if (mappedVerses case FailureResult<List<Verse>>(:final Failure failure)) {
-      return Result<ScriptureText>.failure(failure);
+    if (mappedVerses case Left<Failure, List<Verse>>(value: final failure)) {
+      return Result<ScriptureText>.left(failure);
     }
 
     // **A `List<Question>` and not a `Result`,** because [\_questions] cannot fail:
     // an unreadable entry is **skipped**, and the whole question of skipping is
     // settled by the table below. A `Result` here manufactured an arm that nothing
-    // could reach — `mappedQuestions case FailureResult<List<Question>>` was dead
+    // could reach — `mappedQuestions case Left<Failure, List<Question>>` was dead
     // code, and this file's two remaining uncovered lines were its banner and this
     // arm.
     final List<Question> mappedQuestions = _questions(
-      questions.valueOrElse(<Object?>[]),
+      questions.getOrElse((_) => <Object?>[]),
     );
 
     // `valueOrElse` from here, not `!`: the gates above have proved there is no
     // failure arm to take, so the fallback can never be reached, and spelling it
     // this way keeps §4's "no `!` unless provably non-null" honest without an
     // ignore.
-    return Result<ScriptureText>.success(
+    return Result<ScriptureText>.of(
       ScriptureText(
-        readingId: readingId.valueOrElse(''),
-        groupId: groupId.valueOrElse(0),
-        scheduledDate: scheduledDate.valueOrElse(''),
-        language: language.valueOrElse(ReadingLanguage.english),
+        readingId: readingId.getOrElse((_) => ''),
+        groupId: groupId.getOrElse((_) => 0),
+        scheduledDate: scheduledDate.getOrElse((_) => ''),
+        language: language.getOrElse((_) => ReadingLanguage.english),
         // ## THE TWO LABEL FIELDS, AND WHY THEY ARE BLANKED RATHER THAN REFUSED
         //
         // `renderableTextOrEmpty` and not `valueOrElse('')`: both fields are painted
@@ -228,17 +229,17 @@ final class TodayReadingMapper {
         // above: `reference: ''` and `translation: ''` are values the server can send
         // and this mapper has always passed through on purpose. See decision 95 in
         // `renderable_text.dart`.
-        reference: renderableTextOrEmpty(reference.valueOrElse('')),
-        translation: renderableTextOrEmpty(translation.valueOrElse('')),
-        verses: mappedVerses.valueOrElse(<Verse>[]),
+        reference: renderableTextOrEmpty(reference.getOrElse((_) => '')),
+        translation: renderableTextOrEmpty(translation.getOrElse((_) => '')),
+        verses: mappedVerses.getOrElse((_) => <Verse>[]),
         questions: mappedQuestions,
-        isFullyCompleted: isFullyCompleted.valueOrElse(false),
-        pointsEarnedToday: points.valueOrElse(0),
+        isFullyCompleted: isFullyCompleted.getOrElse((_) => false),
+        pointsEarnedToday: points.getOrElse((_) => 0),
         // The reading endpoint's **own** streak copy, which reads `4` where
         // `streak/summary` reads `0`. Carried because the payload carries it;
         // `ScriptureText.currentStreak`'s doc says why nothing reads it and why
         // removing it would be worse.
-        currentStreak: streak.valueOrElse(0),
+        currentStreak: streak.getOrElse((_) => 0),
       ),
     );
   }
@@ -250,22 +251,20 @@ final class TodayReadingMapper {
   /// oversight.
   Result<List<Verse>> _verses(List<Object?> raw) {
     if (raw.isEmpty) {
-      return Result<List<Verse>>.failure(
-        _bad('verses', raw, 'a non-empty list'),
-      );
+      return Result<List<Verse>>.left(_bad('verses', raw, 'a non-empty list'));
     }
 
     final List<Verse> mapped = <Verse>[];
     for (int index = 0; index < raw.length; index++) {
       switch (_verseEntry(raw[index], index)) {
-        case Success<Verse>(:final Verse value):
+        case Right<Failure, Verse>(:final Verse value):
           mapped.add(value);
-        case FailureResult<Verse>(:final Failure failure):
-          if (index == 0) return Result<List<Verse>>.failure(failure);
+        case Left<Failure, Verse>(value: final failure):
+          if (index == 0) return Result<List<Verse>>.left(failure);
       }
     }
 
-    return Result<List<Verse>>.success(mapped);
+    return Result<List<Verse>>.of(mapped);
   }
 
   /// One entry of the `verses` list.
@@ -275,7 +274,7 @@ final class TodayReadingMapper {
   /// has to name the position — `verses[2]`, not `verses`.
   Result<Verse> _verseEntry(Object? entry, int index) {
     if (entry is! Map<Object?, Object?>) {
-      return Result<Verse>.failure(_bad('verses[$index]', entry, 'an object'));
+      return Result<Verse>.left(_bad('verses[$index]', entry, 'an object'));
     }
     // The reported key is applied **once**, in [_verse], which already knows the
     // index. Renaming here as well produced `verses[0].verses[0].book_number` on the
@@ -328,11 +327,11 @@ final class TodayReadingMapper {
       number,
       text,
     ]);
-    if (gate case FailureResult<void>(:final Failure failure)) {
-      return Result<Verse>.failure(_renamed(failure, 'verses[$index]'));
+    if (gate case Left<Failure, void>(value: final failure)) {
+      return Result<Verse>.left(_renamed(failure, 'verses[$index]'));
     }
 
-    final String verseText = text.valueOrElse('');
+    final String verseText = text.getOrElse((_) => '');
 
     // **Paintability is a second gate, and it is a different gate from the type
     // check above.** A `String` that is not renderable throws from `dart:ui`'s
@@ -345,7 +344,7 @@ final class TodayReadingMapper {
     // blanking a label keeps the passage, refusing it would not. See
     // `isRenderableText`'s decision 95.
     if (!isRenderableText(verseText)) {
-      return Result<Verse>.failure(
+      return Result<Verse>.left(
         _renamed(
           _bad('text', verseText, _renderableExpectation),
           'verses[$index]',
@@ -370,11 +369,11 @@ final class TodayReadingMapper {
     // and `/reading` renders `text` anyway, so nothing is lost on either arm.
     final Object? clean = body['text_clean'];
 
-    return Result<Verse>.success(
+    return Result<Verse>.of(
       Verse(
-        bookNumber: bookNumber.valueOrElse(0),
-        chapter: chapter.valueOrElse(0),
-        number: number.valueOrElse(0),
+        bookNumber: bookNumber.getOrElse((_) => 0),
+        chapter: chapter.getOrElse((_) => 0),
+        number: number.getOrElse((_) => 0),
         text: verseText,
         textClean: clean is String && isRenderableText(clean) ? clean : null,
       ),
@@ -389,7 +388,7 @@ final class TodayReadingMapper {
   ///
   /// Because it cannot fail, and a `Result` it cannot fail in is a `Failure` arm no
   /// caller can reach. The caller had exactly that:
-  /// `if (mappedQuestions case FailureResult<List<Question>>(…)) return …` — dead
+  /// `if (mappedQuestions case Left<Failure, List<Question>>(…)) return …` — dead
   /// code, and the second of this file's three unreachable lines.
   ///
   /// **The table's "`questions` not a list → **refused**" row is still true, and it
@@ -401,7 +400,7 @@ final class TodayReadingMapper {
     for (final Object? entry in raw) {
       if (entry is! Map<Object?, Object?>) continue;
       final Result<Question> question = _question(entry);
-      if (question case Success<Question>(:final Question value)) {
+      if (question case Right<Failure, Question>(:final Question value)) {
         mapped.add(value);
       }
     }
@@ -438,18 +437,18 @@ final class TodayReadingMapper {
       options,
       pointsValue,
     ]);
-    if (gate case FailureResult<void>(:final Failure failure)) {
-      return Result<Question>.failure(failure);
+    if (gate case Left<Failure, void>(value: final failure)) {
+      return Result<Question>.left(failure);
     }
 
-    final String questionPrompt = prompt.valueOrElse('');
+    final String questionPrompt = prompt.getOrElse((_) => '');
 
     // The paintability gate, and it is a separate `if` from the type gate above for
     // the reason `_verse`'s is: `''` is a question with no wording and a malformed
     // one is a question that takes the screen down, and a rule that collapsed them
     // would have to pick one verdict for both.
     if (!isRenderableText(questionPrompt)) {
-      return Result<Question>.failure(
+      return Result<Question>.left(
         _bad('prompt', questionPrompt, _renderableExpectation),
       );
     }
@@ -463,14 +462,14 @@ final class TodayReadingMapper {
     final Object? answer = body['user_answer'];
     final Object? correct = body['is_correct'];
 
-    return Result<Question>.success(
+    return Result<Question>.of(
       Question(
-        id: id.valueOrElse(''),
-        sortOrder: sortOrder.valueOrElse(0),
-        type: type.valueOrElse(''),
+        id: id.getOrElse((_) => ''),
+        sortOrder: sortOrder.getOrElse((_) => 0),
+        type: type.getOrElse((_) => ''),
         prompt: questionPrompt,
-        options: options.valueOrElse(const <String, String>{}),
-        pointsValue: pointsValue.valueOrElse(0),
+        options: options.getOrElse((_) => const <String, String>{}),
+        pointsValue: pointsValue.getOrElse((_) => 0),
         alreadyAnswered: answered == true,
         userAnswer: answer is String ? answer : null,
         isCorrect: correct is bool ? correct : null,
@@ -487,7 +486,7 @@ final class TodayReadingMapper {
   Result<Map<String, String>> _options(Map<Object?, Object?> body) {
     final Object? value = body['options'];
     if (value is! Map<Object?, Object?>) {
-      return Result<Map<String, String>>.failure(
+      return Result<Map<String, String>>.left(
         _bad('options', value, 'an object of String to String'),
       );
     }
@@ -496,20 +495,20 @@ final class TodayReadingMapper {
       final Object? key = entry.key;
       final Object? option = entry.value;
       if (key is! String || option is! String) {
-        return Result<Map<String, String>>.failure(
+        return Result<Map<String, String>>.left(
           _bad('options', value, 'an object of String to String'),
         );
       }
       // The same paintability gate as `text` and `prompt`, for the same reason:
       // `/quiz` puts every option on screen through a `Text`.
       if (!isRenderableText(option)) {
-        return Result<Map<String, String>>.failure(
+        return Result<Map<String, String>>.left(
           _bad('options.$key', option, _renderableExpectation),
         );
       }
       mapped[key] = option;
     }
-    return Result<Map<String, String>>.success(mapped);
+    return Result<Map<String, String>>.of(mapped);
   }
 
   /// [body] to a [TodayReading] — `/`'s narrow projection.
@@ -567,10 +566,10 @@ final class TodayReadingMapper {
         ? ReadingLanguage.fromCode(value)
         : null;
     return language == null
-        ? Result<ReadingLanguage>.failure(
+        ? Result<ReadingLanguage>.left(
             _bad('language', value, 'one of ${ReadingLanguage.values}'),
           )
-        : Result<ReadingLanguage>.success(language);
+        : Result<ReadingLanguage>.of(language);
   }
 
   // --- typed reads ----------------------------------------------------------
@@ -578,8 +577,8 @@ final class TodayReadingMapper {
   Result<String> _string(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is String
-        ? Result<String>.success(value)
-        : Result<String>.failure(_bad(key, value, 'a String'));
+        ? Result<String>.of(value)
+        : Result<String>.left(_bad(key, value, 'a String'));
   }
 
   /// An `int`, and not a `num`.
@@ -591,8 +590,8 @@ final class TodayReadingMapper {
   Result<int> _int(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is int
-        ? Result<int>.success(value)
-        : Result<int>.failure(_bad(key, value, 'an int'));
+        ? Result<int>.of(value)
+        : Result<int>.left(_bad(key, value, 'an int'));
   }
 
   /// A count that cannot be negative.
@@ -614,39 +613,39 @@ final class TodayReadingMapper {
   Result<int> _nonNegativeInt(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     if (value is! int) {
-      return Result<int>.failure(_bad(key, value, 'an int'));
+      return Result<int>.left(_bad(key, value, 'an int'));
     }
     if (value < 0) {
-      return Result<int>.failure(
+      return Result<int>.left(
         _bad(key, value, 'an int of 0 or more — a count of completed days'),
       );
     }
-    return Result<int>.success(value);
+    return Result<int>.of(value);
   }
 
   Result<bool> _bool(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is bool
-        ? Result<bool>.success(value)
-        : Result<bool>.failure(_bad(key, value, 'a bool'));
+        ? Result<bool>.of(value)
+        : Result<bool>.left(_bad(key, value, 'a bool'));
   }
 
   Result<List<Object?>> _list(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is List<Object?>
-        ? Result<List<Object?>>.success(value)
-        : Result<List<Object?>>.failure(_bad(key, value, 'a list'));
+        ? Result<List<Object?>>.of(value)
+        : Result<List<Object?>>.left(_bad(key, value, 'a list'));
   }
 
   /// The first failure among [results], as a `Result<void>` so the caller
   /// pattern-matches it once instead of checking eleven locals.
   Result<void> _firstFailure(List<Result<Object?>> results) {
     for (final Result<Object?> result in results) {
-      if (result case FailureResult<Object?>(:final Failure failure)) {
-        return Result<void>.failure(failure);
+      if (result case Left<Failure, Object?>(value: final failure)) {
+        return Result<void>.left(failure);
       }
     }
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 
   /// Why a body that is not an object is named by *what it was*, not by a type.

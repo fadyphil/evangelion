@@ -4,6 +4,7 @@ import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// The **only** [AuthRepository] that ships, because there is no auth endpoint.
 ///
@@ -95,7 +96,7 @@ final class FakeAuthRepository implements AuthRepository {
       // `firstError` rather than `emailError ?? passwordError` at this call
       // site: the field order is the form's field order, and it is written down
       // once on the getter.
-      return Result<AuthSession>.failure(
+      return Result<AuthSession>.left(
         Failure(kind: FailureKind.validation, message: verdict.firstError!),
       );
     }
@@ -105,7 +106,7 @@ final class FakeAuthRepository implements AuthRepository {
     );
 
     await _source.writeSession(existing);
-    return Result<AuthSession>.success(existing);
+    return Result<AuthSession>.of(existing);
   }
 
   @override
@@ -113,11 +114,11 @@ final class FakeAuthRepository implements AuthRepository {
     final AuthSession? stored = await _source.readSession();
     final AuthSession? session = _session ?? stored;
     if (session == null) {
-      return const Result<AuthSession>.failure(
+      return const Left<Failure, AuthSession>(
         Failure(kind: FailureKind.unauthorized, message: 'Not signed in.'),
       );
     }
-    return Result<AuthSession>.success(session);
+    return Result<AuthSession>.of(session);
   }
 
   @override
@@ -127,6 +128,6 @@ final class FakeAuthRepository implements AuthRepository {
     // Succeeds even with nothing to end: the session is already in the state the
     // caller is asking for, so reporting a failure would describe a problem the
     // reader cannot do anything about.
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 }

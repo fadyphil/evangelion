@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
@@ -14,6 +15,7 @@ import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/app_harness.dart';
 import '../../../../support/reading_harness.dart';
@@ -117,7 +119,7 @@ void main() {
           await mountReadingOver(
             tester,
             locale: const Locale('ar'),
-            scripture: const Result<ScriptureText>.success(liveArabicPassage),
+            scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
           );
 
       await tester.tap(find.text(AppLocalizationsAr().readingBeginReflection));
@@ -154,7 +156,7 @@ Future<({AppRouter router, ReadingHarness harness})> mountReadingOver(
 }) async {
   final ReadingHarness h = readingHarness(
     scripture:
-        scripture ?? const Result<ScriptureText>.success(liveEnglishPassage),
+        scripture ?? const Right<Failure, ScriptureText>(liveEnglishPassage),
   );
   // **Not** `routerHost`'s `registerTestReadingCubit`, for the reason above. The
   // teardown is registered by `readingHarness` for the cubit itself; this unregisters

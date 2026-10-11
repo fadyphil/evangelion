@@ -33,7 +33,7 @@ import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.da
 /// ## THE BODY IS TWO ARMS, AND THAT IS THE WHOLE OF THE CONTRACT
 ///
 /// ```dart
-/// try   → Result.failure(errors.fromDioException(e))   // transport, or non-2xx
+/// try   → Result.left(errors.fromDioException(e))   // transport, or non-2xx
 /// body  → mapper.map(body)                              // 2xx that cannot be read
 /// ```
 ///
@@ -103,7 +103,7 @@ final class DioReadingRepository implements ReadingRepository {
       // *missing* `X-User-Id` is a **400**, not a 401, so nothing below may
       // distinguish "unauthenticated" from "bad request" — the status decides the
       // kind and the body decides the message, both in `ApiErrorMapper`.
-      return Result<ScriptureText>.failure(errors.fromDioException(error));
+      return Result<ScriptureText>.left(errors.fromDioException(error));
     }
   }
 
@@ -172,7 +172,7 @@ final class DioReadingRepository implements ReadingRepository {
       );
       return submits.map(body);
     } on DioException catch (error) {
-      return Result<SubmitResult>.failure(errors.fromDioException(error));
+      return Result<SubmitResult>.left(errors.fromDioException(error));
     }
   }
 }

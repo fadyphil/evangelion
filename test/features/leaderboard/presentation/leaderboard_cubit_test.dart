@@ -7,6 +7,7 @@ import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart'
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// A fake **repository**, not a fake use case.
 ///
@@ -72,7 +73,7 @@ void main() {
   group('a cold cubit', () {
     test('is loading, on the weekly window, with nothing on screen', () {
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.success(empty),
+        const Right<Failure, LeaderboardBoard>(empty),
       );
       expect(h.cubit.state.status, LeaderboardStatus.loading);
       expect(h.cubit.state.window, LeaderboardWindow.weekly);
@@ -84,7 +85,7 @@ void main() {
   group('load', () {
     test("asks for the server's own limit, not a display count", () async {
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.success(populated),
+        const Right<Failure, LeaderboardBoard>(populated),
       );
       await h.cubit.load(LeaderboardWindow.monthly);
 
@@ -99,7 +100,7 @@ void main() {
 
     test('and becomes ready carrying the board', () async {
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.success(populated),
+        const Right<Failure, LeaderboardBoard>(populated),
       );
       await h.cubit.load(LeaderboardWindow.weekly);
 
@@ -117,7 +118,7 @@ void main() {
         // about its own window — `LeaderboardBoard.window` exists for that — but it has
         // not arrived yet, and the previous window's rows are the wrong answer meanwhile.
         final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-          const Result<LeaderboardBoard>.success(populated),
+          const Right<Failure, LeaderboardBoard>(populated),
         );
         await h.cubit.load(LeaderboardWindow.weekly);
         expect(h.cubit.state.board, isNotNull);
@@ -146,7 +147,7 @@ void main() {
         message: 'Could not reach the server.',
       );
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.failure(failure),
+        const Left<Failure, LeaderboardBoard>(failure),
       );
       await h.cubit.load(LeaderboardWindow.weekly);
 
@@ -161,7 +162,7 @@ void main() {
       // read "All time" — the client mislabelling its own request, which is the exact
       // confusion the response's own `window` field exists to catch.
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.failure(
+        const Left<Failure, LeaderboardBoard>(
           Failure(kind: FailureKind.timeout, message: 'The request timed out.'),
         ),
       );
@@ -174,7 +175,7 @@ void main() {
   group('retry', () {
     test('re-requests the window on screen, not the default', () async {
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.success(empty),
+        const Right<Failure, LeaderboardBoard>(empty),
       );
       await h.cubit.load(LeaderboardWindow.monthly);
       await h.cubit.retry();
@@ -192,14 +193,14 @@ void main() {
 
     test('and recovers from a failure', () async {
       final ({LeaderboardCubit cubit, _Repo repo}) h = harness(
-        const Result<LeaderboardBoard>.failure(
+        const Left<Failure, LeaderboardBoard>(
           Failure(kind: FailureKind.server, message: 'HTTP 500'),
         ),
       );
       await h.cubit.load(LeaderboardWindow.weekly);
       expect(h.cubit.state.status, LeaderboardStatus.failed);
 
-      h.repo.result = const Result<LeaderboardBoard>.success(populated);
+      h.repo.result = const Right<Failure, LeaderboardBoard>(populated);
       await h.cubit.retry();
 
       expect(h.cubit.state.status, LeaderboardStatus.ready);

@@ -1,4 +1,4 @@
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
@@ -6,6 +6,7 @@ import 'package:evangelion/features/home/presentation/widgets/today_reading_pane
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/home_harness.dart';
@@ -46,7 +47,7 @@ void main() {
       // Arabic script is *taller* at the same point size and the reference is a
       // wider string in practice, so the RTL arm is not a mirror of the LTR one.
       final HomeHarness h = harness();
-      h.readings.scripture = const Result<ScriptureText>.success(
+      h.readings.scripture = const Right<Failure, ScriptureText>(
         liveArabicScripture,
       );
       await pumpHome(
@@ -96,7 +97,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result<ScriptureText>.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
 
@@ -106,7 +107,7 @@ void main() {
 
     testWidgets('a failed STREAK', (WidgetTester tester) async {
       final HomeHarness h = harness(
-        streak: const Result<StreakSummary>.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
 

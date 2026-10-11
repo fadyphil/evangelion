@@ -1,6 +1,5 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -8,6 +7,7 @@ import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart'
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../../support/home_harness.dart';
@@ -62,7 +62,7 @@ void main() {
     when(() => repository.todayScripture(language: any(named: 'language')))
         .thenAnswer(
           (_) async =>
-              const Result<ScriptureText>.success(liveEnglishScripture),
+              const Right<Failure, ScriptureText>(liveEnglishScripture),
         );
   });
 
@@ -112,7 +112,7 @@ void main() {
       when(
         () => repository.todayScripture(language: any(named: 'language')),
       ).thenAnswer(
-        (_) async => const Result<ScriptureText>.failure(
+        (_) async => const Left<Failure, ScriptureText>(
           Failure(kind: FailureKind.network, message: 'Could not reach it.'),
         ),
       );
@@ -145,12 +145,12 @@ void main() {
       when(() => repository.todayScripture(language: ReadingLanguage.english))
           .thenAnswer(
             (_) async =>
-                const Result<ScriptureText>.success(liveEnglishScripture),
+                const Right<Failure, ScriptureText>(liveEnglishScripture),
           );
       when(() => repository.todayScripture(language: ReadingLanguage.arabic))
           .thenAnswer(
             (_) async =>
-                const Result<ScriptureText>.success(liveArabicScripture),
+                const Right<Failure, ScriptureText>(liveArabicScripture),
           );
     },
     act: (ReadingCubit c) async {
@@ -201,7 +201,7 @@ void main() {
       await c.load(ReadingLanguage.english);
       when(() => repository.todayScripture(language: any(named: 'language')))
           .thenAnswer(
-            (_) async => const Result<ScriptureText>.failure(
+            (_) async => const Left<Failure, ScriptureText>(
               Failure(kind: FailureKind.network, message: 'Gone.'),
             ),
           );
@@ -256,7 +256,7 @@ void main() {
       expect(c.state.textSizePanelOpen, isTrue);
       when(() => repository.todayScripture(language: any(named: 'language')))
           .thenAnswer(
-            (_) async => const Result<ScriptureText>.failure(
+            (_) async => const Left<Failure, ScriptureText>(
               Failure(kind: FailureKind.network, message: 'x'),
             ),
           );

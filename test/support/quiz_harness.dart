@@ -1,3 +1,4 @@
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
@@ -13,6 +14,7 @@ import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import 'contract_payloads.dart';
 import 'design_system_harness.dart';
@@ -172,10 +174,9 @@ ScriptureText arabicPassageWith(List<Question> questions) => ScriptureText(
 /// there too — and a private fixture would have meant two transcriptions of "the
 /// open question that carries the answer key", which is the failure this fixture's
 /// own doc is about.
-Result<ScriptureText> get answerBearingQuizPassage =>
-    Result<ScriptureText>.success(
-      englishPassageWith(<Question>[verdictCarryingQuestion]),
-    );
+Result<ScriptureText> get answerBearingQuizPassage => Result<ScriptureText>.of(
+  englishPassageWith(<Question>[verdictCarryingQuestion]),
+);
 
 /// A passage whose **first** question is already answered and whose second is open.
 ///
@@ -245,7 +246,7 @@ QuizBloc quizBloc(
 /// transcription of the one contract the backend declares, and a second fixture for
 /// it would be a second thing to keep in step.
 Result<SubmitResult> get defaultSubmission =>
-    const Result<SubmitResult>.success(contractSubmitAnswerFixture);
+    const Right<Failure, SubmitResult>(contractSubmitAnswerFixture);
 
 /// Mounts [QuizPage] over [bloc] and lets the load land.
 ///

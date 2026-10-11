@@ -41,6 +41,7 @@
 /// `return style`, and forced to never swap.
 library;
 
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/arabic_digits.dart';
@@ -68,6 +69,7 @@ import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import 'support/arabic_typography_gate.dart';
 import 'support/design_system_harness.dart';
@@ -134,7 +136,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result<ScriptureText>.success(liveArabicScripture),
+        reading: const Right<Failure, ScriptureText>(liveArabicScripture),
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
@@ -158,7 +160,7 @@ void main() {
       // `readingComplete` — the run most likely to be dropped in a refactor, and the
       // one the review named.
       final HomeHarness h = harness(
-        reading: Result<ScriptureText>.success(
+        reading: Result<ScriptureText>.of(
           liveArabicScripture.copyWith(isFullyCompleted: true),
         ),
       );
@@ -180,8 +182,8 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result<ScriptureText>.failure(homeReadingFailure),
-        streak: const Result<StreakSummary>.success(liveStreakSummary),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
+        streak: const Right<Failure, StreakSummary>(liveStreakSummary),
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
@@ -367,7 +369,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
 
@@ -382,7 +384,7 @@ void main() {
     testWidgets('the `Aa` disclosure is gated — it is two more Arabic runs behind '
         'a tap', (WidgetTester tester) async {
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       // **A taller viewport than `kGeometrySurface`, and it is load-bearing.**
       // `ScriptureBlock` is a `ListView.builder`, so a verse below the fold is not
@@ -481,7 +483,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveArabicQuizPassage),
+        const Right<Failure, ScriptureText>(liveArabicQuizPassage),
       );
       await pumpQuiz(tester, bloc: bloc, locale: const Locale('ar'));
 
@@ -513,7 +515,7 @@ void main() {
       // is decision 47's argument one layer up: one rule, one place.
       final ({QuizBloc bloc, CountingReadingRepository readings}) fixture =
           quizBlocWith(
-            const Result<ScriptureText>.success(liveArabicQuizPassage),
+            const Right<Failure, ScriptureText>(liveArabicQuizPassage),
           );
       await pumpQuiz(tester, bloc: fixture.bloc, locale: const Locale('ar'));
 
@@ -549,7 +551,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await pumpQuiz(tester, bloc: bloc);
       await _expectNoArabic(tester, '/quiz');

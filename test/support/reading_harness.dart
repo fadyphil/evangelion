@@ -13,6 +13,7 @@ import 'package:evangelion/features/reading/presentation/pages/reading_page.dart
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import 'contract_payloads.dart';
 import 'design_system_harness.dart';
@@ -61,7 +62,7 @@ final class CountingReadingRepository implements ReadingRepository {
 
   /// What [submitAnswer] answers. Settable, because the bloc tests need both a
   /// graded answer and a 409-shaped failure and neither is the interesting default.
-  Result<SubmitResult> submission = const Result<SubmitResult>.success(
+  Result<SubmitResult> submission = const Right<Failure, SubmitResult>(
     contractSubmitAnswerFixture,
   );
 
@@ -118,7 +119,7 @@ final class CountingReadingRepository implements ReadingRepository {
 ReadingHarness readingHarness({Result<ScriptureText>? scripture}) {
   final CountingReadingRepository readings = CountingReadingRepository(
     scripture:
-        scripture ?? const Result<ScriptureText>.success(liveEnglishPassage),
+        scripture ?? const Right<Failure, ScriptureText>(liveEnglishPassage),
   );
   final ReadingCubit cubit = ReadingCubit(
     loadScripture: LoadScripture(readings),

@@ -16,7 +16,7 @@ library;
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
@@ -34,6 +34,7 @@ import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/app_harness.dart';
 import '../../../../support/home_harness.dart';
@@ -222,7 +223,7 @@ void main() {
       // endpoint's answer changes. Both fakes are re-stubbed **while `/` is covered**,
       // which is the whole point — the only way `/` can show these is by asking
       // again on the way back.
-      h.streaks.answer = const Result<StreakSummary>.success(
+      h.streaks.answer = const Right<Failure, StreakSummary>(
         StreakSummary(
           currentStreak: 7,
           longestStreak: 6,
@@ -237,7 +238,7 @@ void main() {
       // A **wide** entity, because `TodayReading` is a view of this one now and a
       // narrow one has no way to say "five verses" — the count was the only thing
       // the old fixture varied besides the reference.
-      h.readings.scripture = const Result<ScriptureText>.success(
+      h.readings.scripture = const Right<Failure, ScriptureText>(
         ScriptureText(
           readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           groupId: 3,

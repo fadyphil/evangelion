@@ -1,6 +1,6 @@
 import 'dart:ui' show Tristate;
 
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
@@ -11,6 +11,7 @@ import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/home_harness.dart';
@@ -203,7 +204,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
 
       final HomeHarness h = harness(
-        reading: const Result.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -224,7 +225,7 @@ void main() {
       final SemanticsHandle handle = tester.ensureSemantics();
 
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -256,13 +257,13 @@ void main() {
           (
             'a failed reading',
             () => harness(
-              reading: const Result<ScriptureText>.failure(homeReadingFailure),
+              reading: const Left<Failure, ScriptureText>(homeReadingFailure),
             ),
           ),
           (
             'a failed streak',
             () => harness(
-              streak: const Result<StreakSummary>.failure(streakFailure),
+              streak: const Left<Failure, StreakSummary>(streakFailure),
             ),
           ),
         ]) {
@@ -332,7 +333,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 

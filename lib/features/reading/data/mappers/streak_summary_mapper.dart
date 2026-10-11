@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Turns one `GET /api/v1/streak/summary` body into a [StreakSummary].
 ///
@@ -50,7 +51,7 @@ final class StreakSummaryMapper {
   /// response rather than a Dart type error.
   Result<StreakSummary> map(Object? body) {
     if (body is! Map<Object?, Object?>) {
-      return Result<StreakSummary>.failure(_notAnObject(body));
+      return Result<StreakSummary>.left(_notAnObject(body));
     }
 
     // Wire order, so the message on a body with several problems names the key a
@@ -77,23 +78,23 @@ final class StreakSummaryMapper {
       nextMilestone,
       daysToMilestone,
     ]);
-    if (scalars case FailureResult<void>(:final Failure failure)) {
-      return Result<StreakSummary>.failure(failure);
+    if (scalars case Left<Failure, void>(value: final failure)) {
+      return Result<StreakSummary>.left(failure);
     }
 
     // `valueOrElse` rather than `!`: the gate above has proved there is no failure
     // arm, so the fallback cannot be reached, and §4 forbids a `!` that is not
     // provably non-null.
-    return Result<StreakSummary>.success(
+    return Result<StreakSummary>.of(
       StreakSummary(
-        currentStreak: currentStreak.valueOrElse(0),
-        longestStreak: longestStreak.valueOrElse(0),
-        lastCompletedDate: lastCompletedDate.valueOrElse(''),
-        todayStatus: todayStatus.valueOrElse(StreakTodayStatus.pending),
-        todayCompleted: todayCompleted.valueOrElse(false),
-        todayScheduled: todayScheduled.valueOrElse(false),
-        nextMilestone: nextMilestone.valueOrElse(0),
-        daysToMilestone: daysToMilestone.valueOrElse(0),
+        currentStreak: currentStreak.getOrElse((_) => 0),
+        longestStreak: longestStreak.getOrElse((_) => 0),
+        lastCompletedDate: lastCompletedDate.getOrElse((_) => ''),
+        todayStatus: todayStatus.getOrElse((_) => StreakTodayStatus.pending),
+        todayCompleted: todayCompleted.getOrElse((_) => false),
+        todayScheduled: todayScheduled.getOrElse((_) => false),
+        nextMilestone: nextMilestone.getOrElse((_) => 0),
+        daysToMilestone: daysToMilestone.getOrElse((_) => 0),
       ),
     );
   }
@@ -106,23 +107,23 @@ final class StreakSummaryMapper {
   Result<StreakTodayStatus> _status(Map<Object?, Object?> body) {
     final Object? value = body['today_status'];
     if (value is! String) {
-      return Result<StreakTodayStatus>.failure(
+      return Result<StreakTodayStatus>.left(
         _bad('today_status', value, 'a String'),
       );
     }
     final StreakTodayStatus? status = StreakTodayStatus.fromCode(value);
     return status == null
-        ? Result<StreakTodayStatus>.failure(
+        ? Result<StreakTodayStatus>.left(
             _bad('today_status', value, 'one of ${StreakTodayStatus.values}'),
           )
-        : Result<StreakTodayStatus>.success(status);
+        : Result<StreakTodayStatus>.of(status);
   }
 
   Result<String> _string(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is String
-        ? Result<String>.success(value)
-        : Result<String>.failure(_bad(key, value, 'a String'));
+        ? Result<String>.of(value)
+        : Result<String>.left(_bad(key, value, 'a String'));
   }
 
   /// An `int`, and not a `num`.
@@ -132,24 +133,24 @@ final class StreakSummaryMapper {
   Result<int> _int(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is int
-        ? Result<int>.success(value)
-        : Result<int>.failure(_bad(key, value, 'an int'));
+        ? Result<int>.of(value)
+        : Result<int>.left(_bad(key, value, 'an int'));
   }
 
   Result<bool> _bool(Map<Object?, Object?> body, String key) {
     final Object? value = body[key];
     return value is bool
-        ? Result<bool>.success(value)
-        : Result<bool>.failure(_bad(key, value, 'a bool'));
+        ? Result<bool>.of(value)
+        : Result<bool>.left(_bad(key, value, 'a bool'));
   }
 
   Result<void> _firstFailure(List<Result<Object?>> results) {
     for (final Result<Object?> result in results) {
-      if (result case FailureResult<Object?>(:final Failure failure)) {
-        return Result<void>.failure(failure);
+      if (result case Left<Failure, Object?>(value: final failure)) {
+        return Result<void>.left(failure);
       }
     }
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 
   Failure _notAnObject(Object? body) => Failure(

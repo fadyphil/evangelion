@@ -40,11 +40,11 @@ void main() {
       limit: limit,
     );
     return answer.fold<LeaderboardBoard>(
-      onSuccess: (LeaderboardBoard value) => value,
-      onFailure: (Failure failure) => fail(
+      (Failure failure) => fail(
         'the stub answered with a failure, which it never should: '
         '${failure.message}',
       ),
+      (LeaderboardBoard value) => value,
     );
   }
 

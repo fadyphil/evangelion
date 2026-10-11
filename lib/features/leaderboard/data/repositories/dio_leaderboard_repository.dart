@@ -11,7 +11,7 @@ import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.
 /// ## THE BODY IS TWO ARMS, AND THAT IS THE WHOLE OF THE CONTRACT
 ///
 /// ```dart
-/// try   → Result.failure(errors.fromDioException(e))   // transport, or non-2xx
+/// try   → Result.left(errors.fromDioException(e))   // transport, or non-2xx
 /// body  → mapper.map(body)                              // 2xx that cannot be read
 /// ```
 ///
@@ -55,7 +55,7 @@ final class DioLeaderboardRepository implements LeaderboardRepository {
       final Object? body = await dataSource.board(window: window, limit: limit);
       return mapper.map(body, limit: limit);
     } on DioException catch (error) {
-      return Result<LeaderboardBoard>.failure(errors.fromDioException(error));
+      return Result<LeaderboardBoard>.left(errors.fromDioException(error));
     }
   }
 }
