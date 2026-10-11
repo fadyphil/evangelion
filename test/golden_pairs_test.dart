@@ -44,7 +44,7 @@ import 'support/project_import_graph.dart';
 /// with a reason that says why. Everything else a golden does — pinning the
 /// resolved style, catching a widget that ignores its own parameters — is
 /// untouched, and those two pairs were not worthless: `TextLink` ignoring `color`
-/// or `EvaChip` ignoring `sticker` would still have turned them red. What they
+/// or a chip ignoring `sticker` would still have turned them red. What they
 /// could never do is catch a **theming** regression, which is the only thing the
 /// name claimed.
 ///

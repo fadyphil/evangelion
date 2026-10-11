@@ -37,7 +37,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// > *"exist only to let the Figma agent preview states … Must not be ported."*
 ///
 /// `QuizScreen.tsx:56-63` is the whole of it, and it is worth being precise about
-/// what it is: two `EvaChip`-shaped buttons whose only behaviour is
+/// what it is: two chip-shaped buttons whose only behaviour is
 /// `setSelected(null); setChecked(false)` and `setSelected('B'); setChecked(true)`.
 /// **The second one sets the correct answer to `B` and marks it correct without
 /// asking the server.** Porting it would put a control on the quiz that grades a

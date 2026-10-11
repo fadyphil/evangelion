@@ -276,18 +276,29 @@ rendered** sites in the prototype — the `App.tsx` theme toggle, the per-route
 chips, the `QuizScreen` frame toggle, the FAB dock items. None of those
 destinations shipped, so the widget that was built to carry them has no caller.
 
-**NOT FIXED HERE, AND THE GATE IS DELIBERATELY LEFT RED.** Three things are
-defensible and all of them are product decisions:
+**RESOLVED — DELETED.** Both of the prototype's real call sites were the passage
+library, cut by decision 1 (`HomeScreen.tsx:86`, `ds.tsx:389`), and the other three
+pill styles were marked *"do not port"* by defect #12 — so the widget had no caller
+left by construction, not by oversight. Removed: the widget (448 lines), its own
+test suite, 8 goldens, and every reference to it. The design-system barrel export
+is gone with it.
 
-* **place it** — the settings theme row currently uses `SegmentedControl`
-  (`settings_page.dart:203`) rather than chips, and that is a design choice, not
-  an oversight;
-* **delete it** — along with 8 goldens and whatever test surface keeps them honest;
+The three options were real and all were defensible:
+
+* **place it** — the settings theme row uses `SegmentedControl`
+  (`settings_page.dart:203`) rather than chips; that is a design choice, not an
+  oversight;
+* **delete it** — **taken**, along with the 8 goldens and their test surface;
 * **allowlist it** — as a design-system primitive kept for prototype parity.
 
+Nothing is lost that any shipped screen could use. The doc comments that *named*
+the widget were reworded, not deleted — they explain why a control is announceable
+or colour-safe, and that reasoning outlives the class.
+
 What is *not* acceptable is what the repository did for ten phases, which is
-nothing: the widget is built, it is golden-tested, and every §7 gate was green.
-`tool/gates/orphan_widget_check.py` fails on it until one of the three is chosen.
+nothing: the widget was built, golden-tested, and every §7 gate stayed green.
+`tool/gates/orphan_widget_check.py` now passes because the orphan is gone, not
+because the check was softened.
 
 ### What building the gate found in the gate itself
 
