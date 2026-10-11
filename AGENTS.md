@@ -33,6 +33,27 @@ Target a different backend at build time:
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
+### If it aborts with `GLib-GIO-ERROR … 'xsettings' does not contain a key named 'antialiasing'`
+
+The app **built and launched** — this is an environment fault, not a code fault. Check
+`echo $GSETTINGS_SCHEMA_DIR`. If it points inside a **snap** directory (VS Code ships
+one at `~/snap/code/*/.local/share/glib-2.0/schemas`, which contains no GNOME
+schemas), GLib searches there, finds nothing, and aborts on every launch:
+
+```bash
+GSETTINGS_SCHEMA_DIR=/usr/share/glib-2.0/schemas flutter run -d linux
+```
+
+That fixes the abort. If the window still does not appear, the GTK shell is picking
+X11 on a Wayland session (`gdk_x11_window_get_xid: assertion 'GDK_IS_X11_WINDOW
+(window)' failed`); run it from your own terminal, where the session env is correct.
+
+**Do not trust a build to mean the app runs.** Per decision 142,
+`flutter build linux --release` reported `✓ Built` for three commits while the toolchain
+was missing entirely. `tool/verify_linux_build.sh` exists because of that, and
+`flutter doctor`'s `✓ Linux toolchain` line is the one command that checks the
+*machine* rather than the source.
+
 ## Architecture in one paragraph
 
 Feature-first clean architecture. Dependency direction is strictly inward:
