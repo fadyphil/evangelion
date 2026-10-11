@@ -154,3 +154,98 @@ was never performed against the package being decided about.
 That is why §5 of `AGENT_CONTEXT.md` carries the rule that an empty response is a fact
 about a process and not a property of a system (decision 143). The same rule applies to
 a comparison you did not run.
+
+---
+
+## 6. Whole-state writers are applied where the state is LARGEST
+
+**This entry is a different kind from the five above.** Those are *factual* claims that
+failed verification. This one is a **design** claim that fails on its own terms, with
+every number in it already correct.
+
+**NOT DECIDED. Recorded so the next change is a decision rather than a drift. Nothing
+was reverted.**
+
+### The audit
+
+Six state classes exist. `lib/features/result/` has no bloc at all — `ResultPage` takes
+`SubmitResult` as a constructor argument.
+
+| State | Fields | `copyWith` | What it uses instead |
+|---|---|---|---|
+| `HomeState` | **13** | disabled `@Freezed(copyWith: false)` | 6 named `with*` writers, each restating all 13 fields |
+| `AuthState` | **10** | disabled | 2 writers + a **hand-rolled** `copyWith` (`auth_bloc.dart:366`) |
+| `QuizState` | **5** | disabled | inline full constructors, 11 sites |
+| `LeaderboardState` | 4 | generated — **zero call sites** | inline full constructors, 3 sites |
+| `ReadingState` | 4 | generated ✅ | `copyWith` |
+| `SettingsState` | 3 | generated ✅ | `copyWith` |
+
+**The correlation is the finding: `copyWith` is disabled on the three largest states and
+kept on the three smallest.** A property whose benefit grows with reuse is being
+withheld exactly where the state is big enough to hurt — which is backwards.
+
+The repository states the cost itself: *"adding `leaderboardStatus` required **editing
+every writer**"* (decision 141).
+
+### Two cost signals that are not argument, only fact
+
+* **`AuthState` hand-rolls a partial `copyWith`** (`auth_bloc.dart:366`) to get back part
+  of what disabling it removed.
+* **`LeaderboardState` has a generated `copyWith` that no call site reaches** — zero in
+  `lib/`, zero in `test/`. The cubit builds all three of its states through the
+  constructor. That is the pattern paying for a function nobody calls.
+
+### THE TRADE-OFF IS REAL, AND IT IS NARROWER THAN PREVIOUSLY CLAIMED
+
+**Correcting a claim made during the audit.** It was asserted here that freezed's
+`copyWith` "cannot clear a nullable field". **That is false**, and the generated code is
+the disproof — `settings_state.freezed.dart:71`:
+
+```dart
+call({Object? settings = null, Object? status = null, Object? failure = freezed,})
+failure: freezed == failure ? _self.failure : failure
+```
+
+freezed gives every **nullable** field a `freezed` sentinel default, so `null` means
+*"explicitly clear this"* and the sentinel means *"keep the current value"*. Non-nullable
+fields default to `null`, which cannot express clearing because there is nothing to
+clear. The mechanism is deliberate and it works.
+
+**What `copyWith` genuinely cannot do is express a cross-field invariant.** One call site
+can produce an inconsistent triple:
+
+```dart
+state.copyWith(readingStatus: HomeSectionStatus.failed, readingFailure: f)
+// reading still holds the OLD value — status says "failed", payload says "ready"
+```
+
+`withReading` forces the caller to state all three, so the triple is always consistent:
+
+```dart
+state.withReading(status: failed, reading: null, failure: f)
+```
+
+So the honest statement is: **`HomeState`'s six writers are justified by an invariant a
+generated `copyWith` structurally cannot express** — four independently-failing backend
+endpoints, each a `status · payload · failure` triple that must stay mutually consistent.
+
+**And that justification does not reach the other two states.** No cross-field invariant
+is recorded for `QuizState` or `AuthState` anywhere in the repository. Decision 141
+records the rationale for `HomeState`; there is no equivalent for the other two, and
+`AuthState`'s hand-rolled `copyWith` is evidence that whoever wrote it felt the same.
+
+### Why this is not fixed here
+
+Three changes would each be defensible — re-enable `copyWith` on `QuizState` and
+`AuthState`, delete `LeaderboardState`'s dead one, drop `AuthState`'s hand-rolled one —
+and each needs its own decision and its own tests. Silently reverting a pattern that six
+blocs and 2541 tests currently agree on is not a drift fix, it is a refactor.
+
+### The transferable rule
+
+> A rule that grows more expensive as the thing it governs grows should be re-examined
+> every time the thing grows. The cost here was paid once, when the state was small,
+> and then inherited by every feature that added a field.
+
+This is the same shape as entries 1–5, one level up: a decision made for a
+four-field state and never revisited once the state was thirteen fields.

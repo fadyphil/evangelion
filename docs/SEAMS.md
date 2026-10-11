@@ -152,9 +152,28 @@ Moving JSON knowledge into an entity leaks transport into the domain and fails G
 
 `features/*/presentation/bloc/`
 
-States and events are `@freezed`. `@Freezed(copyWith: false)` plus **whole-state
-writers** (`withReading`, `withStreak`, `withReader`) — so adding a field requires
-editing every writer. A writer that forgets the new fields **silently clears them**.
+States and events are `@freezed`. Three states disable its generated `copyWith`
+(`@Freezed(copyWith: false)`) and write **whole-state writers** instead
+(`withReading`, `withStreak`, `withReader`) — so adding a field means editing every
+writer, each of which restates all 13 fields of `HomeState`.
+
+**Which three, and why it matters.** `copyWith` is disabled on the three **largest**
+states (`HomeState` 13 fields, `AuthState` 10, `QuizState` 5) and kept on the three
+smallest (`LeaderboardState` 4, `ReadingState` 4, `SettingsState` 3). The cost grows
+with the field count, which is backwards from what reuse is for.
+
+**What the writers actually buy.** Not safety in general. A generated `copyWith` *can*
+clear a nullable field — freezed gives nullables a `freezed` sentinel so `null` means
+"clear this" — so that argument is false. What it cannot do is express a **cross-field
+invariant**. `state.copyWith(readingStatus: failed, readingFailure: f)` leaves
+`reading` holding its old value, so the triple disagrees with itself; `withReading`
+forces the caller to state all three.
+
+`HomeState`'s six writers are justified by that — four independently-failing backend
+endpoints, each a `status · payload · failure` triple. **No equivalent invariant is
+recorded for `QuizState` or `AuthState`**, and `AuthState` hand-rolls a partial
+`copyWith` (`auth_bloc.dart:366`) to get part of it back. Audit and evidence in
+`DRIFT.md` §6 — recorded, not decided.
 
 **The trap that reads as a feature.** Three classes override `toString` to keep a
 secret out of logs: `LoginCredentials`, `AuthState`, `AuthPasswordChanged`. freezed

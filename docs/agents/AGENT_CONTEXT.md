@@ -4082,3 +4082,53 @@ is anonymous to a screen reader is precisely the defect §14 is about.
 is not boilerplate: `5f53eb5`'s "leaderboard card → Home" was claimed and the card was
 never rendered, and **a component that is built, tested and never placed is invisible to
 every assertion that does not look for it on the screen.**
+
+### Recorded decisions — the whole-state writers audit
+
+**156. THE `@Freezed(copyWith: false)` DECISION IS APPLIED WHERE THE STATE IS
+LARGEST, AND IT IS NOT RE-EXAMINED AS THE STATE GROWS.**
+
+Recorded, **not reversed**. Nothing here changes behaviour, and nothing here says the
+pattern is wrong — it says it was decided for one shape of state and inherited by every
+feature that added a field.
+
+**The audit.** Six state classes exist (`lib/features/result/` has no bloc —
+`ResultPage` takes `SubmitResult` as a constructor argument). `copyWith` is disabled on
+the three largest and kept on the three smallest:
+
+| state | fields | `copyWith` | alternative in use |
+|---|---|---|---|
+| `HomeState` | **13** | disabled `home_bloc.dart:418` | 6 named `with*` writers, each restating all 13 |
+| `AuthState` | **10** | disabled `auth_bloc.dart:239` | 2 writers + a **hand-rolled** `copyWith` `auth_bloc.dart:366` |
+| `QuizState` | **5** | disabled `quiz_bloc.dart:213` | inline full constructors, 11 sites |
+| `LeaderboardState` | 4 | generated — **zero call sites** | inline full constructors, 3 sites |
+| `ReadingState` | 4 | generated ✅ | `copyWith` |
+| `SettingsState` | 3 | generated ✅ | `copyWith` |
+
+Two facts that are not argument, only observation: `AuthState` hand-rolls a partial
+`copyWith` to get part of what disabling it removed, and `LeaderboardState` carries a
+generated `copyWith` that **no call site in `lib/` or `test/` reaches** — the cubit
+builds all three of its states through the constructor.
+
+**THE JUSTIFICATION IS REAL AND IT IS NARROW.** Decision 141 records it for `HomeState`:
+four independently-failing backend endpoints, each a `status · payload · failure` triple
+that must stay mutually consistent. A generated `copyWith` **can** clear a nullable
+field — freezed gives every nullable a `freezed` sentinel default, so `null` means
+"clear this" and the sentinel means "keep current" (`settings_state.freezed.dart:71`) —
+but it **cannot** express the invariant. `state.copyWith(readingStatus: failed,
+readingFailure: f)` leaves `reading` holding its old value, so the triple disagrees with
+itself; `withReading` forces the caller to state all three.
+
+**That justification does not reach the other two states.** No cross-field invariant is
+recorded for `QuizState` or `AuthState` anywhere. Decision 141 is about `HomeState`,
+and its argument was inherited rather than re-argued — which is the shape this file
+records a dozen times elsewhere.
+
+**THE RULE THAT FOLLOWS.** A rule that grows more expensive as the thing it governs
+grows should be re-examined whenever the thing grows. The cost here was accepted when
+`HomeState` was small, and then carried by every feature that added a field.
+
+**NOT FIXED HERE.** Re-enabling `copyWith` on `QuizState`/`AuthState`, deleting
+`LeaderboardState`'s dead one, and dropping `AuthState`'s hand-rolled one are each
+defensible, and each is a refactor needing its own decision and tests — not a drift fix
+applied silently to a pattern 2541 tests currently agree on. See `docs/DRIFT.md` §6.
