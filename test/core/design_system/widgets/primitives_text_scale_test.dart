@@ -74,8 +74,6 @@ void main() {
       expanded: false,
       onPressed: _noopVoid,
     ),
-    'EvaChip — toggle': () =>
-        const EvaChip(label: 'Dark', selected: true, onSelected: _noopBool),
     'EvaTextField — with an error': () => Material(
       type: MaterialType.transparency,
       child: EvaTextField(
@@ -435,19 +433,22 @@ void main() {
 
   group('coverage', () {
     test('every text-bearing Tier-1 widget has a row', () {
-      // The 18 Tier-1 primitives minus the two that render no text at all:
+      // The 17 Tier-1 primitives minus the two that render no text at all:
       // `ProgressBeads` is here (it has a semantics label but no `Text`), and
       // `NeuralScaffold` has its own test above because it needs a viewport.
       // Counted so a new widget added without a row is a count a reader can
       // compare against `04-widget-inventory.md` §6 rather than an omission.
-      // 18 widget *families*; 19 rows because `EvaButton` is tested in its three
+      // 17 widget *families*; 18 rows because `EvaButton` is tested in its three
       // prototype variants, which is three separate layouts.
-      expect(cases, hasLength(19));
+      //
+      // Was 18/19 until `EvaChip` was deleted: its only two prototype call sites
+      // were the passage library, cut by decision 1, and the other three pill
+      // styles were "do not port" (defect #12). See `docs/DRIFT.md` §7.
+      expect(cases, hasLength(18));
       expect(
         cases.keys.map((String label) => label.split(' —').first).toSet(),
         <String>{
           'EvaButton',
-          'EvaChip',
           'EvaTextField',
           'EvaSectionHeader',
           'SettingsTile',

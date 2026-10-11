@@ -126,8 +126,9 @@ ReadingLanguage selectedLanguageOf(BuildContext context) =>
 /// picker and no other: "a segmented control with no track is two buttons."
 ///
 /// Each row is a `ListTile`-shaped tap target inside a `SettingsTile`-shaped glass row,
-/// and each is `Semantics(button: true, selected: …)` — `EvaChip`'s §14 prescription,
-/// which is what makes "which one is current" announceable rather than merely visible.
+/// and each is `Semantics(button: true, selected: …)` — §14's prescription for a
+/// selectable control, which is what makes "which one is current" announceable
+/// rather than merely visible.
 class _LanguageSheet extends StatelessWidget {
   const _LanguageSheet({required this.selected});
 
@@ -235,7 +236,7 @@ class _LanguageRow extends StatelessWidget {
 
     return Semantics(
       button: true,
-      // §14's prescription for a selectable control — `EvaChip`'s row, and the same
+      // §14's prescription for a selectable control, and the same
       // reason `SegmentedControl`'s segments each carry one: without `selected`, a
       // screen-reader user cannot tell which of the two languages is current, and
       // "the Arabic row is a button" does not say it is the answer.
@@ -270,7 +271,7 @@ class _LanguageRow extends StatelessWidget {
                         ),
                   ),
                 ),
-                // The check is the **non-colour** half of "selected", per `EvaChip`'s
+                // The check is the **non-colour** half of "selected", per §14's
                 // §14 argument: the ember alone is the colour-only state §14 bans, and
                 // a check glyph survives greyscale and announces through the
                 // `selected` flag above.

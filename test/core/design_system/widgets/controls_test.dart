@@ -608,7 +608,7 @@ void main() {
     // `Semantics(…, excludeSemantics: true)` drops the subtree's semantics —
     // including the `InkWell`'s tap action, because the `InkWell` is a descendant
     // of the node doing the excluding. Six widgets wrapped that way: `EvaButton`,
-    // `TextLink`, `EvaChip`, `EvaToggle`, `IconActionButton`, and therefore
+    // `TextLink`, `EvaToggle`, `IconActionButton`, and therefore
     // `ErrorView`'s retry. Each shipped `isButton == true` and a label, and
     // `hasAction(SemanticsAction.tap) == false`: a screen reader could read the
     // control and could not press it. A TalkBack double-tap is `ACTION_CLICK`,

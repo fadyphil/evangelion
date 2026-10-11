@@ -593,7 +593,7 @@ SemanticsNode semanticsOf(WidgetTester tester, Finder finder) =>
 ///   — and no single `getSemantics` call can see all of them.
 /// - a leaf node whose subtree was dropped by `excludeSemantics: true` has
 ///   `rect == Rect.zero`, so rect-containment membership silently finds nothing
-///   for `EvaChip`, `EvaToggle`, `IconActionButton` or `GlassSurface`.
+///   for a chip, `EvaToggle`, `IconActionButton` or `GlassSurface`.
 ///
 /// A rect-containment walk was tried and rejected for exactly that last reason:
 /// it returned zero nodes for four of the widgets it was supposed to attribute,
@@ -747,13 +747,6 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
     tappableLabel: 'Email',
   ),
   (
-    widget: EvaChip,
-    name: 'ds.tsx CategoryChip + App.tsx chips, §14 "mono-caps chips"',
-    build: () => const EvaChip(label: 'Dark', onSelected: _noopBool),
-    activation: SemanticsAction.tap,
-    tappableLabel: 'Dark',
-  ),
-  (
     widget: SegmentedControl<String>,
     name: 'SettingsScreen theme picker — Phase 3 keyboard gate',
     build: () => SegmentedControl<String>(
@@ -885,13 +878,6 @@ final List<InteractiveWidget> kDisabledWidgets = <InteractiveWidget>[
     build: () => const TextLink(label: 'Create account'),
     activation: SemanticsAction.tap,
     tappableLabel: 'Create account',
-  ),
-  (
-    widget: EvaChip,
-    name: 'an inert chip is a menu entry, not an option',
-    build: () => const EvaChip(label: 'Dark'),
-    activation: SemanticsAction.tap,
-    tappableLabel: 'Dark',
   ),
   (
     widget: IconActionButton,

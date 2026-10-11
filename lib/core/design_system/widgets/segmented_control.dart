@@ -90,8 +90,8 @@ int selectionStepFor({
 ///
 /// There is no hover-only affordance, no animated sliding thumb, and no
 /// `selectedIcon`. The prototype's selection is a fill plus a colour change and
-/// that is what this draws — see [EvaChip] for why the §14 colour-only ban does
-/// not bite here.
+/// that is what this draws. The §14 colour-only ban does not bite here because
+/// the selected state is announced, not merely coloured.
 class SegmentedControl<T> extends StatefulWidget {
   /// A picker over [values], showing [selected].
   const SegmentedControl({
