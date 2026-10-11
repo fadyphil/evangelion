@@ -23,14 +23,14 @@ Toolchain: Flutter **3.47.4** / Dart **3.13.3** (stable). No FVM, no melos.
 These were decided with the user. Do not re-litigate. Do not expand scope.
 
 | # | Decision |
-|---|---|
+| --- | --- |
 | 1 | **Six screens.** Library and Profile are **cut**. There is no passage library, no category system, no reflection history, no user profile. |
 | 2 | **Live API** against `http://localhost:3000` for reading / quiz / result / streak. |
 | 3 | **Login and onboarding are UI-only.** A `FakeAuthRepository` returns a seeded session. There is **no auth endpoint on the backend** and no login API call. |
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
 | 5 | **No servant/admin portal.** Those backend routes stay untested from the client. |
 | 6 | **Dark glassmorphic design system** per `docs/plans/03-design-system.md`, including the five mandatory performance mitigations in `docs/plans/09-quality-gates.md` §13. |
-| 7 | **Error handling is the hand-written `sealed Result<T>`, NOT `fp_dart`/`dartz`.** Added by amendment — §2.1. |
+| 7 | **Error handling is `Result<T>`, a `typedef` for `fp_dart`'s `Either<Failure, T>`.** Amended again by §2.1's `fp_dart` correction below — the original wording said "NOT fp_dart" and was wrong. |
 | 8 | **States and entities use `freezed`; localization is ARB + `gen_l10n`.** Added by amendment — §2.1. |
 
 ### 2.1 Dependency amendment — `freezed`, `gen_l10n`, and the `fp_dart` rejection
@@ -39,27 +39,57 @@ Decided by the user after Phase 8, on measurement. This subsection exists so the
 agent does not re-propose what was rejected, or re-litigate what was accepted.
 
 | # | Decision | Consequence |
-|---|---|---|
-| 7 | **Keep `sealed Result<T>`.** `fp_dart`/`dartz` rejected. | `lib/core/common/result.dart` stays hand-written. |
+| --- | --- | --- |
+| 7 | **`Result<T>` = `Either<Failure, T>`.** `fp_dart` **adopted**; `dartz` still rejected. | `lib/core/common/result.dart` is now a typedef plus two extension accessors. See the `SUPERSEDED` block below for what that costs. |
 | 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal was deferred at that point because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7). **Now done — decision 131:** both kept hand-written equality and dropped the base class, so `equatable` is **no longer a direct dependency and no longer in `pubspec.lock` at all**. |
 | 8b | **Adopt ARB + `gen_l10n`.** | **Shipped** on `refactor/gen-l10n`: the **five** hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/app_en.arb` + `app_ar.arb` (72 keys). Decisions 101–111 below. Three of §2.1's own claims were corrected **by measurement** during that task and are marked there: the table and field counts, "compile-time key checking" (a missing key is a codegen *warning*, not a build error), and the locale re-dispatch (it is a corpus re-fetch and it **stays**). |
 | 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
 
-**Why `fp_dart` was rejected, with the numbers, so it is not re-proposed:**
+**SUPERSEDED — `fp_dart` was ADOPTED. The original rejection was partly wrong; corrected
+below and in `docs/DRIFT.md`.** `Result<T>` is now
+`typedef Result<T> = Either<Failure, T>` over `package:fpdart`.
 
-| measurement | value |
-|---|---|
-| `try` blocks in all of `lib/` | **3** — all three in the two Dio repositories |
-| files importing `result.dart` or `failure.dart` | 26 in `lib/`, 40 in `test/` |
-| assertions naming `Result` / `Failure` / `FailureKind` | **879** |
+**What the original rejection claimed, and which parts were false.** It argued that
+"`sealed` + exhaustive `switch` is *strictly stronger* than `dartz`'s `Either`". That
+comparison was against **dartz**, not against `fp_dart` — and `fp_dart`'s `Either` is
+itself `sealed` (`either.dart:39`). The claim was true of dartz and irrelevant to the
+package being rejected. The migration measured three things that argument did not:
 
-`Result<T>` is already the either pattern, and `sealed` + exhaustive `switch`
-**expressions with no `default` arm** is strictly stronger than `dartz`'s `Either`:
-a third subtype becomes a compile error at every `switch`, which `Either` cannot
-express. That exhaustiveness is already load-bearing — `ApiErrorMapper`'s `switch`
-over `DioExceptionType.values` is a recorded gate. The one real gap was
-`AsyncEither`, and it applies to **3** call sites, which does not justify rewriting
-879 assertions and surrendering compile-time exhaustiveness at every seam.
+* **`typedef` preserves the exhaustiveness.** A `switch` over `Result<T>` is still an
+  exhaustive switch *expression* with no `default` arm, because a typedef is an alias
+  and not a wrapper. Verified in a scratch package *before* the migration was committed,
+  because this was the load-bearing risk.
+* **The cost was not 3 call sites but 72 files.** The rejection's own table is stale on
+  every line — `try` blocks are **6**, in **4** repositories, not 3 in 2; and 40 `lib`
+  files plus 59 `test` files import the type, not 26 and 40. The leaderboard and role
+  phases landed after the measurement was taken and it was never re-taken.
+* **`fp_dart`'s arms compare by payload, not by type parameter, and the covariance
+  guard was genuinely lost.** `Right.operator ==` is
+  `(other is Right) && other._value == _value` (`either.dart:572`) — the type arguments
+  are never mentioned, so `Right<Failure,int>(1) == Right<Failure,num>(1)` is `true`.
+  The hand-written type guarded on `runtimeType` for exactly this reason (decision 131)
+  and had mutation tests behind it.
+
+**Subclassing `Right`/`Left` to restore the guard DOES NOT WORK**, and this is recorded
+because it looks like it should: a subclass does not match the supertype's *object
+pattern*, so `switch` over the alias stops being exhaustive — "does not match the pattern
+`Right<Failure, T>()`". Restoring equality that way destroys the sealed exhaustiveness,
+so the two requirements are in direct conflict.
+
+**What was kept, and what was given up.** Kept: sealed exhaustiveness at every seam, the
+hand-written `Failure` with its `==` and its `toString` that omits `details`. Given up:
+the type-argument guard in `Result`'s own `==`, now pinned as *observed behaviour* by
+`test/core/common/result_test.dart` rather than asserted as a guarantee — if a future
+`fp_dart` release adds the check, that test fails. Also given up: nothing gained
+`fp_dart` is currently used for. `flatMap`, `traverse` and `Either.Do` are available and
+unused, and `==` on a `List` payload is identity in **both** implementations, so
+"fp_dart fixes collection equality" is **false** and is asserted false.
+
+**Two more claims in the original table that measurement disproved.** `879` assertions
+naming `Result`/`Failure` is not reproducible — 1184 lines in `test/` name them, 97 on
+an `expect(` line — so the figure was taken with an unknown method and is not the basis
+of any decision now. And the one real gap that justified the rejection, `AsyncEither`,
+does not exist in this codebase at all.
 
 **What `freezed` changes, and the two hazards recorded before adopting it:**
 
@@ -100,22 +130,22 @@ over `DioExceptionType.values` is a recorded gate. The one real gap was
 `refactor/gen-l10n`; where the measurement disagreed, the correction is recorded at
 decision 111 and marked here.)*
 
-- ~~69 distinct string fields across the six tables~~ — **five** tables, **73** string
+* ~~69 distinct string fields across the six tables~~ — **five** tables, **73** string
   fields, **67** distinct bare names, **72** ARB keys. Three collide and were
   namespaced: `retry` (`home`/`quiz`/`reading`), `unavailableSuffix`
   (`auth`/`home`/`quiz`/`reading`), `wordmark` (`auth`/`home`).
-- **ICU plurals**, which the hand-rolled tables do not have. Arabic has
+* **ICU plurals**, which the hand-rolled tables do not have. Arabic has
   zero/one/two/few/many/other, and Phase 8 hand-wrote `1 question` /
   `5 questions` / `٠ أسئلة`. That is a correctness gap, not an ergonomic one.
   **Landed**, and it paid off a recorded debt: the old `captionFor(2)` was `٢ أسئلة`
   where correct Arabic is `٢ سؤالان`. Two counts became plurals and four were audited
   and named as not plural-dependent — decision 104.
-- ~~**Compile-time key checking.** A typo becomes a build error~~ — **half true, and
+* ~~**Compile-time key checking.** A typo becomes a build error~~ — **half true, and
   the half that is false matters**: a key missing from a locale file makes
   `flutter gen-l10n` print a hint and **exit 0**, emitting the template's **English**
   value into the Arabic class, and `dart analyze` reports nothing. A structural test
   over the two ARB files is what turns it red — decision 108.
-- ~~**The manual locale re-dispatch dies.**~~ **This bullet was wrong and the code was
+* ~~**The manual locale re-dispatch dies.**~~ **This bullet was wrong and the code was
   left alone.** `HomePage`/`QuizPage`'s `didChangeDependencies` branch is
   `if (_requested != _language) _load()` — a **corpus re-fetch**, not a string
   resolution, and it reads `Localizations` directly. Emptying it fails **56** tests.
@@ -126,7 +156,7 @@ decision 111 and marked here.)*
 ### The six routes
 
 | Route | Screen | Data source |
-|---|---|---|
+| --- | --- | --- |
 | `/login` | Onboarding + login (email, password, social buttons) | `FakeAuthRepository` |
 | `/` | Home — greeting, streak flame, today's-reading panel | **API** |
 | `/reading` | Reading sanctuary, EN and AR, zero chrome | **API** |
@@ -144,7 +174,7 @@ the backend has **no `GET /readings/:id`** endpoint.
 
 Dependency direction is strictly inward:
 
-```
+```Graph
 presentation  ──▶  domain  ◀──  data
 ```
 
@@ -152,7 +182,7 @@ presentation  ──▶  domain  ◀──  data
 
 ### Layer responsibilities
 
-```
+```Tree
 lib/
   app/                     composition root: DI, router, bootstrap
   core/
@@ -173,7 +203,7 @@ Six screens read the same handful of types. Without a shared kernel, `home`, `re
 the purity gate in §7. So entities and ports **consumed by two or more features** live in
 `core/domain/`, not inside any one feature.
 
-```
+```Text
 core/domain/
   entities/
     scripture_verse.dart    Verse, ScriptureText          — home, reading
@@ -200,7 +230,7 @@ more → `core/domain/`. Nothing enters `core/domain/` speculatively.
 ### SOLID — as testable obligations, not slogans
 
 | Principle | Concrete obligation here |
-|---|---|
+| --- | --- |
 | **SRP** | One reason to change per file. A cubit owns state transitions only. A mapper owns JSON→domain only. A repository owns transport orchestration only. No file that both fetches and builds widgets. |
 | **OCP** | A new script language or question type is added by **adding a class and registering it**, never by editing a growing `if (language == …)` ladder. Bilingual-vs-localized payload differences go behind a `ReadingParser` seam. |
 | **LSP** | Every `ReadingRepository` implementation honours the whole contract, *including the non-obvious parts*: never throws across the seam, always returns `Result`, treats HTTP 409 as a typed failure and never an exception. A `FakeReadingRepository` must be substitutable for `DioReadingRepository`. |
@@ -219,22 +249,22 @@ more → `core/domain/`. Nothing enters `core/domain/` speculatively.
 
 ### Effective Dart — mandatory
 
-- `final` by default; `const` wherever the compiler allows.
-- Exhaustive `switch` **expressions** over `sealed` classes / enums. No `if`-chains for
+* `final` by default; `const` wherever the compiler allows.
+* Exhaustive `switch` **expressions** over `sealed` classes / enums. No `if`-chains for
   state branching.
-- **No `dynamic`** anywhere. `avoid_dynamic_calls` is enabled.
-- Explicit types on every public API.
-- Fire-and-forget futures use `unawaited()` from `dart:async` — never a bare expression
+* **No `dynamic`** anywhere. `avoid_dynamic_calls` is enabled.
+* Explicit types on every public API.
+* Fire-and-forget futures use `unawaited()` from `dart:async` — never a bare expression
   statement that drops a `Future`.
-- `debugPrint`, never `print`.
-- No `!` unless provably non-null, with an adjacent comment saying why.
-- Prefer constructor initialisers and `final` fields over `late`.
-- Named parameters for anything with more than two arguments.
+* `debugPrint`, never `print`.
+* No `!` unless provably non-null, with an adjacent comment saying why.
+* Prefer constructor initialisers and `final` fields over `late`.
+* Named parameters for anything with more than two arguments.
 
 ### Forbidden APIs — Flutter 3.47.4
 
 | Never use | Use instead |
-|---|---|
+| --- | --- |
 | `ColorScheme.surfaceVariant` | `surfaceContainerHighest` |
 | `MaterialStateProperty` / `MaterialState*` | `WidgetStateProperty` / `WidgetState*` |
 | `WillPopScope` | `PopScope` |
@@ -261,7 +291,7 @@ Prefix: `/api/v1`. CORS is wide open. Auth is **not** implemented — identity i
 ### Identity headers — required on every request
 
 | Header | Rule |
-|---|---|
+| --- | --- |
 | `X-User-Id` | **Must be a non-empty string.** Absent → **400** (Fastify schema, `headers must have required property 'x-user-id'`). Present but **empty** → **401**. A **non-UUID** value such as `not-a-uuid` is accepted with **200** and echoed back as `user_id`. |
 | `X-Group-Id` | Required for reading + leaderboard routes. Integer string. Use **`3`**. |
 | `X-User-Role` | Parsed but **never checked**. Send `kid`. Decorative. |
@@ -272,7 +302,7 @@ distinguishes "unauthenticated" from "bad request" on a missing header.
 ### Seeded working data (in-memory fallback)
 
 | Entity | Value |
-|---|---|
+| --- | --- |
 | Users | `11111111-1111-1111-1111-111111111111` (David Mina), `22222222-…` (Peter George), `33333333-…` (Mark Anton) — **all group 3** |
 | Reading | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` — John 3:1-5 |
 | Question | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` |
@@ -283,7 +313,7 @@ fabricates non-UUID ids (`question-group-3`) for any other group or date, and
 
 ### Endpoints this client uses
 
-```
+```Api
 GET  /api/v1/readings/today/en      X-Group-Id, X-User-Id?
 GET  /api/v1/readings/today/ar      X-Group-Id, X-User-Id?
 GET  /api/v1/streak/summary         X-User-Id
@@ -441,8 +471,6 @@ today_completed, next_milestone, days_to_milestone, … }`.
     failure deliberately rather than working around it. The only way in is
     `QuizPage`'s terminal `finish` arm.
 
-
-
 ---
 
 ## 6. TDD protocol
@@ -455,6 +483,7 @@ the settings repository · `evaScalerFor` · token and motion tables · **every 
 (using `bloc_test` + `mocktail`).
 
 Procedure per behaviour:
+
 1. Write the failing test.
 2. **Run it and confirm it fails for the intended reason.** A test that fails to compile or
    fails on an unrelated assertion is not a valid red.
@@ -483,8 +512,8 @@ untestable. `AppConfig` supplies the value at the composition root only.
 holds exactly two reasons to change, and both are recorded here so the split is not
 forgotten rather than rediscovered:
 
-- **Transport tuning** — timeouts and base URL want their own reason to change.
-- **In-memory-backend seed fixtures** — `seedUserId` / `seedGroupId` / `seedUserRole` are
+* **Transport tuning** — timeouts and base URL want their own reason to change.
+* **In-memory-backend seed fixtures** — `seedUserId` / `seedGroupId` / `seedUserRole` are
   not configuration. They move next to `FakeAuthRepository` when that exists.
 
 ### Recorded decisions — Phase 0b review
@@ -539,8 +568,8 @@ where the prototype's largest type is 34px, and at 1.22× text scaling on a 320p
 screen it wraps to four lines — which `09-quality-gates.md` §14 forbids. So Phase 3
 owns one of two things and must not skip both:
 
-- clamp the display end of the scale when it builds the first screen, **or**
-- amend §14 to state the exception.
+* clamp the display end of the scale when it builds the first screen, **or**
+* amend §14 to state the exception.
 
 **A golden must not be allowed to freeze 57sp silently.** A golden captures the
 current behaviour; if the first golden is captured with the display end unclamped,
@@ -712,14 +741,14 @@ Dart). Phase 5 changes nothing in `app_router.dart`, `auth_guard.dart` or
 **10. Two deliberate divergences from `06-navigation.md` §8.** The plan is not the
 authority; each divergence has a reason that is mechanical, not aesthetic.
 
-- **`lazySingleton`, not a factory.** The plan registers `AppRouter` as "a factory
+* **`lazySingleton`, not a factory.** The plan registers `AppRouter` as "a factory
   that reads the session from the `getIt` instance". A get_it `@factory` guarantees
   the exact hazard the same section warns about: every lookup hands back a new
   router, only one of which is mounted, and any other caller gets an object with
   its own `navigatorKey` and no `Navigator` behind it. `app.dart` reads the locator
   once, in `build`, so the dependency on the lifetime is visible in the shape of
   the statement rather than hidden behind it.
-- **`routerConfig(reevaluateListenable:)`, not "in `MaterialApp.router`".**
+* **`routerConfig(reevaluateListenable:)`, not "in `MaterialApp.router`".**
   `MaterialApp.router` has no such parameter. It belongs on the `RouterConfig`,
   which is what `AppRouter.config(reevaluateListenable:)` builds, and that config
   is what `MaterialApp.router` is handed. The plan's wording describes an intent
@@ -742,7 +771,7 @@ already taken: `flutter_bloc` re-exports the framework's widget layer alongside 
 bloc, and `bloc` itself is a transitive dependency this project may not promote to
 a direct one. So `AuthBloc` is registered from `navigation_injection.dart` (or a
 sibling file with the same permission), **not** from `auth_module.dart`. The
-`six `@module` files are committed and empty**; each says which phase fills it and
+`six`@module` files are committed and empty**; each says which phase fills it and
 that its provider will be a Flutter type. An empty `@module` emits no registration,
 and `injection_test.dart` asserts the generated config against them in **both**
 directions, so adding a provider without re-running `build_runner` is a failing
@@ -902,7 +931,7 @@ publishes a semantics node of its own, and an ancestor's `Semantics(label:)` mer
 into it only when nothing between them is a semantics boundary — and a `trailing`
 control is one. Measured on `/login`'s password field:
 
-```
+```Text
 "Password"                  <- the Semantics around the column, tap=false
   ""          tap=true      <- EditableText's node, UNLABELLED
   "Show password" tap=true  <- the toggle, correctly named
@@ -1006,14 +1035,14 @@ CORRECTED.** §5 trap 8 is the measurement; the decision is what to do with it.
 **Each field comes from the endpoint whose job it is, and the two are never
 reconciled.** Three alternatives were rejected:
 
-- **Prefer the reading endpoint's streak (`4`).** It agrees with the reading the
+* **Prefer the reading endpoint's streak (`4`).** It agrees with the reading the
   reader is looking at, which is what makes it tempting. It is also a choice made
   *in the client* about a disagreement the *server* owns, and it would silently
   change every number the top bar draws the moment either endpoint is corrected.
-- **Prefer the streak endpoint's (`0`).** Same objection, and worse: it is the
+* **Prefer the streak endpoint's (`0`).** Same objection, and worse: it is the
   endpoint whose entire job is the streak, so preferring it here means `/` reads the
   summary and ignores the reading it is named for.
-- **Reconcile** — take the max, or "completed if either says completed". Strictly
+* **Reconcile** — take the max, or "completed if either says completed". Strictly
   the worst. It invents a third source of truth that matches neither response, so a
   reader sees a number the server has never sent and the client cannot be debugged
   from the wire.
@@ -1611,7 +1640,6 @@ members, written out rather than left unimplemented (an unimplemented one is a c
 error today and a silent no-op the moment the package gives it a body), recorded here
 rather than suppressed.
 
-
 ### Recorded decisions — Phase 7 review
 
 **49. ONE PORT, TWO METHODS, AND THE WIDE ONE IS THE PORT.** `ReadingRepository` gains
@@ -1620,12 +1648,12 @@ detail of the data layer. `07-file-map.md` §7 implies one method; `08-build-pha
 §Phase 7 requires `GET /readings/today/{lang}` through it. Two alternatives were
 rejected:
 
-- **A second port, `ScriptureRepository`.** Two ports for one endpoint means two
+* **A second port, `ScriptureRepository`.** Two ports for one endpoint means two
   adapters, two sets of fakes, and a question — answered per screen — about which one a
   caller wanted. `core/domain/` exists so a type consumed by two features lives in one
   place; `ScriptureText` is consumed by `/` and `/reading`, so it belongs there, and so
   does its port.
-- **Make `today` return the wide type and let the screens ignore the extra.** This is
+* **Make `today` return the wide type and let the screens ignore the extra.** This is
   what actually shipped, and the reason it is right is that `TodayReading` stays a
   **projection** rather than being deleted: `/` wants six fields and `/reading` wants
   verses. `ScriptureText.toTodayReading` is the narrowing, it is in the domain layer, and
@@ -1638,10 +1666,10 @@ without it. Verses 1 and up are **skipped**, and malformed questions are **skipp
 because a passage with four of five verses is still the passage and a screen is not a
 validator. Three alternatives were rejected:
 
-- **Strict on every verse.** One bad row in a 40-verse passage blanks the whole reading.
-- **Substitute an empty verse.** The reader sees a numbered gap with nothing in it and no
+* **Strict on every verse.** One bad row in a 40-verse passage blanks the whole reading.
+* **Substitute an empty verse.** The reader sees a numbered gap with nothing in it and no
   way to know it is a gap; the skip is at least visible as a missing number.
-- **Throw the whole response away.** Strict-on-first is already that, for the only case
+* **Throw the whole response away.** Strict-on-first is already that, for the only case
   where it is defensible.
 
 `questionCount` counts the questions that **survived**, not the ones the server sent, so
@@ -1809,7 +1837,7 @@ own. The method that exists (`ScriptureBlock._verseParagraph`) builds the same
 
 Two alternatives were rejected:
 
-- **A `ScriptureVerse` widget taking the three styles.** It would be testable in
+* **A `ScriptureVerse` widget taking the three styles.** It would be testable in
   isolation, and it would need a test that passes all three styles to construct it — a
 fixture that re-derives the production derivation, which is the coverage that reads as
 coverage and asserts nothing.
@@ -1830,7 +1858,8 @@ a hand-written immutable entity with `==`).
 The naming that did survive is `DioReadingRepository` and `DioStreakRepository` — two
 `Dio`-prefixed adapters for two ports, which is what decision 23 already settled. The
 file-map lines have been corrected rather than left to be read as omissions.
-- **A widget taking the `Verse` and the language and deriving the styles itself.** Then
+
+* **A widget taking the `Verse` and the language and deriving the styles itself.** Then
   the drop cap has to be threaded in too, and `first` becomes a positional boolean at a
   call site that reads `child: ScriptureVerse(verse, language, cap: null)`.
 
@@ -1879,14 +1908,14 @@ the decision are the same shape.
 
 Alternatives rejected:
 
-- **`text.runes.take(1).map(String.fromCharCode)` inline at each call site.** Two copies of
+* **`text.runes.take(1).map(String.fromCharCode)` inline at each call site.** Two copies of
   the astral fix and the trim rule, which is exactly the shape that let Phase 7 re-create
   Phase 6's defect.
-- **`package:characters`.** Already a transitive dependency, so no `pubspec.yaml` change —
+* **`package:characters`.** Already a transitive dependency, so no `pubspec.yaml` change —
   and §8.4 pins that file, so promoting it is a hard stop. It also does not answer the trim
   question, and `String.fromCharCode` on a single rune is the whole of what is needed.
-- **Stripping combining marks too.** A shape test; see above.
-- **Leaving the second half to `previewText` only.** `previewText` owns the *truncation* and
+* **Stripping combining marks too.** A shape test; see above.
+* **Leaving the second half to `previewText` only.** `previewText` owns the *truncation* and
   cannot own the *first-rune* split, and fixing only the truncation leaves
   `preview.substring(0, 1)` returning a lone surrogate for a preview that opens with one.
 
@@ -2000,7 +2029,6 @@ So the lesson is decision 73's own, one level up: **a measurement written in a d
 is a claim, and §9's rule is that a claim is only as good as the test that checks it.** There
 was none. There is now — `test/arabic_typography_test.dart`, over all six screens.
 
-
 ### Recorded decisions — bilingual typography (decision 73's follow-up)
 
 **74. THE ARABIC ARM'S FAMILY IS RESOLVED BY **ONE FUNCTION**, AND THE AMBIENT
@@ -2024,24 +2052,24 @@ run site, in order to reach a value the design system could have read for itself
 
 Four alternatives, all rejected:
 
-- **A `TextTheme` whose Arabic slots resolve to Amiri.** **Not available, and this is a
+* **A `TextTheme` whose Arabic slots resolve to Amiri.** **Not available, and this is a
   framework fact rather than a preference.** `MaterialApp` takes one `theme:` and one
   `darkTheme:` and has **no per-locale theme hook**, so there is nowhere to put a second
   text theme for the engine to choose between. Every design system that appears to do this
   is switching one at runtime in `MaterialApp.builder`; that is a theme swap, and on this
   app it would swap `TextTheme` for the whole screen rather than resolve a run's family.
-- **Reading `Localizations.localeOf` inside a Tier-1 primitive.** Decisions 66 and 71 reject
+* **Reading `Localizations.localeOf` inside a Tier-1 primitive.** Decisions 66 and 71 reject
   this and the rejection stands: an English label and an Arabic one would travel the same
   invisible code path. `arabicAware` takes the direction **as a parameter**, so every call
   site names the ambient source in full — `Directionality.of(context)` — and a reviewer can
   see it. It also adds no second decision: decision 61 established that direction comes from
   the locale through `MaterialApp`, so there is nothing new to keep in step, and `lib/` still
   contains **no `Directionality` this client installs** and **no `startsWith('ar')`**.
-- **A shape test on each run's own script.** Decision 29 rejects one for this family of
+* **A shape test on each run's own script.** Decision 29 rejects one for this family of
   widget for a measured reason (it breaks on a verse opening with a numeral or a bracket, and
   §5's live payload opens one behind a `‹Verily`), and it would be a per-run scan on every
   frame of a scrolling list.
-- **Parameter threading.** Phase 7's reviewer already called it "a screen rewrite wearing a
+* **Parameter threading.** Phase 7's reviewer already called it "a screen rewrite wearing a
   parameter's clothes"; this is that rewrite with a constructor on each end of it.
 
 **And the one thing this rule depends on, stated because it is a dependency.** RTL implies
@@ -2083,7 +2111,7 @@ engine**:
    **pushes** styles onto a `ui.ParagraphBuilder` and pops them, so a child carrying only a
    colour **keeps its parent's family**. `??` read that child's family as `null` and
    substituted the ambient fallback, reporting **`monospace`** for `_Greeting`'s Arabic
-   lead-in `صباح الخير، ` — a run that renders in Cormorant Garamond. **A correct render
+   lead-in `صباح الخير،` — a run that renders in Cormorant Garamond. **A correct render
    reported as tofu**, which is worse than no gate: it trains its readers to ignore it.
 4. and the repair's **base/other order was backwards.** `TextStyle.merge` reads "a copy of
    **this** where the non-null fields in **other** have replaced the corresponding null
@@ -2263,7 +2291,6 @@ with a bare `\u0301`, which the corpus does not produce. The refusal also has th
 *shape* of reason — the fix and the decision are the same shape, and a fix that is the same
 shape as the thing it would override is not a fix.
 
-
 ### Recorded decisions — Phase 8 review
 
 **81. `/result` TAKES ITS SUBMIT RESPONSE AS A **REQUIRED CONSTRUCTOR PARAMETER**, AND
@@ -2345,7 +2372,7 @@ HAD TO FIX.**
 
 The bilingual gate reported, in its first run against a built `/result`:
 
-```
+```Text
 `١٠` renders Arabic in `CormorantGaramond`, which carries no Arabic glyph at all
 `هذه الإجابة` renders Arabic in `SpaceMono`, which carries no Arabic glyph at all
 ```
@@ -2597,8 +2624,6 @@ carry a verdict must print the verdict **as the asserted value**, never as a lab
 that has to be read separately. Phase 7's `find.textContaining` miss, Phase 8's `excludeSemantics`
 miss, and this.
 
-
-
 ### Recorded decisions — the `freezed` migration (decision 8a)
 
 Shipped on `refactor/freezed-states`. **34 types** converted: 17 classes with
@@ -2685,11 +2710,11 @@ import exactly one package, `freezed_annotation`, whose own dependencies are
 Verified by scan and by negative control (an `import 'package:flutter/material.dart'`
 planted in a `core/domain` part makes Gate 1 exit 1).
 
-
 ### Recorded decisions — ARB + `gen_l10n` (decision 8b)
 
 Shipped on `refactor/gen-l10n`. Five `*Strings` tables deleted; `lib/l10n/app_en.arb`
-+ `app_ar.arb` (72 keys) and the three generated `app_localizations*.dart` files
+
+* `app_ar.arb` (72 keys) and the three generated `app_localizations*.dart` files
 replace them. No new dependency — `flutter_localizations` and `intl` were already
 present — and `pubspec.yaml` changed by exactly one line, `generate: true`.
 
@@ -2815,7 +2840,6 @@ are **72** ARB keys after `questionSingular`/`questionPlural` merge into one plu
 `resultTotalCaption` becomes one. §2.1's "69 distinct string fields across the six
 tables" matches none of those three numbers.
 
-
 ### Recorded decisions — Phase 10 review
 
 Shipped on `feat/phase-10-polish`. **2215 → 2311 tests, coverage 98.17% → 98.21%.**
@@ -2823,7 +2847,7 @@ The phase's own framing was measured before anything was built and **three of th
 scope bullets were already satisfied**; the work that was actually missing is below,
 together with the two recorded decisions that are not "what I built".
 
-**123. THE FOUR PLAN BULLETS, MEASURED — THREE WERE ALREADY DONE**
+#### **123. THE FOUR PLAN BULLETS, MEASURED — THREE WERE ALREADY DONE**
 
 | `08-build-phases.md` Phase 10 scope line | measured state on entry |
 | --- | --- |
@@ -2860,7 +2884,7 @@ on the detector. It also found that `/settings` had **no** `*_text_scale_test.da
 all, so §14's "1.22× at 320px" was unverified for the one screen a reader opens to change
 their text size — closed by `settings_text_scale_test.dart`.
 
-**124. THE GLOBAL ROUTE TRANSITION DID NOT HONOUR REDUCED MOTION**
+##### **124. THE GLOBAL ROUTE TRANSITION DID NOT HONOUR REDUCED MOTION**
 
 Seven animation sites; six already read the flag. The seventh is
 `EvaMotion.fadeSlide` (`eva_motion.dart:144`), installed **app-wide** by
@@ -2940,7 +2964,7 @@ task specifies a path. The notice is assembled in the page from tokens that alre
 `Semantics(button: true)` forms a boundary so the `InkWell` could not merge the labelled
 node up into itself either. Measured on the pumped tree:
 
-```
+```Text
 lbl="A. Nicodemus"  acts=[tap]         <- the Semantics
 lbl=""              acts=[tap, focus]   <- the InkWell, and it has no name
 ```
@@ -3162,16 +3186,16 @@ green. Do not narrow the list back without re-reading those two doc comments.
 
 #### What each gate matches — do not narrow these patterns
 
-- **Gate 1 matches `import`, `export`, *and* `part`** against
+* **Gate 1 matches `import`, `export`, *and* `part`** against
   `package:(flutter|dio|http)/`. All three make the named library part of the file's own
   surface: an `export` of `package:flutter/material.dart` is exactly as impure as an
   `import` of it, and neither it nor `part` trips any lint. Both were found by negative
   control — the gate printed `ok` while a planted `export` sat in a domain file. Do not
   "simplify" this back to `import`.
-- **The match is anchored to a directive keyword, never a bare substring.** A doc comment
+* **The match is anchored to a directive keyword, never a bare substring.** A doc comment
   explaining *why* a file is dependency-free mentions the forbidden package by name; a
   substring scan would fail the gate and force that documentation to be watered down.
-- **Gate 2 resolves paths, it does not match URIs.** `tool/feature_import_check.dart` (pure
+* **Gate 2 resolves paths, it does not match URIs.** `tool/feature_import_check.dart` (pure
   Dart, `dart:io` only, no dependency, no codegen — run it directly with
   `dart run tool/feature_import_check.dart`) resolves every `import` / `export` / `part`
   target to a path under `lib/`, takes its feature segment, and compares it against the
@@ -3179,10 +3203,10 @@ green. Do not narrow the list back without re-reading those two doc comments.
   `package:evangelion/features/quiz/…` and `../../quiz/…` — and a URI-substring check
   catches only the first. It makes one pass, so a `lib/core/` violation is reported once, not
   once per feature.
-- **Gate 2 matches both quote styles; Gate 1 matches single quotes only.** `prefer_single_quotes`
+* **Gate 2 matches both quote styles; Gate 1 matches single quotes only.** `prefer_single_quotes`
   is enabled and `--fatal-infos` makes the other form fatal, so Gate 1 relies on the analyzer
   for that. Gate 2 is a standalone `dart run` and must not.
-- **Gate 4 gates the *mechanism*, not the invariants.** `tool/route_check.dart` parses
+* **Gate 4 gates the *mechanism*, not the invariants.** `tool/route_check.dart` parses
   `app_routes.dart`, because Dart has no reflection and the route invariants in
   `app_routes_test.dart` need an enumeration. It exits `1` when a declaration exists whose
   initialiser is not a plain string literal — that route is then invisible to the
@@ -3202,12 +3226,12 @@ only stdout, so a broken or missing `rg` produced empty output, the hit counter 
 and it printed `PASSED — all gates exercised and clean`. A broken toolchain was reported as a
 clean run. **A gate has to be able to fail before you may believe it passes.** Concretely:
 
-- `rg` missing from `PATH` → `FATAL … exit 2`. `rg` present but unable to match a known
+* `rg` missing from `PATH` → `FATAL … exit 2`. `rg` present but unable to match a known
   string piped in on stdin → `FATAL … exit 2`.
-- Every scan captures `rg`'s status explicitly: `1` means "no matches" (the good outcome),
+* Every scan captures `rg`'s status explicitly: `1` means "no matches" (the good outcome),
   anything `>= 2` is `FATAL … exit 2`. `0` with an empty capture is self-contradictory and
   also `FATAL`.
-- **The script deliberately does not use `set -e`.** `rg` exits `1` on zero matches, and `-e`
+* **The script deliberately does not use `set -e`.** `rg` exits `1` on zero matches, and `-e`
   would abort the script at exactly the moment the clean result is available to be read.
 
 Every gate above is negative-controlled: the violation is planted in a scratch copy under
@@ -3241,12 +3265,12 @@ change a gate, plant a violation and prove it fires before reporting the gate as
 
 End every report with:
 
-- **Status:** `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
-- What you implemented
-- What you tested, and the actual pass/fail counts
-- Files changed
-- Self-review findings
-- Concerns
+* **Status:** `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
+* What you implemented
+* What you tested, and the actual pass/fail counts
+* Files changed
+* Self-review findings
+* Concerns
 
 ### When to escalate — do not guess
 
@@ -3255,6 +3279,7 @@ Report `BLOCKED` if the task needs an architectural decision with several valid 
 if you cannot make progress reading the code, or if you are unsure the approach is correct.
 
 **Bad work is worse than no work. You will not be penalised for escalating.**
+
 ### Recorded decisions — dropping `equatable` (decision 8a, closing out §2.1)
 
 **131. `equatable` IS GONE. NOT TRANSITIVE — ENTIRELY ABSENT.**
@@ -3336,7 +3361,7 @@ minors, and this app's motion tokens have to keep meaning one thing across an up
 
 Its complete effect surface was extracted from the 4.5.2 tarball rather than recalled:
 
-```
+```Text
 align blur blurX blurXY blurY boxShadow callback color crossfade custom desaturate effect
 elevation fade fadeIn fadeOut flip flipH flipV followPath hide listen move moveX moveY
 rotate saturate scale scaleX scaleXY scaleY shader shake shakeX shakeY shimmer show slide
@@ -3530,7 +3555,7 @@ three consecutive commit messages.
 
 The command printed
 
-```
+```Text
 Building Linux application...
 ✓ Built build/linux/x64/release/bundle/evangelion
 ```
@@ -3541,7 +3566,7 @@ output was already present, so CMake was never asked to regenerate anything, not
 compiled, and the command reported success. Deleting the cache produced the real answer
 in seconds:
 
-```
+```Text
 CMake Error at FindPkgConfig.cmake:1093 (message):  - gtk+-3.0
   flutter/CMakeLists.txt:25 (pkg_check_modules)
 ```
@@ -3557,7 +3582,7 @@ of reading the diff would reveal.
 **AND THE FAILURE WAS CACHED, WHICH MADE IT WORSE.** Once `libgtk-3-dev` was installed,
 the build still failed:
 
-```
+```Text
 Imported target "PkgConfig::GTK" includes non-existent path "/usr/include/webp"
 ```
 
@@ -3589,7 +3614,7 @@ check. Setting the bundle's mtime to 2020 and running the whole script returned
 **PASSED**, because step 3 relinked it first. So the script takes `--check-only`, which
 skips the build, and the negative control passes: a 2020 bundle now fails with
 
-```
+```Text
 FAIL: the bundle is OLDER than the newest Dart source.
       bundle:     2020-01-01 00:00:00
       newest src: 2026-10-06 20:25:06  lib/features/leaderboard/presentation/pages/leaderboard_page.dart
@@ -3716,7 +3741,7 @@ Both are product decisions, taken by the user rather than inferred:
 `arabic_typography_test.dart` failed the moment the card entered `/`, and its output
 named the families rather than the symptom:
 
-```
+```Font
 SpaceMono   هذا الأسبوع
 DMSans      غير مصنّف بعد
 DMSans      لا توجد نتائج بعد
@@ -3744,7 +3769,7 @@ Measured, WCAG 2.1 relative luminance against `glassFill` (`#0DFFFFFF`) composit
 each theme's `canvas`:
 
 | run | on dark glass | on light glass |
-|---|---|---|
+| --- | --- | --- |
 | `ink` `#EAE8F5` / `#120E28` | **14.95:1** | **16.56:1** |
 | `ink2` `#8A8FAD` / `#5A5480` | **5.70:1** | **6.15:1** |
 | `ink3` `#424669` / `#9B97B8` | **1.99:1** | **2.47:1** |
@@ -3794,7 +3819,7 @@ were using a disabled-ink token for live content. Nothing about the palette chan
 Promoted to `ink2` (worst surface: **4.73:1 dark, 5.02:1 light** — clears 4.5:1 in both):
 
 | widget | what moved |
-|---|---|
+| --- | --- |
 | `leaderboard_row_tile` | rank column, "points" label |
 | `stat_tile` | caption |
 | `eva_section_header` | the header label |
@@ -3861,7 +3886,7 @@ comment in the file now names the trap.
 The gate's ledger is what surfaced these, and they are worse than `ink3` was:
 
 | token | worst surface (light) | used as text for |
-|---|---|---|
+| --- | --- | --- |
 | `ember` | **2.05:1** | the reader's name in the greeting on `/`, `leaderboardYourRank`, the reader's row |
 | `ok` | 3.03:1 | correct answers |
 | `err` | 3.33:1 | incorrect answers |
@@ -3922,7 +3947,7 @@ on one token, and it is why "just darken it" was never the answer.
 So the accent gets two names per role, and **only the light values differ**:
 
 | token | dark | light | used for |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `ember` | `#E8A33D` | `#D4891A` | fills: buttons, chips, beads, toggles, flame, cursor, glows |
 | `emberInk` | `#E8A33D` | **`#845610`** | text, drop caps, verse numbers, meaningful icons |
 | `ok` / `okInk` | `#4ECCA3` | `#1A8C6A` / **`#146C52`** | fills / correct-answer text |
