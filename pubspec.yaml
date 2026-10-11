@@ -26,6 +26,12 @@ dependencies:
   # Transport, state, DI and routing.
   dio: ^5.11.1
   flutter_bloc: ^9.1.1
+  # The error algebra at every repository seam. `Result<T>` is a `typedef` for
+  # `Either<Failure, T>` (`lib/core/common/result.dart`), so the two are the same
+  # type and the sealed exhaustiveness survives the alias. See `docs/DRIFT.md` —
+  # the original rejection of this package rested on a claim about `dartz` that
+  # does not hold for fpdart, whose `Either` is `sealed` (`either.dart:39`).
+  fpdart: ^1.2.0
   # Immutable states, events and entities. See AGENT_CONTEXT §2.1 decision 8a.
   freezed_annotation: ^3.1.0
   # `equatable` is NOT a direct dependency any more, and it is not a TRANSITIVE one
