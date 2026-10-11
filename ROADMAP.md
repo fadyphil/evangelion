@@ -1,0 +1,437 @@
+# ROADMAP
+
+This file records what the Evangelion client ships today, what is planned, and
+what is blocked, deferred, or wrong. It is written against measurement rather
+than intention, and every figure carries the command or the `file:line` that
+produced it.
+
+`docs/DRIFT.md` is the catalogue of claims that were written once and later
+found false. A roadmap is the most likely place for a new one to be born,
+because it is written once and then stops being checked. So the rule here is
+narrow and deliberate: **every number below was measured on 2026-10-11, or is
+quoted from a named document with a `file:line`.** Where the two disagree, this
+file shows the measurement and names the document it contradicts.
+
+The authority for scope, architecture, and standards is
+[`docs/agents/AGENT_CONTEXT.md`](docs/agents/AGENT_CONTEXT.md), which wins over
+this file. Where this file and that one disagree, that one is right and this one
+is stale.
+
+## Status
+
+The client is a working Flutter application against a live REST backend, with
+all seven of its gates passing at the time of writing. It has never been tagged
+or released.
+
+| Property | Value | Source |
+| --- | --- | --- |
+| Declared version | `1.0.0+1` | `pubspec.yaml:5` |
+| Published to pub.dev | no — `publish_to: 'none'` | `pubspec.yaml:3` |
+| Git tags | 0 | `git tag` |
+| Published releases | none | `gh release list` |
+| Changelog entry | `[1.0.0] - 2026-10-11` | `CHANGELOG.md:20` |
+| Commit range | 81 commits, 2026-10-02 to 2026-10-11 | `git log` |
+| Screens | 7 | `lib/features/*/presentation/pages/` |
+| Routes | 7 `AutoRoute`s + 1 wildcard redirect | `lib/app/router/app_router.dart:242` |
+| Route constants | 9 | `tool/verify_purity.sh`, gate 4 |
+| Repository ports | 5 | `lib/core/domain/repositories/` |
+| DI modules | 8, of which 7 carry providers | `lib/app/di/modules/` |
+| ARB keys | 111 per locale | `lib/l10n/app_en.arb` |
+| Design-system widgets | 23 | `lib/core/design_system/widgets/` |
+| Tests | 2507, all passing | `flutter test` |
+| Line coverage | 98.39 % (4753/4831) | `flutter test --coverage` |
+| Analyzer | no issues | `dart analyze --fatal-infos --fatal-warnings` |
+
+The last three rows are what `tool/verify_all.sh` reports. Running it prints a
+summary of the same seven gates and exits `0`.
+
+> [!NOTE]
+> The recorded floor in
+> [`tool/baseline/gates.txt`](tool/baseline/gates.txt) reads `2507` tests and
+> `98.25` percent. The test count matches. The coverage figure does not: that
+> file's own comment records coverage *rising* to 98.39 % when `EvaChip` was
+> deleted, and the `coverage_pct` field was never re-recorded. **98.25 % is the
+> recorded floor; 98.39 % is the current measurement.** Both are true, of
+> different things, and the floor is only ever rewritten by
+> `tool/verify_all.sh --update-baseline`.
+
+## Design overhaul
+
+A major visual overhaul is planned. A new prototype, or a written specification,
+is to replace `eva/` as the design source of truth. The visual direction has not
+been decided, and this file does not guess at it.
+
+The scope you have been given is visual: design tokens, the 23 design-system
+widgets, and screen composition. Goldens and screens change. The layer model,
+the repository ports, the dependency-injection split, the error algebra, and the
+routing shape are **not** in scope and are not expected to change.
+
+No decision in this repository has been reversed, deprecated, or superseded.
+ADRs [`0016`](docs/adr/0016-dark-glassmorphic-design-system.md),
+[`0017`](docs/adr/0017-split-the-accent-into-a-fill-and-an-ink.md),
+[`0018`](docs/adr/0018-bilingual-typography-two-arms-two-questions.md), and
+[`0019`](docs/adr/0019-performance-budget.md) all carry the status
+`accepted — under review` and point here. That status means exactly what it
+says: the decision is in effect today, it is testable today, and it will be
+re-examined when the overhaul lands.
+
+### What a prototype swap breaks
+
+`eva/` is not a folder of reference images. It is load-bearing in the test
+suite, and the dependency is measured rather than asserted. Replacing it is a
+checklist, not a visual refresh.
+
+| Surface | Measured today | What a swap does to it |
+| --- | --- | --- |
+| Dart files carrying `X.tsx:NNN` citations | 119 (63 in `lib/`, 56 in `test/`) | every claim must be re-derived or deleted |
+| Individual citations | 948, all resolving | each one is a line-number assertion |
+| Prototype files cited | 12 `.tsx` under `eva/src` | the new source must supply equivalents |
+| Geometry harnesses parsing the prototype at test time | 5 | they read files that will not exist |
+| Golden PNGs | 148 | all invalidated by any visual change |
+| Token gates re-baselined | 5 | see below |
+
+Run the citation gate yourself to confirm the table's first four rows:
+
+```bash
+python3 tool/gates/citation_check.py
+```
+
+It reports the prototype file count, the citation count, and how many resolve.
+At the time of writing it reports **948 found, 948 resolved, 0 broken**.
+
+Two properties of that gate matter more than the count, and both cut in
+opposite directions.
+
+First, it **will** fail loudly on a line-number shift, because it checks
+existence and range. That is the cheap failure. Second, it **will not** tell you
+that a citation now points at a line which no longer says what the claim says.
+As [`docs/agents/AGENT_CONTEXT.md:658`](docs/agents/AGENT_CONTEXT.md) records,
+the harness for `/login` found **two of its own citations wrong on its first
+run**. A new prototype will produce more findings of that kind, and the gate
+does not distinguish them from the ones that are merely renumbered.
+
+### The five gates a visual change re-baselines
+
+Token-level gates carry measured numbers that a visual change moves. Each has to
+be re-recorded deliberately, or the change is not measurable at all.
+
+| Gate | File | What it pins |
+| --- | --- | --- |
+| Text contrast | `test/core/design_system/tokens/text_contrast_gate_test.dart` | per-token contrast ratios, light and dark |
+| No colour literals | `test/core/design_system/effects/no_colour_literals_test.dart` | every colour resolves through the token ramp |
+| Glass blur budget | `test/core/design_system/widgets/glass_blur_budget_test.dart` | the blur-area ceiling |
+| Font coverage | `test/support/font_coverage_test.dart` | every rendered run has a bundled face |
+| Arabic typography | `test/arabic_typography_test.dart` | declared Amiri runs, over six screens |
+
+The Arabic typography gate deserves a note, because it is the only one of the
+five that is designed to resist a silently weakened version of itself. It
+compares a **declared list** of Arabic runs for equality in both directions
+rather than counting them, so a run that vanishes is red by name instead of
+passing vacuously. Seven `vacuousBecause: null` call sites stand behind that
+list, and every one of them is currently null — which means the gate is not
+vacuous on any screen it covers.
+
+### Two screens have no prototype harness at all
+
+`/login`, `/`, `/quiz`, `/reading`, and `/result` each have a geometry harness
+that parses the prototype **at test time**. `/settings` and `/leaderboard` have
+none.
+
+That is the part worth pausing on. Those two screens are verified against
+**no** prototype today, and they will stay that way unless the overhaul adds a
+harness for them. A reader skimming a green gate run would reasonably assume
+every screen is prototype-checked; on this repository, two of seven are not.
+
+## Blocked on the backend
+
+The backend is a **separate project in a sibling checkout**. This repository
+does not own it, treats it as read-only reference material, and never writes to
+it. If a task appears to need a backend change, escalate it rather than working
+around it.
+
+Every claim below is measured in
+[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md), which was
+verified against a running server on **2026-10-11**, or is recorded in
+[`docs/agents/AGENT_CONTEXT.md`](docs/agents/AGENT_CONTEXT.md) §5.
+
+| # | Blocked item | Consequence for the client |
+| --- | --- | --- |
+| 1 | No successful submit has ever been observed | `/quiz` cannot complete against live data |
+| 2 | `/readings/today` and `/streak/summary` disagree about today | the two are never reconciled |
+| 3 | No auth endpoint exists | `FakeAuthRepository` is the only adapter; login is UI-only |
+| 4 | No `GET /readings/:id` exists | `/quiz` re-fetches to get fresh `already_answered` flags |
+
+### No successful submit has ever been observed
+
+All three probe rows were reproduced exactly. The two halves of the contract
+cannot both be satisfied: the read endpoint hands out **non-UUID** question ids
+for a date-stamped reading, and the submit route declares a `uuid` schema.
+
+| Submit target | Result |
+| --- | --- |
+| Date-stamped reading, `question-group-3` | `400` — `question_id must match format "uuid"` |
+| Today's seeded reading, `bbbbbbbb-…` | `409` already-submitted |
+
+No client can submit against the seeded group. Two standing rules follow, and
+both survive untouched: do not validate ids as UUIDs on the read path, because
+today's is a UUID while a `?date=` is not; and treat fixtures in `test/` as
+transcriptions rather than captures.
+
+### The two endpoints disagree about today
+
+Read in the same minute, the streak endpoint reports `current_streak: 0` and
+`today_status: 'pending'`, while the reading endpoint reports
+`current_streak: 4` and `is_fully_completed: true`.
+
+Neither is wrong about its own job. The client's answer is to **never
+reconcile them**: each field comes from the endpoint whose job it is, nothing
+sums them, prefers one, or cross-checks them. The property that earns this is
+that when the backend fixes the disagreement, no client line changes.
+Reconciling — taking the max, or "completed if either says completed" — is the
+one answer ruled out, because it invents a number the server never sent.
+
+### Login is UI-only
+
+There is no auth endpoint. `FakeAuthRepository` is the only class in `lib/`
+that implements `AuthRepository`, and it returns a seeded session. Login and
+onboarding are therefore presentation-only, which is recorded as
+`docs/agents/AGENT_CONTEXT.md` §2 decision 3.
+
+## Deliberate product debt
+
+Every item here is a live control that is inert, or a surface that cannot be
+reached. Each was decided, and each is documented where a reader will find it.
+None is an oversight.
+
+The four permanently inert controls on `/login` are the clearest case. Each
+renders disabled and carries the reason in its accessible name, which is the
+policy: a reader must be told *why* a control cannot be pressed, not only that
+it cannot.
+
+| Control | Where | Reason recorded |
+| --- | --- | --- |
+| Forgot password | `lib/features/auth/presentation/pages/login_page.dart:490` | no auth endpoint |
+| Create account | `lib/features/auth/presentation/pages/login_page.dart:553` | no auth endpoint |
+| Continue with Google | `lib/features/auth/presentation/pages/login_page.dart:498` | no auth endpoint |
+| Continue with Apple | `lib/features/auth/presentation/pages/login_page.dart:505` | no auth endpoint |
+
+The remaining items are narrower, and each has its own reason.
+
+| Item | State | Source |
+| --- | --- | --- |
+| `/reading` bookmark | inert; names its own unavailability | `lib/features/reading/presentation/widgets/reading_controls.dart:201` |
+| `/login` validation messages | render in English on the Arabic arm | `lib/features/auth/domain/login_credentials.dart:75` |
+| `/result` | not deep-linkable; required constructor parameter | [`ADR-0015`](docs/adr/0015-result-is-not-deep-linkable.md) |
+| `/quiz` all-answered | dead end: `QuizCta.none`, no result to show | `lib/features/quiz/presentation/bloc/quiz_bloc.dart:318` |
+| `/` avatar | **no longer inert** — pushes `/settings` | `lib/features/home/presentation/pages/home_page.dart:398` |
+
+The validation messages deserve their own sentence, because the cause is
+structural rather than an oversight. The strings live in a pure-Dart domain
+file, which has no `Locale` parameter and by the project's own purity rules
+cannot acquire one. An English-only message on the Arabic arm is the price of
+keeping the domain layer free of the framework, not a missing translation.
+
+`/result` cannot be deep-linked because `ResultPage` takes its `SubmitResult` as
+a **required constructor parameter**. It cannot read it from `QuizBloc`, because
+that would be a cross-feature import. The response travels as an argument from
+the one screen that holds it to the one that renders it, and a reader who has
+submitted nothing therefore has no result screen.
+
+## Release debt
+
+Three items stand between this repository and a distributable build. None is
+hidden, and none is expensive; all three are unfinished.
+
+| Item | State | Source |
+| --- | --- | --- |
+| Android application id | `com.example.evangelion` | `android/app/build.gradle.kts:19` |
+| iOS bundle identifier | `com.example.evangelion` | `ios/Runner.xcodeproj/project.pbxproj:386` |
+| Continuous integration | no workflow files exist | `.github/` |
+
+The two identifiers are still the `flutter create` placeholders. They share a
+name across both platforms and must be changed before any real distribution.
+
+The CI row is worth reading precisely, because it is a measurement rather than
+an expectation. `.github/` exists and contains a single
+`.github/modernize/` directory holding PowerShell and shell hook scripts. There
+is **no** `.github/workflows/` directory and therefore no workflow that runs any
+of the seven gates. Every gate in this repository is currently enforced by a
+person running `tool/verify_all.sh`, which means a green state is a property of
+that person's discipline rather than of the repository.
+
+The Linux build gate is a related caution. It is the slowest gate and it
+**wipes `build/linux/x64/{debug,release}`** before rebuilding, so
+`tool/verify_all.sh` runs it only behind `--with-build`. On a fresh clone the
+build is therefore unverified until someone asks for it.
+
+> [!WARNING]
+> Do not trust `flutter build linux --release` reporting success on its own. It
+> reported a clean build for three commits while the Linux toolchain was missing
+> entirely. `tool/verify_linux_build.sh` exists because of that, and
+> `flutter doctor`'s `Linux toolchain` line is the one command that checks the
+> machine rather than the source. Its current defect is described in
+> [A live gate defect](#a-live-gate-defect).
+
+## Decided, not yet done
+
+These three are settled questions whose answers have not been implemented, or
+whose implementation was deliberately left standing. None is urgent, and none
+should be reopened by accident.
+
+| Item | State | Source |
+| --- | --- | --- |
+| Whole-state writers on the largest states | recorded, deliberately not reversed | [`DRIFT.md` §6](docs/DRIFT.md), decision 156 |
+| `core/design_system` as its own pub package | open question, single package is the default | `docs/plans/10-open-decisions.md:17` |
+| A stub leaderboard adapter | ships, behind a compile-time flag | `lib/features/leaderboard/data/repositories/stub_leaderboard_repository.dart` |
+
+The whole-state writers are the most interesting of the three, because the
+audit behind them is a **design** claim rather than a factual one, and every
+number in it is already correct. `copyWith` is disabled on the three largest
+states and kept on the three smallest. A property whose benefit grows with
+reuse is withheld exactly where the state is big enough to hurt. It was
+recorded and not reversed, deliberately.
+
+The stub leaderboard is the only stubbed adapter in `lib/`, and it is inert by
+default. It is selected by `--dart-define=USE_STUB_LEADERBOARD=true` alone, read
+through `bool.fromEnvironment` with `defaultValue: false`, so it cannot leak
+into a build that does not name the flag. It exists because the seeded scores
+are frozen: the reader's rank can never move without a working submission path,
+so the app can never show the states that matter most.
+
+Note that the plan expects a **notifications** stubbed toggle to ship with the
+settings feature, and it does not. `UserSettings` has four fields and none of
+them is `notificationsEnabled`, and the screen records the row as cut. The plan
+is not the authority here; [`AGENT_CONTEXT.md`](docs/agents/AGENT_CONTEXT.md)
+§2 is.
+
+## Docs debt: findings from re-measurement
+
+Every row below was found by **re-measuring**, not by reading carefully. That
+is the point, and it is stated once here rather than editorialised: prose cannot
+fail a test. A gate reports on the code; a document reports on whoever last
+wrote it, and nothing tells you the two have parted.
+
+These are reported as findings, not as work someone forgot.
+
+| Document and line | Says | Measures |
+| --- | --- | --- |
+| `docs/agents/AGENT_CONTEXT.md:27` | six screens | 7 |
+| `docs/agents/AGENT_CONTEXT.md:223`, `:237` | four repository ports | 5 |
+| `docs/agents/AGENT_CONTEXT.md:774` | six `@module` files, committed and empty | 8 files, 7 carrying providers |
+| `docs/agents/AGENT_CONTEXT.md:2199` (decision 79) | three of six screens vacuous | none vacuous |
+| `docs/agents/AGENT_CONTEXT.md:1202` (decision 32) | avatar has no destination | it pushes `/settings` |
+| `docs/agents/AGENT_CONTEXT.md:45`, `:134`, `:2717`, `:2839` | 72 ARB keys | 111 |
+| `docs/SEAMS.md:267` (Seam 7) | `lib/app/app.dart` hard-codes `ThemeMode.dark` | it switches over a persisted setting |
+| `AGENTS.md:127` | 27 design-system widgets | 23 |
+| `lib/app/router/app_router.dart:9`, `:23`, `:214` | six routes, six locked routes, six features | 7 |
+| `lib/app/di/navigation_injection.dart:58` | five hand-written registrations | 10 |
+| `lib/core/design_system/tokens/eva_colors.dart:123`, `:213` | light `ember` is 2.05:1 | 2.11:1 |
+| `lib/features/home/presentation/pages/home_page.dart:489` | light `ember` is 2.05:1 | 2.11:1 |
+
+Three of these deserve a note, because the correction is *documented inside the
+document that is wrong*.
+
+[`ADR-0005`](docs/adr/0005-four-narrow-ports-no-fat-repository.md) is titled
+"Declare **four** narrow repository ports" and its body says four, while its own
+line 77 records that five exist and explains why. The ADR knows. Its title does
+not.
+
+The `ember` contrast rows are the same shape. The contrast gate holds the
+corrected figure at
+`test/core/design_system/tokens/text_contrast_gate_test.dart:188`, and three
+doc comments elsewhere still carry the pre-correction 2.05:1. The gate is right
+and the prose is stale, in the same repository, on the same token.
+
+The registration row is a plain undercount. `configureNavigation()` contains ten
+`registerSingleton` and `registerLazySingleton` calls; the header above them
+says five, and names five of them.
+
+### Two further gaps, of a different kind
+
+[`README.md`](README.md) is still the unmodified `flutter create` template. It
+describes a starting point for a Flutter project and nothing about this one.
+For a public repository that is the first thing a reader sees.
+
+Machine-specific absolute paths are committed in seven places across three
+documents — `AGENTS.md`, `docs/agents/AGENT_CONTEXT.md`, and
+`docs/BACKEND-VERIFICATION.md` — naming the author's home directory and the
+backend's sibling path. They are correct on the machine that wrote them and
+meaningless everywhere else.
+
+### The quarantined proposals directory
+
+[`docs/proposals/`](docs/proposals/README.md) is quarantined, and its own README
+says so in its title: "NOT WHAT THIS CODEBASE SHIPS". Two proposals live there,
+written against the backend's surface rather than the client's, and they are
+kept because the backend contract they describe is real even where the client
+implementation is not.
+
+One of them lists its own corrections to the client in a table, and keeps them.
+Whether a quarantined proposal is promoted or deleted is an open call, and this
+file leaves it open. It is recorded here so that a reader meets the directory
+and its status at the same time.
+
+## A live gate defect
+
+[`tool/verify_linux_build.sh`](tool/verify_linux_build.sh) has a header at line
+32 saying its step 1 is `flutter doctor`. It never runs it. Line 70 reads
+`/tmp/eva_doctor.log`, a fixed path outside the repository, and greps it.
+
+This is not a false pass, and the distinction matters. The script **fails
+closed**: with the log absent, it prints `FAIL: flutter doctor did not report a
+Linux toolchain line at all.` and exits `1`, which is the behaviour you want
+from a gate that cannot find its input.
+
+The defect is that a **stale** log satisfies it. The file is not written by the
+script, is not versioned, and has no freshness check. A log left over from a
+machine that had a working toolchain makes the gate pass on one that does not,
+which is the failure mode the script exists to catch, reproduced inside the
+script.
+
+There is a second, quieter problem in the same function, and it is a matter of
+consistency rather than of correctness. Lines 92 to 96 search for
+`^\[.\] Linux toolchain`, using the byte-anchored pattern that the script's own
+header at lines 66 to 69 explains **cannot match** under the C locale, because
+`.` matches a single byte and the status glyph is three bytes of UTF-8. That is
+accurate, and measured: the same pattern matches under `LANG=en_US.UTF-8` and
+does not match under `LC_ALL=C`.
+
+So the branch is not dead, it is **locale-dependent** — it fires on a
+UTF-8 machine and silently does nothing on a C-locale one, which is the same
+green result either way. The check that actually works regardless is at lines
+81 to 90, which compares against the glyphs as byte escapes precisely so it
+cannot depend on the locale. Having fixed that for the first check and not the
+second is what makes the pair inconsistent.
+
+> [!WARNING]
+> This is exactly the class of defect
+> [`ADR-0020`](docs/adr/0020-a-gate-that-cannot-fail-is-worse-than-no-gate.md)
+> exists to name: a gate that cannot fail. This one fails closed, so it is the
+> milder cousin — but a reader who trusts step 1 is trusting a log file nobody
+> generated. If you touch this script,
+> [`tool/verify_gates_selftest.sh`](tool/verify_gates_selftest.sh) shows the
+> negative-control method the repository expects: plant the violation, prove
+> the gate fires, remove it.
+
+## How to check the numbers in this file
+
+Every measurement in this file is reproducible. The fastest check is the gate
+runner, which prints most of the status table itself:
+
+```bash
+tool/verify_all.sh
+```
+
+| Claim | Command |
+| --- | --- |
+| Tests and coverage | `flutter test --coverage` |
+| Analyzer | `dart analyze --fatal-infos --fatal-warnings` |
+| Prototype citations | `python3 tool/gates/citation_check.py` |
+| Widget reachability | `python3 tool/gates/orphan_widget_check.py` |
+| Layer and route purity | `tool/verify_purity.sh` |
+| Goldens | `find test -name '*.png' \| wc -l` |
+| ADR statuses | `rg -n 'Status' docs/adr/` |
+
+When you add a figure to this file, measure it the same way and say which
+command produced it. A number here that nobody can reproduce is the defect this
+file exists to prevent.
