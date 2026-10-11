@@ -1,0 +1,11 @@
+# The recorded floor for `tool/verify_all.sh` gate 6.
+#
+# §7 says `flutter test --coverage` "must not drop". Without a recorded number
+# that is a wish, so this file is the wish written down.
+#
+# Update ONLY via:  tool/verify_all.sh --update-baseline
+# which prints the old and new values, so a change here is visible in the commit.
+#
+# Recorded against: Flutter 3.47.4 / Dart 3.13.3, Linux desktop.
+test_count      2541
+coverage_pct    98.25
