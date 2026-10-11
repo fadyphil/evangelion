@@ -3,7 +3,7 @@ import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart' show Effect;
 
-/// The `E` speed dial — `ds.tsx:533-573`, transcribed.
+/// The `E` speed dial — `ds.tsx:533-570`, transcribed.
 ///
 /// ## WHAT IT IS, AND WHY IT EXISTS AGAIN
 ///

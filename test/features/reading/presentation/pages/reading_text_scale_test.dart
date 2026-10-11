@@ -57,9 +57,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // Arabic script is *taller* at the same point size, the Arabic caption is
-      // longer for the same count, and `WordReference.tsx:16` shows the quotation
-      // marks are Arabic `«…»` rather than the English `‹…›` — so the RTL arm is not
-      // a mirror of the LTR one and is mounted separately.
+      // longer for the same count, and `ReadingArScreen.tsx:57` shows the
+      // quotation marks are Arabic `«…»` rather than the English `‹…›` — so the RTL
+      // arm is not a mirror of the LTR one and is mounted separately.
       final ReadingHarness h = readingHarness(
         scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
