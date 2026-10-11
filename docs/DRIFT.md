@@ -249,3 +249,65 @@ blocs and 2541 tests currently agree on is not a drift fix, it is a refactor.
 
 This is the same shape as entries 1–5, one level up: a decision made for a
 four-field state and never revisited once the state was thirteen fields.
+
+---
+
+## 7. `EvaChip` IS BUILT, GOLDEN-TESTED, AND NEVER PLACED ON A SCREEN
+
+Found by `tool/gates/orphan_widget_check.py`, which is the defect decision 144
+records and no gate was looking for:
+
+> "`LeaderboardCard` was written, given a DI seam, a five-surface overflow matrix
+> and a 21-test view suite — and **no page instantiated it**. ... Three suites, all
+> green, all correct about their own subject, and together they could not tell
+> whether the feature shipped."
+
+**`EvaChip` is that, today.**
+
+| | |
+|---|---|
+| Declared | `lib/core/design_system/widgets/eva_chip.dart` |
+| Constructed in `lib/` | **nowhere** — the only match is its own constructor |
+| Goldens | **8** (`eva_chip_{filter,static,toggle}_{dark,light}.png`, plus two state) |
+| Listed in | `docs/plans/04-widget-inventory.md:29` as collapsing 11 prototype call sites |
+
+The widget inventory says the mono-caps pill has **4 style definitions and 11
+rendered** sites in the prototype — the `App.tsx` theme toggle, the per-route
+chips, the `QuizScreen` frame toggle, the FAB dock items. None of those
+destinations shipped, so the widget that was built to carry them has no caller.
+
+**NOT FIXED HERE, AND THE GATE IS DELIBERATELY LEFT RED.** Three things are
+defensible and all of them are product decisions:
+
+* **place it** — the settings theme row currently uses `SegmentedControl`
+  (`settings_page.dart:203`) rather than chips, and that is a design choice, not
+  an oversight;
+* **delete it** — along with 8 goldens and whatever test surface keeps them honest;
+* **allowlist it** — as a design-system primitive kept for prototype parity.
+
+What is *not* acceptable is what the repository did for ten phases, which is
+nothing: the widget is built, it is golden-tested, and every §7 gate was green.
+`tool/gates/orphan_widget_check.py` fails on it until one of the three is chosen.
+
+### What building the gate found in the gate itself
+
+Three bugs, all the same shape as decision 143's lesson — a check that reports
+success while looking at nothing:
+
+1. **A bare name match reports widgets as PLACED that are not.** This repository
+   discusses `EvaChip` and `SegmentedControl` constantly in prose — design-system
+   docs, `language_sheet.dart`'s "why not a SegmentedControl" reasoning,
+   `leaderboard_page.dart` describing a window switcher it does not have. Comments
+   are now stripped before matching; without that the gate missed the exact defect
+   it was written for.
+2. **A widget's own constructor declaration places itself.** `const
+   SegmentedControl({...})` matches the name, so every widget placed itself and the
+   gate reported zero orphans forever.
+3. **`class Foo<T> extends StatefulWidget` matched nothing.** The pattern had no
+   type-parameter clause, so every generic widget was silently skipped — which is
+   how `SegmentedControl` was first reported as an orphan when it is on
+   `/settings` today.
+
+The third was the dangerous one. A gate that quietly skips a class of declarations
+is the same defect as one that cannot fail: both report a clean run over a surface
+they never examined.
