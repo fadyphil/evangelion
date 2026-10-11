@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Succeeds with a fixed greeting. Lives in `test/`, never in `lib/` — the
 /// production use cases arrive with the features that own them.
@@ -9,7 +10,7 @@ final class GreetUser implements NoParamsUseCase<String> {
   const GreetUser();
 
   @override
-  Future<Result<String>> call() async => const Result<String>.success('Shalom');
+  Future<Result<String>> call() async => const Right<Failure, String>('Shalom');
 }
 
 /// Takes params, so it exercises the two-parameter seam.
@@ -18,7 +19,7 @@ final class LengthOfReference implements UseCase<String, int> {
 
   @override
   Future<Result<int>> call(String params) async =>
-      Result<int>.success(params.length);
+      Result<int>.of(params.length);
 }
 
 /// Every exception path a repository has to swallow before it can honour the
@@ -31,7 +32,7 @@ final class ExplodingUserLoader implements NoParamsUseCase<int> {
     try {
       throw const FormatException('malformed reading_id');
     } on FormatException {
-      return const Result<int>.failure(
+      return const Left<Failure, int>(
         Failure(
           kind: FailureKind.serialization,
           message: 'malformed reading_id',
@@ -69,7 +70,7 @@ final class BrokenReadingRepository implements NoParamsUseCase<int> {
     try {
       throw const ReadingParseException('text_clean');
     } on ReadingParseException {
-      return const Result<int>.failure(
+      return const Left<Failure, int>(
         Failure(
           kind: FailureKind.serialization,
           message: 'text_clean is absent from the en payload',
@@ -84,7 +85,7 @@ final class UnreachableEndpoint implements NoParamsUseCase<int> {
   const UnreachableEndpoint();
 
   @override
-  Future<Result<int>> call() async => const Result<int>.failure(
+  Future<Result<int>> call() async => const Left<Failure, int>(
     Failure(kind: FailureKind.network, message: 'connection refused'),
   );
 }
@@ -98,7 +99,7 @@ void main() {
 
       final Result<String> result = await usecase();
 
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
     });
 
     test('is typed as Future<Result<Out>>', () async {
@@ -107,7 +108,7 @@ void main() {
       final Future<Result<String>> future = usecase();
 
       expect(future, isA<Future<Result<String>>>());
-      expect(await future, const Result<String>.success('Shalom'));
+      expect(await future, const Right<Failure, String>('Shalom'));
     });
 
     test('does not require a Flutter binding', () async {
@@ -117,7 +118,7 @@ void main() {
       // proof is the `rg` gate in AGENT_CONTEXT §7.
       const NoParamsUseCase<String> usecase = GreetUser();
 
-      expect(await usecase(), const Result<String>.success('Shalom'));
+      expect(await usecase(), const Right<Failure, String>('Shalom'));
     });
 
     test('a concrete implementation is substitutable for another', () async {
@@ -153,7 +154,7 @@ void main() {
 
       final Result<int> result = await usecase();
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
         result
             .failureOrElse(
@@ -233,7 +234,7 @@ void main() {
     test('is callable with its params', () async {
       const UseCase<String, int> usecase = LengthOfReference();
 
-      expect(await usecase('John 3: 1-5'), const Result<int>.success(11));
+      expect(await usecase('John 3: 1-5'), const Right<Failure, int>(11));
     });
 
     test('is typed as Future<Result<Out>>', () async {
@@ -242,13 +243,13 @@ void main() {
       final Future<Result<int>> future = usecase('abc');
 
       expect(future, isA<Future<Result<int>>>());
-      expect(await future, const Result<int>.success(3));
+      expect(await future, const Right<Failure, int>(3));
     });
 
     test('rejects nothing itself: params reach the implementation', () async {
       const LengthOfReference usecase = LengthOfReference();
 
-      expect(await usecase(''), const Result<int>.success(0));
+      expect(await usecase(''), const Right<Failure, int>(0));
     });
   });
 

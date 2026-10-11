@@ -8,6 +8,7 @@ import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// The app-wide reader preferences, and the only writer of them.
 ///
@@ -98,7 +99,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   Future<void> load() async {
     final Result<UserSettings> result = await _getSettings();
     switch (result) {
-      case Success<UserSettings>(:final UserSettings value):
+      case Right<Failure, UserSettings>(:final UserSettings value):
         _confirmed = _clamp(value);
         emit(
           state.copyWith(
@@ -107,7 +108,7 @@ class SettingsCubit extends Cubit<SettingsState> {
             failure: null,
           ),
         );
-      case FailureResult<UserSettings>(:final Failure failure):
+      case Left<Failure, UserSettings>(value: final failure):
         emit(
           state.copyWith(
             status: SettingsStatus.failed,
@@ -167,7 +168,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   Future<void> _persist(UserSettings next) async {
     final Result<UserSettings> result = await _updateSettings(next);
     switch (result) {
-      case Success<UserSettings>(value: final UserSettings stored):
+      case Right<Failure, UserSettings>(value: final UserSettings stored):
         // **The store's answer, not [next].** `SettingsRepositoryImpl` does not
         // normalise today, so the two are equal — but a store that did normalise one
         // would otherwise leave the reader looking at a value the device does not
@@ -184,7 +185,7 @@ class SettingsCubit extends Cubit<SettingsState> {
             failure: null,
           ),
         );
-      case FailureResult<UserSettings>(:final Failure failure):
+      case Left<Failure, UserSettings>(value: final failure):
         emit(
           state.copyWith(
             status: SettingsStatus.failed,

@@ -1,4 +1,4 @@
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
@@ -10,6 +10,7 @@ import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/reading_harness.dart';
@@ -60,7 +61,7 @@ void main() {
       // marks are Arabic `«…»` rather than the English `‹…›` — so the RTL arm is not
       // a mirror of the LTR one and is mounted separately.
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(
         tester,
@@ -77,7 +78,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.failure(readingFailure),
+        scripture: const Left<Failure, ScriptureText>(readingFailure),
       );
       await pumpReading(
         tester,

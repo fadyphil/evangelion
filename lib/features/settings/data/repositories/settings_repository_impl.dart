@@ -40,7 +40,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<Result<UserSettings>> load() async {
     try {
-      return Result<UserSettings>.success(await _store.read());
+      return Result<UserSettings>.of(await _store.read());
     } on Object catch (error) {
       // `catch (Object)` rather than `catch (Exception)` deliberately: a plugin
       // channel failure arrives as a `PlatformException`, which is an `Exception`,
@@ -48,7 +48,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       // asserting, and a settings store that cannot be read must be a typed failure
       // whatever it threw. An `Error` escaping would take the frame with it, so it is
       // caught too — see the class doc.
-      return Result<UserSettings>.failure(_unreachable(error));
+      return Result<UserSettings>.left(_unreachable(error));
     }
   }
 
@@ -56,9 +56,9 @@ final class SettingsRepositoryImpl implements SettingsRepository {
   Future<Result<UserSettings>> save(UserSettings settings) async {
     try {
       await _store.write(settings);
-      return Result<UserSettings>.success(settings);
+      return Result<UserSettings>.of(settings);
     } on Object catch (error) {
-      return Result<UserSettings>.failure(_unreachable(error));
+      return Result<UserSettings>.left(_unreachable(error));
     }
   }
 

@@ -17,6 +17,7 @@ import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dar
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../../support/home_harness.dart';
@@ -153,12 +154,12 @@ void main() {
     auth = MockAuthRepository();
 
     when(() => readings.today(language: any(named: 'language')))
-        .thenAnswer((_) async => Result<TodayReading>.success(liveReading));
+        .thenAnswer((_) async => Result<TodayReading>.of(liveReading));
     when(
       streaks.summary,
-    ).thenAnswer((_) async => const Result<StreakSummary>.success(liveStreak));
+    ).thenAnswer((_) async => const Right<Failure, StreakSummary>(liveStreak));
     when(auth.getCurrentSession)
-        .thenAnswer((_) async => Result<AuthSession>.success(session));
+        .thenAnswer((_) async => Result<AuthSession>.of(session));
     // The seeded **empty** board, which is the measured state of this endpoint.
     when(
       () => leaderboard.board(
@@ -166,7 +167,7 @@ void main() {
         limit: any(named: 'limit'),
       ),
     ).thenAnswer(
-      (_) async => const Result<LeaderboardBoard>.success(
+      (_) async => const Right<Failure, LeaderboardBoard>(
         LeaderboardBoard(
           window: LeaderboardWindow.weekly,
           groupId: 3,
@@ -305,7 +306,7 @@ void main() {
         'a missing session yields no name and no failure',
         setUp: () {
           when(auth.getCurrentSession).thenAnswer(
-            (_) async => const Result<AuthSession>.failure(
+            (_) async => const Left<Failure, AuthSession>(
               Failure(
                 kind: FailureKind.unauthorized,
                 message: 'Not signed in.',
@@ -338,7 +339,7 @@ void main() {
       'a failed READING leaves the streak ready and keeps its own number',
       setUp: () {
         when(() => readings.today(language: any(named: 'language'))).thenAnswer(
-          (_) async => const Result<TodayReading>.failure(serializationFailure),
+          (_) async => const Left<Failure, TodayReading>(serializationFailure),
         );
       },
       build: build,
@@ -395,7 +396,7 @@ void main() {
       'a failed STREAK leaves the reading ready and keeps its flag',
       setUp: () {
         when(streaks.summary).thenAnswer(
-          (_) async => const Result<StreakSummary>.failure(networkFailure),
+          (_) async => const Left<Failure, StreakSummary>(networkFailure),
         );
       },
       build: build,
@@ -417,10 +418,10 @@ void main() {
       'both failing is still two failures, not one',
       setUp: () {
         when(() => readings.today(language: any(named: 'language'))).thenAnswer(
-          (_) async => const Result<TodayReading>.failure(serializationFailure),
+          (_) async => const Left<Failure, TodayReading>(serializationFailure),
         );
         when(streaks.summary).thenAnswer(
-          (_) async => const Result<StreakSummary>.failure(networkFailure),
+          (_) async => const Left<Failure, StreakSummary>(networkFailure),
         );
       },
       build: build,
@@ -565,7 +566,7 @@ void main() {
         // first attempt, so a call counter would be off by one — the retry is the
         // first call this port ever sees.
         when(() => readings.today(language: any(named: 'language'))).thenAnswer(
-          (_) async => const Result<TodayReading>.failure(networkFailure),
+          (_) async => const Left<Failure, TodayReading>(networkFailure),
         );
       },
       build: build,

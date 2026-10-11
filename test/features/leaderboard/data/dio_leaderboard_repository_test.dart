@@ -7,6 +7,7 @@ import 'package:evangelion/features/leaderboard/data/datasources/leaderboard_rem
 import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.dart';
 import 'package:evangelion/features/leaderboard/data/repositories/dio_leaderboard_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../support/fake_dio.dart';
@@ -18,9 +19,9 @@ import '../../../support/fake_dio.dart';
 /// `:final Failure f` looks for a field called `f` and reports `f` as undefined.
 Failure unwrapFailure<T>(Result<T> result) {
   switch (result) {
-    case FailureResult<T>(:final Failure failure):
+    case Left<Failure, T>(value: final failure):
       return failure;
-    case Success<T>():
+    case Right<Failure, T>():
       fail('expected a failure, got a success');
   }
 }
@@ -28,9 +29,9 @@ Failure unwrapFailure<T>(Result<T> result) {
 /// Unwraps a [Result] that must have succeeded.
 T unwrapSuccess<T>(Result<T> result) {
   switch (result) {
-    case Success<T>(:final T value):
+    case Right<Failure, T>(:final T value):
       return value;
-    case FailureResult<T>(:final Failure failure):
+    case Left<Failure, T>(value: final failure):
       fail('expected a success, got ${failure.kind}: ${failure.message}');
   }
 }

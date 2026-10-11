@@ -8,6 +8,7 @@ import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/contract_payloads.dart';
 import '../../../../support/design_system_harness.dart';
@@ -57,7 +58,7 @@ void main() {
   /// would be a fourth transcription of a shape two already exist in, and the two
   /// copies could disagree about which numbers a wrong answer moves.
   final Result<SubmitResult> wrongSubmission =
-      const Result<SubmitResult>.success(contractWrongAnswerFixture);
+      const Right<Failure, SubmitResult>(contractWrongAnswerFixture);
 
   group('no unlabeled interactive node', () {
     /// Sweeps one state.
@@ -97,7 +98,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         ),
       );
     });
@@ -112,7 +113,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
           submission: defaultSubmission,
         ),
       );
@@ -140,7 +141,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          Result<ScriptureText>.success(
+          Result<ScriptureText>.of(
             englishPassageWith(<Question>[answeredQuestion]),
           ),
         ),
@@ -153,7 +154,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.failure(
+          const Left<Failure, ScriptureText>(
             Failure(kind: FailureKind.network, message: 'offline'),
           ),
         ),
@@ -166,7 +167,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveArabicQuizPassage),
+          const Right<Failure, ScriptureText>(liveArabicQuizPassage),
         ),
         locale: const Locale('ar'),
       );
@@ -181,7 +182,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         ),
       );
 
@@ -344,7 +345,7 @@ Future<void> gradeTheAnsweredOption(
   await pumpQuiz(
     tester,
     bloc: quizBloc(
-      const Result<ScriptureText>.success(liveEnglishQuizPassage),
+      const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       submission: submission ?? defaultSubmission,
     ),
   );

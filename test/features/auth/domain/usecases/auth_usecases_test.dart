@@ -7,6 +7,7 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 /// The three `auth` use cases — red-first (AGENT_CONTEXT §6).
@@ -54,11 +55,11 @@ void main() {
         email: any(named: 'email'),
         password: any(named: 'password'),
       ),
-    ).thenAnswer((_) async => Result<AuthSession>.success(session));
+    ).thenAnswer((_) async => Result<AuthSession>.of(session));
     when(repository.getCurrentSession)
-        .thenAnswer((_) async => Result<AuthSession>.success(session));
+        .thenAnswer((_) async => Result<AuthSession>.of(session));
     when(repository.signOut)
-        .thenAnswer((_) async => const Result<void>.success(null));
+        .thenAnswer((_) async => const Right<Failure, void>(null));
   });
 
   group('SignIn', () {
@@ -88,8 +89,8 @@ void main() {
         const SignInParams(email: email, password: password),
       );
 
-      expect(result.isSuccess, isTrue);
-      expect(result.valueOrElse(session), same(session));
+      expect(result.isRight(), isTrue);
+      expect(result.getOrElse((_) => session), same(session));
     });
 
     test('returns the repository\'s failure untouched', () async {
@@ -102,13 +103,13 @@ void main() {
           email: any(named: 'email'),
           password: any(named: 'password'),
         ),
-      ).thenAnswer((_) async => const Result<AuthSession>.failure(failure));
+      ).thenAnswer((_) async => const Left<Failure, AuthSession>(failure));
 
       final Result<AuthSession> result = await SignIn(repository)(
         const SignInParams(email: email, password: password),
       );
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(result.failureOrElse(failure), same(failure));
     });
 
@@ -135,12 +136,12 @@ void main() {
       final Result<void> result = await SignOut(repository)();
 
       verify(repository.signOut).called(1);
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
     });
 
     test('and surfaces a failure rather than dropping it', () async {
       when(repository.signOut)
-          .thenAnswer((_) async => const Result<void>.failure(failure));
+          .thenAnswer((_) async => const Left<Failure, void>(failure));
 
       final Result<void> result = await SignOut(repository)();
 
@@ -153,12 +154,12 @@ void main() {
       final Result<AuthSession> result = await GetCurrentSession(repository)();
 
       verify(repository.getCurrentSession).called(1);
-      expect(result.valueOrElse(session), same(session));
+      expect(result.getOrElse((_) => session), same(session));
     });
 
     test('and passes a failure straight through', () async {
       when(repository.getCurrentSession)
-          .thenAnswer((_) async => const Result<AuthSession>.failure(failure));
+          .thenAnswer((_) async => const Left<Failure, AuthSession>(failure));
 
       expect(
         (await GetCurrentSession(repository)()).failureOrElse(failure),

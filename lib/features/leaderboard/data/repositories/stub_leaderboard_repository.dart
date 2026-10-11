@@ -106,7 +106,7 @@ final class StubLeaderboardRepository implements LeaderboardRepository {
 
     final List<LeaderboardRow> page = all.take(limit).toList();
 
-    return Result<LeaderboardBoard>.success(
+    return Result<LeaderboardBoard>.of(
       LeaderboardBoard(
         window: window,
         groupId: 3,

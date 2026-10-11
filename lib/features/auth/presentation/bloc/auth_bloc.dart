@@ -61,6 +61,7 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_bloc.freezed.dart';
@@ -502,9 +503,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
     final Result<AuthSession> current = await _getCurrentSession();
     switch (current) {
-      case Success<AuthSession>(:final AuthSession value):
+      case Right<Failure, AuthSession>(:final AuthSession value):
         emit(AuthState(status: AuthSessionStatus.signedIn, session: value));
-      case FailureResult<AuthSession>():
+      case Left<Failure, AuthSession>():
         emit(const AuthState(status: AuthSessionStatus.signedOut));
     }
   }
@@ -584,9 +585,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     switch (result) {
-      case Success<AuthSession>(:final AuthSession value):
+      case Right<Failure, AuthSession>(:final AuthSession value):
         emit(AuthState(status: AuthSessionStatus.signedIn, session: value));
-      case FailureResult<AuthSession>(:final Failure failure):
+      case Left<Failure, AuthSession>(value: final failure):
         emit(
           _revalidated(
             state.copyWith(status: before),

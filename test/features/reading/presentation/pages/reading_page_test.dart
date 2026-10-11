@@ -1,3 +1,4 @@
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
@@ -10,6 +11,7 @@ import 'package:evangelion/features/settings/data/datasources/settings_local_dat
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/reading_harness.dart';
 import '../../../../support/settings_harness.dart';
@@ -86,7 +88,7 @@ void main() {
       // Stub the Arabic arm **while the English one is on screen**, so the assertion
       // below cannot pass by never having been shown. `home_navigation_test.dart`
       // does the same thing for `/`'s re-entry and calls it out.
-      h.readings.scripture = const Result<ScriptureText>.success(
+      h.readings.scripture = const Right<Failure, ScriptureText>(
         liveArabicPassage,
       );
       // A locale change is a `didChangeDependencies` trigger, and `_requested` is a
@@ -136,7 +138,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.success(
+          scripture: Result<ScriptureText>.of(
             liveEnglishPassage.copyWith(
               verses: <Verse>[
                 liveEnglishPassageVerses.first.copyWith(text: openingVerse),
@@ -180,7 +182,7 @@ void main() {
       // `RangeError` out of `build`, and the reader can no longer reach the
       // reflection.
       final ReadingHarness h = readingHarness(
-        scripture: Result<ScriptureText>.success(
+        scripture: Result<ScriptureText>.of(
           liveEnglishPassage.copyWith(
             verses: <Verse>[
               liveEnglishPassageVerses.first.copyWith(text: '   '),
@@ -204,14 +206,14 @@ void main() {
         // test — so the arm with no cap is the arm whose verse is Arabic, not the arm
         // whose verse happens to start with a mark.
         final ReadingHarness h = readingHarness(
-          scripture: const Result<ScriptureText>.success(liveArabicPassage),
+          scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
         );
         await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
         expect(dropCapLetters(tester), isEmpty);
         // And an Arabic verse opening with an emoji — the C1 input — is inert on this
         // arm because the branch is reached before any character is chosen.
         final ReadingHarness emoji = readingHarness(
-          scripture: Result<ScriptureText>.success(
+          scripture: Result<ScriptureText>.of(
             liveArabicPassage.copyWith(
               verses: <Verse>[
                 const Verse(
@@ -244,7 +246,7 @@ void main() {
       // client invented." The mapper proves the entity carries it; this is the
       // reader-visible half, which nothing asserted.
       final ReadingHarness h = readingHarness(
-        scripture: Result<ScriptureText>.success(
+        scripture: Result<ScriptureText>.of(
           liveEnglishPassage.copyWith(
             verses: <Verse>[
               liveEnglishPassageVerses.first,
@@ -287,7 +289,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.success(passage),
+          scripture: Result<ScriptureText>.of(passage),
         );
         await pumpReading(tester, cubit: h.cubit, locale: locale);
 
@@ -392,7 +394,7 @@ void main() {
         WidgetTester tester,
       ) async {
         final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.success(
+          scripture: Result<ScriptureText>.of(
             (language == ReadingLanguage.english
                     ? liveEnglishPassage
                     : liveArabicPassage)
@@ -466,7 +468,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
       // `يوحنا 3: 1-5` — with the space after the colon that the English arm does not
@@ -487,7 +489,7 @@ void main() {
       expect(find.text('5 questions'), findsNothing);
       // The Arabic arm's singular, with the Arabic-Indic numeral the prototype uses.
       final ReadingHarness ar = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
       expect(find.text('١ سؤال واحد'), findsOneWidget);
@@ -500,7 +502,7 @@ void main() {
       // The other direction, because a pluralisation that only ever said "1" would
       // satisfy the test above.
       final ReadingHarness h = readingHarness(
-        scripture: Result<ScriptureText>.success(
+        scripture: Result<ScriptureText>.of(
           liveEnglishPassage.copyWith(
             questions: <Question>[
               ...liveEnglishPassageQuestions,
@@ -533,7 +535,7 @@ void main() {
         expect(find.text('NKJV (NEW KING JAMES VERSION)'), findsOneWidget);
 
         final ReadingHarness ar = readingHarness(
-          scripture: const Result<ScriptureText>.success(liveArabicPassage),
+          scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
         );
         await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
         expect(find.text('Smith & Van Dyck (فانديك)'), findsOneWidget);
@@ -548,7 +550,7 @@ void main() {
       // tofu boxes per screen in Latin as well as Arabic.
       for (final Locale locale in const <Locale>[Locale('en'), Locale('ar')]) {
         final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.success(
+          scripture: Result<ScriptureText>.of(
             locale.languageCode == 'ar'
                 ? liveArabicPassage
                 : liveEnglishPassage,
@@ -698,7 +700,7 @@ void main() {
       );
 
       final ReadingHarness ar = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
       expect(
@@ -794,7 +796,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.failure(readingFailure),
+        scripture: const Left<Failure, ScriptureText>(readingFailure),
       );
       await pumpReading(tester, cubit: h.cubit);
 
@@ -804,7 +806,7 @@ void main() {
       expect(find.text(AppLocalizationsEn().readingRetry), findsOneWidget);
 
       // The retry re-asks, and this is the one place a **second** request is correct.
-      h.readings.scripture = const Result<ScriptureText>.success(
+      h.readings.scripture = const Right<Failure, ScriptureText>(
         liveEnglishPassage,
       );
       await tester.tap(find.text(AppLocalizationsEn().readingRetry));
@@ -818,7 +820,7 @@ void main() {
     ) async {
       // The CTA's caption is `questionCount`, which lives on a passage there is not.
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.failure(readingFailure),
+        scripture: const Left<Failure, ScriptureText>(readingFailure),
       );
       await pumpReading(tester, cubit: h.cubit);
       expect(find.byType(StickyCta), findsNothing);
@@ -847,7 +849,7 @@ void main() {
             ('Arabic', liveArabicPassage, const Locale('ar')),
           ]) {
         final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.success(
+          scripture: Result<ScriptureText>.of(
             passage.copyWith(questions: const <Question>[]),
           ),
         );

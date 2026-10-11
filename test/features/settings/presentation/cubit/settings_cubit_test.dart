@@ -15,6 +15,7 @@ import 'package:evangelion/features/settings/domain/usecases/update_settings.dar
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/settings_harness.dart';
 
@@ -305,7 +306,7 @@ void main() {
             'above about the EMIT rather than about the write having finished',
       );
 
-      gate.complete(Result<UserSettings>.success(cubit.state.settings));
+      gate.complete(Result<UserSettings>.of(cubit.state.settings));
       await pending;
       expect(
         cubit.state.status,
@@ -439,8 +440,8 @@ void main() {
 /// compile against a third arm, because the `switch` is exhaustive.
 extension _SuccessValue on Result<UserSettings> {
   UserSettings get successValue => switch (this) {
-    Success<UserSettings>(:final UserSettings value) => value,
-    FailureResult<UserSettings>(:final Failure failure) => throw StateError(
+    Right<Failure, UserSettings>(:final UserSettings value) => value,
+    Left<Failure, UserSettings>(value: final failure) => throw StateError(
       'expected a success and got ${failure.kind}',
     ),
   };
@@ -454,11 +455,11 @@ final class _AlwaysFailsRepository implements SettingsRepository {
 
   @override
   Future<Result<UserSettings>> load() async =>
-      Result<UserSettings>.failure(_failure);
+      Result<UserSettings>.left(_failure);
 
   @override
   Future<Result<UserSettings>> save(UserSettings settings) async =>
-      Result<UserSettings>.failure(_failure);
+      Result<UserSettings>.left(_failure);
 }
 
 /// A repository whose writes park until [gate] completes.

@@ -13,6 +13,7 @@ import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questio
 import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// A [ReadingRepository] answering a fixed reading and recording what it was asked.
 ///
@@ -22,14 +23,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// that only counted calls could not tell the two apart.
 /// Wraps a payload as the success a port would hand back, so a suite can write
 /// `_CountingRepository(ok(twoQuestions))` rather than spelling the generic.
-Result<ScriptureText> ok(ScriptureText text) =>
-    Result<ScriptureText>.success(text);
+Result<ScriptureText> ok(ScriptureText text) => Result<ScriptureText>.of(text);
 
 final class _CountingRepository implements ReadingRepository {
   _CountingRepository(this.reading);
 
   Result<ScriptureText> reading;
-  Result<SubmitResult> submission = const Result<SubmitResult>.success(
+  Result<SubmitResult> submission = const Right<Failure, SubmitResult>(
     SubmitResult(
       questionId: 'question-group-3',
       isCorrect: true,
@@ -139,8 +139,9 @@ void main() {
           ReadingLanguage.english,
         );
 
-        expect(result.isSuccess, isTrue);
-        final QuizSession session = (result as Success<QuizSession>).value;
+        expect(result.isRight(), isTrue);
+        final QuizSession session =
+            (result as Right<Failure, QuizSession>).value;
         expect(session.readingId, 'reading-group-3-2026-10-04');
         expect(session.questionCount, 2);
         expect(session.answeredCount, 1, reason: 'the wire flag counts');
@@ -172,14 +173,14 @@ void main() {
         message: 'Could not reach the server.',
       );
       final StartSession useCase = StartSession(
-        _CountingRepository(const Result<ScriptureText>.failure(failure)),
+        _CountingRepository(const Left<Failure, ScriptureText>(failure)),
       );
 
       final Result<QuizSession> result = await useCase(ReadingLanguage.english);
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
-        (result as FailureResult<QuizSession>).failure,
+        (result as Left<Failure, QuizSession>).value,
         failure,
         reason:
             'a use case that reclassified an error would be a second place '
@@ -218,8 +219,8 @@ void main() {
           ReadingLanguage.english,
         );
 
-        expect(result.isSuccess, isTrue);
-        expect((result as Success<QuizSession>).value.isEmpty, isTrue);
+        expect(result.isRight(), isTrue);
+        expect((result as Right<Failure, QuizSession>).value.isEmpty, isTrue);
       },
     );
   });
@@ -252,9 +253,9 @@ void main() {
       final Result<RefreshedQuestions> first = await useCase(
         ReadingLanguage.english,
       );
-      expect(first.isSuccess, isTrue);
+      expect(first.isRight(), isTrue);
       expect(
-        (first as Success<RefreshedQuestions>).value.questions.map(
+        (first as Right<Failure, RefreshedQuestions>).value.questions.map(
           (Question q) => q.alreadyAnswered,
         ),
         <bool>[false, true],
@@ -303,7 +304,7 @@ void main() {
 
       expect(repository.calls, 1, reason: 'a request went out');
       final RefreshedQuestions value =
-          (refreshed as Success<RefreshedQuestions>).value;
+          (refreshed as Right<Failure, RefreshedQuestions>).value;
       expect(
         value.questions.first.alreadyAnswered,
         isTrue,
@@ -343,7 +344,7 @@ void main() {
         )(ReadingLanguage.english);
 
         expect(
-          (result as Success<RefreshedQuestions>).value.readingId,
+          (result as Right<Failure, RefreshedQuestions>).value.readingId,
           'reading-group-3-2026-10-05',
         );
       },
@@ -355,11 +356,11 @@ void main() {
         message: 'The request timed out.',
       );
       final Result<RefreshedQuestions> result = await RefreshSessionQuestions(
-        _CountingRepository(const Result<ScriptureText>.failure(failure)),
+        _CountingRepository(const Left<Failure, ScriptureText>(failure)),
       )(ReadingLanguage.english);
 
-      expect(result.isFailure, isTrue);
-      expect((result as FailureResult<RefreshedQuestions>).failure, failure);
+      expect(result.isLeft(), isTrue);
+      expect((result as Left<Failure, RefreshedQuestions>).value, failure);
     });
 
     test('`RefreshedQuestions` is two fields and nothing else', () {
@@ -406,7 +407,7 @@ void main() {
         ),
       );
 
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
       expect(repository.sent.single, (
         readingId: 'reading-group-3-2026-10-04',
         questionId: 'question-group-3',
@@ -458,7 +459,7 @@ void main() {
         );
         final _CountingRepository repository = _CountingRepository(
           ok(twoQuestions),
-        )..submission = const Result<SubmitResult>.failure(conflict);
+        )..submission = const Left<Failure, SubmitResult>(conflict);
 
         final Result<SubmitResult> result = await SubmitAnswer(repository)(
           const SubmitAnswerParams(
@@ -468,8 +469,8 @@ void main() {
           ),
         );
 
-        expect(result.isFailure, isTrue);
-        expect((result as FailureResult<SubmitResult>).failure, conflict);
+        expect(result.isLeft(), isTrue);
+        expect((result as Left<Failure, SubmitResult>).value, conflict);
       },
     );
 

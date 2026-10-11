@@ -100,7 +100,7 @@
 /// off the tree.
 library;
 
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
@@ -112,6 +112,7 @@ import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/arabic_typography_gate.dart';
 import '../../../../support/reading_harness.dart';
@@ -124,7 +125,7 @@ void main() {
       // The eight that were tofu, one assertion each, so a regression says **which
       // element** lost its family rather than "something did".
       final ReadingHarness h = readingHarness(
-        scripture: const Result<ScriptureText>.success(liveArabicPassage),
+        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
       await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
 

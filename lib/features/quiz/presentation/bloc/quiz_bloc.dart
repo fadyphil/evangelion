@@ -8,6 +8,7 @@ import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questio
 import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'quiz_bloc.freezed.dart';
@@ -497,7 +498,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
       event.language,
     );
     switch (refreshed) {
-      case Success<RefreshedOutcome>(:final RefreshedOutcome value):
+      case Right<Failure, RefreshedOutcome>(:final RefreshedOutcome value):
         emit(
           QuizState(
             status: QuizStatus.ready,
@@ -530,7 +531,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
             lastResult: state.lastResult,
           ),
         );
-      case FailureResult<RefreshedOutcome>(:final Failure failure):
+      case Left<Failure, RefreshedOutcome>(value: final failure):
         // **The session is dropped**, unlike a failed submit. A failed *read* means
         // the flags on screen are the ones we cannot vouch for any more, and
         // `ReadingCubit`'s rule is that a stale passage must not sit under an error.
@@ -616,7 +617,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     );
 
     switch (result) {
-      case Success<SubmitResult>(:final SubmitResult value):
+      case Right<Failure, SubmitResult>(:final SubmitResult value):
         emit(
           QuizState(
             status: QuizStatus.ready,
@@ -628,7 +629,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
             lastResult: value,
           ),
         );
-      case FailureResult<SubmitResult>(:final Failure failure):
+      case Left<Failure, SubmitResult>(value: final failure):
         emit(
           QuizState(
             status: QuizStatus.failed,
@@ -704,13 +705,13 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
   ) {
     emit(
       result.fold<QuizState>(
-        onSuccess: (QuizSession value) => QuizState(
+        (Failure failure) =>
+            QuizState(status: QuizStatus.failed, failure: failure),
+        (QuizSession value) => QuizState(
           status: QuizStatus.ready,
           session: value,
           lastResult: lastResult,
         ),
-        onFailure: (Failure failure) =>
-            QuizState(status: QuizStatus.failed, failure: failure),
       ),
     );
   }

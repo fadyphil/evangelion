@@ -26,13 +26,13 @@
 library;
 
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/widgets/error_view.dart';
 import 'package:evangelion/core/design_system/widgets/leaderboard_row_tile.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/home_harness.dart';
 
@@ -56,7 +56,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        leaderboardAnswer: const Result<LeaderboardBoard>.success(_three),
+        leaderboardAnswer: const Right<Failure, LeaderboardBoard>(_three),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -88,7 +88,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        leaderboardAnswer: const Result<LeaderboardBoard>.success(_three),
+        leaderboardAnswer: const Right<Failure, LeaderboardBoard>(_three),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -102,7 +102,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        leaderboardAnswer: const Result<LeaderboardBoard>.success(_three),
+        leaderboardAnswer: const Right<Failure, LeaderboardBoard>(_three),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -133,7 +133,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        leaderboardAnswer: const Result<LeaderboardBoard>.failure(
+        leaderboardAnswer: const Left<Failure, LeaderboardBoard>(
           Failure(
             kind: FailureKind.network,
             message: 'Could not reach the server.',

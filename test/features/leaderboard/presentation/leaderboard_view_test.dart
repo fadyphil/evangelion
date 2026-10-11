@@ -13,6 +13,7 @@ import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_p
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../support/design_system_harness.dart';
 
@@ -168,14 +169,14 @@ final class _RecordingRepo implements LeaderboardRepository {
   }) async {
     asked.add(window);
     if (asked.length >= failFrom) {
-      return const Result<LeaderboardBoard>.failure(
+      return const Left<Failure, LeaderboardBoard>(
         Failure(
           kind: FailureKind.network,
           message: 'Could not reach the server.',
         ),
       );
     }
-    return Result<LeaderboardBoard>.success(answer);
+    return Result<LeaderboardBoard>.of(answer);
   }
 }
 

@@ -623,7 +623,7 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
         sites: 1,
         converted: false,
         reason:
-            '`FailureResult<T>` hash equality. `Result<T>` and its arms stayed '
+            '`Left<Failure, T>` hash equality. `Result<T>` and its arms stayed '
             'hand-written with `Failure` (§2.1 decision 7), so this is '
             'untouched.',
       ),
@@ -631,7 +631,7 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
       _Reviewed(
         sites: 1,
         converted: false,
-        reason: '`Success<T>` hash equality, same reasoning.',
+        reason: '`Right<Failure, T>` hash equality, same reasoning.',
       ),
   'test/core/common/result_test.dart#two failures carrying structurally equal Failures are equal':
       _Reviewed(
@@ -647,7 +647,7 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
         sites: 1,
         converted: false,
         reason:
-            'The anti-vacuity guard for the `Success<T>` equality group. '
+            'The anti-vacuity guard for the `Right<Failure, T>` equality group. '
             'Untouched by the migration.',
       ),
   'test/core/design_system/effects/neural_background_test.dart#NeuralBackground.build does not re-run across 60 frames':

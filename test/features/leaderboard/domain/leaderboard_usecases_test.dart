@@ -5,6 +5,7 @@ import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart'
 import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Records what it was asked for, so the assertions can be about the *request* rather
 /// than about the return value — which for a pass-through is the only thing it has.
@@ -22,7 +23,7 @@ final class _RecordingRepository implements LeaderboardRepository {
   }) async {
     calls.add((window: window, limit: limit));
     return answer ??
-        const Result<LeaderboardBoard>.success(
+        const Right<Failure, LeaderboardBoard>(
           LeaderboardBoard(
             window: LeaderboardWindow.weekly,
             groupId: 3,
@@ -56,13 +57,13 @@ void main() {
 
     test("returns the repository's board byte-identical", () async {
       final _RecordingRepository repository = _RecordingRepository(
-        const Result<LeaderboardBoard>.success(board),
+        const Right<Failure, LeaderboardBoard>(board),
       );
       expect(
         await LoadLeaderboard(repository)(
           const LeaderboardQuery(window: LeaderboardWindow.monthly, limit: 50),
         ),
-        const Result<LeaderboardBoard>.success(board),
+        const Right<Failure, LeaderboardBoard>(board),
       );
     });
 
@@ -74,13 +75,13 @@ void main() {
         message: 'Could not reach the server.',
       );
       final _RecordingRepository repository = _RecordingRepository(
-        const Result<LeaderboardBoard>.failure(failure),
+        const Left<Failure, LeaderboardBoard>(failure),
       );
       expect(
         await LoadLeaderboard(repository)(
           const LeaderboardQuery(window: LeaderboardWindow.monthly, limit: 50),
         ),
-        const Result<LeaderboardBoard>.failure(failure),
+        const Left<Failure, LeaderboardBoard>(failure),
       );
     });
   });
@@ -108,11 +109,11 @@ void main() {
 
     test("returns the repository's board unchanged", () async {
       final _RecordingRepository repository = _RecordingRepository(
-        const Result<LeaderboardBoard>.success(board),
+        const Right<Failure, LeaderboardBoard>(board),
       );
       expect(
         await LoadLeaderboardPreview(repository)(),
-        const Result<LeaderboardBoard>.success(board),
+        const Right<Failure, LeaderboardBoard>(board),
       );
     });
 
@@ -122,11 +123,11 @@ void main() {
         message: 'The request timed out.',
       );
       final _RecordingRepository repository = _RecordingRepository(
-        const Result<LeaderboardBoard>.failure(failure),
+        const Left<Failure, LeaderboardBoard>(failure),
       );
       expect(
         await LoadLeaderboardPreview(repository)(),
-        const Result<LeaderboardBoard>.failure(failure),
+        const Left<Failure, LeaderboardBoard>(failure),
       );
     });
   });

@@ -3,14 +3,15 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// Unwraps a [Result] that must have succeeded, with a message that says which
 /// expectation failed rather than reporting a cast error three frames away.
 T expectSuccess<T>(Result<T> result) {
   switch (result) {
-    case Success<T>(:final T value):
+    case Right<Failure, T>(:final T value):
       return value;
-    case FailureResult<T>(:final Failure failure):
+    case Left<Failure, T>(value: final failure):
       fail('expected a success, got ${failure.kind}: ${failure.message}');
   }
 }
@@ -18,9 +19,9 @@ T expectSuccess<T>(Result<T> result) {
 /// Unwraps a [Result] that must have failed.
 Failure expectFailure<T>(Result<T> result) {
   switch (result) {
-    case FailureResult<T>(:final Failure failure):
+    case Left<Failure, T>(value: final failure):
       return failure;
-    case Success<T>():
+    case Right<Failure, T>():
       fail('expected a failure, got a success');
   }
 }

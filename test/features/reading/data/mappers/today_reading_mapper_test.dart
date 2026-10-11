@@ -5,6 +5,7 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/live_payloads.dart';
 
@@ -36,18 +37,18 @@ void main() {
   /// The success value, or a failure whose message names [body]'s problem.
   TodayReading entityOf(Result<TodayReading> result) {
     expect(
-      result.isSuccess,
+      result.isRight(),
       isTrue,
-      reason: result.isFailure
+      reason: result.isLeft()
           ? 'expected a success, got ${result.failureOrElse(const Failure(kind: FailureKind.unknown, message: '?'))}'
           : null,
     );
-    return (result as Success<TodayReading>).value;
+    return (result as Right<Failure, TodayReading>).value;
   }
 
   Failure failureOf(Result<TodayReading> result) {
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<TodayReading>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, TodayReading>).value;
   }
 
   /// The wide entity, for the assertions that are about what survived the wire.
@@ -60,19 +61,19 @@ void main() {
   /// `Verse.number` for the rows that survived.
   ScriptureText entityOfScripture(Result<ScriptureText> result) {
     expect(
-      result.isSuccess,
+      result.isRight(),
       isTrue,
-      reason: result.isFailure
+      reason: result.isLeft()
           ? 'expected a success, got ${result.failureOrElse(const Failure(kind: FailureKind.unknown, message: '?'))}'
           : null,
     );
-    return (result as Success<ScriptureText>).value;
+    return (result as Right<Failure, ScriptureText>).value;
   }
 
   /// A [Failure] from the wide read.
   Failure scriptureFailureOf(Result<ScriptureText> result) {
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<ScriptureText>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, ScriptureText>).value;
   }
 
   group('the live English payload', () {

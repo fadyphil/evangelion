@@ -213,7 +213,7 @@ void main() {
 
     test('`LeaderboardBoard`, and its `rows` compares by CONTENT', () {
       // `LeaderboardBoard` is the **first entity in `core/domain` with a `List` field.**
-      // `result.dart` records that dropping Equatable made `Success<List<_>>` compare by
+      // `result.dart` records that dropping Equatable made `Right<Failure, List<_>>` compare by
       // identity, and warns that a collection-valued type is where the decision has to
       // be written. freezed generates `DeepCollectionEquality` for collection fields, so
       // the board compares by content — and the first two assertions below are what

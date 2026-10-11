@@ -3,6 +3,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'leaderboard_cubit.freezed.dart';
@@ -90,7 +91,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
       LeaderboardQuery(window: window, limit: rowLimit),
     );
     switch (result) {
-      case Success<LeaderboardBoard>(:final LeaderboardBoard value):
+      case Right<Failure, LeaderboardBoard>(:final LeaderboardBoard value):
         emit(
           LeaderboardState(
             status: LeaderboardStatus.ready,
@@ -98,7 +99,7 @@ class LeaderboardCubit extends Cubit<LeaderboardState> {
             board: value,
           ),
         );
-      case FailureResult<LeaderboardBoard>(:final Failure failure):
+      case Left<Failure, LeaderboardBoard>(value: final failure):
         emit(
           LeaderboardState(
             status: LeaderboardStatus.failed,

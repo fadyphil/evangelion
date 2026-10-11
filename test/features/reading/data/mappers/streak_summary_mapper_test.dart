@@ -3,6 +3,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/live_payloads.dart';
 
@@ -26,13 +27,13 @@ void main() {
   const StreakSummaryMapper mapper = StreakSummaryMapper();
 
   StreakSummary entityOf(Result<StreakSummary> result) {
-    expect(result.isSuccess, isTrue, reason: result.toString());
-    return (result as Success<StreakSummary>).value;
+    expect(result.isRight(), isTrue, reason: result.toString());
+    return (result as Right<Failure, StreakSummary>).value;
   }
 
   Failure failureOf(Result<StreakSummary> result) {
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<StreakSummary>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, StreakSummary>).value;
   }
 
   group('the live payload', () {

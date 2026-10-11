@@ -4,6 +4,7 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reading_cubit.freezed.dart';
@@ -179,9 +180,9 @@ class ReadingCubit extends Cubit<ReadingState> {
     emit(_loading());
     final Result<ScriptureText> result = await loadScripture(language);
     switch (result) {
-      case Success<ScriptureText>(:final ScriptureText value):
+      case Right<Failure, ScriptureText>(:final ScriptureText value):
         emit(_ready(value));
-      case FailureResult<ScriptureText>(:final Failure failure):
+      case Left<Failure, ScriptureText>(value: final failure):
         emit(_failed(failure));
     }
   }

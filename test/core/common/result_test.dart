@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// A 5xx with the shape AGENT_CONTEXT §5 documents.
 const Failure boom = Failure(
@@ -24,14 +25,14 @@ Failure _builtFailure(FailureKind kind, String message, {int? statusCode}) =>
 /// [Success] via a parameter, for the same reason as [_builtFailure].
 ///
 /// Generic in [T] rather than fixed at `int` because the hash-agreement test
-/// needs `Success<String>` — and building that through an `int`-only helper is
+/// needs `Right<Failure, String>` — and building that through an `int`-only helper is
 /// how the generic-parameter check would have been written by accident.
-Success<T> _builtSuccess<T>(T value) => Success<T>(value);
+Right<Failure, T> _builtSuccess<T>(T value) => Right<Failure, T>(value);
 
 /// [FailureResult] via a parameter, for the same reason as [_builtFailure], and
 /// generic in [T] for the same reason as [_builtSuccess].
-FailureResult<T> _builtFailureResult<T>(Failure failure) =>
-    FailureResult<T>(failure);
+Left<Failure, T> _builtFailureResult<T>(Failure failure) =>
+    Left<Failure, T>(failure);
 
 void main() {
   group('construction', () {
@@ -42,17 +43,17 @@ void main() {
       // rewritten, because swapping the two getters preserves the relation
       // exactly — it could never fail, and a third copy of these two assertions
       // would only have hidden that.
-      const Result<int> result = Result<int>.success(7);
+      const Result<int> result = Right<Failure, int>(7);
 
-      expect(result.isSuccess, isTrue);
-      expect(result.isFailure, isFalse);
+      expect(result.isRight(), isTrue);
+      expect(result.isLeft(), isFalse);
     });
 
     test('failure() carries a Failure and reports isFailure', () {
-      const Result<int> result = Result<int>.failure(boom);
+      const Result<int> result = Left<Failure, int>(boom);
 
-      expect(result.isFailure, isTrue);
-      expect(result.isSuccess, isFalse);
+      expect(result.isLeft(), isTrue);
+      expect(result.isRight(), isFalse);
     });
 
     test('neither arm is const-only', () {
@@ -62,19 +63,19 @@ void main() {
       // "both factories are const-constructible" while containing no `const` and
       // asserting nothing about construction.)
       final int year = DateTime.now().year;
-      final Result<int> runtimeSuccess = Result<int>.success(year);
-      final Result<int> runtimeFailure = Result<int>.failure(
+      final Result<int> runtimeSuccess = Result<int>.of(year);
+      final Result<int> runtimeFailure = Result<int>.left(
         Failure(kind: FailureKind.unknown, message: runtimeSuccess.toString()),
       );
 
-      expect(runtimeSuccess.isSuccess, isTrue);
-      expect(runtimeFailure.isFailure, isTrue);
+      expect(runtimeSuccess.isRight(), isTrue);
+      expect(runtimeFailure.isLeft(), isTrue);
     });
 
     test('each arm puts its payload in props — that is what equality rests on', () {
       // The cross-arm equality tests cannot fail: `Equatable.operator ==`
-      // compares `runtimeType` before `props`, so `Success<int>` and
-      // `FailureResult<int>` are unequal whatever they hold, an empty payload
+      // compares `runtimeType` before `props`, so `Right<Failure, int>` and
+      // `Left<Failure, int>` are unequal whatever they hold, an empty payload
       // included. What makes equality meaningful is that each arm compares its
       // payload, so two instances of the *same* arm with different payloads
       // differ. Asserted through `==` rather than a `props` list, because
@@ -85,7 +86,7 @@ void main() {
       // `T` given EXPLICITLY at every call site in this test, and that is the
       // fix for a failure this test hit while being written: with `_builtSuccess`
       // inferred from its argument, `_builtFailureResult<int>(someFailure)` resolved
-      // `T` to `dynamic`, so the arm compared unequal to a `FailureResult<int>` on
+      // `T` to `dynamic`, so the arm compared unequal to a `Left<Failure, int>` on
       // the *type* rather than on the payload it exists to test. The assertion
       // passed for the wrong reason — which is the failure mode this very test
       // was written to catch.
@@ -94,8 +95,8 @@ void main() {
         message: 'boom',
         statusCode: 500,
       );
-      final Success<int> success = _builtSuccess<int>(4);
-      final FailureResult<int> failure = _builtFailureResult<int>(boom);
+      final Right<Failure, int> success = _builtSuccess<int>(4);
+      final Left<Failure, int> failure = _builtFailureResult<int>(boom);
 
       expect(success, isNot(_builtSuccess<int>(5)));
       // Same [Failure] fields but a different `statusCode` — which IS one of the
@@ -109,30 +110,27 @@ void main() {
 
   group('map', () {
     test('transforms the success value', () {
-      final Result<int> result = const Result<int>.success(21)
+      final Result<int> result = const Right<Failure, int>(21)
           .map((int doubled) => doubled * 2);
 
-      expect(
-        result.fold<int>(onSuccess: (int v) => v, onFailure: (Failure _) => -1),
-        42,
-      );
+      expect(result.fold<int>((Failure _) => -1, (int v) => v), 42);
     });
 
     test('does NOT run its function for a failure', () {
       bool called = false;
 
-      final Result<int> result = const Result<int>.failure(boom)
+      final Result<int> result = const Left<Failure, int>(boom)
           .map((int value) {
             called = true;
             return value * 2;
           });
 
       expect(called, isFalse);
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
     });
 
     test('leaves the failure byte-for-byte identical', () {
-      final Result<int> mapped = const Result<int>.failure(boom)
+      final Result<int> mapped = const Left<Failure, int>(boom)
           .map((int v) => v * 2);
 
       expect(mapped.failureOrElse(boom), boom);
@@ -141,14 +139,11 @@ void main() {
     test('changes the static type of the success arm', () {
       // Result<int>.map((int v) => '$v') is a Result<String>: the transform is
       // what retypes the value, and `fold` is where the two arms meet.
-      final Result<String> mapped = const Result<int>.success(7)
+      final Result<String> mapped = const Right<Failure, int>(7)
           .map((int v) => 'id=$v');
 
       expect(
-        mapped.fold<String>(
-          onSuccess: (String s) => s,
-          onFailure: (Failure _) => 'failed',
-        ),
+        mapped.fold<String>((Failure _) => 'failed', (String s) => s),
         'id=7',
       );
     });
@@ -158,20 +153,20 @@ void main() {
     test('does NOT run for a success', () {
       bool called = false;
 
-      final Result<int> result = const Result<int>.success(1)
-          .mapFailure((Failure f) {
+      final Result<int> result = const Right<Failure, int>(1)
+          .mapLeft((Failure f) {
             called = true;
             return f;
           });
 
       expect(called, isFalse);
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
     });
 
     test('preserves the ORIGINAL kind when the transform rebuilds it', () {
       // The realistic use is adding context without reclassifying: a mapper
       // annotates a 409, it does not turn it into an `unknown`.
-      final Result<int> result = const Result<int>.failure(boom).mapFailure(
+      final Result<int> result = const Left<Failure, int>(boom).mapLeft(
         (Failure f) => Failure(
           kind: f.kind,
           message: 'submit failed: ${f.message}',
@@ -179,7 +174,7 @@ void main() {
         ),
       );
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(result.failureOrElse(boom).kind, FailureKind.server);
       expect(
         result.failureOrElse(boom).message,
@@ -192,7 +187,7 @@ void main() {
       // Proves the previous test is not vacuous: kind is carried by the
       // transform's return value, so equality of kind there was a real
       // decision and not a copy of the original.
-      final Result<int> result = const Result<int>.failure(boom).mapFailure(
+      final Result<int> result = const Left<Failure, int>(boom).mapLeft(
         (Failure f) => Failure(kind: FailureKind.unknown, message: f.message),
       );
 
@@ -201,18 +196,14 @@ void main() {
 
     test('keeps the success value untouched', () {
       // The transform must actually be handed to `mapFailure`. An earlier
-      // version of this test built a bare `Result<int>.success(3)` and folded
+      // version of this test built a bare `Result<int>.of(3)` and folded
       // it — it never called `mapFailure` at all, which is why replacing the
-      // success arm with `Success<T>(0 as T)` left the suite green.
-      final Result<int> result = const Result<int>.success(
-        3,
-      ).mapFailure((Failure f) => Failure(kind: f.kind, message: 'never runs'));
+      // success arm with `Right<Failure, T>(0 as T)` left the suite green.
+      final Result<int> result = const Right<Failure, int>(3)
+          .mapLeft((Failure f) => Failure(kind: f.kind, message: 'never runs'));
 
-      expect(
-        result.fold<int>(onSuccess: (int v) => v, onFailure: (Failure _) => -1),
-        3,
-      );
-      expect(result.isSuccess, isTrue);
+      expect(result.fold<int>((Failure _) => -1, (int v) => v), 3);
+      expect(result.isRight(), isTrue);
     });
   });
 
@@ -220,11 +211,13 @@ void main() {
     test('selects onSuccess for a success and ignores onFailure', () {
       bool onFailureRan = false;
 
-      final String out = const Result<int>.success(5).fold<String>(
-        onSuccess: (int v) => 'value=$v',
-        onFailure: (Failure _) {
+      final String out = const Right<Failure, int>(5).fold<String>(
+        (Failure _) {
           onFailureRan = true;
           return 'failed';
+        },
+        (int v) {
+          return 'value=$v';
         },
       );
 
@@ -235,13 +228,11 @@ void main() {
     test('selects onFailure for a failure and hands over the Failure', () {
       String? seenKind;
 
-      final String out = const Result<int>.failure(boom).fold<String>(
-        onSuccess: (int v) => 'value=$v',
-        onFailure: (Failure f) {
-          seenKind = f.kind.name;
-          return f.message;
-        },
-      );
+      final String out = const Left<Failure, int>(boom)
+          .fold<String>((Failure f) {
+            seenKind = f.kind.name;
+            return f.message;
+          }, (int v) => 'unreachable');
 
       expect(out, 'internal server error');
       expect(seenKind, 'server');
@@ -250,10 +241,10 @@ void main() {
     test('unifies both arms into one static type', () {
       // This is the whole point of fold: the caller never writes a branch, and
       // the cubit can assign either arm to one field.
-      final int fromSuccess = const Result<int>.success(2)
-          .fold<int>(onSuccess: (int v) => v, onFailure: (Failure _) => 0);
-      final int fromFailure = const Result<int>.failure(boom)
-          .fold<int>(onSuccess: (int v) => v, onFailure: (Failure _) => 0);
+      final int fromSuccess = const Right<Failure, int>(2)
+          .fold<int>((Failure _) => 0, (int v) => v);
+      final int fromFailure = const Left<Failure, int>(boom)
+          .fold<int>((Failure _) => 0, (int v) => v);
 
       expect(fromSuccess, 2);
       expect(fromFailure, 0);
@@ -262,14 +253,14 @@ void main() {
 
   group('valueOrElse', () {
     test('returns the value for a success, ignoring the fallback', () {
-      expect(const Result<int>.success(9).valueOrElse(-1), 9);
+      expect(const Right<Failure, int>(9).getOrElse((_) => -1), 9);
     });
 
     test('returns the fallback for a failure — the loss is explicit', () {
       // Named `valueOrElse`, never `getOrNull`, so the call site states that it
       // is discarding the Failure. AGENT_CONTEXT §3 (LSP) is why there is no
       // `value` getter that would silently null out.
-      expect(const Result<int>.failure(boom).valueOrElse(-1), -1);
+      expect(const Left<Failure, int>(boom).getOrElse((_) => -1), -1);
     });
 
     test('a non-constant fallback of type T is accepted verbatim', () {
@@ -279,8 +270,11 @@ void main() {
       // including one built at run time rather than a `const` literal.
       final int fallback = DateTime.now().year;
 
-      expect(const Result<int>.failure(boom).valueOrElse(fallback), fallback);
-      expect(const Result<int>.success(9).valueOrElse(fallback), 9);
+      expect(
+        const Left<Failure, int>(boom).getOrElse((_) => fallback),
+        fallback,
+      );
+      expect(const Right<Failure, int>(9).getOrElse((_) => fallback), 9);
     });
 
     group('the differing-arms case belongs to fold, not valueOrElse', () {
@@ -288,18 +282,18 @@ void main() {
       // both, so a widget-returning failure arm and a value-returning success arm
       // are one honest branch.
       test('fold<Widget> serves it, and runs exactly one arm', () {
-        const Result<int> success = Result<int>.success(24);
-        const Result<int> failure = Result<int>.failure(boom);
+        const Result<int> success = Right<Failure, int>(24);
+        const Result<int> failure = Left<Failure, int>(boom);
 
         // Different widget TYPES per arm, so picking the wrong arm is
         // unmistakable rather than a width that could coincide.
         final Widget fromSuccess = success.fold<Widget>(
-          onSuccess: (int value) => SizedBox(width: value.toDouble()),
-          onFailure: (Failure _) => const Text('failed'),
+          (Failure _) => const Text('failed'),
+          (int value) => SizedBox(width: value.toDouble()),
         );
         final Widget fromFailure = failure.fold<Widget>(
-          onSuccess: (int value) => SizedBox(width: value.toDouble()),
-          onFailure: (Failure _) => const Text('failed'),
+          (Failure _) => const Text('failed'),
+          (int value) => SizedBox(width: value.toDouble()),
         );
 
         expect(fromSuccess, isA<SizedBox>());
@@ -336,11 +330,11 @@ void main() {
         // What IS observable at run time is asserted here: both arms hand back a
         // value of the value type, never a fallback smuggled in through a
         // widening type parameter.
-        const Result<String> stringFailure = Result<String>.failure(boom);
+        const stringFailure = Left(boom);
 
-        expect(stringFailure.valueOrElse('unavailable'), 'unavailable');
+        expect(stringFailure.getOrElse((_) => 'unavailable'), 'unavailable');
         expect(
-          const Result<String>.success('ok').valueOrElse('unavailable'),
+          const Right<Failure, String>('ok').getOrElse((_) => 'unavailable'),
           'ok',
         );
       });
@@ -358,7 +352,7 @@ void main() {
         message: 'sentinel, never stored',
       );
 
-      final Failure out = const Result<int>.failure(boom)
+      final Failure out = const Left<Failure, int>(boom)
           .failureOrElse(sentinel);
 
       expect(out.kind, FailureKind.server);
@@ -372,27 +366,27 @@ void main() {
         message: 'left',
       );
 
-      expect(const Result<int>.success(1).failureOrElse(other), other);
+      expect(const Right<Failure, int>(1).failureOrElse(other), other);
     });
   });
 
   group('equality', () {
     // Every operand below comes from a builder, never from a `const` literal.
-    // Two `const Result<int>.success(4)` expressions are canonicalised by the
+    // Two `const Right<Failure, int>(4)` expressions are canonicalised by the
     // compiler into ONE instance, so comparing them is `identical()` and passes
     // against any implementation — including `props => []`.
 
     test('two successes with equal values are equal — as distinct objects', () {
-      final Success<int> a = _builtSuccess<int>(4);
-      final Success<int> b = _builtSuccess<int>(4);
+      final Right<Failure, int> a = _builtSuccess<int>(4);
+      final Right<Failure, int> b = _builtSuccess<int>(4);
 
       expect(identical(a, b), isFalse, reason: 'otherwise this is vacuous');
       expect(a, b);
     });
 
     test('equal successes share a hash code', () {
-      final Success<int> a = _builtSuccess<int>(4);
-      final Success<int> b = _builtSuccess<int>(4);
+      final Right<Failure, int> a = _builtSuccess<int>(4);
+      final Right<Failure, int> b = _builtSuccess<int>(4);
 
       expect(identical(a, b), isFalse, reason: 'otherwise this is vacuous');
       expect(a.hashCode, b.hashCode);
@@ -407,23 +401,23 @@ void main() {
       // built separately. Reusing the `const` `boom` on both sides would
       // compare one `Failure` instance with itself and prove nothing about
       // `Failure`'s own equality.
-      final FailureResult<int> a = _builtFailureResult<int>(
+      final Left<Failure, int> a = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
-      final FailureResult<int> b = _builtFailureResult<int>(
+      final Left<Failure, int> b = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
 
       expect(identical(a, b), isFalse, reason: 'otherwise this is vacuous');
-      expect(identical(a.failure, b.failure), isFalse);
+      expect(identical(a.value, b.value), isFalse);
       expect(a, b);
     });
 
     test('equal failure results share a hash code', () {
-      final FailureResult<int> a = _builtFailureResult<int>(
+      final Left<Failure, int> a = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
-      final FailureResult<int> b = _builtFailureResult<int>(
+      final Left<Failure, int> b = _builtFailureResult<int>(
         _builtFailure(FailureKind.server, 'internal server error'),
       );
 
@@ -478,7 +472,7 @@ void main() {
       //
       // Now that each arm owns its `==`, the cross-arm guard is per-arm code, and
       // dropping either one is invisible to a one-directional test. VERIFIED: with
-      // `Success`'s `other is Success<T>` guard replaced by a bare
+      // `Success`'s `other is Right<Failure, T>` guard replaced by a bare
       // `runtimeType` comparison plus an unchecked cast, this file stayed fully
       // green — because `runtimeType` happened to answer it anyway. Both
       // directions are asserted below precisely so that mutation cannot hide
@@ -517,103 +511,129 @@ void main() {
       expect(asSuccess.runtimeType, isNot(asFailure.runtimeType));
     });
 
-    test('a narrow generic does not equal a wider one holding an equal value', () {
-      // THE TEST THAT HOLDS `runtimeType` IN `==`, and it exists because two
-      // successive attempts to remove that clause both needed correcting.
+    test('fp_dart compares PAYLOADS, not type arguments — and that is pinned', () {
+      // ## THIS ASSERTS fp_dart's BEHAVIOUR, NOT A BUG
       //
-      // ## WHY THE OBVIOUS REASONING IS WRONG
+      // The hand-written `Result<T>` guarded `==` on `runtimeType`, because Dart's
+      // generics are covariant: `Success<int> is Success<num>` is true, and `1 == 1.0`
+      // is true, so without the guard two differently-typed Results compare EQUAL.
+      // That guard was decision 131 and had mutation tests behind it.
       //
-      // "The clause is redundant: `other is Success<T>` already rejects a
-      // mismatched generic." It does — in the NARROWING direction.
-      // `Success<String> is Success<int>` is false. So that half of the argument
-      // is right, which is exactly what makes it convincing and exactly what makes
-      // it wrong: **Dart's generic parameters are covariant**, so
-      // `Success<int> is Success<num>` is **true**. With `int` on the left the
-      // type test passes, and since `1 == 1.0` is also true, `value == other.value`
-      // says yes as well. Without `runtimeType` these two compare EQUAL.
+      // fp_dart's arms do not have it. `Right.operator ==` is
+      // `(other is Right) && other._value == _value` (`either.dart:572`) — the type
+      // parameters are never mentioned. Measured against 1.2.0:
       //
-      // Both facts are measured, not recalled — `is` on the widened pair, and `==`
-      // on the two numeric literals — because the whole claim turns on them.
+      //     Right<Failure, int>(1)  == Right<Failure, num>(1)   ->  true
+      //     Left<Failure, int>(f)   == Left<Failure, Object>(f)  ->  true
       //
-      // ## WHY THIS PAIRED PAYLOAD IS THE ONLY ONE THAT WORKS
+      // Subclassing `Right` to restore the guard was tried and DOES NOT WORK: a
+      // subclass does not match the supertype's object pattern, so `switch` over the
+      // alias stops being exhaustive ("does not match the pattern
+      // `Right<Failure, T>()`"). Restoring equality would destroy the sealed
+      // exhaustiveness the migration was undertaken to obtain.
       //
-      // The natural test, `Success<int>(1)` against `Success<String>('1')`, proves
-      // nothing about the generic parameter: the payloads differ, so `value ==
-      // other.value` rejects the pair on its own and the type check is never
-      // consulted. VERIFIED — rewriting `Success`'s `==` to drop the type-argument
-      // check entirely left that version of the test fully green. Two payloads
-      // that `==` *cannot* distinguish are the only pair that forces the question
-      // out to the type.
-      final Success<int> narrow = _builtSuccess<int>(1);
-      final Success<num> wide = _builtSuccess<num>(1);
+      // So the behaviour is pinned as-is and this is the file that says so. If a
+      // future fp_dart release adds the type check, THIS TEST FAILS, which is the
+      // point: the change is noticed instead of absorbed silently.
+      final Right<Failure, int> narrow = _builtSuccess<int>(1);
+      final Right<Failure, num> wide = _builtSuccess<num>(1);
 
-      expect(narrow, isNot(wide));
-      // Both directions, because `==` dispatches on the LEFT operand and the
-      // covariance trap only opens in one of them.
-      expect(wide, isNot(narrow));
+      // The payload is genuinely `==`-equal, and the generic parameters genuinely
+      // relate by covariance. Without both premises the assertion below would pass
+      // for the wrong reason.
+      expect(narrow.value, wide.value);
+      expect(narrow, isA<Right<Failure, num>>());
 
-      // The hash is the quieter half of the same clause. Two Results that compare
-      // unequal and share a bucket is legal Dart; it degrades a `HashMap<Result>`
-      // into a linear scan and fails nothing. Since the payloads are `==`-equal,
-      // `runtimeType` is the only thing that can separate these hashes at all.
-      expect(narrow.hashCode, isNot(wide.hashCode));
+      // The actual behaviour: equal, because only the payload is compared.
+      expect(narrow, wide);
+      // And symmetric — `==` here dispatches on the value being compared, not on a
+      // left-operand override, so there is only one direction to state.
+      expect(wide, narrow);
 
-      // And the widening direction is checked for real rather than assumed:
-      // `narrow is Success<num>` is what makes the mutation above reachable, so
-      // this asserts the premise the whole test rests on.
-      expect(narrow, isA<Success<num>>());
+      // The same on the failure arm, where it is WORSE: both arms carry the
+      // IDENTICAL `Failure`, so there is no payload that could separate them.
+      final Left<Failure, int> fNarrow = _builtFailureResult<int>(boom);
+      final Left<Failure, Object> fWide = _builtFailureResult<Object>(boom);
+
+      expect(fNarrow.value, fWide.value);
+      expect(fNarrow, fWide);
     });
 
-    test('a narrow generic does not equal a wider failure arm', () {
-      // The same covariance trap on `FailureResult`, where it is *worse*: both
-      // arms carry the IDENTICAL `Failure`, so once the type test is passed the
-      // payload comparison agrees unconditionally. Dropping `runtimeType` here
-      // makes two differently-typed Results equal on every payload there is.
-      final FailureResult<int> narrow = _builtFailureResult<int>(boom);
-      final FailureResult<Object> wide = _builtFailureResult<Object>(boom);
-
-      expect(narrow, isNot(wide));
-      expect(wide, isNot(narrow));
-      expect(narrow.hashCode, isNot(wide.hashCode));
-      // Premise, asserted: the payload really is the same object, so nothing but
-      // the type can be doing the work.
-      expect(narrow.failure, wide.failure);
-      expect(narrow, isA<FailureResult<Object>>());
+    test('the two arms never compare equal to each other', () {
+      // The property that DOES hold, and that the old `runtimeType` clause was
+      // most load-bearing for: `Right` is never a `Left`. Losing the type
+      // argument did not touch this.
+      expect(_builtSuccess<int>(1), isNot(_builtFailureResult<int>(boom)));
+      expect(_builtFailureResult<int>(boom), isNot(_builtSuccess<int>(1)));
     });
 
-    test('a hash separates arms of different generic parameters', () {
-      // The plain version, for the case where the payloads differ outright — and
-      // the half that fails if a `hashCode` is replaced by a constant, which
-      // "equal values share a hash" would NOT catch. VERIFIED: `Success`'s
-      // `hashCode` replaced with the literal `0` makes exactly this fail while
-      // every equality assertion in the file stays green.
-      final Success<int> intArm = _builtSuccess<int>(1);
-      final Success<String> stringArm = _builtSuccess<String>('1');
+    test('differing payloads still compare unequal, and hash apart', () {
+      // The half that catches a `hashCode` replaced by a constant — which
+      // "equal values share a hash" would NOT catch. Unaffected by fp_dart.
+      final Right<Failure, int> intArm = _builtSuccess<int>(1);
+      final Right<Failure, String> stringArm = _builtSuccess<String>('1');
 
       expect(intArm, isNot(stringArm));
       expect(intArm.hashCode, isNot(stringArm.hashCode));
 
-      final FailureResult<int> fInt = _builtFailureResult<int>(boom);
-      final FailureResult<String> fString = _builtFailureResult<String>(boom);
+      // On the failure arm the payloads must actually DIFFER, or the pair
+      // collapses into the covariance case pinned above — both arms carry the
+      // identical `Failure`, so differing type arguments alone do not make
+      // them unequal. That is the trap this arm-specific fixture exists to
+      // avoid, and it is the reason the failure arm needs its own payload.
+      final Left<Failure, int> fInt = _builtFailureResult<int>(boom);
+      final Left<Failure, String> fString = _builtFailureResult<String>(
+        _builtFailure(FailureKind.cancelled, 'other'),
+      );
 
       expect(fInt, isNot(fString));
       expect(fInt.hashCode, isNot(fString.hashCode));
     });
+
+    test('a collection payload compares by IDENTITY — recorded, not fixed', () {
+      // fp_dart does NOT fix the identity comparison the hand-written type had,
+      // and this is the pair that proves it. Both `Result<List<int>>` values carry
+      // equal, deeply-equal lists, and they still compare unequal.
+      //
+      // `==` on a `List` is identity in plain Dart, and fp_dart's `==` delegates
+      // to `==` on the payload, so nothing is gained here. This is asserted
+      // because the claim "fp_dart fixes collection equality" is easy to believe
+      // and is FALSE — and it is REACHABLE, because
+      // `today_reading_mapper.dart` builds `Result<List<Verse>>`.
+      final shared = <int>[1, 2];
+
+      expect(
+        _builtSuccess<List<int>>(shared),
+        _builtSuccess<List<int>>(shared),
+        reason: 'the same list instance is equal',
+      );
+      expect(
+        _builtSuccess<List<int>>([1, 2]),
+        isNot(_builtSuccess<List<int>>([1, 2])),
+        reason:
+            'but two equal, distinct lists are NOT — and fp_dart does not '
+            'change that, contrary to what its type-parameter-free `==` '
+            'suggests at first glance',
+      );
+    });
   });
 
   group('toString', () {
-    // Equatable's default is `Instance of 'Success<int>'`, which is what a log
-    // line and a failed `expect` would otherwise show. Pinned so a rewrite that
-    // drops the value cannot pass unnoticed.
+    // fp_dart's arms render as `Right(4)` / `Left(Failure(...))` — no type
+    // arguments (`either.dart:578`, `:667`). That is what a log line and a
+    // failed `expect` show, and it is pinned so a rewrite that DROPS THE VALUE
+    // cannot pass unnoticed. The type arguments are deliberately not in the
+    // rendering: they are noise in a log, and the payload is the part a reader
+    // is looking for.
 
     test('Success names its value', () {
-      expect(_builtSuccess<int>(4).toString(), 'Success<int>(4)');
+      expect(_builtSuccess<int>(4).toString(), 'Right(4)');
     });
 
     test('FailureResult names the failure it carries', () {
       expect(
         _builtFailureResult<int>(boom).toString(),
-        'FailureResult<int>(Failure(kind: server, statusCode: 500, '
+        'Left(Failure(kind: server, statusCode: 500, '
         'message: internal server error))',
       );
     });
@@ -628,18 +648,19 @@ void main() {
 
   group('sealed exhaustiveness', () {
     // [describe] has NO `default` arm. Because `Result<T>` is `sealed` with
-    // exactly `Success<T>` and `FailureResult<T>`, adding a third subtype makes
+    // exactly `Right<Failure, T>` and `Left<Failure, T>`, adding a third subtype makes
     // this function fail to COMPILE — which is the guarantee the test guards.
     String describe(Result<int> result) => switch (result) {
-      Success<int>(:final value) => 'success:$value',
-      FailureResult<int>(:final failure) => 'failure:${failure.kind.name}',
+      Right<Failure, int>(:final value) => 'success:$value',
+      Left<Failure, int>(value: final failure) =>
+        'failure:${failure.kind.name}',
     };
 
     test('a no-default switch exhausts the sealed type', () {
-      expect(describe(const Result<int>.success(12)), 'success:12');
+      expect(describe(const Right<Failure, int>(12)), 'success:12');
       expect(
         describe(
-          const Result<int>.failure(
+          const Left<Failure, int>(
             Failure(kind: FailureKind.conflict, message: 'already answered'),
           ),
         ),
@@ -649,15 +670,15 @@ void main() {
 
     test('a no-default switch can also destructure the Failure', () {
       String code(Result<String> result) => switch (result) {
-        Success<String>(:final value) => value,
-        FailureResult<String>(:final failure) =>
+        Right<Failure, String>(:final value) => value,
+        Left<Failure, String>(value: final failure) =>
           '${failure.statusCode ?? 0}:${failure.kind.name}',
       };
 
-      expect(code(const Result<String>.success('ok')), 'ok');
+      expect(code(const Right<Failure, String>('ok')), 'ok');
       expect(
         code(
-          const Result<String>.failure(
+          const Left<Failure, String>(
             Failure(
               kind: FailureKind.unauthorized,
               message: 'bad id',

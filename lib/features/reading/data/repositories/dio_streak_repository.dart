@@ -60,7 +60,7 @@ final class DioStreakRepository implements StreakRepository {
       final Object? body = await dataSource.summary();
       return mapper.map(body);
     } on DioException catch (error) {
-      return Result<StreakSummary>.failure(errors.fromDioException(error));
+      return Result<StreakSummary>.left(errors.fromDioException(error));
     }
   }
 }

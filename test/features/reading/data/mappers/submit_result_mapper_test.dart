@@ -3,6 +3,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/reading/data/mappers/submit_result_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/contract_payloads.dart';
 
@@ -38,18 +39,18 @@ void main() {
 
   SubmitResult entityOf(Result<SubmitResult> result) {
     expect(
-      result.isSuccess,
+      result.isRight(),
       isTrue,
-      reason: result.isFailure
+      reason: result.isLeft()
           ? 'expected a success, got ${result.failureOrElse(const Failure(kind: FailureKind.unknown, message: '?'))}'
           : null,
     );
-    return (result as Success<SubmitResult>).value;
+    return (result as Right<Failure, SubmitResult>).value;
   }
 
   Failure failureOf(Result<SubmitResult> result) {
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<SubmitResult>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, SubmitResult>).value;
   }
 
   group('the contract body, transcribed from the service interface', () {

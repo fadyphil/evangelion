@@ -1,6 +1,6 @@
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// The closed vocabulary the dual-shape error mapper (Phase 5) must be able to
 /// produce. Asserted as a set of wire names so this pins the *contract* without
@@ -429,19 +429,19 @@ void main() {
       });
 
       test('Success names its value', () {
-        expect(const Result<int>.success(4).toString(), 'Success<int>(4)');
+        expect(const Right<Failure, int>(4).toString(), 'Right(4)');
       });
 
       test('FailureResult names its failure', () {
         expect(
-          const Result<int>.failure(
+          const Left<Failure, int>(
             Failure(
               kind: FailureKind.server,
               message: 'internal server error',
               statusCode: 500,
             ),
           ).toString(),
-          'FailureResult<int>(Failure(kind: server, statusCode: 500, '
+          'Left(Failure(kind: server, statusCode: 500, '
           'message: internal server error))',
         );
       });

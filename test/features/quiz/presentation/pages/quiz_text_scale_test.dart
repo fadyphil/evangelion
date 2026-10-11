@@ -44,6 +44,7 @@
 /// on exactly that.
 library;
 
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
@@ -56,6 +57,7 @@ import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/quiz_harness.dart';
@@ -70,7 +72,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         ),
         size: surface,
         textScale: scale,
@@ -88,7 +90,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveArabicQuizPassage),
+          const Right<Failure, ScriptureText>(liveArabicQuizPassage),
         ),
         locale: const Locale('ar'),
         size: surface,
@@ -108,7 +110,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveEnglishQuizPassage),
+          const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         ),
         size: surface,
         textScale: scale,
@@ -136,7 +138,7 @@ void main() {
       // and driving the bloc is what lets the graded layout be measured at all; the
       // tap path is `quiz_page_test.dart`'s subject at the default surface.
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveEnglishQuizPassage),
+        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         submission: defaultSubmission,
       );
       await pumpQuiz(tester, bloc: bloc, size: surface, textScale: scale);
@@ -165,7 +167,7 @@ void main() {
 
     testWidgets('after a check, Arabic', (WidgetTester tester) async {
       final QuizBloc bloc = quizBloc(
-        const Result<ScriptureText>.success(liveArabicQuizPassage),
+        const Right<Failure, ScriptureText>(liveArabicQuizPassage),
         submission: defaultSubmission,
       );
       await pumpQuiz(
@@ -196,7 +198,7 @@ void main() {
         await pumpQuiz(
           tester,
           bloc: quizBloc(
-            Result<ScriptureText>.success(
+            Result<ScriptureText>.of(
               englishPassageWith(<Question>[answeredQuestion]),
             ),
           ),
@@ -218,7 +220,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          Result<ScriptureText>.success(
+          Result<ScriptureText>.of(
             arabicPassageWith(<Question>[answeredQuestion]),
           ),
         ),
@@ -240,7 +242,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(
+          const Right<Failure, ScriptureText>(
             // `questions: []` **maps**, so this is reachable: recorded decision 50
             // skips an unreadable question rather than refusing the passage.
             ScriptureText(
@@ -275,7 +277,7 @@ void main() {
       await pumpQuiz(
         tester,
         bloc: quizBloc(
-          const Result<ScriptureText>.success(liveArabicQuizPassage),
+          const Right<Failure, ScriptureText>(liveArabicQuizPassage),
         ),
         locale: const Locale('ar'),
         size: surface,

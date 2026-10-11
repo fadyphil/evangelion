@@ -5,7 +5,7 @@ import 'package:evangelion/app/router/app_router.dart';
 // The generated `*Route` classes, reached the way `app_router.dart` reaches them.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
-import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
@@ -19,6 +19,7 @@ import 'package:evangelion/features/reading/presentation/pages/reading_page.dart
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../support/app_harness.dart';
 import '../../support/quiz_harness.dart';
@@ -581,7 +582,7 @@ void main() {
       // A guarded-route test is about the *guard*, so it hands the page the one thing
       // the guard does not care about.
       final QuizBloc quiz = quizBloc(
-        const Result<ScriptureText>.success(liveArabicQuizPassage),
+        const Right<Failure, ScriptureText>(liveArabicQuizPassage),
       );
       unawaited(harness.router.push<void>(QuizRoute(bloc: quiz)));
       await pumpUntilFound(tester, find.byType(QuizPage));

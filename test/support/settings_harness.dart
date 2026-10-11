@@ -256,11 +256,11 @@ final class FailingSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<UserSettings>> load() async =>
-      Result<UserSettings>.failure(failure);
+      Result<UserSettings>.left(failure);
 
   @override
   Future<Result<UserSettings>> save(UserSettings settings) async =>
-      Result<UserSettings>.failure(failure);
+      Result<UserSettings>.left(failure);
 }
 
 /// Pumps `/settings` over a [SettingsCubit] and returns it.

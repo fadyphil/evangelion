@@ -8,6 +8,7 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 /// `GetSettings` and `UpdateSettings` — the two use cases, which add **nothing**.
 ///
@@ -36,12 +37,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// nothing". This one always answers.
 class RecordingSettingsRepository implements SettingsRepository {
   /// What [load] answers.
-  Result<UserSettings> onLoad = const Result<UserSettings>.success(
+  Result<UserSettings> onLoad = const Right<Failure, UserSettings>(
     UserSettings(),
   );
 
   /// What [save] answers.
-  Result<UserSettings> onSave = const Result<UserSettings>.success(
+  Result<UserSettings> onSave = const Right<Failure, UserSettings>(
     UserSettings(),
   );
 
@@ -81,7 +82,7 @@ void main() {
       final Result<UserSettings> result = await useCase();
 
       expect(repository.loads, 1);
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
     });
 
     test('and it is NOT a `UseCase<void, …>`', () {
@@ -103,12 +104,12 @@ void main() {
     test('a failure is returned UNCHANGED, same instance', () async {
       final RecordingSettingsRepository repository =
           RecordingSettingsRepository()
-            ..onLoad = const Result<UserSettings>.failure(boom);
+            ..onLoad = const Left<Failure, UserSettings>(boom);
       final Result<UserSettings> result = await GetSettings(repository)();
 
-      expect(result.isFailure, isTrue);
+      expect(result.isLeft(), isTrue);
       expect(
-        (result as FailureResult<UserSettings>).failure,
+        (result as Left<Failure, UserSettings>).value,
         boom,
         reason:
             'the SAME instance. A re-wrapped failure would change the answer for a '
@@ -129,7 +130,7 @@ void main() {
         language: ReadingLanguage.arabic,
         reducedMotion: true,
       );
-      repository.onSave = const Result<UserSettings>.success(next);
+      repository.onSave = const Right<Failure, UserSettings>(next);
 
       final Result<UserSettings> result = await UpdateSettings(repository)(
         next,
@@ -137,9 +138,9 @@ void main() {
 
       expect(repository.saves, 1);
       expect(repository.saved, <UserSettings>[next]);
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
       expect(
-        (result as Success<UserSettings>).value,
+        (result as Right<Failure, UserSettings>).value,
         next,
         reason:
             'the port returns `UserSettings` rather than `void` so a write round trip is '
@@ -170,14 +171,14 @@ void main() {
     test('a failure is returned UNCHANGED', () async {
       final RecordingSettingsRepository repository =
           RecordingSettingsRepository()
-            ..onSave = const Result<UserSettings>.failure(boom);
+            ..onSave = const Left<Failure, UserSettings>(boom);
 
       final Result<UserSettings> result = await UpdateSettings(repository)(
         const UserSettings(),
       );
 
-      expect(result.isFailure, isTrue);
-      expect((result as FailureResult<UserSettings>).failure, boom);
+      expect(result.isLeft(), isTrue);
+      expect((result as Left<Failure, UserSettings>).value, boom);
     });
   });
 
@@ -188,7 +189,7 @@ void main() {
       // always returning a `Result` — are enforced by the type. This is that row
       // exercised rather than quoted.
       final RecordingSettingsRepository fake = RecordingSettingsRepository()
-        ..onLoad = const Result<UserSettings>.success(
+        ..onLoad = const Right<Failure, UserSettings>(
           UserSettings(themeMode: AppThemeMode.system),
         );
       final RecordingSettingsRepository other = RecordingSettingsRepository();
@@ -197,7 +198,7 @@ void main() {
       final List<AppThemeMode> answered = <AppThemeMode>[];
       for (final SettingsRepository port in ports) {
         final Result<UserSettings> result = await GetSettings(port)();
-        answered.add((result as Success<UserSettings>).value.themeMode);
+        answered.add((result as Right<Failure, UserSettings>).value.themeMode);
       }
 
       expect(answered, <AppThemeMode>[AppThemeMode.system, AppThemeMode.dark]);

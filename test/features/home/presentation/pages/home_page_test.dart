@@ -20,6 +20,7 @@
 /// verification line is written about ("renders `ErrorView` … not a blank panel").
 library;
 
+import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
@@ -36,6 +37,7 @@ import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/home_harness.dart';
@@ -210,7 +212,9 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
-      h.readings.scripture = const Result.success(liveArabicScripture);
+      h.readings.scripture = const Right<Failure, ScriptureText>(
+        liveArabicScripture,
+      );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
       // Asked for the Arabic endpoint, not the English one.
@@ -284,7 +288,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -299,7 +303,7 @@ void main() {
       (WidgetTester tester) async {
         // The phase's own wording: "not a blank panel, and not a whole-screen error".
         final HomeHarness h = harness(
-          reading: const Result.failure(homeReadingFailure),
+          reading: const Left<Failure, ScriptureText>(homeReadingFailure),
         );
         await pumpHome(tester, bloc: h.bloc);
 
@@ -323,7 +327,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -343,7 +347,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -351,7 +355,9 @@ void main() {
       expect(h.streaks.calls, 1);
       expect(h.auth.calls, 1);
 
-      h.readings.scripture = const Result.success(liveEnglishScripture);
+      h.readings.scripture = const Right<Failure, ScriptureText>(
+        liveEnglishScripture,
+      );
       // `ensureVisible` first: at 320x568 the panel is below the fold, and a tap on
       // an off-screen widget throws a hit-test warning rather than pressing the
       // button — which reads as "the retry does not work".
@@ -386,7 +392,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        reading: const Result.failure(homeReadingFailure),
+        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -406,7 +412,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -431,7 +437,7 @@ void main() {
       // The half of the contradiction this file exists for: the streak endpoint
       // failing must not take the reading's own `is_fully_completed` with it.
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -445,11 +451,11 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
-      h.streaks.answer = const Result.success(liveStreakSummary);
+      h.streaks.answer = const Right<Failure, StreakSummary>(liveStreakSummary);
       final Finder flameRetry = find.byIcon(Icons.sync_problem_outlined);
       await tester.ensureVisible(flameRetry);
       await pumpFrames(tester, 2);
@@ -510,7 +516,7 @@ void main() {
         // narrow `questionCount` is now `questions.length`. The old spelling,
         // `liveEnglishReading.copyWith(questionCount: 0)`, narrowed a count that no
         // longer exists anywhere.
-        h.readings.scripture = const Result<ScriptureText>.success(
+        h.readings.scripture = const Right<Failure, ScriptureText>(
           ScriptureText(
             readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             groupId: 3,
@@ -578,7 +584,9 @@ void main() {
       // unconditionally passed all 1520 tests — so neither direction was watched,
       // and this pair of tests is what watches both.
       final HomeHarness h = harness();
-      h.readings.scripture = const Result.success(liveArabicScripture);
+      h.readings.scripture = const Right<Failure, ScriptureText>(
+        liveArabicScripture,
+      );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
       // The Arabic arm renders the preview whole — a plain `Text`, because there is
@@ -621,7 +629,7 @@ void main() {
       // into the preview. The Arabic arm was already safe, and asserting the Arabic
       // arm too is what stops a future "simplification" that re-joins them.
       final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.success(
+      h.readings.scripture = Result<ScriptureText>.of(
         withEmptyFirstVerse(liveEnglishScripture),
       );
       await pumpHome(tester, bloc: h.bloc);
@@ -652,7 +660,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.success(
+      h.readings.scripture = Result<ScriptureText>.of(
         withEmptyFirstVerse(liveArabicScripture),
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
@@ -725,7 +733,9 @@ void main() {
       // than a rendering of the design, and the same class as Phase 7's defect #2
       // ("Arabic never uses the mono family").
       final HomeHarness h = harness();
-      h.readings.scripture = const Result.success(liveArabicScripture);
+      h.readings.scripture = const Right<Failure, ScriptureText>(
+        liveArabicScripture,
+      );
       await pumpHome(tester, bloc: h.bloc);
 
       // **Exact, whole.** 49 characters, so `previewText` leaves it alone, and the
@@ -759,7 +769,7 @@ void main() {
       // reflection` → `/quiz`** with it: the same two routes the empty-verse case
       // took, for a different reason, discovered the same way.
       final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.success(
+      h.readings.scripture = Result<ScriptureText>.of(
         withAstralFirstVerse(liveEnglishScripture),
       );
       await pumpHome(tester, bloc: h.bloc);
@@ -782,7 +792,7 @@ void main() {
       // a `WidgetSpan`, so its letter is read off the plain text — where a `WidgetSpan`
       // renders as U+FFFC.
       final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.success(
+      h.readings.scripture = Result<ScriptureText>.of(
         withAstralFirstVerse(liveEnglishScripture),
       );
       await pumpHome(tester, bloc: h.bloc);
@@ -847,7 +857,7 @@ void main() {
       // A copyWith rather than a hand-built summary, so the entity keeps being
       // built by the live payload's own mapper and this test cannot drift from it.
       final HomeHarness h = harness(
-        streak: Result<StreakSummary>.success(
+        streak: Result<StreakSummary>.of(
           liveStreakSummary.copyWith(currentStreak: 4),
         ),
       );
@@ -908,7 +918,7 @@ void main() {
       // again. Four router suites timed out at five minutes each with no error at all.
       // So the state is left unwitnessed here and is `home_bloc_test.dart`'s to own.
       final HomeHarness h = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
       await pumpHome(tester, bloc: h.bloc);
 
@@ -944,7 +954,7 @@ void main() {
       // **failed** fixture — is the same `null` the loading frame has, so this needs
       // no gate: one branch, one value, reached by the fixture that does not hang.
       final HomeHarness loading = harness(
-        streak: const Result.failure(streakFailure),
+        streak: const Left<Failure, StreakSummary>(streakFailure),
       );
 
       await pumpHome(tester, bloc: loading.bloc, textScale: 1.0);
@@ -977,7 +987,7 @@ void main() {
       // At 320px — the narrowest surface §14 names — because a row that absorbs twelve
       // digits at 390px has not been shown to absorb them at the size that matters.
       final HomeHarness h = harness(
-        streak: Result<StreakSummary>.success(
+        streak: Result<StreakSummary>.of(
           liveStreakSummary.copyWith(currentStreak: 999999999999),
         ),
       );

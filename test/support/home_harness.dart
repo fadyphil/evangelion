@@ -22,6 +22,7 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import 'design_system_harness.dart';
 
@@ -159,7 +160,7 @@ final class CountingReadingRepository implements ReadingRepository {
     required String readingId,
     required String questionId,
     required String answer,
-  }) async => const Result<SubmitResult>.failure(
+  }) async => const Left<Failure, SubmitResult>(
     Failure(
       kind: FailureKind.network,
       message:
@@ -216,8 +217,8 @@ final class CountingAuthRepository implements AuthRepository {
     calls++;
     final AuthSession? session = _session;
     return _signedIn && session != null
-        ? Result<AuthSession>.success(session)
-        : const Result<AuthSession>.failure(
+        ? Result<AuthSession>.of(session)
+        : const Left<Failure, AuthSession>(
             Failure(kind: FailureKind.unauthorized, message: 'Not signed in.'),
           );
   }
@@ -231,7 +232,7 @@ final class CountingAuthRepository implements AuthRepository {
   @override
   Future<Result<void>> signOut() async {
     _signedIn = false;
-    return const Result<void>.success(null);
+    return const Right<Failure, void>(null);
   }
 }
 
@@ -594,10 +595,10 @@ HomeHarness harness({
 }) {
   final CountingReadingRepository readings = CountingReadingRepository(
     scripture:
-        reading ?? const Result<ScriptureText>.success(liveEnglishScripture),
+        reading ?? const Right<Failure, ScriptureText>(liveEnglishScripture),
   );
   final CountingStreakRepository streaks = CountingStreakRepository(
-    answer: streak ?? const Result<StreakSummary>.success(liveStreakSummary),
+    answer: streak ?? const Right<Failure, StreakSummary>(liveStreakSummary),
   );
   final CountingAuthRepository auth = CountingAuthRepository(
     session: signedIn ? (session ?? liveSession) : null,
@@ -606,7 +607,7 @@ HomeHarness harness({
       CountingLeaderboardRepository(
         answer:
             leaderboardAnswer ??
-            const Result<LeaderboardBoard>.success(
+            const Right<Failure, LeaderboardBoard>(
               LeaderboardBoard(
                 window: LeaderboardWindow.weekly,
                 groupId: 3,

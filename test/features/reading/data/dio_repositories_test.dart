@@ -20,6 +20,7 @@ import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.da
 import 'package:evangelion/features/reading/data/repositories/dio_reading_repository.dart';
 import 'package:evangelion/features/reading/data/repositories/dio_streak_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../support/contract_payloads.dart';
@@ -95,8 +96,8 @@ void main() {
 
   Future<Failure> failureOf(Future<Result<Object?>> call) async {
     final Result<Object?> result = await call;
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<Object?>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, Object?>).value;
   }
 
   group('ReadingRepository.today — the happy path', () {
@@ -113,9 +114,9 @@ void main() {
         language: ReadingLanguage.english,
       );
 
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
       expect(
-        (result as Success<TodayReading>).value,
+        (result as Right<Failure, TodayReading>).value,
         const TodayReading(
           readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           groupId: 3,
@@ -160,7 +161,7 @@ void main() {
 
       expect(sent.single.uri.path, '/api/v1/readings/today/ar');
       expect(
-        (result as Success<TodayReading>).value.firstVerseText,
+        (result as Right<Failure, TodayReading>).value.firstVerseText,
         'كان إنسان من الفريسيين اسمه نيقوديموس، رئيس',
       );
     });
@@ -220,9 +221,9 @@ void main() {
     test('resolves the contract body to the contract entity', () async {
       final Result<SubmitResult> result = await submit();
 
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
       expect(
-        (result as Success<SubmitResult>).value,
+        (result as Right<Failure, SubmitResult>).value,
         const SubmitResult(
           questionId: 'question-group-3',
           isCorrect: true,
@@ -416,9 +417,9 @@ void main() {
     test('resolves the live payload, disagreement and all', () async {
       final Result<StreakSummary> result = await streak.summary();
 
-      expect(result.isSuccess, isTrue);
+      expect(result.isRight(), isTrue);
       expect(
-        (result as Success<StreakSummary>).value,
+        (result as Right<Failure, StreakSummary>).value,
         const StreakSummary(
           // `0`, where `GET /readings/today/en` says `4`. Reproduced exactly, so
           // a suite that reads both cannot accidentally rely on them agreeing.
@@ -557,8 +558,8 @@ void main() {
         );
         final Result<StreakSummary> summary = await streak.summary();
 
-        expect(reading.isFailure, isTrue);
-        expect(summary.isFailure, isTrue);
+        expect(reading.isLeft(), isTrue);
+        expect(summary.isLeft(), isTrue);
         expect(
           reading
               .failureOrElse(
@@ -693,7 +694,7 @@ final class _FakeReadingRepository
   @override
   Future<Result<ScriptureText>> todayScripture({
     required ReadingLanguage language,
-  }) async => Result<ScriptureText>.success(
+  }) async => Result<ScriptureText>.of(
     ScriptureText(
       readingId: 'fake',
       groupId: 3,
@@ -732,7 +733,7 @@ final class _FakeReadingRepository
     required String readingId,
     required String questionId,
     required String answer,
-  }) async => Result<SubmitResult>.success(
+  }) async => Result<SubmitResult>.of(
     SubmitResult(
       questionId: questionId,
       isCorrect: true,
@@ -746,7 +747,7 @@ final class _FakeReadingRepository
 
   @override
   Future<Result<StreakSummary>> summary() async =>
-      const Result<StreakSummary>.success(
+      const Right<Failure, StreakSummary>(
         StreakSummary(
           currentStreak: 0,
           longestStreak: 0,

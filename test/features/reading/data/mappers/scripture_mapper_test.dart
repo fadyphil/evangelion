@@ -6,6 +6,7 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/live_payloads.dart';
 
@@ -38,29 +39,29 @@ void main() {
 
   ScriptureText scriptureOf(Result<ScriptureText> result) {
     expect(
-      result.isSuccess,
+      result.isRight(),
       isTrue,
-      reason: result.isFailure
-          ? 'expected a success, got ${(result as FailureResult<ScriptureText>).failure}'
+      reason: result.isLeft()
+          ? 'expected a success, got ${(result as Left<Failure, ScriptureText>).value}'
           : null,
     );
-    return (result as Success<ScriptureText>).value;
+    return (result as Right<Failure, ScriptureText>).value;
   }
 
   TodayReading entityOf(Result<TodayReading> result) {
     expect(
-      result.isSuccess,
+      result.isRight(),
       isTrue,
-      reason: result.isFailure
-          ? 'expected a success, got ${(result as FailureResult<TodayReading>).failure}'
+      reason: result.isLeft()
+          ? 'expected a success, got ${(result as Left<Failure, TodayReading>).value}'
           : null,
     );
-    return (result as Success<TodayReading>).value;
+    return (result as Right<Failure, TodayReading>).value;
   }
 
   Failure failureOf(Result<ScriptureText> result) {
-    expect(result.isFailure, isTrue, reason: 'expected a failure, got $result');
-    return (result as FailureResult<ScriptureText>).failure;
+    expect(result.isLeft(), isTrue, reason: 'expected a failure, got $result');
+    return (result as Left<Failure, ScriptureText>).value;
   }
 
   group('the live English payload, wide', () {
@@ -554,7 +555,7 @@ void main() {
         withVerses(liveReadingEn(), <Map<String, Object?>>[]),
       ]) {
         final Failure wide = failureOf(mapper.mapScripture(broken));
-        expect(mapper.map(broken).isFailure, isTrue);
+        expect(mapper.map(broken).isLeft(), isTrue);
         expect(mapper.map(broken).failureOrElse(wide), wide);
       }
     });
