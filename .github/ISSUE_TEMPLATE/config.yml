@@ -1,0 +1,41 @@
+# GitHub issue chooser for this repository.
+#
+# Blank issues are disabled because the two templates below carry the five
+# things triage actually needs, and a blank issue almost always arrives without
+# them. Choosing a template is less work than reconstructing a gate run after
+# the fact.
+#
+# This repository has NO Discussions tab configured, so issues are the support
+# channel as well as the tracker. The contact links below point at files in the
+# repository rather than at a discussion category that does not exist — adding
+# one is a separate, deliberate change.
+
+blank_issues_enabled: false
+
+description: >
+  Report a bug or propose a feature. Bugs need the full
+  `tool/verify_all.sh` output, `flutter --version`, and the platform; feature
+  requests need the problem they solve and a scope check against
+  `docs/agents/AGENT_CONTEXT.md` §2. Security reports do not belong here at all
+  — see the link below.
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/fadyphil/evangelion/blob/main/SECURITY.md
+    about: >
+      Do NOT open an issue for a security problem. Security reports go through
+      SECURITY.md, which uses GitHub private vulnerability reporting so the
+      details stay off a public timeline.
+
+  - name: Where to ask, and before you file
+    url: https://github.com/fadyphil/evangelion/blob/main/SUPPORT.md
+    about: >
+      Routing for questions, backend reports, and security reports, plus what
+      to collect first. Backend bugs belong to the backend's own repository,
+      not to this tracker.
+
+  - name: Contributing guide
+    url: https://github.com/fadyphil/evangelion/blob/main/CONTRIBUTING.md
+    about: >
+      The eight gates, what each one means when it fails, and what a pull
+      request is expected to answer.
