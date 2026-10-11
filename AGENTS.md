@@ -54,6 +54,26 @@ was missing entirely. `tool/verify_linux_build.sh` exists because of that, and
 `flutter doctor`'s `✓ Linux toolchain` line is the one command that checks the
 *machine* rather than the source.
 
+### Running the backend (read-only — never modify it)
+
+```bash
+cd /home/fady/Projects/EvangelionBackend
+NODE_ENV=development PORT=3000 node dist/server.js
+```
+
+`NODE_ENV=development` is **not optional**. `InMemoryRedisFallback`'s constructor
+pre-seeds the leaderboard ZSETs only when `NODE_ENV !== 'test'`, so a server started
+under `NODE_ENV=test` answers with an empty leaderboard — which is how decision 143
+came to record "the leaderboard is always empty" as a property of the backend when it
+was a property of a process. No Postgres or Redis is required; both fall back to
+in-memory.
+
+If you background it, use `setsid … & disown`. A plain `&` is killed when the calling
+shell exits and every request then returns `000`, which reads like a server fault.
+
+What the running server is actually like is measured in
+[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md).
+
 ## Architecture in one paragraph
 
 Feature-first clean architecture. Dependency direction is strictly inward:
