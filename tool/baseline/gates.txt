@@ -7,5 +7,10 @@
 # which prints the old and new values, so a change here is visible in the commit.
 #
 # Recorded against: Flutter 3.47.4 / Dart 3.13.3, Linux desktop.
-test_count      2541
+#
+# test_count was 2541 until EvaChip was deleted (its only prototype callers were
+# the cut library, AGENT_CONTEXT §2 decision 1). The 36-test drop is that deleted
+# suite and its 8 goldens — no live test was lost, and coverage ROSE from 98.25% to
+# 98.39% over the same change.
+test_count      2507
 coverage_pct    98.25
