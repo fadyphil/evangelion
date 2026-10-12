@@ -110,6 +110,32 @@ the harness for `/login` found **two of its own citations wrong on its first
 run**. A new prototype will produce more findings of that kind, and the gate
 does not distinguish them from the ones that are merely renumbered.
 
+### The citations now describe a design the goldens no longer show
+
+**Found on 2026-10-12, by re-measuring rather than by reading.** The fonts were
+swapped to the redesign's five families and **148 goldens were re-recorded**. Every
+one changed and none for a geometry reason — no layout number moved, only the
+typeface.
+
+So there is a live inconsistency, and it is worth naming precisely rather than
+leaving to be discovered:
+
+- **All 948 citations still resolve** against `eva/src/*.tsx`. The gate is green
+  and it is correctly green: every claim it supports is a claim about *geometry* —
+  a height, a radius, a padding — and geometry is exactly what did not change.
+- **The goldens now depict the redesign's typefaces** while the citations still
+  describe the old prototype's. `citation_check` cannot see this. It checks that a
+  line exists, not what the line depicts.
+- **The coupling is not broken, it is narrowed.** `CONTRIBUTING.md` requires a
+  changed golden to be re-checked against its citation. For a typeface change that
+  check is a formality, because the citation is about a number the swap did not
+  touch.
+
+What closes it: the geometry harnesses being re-pointed at `redesign.html`, which
+is the remaining work on `build/redesign-reference`. Until then, a golden is a
+record of *this* client's rendering and a citation is a record of *that*
+prototype's geometry, and the two are not describing the same artefact.
+
 ### The five gates a visual change re-baselines
 
 Token-level gates carry measured numbers that a visual change moves. Each has to
