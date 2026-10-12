@@ -12,21 +12,21 @@ import '../../../flutter_test_config.dart';
 /// fifteen slots are mapped" assertion honest — a slot the implementation leaves
 /// null is not in this table and is caught by the count assertion below.
 const Map<String, String> expectedSlotFamilies = <String, String>{
-  'displayLarge': 'CormorantGaramond',
-  'displayMedium': 'CormorantGaramond',
-  'displaySmall': 'CormorantGaramond',
-  'headlineLarge': 'CormorantGaramond',
-  'headlineMedium': 'CormorantGaramond',
-  'headlineSmall': 'CormorantGaramond',
-  'titleLarge': 'DMSans',
-  'titleMedium': 'DMSans',
-  'titleSmall': 'DMSans',
-  'bodyLarge': 'DMSans',
-  'bodyMedium': 'DMSans',
-  'bodySmall': 'DMSans',
-  'labelLarge': 'DMSans',
-  'labelMedium': 'DMSans',
-  'labelSmall': 'DMSans',
+  'displayLarge': 'EBGaramond',
+  'displayMedium': 'EBGaramond',
+  'displaySmall': 'EBGaramond',
+  'headlineLarge': 'EBGaramond',
+  'headlineMedium': 'EBGaramond',
+  'headlineSmall': 'EBGaramond',
+  'titleLarge': 'Inter',
+  'titleMedium': 'Inter',
+  'titleSmall': 'Inter',
+  'bodyLarge': 'Inter',
+  'bodyMedium': 'Inter',
+  'bodySmall': 'Inter',
+  'labelLarge': 'Inter',
+  'labelMedium': 'Inter',
+  'labelSmall': 'Inter',
 };
 
 TextStyle? slot(TextTheme theme, String name) => switch (name) {
@@ -59,33 +59,101 @@ void main() {
       // exception, no warning, just the wrong typeface in every golden. So this
       // asserts against the registry the test engine actually loaded, not
       // against a copy of the names.
-      expect(<String>{
-        EvaTypography.displayFamily,
-        EvaTypography.scriptureFamily,
-        EvaTypography.arabicFamily,
-        EvaTypography.uiFamily,
-        EvaTypography.monoFamily,
-      }, bundledFontFamilies.keys.toSet());
-      expect(EvaTypography.uiFamily, 'DMSans', reason: 'not "DMSans"');
-      expect(EvaTypography.displayFamily, 'CormorantGaramond');
-      expect(EvaTypography.scriptureFamily, 'EBGaramond');
-      expect(EvaTypography.arabicFamily, 'Amiri');
-      expect(EvaTypography.monoFamily, 'SpaceMono');
-    });
-
-    test('are five distinct families', () {
-      // Four families and one typo apart is the failure mode this catches: a
-      // duplicated family name leaves two roles rendering identically and no
-      // test noticing, because both names are in the pubspec.
+      //
+      // `scriptureFamily` is deliberately absent from this set: it is the same
+      // string as `displayFamily`, and the next line asserts that rather than the
+      // set silently covering for it. Listing both would be a literal with a
+      // statically-known duplicate in it.
       expect(
         <String>{
           EvaTypography.displayFamily,
-          EvaTypography.scriptureFamily,
           EvaTypography.arabicFamily,
           EvaTypography.uiFamily,
+          EvaTypography.uiArabicFamily,
           EvaTypography.monoFamily,
-        }.length,
+        },
+        bundledFontFamilies.keys.toSet(),
+        reason:
+            'Every role must resolve to a family this registry actually '
+            'loaded. A name that is not here resolves to the fallback font '
+            'with no error at all — the wrong typeface in every golden, '
+            'silently.',
+      );
+      expect(EvaTypography.uiFamily, 'Inter', reason: 'not "Inter"');
+      expect(EvaTypography.displayFamily, 'EBGaramond');
+      expect(EvaTypography.scriptureFamily, 'EBGaramond');
+      expect(EvaTypography.arabicFamily, 'Amiri');
+      expect(EvaTypography.uiArabicFamily, 'IBMPlexSansArabic');
+      expect(EvaTypography.monoFamily, 'JetBrainsMono');
+    });
+
+    test('are five families across six roles, and the sharing is deliberate', () {
+      // FIVE families, SIX roles. `display` and `scripture` are both EB Garamond
+      // on purpose: `eva/redesign.html` has no separate display face, and its
+      // 64px streak numeral and its 19px verse name are the same family at
+      // different weights.
+      //
+      // So the old invariant — every role a distinct family — is no longer the
+      // thing to assert, and asserting it would be asserting a design the
+      // redesign does not have. What replaces it is narrower and stronger: the
+      // pairs that MUST differ still differ, and the one pair that shares does
+      // so for a stated reason.
+      const List<String> roles = <String>[
+        'display',
+        'scripture',
+        'arabic',
+        'ui',
+        'uiArabic',
+        'mono',
+      ];
+      final Map<String, String> byRole = <String, String>{
+        'display': EvaTypography.displayFamily,
+        'scripture': EvaTypography.scriptureFamily,
+        'arabic': EvaTypography.arabicFamily,
+        'ui': EvaTypography.uiFamily,
+        'uiArabic': EvaTypography.uiArabicFamily,
+        'mono': EvaTypography.monoFamily,
+      };
+      expect(
+        byRole.values.toSet().length,
         5,
+        reason:
+            'Six roles over five families. If this is 6 the collapse did not '
+            'happen; if it is 4, two roles share a family for no stated reason.',
+      );
+      expect(
+        byRole['display'],
+        byRole['scripture'],
+        reason: 'deliberate: the redesign names one serif, --scr, for both',
+      );
+      // The pairs that must differ, and why each one matters.
+      expect(
+        byRole['arabic'],
+        isNot(byRole['uiArabic']),
+        reason:
+            'Amiri is scripture; IBM Plex Sans Arabic is chrome. Sharing one '
+            'family is the bug the redesign fixes, and it would undo that split.',
+      );
+      expect(
+        byRole['arabic'],
+        isNot(byRole['ui']),
+        reason: 'a Latin UI face cannot render Arabic',
+      );
+      expect(
+        byRole['uiArabic'],
+        isNot(byRole['ui']),
+        reason: 'a Latin UI face cannot render Arabic',
+      );
+      expect(byRole['mono'], isNot(byRole['ui']), reason: 'distinct roles');
+      expect(
+        byRole['mono'],
+        isNot(byRole['scripture']),
+        reason: 'distinct roles',
+      );
+      expect(
+        roles.length,
+        byRole.length,
+        reason: 'the list and the map must name the same roles',
       );
     });
   });

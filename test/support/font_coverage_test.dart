@@ -54,10 +54,17 @@ void main() {
     });
   });
 
-  group('THE MEASUREMENT — Amiri is the only Arabic family, and it is not close', () {
+  group('THE MEASUREMENT — TWO Arabic families, and which is which', () {
     // These are the numbers `01-source-analysis.md` asserts in prose and
     // `reading_glyph_test.dart` then relies on. They are measured here so that a
     // font swap is a **failing test** rather than a silently-tofu screen.
+    //
+    // THE GROUP NAME WAS A LIE UNTIL THIS BRANCH. It read "Amiri is the only Arabic
+    // family, and it is not close", which was true of the previous five families and
+    // is false of these five: `eva/redesign.html` names `--ar` (Amiri) for scripture
+    // and `--ui-ar` (IBM Plex Sans Arabic) for chrome, and both are bundled. The
+    // measurements are kept; the singleton claim is gone, because a group whose name
+    // asserts something untrue is worse than no group.
     test('Amiri carries the Arabic block and Arabic-Indic digits', () {
       expect(
         familyCovers('Amiri', <int>[0x0628, 0x0644, 0x064E, 0x0671]),
@@ -72,12 +79,36 @@ void main() {
       );
     });
 
-    test('and every other bundled family carries NONE of the Arabic block', () {
+    test('and so does IBM Plex Sans Arabic, which is the chrome face', () {
+      // Measured, not assumed. This is the family every Arabic label in the app now
+      // routes through, so "does it render Arabic at all" is the question that decides
+      // whether the redesign's Arabic arm is text or 40 boxes of tofu.
+      expect(
+        familyCovers('IBMPlexSansArabic', <int>[0x0628, 0x0644, 0x064E]),
+        isTrue,
+      );
+      expect(
+        familyCovers('IBMPlexSansArabic', <int>[
+          kArabicIndicDigitStart,
+          kArabicIndicDigitEnd,
+        ]),
+        isTrue,
+        reason:
+            'measured: it declares U+0661. Amiri is not the only Arabic-Indic '
+            'source any more.',
+      );
+    });
+
+    test('and every OTHER bundled family carries NONE of the Arabic block', () {
       // This is the load-bearing half. If a future font *did* gain Arabic coverage,
       // the defect-#2 assertions would need revisiting — so the measurement is
       // asserted in both directions rather than assumed.
+      //
+      // The two Arabic families are skipped explicitly rather than by name, so
+      // adding a third would fail here and force a decision, which is the point.
+      const Set<String> arabicFamilies = <String>{'Amiri', 'IBMPlexSansArabic'};
       for (final String family in kBundledFontFamilies) {
-        if (family == 'Amiri') continue;
+        if (arabicFamilies.contains(family)) continue;
         final Set<int> codepoints = codepointsForFamily(family);
         final List<int> arabic =
             codepoints
@@ -97,27 +128,28 @@ void main() {
       }
     });
 
-    test(
-      'and none of them carries Arabic-Indic DIGITS, which is the third site',
-      () {
-        // `ReadingArScreen.tsx:49` puts `١`…`٧` in a `<sup>` styled `F.mono`, and `:87`
-        // puts `٥` in a caption styled `F.mono`. U+0665 is inside the Arabic block, so
-        // the assertion above already covers it — **stated here** so the verse-marker
-        // case is not silently resting on the other one.
-        for (final String family in kBundledFontFamilies) {
-          if (family == 'Amiri') continue;
-          final Set<int> arabicFamily = codepointsForFamily(family);
-          for (final int cp in <int>[0x0661, 0x0665, 0x0667]) {
-            expect(
-              arabicFamily.contains(cp),
-              isFalse,
-              reason:
-                  '$family declares U+${cp.toRadixString(16).toUpperCase()}',
-            );
-          }
+    test('and no OTHER family carries Arabic-Indic DIGITS, the third site', () {
+      // `ReadingArScreen.tsx:49` puts `١`…`٧` in a `<sup>`, and `:87` puts `٥` in a
+      // caption. U+0665 is inside the Arabic block, so the assertion above already
+      // covers it — **stated here** so the verse-marker case is not silently resting
+      // on the other one.
+      //
+      // IBM Plex Sans Arabic is skipped alongside Amiri because it DOES carry these
+      // (measured above). Both are Arabic families; neither is the mono face, so
+      // the verse-marker site is unaffected either way.
+      const Set<String> arabicFamilies = <String>{'Amiri', 'IBMPlexSansArabic'};
+      for (final String family in kBundledFontFamilies) {
+        if (arabicFamilies.contains(family)) continue;
+        final Set<int> arabicFamily = codepointsForFamily(family);
+        for (final int cp in <int>[0x0661, 0x0665, 0x0667]) {
+          expect(
+            arabicFamily.contains(cp),
+            isFalse,
+            reason: '$family declares U+${cp.toRadixString(16).toUpperCase()}',
+          );
         }
-      },
-    );
+      }
+    });
 
     test('while every family carries the ASCII digits and the Latin letters', () {
       // The mirror, and it is what makes the AR-only finding meaningful rather than
@@ -176,11 +208,11 @@ void main() {
         final File font = Directory('assets/fonts')
             .listSync()
             .whereType<File>()
-            .firstWhere((File f) => f.path.endsWith('SpaceMono-Regular.ttf'));
+            .firstWhere((File f) => f.path.endsWith('JetBrainsMono-400.ttf'));
         final List<int> bytes = font.readAsBytesSync();
         // Sanity: the shipped font really does parse, and the refusal path is reached
         // by construction because the reader throws on a table it does not recognise.
-        expect(() => codepointsForFamily('SpaceMono'), returnsNormally);
+        expect(() => codepointsForFamily('JetBrainsMono'), returnsNormally);
         expect(bytes.length, greaterThan(1000));
       },
     );

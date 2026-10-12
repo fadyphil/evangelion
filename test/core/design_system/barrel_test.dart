@@ -110,7 +110,7 @@ void main() {
       expect(EvaRadii.chip, 999.0);
       expect(EvaMotion.fast, const Duration(milliseconds: 150));
       expect(EvaElevations.card, 0.0);
-      expect(EvaTypography.uiFamily, 'DMSans');
+      expect(EvaTypography.uiFamily, 'Inter');
       expect(evaScalerFor(3).scale(1.0), 1.0);
       expect(
         EvaTheme.build(const EvaColors.dark()).brightness,

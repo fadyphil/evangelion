@@ -6,7 +6,7 @@
 /// that walks the wrong tree, paints nothing, or recognises no Arabic reports
 /// **success** on a screen full of tofu — and that is not a hypothetical. All four
 /// guards below exist because this walk shipped broken once and reported a **correct
-/// fix as wrong** (a tooltip the app had rendered in Amiri, reported as `DMSans`).
+/// fix as wrong** (a tooltip the app had rendered in Amiri, reported as `Inter`).
 ///
 /// So every guard is proved here by **planting the defect** and asserting the
 /// detection, rather than by asserting that the harness's own output looks right. An
@@ -70,7 +70,7 @@ void main() {
           await paintedTooltips(tester);
       expect(painted, hasLength(1));
       expect(painted.single.message, backLabel);
-      // **`DMSans`, measured** — and *not* `MaterialApp`'s own `_errorTextStyle`
+      // **`Inter`, measured** — and *not* `MaterialApp`'s own `_errorTextStyle`
       // family, which is `monospace`. The tooltip's content is built inside the
       // `Material`, and `Material` installs `bodyMedium`, so `bodyMedium` is the
       // real resolution. Decision 71's documented mechanism is therefore correct and
@@ -79,7 +79,7 @@ void main() {
       // provider and mistaken it for this.
       expect(
         painted.single.run.family,
-        'DMSans',
+        'Inter',
         reason: 'the value decision 71 measured, and the family the gate exists to catch.',
       );
       expect(
@@ -101,7 +101,7 @@ void main() {
       'is the fix this file must not get wrong again',
       (WidgetTester tester) async {
         // **The regression that mattered.** The walk read the child's `fontFamily` as
-        // `null`, substituted `bodyMedium`, and reported `DMSans` for a tooltip the
+        // `null`, substituted `bodyMedium`, and reported `Inter` for a tooltip the
         // app had already rendered in Amiri — a correct fix reported wrong, in the one
         // family the gate exists to catch.
         await _pump(
@@ -308,7 +308,7 @@ void main() {
     test('and the value is MaterialApp\'s own error style, not bodyMedium', () {
       // **Measured, and the gate it replaces got it wrong.** That walk documented
       // "Flutter resolves a null `TextStyle` to `ThemeData.textTheme.bodyMedium`,
-      // measured `DMSans`". It does not: `MaterialApp` installs its own
+      // measured `Inter`". It does not: `MaterialApp` installs its own
       // `DefaultTextStyle`, `_errorTextStyle`, whose `debugLabel` is "fallback style;
       // consider putting your text in a Material" and whose family is **`monospace`**
       // — a family `pubspec.yaml` does not declare, so the engine's default font
@@ -317,7 +317,7 @@ void main() {
       //
       // Recorded because the two readings are not equally wrong: `bodyMedium` at least
       // names a bundled family, and `monospace` names none at all.
-      expect(EvaThemeDark.theme.textTheme.bodyMedium?.fontFamily, 'DMSans');
+      expect(EvaThemeDark.theme.textTheme.bodyMedium?.fontFamily, 'Inter');
       expect(const DefaultTextStyle.fallback().style.fontFamily, isNull);
     });
   });
@@ -333,12 +333,12 @@ void main() {
       // detection is attributable to the harness and not to any screen's wiring.
       await _pump(
         tester,
-        const Text(backLabel, style: TextStyle(fontFamily: 'DMSans')),
+        const Text(backLabel, style: TextStyle(fontFamily: 'Inter')),
       );
 
       final List<RenderedRun> arabic = await arabicRuns(tester);
       expect(arabic, hasLength(1), reason: 'the walk sees it');
-      expect(arabic.single.family, 'DMSans', reason: 'and reads it honestly');
+      expect(arabic.single.family, 'Inter', reason: 'and reads it honestly');
       // Everything the gate asserts about a run is reachable from this one list, so
       // a gate over it would fail in four places at once.
       expect(familyCovers(arabic.single.family, <int>[0x0631]), isFalse);

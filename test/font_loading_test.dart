@@ -38,11 +38,11 @@ void main() {
       // would shrink the check silently. Spelled out here so dropping one is a
       // visible edit to a test rather than a silent reduction in coverage.
       expect(bundledFontFamilies.keys.toSet(), <String>{
-        'CormorantGaramond',
         'EBGaramond',
-        'DMSans',
+        'Inter',
+        'IBMPlexSansArabic',
         'Amiri',
-        'SpaceMono',
+        'JetBrainsMono',
       }, reason: 'the five families declared in pubspec.yaml under `fonts:`');
       expect(
         bundledFontFamilies.values.every(
@@ -87,24 +87,25 @@ void main() {
       }
     });
 
-    test(
-      'resolves a monospaced family and a proportional one as themselves',
-      () {
-        // Guards against the subtler version of the same rot: all five families
-        // resolving to one face would satisfy the test above. `SpaceMono` really is
-        // monospaced and `Amiri` really is proportional, so this pair distinguishes
-        // "the five registered fonts" from "one font registered five times".
-        expect(
-          advanceOf('SpaceMono', _narrowRun),
-          advanceOf('SpaceMono', _wideRun),
-          reason: 'SpaceMono is monospaced, so both runs must measure the same',
-        );
-        expect(
-          advanceOf('Amiri', _narrowRun),
-          isNot(advanceOf('Amiri', _wideRun)),
-          reason: 'Amiri is proportional, so the two runs must differ',
-        );
-      },
-    );
+    test('resolves a monospaced family and a proportional one as themselves', () {
+      // Guards against the subtler version of the same rot: all five families
+      // resolving to one face would satisfy the test above. `JetBrains Mono`
+      // really is monospaced and `Amiri` really is proportional, so this pair
+      // distinguishes "the five registered fonts" from "one font registered
+      // five times". Space Mono is retired; JetBrains Mono is the mono slot and
+      // has the property this assertion depends on.
+      expect(
+        advanceOf('JetBrainsMono', _narrowRun),
+        advanceOf('JetBrainsMono', _wideRun),
+        reason:
+            'JetBrains Mono is monospaced, so both runs must measure the '
+            'same',
+      );
+      expect(
+        advanceOf('Amiri', _narrowRun),
+        isNot(advanceOf('Amiri', _wideRun)),
+        reason: 'Amiri is proportional, so the two runs must differ',
+      );
+    });
   });
 }

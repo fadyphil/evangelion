@@ -116,21 +116,26 @@ flutter:
   generate: true
   uses-material-design: true
 
+  # Bundled as static instances so Flutter never resorts to synthetic bolding and
+  # so goldens resolve offline. The families are the ones `eva/redesign.html`
+  # names, at the weights it uses:
+  #
+  #   --scr   'EB Garamond'              display AND scripture — there is no
+  #                                       separate display face in the redesign,
+  #                                       so `displayFamily` collapses onto this
+  #   --ui    'Inter'                    every label, button, field, caption
+  #   --ui-ar 'IBM Plex Sans Arabic'     the Arabic arm of all of the above
+  #   --ar    'Amiri'                    Arabic SCRIPTURE only
+  #   --mono  'JetBrains Mono'           the mono slots
+  #
+  # Weights are the ones measured in use, not a full 9-weight set: Inter uses
+  # 400-800 with 600 carrying most of the UI, JetBrains Mono uses 400 and 600
+  # only, and IBM Plex Sans Arabic ships 400/500/600 upstream.
+  #
+  # Cormorant Garamond, DM Sans and Space Mono were retired here. No `font-style:
+  # italic` survives in the redesign, so the two italic faces were dropped with
+  # them; EB Garamond and Amiri keep theirs because both families are retained.
   fonts:
-    - family: CormorantGaramond
-      fonts:
-        - asset: assets/fonts/CormorantGaramond-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/CormorantGaramond-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/CormorantGaramond-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/CormorantGaramond-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/CormorantGaramond-RegularItalic.ttf
-          weight: 400
-          style: italic
-
     - family: EBGaramond
       fonts:
         - asset: assets/fonts/EBGaramond-Regular.ttf
@@ -141,22 +146,33 @@ flutter:
           weight: 600
         - asset: assets/fonts/EBGaramond-Bold.ttf
           weight: 700
+        - asset: assets/fonts/EBGaramond-ExtraBold.ttf
+          weight: 800
         - asset: assets/fonts/EBGaramond-RegularItalic.ttf
           weight: 400
           style: italic
 
-    - family: DMSans
+    - family: Inter
       fonts:
-        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/Inter-400.ttf
           weight: 400
-        - asset: assets/fonts/DMSans-Medium.ttf
+        - asset: assets/fonts/Inter-500.ttf
           weight: 500
-        - asset: assets/fonts/DMSans-SemiBold.ttf
+        - asset: assets/fonts/Inter-600.ttf
           weight: 600
-        - asset: assets/fonts/DMSans-Bold.ttf
+        - asset: assets/fonts/Inter-700.ttf
           weight: 700
-        - asset: assets/fonts/DMSans-ExtraBold.ttf
+        - asset: assets/fonts/Inter-800.ttf
           weight: 800
+
+    - family: IBMPlexSansArabic
+      fonts:
+        - asset: assets/fonts/IBMPlexSansArabic-400.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSansArabic-500.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSansArabic-600.ttf
+          weight: 600
 
     - family: Amiri
       fonts:
@@ -168,9 +184,9 @@ flutter:
           weight: 400
           style: italic
 
-    - family: SpaceMono
+    - family: JetBrainsMono
       fonts:
-        - asset: assets/fonts/SpaceMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-400.ttf
           weight: 400
-        - asset: assets/fonts/SpaceMono-Bold.ttf
-          weight: 700
+        - asset: assets/fonts/JetBrainsMono-600.ttf
+          weight: 600

@@ -36,40 +36,45 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// Keys are the `family:` names in `pubspec.yaml` — they must match
 /// character-for-character, because that string is what a
-/// `TextStyle(fontFamily: …)` is matched against. All five weights of a family
-/// are added to the same [FontLoader]: the loader registers each file as its own
-/// face under one family name and the engine reads the weight out of the font
-/// data, so `FontWeight.w700` still resolves to the right file.
+/// `TextStyle(fontFamily: …)` is matched against. All weights of a family are
+/// added to the same [FontLoader]: the loader registers each file as its own face
+/// under one family name and the engine reads the weight out of the font data,
+/// so `FontWeight.w700` still resolves to the right file.
+///
+/// This is a hand-written copy of the `fonts:` block in `pubspec.yaml`, and the
+/// duplication is the price of loading fonts before the suite: `pubspec.yaml` is
+/// not readable as data at test time. `eva_typography_test.dart` asserts the two
+/// agree — that every `EvaTypography.*Family` is a key here — so the copy cannot
+/// drift from the registry silently, which is the failure the old list had.
 const Map<String, List<String>> bundledFontFamilies = <String, List<String>>{
-  'CormorantGaramond': <String>[
-    'assets/fonts/CormorantGaramond-Regular.ttf',
-    'assets/fonts/CormorantGaramond-Medium.ttf',
-    'assets/fonts/CormorantGaramond-SemiBold.ttf',
-    'assets/fonts/CormorantGaramond-Bold.ttf',
-    'assets/fonts/CormorantGaramond-RegularItalic.ttf',
-  ],
   'EBGaramond': <String>[
     'assets/fonts/EBGaramond-Regular.ttf',
     'assets/fonts/EBGaramond-Medium.ttf',
     'assets/fonts/EBGaramond-SemiBold.ttf',
     'assets/fonts/EBGaramond-Bold.ttf',
+    'assets/fonts/EBGaramond-ExtraBold.ttf',
     'assets/fonts/EBGaramond-RegularItalic.ttf',
   ],
-  'DMSans': <String>[
-    'assets/fonts/DMSans-Regular.ttf',
-    'assets/fonts/DMSans-Medium.ttf',
-    'assets/fonts/DMSans-SemiBold.ttf',
-    'assets/fonts/DMSans-Bold.ttf',
-    'assets/fonts/DMSans-ExtraBold.ttf',
+  'Inter': <String>[
+    'assets/fonts/Inter-400.ttf',
+    'assets/fonts/Inter-500.ttf',
+    'assets/fonts/Inter-600.ttf',
+    'assets/fonts/Inter-700.ttf',
+    'assets/fonts/Inter-800.ttf',
+  ],
+  'IBMPlexSansArabic': <String>[
+    'assets/fonts/IBMPlexSansArabic-400.ttf',
+    'assets/fonts/IBMPlexSansArabic-500.ttf',
+    'assets/fonts/IBMPlexSansArabic-600.ttf',
   ],
   'Amiri': <String>[
     'assets/fonts/Amiri-Regular.ttf',
     'assets/fonts/Amiri-Bold.ttf',
     'assets/fonts/Amiri-Italic.ttf',
   ],
-  'SpaceMono': <String>[
-    'assets/fonts/SpaceMono-Regular.ttf',
-    'assets/fonts/SpaceMono-Bold.ttf',
+  'JetBrainsMono': <String>[
+    'assets/fonts/JetBrainsMono-400.ttf',
+    'assets/fonts/JetBrainsMono-600.ttf',
   ],
 };
 
