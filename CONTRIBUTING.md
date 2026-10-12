@@ -216,7 +216,7 @@ catch its absence.
 | Rule | Where it is enforced |
 | --- | --- |
 | Commit message is `<type>(<scope>): <subject>` | Review |
-| One branch per phase, named `feat/phase-N-<name>` | Review |
+| One branch per unit of work, named `<scope>/<name>` — `feat/`, `build/` or `docs/`, matching the commit-message scope | Review |
 | Do not merge to `main` without review | [`docs/agents/AGENT_CONTEXT.md`](docs/agents/AGENT_CONTEXT.md) §8 |
 | `dart analyze` runs with `--fatal-infos --fatal-warnings` | Gate 2 |
 | No deprecated APIs | Gate 2 reports `deprecated_member_use` natively; the forbidden-API table in §4 is a seed, the analyzer is the enforcement. Fix with `dart fix --apply --code=deprecated_member_use`. |
