@@ -9,11 +9,16 @@ import 'package:flutter/material.dart';
 ///
 /// | Role | Family | Source |
 /// | --- | --- | --- |
-/// | `display` | Cormorant Garamond 400/500/600/700 + italics | `F.display` |
-/// | `scripture` | EB Garamond 400/500 + italic | `F.scripture` |
-/// | `arabic` | Amiri 400/700 + italic | `F.arabic` |
-/// | `ui` | DM Sans 300–800 + italics | `F.ui` |
-/// | `mono` | Space Mono 400/700 + italic | `F.mono` |
+/// | `display` | EB Garamond 400/500/600/700/800 + italic | `F.display` |
+/// | `scripture` | EB Garamond 400/500/600/700/800 + italic | `F.scripture` |
+/// | `arabic` | Amiri 400/700 + italic — **scripture only** | `F.arabic` |
+/// | `ui` | Inter 400/500/600/700/800 | `F.ui` |
+/// | `uiArabic` | IBM Plex Sans Arabic 400/500/600 — **chrome** | `F.uiArabic` |
+/// | `mono` | JetBrains Mono 400/600 | `F.mono` |
+///
+/// Six roles over **five** families. `display` and `scripture` share EB Garamond
+/// because `eva/redesign.html` names one serif (`--scr`) for both. The previous
+/// system had a separate display face, Cormorant Garamond, and retired it.
 ///
 /// ## NO `google_fonts`
 ///
@@ -66,21 +71,51 @@ abstract final class EvaTypography {
   // `TextStyle.fontFamily` against that string exactly, and a name that merely
   // looks right resolves to the fallback font with no error at all.
 
-  /// `Cormorant Garamond` — the display serif. `pubspec.yaml` family
-  /// `CormorantGaramond`.
-  static const String displayFamily = 'CormorantGaramond';
+  /// `EB Garamond` — display AND latin scripture. `pubspec.yaml` family
+  /// `EBGaramond`.
+  ///
+  /// **These were two families and are now one.** The redesign's type system
+  /// names five slots and `--scr` ('EB Garamond') fills both the display role
+  /// and the scripture role: `.jname` at 22px, the 64px streak numeral and
+  /// `.bcard .bn` at 19px are all `--scr` at different weights. There is no
+  /// separate display face in it, so `displayFamily` collapses onto
+  /// [scriptureFamily] rather than naming a family the design does not have.
+  ///
+  /// Cormorant Garamond was the previous display face and is retired. The
+  /// collapse is a design change, not a rename, and it is why this constant
+  /// still exists as an alias: 5 call sites read it and none of them should
+  /// have to change to follow the redesign.
+  static const String displayFamily = 'EBGaramond';
 
   /// `EB Garamond` — latin scripture. `pubspec.yaml` family `EBGaramond`.
   static const String scriptureFamily = 'EBGaramond';
 
-  /// `Amiri` — arabic scripture. `pubspec.yaml` family `Amiri`.
+  /// `Amiri` — arabic SCRIPTURE only. `pubspec.yaml` family `Amiri`.
   static const String arabicFamily = 'Amiri';
 
-  /// `DM Sans` — UI text. `pubspec.yaml` family `DMSans`, without the space.
-  static const String uiFamily = 'DMSans';
+  /// `IBM Plex Sans Arabic` — arabic UI chrome. `pubspec.yaml` family
+  /// `IBMPlexSansArabic`, without the spaces.
+  ///
+  /// **This is the slot the redesign adds.** The previous system used one
+  /// Arabic family for everything; `eva/redesign.html` uses `--ar` ('Amiri') for
+  /// scripture and `--ui-ar` ('IBM Plex Sans Arabic') for chrome. Amiri is a
+  /// naskh face and at 11-13px with a UI's letter-spacing it reads as a
+  /// rendering of a label rather than as a label.
+  ///
+  /// **Declared here and wired in `arabicAware`, not at these call sites.**
+  /// `arabicAware(style, direction)` takes the ambient direction and swaps the
+  /// family, which is what [recorded decision 74][1] settled: a chrome label has
+  /// no payload behind it, so there is no arm for a caller to pass.
+  ///
+  /// [1]: docs/agents/AGENT_CONTEXT.md decision 74, `feat/arabic-ui-family`.
+  static const String uiArabicFamily = 'IBMPlexSansArabic';
 
-  /// `Space Mono` — mono-caps labels. `pubspec.yaml` family `SpaceMono`.
-  static const String monoFamily = 'SpaceMono';
+  /// `Inter` — UI text. `pubspec.yaml` family `Inter`.
+  static const String uiFamily = 'Inter';
+
+  /// `JetBrains Mono` — mono-caps labels. `pubspec.yaml` family
+  /// `JetBrainsMono`, without the space.
+  static const String monoFamily = 'JetBrainsMono';
 
   /// The shared, colour-free geometry source for everything below.
   ///

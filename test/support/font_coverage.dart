@@ -64,17 +64,17 @@ Set<int> codepointsForFamily(String family) {
 /// The five families `pubspec.yaml` declares, by their `family:` keys.
 ///
 /// **Spelled as the `family:` keys and not as the file-name stems**, because those
-/// two differ on four of the five — `DMSans` vs `DMSans`, `CormorantGaramond`,
-/// `EBGaramond`, `SpaceMono`, `Amiri` — and the engine matches `TextStyle.fontFamily`
-/// against the `family:` string exactly. `eva_typography.dart` says the same in its own
-/// words: "a name that merely looks right resolves to the fallback font with no error
-/// at all".
+/// two differ on three of the five — `IBMPlexSansArabic` vs `IBMPlexSansArabic-400`,
+/// `JetBrainsMono` vs `JetBrainsMono-400`, `Inter` vs `Inter-400` — and the engine
+/// matches `TextStyle.fontFamily` against the `family:` string exactly.
+/// `eva_typography.dart` says the same in its own words: "a name that merely looks
+/// right resolves to the fallback font with no error at all".
 const List<String> kBundledFontFamilies = <String>[
   'Amiri',
-  'CormorantGaramond',
-  'DMSans',
   'EBGaramond',
-  'SpaceMono',
+  'IBMPlexSansArabic',
+  'Inter',
+  'JetBrainsMono',
 ];
 
 /// U+0600, the first codepoint of the Arabic block.

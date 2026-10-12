@@ -383,7 +383,7 @@ Future<void> expectArabicTypography(
       reason:
           '`${run.label}` renders Arabic in `${run.family}`, which carries no '
           'Arabic glyph at all. "Not Space Mono" would have passed this: '
-          '`CormorantGaramond`, `DMSans` and `EBGaramond` are all equally tofu.',
+          '`CormorantGaramond`, `Inter` and `EBGaramond` are all equally tofu.',
     );
     expect(
       run.family,

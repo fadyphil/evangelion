@@ -901,14 +901,50 @@ void main() {
     // The three properties the whole mechanism rests on, tested as a plain function
     // with no widget tree — so they are a unit test rather than a widget test, and a
     // reader can check them in three lines.
-    test('Amiri is the only bundled family that can render Arabic', () {
-      for (final String family in kBundledFontFamilies) {
+    test('and which bundled families can render Arabic is now a decision', () {
+      // THIS WAS A SINGLETON AND IS NOT ANY MORE. It read "Amiri is the only
+      // bundled family that can render Arabic", which was true when the redesign
+      // had not landed and `eva/redesign.html` names TWO Arabic faces:
+      //
+      //   --ar     Amiri                  arabic SCRIPTURE
+      //   --ui-ar  IBM Plex Sans Arabic   arabic chrome
+      //
+      // Both are bundled, so "the only family" has no referent. What replaced it
+      // is the pair that matters, asserted in both directions because a resolver
+      // that returned either one for both would leave two roles rendering
+      // identically and no notice taken.
+      expect(
+        familyCovers(EvaTypography.arabicFamily, <int>[0x0628, 0x0644]),
+        isTrue,
+        reason: 'Amiri must render Arabic — it is the scripture face',
+      );
+      expect(
+        familyCovers(EvaTypography.uiArabicFamily, <int>[0x0628, 0x0644]),
+        isTrue,
+        reason:
+            'IBM Plex Sans Arabic must render Arabic — it is the chrome face, '
+            'and every Arabic label in the app now routes through it',
+      );
+      expect(
+        EvaTypography.uiArabicFamily,
+        isNot(EvaTypography.arabicFamily),
+        reason: 'the split is the whole point; sharing one family undoes it',
+      );
+      // The Latin faces still must not render Arabic. This is what makes the
+      // assertion above a discrimination rather than a tautology — if every family
+      // "covered" Arabic, checking that two of them do would mean nothing.
+      for (final String family in <String>[
+        EvaTypography.uiFamily,
+        EvaTypography.monoFamily,
+        EvaTypography.displayFamily,
+        EvaTypography.scriptureFamily,
+      ]) {
         expect(
           familyCovers(family, <int>[0x0628, 0x0644]),
-          family == EvaTypography.arabicFamily,
+          isFalse,
           reason:
-              '$family\'s Arabic coverage decides whether the Arabic arm is tofu. '
-              'Measured from the bundled `cmap`s.',
+              '$family is a Latin face. If it now reports Arabic coverage the '
+              'whole gate has stopped discriminating.',
         );
       }
     });

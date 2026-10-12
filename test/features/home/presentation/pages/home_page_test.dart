@@ -964,14 +964,25 @@ void main() {
       final double atOneTwentyTwo = _subtitleRow(tester);
 
       expect(atOneTwentyTwo, greaterThan(atOne));
-      // And it is the *scaled* line, not just a bigger number: 20 × 1.22 = 24.4, and
-      // the engine rounds the paragraph box, so a lower bound rather than an equality.
+      // And it is the *scaled* line, not just a bigger number.
+      //
+      // **This bound moved when the typeface did, and the property did not.** It
+      // read `greaterThan(4)`, calibrated against DM Sans, whose line box grew by
+      // more than four pixels at 1.22×. Inter's grows by exactly 4.0: 44.0 at 1.0×
+      // and 48.0 at 1.22×, because the engine rounds 20 × 1.22 = 24.4 to 24.
+      //
+      // Four pixels IS the line's own leading here — 20.0 becomes 24.0 — so the
+      // assertion is now written as that rather than as a strictly-greater bound
+      // that a rounding accident happened to clear. The claim is "the reserved
+      // height moved with the reader's text scale", and it moved.
       expect(
         atOneTwentyTwo - atOne,
-        greaterThan(4),
+        greaterThanOrEqualTo(4),
         reason:
-            '1.22× of a 20px line is 24.4; a reserved height that did not move would '
-            'be the `SizedBox` this replaced',
+            'measured 44.0 at 1.0x and 48.0 at 1.22x: the line box grows 20.0 -> '
+            '24.0 as the engine rounds 24.4, and the row padding is 24 in both. A '
+            'reserved height that did not move would be the `SizedBox` this '
+            'replaced.',
       );
     });
 
