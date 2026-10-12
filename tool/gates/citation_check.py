@@ -45,7 +45,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # `name.tsx:12` and `name.tsx:12-34`. The name may be preceded by anything, so a
 # match inside a longer word is fine — `ds.tsx` inside `HomeScreen.ds.tsx` should
 # resolve.
-CITATION = re.compile(r"(?P<file>[A-Za-z0-9_]+\.tsx):(?P<from>\d+)(?:-(?P<to>\d+))?")
+#
+# `.html` is the redesigned reference, committed alongside the React prototype it
+# replaces as the design source of truth. It is a single file, `eva/redesign.html`,
+# and a citation to it is `redesign.html:NNN`. The extension is alternated rather
+# than a second pattern so the range syntax is written once.
+CITATION = re.compile(
+    r"(?P<file>[A-Za-z0-9_]+\.(?:tsx|html)):(?P<from>\d+)(?:-(?P<to>\d+))?"
+)
 
 # Only these trees are scanned. `eva/` is the reference material itself, so
 # scanning it would report every example in a comment.
@@ -53,17 +60,54 @@ ROOTS = ("lib", "test", "tool")
 
 SKIP_SUFFIXES = (".gr.dart", ".freezed.dart", ".config.dart")
 
+# The reference the citations are resolved against: every `.tsx` under `eva/src`,
+# plus ONE named `.html` at the top of `eva/`. Both are checked.
+#
+# The HTML is named, not globbed, and that is deliberate. `eva/` is a Vite project
+# and contains `index.html` — the app shell, not a design reference. A
+# `rglob("*.html")` picked it up and would have let a citation resolve against a
+# file that declares no geometry at all. A reference that is named cannot acquire
+# a sibling by accident.
+HTML_REFERENCE = ROOT / "eva" / "redesign.html"
+TSX_ROOT = ROOT / "eva" / "src"
+
+# BOTH references are REQUIRED, and their absence is FATAL rather than a reduced
+# set of checks.
+#
+# That was found by planting a violation: removing redesign.html while nothing
+# cited it yet left 12 .tsx files resolving, so the gate reported a green run
+# over a reference that no longer existed. The check that would have caught it
+# was the one doing the checking, so nothing noticed.
+#
+# This is the ADR-0020 shape exactly — a gate that passes over a surface it is
+# no longer examining — and the only repair is to make the missing input loud.
+REQUIRED_REFERENCES = (TSX_ROOT, HTML_REFERENCE)
+
 
 def prototype_files() -> dict[str, int]:
-    """name -> line count, for every `.tsx` under eva/src."""
+    """name -> line count, for every reference file a citation may name."""
     out: dict[str, int] = {}
-    eva = ROOT / "eva" / "src"
-    if not eva.is_dir():
-        return out
-    for p in sorted(eva.rglob("*.tsx")):
-        with p.open(encoding="utf-8", errors="ignore") as fh:
-            out[p.name] = sum(1 for _ in fh)
+    src = ROOT / "eva" / "src"
+    if src.is_dir():
+        for p in sorted(src.rglob("*.tsx")):
+            with p.open(encoding="utf-8", errors="ignore") as fh:
+                out[p.name] = sum(1 for _ in fh)
+    if HTML_REFERENCE.is_file():
+        with HTML_REFERENCE.open(encoding="utf-8", errors="ignore") as fh:
+            out[HTML_REFERENCE.name] = sum(1 for _ in fh)
     return out
+
+
+def missing_references() -> list[str]:
+    """Every required reference that is absent, named for the error message."""
+    missing = []
+    for path in REQUIRED_REFERENCES:
+        if path.is_dir():
+            if not any(path.rglob("*.tsx")):
+                missing.append(f"{path.relative_to(ROOT)} (no .tsx under it)")
+        elif not path.is_file():
+            missing.append(str(path.relative_to(ROOT)))
+    return missing
 
 
 def scanned_files() -> list[Path]:
@@ -80,13 +124,21 @@ def scanned_files() -> list[Path]:
 
 
 def main() -> int:
-    if not (ROOT / "eva" / "src").is_dir():
-        print("FATAL: eva/src not found — nothing to check against", file=sys.stderr)
+    absent = missing_references()
+    if absent:
+        print(
+            "FATAL: a required design reference is missing — "
+            + ", ".join(absent)
+            + ". Citations cannot be verified against what is not there, and "
+            "silently checking a smaller surface is the failure this gate exists "
+            "to prevent.",
+            file=sys.stderr,
+        )
         return 2
 
     lens = prototype_files()
     if not lens:
-        print("FATAL: no .tsx files under eva/src", file=sys.stderr)
+        print("FATAL: reference files were found but none could be read", file=sys.stderr)
         return 2
 
     files = scanned_files()

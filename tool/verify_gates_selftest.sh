@@ -81,6 +81,14 @@ make_scratch() {
   # two files this harness actually needs for it, untracked or not.
   mkdir -p "$dir/tool/baseline"
   cp "$ROOT/tool/baseline/gates.txt" "$dir/tool/baseline/gates.txt" 2>/dev/null || true
+  # Same reasoning for the redesigned reference: `eva/redesign.html` is added by
+  # a later commit than this harness and is therefore untracked on the branch
+  # that introduces it. `git ls-files` would skip it and the citation negative
+  # control would have neither a file to resolve against nor a file to remove.
+  mkdir -p "$dir/eva"
+  cp "$ROOT/eva/redesign.html" "$dir/eva/redesign.html" 2>/dev/null || true
+  # `eva/src` is tracked and already copied above; the explicit copy is only a
+  # safety net for the same untracked-window case.
   # Symlink, not copy: a real pub get per gate would dominate the runtime.
   ln -s "$ROOT/.dart_tool" "$dir/.dart_tool" 2>/dev/null || true
   cp "$ROOT/pubspec.lock" "$dir/pubspec.lock" 2>/dev/null || true
@@ -256,6 +264,48 @@ else
     printf '  %-10s %svariants parsed=%s empty-refused=%s — one is wrong%s\n' \
       "FAIL" "$R" "$ok_parse" "$empty_refused" "$N"
   fi
+fi
+
+# --- 8. citation reference must be present ------------------------------------
+# citation_check resolves every `X.tsx:NNN` and `redesign.html:NNN` claim against
+# a reference under eva/. It had NO negative control until the redesigned reference
+# was added, which is the gap this case fills.
+#
+# Two distinct outcomes are asserted, because conflating them is the defect:
+#   - a citation that cannot resolve is FAIL (exit 1) — the claim is wrong
+#   - a required reference that is ABSENT is FATAL (exit 2) — the surface being
+#     checked is not there, which is not the same as finding nothing in it
+#
+# The second was found by planting the first and reading the wrong reason. With
+# redesign.html removed and nothing citing it yet, 12 .tsx files still resolved
+# and the gate reported a green run over a reference that no longer existed. The
+# check that would have noticed was the one doing the checking.
+d=$(make_scratch citation)
+cite_fired=0; ref_fired=0
+if [[ -f "$d/eva/redesign.html" ]]; then
+  # A citation past the end of the file: it exists, the line does not.
+  printf '// plant: see redesign.html:999999\nconst _ = 0;\n' > "$d/lib/plant_citation.dart"
+  ( cd "$d" && python3 tool/gates/citation_check.py >/dev/null 2>&1 )
+  rc=$?
+  rm -f "$d/lib/plant_citation.dart"
+  [[ $rc -eq 1 ]] && cite_fired=1
+  # Now remove the reference entirely. Nothing cites it, so only the required-
+  # reference check can catch this.
+  mv "$d/eva/redesign.html" "$d/eva/redesign.html.removed"
+  ( cd "$d" && python3 tool/gates/citation_check.py >/dev/null 2>&1 )
+  rc=$?
+  mv "$d/eva/redesign.html.removed" "$d/eva/redesign.html"
+  [[ $rc -eq 2 ]] && ref_fired=1
+else
+  printf '  %-10s %sno eva/redesign.html in the scratch copy — cannot run this control%s\n' "FAIL" "$R" "$N"
+fi
+if [[ $cite_fired -eq 1 && $ref_fired -eq 1 ]]; then
+  record "citation" "fired"
+  printf '  %-10s bad citation -> FAIL(1); reference removed -> FATAL(2). The two are not the same.\n' "$G"
+else
+  record "citation" "COULD-NOT-FAIL"
+  printf '  %-10s %sbad-citation fired=%s missing-reference fired=%s — one is wrong%s\n' \
+    "FAIL" "$R" "$cite_fired" "$ref_fired" "$N"
 fi
 
 # --- summary -----------------------------------------------------------------
