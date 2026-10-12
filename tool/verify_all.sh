@@ -196,10 +196,57 @@ else
 fi
 
 # --- 5. test -----------------------------------------------------------------
+# ## WHY THE SUMMARY IS PARSED, AND WHY AN UNPARSABLE ONE IS FATAL
+#
+# Measured failure, on a GitHub runner, not reproduced locally:
+#
+#     ok     flutter test —
+#     ok     coverage 98.36% and  tests meet the recorded floor
+#                                                        ^^^^^ empty
+#
+# `flutter test` exited 0 — every test passed — and the summary it printed could
+# not be parsed. ACTUAL_TESTS came back empty, the recorded test-count floor
+# was never compared, and gate 5 still reported `ok`. Nothing on screen says a
+# check was skipped.
+#
+# This is ADR-0020's subject reached from the other direction: not a gate that
+# could not run, but a gate that ran and reported green over half of what it
+# claims to cover.
+#
+# Locale was ruled out (the same regex matches under C, C.UTF-8, POSIX and
+# en_US.UTF-8), binary-detection was ruled out (no NUL bytes, the output
+# decodes as UTF-8), and ANSI/CR variants were simulated and all matched. So the
+# cause is not known. The fix below does not pretend to know it: it makes the
+# unparsable case impossible to mistake for a pass.
+#
+# Two rules, in order of importance:
+#   1. An unparsable summary is FATAL. It means this gate could not report what
+#      it checked, which is the same class as a missing tool.
+#   2. The pass line never prints an empty description. `flutter test — ` with
+#      nothing after the em-dash is the shape this failure wore.
+tests_passed() {
+  # Strip ANSI, normalise CR progress separators, then take the last match.
+  printf '%s' "$1" \
+    | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+    | tr '\r' '\n' \
+    | grep -oE '\+[0-9]+: *All tests passed' \
+    | tail -1 \
+    | grep -oE '[0-9]+' \
+    | head -1
+}
+
 printf '\n%s5. test suite%s\n' "$B" "$N"
 if out=$(flutter test 2>&1); then
-  pass "flutter test — $(printf '%s' "$out" | grep -oE '\+[0-9]+.*All tests passed' | tail -1 | sed 's/^ *//' | sed 's/[0-9]\+ms.*//')"
-  ACTUAL_TESTS=$(printf '%s' "$out" | grep -oE '\+[0-9]+: All tests passed' | tail -1 | grep -oE '\+[0-9]+' | tr -d '+')
+  ACTUAL_TESTS=$(tests_passed "$out")
+  if [[ -z "$ACTUAL_TESTS" ]]; then
+    # FATAL, not fail and not pass. The suite passed; this script cannot say how
+    # many tests that was, so the recorded floor below cannot be enforced.
+    fatal "flutter test exited 0 but its summary could not be parsed, so the recorded test-count floor was NOT checked. Treat this run as unknown, not as clean."
+    printf '         %s\n' "the summary line looked for is '+N: All tests passed'; nothing in the output matched it."
+    ACTUAL_TESTS=""
+  else
+    pass "flutter test — $ACTUAL_TESTS tests passed"
+  fi
 else
   fail "flutter test — $(printf '%s' "$out" | grep -oE '\+[0-9]+ -[0-9]+' | tail -1)"
   printf '         %s\n' "$(printf '%s' "$out" | grep -A2 'Failing tests' | tail -1)"
@@ -232,9 +279,14 @@ else
         below=0
         python3 -c "import sys; sys.exit(0 if $PCT + 1e-9 >= $FLOOR_COV else 1)" \
           || { fail "coverage $PCT% is BELOW the recorded floor $FLOOR_COV%"; below=1; }
-        if [[ -n "${ACTUAL_TESTS:-}" ]]; then
-          [[ "$ACTUAL_TESTS" -ge "$FLOOR_TESTS" ]] \
-            || { fail "test count $ACTUAL_TESTS is BELOW the recorded floor $FLOOR_TESTS"; below=1; }
+        if [[ -z "${ACTUAL_TESTS:-}" ]]; then
+          # Defence in depth. Gate 5 already FATALs on an unparsable summary, so
+          # reaching here empty means something reached past it. Skipping is what
+          # turned this into a green gate over half its scope; refuse instead.
+          fatal "no test count was captured, so the recorded test-count floor ($FLOOR_TESTS) was NOT checked. Treat this run as unknown, not as clean."
+          below=1
+        elif [[ "$ACTUAL_TESTS" -lt "$FLOOR_TESTS" ]]; then
+          fail "test count $ACTUAL_TESTS is BELOW the recorded floor $FLOOR_TESTS"; below=1
         fi
         [[ $below -eq 0 ]] && pass "coverage $PCT% and $ACTUAL_TESTS tests meet the recorded floor"
       fi

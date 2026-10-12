@@ -206,6 +206,49 @@ else
   fi
 fi
 
+# --- 7. unparsable test summary ----------------------------------------------
+# This one is not a planted file. The failure it guards was MEASURED on a GitHub
+# runner: `flutter test` exited 0, its summary could not be parsed, ACTUAL_TESTS
+# came back empty, and gates 5 and 6 both reported `ok` with the recorded
+# test-count floor never compared. The old code skipped the comparison when the
+# count was empty, so a gate that could not see its own input reported green.
+#
+# What is asserted here is the shipped `tests_passed` function, read out of
+# verify_all.sh rather than reimplemented — two implementations of one parse is
+# two things to keep in step, and this harness exists to test the real thing.
+extract_fn=$(sed -n '/^tests_passed()/,/^}/p' "$ROOT/tool/verify_all.sh")
+if [[ -z "$extract_fn" ]]; then
+  record "parse" "COULD-NOT-FAIL"
+  printf '  %-10s %scould not extract tests_passed() from verify_all.sh%s\n' "FAIL" "$R" "$N"
+else
+  eval "$extract_fn"
+  case_ok=0; case_empty=0
+  # A real summary must parse.
+  if [[ "$(tests_passed '00:59 +2507: All tests passed!')" == "2507" ]]; then
+    case_ok=1
+  fi
+  # Every variant that broke on the runner must now parse too.
+  for variant in $'\r+2507: All tests passed!\r' \
+                 $'\x1b[32m+2507: All tests passed!\x1b[0m' \
+                 $'\r\x1b[2K+2507: All tests passed!'; do
+    [[ "$(tests_passed "$variant")" == "2507" ]] && case_ok=1 || case_ok=0
+  done
+  # An output with NO summary in it must NOT produce a number. This is the whole
+  # point: it has to come back empty so the caller can make it FATAL, rather than
+  # inventing a count.
+  if [[ -z "$(tests_passed 'the suite produced no machine-readable summary')" ]]; then
+    case_empty=1
+  fi
+  if [[ $case_ok -eq 1 && $case_empty -eq 1 ]]; then
+    record "parse" "fired"
+    printf '  %-10s unparsable summary -> empty (caller makes it FATAL); real + ANSI + CR -> 2507\n' "$G"
+  else
+    record "parse" "COULD-NOT-FAIL"
+    printf '  %-10s %sreal/ANSI/CR parsed=%s empty-refused=%s — one is wrong%s\n' \
+      "FAIL" "$R" "$case_ok" "$case_empty" "$N"
+  fi
+fi
+
 # --- summary -----------------------------------------------------------------
 echo
 echo "${B}Summary${N}"
