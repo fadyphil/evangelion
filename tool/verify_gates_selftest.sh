@@ -208,30 +208,40 @@ fi
 
 # --- 7. unparsable test summary ----------------------------------------------
 # Not a planted file. The failure this guards was MEASURED on a GitHub runner on
-# 2026-10-12: `flutter test` exited 0, its summary could not be parsed,
-# ACTUAL_TESTS came back empty, and gates 6 and 7 BOTH reported `ok` with the
-# recorded test-count floor never compared. The old code was
+# 2026-10-12: `flutter test` exited 0, every test passed, and no line matched
+# '+N: All tests passed' — because GITHUB_ACTIONS=true makes Flutter select its
+# `github` reporter, which ends with '🎉 N tests passed.' instead. ACTUAL_TESTS
+# came back empty, and the old code was
 #
 #     if [[ -n "${ACTUAL_TESTS:-}" ]]; then ... fi
 #
-# so an empty count skipped the comparison and the gate still printed ok.
+# so the recorded test-count floor was skipped while the gate printed ok.
 #
 # What is asserted here is the shipped `tests_passed` function, read out of
 # verify_all.sh rather than reimplemented — two implementations of one parse is
 # two things to keep in step, and this harness exists to test the real thing.
+# Both reporter forms are asserted, because the reporter is chosen by the
+# environment and a local-only suite would never see the second one again.
 extract_fn=$(sed -n '/^tests_passed()/,/^}/p' "$ROOT/tool/verify_all.sh")
 if [[ -z "$extract_fn" ]]; then
   record "parse" "COULD-NOT-FAIL"
   printf '  %-10s %scould not extract tests_passed() from verify_all.sh%s\n' "FAIL" "$R" "$N"
 else
   eval "$extract_fn"
-  ok_parse=0
-  # Every variant that plausibly broke on the runner must parse.
+  ok_parse=1
+  # Form 1: the default compact reporter, and the ANSI and CR variants of it.
   for variant in '00:59 +2507: All tests passed!' \
                  $'\r+2507: All tests passed!\r' \
                  $'\x1b[32m+2507: All tests passed!\x1b[0m' \
                  $'\r\x1b[2K+2507: All tests passed!'; do
-    [[ "$(tests_passed "$variant")" == "2507" ]] && ok_parse=1 || ok_parse=0
+    [[ "$(tests_passed "$variant")" == "2507" ]] || ok_parse=0
+  done
+  # Form 2: what GITHUB_ACTIONS=true selects, captured verbatim from the runner
+  # log that first reported the failure.
+  for variant in '🎉 2507 tests passed.' \
+                 $'✅ some test\n🎉 2507 tests passed.\n' \
+                 $'\r🎉 2507 tests passed.\r'; do
+    [[ "$(tests_passed "$variant")" == "2507" ]] || ok_parse=0
   done
   # Output with NO summary must NOT produce a number. That is the whole point:
   # it has to come back empty so the caller can make it FATAL, rather than
@@ -240,7 +250,7 @@ else
   [[ -z "$(tests_passed 'the suite produced no machine-readable summary')" ]] && empty_refused=1
   if [[ $ok_parse -eq 1 && $empty_refused -eq 1 ]]; then
     record "parse" "fired"
-    printf '  %-10s unparsable summary -> empty (caller makes it FATAL); plain/CR/ANSI -> 2507\n' "$G"
+    printf '  %-10s both reporter forms -> 2507; no-summary -> empty, so the caller makes it FATAL\n' "$G"
   else
     record "parse" "COULD-NOT-FAIL"
     printf '  %-10s %svariants parsed=%s empty-refused=%s — one is wrong%s\n' \

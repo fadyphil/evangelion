@@ -246,11 +246,37 @@ fi
 # could not run, but a gate that ran and reported green over half of what it
 # claims to cover.
 #
-# Locale was ruled out (the old regex matches under C, C.UTF-8, POSIX and
-# en_US.UTF-8), binary detection was ruled out (no NUL bytes, the output decodes
-# as UTF-8), and ANSI/CR variants were simulated and all matched. So the cause
-# is not known. What is replaced here is therefore a guess; what is added is a
-# guarantee that being wrong about the guess cannot produce a green gate.
+# Measured failure, on a GitHub runner, before the cause above was found:
+#
+#     ok     flutter test —
+#     ok     coverage 98.36% and  tests meet the recorded floor
+#                                                        ^^^^^ empty
+#
+# The old code was `if [[ -n "${ACTUAL_TESTS:-}" ]]; then ... fi`, so an empty
+# count SKIPPED the recorded floor and the gate still printed ok. This is
+# ADR-0020's subject reached from the other direction: not a gate that could not
+# run, but a gate that ran and reported green over half of what it covers.
+#
+# THE CAUSE, found by running the suite with each candidate variable set, on the
+# machine that reported it:
+#
+#     (unset)              -> +2507: All tests passed!    the default reporter
+#     CI=true              -> +2507: All tests passed!    NOT the cause
+#     GITHUB_ACTIONS=true  -> 🎉 2507 tests passed.       THE cause
+#
+# GitHub Actions exports GITHUB_ACTIONS=true in the runner environment, Flutter's
+# test runner reads it, and switches to its `github` reporter — `✅` per test and
+# `🎉 N tests passed.` at the end. The regex that had read this since the gate was
+# written had only ever seen the compact form, so on every runner the count came
+# back empty and the floor was never compared.
+#
+# CI=true is the obvious suspect and it is wrong. That is worth recording, because
+# the obvious suspect being wrong is what left this unidentified: three plausible
+# causes were ruled out by measurement before the fourth was found, and every
+# rule-out was a thing somebody had previously assumed.
+#
+# Both forms are matched explicitly rather than one being assumed, because the
+# reporter is chosen by the environment and the environment differs by design.
 #
 # Two rules, in order of importance:
 #   1. An unparsable summary is FATAL. It means this gate could not report what
@@ -258,14 +284,16 @@ fi
 #   2. The pass line never prints an empty description. `flutter test — ` with
 #      nothing after the em-dash is the shape this failure wore.
 tests_passed() {
-  # Strip ANSI, normalise CR progress separators, then take the last match.
-  printf '%s' "$1" \
-    | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-    | tr '\r' '\n' \
-    | grep -oE '\+[0-9]+: *All tests passed' \
-    | tail -1 \
-    | grep -oE '[0-9]+' \
-    | head -1
+  # Strip ANSI, normalise CR progress separators, then try each known form.
+  local clean n
+  clean=$(printf '%s' "$1" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr '\r' '\n')
+  n=$(printf '%s' "$clean" \
+    | grep -oE '\+[0-9]+: *All tests passed' | tail -1 | grep -oE '[0-9]+' | head -1)
+  if [[ -n "$n" ]]; then printf '%s' "$n"; return 0; fi
+  # The github reporter, selected by GITHUB_ACTIONS=true. The 🎉 is multi-byte;
+  # the regex matches around it rather than through it.
+  printf '%s' "$clean" \
+    | grep -oE '[0-9]+ tests passed' | tail -1 | grep -oE '[0-9]+' | head -1
 }
 
 printf '\n%s6. test suite%s\n' "$B" "$N"
