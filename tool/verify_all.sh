@@ -276,6 +276,13 @@ if out=$(flutter test 2>&1); then
     # many tests that was, so the recorded floor in gate 7 cannot be enforced.
     fatal "flutter test exited 0 but its summary could not be parsed, so the recorded test-count floor was NOT checked. Treat this run as unknown, not as clean."
     printf '         %s\n' "the summary line looked for is '+N: All tests passed'; nothing in the output matched it."
+    printf '         %s\n' "The last lines the suite actually printed, so this is diagnosable rather than a shrug:"
+    # The suite's own output is the only evidence of what it printed. Discarding
+    # it is what made this undiagnosable on a runner: the first report of this
+    # failure arrived with the failing command, the exit code, and nothing else.
+    printf '%s' "$out" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr '\r' '\n' \
+      | grep -v '^[[:space:]]*$' | tail -12 \
+      | sed 's/^/           | /'
     ACTUAL_TESTS=""
   else
     pass "flutter test — $ACTUAL_TESTS tests passed"
