@@ -650,6 +650,51 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'The anti-vacuity guard for the `Right<Failure, T>` equality group. '
             'Untouched by the migration.',
       ),
+  'test/core/design_system/effects/lumen_canvas_test.dart#loads the shader and memoises the wrapper':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`LumenProgram.load()` memoises the wrapper: two loads must hand '
+            'back the same wrapper object, which is the observable half of '
+            '"holding one instance". The wrapper defines no `==`, so identity '
+            'IS the claim — a second wrapper around the same engine program '
+            'would pass any equality check while doubling the sharing the '
+            'class exists to provide.',
+      ),
+  'test/core/design_system/effects/lumen_canvas_test.dart#each program hands out its own FragmentShader':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`newShader()` must allocate: two calls hand back two uniform '
+            'buffers, which is why `LumenCanvas` calls it once and mutates '
+            'the result. `FragmentShader` defines no `==`, so only identity '
+            'can say "a second call is a second buffer" — the `isFalse` half '
+            'carries the allocation claim.',
+      ),
+  'test/core/design_system/effects/lumen_canvas_test.dart#a failed load is not memoised':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'The memoised good program is untouched by the failures in this '
+            'test: two loads hand back the same wrapper. Same shape as the '
+            'memoise row — identity is the claim because the wrapper defines '
+            'no `==`, and a reloaded-but-equal program would pass `==` while '
+            'hiding a broken cache.',
+      ),
+  'test/core/design_system/effects/lumen_canvas_test.dart#the FragmentShader is allocated once, on the first paint':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`paint` must mutate one `FragmentShader` in place across frames: '
+            'identical pixels cannot tell one buffer from two, so instance '
+            'identity is the only witness that hard rule 2 holds — a '
+            'per-frame allocator passes every pixel test in the file. '
+            '`FragmentShader` defines no `==`.',
+      ),
   'test/core/design_system/effects/neural_background_test.dart#NeuralBackground.build does not re-run across 60 frames':
       _Reviewed(
         sites: 1,
