@@ -230,11 +230,12 @@ void main() {
     });
 
     test('`slot()` is the same for every instance', () {
-      // It is an instance method and not a static one only so a painter can
-      // write `uniforms.slot(UniformSlot.uHueX)` with one receiver. That makes
-      // "the slot does not depend on the table's contents" a claim, so it is
-      // asserted here: a lookup that read a field would pass every constant
-      // above on `identity()` and still be wrong on the table actually painted.
+      // `slot()` is the instance-method twin of `.index`: production call
+      // sites write `UniformSlot.uHueX.index` directly (Task 1.3b), and this
+      // twin exists so "the slot does not depend on the table's contents" is
+      // a claim. It is asserted here: a lookup that read a field would pass
+      // every constant above on `identity()` and still be wrong on the table
+      // actually painted.
       final LumenUniforms painted = const LumenUniforms.identity().withHue(
         h: 258,
         s: 90,

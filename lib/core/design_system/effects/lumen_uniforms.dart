@@ -390,15 +390,22 @@ double _hue2Lightness(double l) => math.min(l + 6, 88);
 /// should get. The Workshop's defaults belong to whatever constructs the first
 /// real table, and the numbers are transcribed there.
 ///
-/// ## `slot()` IS AN INSTANCE METHOD AND THAT IS THE WHOLE REASON FOR IT
+/// ## `slot()` IS AN INSTANCE METHOD, AND WHAT IT IS FOR NOW
 ///
-/// So a painter writes `uniforms.slot(UniformSlot.uHueX)` with one receiver
-/// rather than `UniformSlot.uHueX.index` — the call site that appears twenty
-/// times per frame reads better with the table in hand, and it costs a `this`
-/// that is already in a register. It also makes "the slot is a constant and
-/// never depends on the table's contents" a *claim* the suite can check, which
-/// it does: a lookup that read a field would pass every constant asserted against
-/// [identity] and still be wrong on the table actually painted.
+/// History first: a painter used to write `uniforms.slot(UniformSlot.uHueX)`
+/// with one receiver rather than `UniformSlot.uHueX.index`. Task 1.3b Step 2
+/// deleted that indirection — call sites write `slot.index` directly
+/// (`lumen_canvas.dart:126-151`), because the enum position IS the `setFloat`
+/// index and a translation method was a second place to be wrong.
+///
+/// What remains is the twin the suite asserts against: `u.slot(s) ==
+/// s.index` for every member on every table, which keeps "the slot is a
+/// constant and never depends on the table's contents" a *claim* rather than
+/// prose — a lookup that read a field would pass every constant asserted
+/// against [identity] and still be wrong on the table actually painted.
+/// Production has no caller left; the uniforms test is its only reader. It is
+/// kept, not deleted, pending a decision: removing public API is a decision,
+/// not a cleanup, and the twin costs one line.
 class LumenUniforms {
   /// Creates a table. Every parameter defaults to [identity]'s value, so
   /// `const LumenUniforms()` **is** the identity table.

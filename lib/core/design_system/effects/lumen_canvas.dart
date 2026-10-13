@@ -87,6 +87,16 @@ class LumenCanvas extends CustomPainter {
 
   ui.FragmentShader? _shader;
 
+  /// The shader [paint] reuses across frames, or null before the first paint.
+  ///
+  /// Test-only: the suite asserts [paint] allocates exactly once no matter how
+  /// many frames it paints (see the class doc on why one), and instance
+  /// identity is the only witness — identical pixels cannot tell one buffer
+  /// from two. Production has no reader; the field is written in [paint] and
+  /// read here.
+  @visibleForTesting
+  ui.FragmentShader? get debugShader => _shader;
+
   /// WHY [clock] IS THE ONLY SUBSCRIPTION, AND WHY IT IS NOT A
   /// `Listenable.merge`
   ///

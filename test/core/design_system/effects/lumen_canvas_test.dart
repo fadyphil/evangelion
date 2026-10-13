@@ -618,6 +618,46 @@ void main() {
     });
   });
 
+  group('LumenCanvas.paint — one shader, however many frames', () {
+    testWidgets('the FragmentShader is allocated once, on the first paint', (
+      WidgetTester tester,
+    ) async {
+      // HARD RULE 2, PINNED. `program.newShader()` allocates a fresh uniform
+      // buffer every call, so a `paint()` that allocated per frame would burn
+      // one buffer per frame behind identical pixels with nothing throwing —
+      // the only witness is the instance identity asserted here. Construction
+      // allocates nothing: a painter built and discarded before painting (a
+      // failed golden comparison does exactly this) must cost nothing.
+      final LumenCanvas canvas = LumenCanvas(
+        program: await LumenProgram.load(),
+        uniforms: fixture(),
+        clock: LumenClock.fixed(3.7),
+      );
+      expect(
+        canvas.debugShader,
+        isNull,
+        reason: 'lazy — construction allocates nothing',
+      );
+
+      final ui.PictureRecorder first = ui.PictureRecorder();
+      canvas.paint(Canvas(first), kSurface);
+      final ui.FragmentShader? allocated = canvas.debugShader;
+      expect(allocated, isNotNull);
+
+      final ui.PictureRecorder second = ui.PictureRecorder();
+      canvas.paint(Canvas(second), kSurface);
+      expect(
+        identical(canvas.debugShader, allocated),
+        isTrue,
+        reason:
+            'the second paint mutated the first paint\'s shader in place; a '
+            '`newShader()` per paint would hand back a different instance',
+      );
+      first.endRecording().dispose();
+      second.endRecording().dispose();
+    });
+  });
+
   group('u_time is unwrapped — the value the GPU receives', () {
     testWidgets('at an hour the shader gets 3600 s, not 0 s', (
       WidgetTester tester,
@@ -715,6 +755,45 @@ void main() {
         greaterThan(kChannelTolerance),
         reason:
             'advancing u_time by 0.67 s changed the frame by at most '
+            '${where(delta)}',
+      );
+    });
+
+    testWidgets('the production clock reaches the shader', (
+      WidgetTester tester,
+    ) async {
+      // THE PATH NO OTHER FRAME EXERCISES. The fixed/fixed pair above proves
+      // `u_time` reaches the shader; this proves the PRODUCTION clock does —
+      // `TickedLumenClock.seconds` → `resolveAt` → `setFloat` → pixels. A
+      // painter that read a stale time, or a clock whose ticker never ran,
+      // would paint the same frame twice and fail here while every fixed-clock
+      // test above stayed green. Kept alongside the fixed/fixed pair rather
+      // than replacing it: that pair is the one that says *what* the bytes
+      // mean, this one says *whose* time they carry.
+      final ScopeHarness harness = await pumpScope(tester);
+      final LumenProgram program = await LumenProgram.load();
+      final Uint8List first = await captureFrame(
+        tester,
+        program: program,
+        uniforms: fixture(),
+        clock: harness.clock,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      final Uint8List second = await captureFrame(
+        tester,
+        program: program,
+        uniforms: fixture(),
+        clock: harness.clock,
+      );
+      final ({int worst, int x, int y, int channel}) delta = worstChannelError(
+        second,
+        first,
+      );
+      expect(
+        delta.worst,
+        greaterThan(kChannelTolerance),
+        reason:
+            'one live second advanced u_time and moved the frame — '
             '${where(delta)}',
       );
     });
