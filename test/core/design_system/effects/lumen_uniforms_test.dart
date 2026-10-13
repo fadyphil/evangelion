@@ -663,6 +663,23 @@ void main() {
       expect(before.copyWith(intensity: 0.9).time, 0);
       expect(before.copyWith(), before);
     });
+
+    test('toString names every field', () {
+      // Pinned because it is load-bearing: eighteen fields print as
+      // `Instance of 'LumenUniforms'` without it, which makes a failed
+      // `expect` useless. Identity's table exercises every arm — doubles
+      // print `0.0`, the `int` shape prints `0`, hues print six places.
+      expect(
+        const LumenUniforms.identity().toString(),
+        'LumenUniforms(resX: 0.0, resY: 0.0, time: 0.0, shape: 0, '
+        'spread: 0.0, rays: 0.0, pointerX: 0.0, pointerY: 0.0, '
+        'pointerIntensity: 0.0, intensity: 0.0, spike: 0.0, '
+        'hue: HslRgb(0.000000, 0.000000, 0.000000), '
+        'hue2: HslRgb(0.000000, 0.000000, 0.000000), '
+        'hue3: HslRgb(0.000000, 0.000000, 0.000000), '
+        'melt: 0.0, white: 0.0, light: 0.0, dots: 0.0)',
+      );
+    });
   });
 }
 

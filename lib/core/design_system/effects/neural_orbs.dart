@@ -578,8 +578,9 @@ double _floatComponent(OrbFloatPath path, double phase, int component) {
   }
   // Unreachable: the loop above always returns on its last iteration. Kept as a
   // value rather than a `throw` so a future keyframe set cannot take the
-  // background down at paint time.
-  return keys.first[component];
+  // background down at paint time. It is excluded from coverage because no test
+  // can execute it; the exclusion documents intent rather than hiding behaviour.
+  return keys.first[component]; // coverage:ignore-line
 }
 
 /// The translation of a [path] at [phase], in logical px.

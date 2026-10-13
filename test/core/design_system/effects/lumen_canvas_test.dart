@@ -354,6 +354,13 @@ void main() {
       expect(fired, 0);
       clock.dispose();
     });
+
+    test('toString names the frozen seconds', () {
+      // Pinned because it is load-bearing, not because it is interesting: a
+      // clock's string is what an `expect` failure prints when time is the
+      // suspect, so a drifted format wastes the next reader's debugging.
+      expect(LumenClock.fixed(3.7).toString(), 'FixedLumenClock(3.7 s)');
+    });
   });
 
   group('TickedLumenClock — production, driven by a shared controller', () {
@@ -371,6 +378,21 @@ void main() {
             'elapsed reading — a `value × period` implementation would agree '
             'here too, which is why the restart case below is the one that '
             'tells the two apart',
+      );
+    });
+
+    testWidgets('toString names seconds, raw and offset', (
+      WidgetTester tester,
+    ) async {
+      // Same rationale as the fixed clock's row: failure output, not ceremony.
+      // Exact values because fake-async elapsed time is exact — microseconds
+      // integers, not wall-clock floats — so `2.0` here is `2.0`, and a
+      // formatting drift fails loudly instead of hiding in a `contains`.
+      final ScopeHarness harness = await pumpScope(tester);
+      await tester.pump(const Duration(seconds: 2));
+      expect(
+        harness.clock.toString(),
+        'TickedLumenClock(seconds: 2.0, raw: 2.0s, offset: 0.0s)',
       );
     });
 
@@ -486,6 +508,15 @@ void main() {
         identical(await LumenProgram.load(), await LumenProgram.load()),
         isTrue,
         reason: 'the failures left the memoised good program untouched',
+      );
+    });
+
+    testWidgets('toString names the asset', (WidgetTester tester) async {
+      // Failure output again: a shader error names neither the program nor
+      // the asset, so the wrapper's string is what identifies it.
+      expect(
+        (await LumenProgram.load()).toString(),
+        'LumenProgram(asset: shaders/lumen.frag)',
       );
     });
 
@@ -681,6 +712,26 @@ void main() {
       );
       first.endRecording().dispose();
       second.endRecording().dispose();
+    });
+  });
+
+  group('LumenCanvas.toString — failure output reads', () {
+    testWidgets('it names the program and the clock seconds', (
+      WidgetTester tester,
+    ) async {
+      // The painter's string is what a `shouldRepaint` or golden failure
+      // prints, and `time` in it is the clock's value, not the table's — the
+      // same distinction `resolveAt` exists to enforce.
+      final LumenCanvas canvas = LumenCanvas(
+        program: await LumenProgram.load(),
+        uniforms: fixture(time: 999),
+        clock: LumenClock.fixed(3.7),
+      );
+      expect(
+        canvas.toString(),
+        'LumenCanvas(program: LumenProgram(asset: shaders/lumen.frag), '
+        'time: 3.7 s)',
+      );
     });
   });
 
