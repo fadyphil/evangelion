@@ -73,7 +73,7 @@ five things. Each is marked in place with the evidence.
 | 1 | `u_time` wrapped (Task 1.4) | **cut**; a test asserts it stays unwrapped | Decay onset is ≈10 h not 1 h; no exact loop period exists for any `T` |
 | 2 | Slot table = source declaration order | **reflected** order, generated not hand-written | Impeller re-sorts by SPIR-V location; every index in the old table was wrong |
 | 3 | `Picture.toImage` capture, bare | wrapped in **`tester.runAsync()`** + explicit `dispose()` | Bare capture deadlocks the full 10-min timeout, with or without a shader |
-| 4 | Two-`dirname` `impellerc` path | **three** `dirname`s | The two-`dirname` path does not exist |
+| 4 | Two-`dirname` `impellerc` path | **two `dirname`s + `/bin/cache`** | `<sdk>/cache/…` does not exist; artifacts are at `<sdk>/bin/cache/…` |
 | 5 | Tech Stack: "GLSL ES → SkSL" | explicit that you author **GLSL ES** | `impellerc` accepts only `glsl\|hlsl`; SkSL is the IR the build emits |
 
 Two claims were **confirmed and kept**: the Y flip is required (under Impeller
@@ -375,7 +375,7 @@ Under `flutter:`, after `uses-material-design: true`:
 - [ ] **Step 3: Prove it compiles, using the SDK's own compiler**
 
 ```bash
-FL=$(dirname $(dirname $(dirname $(readlink -f $(which flutter)))))/cache/artifacts/engine/linux-x64
+FL=$(dirname $(dirname $(readlink -f $(which flutter))))/bin/cache/artifacts/engine/linux-x64
 ls -la "$FL/impellerc"   # fail loudly if the path is wrong
 "$FL/impellerc" --sksl --runtime-stage-gles --runtime-stage-gles3 \
   --runtime-stage-vulkan --iplr --sl=/tmp/opencode/lumen.iplr \
@@ -387,11 +387,12 @@ echo "exit=$?"
 
 Expected: **exit 0 and no output at all.** Zero errors, zero warnings.
 
-> **Three `dirname`s, not two.** `readlink -f $(which flutter)` →
-> `<sdk>/bin/flutter`; two `dirname`s stop at `<sdk>`, which has no `cache/`.
-> The artifacts live at `<sdk>/bin/cache/artifacts/engine/linux-x64`. Verified:
-> the two-`dirname` form yields `…/flutter/cache/artifacts/engine/linux-x64`,
-> which does not exist.
+> **The `bin/` is load-bearing.** `readlink -f $(which flutter)` →
+> `<sdk>/bin/flutter`; two `dirname`s stop at `<sdk>`, and the engine artifacts
+> live one level deeper, at `<sdk>/bin/cache/artifacts/engine/linux-x64`.
+> Both the original `<sdk>/cache/...` and a naive three-`dirname`
+> `<sdk-parent>/cache/...` **do not exist**. Verified: only
+> `<sdk>/bin/cache/artifacts/engine/linux-x64/impellerc` resolves.
 
 > `--spirv` is **required** even with `--iplr`. Omitting it fails with
 > `Spirv file name was empty` and exit 1. The real tool always passes it.

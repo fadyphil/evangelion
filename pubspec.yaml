@@ -116,6 +116,12 @@ flutter:
   generate: true
   uses-material-design: true
 
+  # The LUMEN aurora. This is a pubspec *stanza*, not a dependency — the shader
+  # is compiled at build time by the SDK's own impellerc, and loaded at runtime
+  # through dart:ui FragmentProgram. No package is added. See AGENT_CONTEXT §8.4.
+  shaders:
+    - shaders/lumen.frag
+
   # Bundled as static instances so Flutter never resorts to synthetic bolding and
   # so goldens resolve offline. The families are the ones `eva/redesign.html`
   # names, at the weights it uses:
