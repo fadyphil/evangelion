@@ -814,21 +814,15 @@ Measured: 2.98 ns/px for shapes 0–2, **5.04 ns/px** for shafts.
 
 # Phase 2 — Palette & tokens
 
-> **Status: research DONE (two parallel subagents, 2026-10-13). Corrected scope
-> below — Task 2.2's value changes are CUT, focus fix DEFERRED to Phase 5.**
-> Measurements reproduce the plan's four "Measured" ratios exactly (vs prototype
-> canvas `#F5F2EA`), but the "Repaired" column does not survive: `#8A6D15`
-> measures 4.387 (not ≥4.5), white-on-`#8A6D15` is 4.908 (not 5.30), and the
-> current `EvaColors.light` tokens already exceed every repair
-> (`ink2 #5A5480` at 6.10 vs repair 4.70; `emberInk #845610` at 5.54 vs repair
-> 4.90/4.39). Adopting the table verbatim would REGRESS the palette. The
-> prototype's converge-repair is superseded by Decision 153's split
-> (`ember` fills + `emberInk` writes). Focus numbers also corrected: in-focus
-> flattening is 1.000:1 (not ~1.5:1 — that is `#d9dfef` vs remembered
-> normal-mode `#A9B0C8` at 1.62:1); `#d9dfef` maxes at 15.75:1 so "17.98:1 vs
-> canvas" describes hot-verse legibility, not the bug. `eva_colors_test.dart`
-> pins **30** hexes (15+15), not 34. No `vline`/verse widget exists in `lib/`
-> yet — focus fix has no target until Phase 5 builds `/reading`.
+> **Status: COMPLETE (commits `659fa8e`, `cc342ef`, `a712fb0`, `c661245`).**
+> Full gate green: **2609 tests** (floor 2507), **98.46% coverage** (floor 98.25%),
+> citations 1014/1014. Two parallel research subagents first (contrast
+> verification + gate inventory), one implementer, two-stage review per task with
+> mutation-checked re-reviews. Net result: **zero hex changes** — the plan's
+> repair table did not survive measurement (see Task 2.2). Six Decision-153 ink
+> byte-pins added; gaps 0:7, onEmber 9.17/5.41, 5-entry ledger all unchanged;
+> four unaffected gates green. Standing rules: Task 2.2's table is the answer to
+> future re-proposals; focus ≥3:1 rule lives in Phase 5 Task 5.3.
 
 ## Task 2.1: Adopt dark verbatim
 
