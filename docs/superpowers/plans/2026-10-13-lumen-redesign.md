@@ -75,6 +75,7 @@ five things. Each is marked in place with the evidence.
 | 3 | `Picture.toImage` capture, bare | wrapped in **`tester.runAsync()`** + explicit `dispose()` | Bare capture deadlocks the full 10-min timeout, with or without a shader |
 | 4 | Two-`dirname` `impellerc` path | **two `dirname`s + `/bin/cache`** | `<sdk>/cache/…` does not exist; artifacts are at `<sdk>/bin/cache/…` |
 | 5 | Tech Stack: "GLSL ES → SkSL" | explicit that you author **GLSL ES** | `impellerc` accepts only `glsl\|hlsl`; SkSL is the IR the build emits |
+| 6 | `hslToRgb(258,90,66)` ≈ `(0.545, 0.106, 0.831)` | **`(0.5376, 0.3540, 0.9660)`** `#895AF6` | Running `redesign.html:879-880` verbatim gives `(0.5376, 0.354, 0.966)`, cross-checked against the textbook C/X/m sextant conversion — **identical**. The old green channel was off by **0.248**, not rounding. The old triple is `#8B1BD4` ≈ HSL(276, 77%, 47%), a different colour entirely. |
 
 Two claims were **confirmed and kept**: the Y flip is required (under Impeller
 `gl_FragCoord` is silently aliased to the local vertex position), and it is also
@@ -466,9 +467,9 @@ void main() {
   group('hslToRgb', () {
     test('matches the redesign prototype at h=258 s=90 l=66', () {
       final rgb = hslToRgb(258, 90, 66);
-      expect(rgb.r, closeTo(0.545, 0.005));
-      expect(rgb.g, closeTo(0.106, 0.005));
-      expect(rgb.b, closeTo(0.831, 0.005));
+      expect(rgb.r, closeTo(0.5376, 0.0005));
+      expect(rgb.g, closeTo(0.3540, 0.0005));
+      expect(rgb.b, closeTo(0.9660, 0.0005));
     });
   });
 
@@ -910,6 +911,7 @@ tool/verify_all.sh --with-build
 | `orphan_widget_check.py` has an **empty** allowlist | every new widget must be reachable | place it or delete it — never allowlist |
 | Uniform slot layout silently moves on an engine bump | it is compiler output, ordered by SPIR-V location, not by hand | generate from `--reflection-json`; gate fails on change and names the commit |
 | `flutter test` ≠ Impeller | tests run Skia software (`flutter_tester_device.dart:113`) | **measured equivalent** for `FlutterFragCoord` — but re-check whenever the capture harness is touched |
+| `verify_purity.sh` Gate 1 does **not** scan `lib/core/design_system/` | it covers only `core/domain`, `core/common`, `core/navigation`, `features/*/domain` (`tool/verify_purity.sh:178`) | `lumen_uniforms.dart`'s Flutter-freedom is by construction (`dart:math` only) and review, **not** by instrument. Extending Gate 1 to the design system is a separate change. |
 
 ## Suggested issue split
 
