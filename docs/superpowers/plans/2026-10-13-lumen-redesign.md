@@ -71,7 +71,7 @@ five things. Each is marked in place with the evidence.
 | # | Was | Now | Why |
 | --- | --- | --- | --- |
 | 1 | `u_time` wrapped (Task 1.4) | **cut**; a test asserts it stays unwrapped | Decay onset is ≈10 h not 1 h; no exact loop period exists for any `T` |
-| 2 | Slot table = source declaration order | **reflected** order, generated not hand-written | Impeller re-sorts by SPIR-V location; every index in the old table was wrong |
+| 2 | Slot table = source declaration order | **declaration order, confirmed** — but the *reason* given was wrong | `--reflection-json` reports SPIR-V ID order, not the runtime order; the runtime order is declaration order per the engine's own comment (`runtime_effect_contents.cc:290-298`) and per a render test (1/255 vs 247/255, both renderers). The intermediate revision of this row — "reflected order, generated not hand-written" — was wrong and would have painted garbage with a green suite. See Task 1.2 Step 3. |
 | 3 | `Picture.toImage` capture, bare | wrapped in **`tester.runAsync()`** + explicit `dispose()` | Bare capture deadlocks the full 10-min timeout, with or without a shader |
 | 4 | Two-`dirname` `impellerc` path | **two `dirname`s + `/bin/cache`** | `<sdk>/cache/…` does not exist; artifacts are at `<sdk>/bin/cache/…` |
 | 5 | Tech Stack: "GLSL ES → SkSL" | explicit that you author **GLSL ES** | `impellerc` accepts only `glsl\|hlsl`; SkSL is the IR the build emits |
@@ -429,8 +429,8 @@ AGENT_CONTEXT §6 names **"token and motion tables"** as red-first. This is one.
 - [ ] **Step 1: Write the failing test**
 
 `LumenUniforms` is a pure Dart value object. The `setFloat` index is
-load-bearing — but it is **not** source declaration order (see Step 3). The test
-must pin the *reflected* layout, which is what the engine actually uses.
+load-bearing — and it **is** source declaration order (see Step 3). The test
+must pin the *declaration* layout, which is what the engine actually uses.
 
 ```dart
 import 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
@@ -438,29 +438,32 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('LumenUniforms slot order', () {
-    test('matches the reflected layout with no vec3 padding', () {
+    test('matches the declaration layout with no vec3 padding', () {
       const u = LumenUniforms.identity();
-      expect(u.slot(UniformSlot.uShape), 3);
-      expect(u.slot(UniformSlot.uSpread), 4);
-      expect(u.slot(UniformSlot.uStr), 5);
-      expect(u.slot(UniformSlot.uPtrX), 6);
-      expect(u.slot(UniformSlot.uPtrY), 7);
-      expect(u.slot(UniformSlot.uPtrI), 8);
-      expect(u.slot(UniformSlot.uInt), 9);
-      expect(u.slot(UniformSlot.uSpike), 10);
-      expect(u.slot(UniformSlot.uHueX), 11);
-      expect(u.slot(UniformSlot.uHueY), 12);
-      expect(u.slot(UniformSlot.uHueZ), 13);
-      expect(u.slot(UniformSlot.uMelt), 14);
-      expect(u.slot(UniformSlot.uHue2X), 15);
-      expect(u.slot(UniformSlot.uHue2Y), 16);
-      expect(u.slot(UniformSlot.uHue2Z), 17);
-      expect(u.slot(UniformSlot.uHue3X), 18);
-      expect(u.slot(UniformSlot.uHue3Y), 19);
-      expect(u.slot(UniformSlot.uHue3Z), 20);
-      expect(u.slot(UniformSlot.uWhite), 21);
-      expect(u.slot(UniformSlot.uLight), 22);
-      expect(u.slot(UniformSlot.uDots), 23);
+      expect(u.slot(UniformSlot.uResX), 0);
+      expect(u.slot(UniformSlot.uResY), 1);
+      expect(u.slot(UniformSlot.uTime), 2);
+      expect(u.slot(UniformSlot.uHueX), 3);
+      expect(u.slot(UniformSlot.uHueY), 4);
+      expect(u.slot(UniformSlot.uHueZ), 5);
+      expect(u.slot(UniformSlot.uHue2X), 6);
+      expect(u.slot(UniformSlot.uHue2Y), 7);
+      expect(u.slot(UniformSlot.uHue2Z), 8);
+      expect(u.slot(UniformSlot.uHue3X), 9);
+      expect(u.slot(UniformSlot.uHue3Y), 10);
+      expect(u.slot(UniformSlot.uHue3Z), 11);
+      expect(u.slot(UniformSlot.uInt), 12);
+      expect(u.slot(UniformSlot.uStr), 13);
+      expect(u.slot(UniformSlot.uSpike), 14);
+      expect(u.slot(UniformSlot.uSpread), 15);
+      expect(u.slot(UniformSlot.uShape), 16);
+      expect(u.slot(UniformSlot.uMelt), 17);
+      expect(u.slot(UniformSlot.uDots), 18);
+      expect(u.slot(UniformSlot.uWhite), 19);
+      expect(u.slot(UniformSlot.uLight), 20);
+      expect(u.slot(UniformSlot.uPtrX), 21);
+      expect(u.slot(UniformSlot.uPtrY), 22);
+      expect(u.slot(UniformSlot.uPtrI), 23);
     });
   });
 
@@ -515,33 +518,56 @@ Expected: FAIL — `lumen_uniforms.dart` does not exist.
 - [ ] **Step 3: Implement the minimum that passes**
 
 Declare the 16 uniforms in the `.frag` in the **prototype's order** — that is
-what makes the shader source a faithful port. But the *Dart-side slot indices*
-are **not** the declaration order, because Impeller re-sorts uniforms by SPIR-V
-`DecorationLocation` (`impeller/compiler/uniform_sorter.cc`).
+what makes the shader source a faithful port. The *Dart-side slot indices*
+**are** that same order: `setFloat(n)` writes the n-th float of the runtime
+uniform buffer, and the buffer follows declaration order.
 
-**`setFloat` indices come from this table, not from declaration order:**
+**`setFloat` indices come from this table — source declaration order:**
 
 | slot | uniform | slot | uniform | slot | uniform |
 | --- | --- | --- | --- | --- | --- |
-| 0–1 | `u_res` (vec2) | 8 | `u_ptrI` | 15–17 | `u_hue2` (vec3) |
-| 2 | `u_time` | 9 | `u_int` | 18–20 | `u_hue3` (vec3) |
-| 3 | `u_shape` | 10 | `u_spike` | 21 | `u_white` |
-| 4 | `u_spread` | 11–13 | `u_hue` (vec3) | 22 | `u_light` |
-| 5 | `u_str` | 14 | `u_melt` | 23 | `u_dots` |
-| 6–7 | `u_ptr` (vec2) | | | | |
+| 0–1 | `u_res` (vec2) | 8 | `u_hue2.z` | 15 | `u_spread` |
+| 2 | `u_time` | 9–11 | `u_hue3` (vec3) | 16 | `u_shape` |
+| 3–5 | `u_hue` (vec3) | 12 | `u_int` | 17 | `u_melt` |
+| 6–8 | `u_hue2` (vec3) | 13 | `u_str` | 18 | `u_dots` |
+| | | 14 | `u_spike` | 19 | `u_white` |
+| | | | | 20 | `u_light` |
+| | | | | 21–22 | `u_ptr` (vec2) |
+| | | | | 23 | `u_ptrI` |
 
-Total **24** floats, no `vec3` padding — `u_hue` occupies 11,12,13 contiguously.
+Total **24** floats, no `vec3` padding — `u_hue` occupies 3,4,5 contiguously.
 
-Verified three ways, all agreeing: the SDK's `impellerc --reflection-json`; the
-GLSL Impeller itself emits into the `.iplr` (`uniform highp vec2 u_res; uniform
-highp float u_time; uniform highp float u_shape; …`); and three consecutive
-compiles producing byte-identical order.
+Verified two independent ways, both agreeing:
 
-> **Do not hand-maintain this table.** It is compiler output, and it will move
-> when the engine bumps. Generate `UniformSlot` from `--reflection-json` at
-> build time and add a gate that fails when the reflected layout changes,
-> pointing at the commit that changed it. The unit test below then asserts
-> *stability*, which is the property that actually matters — not the constants.
+1. **Render test.** Painting with these indices matches an independently written
+   pure-Dart CPU mirror of the shader maths to **≤ 1/255** per channel over
+   1,280,000 channels (shapes 0–2, sizes 40×40→400×800, melt/daylight on, five
+   `t` values), on **both** `flutter test`'s Skia software path **and** Impeller
+   (`--enable-impeller`, verified a real Impeller context via a `MaskFilter.blur`
+   probe: centre byte 47 Skia vs 45 Impeller). Painting with the
+   `--reflection-json` order instead gives worst error **247/255**. The layout
+   is load-bearing and this is the right one.
+2. **The engine's own comment.** `impeller/entity/contents/runtime_effect_contents.cc:290-298`:
+   *"Uniforms are ordered in the IPLR according to their declaration … Since we
+   know that the declarations are already ordered, we can track the uniform
+   location ourselves."* `_getUniformFloatInfo` (`lib/ui/painting.dart`)
+   likewise walks `_uniformInfo` in order accumulating float offsets.
+
+> **Do NOT use `impellerc --reflection-json` for slot indices.** It reports a
+> *different* order (`u_res, u_time, u_shape, u_spread, u_str, u_ptr, u_ptrI,
+> u_int, u_spike, u_hue, u_melt, u_hue2, u_hue3, u_white, u_light, u_dots`)
+> because it is built from `shader_resources.gl_plain_uniforms` — raw SPIR-V ID
+> order (`impeller/compiler/reflector.cc:231-237`) — while the iplr-embedded
+> lists go through `SortUniforms` (`reflector.cc:389-432`), whose stated intent
+> is declaration order. Painting with the JSON order produces the 247-error
+> frame. A previous revision of this plan made exactly that mistake; the render
+> test caught it.
+>
+> **Do NOT use `getUniformFloat(name).index` either.** `.index` is the
+> *component* offset within the uniform (0 for `.x`, 1 for `.y` — which is why
+> it reads 0 for every single-component lookup). The real setFloat index is the
+> `VisibleForTesting` **`shaderIndex`**, and a test should assert it per uniform
+> — it is the engine's own bookkeeping, cheaper than rendering 1.28M pixels.
 
 Port `hsl2rgb` from `eva/redesign.html:879-880` verbatim.
 
@@ -655,6 +681,45 @@ test is vacuous and the whole golden strategy is unsound.
 
 ```bash
 git commit -m "feat(effects): an injectable clock so goldens stay deterministic"
+```
+
+## Task 1.3b: Reconcile the two slot tables — one layout, not two
+
+Task 1.3 proved by render test that `setFloat` follows **declaration** order
+(≤1/255 vs the CPU mirror; the `--reflection-json` order gives 247/255). But it
+landed a `LumenSlotLayout` enum with *two* production layouts and left
+`UniformSlot` (Task 1.2) pinned to the JSON order — so the suite is green over
+two tables that disagree, and `reflectionOrder` is a public API for painting
+garbage. Reconcile now, in one change:
+
+- [ ] **Step 1: `UniformSlot` → declaration order.** Rewrite the enum in
+  `lumen_uniforms.dart` so member position *is* the `setFloat` index (the table
+  in Task 1.2 Step 3), and update `lumen_uniforms_test.dart` to the Task 1.2
+  Step 1 assertions. The enum doc must state the JSON discrepancy: re-running
+  `impellerc --reflection-json` reproduces a *different* order (S), which is
+  SPIR-V ID order (`reflector.cc:231-237`), not the runtime order — painting
+  with it is the 247-error frame, and the test that proves it lives in
+  `lumen_canvas_test.dart`, not here.
+- [ ] **Step 2: Delete `LumenSlotLayout`.** Production has exactly one layout.
+  `LumenProgram.load` takes no layout; `slotFor` goes away and call sites use
+  `slot.index` directly. The enum's doc on `LumenProgram`'s "two painters' worth
+  of behaviour" goes with it — it was describing a footgun, not a feature.
+- [ ] **Step 3: Correct the `getUniformFloat` doc.** `.index` is the component
+  offset, not the shader index — rewrite the "WHY THIS IS NOT DERIVED" section
+  to say so, citing `painting.dart`'s `UniformFloatSlot.index` doc.
+- [ ] **Step 4: Assert the layout against the engine, cheaply.** Add a test that
+  reads `getUniformFloat(name).shaderIndex` (`VisibleForTesting` — test use is
+  its purpose) per uniform and expects the declaration float position. This pins
+  the layout without rendering 1.28M pixels.
+- [ ] **Step 5: Keep the reflection-order negative control test-only.** The
+  "paint with S-order raw indices → garbage" check stays, but as hard-coded raw
+  indices inside `lumen_canvas_test.dart` — proving layout-sensitivity without a
+  production API for it.
+- [ ] **Step 6: Re-run the four verifications** (`flutter test` on the effects
+  dir, `dart analyze`, `dart format`, `citation_check.py`) and commit:
+
+```bash
+git commit -m "fix(effects): one slot layout — UniformSlot is the setFloat order"
 ```
 
 ## Task 1.4: `u_time` stays unwrapped — **CUT, do not implement**
@@ -912,6 +977,7 @@ tool/verify_all.sh --with-build
 | Uniform slot layout silently moves on an engine bump | it is compiler output, ordered by SPIR-V location, not by hand | generate from `--reflection-json`; gate fails on change and names the commit |
 | `flutter test` ≠ Impeller | tests run Skia software (`flutter_tester_device.dart:113`) | **measured equivalent** for `FlutterFragCoord` — but re-check whenever the capture harness is touched |
 | `verify_purity.sh` Gate 1 does **not** scan `lib/core/design_system/` | it covers only `core/domain`, `core/common`, `core/navigation`, `features/*/domain` (`tool/verify_purity.sh:178`) | `lumen_uniforms.dart`'s Flutter-freedom is by construction (`dart:math` only) and review, **not** by instrument. Extending Gate 1 to the design system is a separate change. |
+| `getUniformFloat(name).index` reads 0 for every uniform | `.index` is the *component* offset (0 for `.x`), not the shader index (`painting.dart`: `UniformFloatSlot.index` — "1 for `.y`, 2 for `.b`") | use the `VisibleForTesting` **`shaderIndex`** for layout assertions in tests; never `.index`. A doc comment shipped this misread once — verified by probe, all 16 uniforms read 0 while `u_nope` throws and `u_res[2]` throws "less than 2". |
 
 ## Suggested issue split
 
