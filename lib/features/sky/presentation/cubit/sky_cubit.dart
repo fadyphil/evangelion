@@ -49,6 +49,13 @@ import 'package:fpdart/fpdart.dart';
 /// sees is always a state the store has confirmed, except in the window between the
 /// lighting and the write, which is one frame wide.
 ///
+/// **Concurrent records may interleave their confirm phases.** Two records in flight
+/// each confirm against the store truth, so the entries stay consistent — but a late
+/// failure after a success still rolls back to `_confirmed` and reports `failed`,
+/// which reads pessimistic next to entries that include the success. Measured, and
+/// accepted: ignoring a failure because something else succeeded would swallow a
+/// real store fault.
+///
 /// ## A RE-LIGHT THAT CHANGES NOTHING EMITS NOTHING
 ///
 /// A scroll re-light fires on every pass over a verse (`eva/redesign.html:1217`),
@@ -111,6 +118,12 @@ class SkyCubit extends Cubit<SkyState> {
   /// that changes nothing — an ordinary re-record of an already ordinary star —
   /// emits nothing and never reaches the store, which is the `SettingsCubit.apply`
   /// no-emit rule restated for a writer that fires on every scroll pass.
+  ///
+  /// **This method does not check the Stars-off switch.** The prototype gates
+  /// lighting on `starsOn` (`eva/redesign.html:1144`) and Stars-off both stops
+  /// lighting *and* clears (`:1483`) — so the caller (the wiring phase, not this
+  /// cubit) must skip [record] while Stars-off is set, or the next scroll pass
+  /// re-lights what the switch just cleared.
   Future<void> record(SkyEntry entry) async {
     final List<SkyEntry> next = _withRecord(state.entries, entry);
     if (identical(next, state.entries)) {

@@ -1,8 +1,9 @@
 /// How many stars the witness sky holds before the oldest is evicted.
 ///
 /// The prototype's `starCap` (`eva/redesign.html:1131`, re-pinned at `:1512`):
-/// `addStar` removes the oldest `.star` while the count is past it (`:1147`), and
-/// the slider re-trims to it (`:1486-1487`).
+/// `addStar` removes the oldest `.star` `while(starCount() >= starCap)` *before*
+/// appending (`:1147`) — effective max exactly 44 — and the slider re-trims to
+/// it (`:1486-1487`).
 ///
 /// ## WHY IT LIVES HERE, IN `features/sky/domain/`, AND NOT ON THE PORT
 ///

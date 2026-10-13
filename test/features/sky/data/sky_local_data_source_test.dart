@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
@@ -117,6 +118,39 @@ void main() {
 
       expect(back.single.litAt.isUtc, isFalse);
       expect(back, <SkyEntry>[local]);
+    });
+
+    test('and a JSON-reloaded store (`List<dynamic>`) still reads the sky', () async {
+      // THE COLD-START SHAPE. On Linux/Windows the store persists to a JSON file,
+      // and after a relaunch the decoded arrays are `List<dynamic>` — the platform
+      // re-casts the outer map (`shared_preferences_linux.dart:364`) but arrays
+      // stay loose, and the package's own getter tolerates them
+      // (`as List<dynamic>?` then `cast<String>()` at
+      // `shared_preferences_legacy.dart:137-141`). Plain `<String>[...]` literals
+      // in `setMockInitialValues` are MORE faithful than the device here, so
+      // without this case the suite is blind to a launch that reads an empty sky
+      // and then overwrites it one star at a time.
+      final SkyLocalDataSource writer = freshStore();
+      await writer.write(<SkyEntry>[
+        verse(verse: 1, at: 1),
+        verse(verse: 2, at: 2),
+      ]);
+      final SharedPreferences raw = await SharedPreferences.getInstance();
+      final List<String>? order = raw.getStringList(kSkyOrderKey);
+      final List<String>? records = raw.getStringList(kSkyEntriesKey);
+      expect(order, isNotNull);
+      expect(records, isNotNull);
+
+      // THE RELAUNCH: both lists pass through the JSON file and come back loose.
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        kSkyOrderKey: jsonDecode(jsonEncode(order)) as Object,
+        kSkyEntriesKey: jsonDecode(jsonEncode(records)) as Object,
+      });
+
+      expect(await freshStore().read(), <SkyEntry>[
+        verse(verse: 1, at: 1),
+        verse(verse: 2, at: 2),
+      ]);
     });
   });
 

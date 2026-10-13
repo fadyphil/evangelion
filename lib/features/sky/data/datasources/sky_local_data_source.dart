@@ -31,10 +31,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   instant in millis.
 ///
 /// The records are written **first** and the order **second**, so a crash between
-/// the two leaves the previous order naming only previous records: the read
-/// answers the old sky whole rather than a new sky with holes. An order entry with
-/// no decodable record is skipped, and a record no order entry names is simply
-/// never read — both directions are safe, and neither is an error.
+/// the two usually leaves the previous order naming only previous records: the
+/// read answers the old sky whole rather than a new sky with holes. Under eviction
+/// that guarantee narrows — at the cap the records write drops the oldest while
+/// the not-yet-written order still names it, so a crash in that window reads back
+/// 43 with the oldest missing. The damage is bounded to the oldest star and the
+/// order stays intact. An order entry with no decodable record is skipped, and a
+/// record no order entry names is simply never read — both directions are safe,
+/// and neither is an error.
 ///
 /// ## WHAT AN UNREADABLE VALUE DOES HERE, AND WHY IT IS **NOT** AN ERROR
 ///
@@ -117,8 +121,10 @@ final class SkyLocalDataSource {
   ///
   /// **Records first, because the order list is the commit point.** A crash between
   /// the two writes leaves the previous order naming only previous records, so the
-  /// next read answers the old sky whole rather than a new sky with holes. The
-  /// reverse order would leave the new order naming records that never landed.
+  /// next read answers the old sky whole rather than a new sky with holes — except
+  /// under eviction, where the dropped oldest is named but no longer recorded (see
+  /// the class doc): the read skips it and answers 43, oldest missing. The reverse
+  /// order would leave the new order naming records that never landed.
   Future<void> write(List<SkyEntry> entries) async {
     final SharedPreferences preferences = await _preferences;
     await preferences.setStringList(kSkyEntriesKey, <String>[
@@ -143,12 +149,44 @@ final class SkyLocalDataSource {
   /// is the answer for "the store is unreachable". So the raw `get` is used and the
   /// type is checked here, which is total for every value the platform can hand
   /// back.
+  ///
+  /// ## AND `is List<String>` IS THE WRONG CHECK FOR AN ARRAY
+  ///
+  /// On Linux/Windows the store persists to a JSON file, and after a relaunch the
+  /// decoded arrays are `List<dynamic>` — the platform re-casts the outer map
+  /// (`shared_preferences_linux.dart:364`) but arrays stay loose. The package's own
+  /// getter tolerates them (`as List<dynamic>?` then `cast<String>()` at
+  /// `shared_preferences_legacy.dart:137-141`), and within this process the cache
+  /// holds the `List<String>` that was written — so `raw is List<String>` passes
+  /// every in-process test and reads an empty sky on the next launch, which the
+  /// next record then overwrites one star at a time. The narrowing below is
+  /// element-wise for exactly that reason: accept any `List`, answer `null` unless
+  /// every element is a `String`.
+  ///
+  /// The settings scalar precedent (`SettingsLocalDataSource._stringAt` and
+  /// friends) does not cover this because `jsonDecode` returns exact scalars — a
+  /// stored `String` decodes to a `String`, an `int` to an `int` — and only arrays
+  /// loosen. A scalar `is` check survives the reload; an array one does not.
+  ///
+  /// **One deliberate difference from the package getter:** a non-`String` element
+  /// answers `null` here rather than throwing. The package's `cast<String>()` is
+  /// lazy and its `toList()` forces it, so a poked store throws a `TypeError` out
+  /// of the typed getter — which is the whole-store-unreadable failure above, one
+  /// layer down. An unreadable value is skipped, never fatal.
   static List<String>? _stringListAt(
     SharedPreferences preferences,
     String key,
   ) {
     final Object? raw = preferences.get(key);
-    return raw is List<String> ? raw : null;
+    if (raw is! List) {
+      return null;
+    }
+    for (final Object? element in raw) {
+      if (element is! String) {
+        return null;
+      }
+    }
+    return raw.cast<String>();
   }
 
   /// One entry as one JSON record: its key segments, its flare, and its instant.

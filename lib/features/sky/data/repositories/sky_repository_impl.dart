@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
@@ -18,14 +20,20 @@ import 'package:fpdart/fpdart.dart';
 /// drift — which is the same division `DioReadingRepository` keeps between its
 /// mapper and its transport.
 ///
-/// ## AND IT WRAPS **THROWING** INTO A TYPED FAILURE, WHICH IS THE REST
+/// ## RECORDS ARE SERIALIZED, BECAUSE SCROLL DOES NOT AWAIT
 ///
-/// `SkyRepository`'s LSP row says an implementation "never throws".
-/// `SharedPreferences.getInstance()` reads from disk over a platform channel, and
-/// a platform with no plugin registered throws `MissingPluginException` out of it.
-/// All four arms of this class are `try`/`catch` over the store and nothing else —
-/// `settings_repository_test.dart`'s "a second `try` and a real cost" is why the
-/// count is stated rather than left to be inferred.
+/// `/reading` lights on scroll into view (`eva/redesign.html:1217`), so two records
+/// can be in flight at once — and a record is read→mutate→write, which loses a star
+/// when two interleave (measured `[John:3:1, John:3:2]` → `[John:3:2]`). Every
+/// mutating arm therefore runs inside [_serialized]: each call snapshots the
+/// current tail, installs its own turn, waits for its predecessors, and only then
+/// touches the store. Reads ([entries], [count]) take no turn — they never mutate,
+/// so there is nothing to interleave.
+///
+/// **Stated here and not on the port**, because the port is frozen and its
+/// signatures do not change: atomicity is an obligation this adapter meets, not a
+/// contract its callers rely on. A caller that needs "both landed" still awaits
+/// both futures; what the chain guarantees is that awaiting both is sufficient.
 ///
 /// ## THE CAP IS ENFORCED HERE, AND THE NUMBER LIVES IN `sky_star_cap.dart`
 ///
@@ -39,28 +47,53 @@ import 'package:fpdart/fpdart.dart';
 /// A cap on the port would have made every reader depend on a number only writers
 /// need; a cap nowhere would have let the sky grow past the `44` the slider
 /// re-trims to (`eva/redesign.html:1486-1487`).
+///
+/// ## AND EVERY ARM WRAPS **THROWING** INTO A TYPED FAILURE
+///
+/// `SkyRepository`'s LSP row says an implementation "never throws".
+/// `SharedPreferences.getInstance()` reads from disk over a platform channel, and
+/// a platform with no plugin registered throws `MissingPluginException` out of it.
+/// The arms below are `try`/`catch` over the store and nothing else —
+/// `settings_repository_test.dart`'s "a second `try` and a real cost" is why the
+/// count is stated rather than left to be inferred.
 final class SkyRepositoryImpl implements SkyRepository {
   /// Reads and writes through [store].
-  const SkyRepositoryImpl(this._store);
+  ///
+  /// Not `const`: [_tail] is per-instance mutable state — the chain this adapter
+  /// serializes on — and a `const` constructor needs every field `final`.
+  SkyRepositoryImpl(this._store);
 
   final SkyLocalDataSource _store;
 
-  @override
-  Future<Result<SkyEntry>> record(SkyEntry entry) async {
+  /// The tail of the mutation chain: the turn no running mutation has released.
+  ///
+  /// Not `final`, because every serialized call installs its own turn as the new
+  /// tail — and complete from construction, so the first mutation runs at once.
+  /// One chain per repository instance, which is also why the data source stays a
+  /// `@lazySingleton`: two adapters would be two chains over one store, and the
+  /// interleaving would be back.
+  Future<void> _tail = Future<void>.value();
+
+  /// Runs [work] after every mutation ahead of it, then releases the next turn.
+  ///
+  /// The `finally` is the load-bearing half: a `work` that threw would otherwise
+  /// leave the tail never-completing and serialize every later mutation behind a
+  /// future that never resolves — a hung sky rather than a lost star.
+  Future<T> _serialized<T>(Future<T> Function() work) async {
+    final Future<void> mine = _tail;
+    final Completer<void> next = Completer<void>();
+    _tail = next.future;
+    await mine;
     try {
-      final List<SkyEntry> current = await _store.read();
-      final SkyEntry stored = _applyRecord(current, entry);
-      await _store.write(current);
-      return Result<SkyEntry>.of(stored);
-    } on Object catch (error) {
-      // `catch (Object)` rather than `catch (Exception)` deliberately, for the
-      // reason `SettingsRepositoryImpl.load`'s doc measures: a platform channel
-      // failure arrives as whatever the channel threw, and a sky store that cannot
-      // be read must be a typed failure whatever it was. An `Error` escaping would
-      // take the frame with it, so it is caught too.
-      return Result<SkyEntry>.left(_unreachable(error));
+      return await work();
+    } finally {
+      next.complete();
     }
   }
+
+  @override
+  Future<Result<SkyEntry>> record(SkyEntry entry) =>
+      _serialized(() => _recordNow(entry));
 
   @override
   Future<Result<List<SkyEntry>>> entries() async {
@@ -81,12 +114,29 @@ final class SkyRepositoryImpl implements SkyRepository {
   }
 
   @override
-  Future<Result<void>> clear() async {
+  Future<Result<void>> clear() => _serialized(() async {
     try {
       await _store.write(<SkyEntry>[]);
       return const Right<Failure, void>(null);
     } on Object catch (error) {
       return Result<void>.left(_unreachable(error));
+    }
+  });
+
+  /// One record's read→mutate→write, run inside [_serialized].
+  Future<Result<SkyEntry>> _recordNow(SkyEntry entry) async {
+    try {
+      final List<SkyEntry> current = await _store.read();
+      final SkyEntry stored = _applyRecord(current, entry);
+      await _store.write(current);
+      return Result<SkyEntry>.of(stored);
+    } on Object catch (error) {
+      // `catch (Object)` rather than `catch (Exception)` deliberately, for the
+      // reason `SettingsRepositoryImpl.load`'s doc measures: a platform channel
+      // failure arrives as whatever the channel threw, and a sky store that cannot
+      // be read must be a typed failure whatever it was. An `Error` escaping would
+      // take the frame with it, so it is caught too.
+      return Result<SkyEntry>.left(_unreachable(error));
     }
   }
 
@@ -103,7 +153,9 @@ final class SkyRepositoryImpl implements SkyRepository {
   ///   to a flare in place, and the upgrade is monotone — an ordinary re-record
   ///   never dims a stored flare, because a last-write-wins store would dim a
   ///   celebrated moment (`:1123`, `:1330`, `:1428`) back to an ordinary one on
-  ///   the next scroll re-light (`:1217`).
+  ///   the next scroll re-light (`:1217`). Monotonicity is scoped to RETAINED
+  ///   entries: an evicted flare re-lights as an ordinary star — a first light
+  ///   again, the store no longer knowing it was ever celebrated.
   ///
   /// Returns the entry **as stored** — the `SettingsRepository.save` contract,
   /// mirrored — so a caller that re-lights a verse sees the first lit instant it

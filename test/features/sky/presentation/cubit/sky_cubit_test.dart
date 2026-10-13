@@ -359,23 +359,30 @@ void main() {
 
   group('the cap', () {
     blocTest<SkyCubit, SkyState>(
-      'a record past 44 surfaces the eviction and does not resurrect it',
+      'a record past 44 publishes the STORE answer, not the optimistic frame',
       build: build,
       setUp: () {
         final List<SkyEntry> full = <SkyEntry>[
           for (int v = 1; v <= skyStarCap; v++) verse(verse: v, at: v),
         ];
-        final List<SkyEntry> evicted = <SkyEntry>[
-          for (int v = 2; v <= skyStarCap + 1; v++) verse(verse: v, at: v),
+        // The confirm re-read answers a store that evicted a DIFFERENT star than
+        // the optimistic frame did — verse 1 stays, verse 2 goes. The disagreement
+        // is deliberate, and it is the only shape that distinguishes "published
+        // the store answer" from "published its own frame": the previous version
+        // of this test had the double agree with the frame, and a mutant that
+        // published the frame passed it. A double that agrees here is the
+        // unfalsifiable half of the flare test's honesty note below — consistent,
+        // but proving nothing about which answer was published.
+        final List<SkyEntry> storeAnswered = <SkyEntry>[
+          verse(verse: 1, at: 1),
+          for (int v = 3; v <= skyStarCap + 1; v++) verse(verse: v, at: v),
         ];
         when(() => repository.entries())
             .thenAnswer((_) async => Right<Failure, List<SkyEntry>>(full));
-        // The confirm re-read answers the store truth — oldest evicted — and the
-        // cubit must publish THAT rather than the optimistic frame it emitted
-        // first, which is what would resurrect verse 1.
         when(() => repository.record(any())).thenAnswer((_) async {
-          when(() => repository.entries())
-              .thenAnswer((_) async => Right<Failure, List<SkyEntry>>(evicted));
+          when(() => repository.entries()).thenAnswer(
+            (_) async => Right<Failure, List<SkyEntry>>(storeAnswered),
+          );
           return Right<Failure, SkyEntry>(verse(verse: skyStarCap + 1, at: 45));
         });
       },
@@ -383,15 +390,42 @@ void main() {
         await cubit.load();
         await cubit.record(verse(verse: skyStarCap + 1, at: 45));
       },
+      expect: () => <SkyState>[
+        SkyState(
+          status: SkyStatus.ready,
+          entries: <SkyEntry>[
+            for (int v = 1; v <= skyStarCap; v++) verse(verse: v, at: v),
+          ],
+        ),
+        // The optimistic frame evicted verse 1 — and the THIRD emit below is the
+        // property: the cubit publishes the store answer on top of it rather
+        // than stopping at its own frame.
+        SkyState(
+          status: SkyStatus.ready,
+          entries: <SkyEntry>[
+            for (int v = 2; v <= skyStarCap + 1; v++) verse(verse: v, at: v),
+          ],
+        ),
+        SkyState(
+          status: SkyStatus.ready,
+          entries: <SkyEntry>[
+            verse(verse: 1, at: 1),
+            for (int v = 3; v <= skyStarCap + 1; v++) verse(verse: v, at: v),
+          ],
+        ),
+      ],
       verify: (SkyCubit cubit) {
         expect(cubit.state.entries, hasLength(skyStarCap));
         expect(
           cubit.state.entries.first.key,
-          'John:3:2',
+          'John:3:1',
           reason:
-              'verse 1 was lit first and is evicted first — the cubit confirms '
-              'against the store answer, never against its own optimistic frame',
+              'the store kept verse 1 and dropped verse 2, and the published sky '
+              'is the STORE answer — an optimistic frame would open with '
+              '`John:3:2`. A publish-the-frame mutant fails here twice over: the '
+              'third emit never fires, and the survivor is the wrong star.',
         );
+        expect(cubit.state.entries.last.key, 'John:3:45');
         expect(cubit.state.status, SkyStatus.ready);
       },
     );

@@ -20,10 +20,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// agrees. It is why `SkyLocalDataSource` carries the same `.over` seam
 /// `SettingsLocalDataSource` does, and `settings_repository_test.dart`'s
 /// `unreachableStore` is the precedent this mirrors line for line.
+///
+/// **And the failure is deferred, not a pre-completed `Future.error`.** A real
+/// channel failure arrives asynchronously; a pre-completed error future with no
+/// listener yet is reported unhandled before the next microtask runs. That was
+/// harmless while `record` awaited the store in the same stack, and it is a
+/// spurious unhandled error now that records serialize behind a chain — the
+/// chain's first turn is a microtask away, and the report fires first. Deferring
+/// the throw models the channel faithfully and keeps the failure for the
+/// adapter's `catch`, which is the property under test.
 SkyLocalDataSource unreachableStore() {
   final SkyLocalDataSource store = SkyLocalDataSource.over(
-    Future<SharedPreferences>.error(
-      MissingPluginException('no shared_preferences implementation'),
+    Future<SharedPreferences>(
+      () =>
+          throw MissingPluginException('no shared_preferences implementation'),
     ),
   );
   addTearDown(store.resetForTest);
@@ -151,6 +161,28 @@ void main() {
     });
   });
 
+  group('concurrent records are serialized', () {
+    test('two records fired without awaiting both land, in order', () async {
+      // SCROLL FIRES WITHOUT AWAITING: `/reading` lights on scroll into view
+      // (`eva/redesign.html:1217`), so two passes in flight must not interleave —
+      // an unserialized read→mutate→write loses the first star (measured
+      // `[John:3:1, John:3:2]` → `[John:3:2]` against the naive three-step).
+      final SkyRepository repo = SkyRepositoryImpl(freshStore());
+      final Future<Result<SkyEntry>> first = repo.record(
+        verse(verse: 1, at: 1),
+      );
+      final Future<Result<SkyEntry>> second = repo.record(
+        verse(verse: 2, at: 2),
+      );
+      await Future.wait(<Future<Result<SkyEntry>>>[first, second]);
+
+      expect(
+        (await entriesThroughFreshStore()).map((SkyEntry e) => e.key),
+        <String>['John:3:1', 'John:3:2'],
+      );
+    });
+  });
+
   group('two readings of the same verse produce one entry', () {
     test('a re-lit verse does not append', () async {
       final SkyRepository repo = SkyRepositoryImpl(freshStore());
@@ -238,6 +270,21 @@ void main() {
       );
       expect(entries.last.key, 'John:3:45');
       expect(unwrap(await repo.count()), skyStarCap);
+    });
+
+    test('an evicted flare re-lights as an ORDINARY star', () async {
+      // Monotonicity is scoped to RETAINED entries: once verse 1 leaves past the
+      // cap, the store no longer knows it was ever celebrated — so re-lighting it
+      // is a first light again, ordinary until celebrated.
+      final SkyRepository repo = SkyRepositoryImpl(freshStore());
+      await repo.record(verse(verse: 1, at: 1, flare: true));
+      for (int v = 2; v <= skyStarCap + 1; v++) {
+        await repo.record(verse(verse: v, at: v));
+      }
+      final SkyEntry relit = unwrap(await repo.record(verse(verse: 1, at: 46)));
+
+      expect(relit.isFlare, isFalse);
+      expect((await entriesThroughFreshStore()).last, relit);
     });
   });
 
