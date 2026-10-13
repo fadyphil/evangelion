@@ -814,40 +814,50 @@ Measured: 2.98 ns/px for shapes 0–2, **5.04 ns/px** for shafts.
 
 # Phase 2 — Palette & tokens
 
+> **Status: research DONE (two parallel subagents, 2026-10-13). Corrected scope
+> below — Task 2.2's value changes are CUT, focus fix DEFERRED to Phase 5.**
+> Measurements reproduce the plan's four "Measured" ratios exactly (vs prototype
+> canvas `#F5F2EA`), but the "Repaired" column does not survive: `#8A6D15`
+> measures 4.387 (not ≥4.5), white-on-`#8A6D15` is 4.908 (not 5.30), and the
+> current `EvaColors.light` tokens already exceed every repair
+> (`ink2 #5A5480` at 6.10 vs repair 4.70; `emberInk #845610` at 5.54 vs repair
+> 4.90/4.39). Adopting the table verbatim would REGRESS the palette. The
+> prototype's converge-repair is superseded by Decision 153's split
+> (`ember` fills + `emberInk` writes). Focus numbers also corrected: in-focus
+> flattening is 1.000:1 (not ~1.5:1 — that is `#d9dfef` vs remembered
+> normal-mode `#A9B0C8` at 1.62:1); `#d9dfef` maxes at 15.75:1 so "17.98:1 vs
+> canvas" describes hot-verse legibility, not the bug. `eva_colors_test.dart`
+> pins **30** hexes (15+15), not 34. No `vline`/verse widget exists in `lib/`
+> yet — focus fix has no target until Phase 5 builds `/reading`.
+
 ## Task 2.1: Adopt dark verbatim
 
 No changes. It passes AA everywhere and beats the current palette on every role.
 
-## Task 2.2: Repair exactly four light values
+## Task 2.2: Repair exactly four light values — **CUT to docs-only, do not change hexes**
 
-| Token | Prototype | Measured | Repaired to | Rendered at |
-| --- | --- | --- | --- | --- |
-| `ink2` | `#707684` | 4.069 | `#666C7A` | 8–17px |
-| gold ink | `#8a6d15` | 4.387 | `#806615` | `.mono b`, `.qnext`, 10–11px |
-| gold | `#9A7B19` | 3.595 | `#8A6D15` | `.rail h4`, 10px |
-| `.cta` label | `#FFFFFF` on `#9A7B19` | **4.022** | fill → `#8A6D15` (5.30) | 11px bold |
+| Token | Prototype | Measured (vs `#F5F2EA`) | Plan said repaired to | Actually measures | `EvaColors.light` today | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ink2` | `#707684` | 4.069 ✓ repro | `#666C7A` | 4.703 ✓ | `#5A5480` at 6.10 | **already better — no change** |
+| gold ink | `#8a6d15` | 4.387 ✓ repro | `#806615` | 4.902 ✓ | `emberInk #845610` at 5.54 | **already better — no change** |
+| gold | `#9A7B19` | 3.595 ✓ repro | `#8A6D15` | **4.387 ✗ (<4.5)** | `ember` fills + `emberInk` writes (Decision 153) | **plan repair fails AA — no change** |
+| `.cta` label | `#FFFFFF` on `#9A7B19` | **4.022** ✓ repro | fill → `#8A6D15` (5.30) | **4.908 ✗ (not 5.30)** | `ember #D4891A` + `onEmber #3A1E00` at 5.41 | **already better; parenthetical wrong — no change** |
 
-- [ ] **Step 1: Make the changes in `eva_colors.dart`**
-- [ ] **Step 2: Cite each repair** — a comment with `redesign.html:NNN` **and**
-  the measured ratio, so a reader sees exactly where and why the app parts ways
-  with the prototype.
-- [ ] **Step 3: Fix the focus affordance.** `redesign.html:177` sets
-  `.screen.focus .vline.in` to `#d9dfef`, which destroys the focus signal —
-  focused and unfocused verse differ by ~1.5:1. Not a contrast bug (17.98:1 vs
-  canvas); an **affordance** bug.
+- [ ] **Step 1: DO NOT change any hex in `eva_colors.dart`.** Proven regression (see table). If a future reader re-proposes the table, this table is the answer.
+- [ ] **Step 2: Cite the non-repair** — a comment in `eva_colors.dart` (light palette doc) with `redesign.html:56,58,70,71,86,90,100` **and** the measured ratios, stating exactly where and why the app parts ways with the prototype (Decision 153 split beats the converge-repair; current tokens exceed every repaired ratio). A reader must see the prototype value, the repaired value, and why neither was adopted.
+- [ ] **Step 3: Fix the focus affordance — DEFERRED to Phase 5.** `redesign.html:177` sets `.screen.focus .vline.in` to `#d9dfef`, flattening every in-view verse including `.hot` to one color (in-focus distinction **1.000:1**, not ~1.5:1; `#d9dfef` vs remembered `#A9B0C8` is 1.62:1; "17.98:1 vs canvas" is hot-verse legibility, max for `#d9dfef` is 15.75:1). **No `vline`/verse widget exists in `lib/`** (grep: only `eva_text_field`/`focus_ring`) — there is no target until Phase 5 builds `/reading`. Record the rule in the plan (Phase 5 Task 5.3): focus mode must preserve a ≥3:1 distinction between in-view and out-of-view verses, never flatten to a single `#d9dfef`.
 
 ## Task 2.3: Re-baseline the five token gates
 
-- [ ] **Step 1: `eva_colors_test.dart`** — 34 byte-pinned hexes, the
-  `expect(gaps.length, dark ? 0 : 7)` sub-AA count, and
-  `closeTo(9.17 / 5.41, 0.05)` on the `onEmber` pairings. Recompute and assert
-  the new count **explicitly**. Do **not** relax to `greaterThanOrEqualTo` —
-  that assertion is what makes the inventory exhaustive.
+- [ ] **Step 1: `eva_colors_test.dart`** — **30** byte-pinned hexes (15 dark + 15 light `expect()` calls; the plan's "34" miscounted — 23 match single-line `expect\(_hex` grep, 9 more are split-line), the
+  `expect(gaps.length, dark ? 0 : 7)` sub-AA count (**unchanged** — no token moves, so the seven `_KnownGap` entries stay), and
+  `closeTo(9.17 / 5.41, 0.05)` on the `onEmber` pairings (**unchanged**). Assert
+  the count **explicitly** (correct 34→30 with the counting method in the comment). Do **not** relax to `greaterThanOrEqualTo` —
+  that assertion is what makes the inventory exhaustive. **Coverage gap to close:** neither spec test pins `emberInk`/`okInk`/`errInk` (Decision 153 tokens) — add byte-pins for the three light + three dark ink values so a future ink edit fails here, not just in the contrast gate.
 - [ ] **Step 2: `text_contrast_gate_test.dart`** — `knownSubstandard` **must not
-  grow**. With four repairs it should *shrink*. **If it grows, a repair was
-  wrong.** The ledger's own words: *"add it deliberately, or fix the token."*
+  grow** (5 entries, unchanged — no token moves). The plan's "should *shrink*" assumed four repairs that were cut; with no hex changes there is nothing to delete. **If it grows or drifts (`closeTo(ratio, 0.005)`), the docs-only change leaked behaviour — STOP.**
 - [ ] **Step 3: Verify the gates that should be unaffected actually are:**
-  `no_colour_literals_test` (new hexes go in `tokens/`, which is exempt),
+  `no_colour_literals_test` (new hexes go in `tokens/`, which is exempt — and this task adds none),
   `glass_blur_budget_test` (purely structural), `font_coverage_test` (the
   redesign uses the **same five** families), `arabic_typography_gate`.
 
