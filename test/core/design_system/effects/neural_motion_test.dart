@@ -708,6 +708,159 @@ void main() {
     });
   });
 
+  group('Task 1.5 — NeuralTiers.resolveShader', () {
+    test('low means the shader stays off', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(393, 852),
+          animationsEnabled: true,
+          override: NeuralTier.low,
+        ),
+        LumenShaderTier.off,
+      );
+    });
+
+    test('a narrow phone resolves to low, so the shader stays off', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(320, 568),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.off,
+      );
+    });
+
+    test('reduced motion keeps the shader off on a 4K desktop', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(3840, 2160),
+          animationsEnabled: false,
+        ),
+        LumenShaderTier.off,
+      );
+    });
+
+    test('reduced motion beats an explicit high override', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(1200, 2000),
+          animationsEnabled: false,
+          override: NeuralTier.high,
+        ),
+        LumenShaderTier.off,
+      );
+    });
+
+    test(
+      'an ordinary phone gets the full shader — 0.33 Mpx is far under budget',
+      () {
+        expect(
+          NeuralTiers.resolveShader(
+            size: const Size(393, 852),
+            animationsEnabled: true,
+          ),
+          LumenShaderTier.full,
+        );
+      },
+    );
+
+    test('a tablet under budget gets shafts too', () {
+      // 1024 x 1366 = 1.40 Mpx.
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(1024, 1366),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.full,
+      );
+    });
+
+    test('a 1080p desktop loses shafts but keeps the shader', () {
+      // 1920 x 1080 = 2.07 Mpx — the first common viewport over budget.
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(1920, 1080),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.noShafts,
+      );
+    });
+
+    test(
+      'a 4K frame with animations on still paints — just without shafts',
+      () {
+        expect(
+          NeuralTiers.resolveShader(
+            size: const Size(3840, 2160),
+            animationsEnabled: true,
+          ),
+          LumenShaderTier.noShafts,
+        );
+      },
+    );
+
+    test('exactly 2 Mpx keeps shafts; one row more loses them', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(2000, 1000),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.full,
+      );
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(2001, 1000),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.noShafts,
+      );
+    });
+
+    test(
+      'the pixel gate applies to mid too — a tall narrow window over budget',
+      () {
+        // Shortest side 600 < 640, so mid — but 600 x 3400 = 2.04 Mpx.
+        expect(
+          NeuralTiers.resolveShader(
+            size: const Size(600, 3400),
+            animationsEnabled: true,
+          ),
+          LumenShaderTier.noShafts,
+        );
+      },
+    );
+
+    test('the budget is two million logical px', () {
+      expect(kShaftsPixelBudget, 2000000);
+    });
+
+    test(
+      'an explicit high override re-enables the shader on a narrow viewport',
+      () {
+        // The override seam: the cost decision belongs to the caller.
+        expect(
+          NeuralTiers.resolveShader(
+            size: const Size(320, 568),
+            animationsEnabled: true,
+            override: NeuralTier.high,
+          ),
+          LumenShaderTier.full,
+        );
+      },
+    );
+
+    test('an explicit low override keeps the shader off on a desktop', () {
+      expect(
+        NeuralTiers.resolveShader(
+          size: const Size(1920, 1080),
+          animationsEnabled: true,
+          override: NeuralTier.low,
+        ),
+        LumenShaderTier.off,
+      );
+    });
+  });
+
   group('auroraPulse — the 0 → 1 → 0 wave of index.css:79-81', () {
     test('is 0 at the start, 1 at the half cycle, 0 at the end', () {
       expect(auroraPulse(0), 0.0);

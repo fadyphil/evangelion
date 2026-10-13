@@ -77,6 +77,90 @@ const double kNarrowViewport = 360;
 /// whole. Above it, the absolute offsets were authored to be seen.
 const double kWideViewport = 640;
 
+/// Whether the LUMEN shader paints, and which shapes it may use.
+///
+/// Resolved by [NeuralTiers.resolveShader] from the same two inputs as
+/// [NeuralTier] — the viewport size and the reader's animation preference — so
+/// everything said there about the override seam and about reduced motion
+/// holds here too. This is the *decision*; wiring a painter to it belongs to
+/// whoever mounts the shader (Phase 5), not to this file. Nothing here is
+/// mounted anywhere.
+///
+/// ## THE TABLE
+///
+/// | tier | shader | shafts (shape 3) |
+/// | --- | --- | --- |
+/// | `high` | on | iff the viewport is at most [kShaftsPixelBudget] |
+/// | `mid` | on | same gate — one rule, not one per tier |
+/// | `low`, or reduced motion | off | — |
+///
+/// ## WHY HIGH+MID AND NOT HIGH ONLY
+///
+/// `mid` is the ordinary-phone tier (`kNarrowViewport ≤ short side <
+/// `kWideViewport`): a 393×852 phone is ~0.33 Mpx, so even the shafts loop
+/// costs ~1.7 ms a frame at the measured rate. Denying the shader to `mid`
+/// would hide the redesign's signature surface from the primary device class
+/// while the size rule already keeps its absolute cost small. `low` stays off
+/// because `low` is the canvas and nothing else — see [NeuralTier]'s doc — and
+/// the shader decision follows the tier rather than re-arguing it.
+///
+/// ## WHY THE SHAFTS GATE IS ONE RULE FOR BOTH TIERS
+///
+/// The cost scales with pixels, not with the tier name: a 600×3400 `mid`
+/// window is 2.04 Mpx and a 1024×1366 `high` tablet is 1.40 Mpx, so a
+/// per-tier ban would deny the tablet's cheaper frame while allowing the
+/// phone's dearer one. The gate reads the pixel count and nothing else.
+enum LumenShaderTier {
+  /// The shader stays off; the static `CustomPainter` paints.
+  ///
+  /// This is today's [NeuralTier.low] behaviour, unchanged — the canvas fill
+  /// and the early return in the background painter. Resolving `off` changes
+  /// no pixel anywhere.
+  off,
+
+  /// The shader paints shapes 0–2 (top/bottom/sides); shape 3 (shafts) is
+  /// disabled.
+  ///
+  /// The caller's shape choice is clamped to this set when this resolves: a
+  /// stored `shafts` preference paints as `sides` (shape 2) rather than being
+  /// forgotten, so toggling back under budget restores it. The clamping itself
+  /// lives with whoever mounts the shader, not here.
+  noShafts,
+
+  /// The shader paints all four shapes, shafts included.
+  full,
+}
+
+/// The logical-pixel count above which shape 3 (shafts) is disabled.
+///
+/// Measured cost (`docs/superpowers/plans/2026-10-13-lumen-redesign.md`,
+/// "What was verified"): **2.98 ns/px** for shapes 0–2, **5.04 ns/px** for
+/// shafts — the 5-iteration loop in the `else` arm of `shaders/lumen.frag`.
+/// At 2 Mpx the shafts frame costs ~10 ms for the background alone, against a
+/// 16.6 ms 60fps budget; shapes 0–2 cost ~6 ms at the same size. The gate
+/// bites where the plan's risk table says it does: a 1080p desktop is 2.07
+/// Mpx (gated), a 1024×1366 tablet is 1.40 Mpx (not), a 393×852 phone is 0.33
+/// Mpx (not).
+///
+/// ## LOGICAL PX, NOT DEVICE PX
+///
+/// `size.width * size.height` where `size` is the viewport's `MediaQuery`
+/// size — the same units `u_res` carries. `LumenCanvas` documents that
+/// `u_res` is the paint rect's *logical* size (`size`, never
+/// `size * devicePixelRatio`), so a gate in device px would need a DPR lookup
+/// this layer has no business doing, and would disagree with the number the
+/// shader actually divides by.
+///
+/// ## WHERE THE SIZE COMES FROM
+///
+/// The `size` handed to [NeuralTiers.resolveShader] — the viewport, not the
+/// paint rect. The background fills the screen when mounted, so the two agree
+/// in practice; deciding here keeps one decision point and keeps the painter
+/// pure. A future caller mounting the shader smaller than the viewport gets
+/// the conservative answer (shafts denied where they would have been
+/// affordable), never the loose one.
+const double kShaftsPixelBudget = 2000000;
+
 /// Resolves a [NeuralTier] from what is knowable synchronously.
 ///
 /// ## WHY A PURE FUNCTION AND NOT A DEVICE-TIER SERVICE
@@ -122,6 +206,46 @@ abstract final class NeuralTiers {
     if (!animationsEnabled) return NeuralTier.low;
     return cost;
   }
+
+  /// Resolves whether the LUMEN shader paints, and which shapes it may use.
+  ///
+  /// Same signature conventions as [resolve]: [override] replaces the *size*
+  /// decision and nothing else, so goldens and tests pass a tier rather than
+  /// arranging a viewport; reduced motion is the last word, inherited from
+  /// [resolve] rather than re-checked here. See [LumenShaderTier] for the
+  /// table and the reasoning behind each row.
+  static LumenShaderTier resolveShader({
+    required Size size,
+    required bool animationsEnabled,
+    NeuralTier? override,
+  }) {
+    // The tier first, through the same seam: `override` replaces the *size*
+    // decision and nothing else, and reduced motion forces `low` — which maps
+    // to `off` below — whatever `override` says. The last-word property is
+    // inherited, not reimplemented; the test that pins it names `resolve`'s
+    // own test beside this one.
+    final NeuralTier tier = resolve(
+      size: size,
+      animationsEnabled: animationsEnabled,
+      override: override,
+    );
+    return switch (tier) {
+      NeuralTier.low => LumenShaderTier.off,
+      NeuralTier.mid || NeuralTier.high =>
+        _shaftsWithinBudget(size)
+            ? LumenShaderTier.full
+            : LumenShaderTier.noShafts,
+    };
+  }
+
+  /// Whether [size]'s pixel count leaves shafts affordable.
+  ///
+  /// At exactly [kShaftsPixelBudget] shafts stay on: "above ~2 Mpx" disables,
+  /// and the boundary belongs to the cheaper side. A zero-area size is under
+  /// budget — and unpaintable anyway (`LumenCanvas.paint` returns early on an
+  /// empty rect rather than dividing by a zero `u_res`).
+  static bool _shaftsWithinBudget(Size size) =>
+      size.width * size.height <= kShaftsPixelBudget;
 
   /// The viewport rule alone, with no accessibility input.
   static NeuralTier _forSize(Size size) {
