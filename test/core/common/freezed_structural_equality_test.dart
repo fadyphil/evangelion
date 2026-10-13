@@ -6,6 +6,7 @@ import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/sky_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
@@ -345,6 +346,29 @@ void main() {
         // The field this mutation was caught by. It is the seventh of seven and
         // the list above is the seventh entry — the count assertion is what turns
         // "someone remembered to name it" into "the list is complete".
+      );
+    });
+
+    test('`SkyEntry`', () {
+      _equalAndDistinct('SkyEntry', _skyEntry(), _skyEntry());
+      _differsInEveryField(
+        'SkyEntry',
+        _skyEntry(),
+        fields: 5,
+        variants: <({String field, SkyEntry value})>[
+          (field: 'book', value: _skyEntry(book: 'Luke')),
+          (field: 'chapter', value: _skyEntry(chapter: 1)),
+          (field: 'verse', value: _skyEntry(verse: 1)),
+          // The marked case: an ordinary read lights `addStar(false)`
+          // (`eva/redesign.html:1217`), so the default is `false` and the
+          // flare is the variant.
+          (field: 'isFlare', value: _skyEntry(isFlare: true)),
+          // A different **instant**. `DateTime`'s `==` is by value — the same
+          // note `AuthSession`'s `createdAt` variant carries, and for the same
+          // reason: "a `DateTime` field" is the one field type where identity
+          // and equality genuinely differ.
+          (field: 'litAt', value: _skyEntry(litAt: _laterInstant())),
+        ],
       );
     });
 
@@ -790,13 +814,14 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(41),
+        hasLength(42),
         reason:
-            'the converted set moved. 23 classes, 14 events and 3 sealed bases is '
+            'the converted set moved. 25 classes, 14 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
-            '`UserSettings` and `SettingsState`, and Phase 1 added '
-            '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard` and '
-            '`LeaderboardQuery`. If this number moved, the migration or the phase '
+            '`UserSettings` and `SettingsState`, Phase 1 added '
+            '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard`, '
+            '`LeaderboardQuery` and `LeaderboardState`, and Phase 3 added '
+            '`SkyEntry`. If this number moved, the migration or the phase '
             'moved and this file has to be told',
       );
       for (final String name in _assertedTypeNames) {
@@ -933,6 +958,8 @@ const Set<String> _assertedTypeNames = <String>{
   'TodayReading',
   'Question',
   'StreakSummary',
+  // Phase 3's one: the witness sky's lit verse, read by three features.
+  'SkyEntry',
   // Phase 1's four. `LeaderboardBoard` is the first entity in `core/domain` with a
   // `List` field, so its `==` is asserted over list *contents* rather than assumed.
   'LeaderboardRow',
@@ -1217,6 +1244,20 @@ SubmitAnswerParams _params({
   readingId: _text(readingId),
   questionId: _text(questionId),
   answer: _text(answer),
+);
+
+SkyEntry _skyEntry({
+  String book = 'John',
+  int chapter = 3,
+  int verse = 16,
+  bool isFlare = false,
+  DateTime? litAt,
+}) => SkyEntry(
+  book: _text(book),
+  chapter: _int(chapter),
+  verse: _int(verse),
+  isFlare: _bool(isFlare),
+  litAt: litAt ?? _firstInstant(),
 );
 
 LoginCredentials _credentials({

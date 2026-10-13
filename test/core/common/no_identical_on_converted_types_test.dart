@@ -89,12 +89,13 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(41),
+        hasLength(42),
         reason:
             'the converted set moved, so the table\'s flags are stale. 34 was the '
             'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`, '
-            'and Phase 1 converted `LeaderboardRow`, `LeaderboardStanding`, '
-            '`LeaderboardBoard`, `LeaderboardQuery` and `LeaderboardState`',
+            'Phase 1 converted `LeaderboardRow`, `LeaderboardStanding`, '
+            '`LeaderboardBoard`, `LeaderboardQuery` and `LeaderboardState`, '
+            'and Phase 3 converted `SkyEntry`',
       );
     });
   });
@@ -856,6 +857,19 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'neighbouring two assertions cover the replacing half. If freezed '
             'ever deep-copied collections this row would go red, and it should: '
             'it is the observable half of "copyWith does not clone".',
+      ),
+  'test/core/domain/entities/sky_entry_test.dart#two identical entries are equal and are two objects':
+      _Reviewed(
+        sites: 1,
+        converted: true,
+        reason:
+            'The canonicalisation probe, in the same shape as `UserSettings`: '
+            '`identical(a, b), isFalse` first, because two identically-written '
+            'constant expressions would be canonicalised into one instance and '
+            '`expect(a, b)` would then pass against any `==`, including a '
+            'broken one. The `lit(…)` helper is what keeps both constructions '
+            'non-constant — the same trick `user_settings_test.dart`\'s '
+            '`step()` plays for the same reason.',
       ),
   'test/core/domain/entities/streak_summary_test.dart#and it is not the same object as an equal one':
       _Reviewed(
