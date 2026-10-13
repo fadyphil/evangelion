@@ -932,7 +932,7 @@ so the placement test puts it in `core/domain/`. **Pure Dart.**
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
 | 5.2 | `/` | `:513-538` | streak real · VOTD real · last-light local · library hardcoded list |
-| 5.3 | `/reading` | `:540-560` | real, + the sky from Phase 3 |
+| 5.3 | `/reading` | `:540-560` | real, + the sky from Phase 3 — focus mode must preserve a ≥3:1 distinction between in-view and out-of-view verses, never flatten to a single `#d9dfef` (`redesign.html:177` flattening is 1.000:1 in-focus; see Phase 2 Task 2.2 Step 3) |
 | 5.4 | `/quiz` | `:562-574` | real |
 | 5.5 | `/communion` | `:612-636` | `GET /leaderboard?window=` |
 | 5.6 | `/journey` | `:576-610` | streak real · rings derived · medals **stubbed** |
