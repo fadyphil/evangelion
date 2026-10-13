@@ -37,18 +37,18 @@ Future<EvaNeuralMotion> pumpScope(
 ///
 /// `SchedulerBinding.transientCallbackCount` is the closest thing the framework
 /// exposes to "how many animations are running", and it is exact: a running
-/// `Ticker` registers one transient callback per frame for itself, so three
-/// running clocks read `3` and three stopped clocks read `0`. Measured in this
+/// `Ticker` registers one transient callback per frame for itself, so four
+/// running clocks read `4` and four stopped clocks read `0`. Measured in this
 /// suite, and the negative controls are the tests either side of the reduced-
 /// motion group.
 ///
 /// This is a stronger witness than `isAnimating`, which only says what one
 /// controller was told — a ticker can be scheduled without the controller
-/// reporting it, and a leaked fourth ticker has no controller to ask about.
+/// reporting it, and a leaked fifth ticker has no controller to ask about.
 int get _tickers => SchedulerBinding.instance.transientCallbackCount;
 
 void main() {
-  group('the bundle is three controllers and a pointer', () {
+  group('the bundle is four controllers and a pointer', () {
     testWidgets('publishes itself to a descendant', (
       WidgetTester tester,
     ) async {
@@ -57,20 +57,21 @@ void main() {
       expect(motion.hue.duration, kHuePeriod);
     });
 
-    testWidgets('all three clocks are running when animations are enabled', (
+    testWidgets('all four clocks are running when animations are enabled', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(tester);
       expect(motion.float.isAnimating, isTrue);
       expect(motion.hue.isAnimating, isTrue);
       expect(motion.aurora.isAnimating, isTrue);
+      expect(motion.lumen.ticker.isAnimating, isTrue);
       await tester.pump();
       expect(
         _tickers,
-        3,
+        4,
         reason:
-            'the control for the reduced-motion group below: three running '
-            'clocks register three transient callbacks, and this is the number '
+            'the control for the reduced-motion group below: four running '
+            'clocks register four transient callbacks, and this is the number '
             'that goes to zero when the platform asks for reduced motion',
       );
     });
@@ -104,7 +105,7 @@ void main() {
       expect(motion.hueValue, greaterThan(hue));
     });
 
-    testWidgets('animationsEnabled: false leaves all three stopped', (
+    testWidgets('animationsEnabled: false leaves all four stopped', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(
@@ -114,6 +115,7 @@ void main() {
       expect(motion.float.isAnimating, isFalse);
       expect(motion.hue.isAnimating, isFalse);
       expect(motion.aurora.isAnimating, isFalse);
+      expect(motion.lumen.ticker.isAnimating, isFalse);
     });
 
     testWidgets('flipping animationsEnabled stops the clocks in place', (
@@ -210,7 +212,7 @@ void main() {
         _tickers,
         0,
         reason:
-            'three tickers burning frames under a background that paints none '
+            'four tickers burning frames under a background that paints none '
             'of them is the exact cost §13 exists to remove, and '
             'isAnimating alone would not catch a ticker the controllers lost '
             'track of',
@@ -242,7 +244,7 @@ void main() {
       expect(motion.auroraValue, aurora0);
     });
 
-    testWidgets('with the signal off, all three run — the negative control', (
+    testWidgets('with the signal off, all four run — the negative control', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(
@@ -251,7 +253,7 @@ void main() {
       );
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 3);
+      expect(_tickers, 4);
     });
 
     testWidgets('an explicit true overrides the platform', (
@@ -268,7 +270,7 @@ void main() {
       final EvaNeuralMotion motion = await pumpScope(tester);
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 3);
+      expect(_tickers, 4);
     });
 
     testWidgets('an OS toggle mid-session stops the clocks', (
@@ -282,7 +284,7 @@ void main() {
       );
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 3);
+      expect(_tickers, 4);
 
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
@@ -475,7 +477,7 @@ void main() {
   });
 
   group('D1 — disposal', () {
-    testWidgets('unmounting the scope disposes all three controllers', (
+    testWidgets('unmounting the scope disposes all four controllers', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(tester);
@@ -494,6 +496,7 @@ void main() {
       expect(motion.float.stop, throwsA(isA<AssertionError>()));
       expect(motion.hue.stop, throwsA(isA<AssertionError>()));
       expect(motion.aurora.stop, throwsA(isA<AssertionError>()));
+      expect(motion.lumen.ticker.stop, throwsA(isA<AssertionError>()));
     });
 
     testWidgets('the pointer notifier is disposed too', (

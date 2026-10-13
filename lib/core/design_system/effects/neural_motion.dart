@@ -1,14 +1,16 @@
+import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 
-/// The three shared controllers app-wide, plus the pointer offset.
+/// The four shared controllers app-wide, plus the pointer offset.
 ///
 /// §13.2, mitigation 2: the prototype declares 3–4 orbs per screen each with
 /// independent `floatDur` / `hueDur`, which is eight screens × 4 orbs × 2
-/// animations = **64** animations. This collapses to **three** [AnimationController]s
-/// — float, hue, aurora — created once, above `MaterialApp`, published by
-/// [NeuralMotionScope] and never recreated per screen.
+/// animations = **64** animations. This collapses to **four**
+/// [AnimationController]s — float, hue, aurora, and the LUMEN shader clock —
+/// created once, above `MaterialApp`, published by [NeuralMotionScope] and
+/// never recreated per screen.
 ///
 /// ## WHY IT IS A `ChangeNotifier` AND NOT JUST A BAG OF CONTROLLERS
 ///
@@ -35,9 +37,9 @@ import 'package:flutter/scheduler.dart' show SchedulerBinding;
 /// ## D3 — WHAT HAPPENED TO `floatDur` AND `hueDur`
 ///
 /// The prototype's `floatDur` (14–28s) and `hueDur` (7–14s) are **per-orb
-/// periods**, and a period is a property of a controller. With three controllers
-/// there is no way to honour twenty-two of them, and no amount of cleverness
-/// changes that: one clock has one rate. §13.2 anticipates exactly this and
+/// periods**, and a period is a property of a controller. With three orb
+/// controllers there is no way to honour twenty-two of them, and no amount of
+/// cleverness changes that: one clock has one rate. §13.2 anticipates exactly this and
 /// prescribes the replacement — "derive per-orb phase from `i / orbCount`" — so
 /// that is what [floatPhaseFor] does and what the painter reads.
 ///
@@ -81,8 +83,15 @@ class EvaNeuralMotion extends ChangeNotifier {
     required this.hue,
     required this.aurora,
     required this.pointer,
+    required this.lumen,
   }) {
-    _sources = Listenable.merge(<Listenable>[float, hue, aurora, pointer]);
+    _sources = Listenable.merge(<Listenable>[
+      float,
+      hue,
+      aurora,
+      pointer,
+      lumen,
+    ]);
     _sources.addListener(_onSourceChanged);
   }
 
@@ -91,13 +100,13 @@ class EvaNeuralMotion extends ChangeNotifier {
   bool _notifiedThisFrame = false;
   bool _disposed = false;
 
-  /// Coalesces the four sources into **one** notification per frame.
+  /// Coalesces the five sources into **one** notification per frame.
   ///
   /// ## WHY COALESCING IS NOT OPTIONAL HERE
   ///
-  /// Three `repeat()`ing controllers each fire their own listener every frame,
-  /// so a naive forward fires `notifyListeners` **three times per frame** and the
-  /// `ListenableBuilder` in `neural_background.dart` rebuilds the painter three
+  /// Four `repeat()`ing controllers each fire their own listener every frame,
+  /// so a naive forward fires `notifyListeners` **four times per frame** and the
+  /// `ListenableBuilder` in `neural_background.dart` rebuilds the painter four
   /// times for one visual update. That is the churn §13's collapse to three
   /// controllers was supposed to *remove*, reintroduced one layer up.
   ///
@@ -137,7 +146,7 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// The pointer offset that drives orb parallax, normalised to the ±16 / ±12
   /// box the prototype uses.
   ///
-  /// A [ValueNotifier] rather than a fourth controller: it is not a clock, it is
+  /// A [ValueNotifier] rather than a controller: it is not a clock, it is
   /// a position, and it settles. The prototype lerps it towards the target at
   /// 0.05 per frame (`ds.tsx:143-144`); Flutter's [Listener] reports a pointer
   /// position directly, so the smoothing would be the *only* thing missing and
@@ -145,7 +154,26 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// same reason the durations are not honoured.
   final ValueNotifier<Offset> pointer;
 
-  /// The listenable that fires whenever any of the three clocks advances or the
+  /// The LUMEN shader's clock — `u_time`, in unwrapped elapsed seconds.
+  ///
+  /// A [TickedLumenClock] and not a [LumenClock] because this bundle **runs**
+  /// clocks: `setAnimationsEnabled` has to stop and start this one with the
+  /// other three, and the only way to do that through an abstraction is to
+  /// reach past it. Holding the concrete type is the honest trade — a painter
+  /// takes a [LumenClock] and nothing else about the two needs to differ, and a
+  /// test that wants a frozen one does not build an `EvaNeuralMotion` at all.
+  ///
+  /// ## WHY IT IS A SEPARATE OBJECT AND NOT A FIFTH ACCESSOR
+  ///
+  /// Because it is the one field in the bundle that a **test** needs to hold
+  /// still. Every other field is read from an `AnimationController` whose
+  /// `value` is a pure function of elapsed time and can be sampled at any point;
+  /// the aurora's 240 goldens are captured through a rasterised frame and can
+  /// only be made reproducible by controlling the clock itself. See
+  /// `lumen_clock.dart` for why it is monotonic by construction.
+  final TickedLumenClock lumen;
+
+  /// The listenable that fires whenever any of the four clocks advances or the
   /// pointer moves.
   ///
   /// This object. See the class doc for why the reference implementation's
@@ -174,14 +202,14 @@ class EvaNeuralMotion extends ChangeNotifier {
     return (index / count) % 1.0;
   }
 
-  /// Starts or stops all three clocks together.
+  /// Starts or stops all four clocks together.
   ///
   /// ## WHY THIS IS HERE AND NOT ONLY A TIER DECISION
   ///
   /// [NeuralTiers.resolve] drops the *painted* layers to nothing when the user
   /// has asked for reduced motion, and that is the requirement. This is the
-  /// other half: three controllers left `repeat()`ing under a background that
-  /// draws none of them are three tickers burning frames for a decision that has
+  /// other half: four controllers left `repeat()`ing under a background that
+  /// draws none of them are four tickers burning frames for a decision that has
   /// already been made. [NeuralMotionScope] exposes it so the composition root
   /// can turn the clock off outright rather than pay for a background it will
   /// not show.
@@ -189,6 +217,12 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// Stopping rather than setting `value` to zero: a reduced-motion user should
   /// get a still background, not one snapped to the top of its cycle, and
   /// `stop(canceled: false)` leaves each clock wherever it had got to.
+  ///
+  /// **The shader clock is included, and stopping it is what makes `u_time`
+  /// freeze rather than rewind.** `TickedLumenClock` reads
+  /// `lastElapsedDuration`, which `stop()` nulls and `repeat()` resets to zero —
+  /// so this method is also the thing that exercises the clock's offset
+  /// arithmetic every time a reader toggles reduced motion.
   void setAnimationsEnabled({required bool enabled}) {
     if (enabled) {
       float.repeat();
@@ -207,10 +241,12 @@ class EvaNeuralMotion extends ChangeNotifier {
       // `auroraPulse`, and the controller is left running forwards. Same wave,
       // correct period.
       aurora.repeat();
+      lumen.ticker.repeat();
     } else {
       float.stop(canceled: false);
       hue.stop(canceled: false);
       aurora.stop(canceled: false);
+      lumen.ticker.stop(canceled: false);
     }
   }
 
@@ -222,14 +258,18 @@ class EvaNeuralMotion extends ChangeNotifier {
     _disposed = true;
     _sources.removeListener(_onSourceChanged);
     pointer.dispose();
+    // Before its ticker, or the clock's own `dispose` would remove a listener
+    // from a controller that is already gone.
+    lumen.dispose();
     float.dispose();
     hue.dispose();
     aurora.dispose();
+    lumen.ticker.dispose();
     super.dispose();
   }
 }
 
-/// Hosts the three shared controllers and publishes them to the tree.
+/// Hosts the four shared controllers and publishes them to the tree.
 ///
 /// Mounted **above** `MaterialApp.router` (`lib/app/app.dart`), so a screen
 /// never creates one and a route push never restarts the ambient animation.
@@ -249,7 +289,7 @@ class NeuralMotionScope extends StatefulWidget {
   /// The subtree that may read the motion bundle.
   final Widget child;
 
-  /// Whether the three clocks run at all.
+  /// Whether the four clocks run at all.
   ///
   /// `null` — the default — resolves to the **platform's** reduced-motion
   /// preference, read from
@@ -351,11 +391,24 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       duration: EvaMotion.aurora,
       animationBehavior: AnimationBehavior.preserve,
     );
+    final AnimationController lumenTicker = AnimationController(
+      vsync: this,
+      duration: kLumenClockPeriod,
+      // `preserve` for the same reason as the three above, and it matters more
+      // here: `AnimationBehavior.normal` multiplies the *duration* by
+      // `disableAnimationsFactor`, and this controller's duration is not read at
+      // all — `TickedLumenClock` reads `lastElapsedDuration`, which the ticker
+      // owns and no behaviour rewrites. So the flag is not about correctness for
+      // the shader clock; it is about the four controllers above the scope not
+      // being collapsed to one frame by a fourth addition to the list.
+      animationBehavior: AnimationBehavior.preserve,
+    );
     final EvaNeuralMotion motion = EvaNeuralMotion(
       float: float,
       hue: hue,
       aurora: aurora,
       pointer: ValueNotifier<Offset>(Offset.zero),
+      lumen: TickedLumenClock(ticker: lumenTicker),
     );
     if (_enabled) {
       motion.setAnimationsEnabled(enabled: true);
@@ -401,7 +454,7 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
     if (widget.animationsEnabled == null) {
       WidgetsBinding.instance.removeObserver(this);
     }
-    // The three controllers are disposed **here**, by the host that owns the
+    // The four controllers are disposed **here**, by the host that owns the
     // `TickerProvider`. `TickerProviderStateMixin.dispose` throws if any ticker
     // it created is still alive, so this is not merely tidy-up: leaving it out
     // turns every app shutdown into a FlutterError.
@@ -432,3 +485,19 @@ const Duration kFloatPeriod = Duration(seconds: 20);
 
 /// The shared hue clock's period. §13.2's reference: 12 seconds.
 const Duration kHuePeriod = Duration(seconds: 12);
+
+/// The LUMEN shader clock's controller period.
+///
+/// ## WHY AN HOUR, AND WHY IT IS **NOT** THE PERIOD OF `u_time`
+///
+/// Because the period is never read. `TickedLumenClock` reads
+/// `AnimationController.lastElapsedDuration` — the ticker's elapsed time since
+/// `start()` — not `value × duration`, so the cycle this number defines never
+/// reaches the shader. It exists only because a controller has to have one, and
+/// an hour is long enough that nothing can observe the wrap: the first thing a
+/// shorter period would buy is a discontinuity nobody wants and cannot see.
+///
+/// The prototype's aurora has no period at all for this term (`redesign.html`
+/// accumulates `u_time` without bound), so this number is as close to
+/// "not a parameter" as a `Duration` can be.
+const Duration kLumenClockPeriod = Duration(hours: 1);

@@ -72,6 +72,10 @@ library;
 
 export 'package:evangelion/core/design_system/effects/gold_flecks.dart';
 export 'package:evangelion/core/design_system/effects/hue_rotate_matrix.dart';
+export 'package:evangelion/core/design_system/effects/lumen_canvas.dart';
+export 'package:evangelion/core/design_system/effects/lumen_clock.dart';
+export 'package:evangelion/core/design_system/effects/lumen_program.dart';
+export 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
 export 'package:evangelion/core/design_system/effects/neural_background.dart';
 export 'package:evangelion/core/design_system/effects/neural_motion.dart';
 export 'package:evangelion/core/design_system/effects/neural_orbs.dart';

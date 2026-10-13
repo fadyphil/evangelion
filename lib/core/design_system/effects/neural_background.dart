@@ -191,7 +191,7 @@ List<OrbSpec> orbsFor(NeuralVariant variant) =>
 
 /// The identity layer behind every screen.
 ///
-/// A [CustomPaint] inside a [RepaintBoundary], driven by the three shared
+/// A [CustomPaint] inside a [RepaintBoundary], driven by the four shared
 /// controllers in [NeuralMotionScope].
 ///
 /// ## THE FIVE MITIGATIONS OF §13, AND WHERE EACH ONE LIVES
@@ -294,7 +294,7 @@ class NeuralBackground extends StatelessWidget {
         child: ListenableBuilder(
           // §13.1's structure, with the one thing that reference was missing:
           // this listenable actually notifies, because [EvaNeuralMotion]
-          // subscribes to the three controllers and forwards. See D1.
+          // subscribes to the four controllers and forwards. See D1.
           listenable: motion.repaint,
           builder: (BuildContext context, Widget? _) => CustomPaint(
             painter: _NeuralPainter(

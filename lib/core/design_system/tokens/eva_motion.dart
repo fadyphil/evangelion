@@ -31,8 +31,9 @@ import 'package:flutter/widgets.dart';
 /// tidy table.
 ///
 /// WHY THE AMBIENT ANIMATIONS ARE NOT `AnimationController`s HELD HERE. There
-/// are three shared controllers app-wide — float, hue, aurora
-/// (`09-quality-gates.md` §13, mitigation 2) — and they live in a
+/// are four shared controllers app-wide — float, hue, aurora, and the LUMEN
+/// shader clock (`09-quality-gates.md` §13, mitigation 2, plus the Task 1.3
+/// clock that `u_time` reads) — and they live in a
 /// `TickerProviderStateMixin` host mounted above `MaterialApp.router`, published
 /// through an inherited scope. That is Phase 2's `NeuralMotionScope`. This file
 /// holds only the numbers and the shapes, which is why it has no `Ticker` and no

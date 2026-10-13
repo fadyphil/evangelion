@@ -232,7 +232,7 @@ void main() {
       expect(tester.widget(find.byType(GoldFlecks)), isA<StatelessWidget>());
     });
 
-    testWidgets('and adds no fourth ticker to the app\'s three', (
+    testWidgets('and adds no fifth ticker to the app\'s four', (
       WidgetTester tester,
     ) async {
       // The whole point of borrowing the float clock. The old version of this
@@ -242,9 +242,9 @@ void main() {
       //
       // `SchedulerBinding.transientCallbackCount` is the witness: a running
       // `Ticker` registers exactly one transient callback per frame for itself,
-      // so three running clocks read `3`. That makes the claim falsifiable in the
+      // so four running clocks read `4`. That makes the claim falsifiable in the
       // way the name promises — a `GoldFlecks` that spun up its own
-      // `AnimationController` would push this to 4.
+      // `AnimationController` would push this to 5.
       tester.view.physicalSize = const Size(380, 120);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -255,9 +255,9 @@ void main() {
 
       expect(
         SchedulerBinding.instance.transientCallbackCount,
-        3,
+        4,
         reason:
-            'the three shared ambient clocks and nothing else — a fourth would '
+            'the four shared ambient clocks and nothing else — a fifth would '
             'be a per-fleck controller, which is what §13.2 collapses away',
       );
       expect(tester.takeException(), isNull);
