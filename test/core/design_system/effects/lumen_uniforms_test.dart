@@ -6,9 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// A transcription, not a derivation. The `.frag` keeps the prototype's
 /// declaration order on purpose — that is what makes it a reviewable port — and
-/// this list is the same order, written down so the suite can assert two
-/// opposing things about it: that [UniformSlot] carries these sixteen names,
-/// and that its **slots** do not follow this order.
+/// this list is the same order, written down so the suite can assert that
+/// [UniformSlot] follows it: the enum's **slots** are this order, because the
+/// runtime uniform buffer is.
 const List<String> kShaderDeclarationOrder = <String>[
   'u_res',
   'u_time',
@@ -60,34 +60,34 @@ Matcher closeHslRgb(HslRgb expected) => predicate<HslRgb>(
 );
 
 void main() {
-  group('UniformSlot — the reflected layout, not the declared one', () {
+  group('UniformSlot — the declaration layout, which is the setFloat order', () {
     const LumenUniforms u = LumenUniforms.identity();
 
-    test('every slot index, as impellerc reflects it', () {
+    test('every slot index, as the shader declares it', () {
       expect(u.slot(UniformSlot.uResX), 0);
       expect(u.slot(UniformSlot.uResY), 1);
       expect(u.slot(UniformSlot.uTime), 2);
-      expect(u.slot(UniformSlot.uShape), 3);
-      expect(u.slot(UniformSlot.uSpread), 4);
-      expect(u.slot(UniformSlot.uStr), 5);
-      expect(u.slot(UniformSlot.uPtrX), 6);
-      expect(u.slot(UniformSlot.uPtrY), 7);
-      expect(u.slot(UniformSlot.uPtrI), 8);
-      expect(u.slot(UniformSlot.uInt), 9);
-      expect(u.slot(UniformSlot.uSpike), 10);
-      expect(u.slot(UniformSlot.uHueX), 11);
-      expect(u.slot(UniformSlot.uHueY), 12);
-      expect(u.slot(UniformSlot.uHueZ), 13);
-      expect(u.slot(UniformSlot.uMelt), 14);
-      expect(u.slot(UniformSlot.uHue2X), 15);
-      expect(u.slot(UniformSlot.uHue2Y), 16);
-      expect(u.slot(UniformSlot.uHue2Z), 17);
-      expect(u.slot(UniformSlot.uHue3X), 18);
-      expect(u.slot(UniformSlot.uHue3Y), 19);
-      expect(u.slot(UniformSlot.uHue3Z), 20);
-      expect(u.slot(UniformSlot.uWhite), 21);
-      expect(u.slot(UniformSlot.uLight), 22);
-      expect(u.slot(UniformSlot.uDots), 23);
+      expect(u.slot(UniformSlot.uHueX), 3);
+      expect(u.slot(UniformSlot.uHueY), 4);
+      expect(u.slot(UniformSlot.uHueZ), 5);
+      expect(u.slot(UniformSlot.uHue2X), 6);
+      expect(u.slot(UniformSlot.uHue2Y), 7);
+      expect(u.slot(UniformSlot.uHue2Z), 8);
+      expect(u.slot(UniformSlot.uHue3X), 9);
+      expect(u.slot(UniformSlot.uHue3Y), 10);
+      expect(u.slot(UniformSlot.uHue3Z), 11);
+      expect(u.slot(UniformSlot.uInt), 12);
+      expect(u.slot(UniformSlot.uStr), 13);
+      expect(u.slot(UniformSlot.uSpike), 14);
+      expect(u.slot(UniformSlot.uSpread), 15);
+      expect(u.slot(UniformSlot.uShape), 16);
+      expect(u.slot(UniformSlot.uMelt), 17);
+      expect(u.slot(UniformSlot.uDots), 18);
+      expect(u.slot(UniformSlot.uWhite), 19);
+      expect(u.slot(UniformSlot.uLight), 20);
+      expect(u.slot(UniformSlot.uPtrX), 21);
+      expect(u.slot(UniformSlot.uPtrY), 22);
+      expect(u.slot(UniformSlot.uPtrI), 23);
     });
 
     test('`.index` is the slot for every member', () {
@@ -153,31 +153,32 @@ void main() {
       );
     });
 
-    test('the shader\'s declaration order, turned into slots, is a '
-        'permutation and not the identity', () {
-      // Read down this list: `0, 2, 11, 15, 18, 9, 5, 10, 4, 3, 14, 23, 21, 22,
-      // 6, 8`. That is the slot of the FIRST float of each uniform, in the
-      // order `shaders/lumen.frag:34-49` writes them. A monotonic `0, 1, 2, …`
-      // here would mean `setFloat`'s index had fallen back to declaration
-      // order, which is the single mistake this file exists to be unable to
-      // make.
+    test('the shader\'s declaration order, turned into slots, is the identity '
+        'ramp, not a permutation', () {
+      // Read down this list: `0, 2, 3, 6, 9, 12, 13, 14, 15, 16, 17, 18, 19,
+      // 20, 21, 23`. That is the slot of the FIRST float of each uniform, in
+      // the order `shaders/lumen.frag:34-49` writes them — strictly ascending,
+      // because member position IS the `setFloat` index. An earlier revision
+      // of this test asserted the opposite (a non-identity permutation pinned
+      // against `--reflection-json`'s SPIR-V ID order); the render test proved
+      // that order paints garbage, so the assertion was inverted with the enum.
       const List<int> firstSlotByDeclarationOrder = <int>[
         0, // u_res
         2, // u_time
-        11, // u_hue
-        15, // u_hue2
-        18, // u_hue3
-        9, // u_int
-        5, // u_str
-        10, // u_spike
-        4, // u_spread
-        3, // u_shape
-        14, // u_melt
-        23, // u_dots
-        21, // u_white
-        22, // u_light
-        6, // u_ptr
-        8, // u_ptrI
+        3, // u_hue
+        6, // u_hue2
+        9, // u_hue3
+        12, // u_int
+        13, // u_str
+        14, // u_spike
+        15, // u_spread
+        16, // u_shape
+        17, // u_melt
+        18, // u_dots
+        19, // u_white
+        20, // u_light
+        21, // u_ptr
+        23, // u_ptrI
       ];
       expect(
         kShaderDeclarationOrder
@@ -191,36 +192,35 @@ void main() {
       );
     });
 
-    test('and yet the SLOT order is a different order', () {
-      // The half that must NOT hold, and the reason this file exists. Impeller
-      // re-sorts uniforms by SPIR-V `DecorationLocation`
-      // (`impeller/compiler/uniform_sorter.cc`) before they reach the
-      // reflection, so `setFloat`'s index is the reflected position and not the
-      // position in the source. The concrete witness is `u_shape`: tenth of
-      // sixteen in the shader, **slot 3**.
+    test('and the SLOT order is the SAME order', () {
+      // The half that must hold, and the reason this file exists. The runtime
+      // uniform buffer follows source declaration order — the engine's own
+      // comment says so (`runtime_effect_contents.cc:290-298`), the render
+      // test proves it (1 vs 247 levels), and the `shaderIndex` test in
+      // `lumen_canvas_test.dart` reads the engine's own bookkeeping. The
+      // concrete witness is `u_shape`: tenth of sixteen in the shader, **slot
+      // 16**. An earlier revision asserted the opposite against
+      // `--reflection-json`'s SPIR-V ID order (`uniform_sorter.cc` was a
+      // misread); that order paints the 247-error frame, and the negative
+      // control proving it lives in `lumen_canvas_test.dart` as raw indices.
       expect(
         uniformNamesInSlotOrder(),
-        isNot(kShaderDeclarationOrder),
+        kShaderDeclarationOrder,
         reason:
-            'if this ever matches, either Impeller stopped re-sorting or the '
-            'enum stopped mirroring the shader — and the slot table below has '
-            'become a second opinion nobody re-derived',
+            'if this ever differs, either the engine stopped laying out in '
+            'declaration order or the enum stopped mirroring the shader',
       );
       expect(
         u.slot(UniformSlot.uShape),
-        3,
+        16,
         reason: 'declared tenth of sixteen',
       );
       expect(
         u.slot(UniformSlot.uSpike),
-        10,
+        14,
         reason: 'declared eighth of sixteen, and it is a neighbour of u_int',
       );
-      expect(
-        u.slot(UniformSlot.uHueX),
-        11,
-        reason: 'declared THIRD of sixteen',
-      );
+      expect(u.slot(UniformSlot.uHueX), 3, reason: 'declared THIRD of sixteen');
     });
 
     test('`slot()` and `.index` cannot disagree, for any member', () {

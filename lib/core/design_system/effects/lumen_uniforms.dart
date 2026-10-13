@@ -5,19 +5,16 @@ import 'dart:math' as math;
 /// ## WHY THIS EXISTS AT ALL, GIVEN THAT `.frag` ALREADY DECLARES EVERY UNIFORM
 ///
 /// `FragmentShader.setFloat(i, v)` takes an **index**, and that index is the
-/// uniform's position in the reflected layout — which is **not** the order the
-/// shader declares them in. Impeller sorts uniforms by SPIR-V
-/// `DecorationLocation` (`impeller/compiler/uniform_sorter.cc`) before they are
-/// reflected, so a `setFloat` index taken from the top of
-/// `shaders/lumen.frag` writes into the wrong variable and nothing reports an
-/// error. The aurora simply renders in colours nobody chose.
+/// uniform's float position in the runtime buffer — which is the order the
+/// shader **declares** them in. The engine lays the buffer out in declaration
+/// order and says so itself (`impeller/entity/contents/runtime_effect_contents.
+/// cc:290-298`): *"Uniforms are ordered in the IPLR according to their
+/// declaration … Since we know that the declarations are already ordered, we
+/// can track the uniform location ourselves."*
 ///
-/// ## THE TABLE, AND HOW IT WAS DERIVED
+/// ## THE JSON DISCREPANCY, STATED SO NOBODY RE-DERIVES IT
 ///
-/// Twenty-four float slots, sixteen uniforms, and **no `vec3` padding** — a
-/// `vec3` here occupies three consecutive floats, so `u_hue` is 11,12,13 and
-/// `u_hue2` starts at 15. That is not a guess about alignment rules; it is the
-/// output of the SDK's own reflection:
+/// Re-running `impellerc --reflection-json` reproduces a *different* order:
 ///
 /// ```sh
 /// # `impellerc` lives at <flutter>/bin/cache/artifacts/engine/<platform>/
@@ -26,14 +23,25 @@ import 'dart:math' as math;
 ///   --spirv=/tmp/u.spirv --reflection-json=/tmp/u.json \
 ///   --input=shaders/lumen.frag --input-type=frag \
 ///   --include=shaders --include="$FL/shader_lib"
-/// python3 -c "import json;u=json.load(open('/tmp/u.json'))['uniforms'];t=0;\
-/// [print(f'{t}-{t+x[\"type\"][\"vec_size\"]-1}',x['name']) \
-///   or globals().__setitem__('t',t+x['type']['vec_size']) for x in u]"
 /// ```
 ///
-/// and it was cross-checked against the GLSL Impeller itself emits into the
-/// `.iplr`. **Re-run that command when the engine bumps**, and diff it against
-/// this list; a changed slot is a silent visual regression, not a build error.
+/// ```text
+/// 0-1  u_res     2  u_time  3  u_shape  4  u_spread  5  u_str
+/// 6-7  u_ptr     8  u_ptrI  9  u_int    10 u_spike
+/// 11-13 u_hue   14 u_melt  15-17 u_hue2 18-20 u_hue3 21 u_white 22 u_light 23 u_dots
+/// ```
+///
+/// That order (call it S) is real compiler output and is **not** the runtime
+/// order: it is built from `shader_resources.gl_plain_uniforms` — raw SPIR-V
+/// ID order (`impeller/compiler/reflector.cc:231-237`) — while the
+/// iplr-embedded uniform lists go through `SortUniforms`
+/// (`reflector.cc:389-432`), whose stated intent is declaration order. Painting
+/// with S produces a frame wrong by up to **247 of 255** levels against the CPU
+/// mirror; painting with the declaration order below gives **1**. An earlier
+/// revision of this enum pinned S (misreading the sort as the runtime order),
+/// and the render test caught it — so the negative control that paints S lives
+/// on in `lumen_canvas_test.dart` as hard-coded raw indices, and this enum
+/// will never name S again.
 ///
 /// ## WHY `.index` IS THE SLOT AND NOTHING ENFORCES THAT
 ///
@@ -47,12 +55,14 @@ import 'dart:math' as math;
 ///        that implements 'Enum'.
 /// ```
 ///
-/// So "the member written fourteenth is the one at slot 13" is a **convention**
+/// So "the member written fourth is the one at slot 3" is a **convention**
 /// and only the suite keeps it honest —
 /// `test/core/design_system/effects/lumen_uniforms_test.dart` asserts
 /// `slot.index == UniformSlot.values.indexOf(slot)` for all twenty-four, plus
-/// the reflected constants themselves. Insert a member in the wrong place and
-/// that test fails; it is the gate this file cannot be.
+/// the Task 1.2 Step 1 constants themselves, plus — cheapest of the three —
+/// the engine's own per-uniform `shaderIndex` bookkeeping in
+/// `lumen_canvas_test.dart`. Insert a member in the wrong place and all three
+/// fail; the enum cannot be its own gate.
 ///
 /// ## WHY EACH MEMBER REPEATS ITS UNIFORM'S NAME
 ///
@@ -73,37 +83,6 @@ enum UniformSlot {
   /// `u_time` — accumulated seconds, already scaled by `0.30` inside the shader.
   uTime('u_time'),
 
-  /// `u_shape` — `0` top, `1` bottom, `2` sides, `3` shafts.
-  ///
-  /// The prototype labels the same four values `['top','bottom','sides',
-  /// 'shafts']` (`redesign.html:1463`) and the shader branches on them at `0.5`
-  /// / `1.5` / `2.5`, so the last one has no branch of its own: it is the
-  /// `else` arm.
-  uShape('u_shape'),
-
-  /// `u_spread` — how far the band reaches, and how soft its edge is.
-  uSpread('u_spread'),
-
-  /// `u_str` — how strongly the fbm noise perturbs the rays. The prototype's
-  /// Workshop control is labelled "Rays".
-  uStr('u_str'),
-
-  /// `u_ptr.x` — pointer position, normalised by the rect's short side.
-  uPtrX('u_ptr'),
-
-  /// `u_ptr.y` — pointer position, normalised by the rect's short side, and
-  /// **inverted**, because the WebGL original measures from the bottom.
-  uPtrY('u_ptr'),
-
-  /// `u_ptrI` — the peak gain of the touch glow.
-  uPtrI('u_ptrI'),
-
-  /// `u_int` — the ambient intensity the band is multiplied by.
-  uInt('u_int'),
-
-  /// `u_spike` — the transient kick a hue or shape change adds to `u_int`.
-  uSpike('u_spike'),
-
   /// `u_hue.r`
   uHueX('u_hue'),
 
@@ -112,9 +91,6 @@ enum UniformSlot {
 
   /// `u_hue.b`
   uHueZ('u_hue'),
-
-  /// `u_melt` — `> 0.5` blends the three hues; `0` uses `u_hue` alone.
-  uMelt('u_melt'),
 
   /// `u_hue2.r` — the second colour the melt oscillates between.
   uHue2X('u_hue2'),
@@ -134,14 +110,48 @@ enum UniformSlot {
   /// `u_hue3.b`
   uHue3Z('u_hue3'),
 
+  /// `u_int` — the ambient intensity the band is multiplied by.
+  uInt('u_int'),
+
+  /// `u_str` — how strongly the fbm noise perturbs the rays. The prototype's
+  /// Workshop control is labelled "Rays".
+  uStr('u_str'),
+
+  /// `u_spike` — the transient kick a hue or shape change adds to `u_int`.
+  uSpike('u_spike'),
+
+  /// `u_spread` — how far the band reaches, and how soft its edge is.
+  uSpread('u_spread'),
+
+  /// `u_shape` — `0` top, `1` bottom, `2` sides, `3` shafts.
+  ///
+  /// The prototype labels the same four values `['top','bottom','sides',
+  /// 'shafts']` (`redesign.html:1463`) and the shader branches on them at `0.5`
+  /// / `1.5` / `2.5`, so the last one has no branch of its own: it is the
+  /// `else` arm.
+  uShape('u_shape'),
+
+  /// `u_melt` — `> 0.5` blends the three hues; `0` uses `u_hue` alone.
+  uMelt('u_melt'),
+
+  /// `u_dots` — the 6px scanline modulation, `> 0.5` to enable.
+  uDots('u_dots'),
+
   /// `u_white` — how much white-hot core the band carries.
   uWhite('u_white'),
 
   /// `u_light` — daylight mode; `0` dark, `1` light.
   uLight('u_light'),
 
-  /// `u_dots` — the 6px scanline modulation, `> 0.5` to enable.
-  uDots('u_dots');
+  /// `u_ptr.x` — pointer position, normalised by the rect's short side.
+  uPtrX('u_ptr'),
+
+  /// `u_ptr.y` — pointer position, normalised by the rect's short side, and
+  /// **inverted**, because the WebGL original measures from the bottom.
+  uPtrY('u_ptr'),
+
+  /// `u_ptrI` — the peak gain of the touch glow.
+  uPtrI('u_ptrI');
 
   const UniformSlot(this.uniform);
 

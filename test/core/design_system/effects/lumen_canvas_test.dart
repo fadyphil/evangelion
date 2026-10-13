@@ -132,6 +132,128 @@ Future<Uint8List> captureFrame(
   return bytes;
 }
 
+/// `--reflection-json`'s SPIR-V ID order (S), as raw `setFloat` indices in
+/// [UniformSlot] (declaration) member order.
+///
+/// Derived, not transcribed. S was re-run on this machine (`impellerc
+/// --reflection-json`: `u_res` 0–1, `u_time` 2, `u_shape` 3, `u_spread` 4,
+/// `u_str` 5, `u_ptr` 6–7, `u_ptrI` 8, `u_int` 9, `u_spike` 10, `u_hue` 11–13,
+/// `u_melt` 14, `u_hue2` 15–17, `u_hue3` 18–20, `u_white` 21, `u_light` 22,
+/// `u_dots` 23 — see `lumen_uniforms.dart`), and each entry below is S's float
+/// position for the member in that slot. Painting through this table is what
+/// the deleted `LumenSlotLayout.reflectionOrder` did. It is kept here — data
+/// in a test, with no production API behind it — because layout-sensitivity
+/// needs a control that actually paints garbage.
+const List<int> kReflectionOrderSlots = <int>[
+  0, // uResX — S: u_res at 0
+  1, // uResY — S: u_res at 1
+  2, // uTime — S: u_time at 2
+  11, // uHueX — S: u_hue at 11
+  12, // uHueY — S: u_hue at 12
+  13, // uHueZ — S: u_hue at 13
+  15, // uHue2X — S: u_hue2 at 15
+  16, // uHue2Y — S: u_hue2 at 16
+  17, // uHue2Z — S: u_hue2 at 17
+  18, // uHue3X — S: u_hue3 at 18
+  19, // uHue3Y — S: u_hue3 at 19
+  20, // uHue3Z — S: u_hue3 at 20
+  9, // uInt — S: u_int at 9
+  5, // uStr — S: u_str at 5
+  10, // uSpike — S: u_spike at 10
+  4, // uSpread — S: u_spread at 4
+  3, // uShape — S: u_shape at 3
+  14, // uMelt — S: u_melt at 14
+  23, // uDots — S: u_dots at 23
+  21, // uWhite — S: u_white at 21
+  22, // uLight — S: u_light at 22
+  6, // uPtrX — S: u_ptr at 6
+  7, // uPtrY — S: u_ptr at 7
+  8, // uPtrI — S: u_ptrI at 8
+];
+
+/// Paints one frame through an EXPLICIT raw slot table instead of
+/// [UniformSlot]'s, and reads it back as raw RGBA.
+///
+/// Test-only: it exists for exactly one caller, the S-order negative control
+/// below. The resolved values come from a real [LumenCanvas] (`resolveAt`), so
+/// the only thing under test is the slot mapping — `u_res` is still the
+/// logical size and `u_time` still the clock. `slots` is indexed by
+/// [UniformSlot] position: `slots[UniformSlot.uShape.index]` is the `setFloat`
+/// index the shape value is written to. Same `runAsync` and disposal rules as
+/// [captureFrame].
+Future<Uint8List> captureFrameWithRawSlots(
+  WidgetTester tester, {
+  required LumenProgram program,
+  required LumenUniforms uniforms,
+  required LumenClock clock,
+  required List<int> slots,
+  Size size = kSurface,
+}) async {
+  assert(
+    slots.length == UniformSlot.values.length,
+    'one raw index per UniformSlot member, got ${slots.length}',
+  );
+  final LumenUniforms resolved = LumenCanvas(
+    program: program,
+    uniforms: uniforms,
+    clock: clock,
+  ).resolveAt(size);
+  // In `UniformSlot.values` order, so entry `i` is the value of the member at
+  // `slot.index == i`. If the enum is ever reordered, this list must follow it
+  // — the `shaderIndex` test and the declaration-ramp test would catch a
+  // drift, but only this comment says where to look.
+  final List<double> values = <double>[
+    resolved.resX,
+    resolved.resY,
+    resolved.time,
+    resolved.hue.r,
+    resolved.hue.g,
+    resolved.hue.b,
+    resolved.hue2.r,
+    resolved.hue2.g,
+    resolved.hue2.b,
+    resolved.hue3.r,
+    resolved.hue3.g,
+    resolved.hue3.b,
+    resolved.intensity,
+    resolved.rays,
+    resolved.spike,
+    resolved.spread,
+    resolved.shape.toDouble(),
+    resolved.melt,
+    resolved.dots,
+    resolved.white,
+    resolved.light,
+    resolved.pointerX,
+    resolved.pointerY,
+    resolved.pointerIntensity,
+  ];
+  final Uint8List? bytes = await tester.runAsync<Uint8List>(() async {
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final ui.FragmentShader shader = program.newShader();
+    for (int i = 0; i < values.length; i++) {
+      shader.setFloat(slots[i], values[i]);
+    }
+    Canvas(recorder).drawRect(Offset.zero & size, Paint()..shader = shader);
+    final ui.Image image = await recorder.endRecording().toImage(
+      size.width.round(),
+      size.height.round(),
+    );
+    final ByteData? data = await image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
+    image.dispose();
+    if (data == null) {
+      throw StateError('the Lumen frame produced no pixels');
+    }
+    return data.buffer.asUint8List();
+  });
+  if (bytes == null) {
+    throw StateError('runAsync returned no pixels');
+  }
+  return bytes;
+}
+
 /// The reference frame for [fixture], at [size].
 Uint8List referenceFrame(LumenUniforms u, {bool flipY = true}) =>
     lumenReferenceFrame(
@@ -341,34 +463,63 @@ void main() {
       expect(identical(program.newShader(), program.newShader()), isFalse);
     });
 
-    test('the two layouts are different tables, and each covers 24 slots', () {
-      // If these were equal the correction documented on `LumenSlotLayout`
-      // would be a no-op, and could be deleted along with the decision to
-      // default to one of them.
-      final List<int> declaration = <int>[
-        for (final UniformSlot slot in UniformSlot.values)
-          kLumenDeclarationSlots[slot.index],
-      ];
-      final List<int> reflection = <int>[
-        for (final UniformSlot slot in UniformSlot.values) slot.index,
-      ];
-      expect(declaration, isNot(reflection));
-      expect(
-        declaration.toSet(),
-        hasLength(24),
-        reason: 'two uniforms claiming one float would leave a hole',
-      );
-      expect(reflection.toSet(), hasLength(24));
-    });
-
-    testWidgets('the default layout is the one the shader actually reads', (
+    testWidgets('the enum order is the engine\'s own bookkeeping', (
       WidgetTester tester,
     ) async {
-      // Held here as a plain assertion rather than inferred from the frames
-      // below, so a reader who changes the default is told what they changed
-      // rather than left to work it out from a red pixel test.
-      final LumenProgram byDefault = await LumenProgram.load();
-      expect(byDefault.layout, LumenSlotLayout.declarationOrder);
+      // THE CHEAP LAYOUT PIN. `FragmentShader.getUniformFloat(name)` answers a
+      // `UniformFloatSlot` whose `.index` is the *component* offset (0 for
+      // `.x`, 1 for `.y` — which is why a naive read of it reports 0 for every
+      // uniform) and whose `shaderIndex` (`VisibleForTesting` — test use is its
+      // purpose) is the absolute float position `setFloat` wants. One assertion
+      // per uniform, no rendering at all: if the engine ever stops laying out
+      // in declaration order, this fails before any pixel test runs.
+      //
+      // Expected values read off `shaders/lumen.frag:34-49`, first float of
+      // each uniform; verified by probe on this SDK rather than trusted from
+      // the field docs.
+      final LumenProgram program = await LumenProgram.load();
+      final ui.FragmentShader shader = program.newShader();
+      const Map<String, int> firstFloatByUniform = <String, int>{
+        'u_res': 0,
+        'u_time': 2,
+        'u_hue': 3,
+        'u_hue2': 6,
+        'u_hue3': 9,
+        'u_int': 12,
+        'u_str': 13,
+        'u_spike': 14,
+        'u_spread': 15,
+        'u_shape': 16,
+        'u_melt': 17,
+        'u_dots': 18,
+        'u_white': 19,
+        'u_light': 20,
+        'u_ptr': 21,
+        'u_ptrI': 23,
+      };
+      expect(firstFloatByUniform, hasLength(16));
+      firstFloatByUniform.forEach((String name, int first) {
+        expect(
+          shader.getUniformFloat(name).shaderIndex,
+          first,
+          reason: '$name starts at float $first',
+        );
+      });
+    });
+
+    testWidgets('and the components follow the base, contiguously', (
+      WidgetTester tester,
+    ) async {
+      // The second half of the `.index`-vs-`shaderIndex` distinction the
+      // `lumen_program.dart` doc corrects: `u_hue[1]` is component offset 1 at
+      // absolute float 4, and `u_res[1]` is offset 1 at float 1. A `vec3` with
+      // padding would read 4 → 8 here instead of 4 → 5.
+      final LumenProgram program = await LumenProgram.load();
+      final ui.FragmentShader shader = program.newShader();
+      expect(shader.getUniformFloat('u_hue', 1).shaderIndex, 4);
+      expect(shader.getUniformFloat('u_hue', 2).shaderIndex, 5);
+      expect(shader.getUniformFloat('u_res', 1).shaderIndex, 1);
+      expect(shader.getUniformFloat('u_hue', 1).index, 1);
     });
   });
 
@@ -729,33 +880,33 @@ void main() {
     testWidgets('and so would the wrong float layout', (
       WidgetTester tester,
     ) async {
-      // THE ONE THAT FIRED. `UniformSlot` — `impellerc --reflection-json`'s
-      // order, which `lumen_uniforms.dart` documents as the runtime index — is
-      // not the order `setFloat` takes. Painting with it produces a frame wrong
-      // by up to 247 of 255 levels, which is what a CPU mirror is for and what a
-      // golden would have recorded as a faithful render of a bug. See
-      // `LumenSlotLayout` for the full measurement, including the check that
-      // Impeller agrees and is genuinely running.
+      // THE ONE THAT FIRED, kept test-only. `--reflection-json`'s SPIR-V ID
+      // order is not the order `setFloat` takes: painting through it produces
+      // a frame wrong by up to 247 of 255 levels, which is what a CPU mirror
+      // is for and what a golden would have recorded as a faithful render of
+      // a bug. The two-layout production enum that used to paint it is
+      // deleted; what remains is the raw table below — data in a test, with
+      // no production API behind it — plus the check that Impeller agrees and
+      // is genuinely running (a `MaskFilter.blur` circle rasterises to centre
+      // byte 47 under Skia and 45 under `--enable-impeller` on lavapipe).
       final LumenProgram program = await LumenProgram.load();
-      final LumenProgram reflected = await LumenProgram.load(
-        layout: LumenSlotLayout.reflectionOrder,
-      );
       final Uint8List correct = await captureFrame(
         tester,
         program: program,
         uniforms: fixture(),
         clock: LumenClock.fixed(3.7),
       );
-      final Uint8List mislaid = await captureFrame(
+      final Uint8List mislaid = await captureFrameWithRawSlots(
         tester,
-        program: reflected,
+        program: program,
         uniforms: fixture(),
         clock: LumenClock.fixed(3.7),
+        slots: kReflectionOrderSlots,
       );
       expect(
         worstChannelError(correct, referenceFrame(fixture())).worst,
         lessThanOrEqualTo(kChannelTolerance),
-        reason: 'the default layout is the one that renders',
+        reason: 'UniformSlot.index is the order that renders',
       );
       final ({int worst, int x, int y, int channel}) delta = worstChannelError(
         mislaid,
@@ -765,8 +916,8 @@ void main() {
         delta.worst,
         greaterThan(100),
         reason:
-            'the reflection order is wrong at runtime, so a painter defaulting '
-            'to it would ship an aurora in colours nobody chose — silently, '
+            'the reflection order is wrong at runtime, so a painter using it '
+            'would ship an aurora in colours nobody chose — silently, '
             'because nothing throws. Measured ${where(delta)}.',
       );
     });

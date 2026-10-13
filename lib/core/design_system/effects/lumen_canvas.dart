@@ -39,9 +39,10 @@ import 'package:flutter/widgets.dart';
 /// shorter and would compile the same error away. It would also be unreadable
 /// next to `shaders/lumen.frag`: twenty-four lines that name the uniform they
 /// write, in the shader's own names, diff against the shader when the shader
-/// changes. The slot numbers come from [LumenProgram.slotFor] and never appear
-/// as literals here, which is the point of the indirection — see
-/// [LumenSlotLayout] for what the numbers actually are.
+/// changes. The slot numbers never appear as literals here: each call writes
+/// `UniformSlot.<member>.index`, which IS the `setFloat` index by
+/// construction — the enum is declared in slot order, and the suite pins that
+/// three ways (see [UniformSlot]).
 ///
 /// ## WHY ONE `FragmentShader` AND NOT ONE PER FRAME
 ///
@@ -122,32 +123,32 @@ class LumenCanvas extends CustomPainter {
 
     shader
       // `u_res` — the LOGICAL size. See the class doc.
-      ..setFloat(program.slotFor(UniformSlot.uResX), resolved.resX)
-      ..setFloat(program.slotFor(UniformSlot.uResY), resolved.resY)
+      ..setFloat(UniformSlot.uResX.index, resolved.resX)
+      ..setFloat(UniformSlot.uResY.index, resolved.resY)
       // `u_time` — the clock's elapsed seconds, unwrapped. See
       // `LumenUniforms.time` and `lumen_canvas_test.dart`.
-      ..setFloat(program.slotFor(UniformSlot.uTime), resolved.time)
-      ..setFloat(program.slotFor(UniformSlot.uShape), resolved.shape.toDouble())
-      ..setFloat(program.slotFor(UniformSlot.uSpread), resolved.spread)
-      ..setFloat(program.slotFor(UniformSlot.uStr), resolved.rays)
-      ..setFloat(program.slotFor(UniformSlot.uPtrX), resolved.pointerX)
-      ..setFloat(program.slotFor(UniformSlot.uPtrY), resolved.pointerY)
-      ..setFloat(program.slotFor(UniformSlot.uPtrI), resolved.pointerIntensity)
-      ..setFloat(program.slotFor(UniformSlot.uInt), resolved.intensity)
-      ..setFloat(program.slotFor(UniformSlot.uSpike), resolved.spike)
-      ..setFloat(program.slotFor(UniformSlot.uHueX), resolved.hue.r)
-      ..setFloat(program.slotFor(UniformSlot.uHueY), resolved.hue.g)
-      ..setFloat(program.slotFor(UniformSlot.uHueZ), resolved.hue.b)
-      ..setFloat(program.slotFor(UniformSlot.uMelt), resolved.melt)
-      ..setFloat(program.slotFor(UniformSlot.uHue2X), resolved.hue2.r)
-      ..setFloat(program.slotFor(UniformSlot.uHue2Y), resolved.hue2.g)
-      ..setFloat(program.slotFor(UniformSlot.uHue2Z), resolved.hue2.b)
-      ..setFloat(program.slotFor(UniformSlot.uHue3X), resolved.hue3.r)
-      ..setFloat(program.slotFor(UniformSlot.uHue3Y), resolved.hue3.g)
-      ..setFloat(program.slotFor(UniformSlot.uHue3Z), resolved.hue3.b)
-      ..setFloat(program.slotFor(UniformSlot.uWhite), resolved.white)
-      ..setFloat(program.slotFor(UniformSlot.uLight), resolved.light)
-      ..setFloat(program.slotFor(UniformSlot.uDots), resolved.dots);
+      ..setFloat(UniformSlot.uTime.index, resolved.time)
+      ..setFloat(UniformSlot.uShape.index, resolved.shape.toDouble())
+      ..setFloat(UniformSlot.uSpread.index, resolved.spread)
+      ..setFloat(UniformSlot.uStr.index, resolved.rays)
+      ..setFloat(UniformSlot.uPtrX.index, resolved.pointerX)
+      ..setFloat(UniformSlot.uPtrY.index, resolved.pointerY)
+      ..setFloat(UniformSlot.uPtrI.index, resolved.pointerIntensity)
+      ..setFloat(UniformSlot.uInt.index, resolved.intensity)
+      ..setFloat(UniformSlot.uSpike.index, resolved.spike)
+      ..setFloat(UniformSlot.uHueX.index, resolved.hue.r)
+      ..setFloat(UniformSlot.uHueY.index, resolved.hue.g)
+      ..setFloat(UniformSlot.uHueZ.index, resolved.hue.b)
+      ..setFloat(UniformSlot.uMelt.index, resolved.melt)
+      ..setFloat(UniformSlot.uHue2X.index, resolved.hue2.r)
+      ..setFloat(UniformSlot.uHue2Y.index, resolved.hue2.g)
+      ..setFloat(UniformSlot.uHue2Z.index, resolved.hue2.b)
+      ..setFloat(UniformSlot.uHue3X.index, resolved.hue3.r)
+      ..setFloat(UniformSlot.uHue3Y.index, resolved.hue3.g)
+      ..setFloat(UniformSlot.uHue3Z.index, resolved.hue3.b)
+      ..setFloat(UniformSlot.uWhite.index, resolved.white)
+      ..setFloat(UniformSlot.uLight.index, resolved.light)
+      ..setFloat(UniformSlot.uDots.index, resolved.dots);
 
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
