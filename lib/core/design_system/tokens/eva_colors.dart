@@ -120,7 +120,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// have REGRESSED the palette, so no hex below moved. If a future reader
   /// re-proposes the converge-repair, this table is the answer:
   ///
-  /// | role | prototype (redesign.html) | measured vs `#F5F2EA` | plan's repair | repair actually measures | this palette today | verdict |
+  /// | role | prototype (redesign.html) | measured vs prototype canvas `#F5F2EA` | plan's repair | repair actually measures | this palette today (vs app canvas `#F0EEFF`; row 4 is a label-on-fill pair) | verdict |
   /// | --- | --- | --- | --- | --- | --- | --- |
   /// | secondary ink | `#707684` (`redesign.html:56` `--ink-2`; rendered at `redesign.html:70` `.segp button`) | 4.069:1 | `#666C7A` | 4.703:1 | `ink2 #5A5480` at 6.10:1 | already better — no change |
   /// | gold ink | `#8a6d15` (`redesign.html:71` `.qcta`, `redesign.html:90` `.mono b`, `redesign.html:100` `.qnext`) | 4.387:1 | `#806615` | 4.902:1 | `emberInk #845610` at 5.54:1 | already better — no change |
@@ -134,12 +134,16 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// value do both and fails exactly where that contradiction bites (row three).
   ///
   /// Focus is the deferred half, not a second non-repair: `redesign.html:177`
-  /// sets `.screen.focus .vline.in` to `#d9dfef`, flattening every in-view verse
-  /// including `.hot` to a single colour (in-focus distinction 1.000:1). No
-  /// `vline`/verse widget exists in `lib/` yet, so there is nothing to fix here;
-  /// the rule Phase 5 must honour when it builds `/reading` is a ≥3:1
-  /// distinction between in-view and out-of-view verses, never a single
-  /// `#d9dfef`.
+  /// sets `.screen.focus .vline.in` to `#d9dfef`. In dark mode nothing overrides
+  /// it, so every in-view verse including `.hot` flattens to one colour —
+  /// in-focus distinction 1.000:1. In light mode the more specific
+  /// `redesign.html:80` (`.screen[data-mode=light] .focus .vline.in`, 0-5-0,
+  /// beats `:177`'s 0-4-0) re-points every in-view verse, hot ones included, at
+  /// `#2A2F3A`, against out-of-view `#3A3F4B` (`redesign.html:74`) — 1.272:1,
+  /// still below any usable focus cue. No `vline`/verse widget exists in `lib/`
+  /// yet, so there is nothing to fix here; the rule Phase 5 must honour when it
+  /// builds `/reading` is a ≥3:1 distinction between in-view and out-of-view
+  /// verses, never a single flattened colour.
   const EvaColors.light()
     : canvas = const Color(0xFFF0EEFF),
       surface = const Color(0xFFFFFFFF),
