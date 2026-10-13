@@ -97,6 +97,27 @@ void main() {
       final List<SkyEntry> back = await freshStore().read();
       expect(back, lit);
     });
+
+    test('and a LOCAL instant round-trips ==-exact, zone flag included', () async {
+      // Every other fixture here lights with `isUtc: true`, so the `utc` flag the
+      // codec carries would pass unexercised: an encode-always-UTC / decode-always-
+      // UTC mutant survives the whole suite. `DateTime.==` compares the zone flag
+      // alongside the millis, so a local noon decoded as UTC noon is unequal to
+      // itself — and this is the test that says so.
+      final SkyEntry local = SkyEntry(
+        book: 'John',
+        chapter: 3,
+        verse: 16,
+        litAt: DateTime(2026, 10, 13, 12),
+      );
+      expect(local.litAt.isUtc, isFalse);
+
+      await freshStore().write(<SkyEntry>[local]);
+      final List<SkyEntry> back = await freshStore().read();
+
+      expect(back.single.litAt.isUtc, isFalse);
+      expect(back, <SkyEntry>[local]);
+    });
   });
 
   group('an unreadable value is skipped, never fatal', () {

@@ -129,6 +129,26 @@ void main() {
 
       expect(await entriesThroughFreshStore(), lit);
     });
+
+    test('and a LOCAL instant survives the record path ==-exact', () async {
+      // The data-source half is pinned in `sky_local_data_source_test.dart`'s
+      // "LOCAL instant" case; this is the same property through the port the
+      // screens actually write — `record` must not normalise the zone flag on the
+      // way in, because `record` returns the entry AS STORED and the caller reads
+      // its own instant back out of that answer.
+      final SkyEntry local = SkyEntry(
+        book: 'John',
+        chapter: 3,
+        verse: 16,
+        litAt: DateTime(2026, 10, 13, 12),
+      );
+      final SkyRepository repo = SkyRepositoryImpl(freshStore());
+      final SkyEntry stored = unwrap(await repo.record(local));
+
+      expect(stored.litAt.isUtc, isFalse);
+      expect(stored, local);
+      expect(await entriesThroughFreshStore(), <SkyEntry>[local]);
+    });
   });
 
   group('two readings of the same verse produce one entry', () {

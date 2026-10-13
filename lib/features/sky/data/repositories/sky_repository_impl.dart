@@ -27,28 +27,23 @@ import 'package:fpdart/fpdart.dart';
 /// `settings_repository_test.dart`'s "a second `try` and a real cost" is why the
 /// count is stated rather than left to be inferred.
 ///
-/// ## THE CAP LIVES HERE, AND THE PORT DOES NOT NAME IT
+/// ## THE CAP IS ENFORCED HERE, AND THE NUMBER LIVES IN `sky_star_cap.dart`
 ///
 /// `SkyRepository`'s doc says the cap "is unmodelled: no cap field or method on
 /// this port" — and this adapter enforces it anyway, because the prototype evicts
 /// inside `addStar` itself (`eva/redesign.html:1147`) rather than in a caller: every
 /// writer goes through [record], so the one-at-a-time eviction inside [record] is
-/// the faithful spelling. A cap on the port would have made every reader depend on
-/// a number only writers need; a cap nowhere would have let the sky grow past the
-/// `44` the slider re-trims to (`eva/redesign.html:1486-1487`).
+/// the faithful spelling. The number itself lives one layer inward, in the
+/// feature's pure-Dart domain, because `SkyCubit`'s optimistic frame needs the same
+/// number and neither writer may import it from the other — see that file's doc.
+/// A cap on the port would have made every reader depend on a number only writers
+/// need; a cap nowhere would have let the sky grow past the `44` the slider
+/// re-trims to (`eva/redesign.html:1486-1487`).
 final class SkyRepositoryImpl implements SkyRepository {
   /// Reads and writes through [store].
   const SkyRepositoryImpl(this._store);
 
   final SkyLocalDataSource _store;
-
-  /// How many stars the sky holds before the oldest is evicted.
-  ///
-  /// The prototype's `starCap` (`eva/redesign.html:1131`, re-pinned at `:1512`):
-  /// `addStar` removes the oldest `.star` while the count is past it (`:1147`),
-  /// and the slider re-trims to it (`:1486-1487`). [record] is this app's
-  /// `addStar`, so the one-at-a-time eviction lives there.
-  static const int starCap = 44;
 
   @override
   Future<Result<SkyEntry>> record(SkyEntry entry) async {
