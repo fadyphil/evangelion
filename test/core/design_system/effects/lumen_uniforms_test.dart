@@ -2,7 +2,7 @@ import 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The sixteen uniforms of `shaders/lumen.frag`, **in the order the shader
-/// declares them** (`shaders/lumen.frag:34-49`).
+/// declares them** (`shaders/lumen.frag:42-57`).
 ///
 /// A transcription, not a derivation. The `.frag` keeps the prototype's
 /// declaration order on purpose — that is what makes it a reviewable port — and
@@ -175,7 +175,7 @@ void main() {
         'ramp, not a permutation', () {
       // Read down this list: `0, 2, 3, 6, 9, 12, 13, 14, 15, 16, 17, 18, 19,
       // 20, 21, 23`. That is the slot of the FIRST float of each uniform, in
-      // the order `shaders/lumen.frag:34-49` writes them — strictly ascending,
+      // the order `shaders/lumen.frag:42-57` writes them — strictly ascending,
       // because member position IS the `setFloat` index. An earlier revision
       // of this test asserted the opposite (a non-identity permutation pinned
       // against `--reflection-json`'s SPIR-V ID order); the render test proved

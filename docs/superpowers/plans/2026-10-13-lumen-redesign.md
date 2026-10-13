@@ -786,6 +786,14 @@ Measured: 2.98 ns/px for shapes 0–2, **5.04 ns/px** for shafts.
 - [ ] **Step 4: Gate `shafts`** — it is the one control that must not ship
   unguarded. Disable it above ~2 Mpx and record the measurement in a comment.
 
+> **Wiring constraint for whoever mounts the painter (Phase 5).** `LumenCanvas`
+> reuses one `FragmentShader` per *instance* (`_shader ??=`), so the allocation
+> saving only materialises if the instance is long-lived. The current
+> `ListenableBuilder` pattern in `neural_background.dart:294-310` builds a fresh
+> painter per frame — mounting `LumenCanvas` that way would silently reintroduce
+> the per-frame uniform-buffer allocation that hard rule 2 removed. Hoist one
+> `LumenCanvas` above the rebuild boundary (or key it stable) when wiring it in.
+
 ---
 
 # Phase 2 — Palette & tokens

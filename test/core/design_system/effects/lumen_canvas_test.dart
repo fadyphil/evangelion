@@ -500,7 +500,7 @@ void main() {
       // per uniform, no rendering at all: if the engine ever stops laying out
       // in declaration order, this fails before any pixel test runs.
       //
-      // Expected values read off `shaders/lumen.frag:34-49`, first float of
+      // Expected values read off `shaders/lumen.frag:42-57`, first float of
       // each uniform; verified by probe on this SDK rather than trusted from
       // the field docs.
       final LumenProgram program = await LumenProgram.load();
@@ -1046,7 +1046,7 @@ void main() {
     // of a noisy frame to a flat one. Three facts make the ratio exact rather
     // than statistical, and each was earned by a failing measurement:
     //
-    // 1. **Dark mode applies no tone curve.** `shaders/lumen.frag:108` is
+    // 1. **Dark mode applies no tone curve.** `shaders/lumen.frag:116` is
     //    `col = mix(emit, 1 − 0.55·em, u_light)`, so at `u_light = 0` the
     //    captured byte is `round(emit · 255)` until it saturates — the factor
     //    IS the byte ratio, with no inversion. An earlier revision of
@@ -1151,7 +1151,7 @@ void main() {
 ///
 /// ## THE RATIO IS THE BYTE RATIO, AND THAT IS THE WHOLE CONTENT
 ///
-/// In dark mode the shader applies no tone curve (`shaders/lumen.frag:108` is
+/// In dark mode the shader applies no tone curve (`shaders/lumen.frag:116` is
 /// `col = mix(emit, 1 − 0.55·em, u_light)`), so an unsaturated captured byte is
 /// `round(emit · 255)` and the multiplier follows by division — no inversion.
 /// Pixels reading `255` are skipped: the byte is clamped and the true emit is

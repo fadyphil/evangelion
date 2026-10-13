@@ -108,7 +108,7 @@ HslRgb lumenFragment({
     fragY: fragY,
     flipY: flipY,
   );
-  // `shaders/lumen.frag:105-109` — the tone curve and the daylight mix.
+  // `shaders/lumen.frag:113-117` — the tone curve and the daylight mix.
   final double emR = fields.emitR / (1.0 + fields.emitR);
   final double emG = fields.emitG / (1.0 + fields.emitG);
   final double emB = fields.emitB / (1.0 + fields.emitB);
@@ -172,7 +172,7 @@ LumenReferenceFields lumenReferenceFields({
   final double resY = uniforms.resY;
   final double shortest = math.min(resX, resY);
 
-  // `shaders/lumen.frag:58` — PORT 2, the Y flip.
+  // `shaders/lumen.frag:66` — PORT 2, the Y flip.
   //
   // `flipY: false` is **only** for the negative controls in
   // `lumen_canvas_test.dart`: it removes the flip so a test can assert that a
@@ -194,7 +194,7 @@ LumenReferenceFields lumenReferenceFields({
   double core = 0.0;
 
   if (uniforms.shape < 3) {
-    // `shaders/lumen.frag:65-76`
+    // `shaders/lumen.frag:73-84`
     if (uniforms.shape == 0) {
       d = (halfH - 0.05) - uvY;
       rc = uvX + d * 0.22;
@@ -222,7 +222,7 @@ LumenReferenceFields lumenReferenceFields({
         (0.85 + 0.15 * math.sin(t * 2.2 + rc * 9.0 + d * 3.0)) *
         edge;
   } else {
-    // `shaders/lumen.frag:77-93` — the five-iteration shafts loop. Written out
+    // `shaders/lumen.frag:85-101` — the five-iteration shafts loop. Written out
     // rather than recursed so the `k` index reads the way the GLSL reads.
     final double depth = halfH - uvY;
     double acc = 0.0;
@@ -252,16 +252,16 @@ LumenReferenceFields lumenReferenceFields({
     rc = uvX;
   }
 
-  // `shaders/lumen.frag:94-95`
+  // `shaders/lumen.frag:102-103`
   final double dx = uvX - uniforms.pointerX;
   final double dy = uvY - uniforms.pointerY;
   final double pd = math.sqrt(dx * dx + dy * dy);
   body += math.exp(-(pd * pd) / 0.07) * uniforms.pointerIntensity;
 
-  // `shaders/lumen.frag:96`
+  // `shaders/lumen.frag:104`
   final double intensity = uniforms.intensity + uniforms.spike;
 
-  // `shaders/lumen.frag:97-104`
+  // `shaders/lumen.frag:105-112`
   HslRgb hue = uniforms.hue;
   if (uniforms.melt > 0.5) {
     final double m1 = math
@@ -287,7 +287,7 @@ LumenReferenceFields lumenReferenceFields({
     );
   }
 
-  // `shaders/lumen.frag:105`
+  // `shaders/lumen.frag:113`
   final double body4 = body * body * body * body;
   final double white =
       body4 * uniforms.white * intensity * (1.0 - uniforms.light);
@@ -298,7 +298,7 @@ LumenReferenceFields lumenReferenceFields({
   double blue =
       hue.b * body * intensity + hue.b * core * 0.7 * intensity + white;
 
-  // `shaders/lumen.frag:106` — PORT 2, site 2. The scanline grid is built from
+  // `shaders/lumen.frag:114` — PORT 2, site 2. The scanline grid is built from
   // the flipped `_fc`, which is the WebGL original's `gl_FragCoord`, so it is
   // built from `fcX`/`fcY` here rather than from `fragX`/`fragY`.
   if (uniforms.dots > 0.5) {
@@ -315,7 +315,7 @@ LumenReferenceFields lumenReferenceFields({
     blue *= scale;
   }
 
-  // `shaders/lumen.frag:107-109`
+  // `shaders/lumen.frag:115-117`
   return LumenReferenceFields(
     body: body,
     core: core,
@@ -325,10 +325,10 @@ LumenReferenceFields lumenReferenceFields({
   );
 }
 
-/// `hash` — `shaders/lumen.frag:50`.
+/// `hash` — `shaders/lumen.frag:58`.
 double lumenReferenceHash(double n) => _fract(math.sin(n) * 43758.5453125);
 
-/// `noise1` — `shaders/lumen.frag:51`.
+/// `noise1` — `shaders/lumen.frag:59`.
 double lumenReferenceNoise1(double x) {
   final double i = x.floorToDouble();
   final double raw = _fract(x);
@@ -336,13 +336,13 @@ double lumenReferenceNoise1(double x) {
   return _mix(lumenReferenceHash(i), lumenReferenceHash(i + 1.0), f);
 }
 
-/// `fbm1` — `shaders/lumen.frag:52`.
+/// `fbm1` — `shaders/lumen.frag:60`.
 double lumenReferenceFbm1(double x) =>
     0.55 * lumenReferenceNoise1(x) +
     0.30 * lumenReferenceNoise1(x * 2.17 + 13.7) +
     0.15 * lumenReferenceNoise1(x * 4.31 + 37.3);
 
-/// `fall` — `shaders/lumen.frag:53`.
+/// `fall` — `shaders/lumen.frag:61`.
 double lumenReferenceFall(double x, double a, double b) =>
     1.0 - _smoothstep(a, b, x);
 

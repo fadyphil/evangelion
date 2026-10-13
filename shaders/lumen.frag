@@ -1,5 +1,8 @@
 // LUMEN aurora — the WebGL shader from `eva/redesign.html:776-855`, ported.
 //
+// WARNING: `lib/` and `test/` cite this file BY LINE NUMBER — growing this
+// header desynchronises them, so bump those cites in the SAME commit.
+//
 // Exactly THREE lines differ from the prototype. Each is marked PORT below with
 // the original quoted beside it. Everything else is byte-identical, re-indented
 // only. Behaviour is preserved: no value, no curve and no control changed.
