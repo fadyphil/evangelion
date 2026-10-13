@@ -314,6 +314,22 @@ git commit -m "docs(adr): 0022 — full-fidelity redesign supersedes ADR-0001"
 
 # Phase 1 — The aurora engine
 
+> **Status: COMPLETE (commits `bf106ec`, `c3100be`, `fddee1c`, `61d9ab8`,
+> `e59cce6`, `ff46582`, `551e807`, `8572aaa`, `f989784`, `2fe5ce6`).**
+> Full gate green: **2609 tests** (floor 2507, baseline 2522), **98.46% coverage**
+> (floor 98.25%, baseline 98.39%), citations 1001/1001. Full two-stage review per
+> task (spec then quality, mutation-verified fixes). Net findings folded back
+> into this plan: slot table is declaration order (corrections row 2 rewritten —
+> the "reflected order" revision was wrong), `shaderIndex` not `.index` for
+> layout assertions, `runAsync` mandatory, `u_time` unwrapped (Task 1.4 cut).
+> Mid-phase the full suite caught two things the task-level gates could not: 4
+> unregistered `identical()` sites (fixed in `f989784` — new `identical()` in
+> `test/` must be added to the audited table in
+> `no_identical_on_converted_types_test.dart` in the same commit), and a coverage
+> dip to 98.10% from untested `toString`s (fixed in `2fe5ce6` — effects dir now
+> 100%). Task 1.5's tier table: shader on for high+mid, off for low; shafts gated
+> above 2M logical px (`kShaftsPixelBudget`).
+
 The highest-risk phase, and the one the spike already de-risked. Follow the
 spike's lead; do not re-derive it.
 
