@@ -11,6 +11,7 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
+import 'package:evangelion/features/sky/presentation/cubit/sky_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -312,6 +313,17 @@ void main() {
       // `flutter_bloc` re-exports Flutter (AGENT_CONTEXT §9, decision 11).
       expect(
         getIt.isRegistered<AuthBloc>(),
+        isTrue,
+        reason:
+            'hand-registered by configureNavigation — see that file for why a '
+            'generated registration is impossible here',
+      );
+      // Phase 3's eighth hand-written registration. `SkyCubit` has no generated
+      // counterpart because `flutter_bloc` re-exports Flutter (AGENT_CONTEXT §9,
+      // decision 11) — and it is built from the generated `SkyRepository`, so the
+      // ordering `bootstrapApp` documents holds for it too.
+      expect(
+        getIt.isRegistered<SkyCubit>(),
         isTrue,
         reason:
             'hand-registered by configureNavigation — see that file for why a '

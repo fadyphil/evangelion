@@ -18,6 +18,7 @@ import '../../core/domain/repositories/auth_repository.dart' as _i497;
 import '../../core/domain/repositories/leaderboard_repository.dart' as _i307;
 import '../../core/domain/repositories/reading_repository.dart' as _i499;
 import '../../core/domain/repositories/settings_repository.dart' as _i896;
+import '../../core/domain/repositories/sky_repository.dart' as _i946;
 import '../../core/domain/repositories/streak_repository.dart' as _i682;
 import '../../core/network/api_error_mapper.dart' as _i998;
 import '../../features/auth/data/datasources/auth_local_data_source.dart'
@@ -49,6 +50,8 @@ import '../../features/settings/data/datasources/settings_local_data_source.dart
     as _i599;
 import '../../features/settings/domain/usecases/get_settings.dart' as _i558;
 import '../../features/settings/domain/usecases/update_settings.dart' as _i986;
+import '../../features/sky/data/datasources/sky_local_data_source.dart'
+    as _i156;
 import 'modules/auth_module.dart' as _i4;
 import 'modules/core_module.dart' as _i134;
 import 'modules/home_module.dart' as _i443;
@@ -56,6 +59,7 @@ import 'modules/leaderboard_module.dart' as _i820;
 import 'modules/quiz_module.dart' as _i697;
 import 'modules/reading_module.dart' as _i768;
 import 'modules/settings_module.dart' as _i145;
+import 'modules/sky_module.dart' as _i696;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -71,6 +75,7 @@ extension GetItInjectableX on _i174.GetIt {
     final quizModule = _$QuizModule();
     final readingModule = _$ReadingModule();
     final settingsModule = _$SettingsModule();
+    final skyModule = _$SkyModule();
     gh.lazySingleton<_i852.AuthLocalDataSource>(
       () => authModule.authLocalDataSource,
     );
@@ -125,6 +130,10 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i558.GetSettings>(() => settingsModule.getSettings);
     gh.lazySingleton<_i986.UpdateSettings>(() => settingsModule.updateSettings);
+    gh.lazySingleton<_i156.SkyLocalDataSource>(
+      () => skyModule.skyLocalDataSource,
+    );
+    gh.lazySingleton<_i946.SkyRepository>(() => skyModule.skyRepository);
     gh.lazySingleton<String>(
       () => coreModule.apiBaseUrl,
       instanceName: 'apiBaseUrl',
@@ -155,3 +164,5 @@ class _$QuizModule extends _i697.QuizModule {}
 class _$ReadingModule extends _i768.ReadingModule {}
 
 class _$SettingsModule extends _i145.SettingsModule {}
+
+class _$SkyModule extends _i696.SkyModule {}

@@ -23,6 +23,7 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
+import 'package:evangelion/features/sky/presentation/cubit/sky_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/freezed_types.dart';
@@ -691,6 +692,36 @@ void main() {
         ],
       );
     });
+
+    test('`SkyState`, and its `entries` compares by CONTENT', () {
+      // `SkyState` is the **second type in the app with a `List` field**, after
+      // `LeaderboardBoard` — and the first whose list is the state a cubit emits
+      // on every scroll pass. `LeaderboardBoard`'s test gives the argument: freezed
+      // generates `DeepCollectionEquality` for collection fields, so two skies with
+      // equal stars compare equal even though the lists are two objects — and the
+      // first assertion below is what makes that a fact about this type rather
+      // than an assumption about freezed. Without it, a cubit emitting a fresh
+      // list with the same stars would read as a state change on every pass.
+      _equalAndDistinct('SkyState', _skyState(), _skyState());
+      expect(_skyState(), _skyState());
+      _differsInEveryField(
+        'SkyState',
+        _skyState(),
+        fields: 3,
+        variants: <({String field, SkyState value})>[
+          (field: 'status', value: _skyState(status: SkyStatus.loading)),
+          // Two stars and one star are different skies — the variant differs by
+          // length, which is also what proves the comparison is over contents.
+          (
+            field: 'entries',
+            value: _skyState(
+              entries: <SkyEntry>[_skyEntry(), _skyEntry(verse: 17)],
+            ),
+          ),
+          (field: 'failure', value: _skyState(failure: _failure())),
+        ],
+      );
+    });
   });
 
   group('events', () {
@@ -814,15 +845,15 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(42),
+        hasLength(43),
         reason:
             'the converted set moved. 25 classes, 14 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
             '`UserSettings` and `SettingsState`, Phase 1 added '
             '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard`, '
-            '`LeaderboardQuery` and `LeaderboardState`, and Phase 3 added '
-            '`SkyEntry`. If this number moved, the migration or the phase '
-            'moved and this file has to be told',
+            '`LeaderboardQuery` and `LeaderboardState`, Phase 3 added '
+            '`SkyEntry` and `SkyState`. If this number moved, the migration or '
+            'the phase moved and this file has to be told',
       );
       for (final String name in _assertedTypeNames) {
         expect(
@@ -960,6 +991,11 @@ const Set<String> _assertedTypeNames = <String>{
   'StreakSummary',
   // Phase 3's one: the witness sky's lit verse, read by three features.
   'SkyEntry',
+  // Phase 3's other one: the witness sky's state, held by `SkyCubit`. The second
+  // type in the app with a `List` field, so its `==` is asserted over list
+  // *contents* — a cubit that emitted a fresh list with the same stars must not
+  // read as a state change.
+  'SkyState',
   // Phase 1's four. `LeaderboardBoard` is the first entity in `core/domain` with a
   // `List` field, so its `==` is asserted over list *contents* rather than assumed.
   'LeaderboardRow',
@@ -1368,6 +1404,19 @@ SettingsState _settingsState({
 }) => SettingsState(
   status: status,
   settings: settings ?? _userSettings(),
+  failure: failure,
+);
+
+SkyState _skyState({
+  SkyStatus status = SkyStatus.ready,
+  List<SkyEntry>? entries,
+  Failure? failure,
+}) => SkyState(
+  status: status,
+  // Built fresh per call rather than shared: `_equalAndDistinct` asserts the pair
+  // is two objects, and a shared list would make it one — which is this file's
+  // whole subject, applied to its own fixture.
+  entries: entries ?? <SkyEntry>[_skyEntry()],
   failure: failure,
 );
 

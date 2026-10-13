@@ -555,7 +555,7 @@ void main() {
       );
     });
 
-    test('the thirty current registrations are the ones the config names', () {
+    test('the thirty-two current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -636,6 +636,18 @@ void main() {
           'lazySingleton<SettingsRepository> settingsRepository',
           'lazySingleton<GetSettings> getSettings',
           'lazySingleton<UpdateSettings> updateSettings',
+          // **Phase 3 added two**, and their position is the evidence again:
+          // `skyLocalDataSource` and `skyRepository` land directly after
+          // `updateSettings` — beside the other store-backed pair, because that
+          // is where injectable puts providers whose only dependencies are each
+          // other. The generator chose this; this test asserts *which* providers
+          // exist. `SkyCubit` is **not** in this list, for `SettingsCubit`'s
+          // reason: it is hand-registered in `navigation_injection.dart` because
+          // `flutter_bloc` re-exports the widget layer and a `@module` naming a
+          // cubit would drag `package:flutter` into `injection.dart`'s graph —
+          // and the group below refuses it by name.
+          'lazySingleton<SkyLocalDataSource> skyLocalDataSource',
+          'lazySingleton<SkyRepository> skyRepository',
           'lazySingleton<String> apiBaseUrl',
           'lazySingleton<Dio> apiClient',
           'lazySingleton<ReadingRemoteDataSource> readingRemoteDataSource',
@@ -848,6 +860,13 @@ void main() {
         // registered beside the cubit it wraps rather than generated from it.
         'SettingsCubit',
         'SettingsHandle',
+        // **Phase 3's eighth.** `SkyCubit` is a cubit, so the identical wall
+        // applies — and it is in this list for the same reason the seven before
+        // it are: the generator would produce a second registration of a type the
+        // navigation half already reads out of the locator by hand, and the
+        // duplicate-type `ArgumentError` would surface in `configureNavigation()`
+        // rather than in the file that caused it.
+        'SkyCubit',
       ]) {
         expect(
           config,
