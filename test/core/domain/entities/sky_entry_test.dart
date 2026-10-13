@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// that make this file more than a field list are all about **identity versus
 /// position**, because that is the one place a starfield is wrong in a way a
 /// reader sees: two readings of the same verse must produce one entry, while
-/// the constellation still follows lit order.
+/// the constellation still follows lit-event order.
 void main() {
   group('`key` names the verse, not the reading', () {
     test('formats as `book:chapter:verse`', () {
@@ -111,7 +111,7 @@ void main() {
       // to every `switch` and `contains` that holds entries. "Two readings of
       // the same verse produce one entry" is therefore a *repository* property
       // (stored by [key], first lit wins the position, flare upgrades in
-      // place), and this is the test that holds the boundary: the entity says
+      // place and never downgrades), and this is the test that holds the boundary: the entity says
       // "different", the repository says "one".
       final SkyEntry first = SkyEntry(
         book: 'John',
@@ -129,38 +129,44 @@ void main() {
     });
   });
 
-  group('`litAt` carries the order the constellation draws', () {
-    test('sorting by `litAt` is the order `drawConstellation` follows', () {
-      // `eva/redesign.html:1143-1159` — `addStar` appends each star after the
-      // last, evicting the oldest past the cap — and `:1167-1185` —
-      // `drawConstellation` reads the stars back in that same DOM order for
-      // its polyline. The repository stores in lit order; this is the entity
-      // half of that claim: the timestamp that orders them.
-      final SkyEntry first = SkyEntry(
+  group('`litAt` is the audit stamp, not the sort key', () {
+    test('a flare upgrade keeps the first instant', () {
+      // The entity half of the repository's monotone upgrade: `copyWith`
+      // carries `litAt` untouched, so brightening a star cannot move it in
+      // time either.
+      final SkyEntry litEntry = SkyEntry(
         book: 'John',
         chapter: 3,
-        verse: 1,
+        verse: 16,
         litAt: lit(1),
       );
-      final SkyEntry second = SkyEntry(
+      final SkyEntry flared = litEntry.copyWith(isFlare: true);
+      expect(flared.isFlare, isTrue);
+      expect(flared.litAt, lit(1));
+      expect(flared.key, litEntry.key);
+    });
+
+    test('and instants are per-entry data, never a sequence', () {
+      // Order is the repository's lit-event order — the sequence of `record`
+      // calls — so two entries may carry out-of-chronological instants
+      // without anything being wrong: `/reading` lights on scroll, and verse
+      // 20 can light before verse 5 is recorded. Each entry just carries its
+      // own stamp verbatim.
+      final SkyEntry twentieth = SkyEntry(
         book: 'John',
         chapter: 3,
-        verse: 2,
-        litAt: lit(2),
+        verse: 20,
+        litAt: lit(20),
       );
-      final SkyEntry third = SkyEntry(
+      final SkyEntry fifth = SkyEntry(
         book: 'John',
         chapter: 3,
-        verse: 3,
-        litAt: lit(3),
+        verse: 5,
+        litAt: lit(10),
       );
-      final List<SkyEntry> shuffled = <SkyEntry>[third, first, second];
-      shuffled.sort((SkyEntry a, SkyEntry b) => a.litAt.compareTo(b.litAt));
-      expect(shuffled.map((SkyEntry e) => e.key), <String>[
-        'John:3:1',
-        'John:3:2',
-        'John:3:3',
-      ]);
+      expect(twentieth.litAt, lit(20));
+      expect(fifth.litAt, lit(10));
+      expect(twentieth, isNot(fifth));
     });
   });
 }

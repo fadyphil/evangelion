@@ -19,10 +19,12 @@ part 'sky_entry.freezed.dart';
 /// ## THE PROTOTYPE IT TRANSCRIBES
 ///
 /// `eva/redesign.html:1143-1159` — `addStar(big)` appends one `.star` `span`
-/// per call, evicting the oldest past `starCap` (`:1147`), and `:1167-1185` —
-/// `drawConstellation` reads the stars back in that same DOM order for its
-/// polyline. So a sky is an *ordered* collection of entries, and the order is
-/// lit order: [litAt] is what carries it.
+/// per call (`:1153`), evicting the oldest past `starCap` (`:1147`), and
+/// `drawConstellation` reads the stars back in that same DOM order (`:1169`)
+/// for its polyline. So a sky is an *ordered* collection of entries, and the
+/// order is lit-event order: the sequence of `record` calls. [litAt] is the
+/// audit stamp of each event, not the sort key — see its field doc and
+/// `SkyRepository`'s order rule, which state the one definition together.
 ///
 /// ## THE FIELDS, AND WHAT EACH ONE IS FOR
 ///
@@ -34,9 +36,10 @@ part 'sky_entry.freezed.dart';
 ///   (`:1330`) and a correct quiz answer (`:1428`). It defaults to `false`
 ///   because the ordinary read is the common case and the flare is the marked
 ///   one.
-/// * [litAt] — when the verse was lit. The constellation polylines follow lit
-///   order, so the repository keeps entries in [litAt] order and this field is
-///   what sorts them.
+/// * [litAt] — when the verse was lit: the audit stamp of the lit event, not
+///   the sort key. Order is the record sequence (`SkyRepository`'s rule); a
+///   re-lit verse keeps its *first* instant, and equal instants need no
+///   tiebreak because position never comes from the timestamp.
 ///
 /// ## EQUALITY IS GENERATED, AND DEDUPE IS NOT `==`
 ///
@@ -91,17 +94,22 @@ final class SkyEntry with _$SkyEntry {
   /// `false` — the ordinary read is the common case.
   final bool isFlare;
 
-  /// When the verse was lit, in the order the constellation draws.
+  /// When the verse was lit.
   ///
-  /// `eva/redesign.html:1143-1159` appends each star after the last and
-  /// `:1167-1185` reads them back in that same order, so the repository keeps
-  /// entries sorted by this field and a re-lit verse keeps its *first* lit
-  /// instant (see `SkyRepository`).
+  /// The audit stamp of the lit event, carried verbatim — including through
+  /// `copyWith(isFlare: true)`, which is how a flare upgrade keeps the first
+  /// instant. It is never the sort key: the repository orders by record
+  /// sequence (lit-event order), so two verses lit in the same millisecond
+  /// are still sequenced and no tiebreak exists.
   final DateTime litAt;
 
   /// The `book:chapter:verse` key the repository stores by.
   ///
   /// `eva/redesign.html:1131-1133` is the `POSRANGE`/defaults/cap context the
   /// starfield lives in: one key, one star, whatever lit it.
+  ///
+  /// The `int` segments make the key injective over verses, but there is no
+  /// inverse: a book name containing `:` would parse ambiguously, so no
+  /// `fromKey` is offered.
   String get key => '$book:$chapter:$verse';
 }
