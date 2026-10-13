@@ -124,7 +124,9 @@ HslRgb lumenFragment({
 ///
 /// ## WHY THE INTERNAL VALUES ARE EXPOSED
 ///
-/// Because `fbm1` cannot be mirrored — see the file header — and the way to
+/// Because a frame cannot be bit-exact — `hash` multiplies its argument by
+/// 43758.5453125, so the rasteriser's float32 rounding and this mirror's
+/// float64 land on different hashes (see the file header) — and the way to
 /// still say something true about the noise term is to compare the *observable*
 /// against the *bounds* the shader's own arithmetic puts on it. `body` is what
 /// the noise multiplies, so a caller that reads `body` with `u_str = 0` has the

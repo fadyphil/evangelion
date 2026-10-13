@@ -21,7 +21,7 @@ import 'package:flutter/scheduler.dart' show SchedulerBinding;
 /// page — silently degrades into a static gradient while every test still
 /// passes. That is the D1 defect, and it is the same failure mode §13 exists to
 /// kill, so the notification is wired here at the source instead: one listener on
-/// each of the four sources, one [notifyListeners] per change, and
+/// each of the five sources, one [notifyListeners] per change, and
 /// `ListenableBuilder(listenable: motion.repaint)` in `neural_background.dart`
 /// therefore rebuilds because the controllers actually moved.
 ///
@@ -110,12 +110,13 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// times for one visual update. That is the churn §13's collapse to three
   /// controllers was supposed to *remove*, reintroduced one layer up.
   ///
-  /// Nothing is lost by dropping the second and third. All three tickers run in
-  /// the same `transientCallbacks` pass, before the build and paint phases, so by
-  /// the time the painter reads `floatValue` / `hueValue` / `auroraValue` every
-  /// clock has already advanced. The first notification is therefore a complete
-  /// one, and the flag is cleared in a post-frame callback — the end of the same
-  /// frame, not the start of the next.
+  /// Nothing is lost by dropping the second, third and fourth. All four tickers
+  /// run in the same `transientCallbacks` pass, before the build and paint
+  /// phases, so by the time the painter reads `floatValue` / `hueValue` /
+  /// `auroraValue` / `lumen.seconds` every clock has already advanced. The
+  /// first notification is therefore a complete one, and the flag is cleared
+  /// in a post-frame callback — the end of the same frame, not the start of
+  /// the next.
   ///
   /// `addPostFrameCallback` rather than a microtask: the scheduler's frame
   /// callback is synchronous from transient callbacks through paint, so a

@@ -395,7 +395,7 @@ double _hue2Lightness(double l) => math.min(l + 6, 88);
 /// History first: a painter used to write `uniforms.slot(UniformSlot.uHueX)`
 /// with one receiver rather than `UniformSlot.uHueX.index`. Task 1.3b Step 2
 /// deleted that indirection — call sites write `slot.index` directly
-/// (`lumen_canvas.dart:126-151`), because the enum position IS the `setFloat`
+/// (`lumen_canvas.dart:136-161`), because the enum position IS the `setFloat`
 /// index and a translation method was a second place to be wrong.
 ///
 /// What remains is the twin the suite asserts against: `u.slot(s) ==

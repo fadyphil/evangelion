@@ -25,9 +25,14 @@
 //     --runtime-stage-vulkan --iplr --input=shaders/lumen.frag --input-type=frag
 //
 // Uniform DECLARATION order below is the prototype's and must stay that way for
-// the source to stay a faithful port. The Dart-side `setFloat` slot indices are
-// NOT this order — Impeller re-sorts uniforms by SPIR-V location. See
-// docs/superpowers/plans/2026-10-13-lumen-redesign.md Task 1.2.
+// the source to stay a faithful port. The Dart-side `setFloat` slot indices ARE
+// this order: the runtime buffer follows declaration order, per the engine's own
+// comment (`runtime_effect_contents.cc:290-298`) and per measurement — painting
+// this order matches the CPU mirror to 1/255 per channel, while
+// `impellerc --reflection-json`'s SPIR-V ID order gives 247/255. An earlier
+// revision of this paragraph claimed the opposite (a re-sort); the plan's
+// corrections ledger row 2 records the retraction. See `lumen_uniforms.dart`
+// (UniformSlot) for the table.
 #include <flutter/runtime_effect.glsl>
 
 precision highp float; // PORT 1

@@ -463,6 +463,32 @@ void main() {
       expect(identical(program.newShader(), program.newShader()), isFalse);
     });
 
+    testWidgets('a failed load is not memoised', (WidgetTester tester) async {
+      // The claim in `load`'s doc, made falsifiable. `_memoised[asset]` is
+      // written only after the `fromAsset` await succeeds, so a missing key
+      // must throw on EVERY attempt — a cached failed future would throw once
+      // and then hand back the same failure without touching the loader. (A
+      // bad key throws `Exception: Asset … not found` rather than hanging:
+      // verified by running this test, not by reading the loader's docs. And
+      // the good load afterwards proves a failure poisons nothing.)
+      const String missing = 'shaders/does-not-exist.frag';
+      await expectLater(
+        LumenProgram.load(asset: missing),
+        throwsA(isA<Exception>()),
+        reason: 'a missing shader asset throws rather than hanging',
+      );
+      await expectLater(
+        LumenProgram.load(asset: missing),
+        throwsA(isA<Exception>()),
+        reason: 'the second attempt throws again — no failure was memoised',
+      );
+      expect(
+        identical(await LumenProgram.load(), await LumenProgram.load()),
+        isTrue,
+        reason: 'the failures left the memoised good program untouched',
+      );
+    });
+
     testWidgets('the enum order is the engine\'s own bookkeeping', (
       WidgetTester tester,
     ) async {

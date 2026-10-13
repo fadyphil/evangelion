@@ -90,26 +90,43 @@ void main() {
       expect(u.slot(UniformSlot.uPtrI), 23);
     });
 
-    test('`.index` is the slot for every member', () {
-      // The whole guarantee rests on declaration order, because Dart refuses to
-      // let an enum redeclare `index`:
-      //   error • illegal_concrete_enum_member
-      //          A concrete instance member named 'index' can't be declared in
-      //          a class that implements 'Enum'.
-      // So nothing in the type system connects "this member is the one at slot
-      // 14" to "this member is written fourteenth". This is the line that fails
-      // when someone inserts a slot in the wrong place, and it is the only
-      // thing standing between a reordered enum and a shader whose uniforms
-      // land in the wrong variables.
-      for (final UniformSlot slot in UniformSlot.values) {
-        expect(
-          slot.index,
-          UniformSlot.values.indexOf(slot),
-          reason:
-              '${slot.name} is not in slot order — a Dart enum cannot redeclare '
-              '`index`, so declaration order IS the slot table',
-        );
-      }
+    test('the member order is the declaration order', () {
+      // The reordering gate, and the only one of its kind that CAN fail. Dart
+      // guarantees `slot.index == values.indexOf(slot)` for every enum, so the
+      // previous version of this test — that loop — was a tautology wearing a
+      // gate's name: green under every reordering. Member NAMES in order are
+      // guaranteed by nothing, so a swapped pair fails here. The constant
+      // assertions above pin the same fact numerically and the declaration
+      // ramp below pins it per uniform; this pins it structurally.
+      expect(
+        UniformSlot.values.map((UniformSlot s) => s.name).toList(),
+        <String>[
+          'uResX',
+          'uResY',
+          'uTime',
+          'uHueX',
+          'uHueY',
+          'uHueZ',
+          'uHue2X',
+          'uHue2Y',
+          'uHue2Z',
+          'uHue3X',
+          'uHue3Y',
+          'uHue3Z',
+          'uInt',
+          'uStr',
+          'uSpike',
+          'uSpread',
+          'uShape',
+          'uMelt',
+          'uDots',
+          'uWhite',
+          'uLight',
+          'uPtrX',
+          'uPtrY',
+          'uPtrI',
+        ],
+      );
     });
 
     test('twenty-four slots, sixteen uniforms, every slot claimed once', () {
@@ -119,9 +136,10 @@ void main() {
         hasLength(24),
         reason: 'a duplicated index means two names claim one float',
       );
-      expect(UniformSlot.values.map((UniformSlot s) => s.index), <int>[
-        for (int i = 0; i < 24; i++) i,
-      ]);
+      // No list-equality against `[0..23]` here on purpose: enum indices ARE
+      // `0..N-1` by construction, so that assertion is the same tautology the
+      // member-order test above replaced. Reordering coverage lives there, in
+      // the per-slot constants, and in the declaration ramp below.
     });
 
     test('each vec3 takes three consecutive slots — GLSL-style padding would '

@@ -85,6 +85,22 @@ class LumenCanvas extends CustomPainter {
   /// Everything except `u_res` and `u_time`, which [resolveAt] supplies.
   final LumenUniforms uniforms;
 
+  /// The one reused shader. Held, never disposed — and that is the contract.
+  ///
+  /// `CustomPainter` offers no disposal hook, so there is nowhere to put a
+  /// `dispose()` call that the framework would honour — and none is needed to
+  /// be correct: the wrapper is GC-managed, so a discarded painter takes its
+  /// native peer with it rather than stranding GPU state. Eager disposal
+  /// would only release sooner, which matters for long-lived holders, not for
+  /// a painter the framework rebuilds away.
+  ///
+  /// What this field does NOT promise is cross-frame reuse by itself. The
+  /// `??=` pays off only across multiple `paint()` calls on ONE instance; a
+  /// painter rebuilt per notification — the `ListenableBuilder` pattern in
+  /// `neural_background.dart:294-310` constructs a fresh painter every frame —
+  /// allocates one buffer per frame regardless. Whoever wires this painter
+  /// (Phase 5) must hold one `LumenCanvas` across frames to realize hard rule
+  /// 2; otherwise the rule holds in the letter and not in the spirit.
   ui.FragmentShader? _shader;
 
   /// The shader [paint] reuses across frames, or null before the first paint.
