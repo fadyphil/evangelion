@@ -252,6 +252,18 @@ List<String> _changedKeys(
 
 void main() {
   // =========================================================================
+  // BYTE-PIN INVENTORY, RECORDED SO THE NEXT READER DOES NOT RECOUNT WRONG.
+  //
+  // The two spec tests below pin 30 colours as packed hexes — 15 per palette
+  // (canvas, surface, raised, ink, ink2, ink3, line, ember, emberDeep, onEmber,
+  // ok, err, glassFill, glassBorder, glassShadow) — plus the 6 Decision-153 ink
+  // pins (emberInk, okInk, errInk × dark/light), for 36 hex pins total. The 4
+  // opacity expects (orb/aurora × dark/light) bring the two tests to 40
+  // expect() calls. The plan's "34 hexes" counted total expect() calls (17 × 2:
+  // 15 colours + 2 opacities) and mislabelled them hexes; its "23 single-line +
+  // 9 split-line" breakdown reads 23 only because a repo-wide `expect(_hex`
+  // grep also catches the lerp interior test's 2. Recounted inside the two
+  // spec tests: 21 single-line + 9 split-line = 30, + 6 ink pins = 36.
   group('the dark palette', () {
     test('carries every dark token value from the spec', () {
       final EvaColors dark = const EvaColors.dark();
@@ -272,6 +284,23 @@ void main() {
       expect(_hex(dark.onEmber), _argb(0x0D, 0x0A, 0x04), reason: 'onEmber');
       expect(_hex(dark.ok), _argb(0x4E, 0xCC, 0xA3), reason: 'ok');
       expect(_hex(dark.err), _argb(0xFF, 0x6B, 0x6B), reason: 'err');
+      // Decision 153 — in dark the accent inks ARE the accents, pinned here so
+      // a future ink edit fails in the spec test, not just in the contrast gate.
+      expect(
+        _hex(dark.emberInk),
+        _argb(0xE8, 0xA3, 0x3D),
+        reason: 'emberInk — #E8A33D, the accent itself in dark',
+      );
+      expect(
+        _hex(dark.okInk),
+        _argb(0x4E, 0xCC, 0xA3),
+        reason: 'okInk — #4ECCA3, the accent itself in dark',
+      );
+      expect(
+        _hex(dark.errInk),
+        _argb(0xFF, 0x6B, 0x6B),
+        reason: 'errInk — #FF6B6B, the accent itself in dark',
+      );
 
       expect(dark.orbOpacity, 0.55, reason: 'orbOpacity');
       expect(dark.auroraOpacity, 0.18, reason: 'auroraOpacity');
@@ -339,6 +368,23 @@ void main() {
       );
       expect(_hex(light.ok), _argb(0x1A, 0x8C, 0x6A), reason: 'ok');
       expect(_hex(light.err), _argb(0xD6, 0x3B, 0x3B), reason: 'err');
+      // Decision 153 — in light these are darker than the fills, and they are
+      // the whole reason the tokens exist.
+      expect(
+        _hex(light.emberInk),
+        _argb(0x84, 0x56, 0x10),
+        reason: 'emberInk — #845610, the light gold ink',
+      );
+      expect(
+        _hex(light.okInk),
+        _argb(0x14, 0x6C, 0x52),
+        reason: 'okInk — #146C52, the light success ink',
+      );
+      expect(
+        _hex(light.errInk),
+        _argb(0xB7, 0x26, 0x26),
+        reason: 'errInk — #B72626, the light error ink',
+      );
 
       expect(light.orbOpacity, 0.18, reason: 'orbOpacity');
       expect(light.auroraOpacity, 0.10, reason: 'auroraOpacity');

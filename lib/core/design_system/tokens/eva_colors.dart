@@ -108,6 +108,38 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// The light glass shadow is `#120E28` at 12% — the built code's light `ink`.
   /// The brief's `#221C15` is explicitly NOT used: that value belongs to the
   /// discarded warm-paper palette (`01-source-analysis.md` §1.2).
+  ///
+  /// ## WHY THE PROTOTYPE'S LIGHT GOLDS WERE NOT ADOPTED (Phase 2 non-repair).
+  ///
+  /// The LUMEN plan proposed converging four light values toward the prototype
+  /// (`eva/redesign.html`, light table at `redesign.html:56-58`) to clear WCAG
+  /// AA. Re-measured against the prototype's own light canvas `#F5F2EA`
+  /// (`redesign.html:56`, `--void-1`) the four failures reproduce exactly — but
+  /// the proposed repairs do not survive either, and the tokens this palette
+  /// already ships exceed every one of them. Adopting the table verbatim would
+  /// have REGRESSED the palette, so no hex below moved. If a future reader
+  /// re-proposes the converge-repair, this table is the answer:
+  ///
+  /// | role | prototype (redesign.html) | measured vs `#F5F2EA` | plan's repair | repair actually measures | this palette today | verdict |
+  /// | --- | --- | --- | --- | --- | --- | --- |
+  /// | secondary ink | `#707684` (`redesign.html:56` `--ink-2`; rendered at `redesign.html:70` `.segp button`) | 4.069:1 | `#666C7A` | 4.703:1 | `ink2 #5A5480` at 6.10:1 | already better — no change |
+  /// | gold ink | `#8a6d15` (`redesign.html:71` `.qcta`, `redesign.html:90` `.mono b`, `redesign.html:100` `.qnext`) | 4.387:1 | `#806615` | 4.902:1 | `emberInk #845610` at 5.54:1 | already better — no change |
+  /// | gold fill | `#9A7B19` (`redesign.html:58` `--gold`; `redesign.html:39` rail `h4`) | 3.595:1 | `#8A6D15` | 4.387:1, still under 4.5 | `ember` fills + `emberInk` writes (Decision 153) | the repair fails AA — no change |
+  /// | `.cta` label | `#FFFFFF` on `#9A7B19` (`redesign.html:86`) | 4.022:1 | fill `#8A6D15` (claimed 5.30:1) | 4.908:1, not 5.30 | `ember #D4891A` + `onEmber #3A1E00` at 5.41:1 | already better; the parenthetical was wrong — no change |
+  ///
+  /// The mechanism that beats the converge-repair is Decision 153's split,
+  /// documented on [emberInk]: one value cannot be both a fill light enough for
+  /// `onEmber` to read on and an ink dark enough to read on a pale surface, so
+  /// `ember` fills and `emberInk` writes. The plan's repair tried to make one
+  /// value do both and fails exactly where that contradiction bites (row three).
+  ///
+  /// Focus is the deferred half, not a second non-repair: `redesign.html:177`
+  /// sets `.screen.focus .vline.in` to `#d9dfef`, flattening every in-view verse
+  /// including `.hot` to a single colour (in-focus distinction 1.000:1). No
+  /// `vline`/verse widget exists in `lib/` yet, so there is nothing to fix here;
+  /// the rule Phase 5 must honour when it builds `/reading` is a ≥3:1
+  /// distinction between in-view and out-of-view verses, never a single
+  /// `#d9dfef`.
   const EvaColors.light()
     : canvas = const Color(0xFFF0EEFF),
       surface = const Color(0xFFFFFFFF),
