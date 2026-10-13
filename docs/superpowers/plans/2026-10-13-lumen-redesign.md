@@ -136,6 +136,32 @@ Every path this plan touches, with its single responsibility.
 **2**. `CONTRIBUTING.md`: "`2` means nothing was checked." No claim in this
 plan — including the table above — can be verified until this phase lands.
 
+> **Task 0.1 is DONE.** Gate restored to `948 found, 948 resolved, 0 broken`,
+> `exit=0`. Baseline recorded: **2522 tests** (floor 2507), **98.39% coverage**
+> (floor 98.25%), 13 prototype files, `git diff HEAD` empty.
+>
+> Three steps below were wrong about the world, and a future implementer should
+> not be misled by them:
+>
+> - **Step 6's `sed` was a no-op.** `lib/main.dart` contains no
+>   `eva/src/App.tsx:1` citation, so the planted violation changed nothing. The
+>   gate was still proved fallible at a *real* citation site instead:
+>   `lib/core/design_system/widgets/neural_scaffold.dart:28` → `App.tsx:99999`,
+>   which yields `947 resolved, 1 broken`, `exit=1`. All three exit codes (0 / 1 /
+>   2) are now demonstrated.
+> - **"38 files return" is 36.** HEAD genuinely tracks 36 files under `eva/`.
+> - **Step 8's commit was unnecessary.** The deletions were unstaged
+>   working-tree-only and were never committed (`git cat-file -t
+>   HEAD~1:eva/redesign.html` still resolves to a blob); the root
+>   `redesign.html` was untracked. Restoring a dirty tree to HEAD is a zero-diff
+>   operation by definition, so there was nothing to commit and no empty commit
+>   was manufactured.
+>
+> **The consequence deserves attention:** this state was never captured by a
+> commit, so it is not reproducible from a fresh clone. If a cleanup step could
+> re-delete `eva/`, the durable guard belongs in `tool/verify_all.sh` — which
+> already FATALs correctly on a missing reference.
+
 ## Task 0.1: Restore the design references
 
 **Files:**
