@@ -20,11 +20,11 @@ Toolchain: Flutter **3.47.4** / Dart **3.13.3** (stable). No FVM, no melos.
 
 ## 2. Locked decisions — NOT up for renegotiation
 
-These were decided with the user. Do not re-litigate. Do not expand scope.
+These were decided with the user. Do not re-litigate. Do not expand scope. **There is exactly one exception, and it is dated:** decision 1 was deliberately reversed on 2026-10-13, and `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` is the authority for it — it ships the fiction table that says which of the redesign's surfaces have a measured endpoint behind them and which are stubs. Read that ADR before proposing anything about screens, the library, or the profile. Do not re-litigate it a second time either; it is decided and the plan that implements it is `docs/superpowers/plans/2026-10-13-lumen-redesign.md`.
 
 | # | Decision |
 | --- | --- |
-| 1 | **Six screens.** Library and Profile are **cut**. There is no passage library, no category system, no reflection history, no user profile. |
+| 1 | **Seven screens, and the library and the profile are BACK.** `/login`, `/`, `/reading`, `/quiz`, `/journey` (the profile), `/communion` (the board) and `/settings`; the library carousel returns to `/`, and `/result` retires to a modal. **This row SUPERSEDES `docs/adr/0001-six-screens-library-and-profile-cut.md`, which cut the library and the profile on 2026-10-02 and is now `superseded by ADR-0022`.** The reason it is reversed is not a change of taste: `eva/redesign.html:1244` names seven routes, `rJourney:576` is the profile and the carousel `:536` is the library, and the backend inventory re-measured for ADR-0022 found **`GET /leaderboard` and `GET /streak` real** while confirming that a profile, a book catalogue, medals, a cheer, a share and notes have **no** endpoint. ADR-0001's Context named those same missing endpoints and concluded the opposite — ship six. The conclusion was right about the data and wrong about what to do with it: the redesign is now adopted **at full fidelity**, and the invented parts are enumerated, priced and put behind repository ports instead of being avoided by cutting screens. What that costs is recorded in the ADR's fiction table, and it is not free: medals, cheer, the starfield and the book catalogue ship as stubs. |
 | 2 | **Live API** against `http://localhost:3000` for reading / quiz / result / streak. |
 | 3 | **Login and onboarding are UI-only.** A `FakeAuthRepository` returns a seeded session. There is **no auth endpoint on the backend** and no login API call. |
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
@@ -167,6 +167,8 @@ decision 111 and marked here.)*
 Routes carry **no `:passageId` parameter**. There is no library to browse, so the passage
 is always *today's*. The quiz re-fetches to obtain fresh `already_answered` flags, because
 the backend has **no `GET /readings/:id`** endpoint.
+
+**Pending implementation.** The table above is what `lib/app/router/app_router.dart:243-261` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: **`/journey`** (the profile) and **`/communion`** (the board, renamed from the `/leaderboard` the client already ships — `lib/core/navigation/app_routes.dart:80`) arrive in **Phase 5**; **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
 
 ---
 

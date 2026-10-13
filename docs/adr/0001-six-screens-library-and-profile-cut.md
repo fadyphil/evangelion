@@ -1,10 +1,20 @@
 # ADR-0001: Ship six screens; cut the library and the profile
 
-- **Status:** accepted
+- **Status:** superseded by [ADR-0022](0022-full-fidelity-redesign-supersedes-0001.md), 2026-10-13
 - **Date decided:** 2026-10-02
 - **Recorded:** 2026-10-11
 - **Deciders:** the project owner, with AI implementers and reviewers
 - **Authority:** `AGENT_CONTEXT.md` §2 decision 1
+
+> **This record is superseded, and it is kept because it was right about the
+> data and wrong about what to do with it.** The Context below names the same
+> missing endpoints ADR-0022 re-measured — no book list, no profile, no medals,
+> no cheer, no share, no notes — and concluded *ship six*. ADR-0022 measured the
+> same fourteen routes, added that **`GET /leaderboard` and `GET /streak` are
+> real**, and concluded *ship the redesign and put the invented parts behind
+> ports*. Both conclusions follow from their measurements; only one of them is
+> what the user wanted. The body below is otherwise unchanged and still
+> describes the codebase as it stood until 2026-10-13.
 
 ## Context
 

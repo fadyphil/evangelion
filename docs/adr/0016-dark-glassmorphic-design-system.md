@@ -1,6 +1,6 @@
 # ADR-0016: One dark glassmorphic design system with five bundled families and zero elevation
 
-- **Status:** accepted — under review. The decision is in effect today and testable today; a planned UI overhaul will re-examine it. See [`ROADMAP.md`](../../ROADMAP.md), **Design overhaul**.
+- **Status:** superseded by [ADR-0022](0022-full-fidelity-redesign-supersedes-0001.md), 2026-10-13. The LUMEN redesign replaces this decision; `lib/` carries the old values until the plan's Phases 2–6 land it.
 - **Date decided:** 2026-10-02
 - **Recorded:** 2026-10-11
 - **Deciders:** the project owner, with AI implementers and reviewers

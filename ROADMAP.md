@@ -57,23 +57,36 @@ summary of the same seven gates and exits `0`.
 
 ## Design overhaul
 
-A major visual overhaul is planned. A new prototype, or a written specification,
-is to replace `eva/` as the design source of truth. The visual direction has not
-been decided, and this file does not guess at it.
+**The visual direction is decided, and it is decided against `eva/redesign.html`.**
+The LUMEN redesign replaces `eva/src/*.tsx` as the design source of truth, and
+[`ADR-0022`](docs/adr/0022-full-fidelity-redesign-supersedes-0001.md) records the
+adoption together with the scope reversal it forced: the redesign names seven
+routes (`eva/redesign.html:1244`), so §2 decision 1's cut of the library and the
+profile is **superseded**, and the ADR ships the **fiction table** — every
+surface the redesign specifies, whether a measured endpoint serves it, and what
+would have to exist to stop it being a stub. Read that table before assuming a
+screen's data is real. It is not a promise about the future; it is the accepted
+price of shipping the design faithfully, and it is dated 2026-10-13.
 
-The scope you have been given is visual: design tokens, the 23 design-system
-widgets, and screen composition. Goldens and screens change. The layer model,
-the repository ports, the dependency-injection split, the error algebra, and the
-routing shape are **not** in scope and are not expected to change.
+The scope is **no longer visual-only**. That sentence used to be the whole of
+this section's caveat and it is now false: the layer model, the repository
+ports, the dependency-injection split, the error algebra and the routing shape
+all stay where they are, but **two routes are added and one is retired**
+(`/journey` and `/communion` in, `/result` out to a modal). See
+`docs/agents/AGENT_CONTEXT.md` §2 decision 1 and its **Pending implementation**
+note under the route table.
 
-No decision in this repository has been reversed, deprecated, or superseded.
-ADRs [`0016`](docs/adr/0016-dark-glassmorphic-design-system.md),
-[`0017`](docs/adr/0017-split-the-accent-into-a-fill-and-an-ink.md),
-[`0018`](docs/adr/0018-bilingual-typography-two-arms-two-questions.md), and
-[`0019`](docs/adr/0019-performance-budget.md) all carry the status
-`accepted — under review` and point here. That status means exactly what it
-says: the decision is in effect today, it is testable today, and it will be
-re-examined when the overhaul lands.
+**Three ADRs are superseded by ADR-0022, and one is not.** `superseded` says the
+decision was *replaced*; it does not say the code has caught up, and here it has
+not — Phases 2 through 6 of
+`docs/superpowers/plans/2026-10-13-lumen-redesign.md` carry it across.
+
+| ADR | Now | Why |
+| --- | --- | --- |
+| [`0016`](docs/adr/0016-dark-glassmorphic-design-system.md) | `superseded by ADR-0022` | the redesign brings its own palette, shader, witness sky and dock, and its five families have already landed on `feat/fonts-ui-families` |
+| [`0017`](docs/adr/0017-split-the-accent-into-a-fill-and-an-ink.md) | `superseded by ADR-0022` | the fill/ink split and the `onEmber` divergence existed to make the old dark-glass accent legible; the redesign replaces the accent |
+| [`0019`](docs/adr/0019-performance-budget.md) | `superseded by ADR-0022` | "one blur site per screen" is a budget for a design that blurs; the redesign blurs the whole viewport with a shader and a 14-control workshop |
+| [`0018`](docs/adr/0018-bilingual-typography-two-arms-two-questions.md) | **still `accepted — under review`** | the redesign is bilingual in the same way and does not touch the two-arms-two-questions resolution, so there is nothing in ADR-0022 to re-examine it against |
 
 ### What a prototype swap breaks
 
@@ -105,10 +118,18 @@ opposite directions.
 First, it **will** fail loudly on a line-number shift, because it checks
 existence and range. That is the cheap failure. Second, it **will not** tell you
 that a citation now points at a line which no longer says what the claim says.
-As [`docs/agents/AGENT_CONTEXT.md:658`](docs/agents/AGENT_CONTEXT.md) records,
+As [`docs/agents/AGENT_CONTEXT.md:660`](docs/agents/AGENT_CONTEXT.md) records,
 the harness for `/login` found **two of its own citations wrong on its first
 run**. A new prototype will produce more findings of that kind, and the gate
 does not distinguish them from the ones that are merely renumbered.
+
+> [!NOTE]
+> **That gate cannot see this file, or ADR-0022.** `citation_check.py:59` sets
+> `ROOTS = ("lib", "test", "tool")` and walks `*.dart` only, so a
+> `redesign.html:NNN` claim in a Markdown file is **unverified by
+> construction**. Every `eva/redesign.html:NNN` in ADR-0022 was read by hand
+> against the file; this is the note that says so rather than letting a green
+> gate imply otherwise.
 
 ### The citations now describe a design the goldens no longer show
 
@@ -341,12 +362,12 @@ These are reported as findings, not as work someone forgot.
 
 | Document and line | Says | Measures |
 | --- | --- | --- |
-| `docs/agents/AGENT_CONTEXT.md:27` | six screens | 7 |
-| `docs/agents/AGENT_CONTEXT.md:223`, `:237` | four repository ports | 5 |
-| `docs/agents/AGENT_CONTEXT.md:774` | six `@module` files, committed and empty | 8 files, 7 carrying providers |
-| `docs/agents/AGENT_CONTEXT.md:2199` (decision 79) | three of six screens vacuous | none vacuous |
-| `docs/agents/AGENT_CONTEXT.md:1202` (decision 32) | avatar has no destination | it pushes `/settings` |
-| `docs/agents/AGENT_CONTEXT.md:45`, `:134`, `:2717`, `:2839` | 72 ARB keys | 111 |
+| `docs/agents/AGENT_CONTEXT.md:27` | ~~six screens~~ — **resolved 2026-10-13** | seven screens, per [`ADR-0022`](docs/adr/0022-full-fidelity-redesign-supersedes-0001.md) |
+| `docs/agents/AGENT_CONTEXT.md:225`, `:239` | four repository ports | 5 |
+| `docs/agents/AGENT_CONTEXT.md:776` | six `@module` files, committed and empty | 8 files, 7 carrying providers |
+| `docs/agents/AGENT_CONTEXT.md:2201` (decision 79) | three of six screens vacuous | none vacuous |
+| `docs/agents/AGENT_CONTEXT.md:1204` (decision 32) | avatar has no destination | it pushes `/settings` |
+| `docs/agents/AGENT_CONTEXT.md:45`, `:134`, `:2719`, `:2841` | 72 ARB keys | 111 |
 | `docs/SEAMS.md:267` (Seam 7) | `lib/app/app.dart` hard-codes `ThemeMode.dark` | it switches over a persisted setting |
 | `AGENTS.md:127` | 27 design-system widgets | 23 |
 | `lib/app/router/app_router.dart:9`, `:23`, `:214` | six routes, six locked routes, six features | 7 |

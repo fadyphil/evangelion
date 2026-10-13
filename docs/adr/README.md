@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Twenty-one records of the architectural decisions that shaped this client, why
+Twenty-two records of the architectural decisions that shaped this client, why
 each was taken, and what it cost. Each names the recorded decision in
 [`docs/agents/AGENT_CONTEXT.md`](../agents/AGENT_CONTEXT.md) that it came from, so
 any claim here can be traced to its source and checked.
@@ -13,15 +13,18 @@ decision and the wrong place to *find* one: the file is over four thousand lines
 long, and reading it end to end to answer "why is `Result<T>` a typedef" is not
 a reasonable thing to ask of a new contributor.
 
-These ADRs are a curated index over that record — twenty-one architectural
+These ADRs are a curated index over that record — twenty-two architectural
 decisions rather than 156 chronological entries. Each one carries the parts that
 are worth keeping when the surrounding chronology is not: the constraint that
 forced it, the alternatives that were rejected and why, and the consequences
 nobody wanted to admit. The remaining decisions stay in `AGENT_CONTEXT.md`.
 
-**These are backfills.** Every one records a decision that was already made and
-shipped. The `Date decided` field is when the decision was recorded, not the day
-the file was written.
+**These are backfills, with one exception.** Every one but ADR-0022 records a
+decision that was already made and shipped. That record was decided on
+2026-10-13 and its implementation has not landed; it is the first record here
+that describes work in flight rather than work done, and it says so. On every
+other record the `Date decided` field is when the decision was recorded, not the
+day the file was written.
 
 ## Status vocabulary
 
@@ -33,28 +36,37 @@ the file was written.
 | `superseded by ADR-NNNN` | A newer record replaced it. Always links the replacement. |
 | `rejected` | Considered and declined. Kept so the option is not re-proposed. |
 
-### The four records under review
+### What the overhaul did to the four records under review
 
-[ADR-0016](0016-dark-glassmorphic-design-system.md),
-[ADR-0017](0017-split-the-accent-into-a-fill-and-an-ink.md),
-[ADR-0018](0018-bilingual-typography-two-arms-two-questions.md) and
-[ADR-0019](0019-performance-budget.md) carry `accepted — under review`. A major
-UI overhaul is planned, with a new prototype replacing the React reference in
-`eva/` as the design source of truth. Each of these four decisions is still
-enforced by a gate today, which is exactly why the honest status is *under
-review* rather than *superseded*: marking them superseded would put a claim in
-the repository that nothing supports yet.
+Until 2026-10-13, ADR-0016, ADR-0017, ADR-0018 and ADR-0019 all carried
+`accepted — under review` on the same reasoning: a major UI overhaul was planned
+with a new prototype replacing the React reference, so each was in effect and
+testable today but would be re-examined. **The overhaul has now landed as a
+decision** — [`ADR-0022`](0022-full-fidelity-redesign-supersedes-0001.md), which
+adopts `eva/redesign.html` and, in the same record, supersedes ADR-0001.
+
+| ADR | Now | Why |
+| --- | --- | --- |
+| [0016](0016-dark-glassmorphic-design-system.md) | `superseded by ADR-0022` | the redesign brings its own palette, shader, witness sky and dock |
+| [0017](0017-split-the-accent-into-a-fill-and-an-ink.md) | `superseded by ADR-0022` | the accent is replaced, so the fill/ink split and the `onEmber` divergence go with it |
+| [0019](0019-performance-budget.md) | `superseded by ADR-0022` | "one blur site per screen" is a budget for a design that does not blur; this one blurs the whole viewport |
+| [0018](0018-bilingual-typography-two-arms-two-questions.md) | **still `accepted — under review`** | the redesign does not touch the bilingual font resolution, so there is nothing to re-examine it against |
+
+`superseded` means **replaced**, not **implemented**. The plan's Phases 2 through
+6 carry the code across, so `lib/` still holds the superseded values today. A
+green gate run says nothing about that, which is why the fiction table in
+ADR-0022 exists as a document rather than as an assertion.
 
 The scope and the measured consequences are in
-[`ROADMAP.md`](../../ROADMAP.md) under **Design overhaul**. Nothing in the
-overhaul reaches the layer model, the ports, the dependency-injection split, the
-error algebra or the routing shape.
+[`ROADMAP.md`](../../ROADMAP.md) under **Design overhaul**. The overhaul reaches
+the routing shape — two routes added, one retired — and it does **not** reach
+the layer model, the ports, the dependency-injection split or the error algebra.
 
 ## Index
 
 | ADR | Title | Status | Decided |
 | --- | --- | --- | --- |
-| [0001](0001-six-screens-library-and-profile-cut.md) | Ship six screens; cut the library and the profile | accepted | 2026-10-02 |
+| [0001](0001-six-screens-library-and-profile-cut.md) | Ship six screens; cut the library and the profile | **superseded by ADR-0022** | 2026-10-02 |
 | [0002](0002-live-api-is-the-only-data-source.md) | Read from the live API; auth stays UI-only and settings stay local | accepted | 2026-10-02 |
 | [0003](0003-strict-three-layer-clean-architecture.md) | Keep three layers with strictly inward dependency direction | accepted | 2026-10-02 |
 | [0004](0004-shared-kernel-in-core-domain.md) | Put types two or more features consume in the shared kernel | accepted | 2026-10-02 |
@@ -69,12 +81,13 @@ error algebra or the routing shape.
 | [0013](0013-register-singletons-for-anything-with-a-stream.md) | Register singletons for anything holding a stream; the router is a lazy singleton | accepted | 2026-10-03 |
 | [0014](0014-auto-route-with-an-auth-status-guard.md) | Route with auto_route behind a guard over a one-member `AuthStatus` | accepted | 2026-10-03 |
 | [0015](0015-result-is-not-deep-linkable.md) | Accept that `/result` cannot be deep-linked | accepted | 2026-10-04 |
-| [0016](0016-dark-glassmorphic-design-system.md) | One dark glassmorphic design system with five bundled families and zero elevation | **accepted — under review** | 2026-10-02 |
-| [0017](0017-split-the-accent-into-a-fill-and-an-ink.md) | Split the accent into a fill and an ink; diverge `onEmber` from spec for WCAG | **accepted — under review** | 2026-10-02 |
+| [0016](0016-dark-glassmorphic-design-system.md) | One dark glassmorphic design system with five bundled families and zero elevation | **superseded by ADR-0022** | 2026-10-02 |
+| [0017](0017-split-the-accent-into-a-fill-and-an-ink.md) | Split the accent into a fill and an ink; diverge `onEmber` from spec for WCAG | **superseded by ADR-0022** | 2026-10-02 |
 | [0018](0018-bilingual-typography-two-arms-two-questions.md) | Resolve the Arabic family with one function plus per-arm switches | **accepted — under review** | 2026-10-04 |
-| [0019](0019-performance-budget.md) | One blur site per screen, three animation controllers app-wide | **accepted — under review** | 2026-10-04 |
+| [0019](0019-performance-budget.md) | One blur site per screen, three animation controllers app-wide | **superseded by ADR-0022** | 2026-10-04 |
 | [0020](0020-a-gate-that-cannot-fail-is-worse-than-no-gate.md) | Treat a gate that cannot fail as worse than no gate | accepted | 2026-10-07 |
 | [0021](0021-tdd-for-domain-and-behaviour-tests-for-widgets.md) | Test-drive the domain; test alongside the widgets | accepted | 2026-10-02 |
+| [0022](0022-full-fidelity-redesign-supersedes-0001.md) | Ship the LUMEN redesign at full fidelity, and supersede ADR-0001 | accepted | 2026-10-13 |
 
 ## Reading order
 

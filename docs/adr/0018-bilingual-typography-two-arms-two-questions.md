@@ -1,6 +1,6 @@
 # ADR-0018: Resolve the Arabic family with one function plus per-arm switches — two different questions
 
-- **Status:** accepted — under review. The decision is in effect today and testable today; a planned UI overhaul will re-examine it. See [`ROADMAP.md`](../../ROADMAP.md), **Design overhaul**.
+- **Status:** accepted — under review. The decision is in effect today and testable today. **It is the one record the LUMEN redesign does *not* re-examine**: [`ADR-0022`](0022-full-fidelity-redesign-supersedes-0001.md) supersedes ADR-0016, ADR-0017 and ADR-0019 and leaves this one standing, because the redesign is bilingual in the same way and does not touch the two-arms-two-questions resolution. See [`ROADMAP.md`](../../ROADMAP.md), **Design overhaul**.
 - **Date decided:** 2026-10-04
 - **Recorded:** 2026-10-11
 - **Deciders:** the project owner, with AI implementers and reviewers
