@@ -99,7 +99,20 @@ def strip_comments(text: str) -> str:
 # entry here is a PRODUCT decision, not a convenience — the same rule
 # `text_contrast_gate_test.dart` applies to `knownSubstandard`: the list cannot
 # grow silently.
-ALLOWLIST: dict[str, str] = {}
+ALLOWLIST: dict[str, str] = {
+    "WitnessSky": (
+        "Phase 3 Task 3.3 shipped the widget; Phase 5 places it. It is the "
+        "full-bleed `#sky` layer (eva/redesign.html:116) and its three consumers "
+        "are Phase 5's screens — `/reading` lights verses as they scroll into "
+        "view (eva/redesign.html:1208-1221), `/quiz` fires the flares "
+        "(`:1428`) and `/journey` counts the sky (`:1186-1189`). Placing it "
+        "here would mean inventing the reader's scroll observer, a router entry "
+        "and a settings row — all three of which the dispatch for this task "
+        "explicitly withholds. The entry is STALE the moment any page "
+        "constructs it, and the gate reports that, so it cannot outlive its "
+        "reason."
+    ),
+}
 
 
 def dart_files() -> list[Path]:

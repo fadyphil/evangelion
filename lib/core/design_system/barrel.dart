@@ -114,3 +114,4 @@ export 'package:evangelion/core/design_system/widgets/stat_tile.dart';
 export 'package:evangelion/core/design_system/widgets/streak_flame.dart';
 export 'package:evangelion/core/design_system/widgets/sun_burst.dart';
 export 'package:evangelion/core/design_system/widgets/text_link.dart';
+export 'package:evangelion/core/design_system/widgets/witness_sky.dart';
