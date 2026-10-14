@@ -387,6 +387,62 @@ void main() {
   group('the four shapes', () {
     const Rect box = Rect.fromLTWH(0, 0, 10, 10);
 
+    test('skyClipsPaint names the prototype\'s TWO mechanisms', () {
+      // `eva/redesign.html:120` is `border-radius: 50%` and `:121-123` are
+      // `clip-path: polygon(…)`. The two behave differently (a rounded border
+      // box keeps its outer shadow; a clip-path inside the border box discards
+      // it), so this is not `!= dot` for tidiness — it is the branch the star
+      // layer makes, and `WitnessSky`'s suite measures both sides of it.
+      expect(skyClipsPaint(SkyStarShape.star), isTrue);
+      expect(skyClipsPaint(SkyStarShape.cross), isTrue);
+      expect(skyClipsPaint(SkyStarShape.diamond), isTrue);
+      expect(
+        skyClipsPaint(SkyStarShape.dot),
+        isFalse,
+        reason: 'the dot is `border-radius: 50%` — a rounded box, not a clip',
+      );
+      // And it is exactly the complement of "has a polygon", so the two tables
+      // cannot disagree.
+      for (final SkyStarShape shape in SkyStarShape.values) {
+        expect(
+          skyClipsPaint(shape),
+          skyStarPolygon[shape] != null,
+          reason: '${shape.name}: the clip flag and the polygon table',
+        );
+      }
+    });
+
+    test('SkyStarClipper.shouldReclip only on a shape change', () {
+      // Trivial by inspection, which is exactly why it needed a witness: the
+      // first version of the shape test read the constructor argument and never
+      // reached the clipper at all, so `shouldReclip` had no test and the
+      // `ClipPath` had no reason to exist in a suite that could see it.
+      const SkyStarClipper star = SkyStarClipper(SkyStarShape.star);
+      expect(
+        star.shouldReclip(const SkyStarClipper(SkyStarShape.star)),
+        isFalse,
+      );
+      expect(
+        star.shouldReclip(const SkyStarClipper(SkyStarShape.cross)),
+        isTrue,
+        reason: 'a different polygon must re-clip',
+      );
+      // And the clip it produces is that shape's path, at the size it is given.
+      // Compared by `getBounds` and by containment rather than by `==`, because
+      // `Path` does not implement value equality — two independently built
+      // identical paths are `!=`, so `expect(a, b)` here would fail for a
+      // correct clipper and pass for nothing.
+      const Rect box = Rect.fromLTWH(0, 0, 10, 10);
+      final Path clipped = star.getClip(const Size(10, 10));
+      final Path direct = skyStarPathFor(SkyStarShape.star, box);
+      expect(clipped.getBounds(), direct.getBounds());
+      expect(
+        clipped.contains(const Offset(0.5, 0.5)),
+        direct.contains(const Offset(0.5, 0.5)),
+      );
+      expect(clipped.contains(box.topLeft), direct.contains(box.topLeft));
+    });
+
     test('the dot is a circle, not a polygon', () {
       // eva/redesign.html:120 — `.star.s-dot{border-radius:50%}`. A polygon here
       // would be an octagon at any size that is not the box it was measured on.

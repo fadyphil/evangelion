@@ -129,9 +129,19 @@ const double kSkyConstellationOpacity = 0.45;
 /// The constellation's `stroke-width`. `eva/redesign.html:1179` — `'1'`.
 const double kSkyConstellationStrokeWidth = 1.0;
 
-/// The stroke alpha in dark: `eva/redesign.html:1178` writes the **book's** own
-/// hue at `.8`. This client has no book catalogue, so the hue is substituted —
-/// see [skyConstellationStroke].
+/// The stroke alpha in dark: `eva/redesign.html:1177` writes the **book's** own
+/// hue at `.8` — `pl.dataset.dark=BOOKS[curBook].css.replace(/[\d.]+\)$/,'.8)')`.
+///
+/// **`:1177`, not `:1178`.** The first version cited `:1178`, which is the line
+/// that *consumes* `pl.dataset.dark` (`pl.setAttribute('stroke', …)`) and is
+/// where the light-mode value lives; the assignment is the line above. Both are
+/// in the same three-line block and both mention the stroke, which is how a
+/// citation one line off survives review — see decision 72 for the same failure
+/// on a number. `citation_check.py` only checks that a line exists, never that
+/// it says this.
+///
+/// This client has no book catalogue, so the hue is substituted — see
+/// [skyConstellationStroke].
 const double kSkyConstellationDarkAlpha = 0.8;
 
 /// The stroke alpha in light: `eva/redesign.html:1178` —
@@ -400,13 +410,34 @@ Path skyStarPathFor(SkyStarShape shape, Rect rect) {
   return path..close();
 }
 
+/// Whether [shape]'s prototype mechanism is a `clip-path` rather than a
+/// `border-radius`.
+///
+/// `true` for [SkyStarShape.star], [SkyStarShape.cross] and
+/// [SkyStarShape.diamond]; `false` for [SkyStarShape.dot].
+///
+/// **The one place the two prototype mechanisms are named.** The star layer
+/// branches on this, and it has to: the three polygons are clipped and lose
+/// their halo, the dot is rounded and keeps it. See [SkyStarClipper]'s doc for
+/// why the two differ.
+bool skyClipsPaint(SkyStarShape shape) => shape != SkyStarShape.dot;
+
 /// Clips a star's box to its silhouette.
 ///
-/// A `CustomClipper` rather than a `ShapeBorder` decoration because the
-/// prototype's three shapes are `clip-path: polygon(…)` — which clip the
-/// **painted box** and leave the `box-shadow` square, exactly as a `clip-path`
-/// does. Clipping the decoration instead would round the glow along with the
-/// fill and produce a different star.
+/// ## THE ONE FLAG THIS PUBLISHES, AND WHY IT IS NOT JUST `!= dot`
+///
+/// The prototype uses **two different mechanisms** for its four shapes
+/// (`eva/redesign.html:120-123`), and they behave differently — which is the
+/// whole of the star layer's branch:
+///
+/// | class | mechanism | clips its own paint? |
+/// | --- | --- | --- |
+/// | `s-dot` | `border-radius: 50%` | no — it rounds the border box, and the shadow follows that rounded outline |
+/// | `s-star` / `s-cross` / `s-diamond` | `clip-path: polygon(…)` | **yes** — the element's whole rendering, and an outer shadow lives outside the border box |
+///
+/// A `CustomClipper` rather than a `ShapeBorder` decoration because
+/// `clip-path: polygon(…)` is a clip and not a shape: it has to wrap a
+/// `paint()`, not replace one.
 @immutable
 class SkyStarClipper extends CustomClipper<Path> {
   /// Clips to [shape].
@@ -444,12 +475,21 @@ class SkyStarClipper extends CustomClipper<Path> {
 Color skyStarFill(EvaColors colors, Brightness brightness) =>
     brightness == Brightness.dark ? colors.ink : colors.ink2;
 
-/// The star's halo.
+/// The star's halo — **the dot's only**, and the reason is [skyClipsPaint].
 ///
 /// `eva/redesign.html:1137-1142` returns two `box-shadow`s from `starShadows`:
 /// in light, `rgba(74,80,96,.4)` at `6px`/`12px` (or `10px`/`20px` for a
 /// flare); in dark, **the current ambient hue lightened by 22 points**, at
 /// `8px`/`16px` (or `14px`/`30px`).
+///
+/// `addStar` writes them onto **every** class (`:1152`), and only the dot's
+/// survive: `border-radius: 50%` rounds the border box so the shadow follows
+/// the rounded outline, while the three `clip-path: polygon(…)` classes are
+/// clipped to a region **inside** the border box and an outer shadow is drawn
+/// outside the border edge only (CSS Backgrounds 3 §6.1.1) — so the two never
+/// overlap. These two radii are therefore also exactly what a **flare**
+/// contributes on a polygon shape: the wide halo at a fixed 5px (`:1148`),
+/// with nothing behind it.
 ///
 /// The dark half cannot be transcribed: `curH` is the LUMEN background's
 /// breathing hue, which this client does not read from a decorative widget and
@@ -604,15 +644,23 @@ class WitnessSky extends StatefulWidget {
   ///
   /// **Fills, and does not choose its own box.** `#sky` is
   /// `position:absolute; inset:0` (`:116`), so the prototype's container is the
-  /// whole screen and nothing else; a caller places this in a `Stack` and the
+  /// whole screen and nothing else; a caller places this where it gets bounded
+  /// constraints — a `Stack`, a `Positioned.fill`, a `SizedBox` — and the
   /// percentages resolve against that box.
   ///
-  /// **An unbounded box paints nothing** rather than throwing — `lumen_canvas`'s
-  /// `if (size.isEmpty) return` rule, extended to `Infinity`, because
-  /// `size.width / 100` on an infinite box is `Infinity` and a `Positioned`
-  /// handed one throws in layout. A sky dropped into a column is a wiring
-  /// mistake, and it should cost the page one missing decoration rather than a
-  /// red screen.
+  /// **An unbounded box THROWS, and the assertion names the fix.** This is the
+  /// corrected version of a claim that said the sky "paints nothing rather than
+  /// throwing", with a `size.isFinite` guard written to make that true. Both
+  /// were false and the guard was unreachable: `Stack` itself asserts on
+  /// unbounded constraints **before** any child of it builds, so the guard could
+  /// not be reached and measured 25 cascading `FlutterError`s instead of the one
+  /// the framework raises.
+  ///
+  /// The framework's own message is the better behaviour here — it names the
+  /// fix ("wrap the Stack in a widget that provides finite height and width
+  /// constraints") and a caller who gets it has learned something a silent
+  /// nothing would have hidden. `witness_sky_test.dart`'s "an unbounded box
+  /// throws and names the fix" holds it.
   const WitnessSky({
     required this.entries,
     this.brightness = kSkyDefaultBrightness,
@@ -688,12 +736,33 @@ class _WitnessSkyState extends State<WitnessSky>
   @override
   void didUpdateWidget(WitnessSky oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Replayed only when the constellation comes **back**, which is what the
-    // prototype's switch does: `:1484-1485` removes the `svg`, and a later
-    // `drawConstellation()` appends a fresh one that draws itself on again.
-    // Every other change — a star lit, the shape switched — leaves it alone, so
-    // adding a star does not restart a line a reader is still watching.
-    if (!oldWidget.showConstellation && widget.showConstellation) {
+    // ## THE REPLAY RULE, IN ONE CONDITION
+    //
+    // **Play when the constellation first becomes drawable.** That is one
+    // predicate and two of its terms, and both halves of it are measured
+    // failures without it:
+    //
+    // - `entries.length >= 2` — `:1170`'s own guard. `/reading` lights verses on
+    //   scroll, so a reader who opens the screen with **one** stored star and
+    //   scrolls to a second crosses this boundary *after* mount. Arming only in
+    //   `initState` left the controller at 0 and `extractPath(0, 0)` drew
+    //   nothing, forever: measured, growing 1 → 2 entries produced a buffer
+    //   byte-identical to a sky built with `showConstellation: false`.
+    // - `!oldWidget.showConstellation && widget.showConstellation` — the
+    //   prototype's switch removes the `svg` outright (`:1484-1485`), and a later
+    //   `drawConstellation()` appends a fresh one that draws itself on again.
+    //
+    // **And a third or later star does NOT replay.** This is the deliberate
+    // half. `:1156-1158` draws once per book, when the last verse is lit — not
+    // once per star — so growth *extends* the line rather than restarting it,
+    // and a line a reader is watching is never yanked back to nothing because
+    // they scrolled. The painter re-reads its `points` on every repaint, so an
+    // extension is simply the same draw-on finishing against a longer path.
+    if (!_constellationDrawable) return;
+    final bool firstStarToMakeItPossible = _isDrawable(oldWidget) == false;
+    final bool switchCameBack =
+        !oldWidget.showConstellation && widget.showConstellation;
+    if (firstStarToMakeItPossible || switchCameBack) {
       _playDrawOn();
     }
   }
@@ -707,6 +776,17 @@ class _WitnessSkyState extends State<WitnessSky>
   void _playDrawOn() {
     if (!mounted) return;
     if (!_constellationDrawable) return;
+    if (_reducedMotion) {
+      // §14: "jump straight to the end state" — `eva_animate.dart:156-163`'s
+      // rule, and `kAlwaysCompleteAnimation` on the route transition for the
+      // same reason (decision 124). **Setting the value rather than forwarding**
+      // is the part that matters: `forward()` would leave a `repeat`-less but
+      // still-ticking controller under a sky that has already reached its end
+      // state, which is measured as a fifth `transientCallbackCount` where the
+      // app's whole ambient budget is four (§13.2).
+      _draw.value = 1.0;
+      return;
+    }
     _draw
       ..value = 0.0
       ..forward();
@@ -714,6 +794,27 @@ class _WitnessSkyState extends State<WitnessSky>
 
   bool get _constellationDrawable =>
       widget.showConstellation && widget.entries.length >= 2;
+
+  static bool _isDrawable(WitnessSky w) =>
+      w.showConstellation && w.entries.length >= 2;
+
+  /// Whether this sky must not animate, as [build] last resolved it.
+  ///
+  /// **A field and not a `context` read inside [_playDrawOn], and the reason is
+  /// mechanical rather than stylistic.** The draw-on is armed from `initState`'s
+  /// post-frame callback and from `didUpdateWidget`; neither is a place that may
+  /// call `dependOnInheritedWidgetOfExactType` — `didUpdateWidget` runs before
+  /// the subtree is rebuilt, and registering a dependency there is the very
+  /// thing AGENT_CONTEXT §35 records Flutter asserting on ("was called before
+  /// `_HomeBodyState.initState()` completed"). `build` is the legal point, so it
+  /// resolves the flag and stashes it here, and the two arming sites read the
+  /// field.
+  ///
+  /// **`initState`'s post-frame callback runs after the first `build`**, so the
+  /// value is populated by then — which is the only ordering this needs, and
+  /// `_playDrawOn` also runs from `didUpdateWidget` where a `build` has always
+  /// happened first.
+  bool _reducedMotion = false;
 
   @override
   Widget build(BuildContext context) {
@@ -725,6 +826,10 @@ class _WitnessSkyState extends State<WitnessSky>
     // in a preview; absent means enabled, which is the framework's own default,
     // and is `GoldFlecks`' rule for the same layer.
     final bool reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    // Stashed for [_playDrawOn], which is armed from `initState` and
+    // `didUpdateWidget` where no `dependOnInheritedWidgetOfExactType` may be
+    // called. See the field's doc.
+    _reducedMotion = reduced;
     final bool twinkleOn = widget.twinkle && !reduced;
 
     return IgnorePointer(
@@ -734,6 +839,57 @@ class _WitnessSkyState extends State<WitnessSky>
             final Size size = constraints.biggest;
             return Stack(
               children: <Widget>[
+                // ## WHAT THIS COSTS, MEASURED, AND WHY IT IS NOT FIXED HERE
+                //
+                // The twinkle is derived from the shared float clock, so **every
+                // frame rebuilds every star** — 44 stars × 5 widgets
+                // (`Positioned` / `Transform.scale` / `Opacity` / `DecoratedBox` /
+                // `SizedBox`, plus the `ClipPath` on the three clipped shapes) is
+                // ~265 elements re-instantiated per frame.
+                //
+                // Measured on the 390×844 ambient surface over 120 frames in
+                // `flutter test` — a debug JIT under fake async, so these are
+                // **not** device numbers and should be read as an upper bound:
+                //
+                // | stars | µs/frame | vs 0 stars | per star |
+                // | --- | --- | --- | --- |
+                // | 0 | 658 | — | — |
+                // | 11 | 1750 | +1092 | 99 |
+                // | 44 | 2214 | +1556 | **35** |
+                //
+                // **The marginal cost of a star FALLS as the count rises** (99µs
+                // at 11, 35µs at 44), which is the signature of a fixed per-frame
+                // cost plus a cheap per-star one — so 44 stars is not 4× the
+                // 11-star case, and the cliff the finding predicted is not there.
+                //
+                // The same table with the clock **stopped** reads 564µs at 44
+                // stars, so roughly **two thirds of the cost is repaint rather
+                // than rebuild**; and `twinkle: false` — an identical widget tree
+                // with a constant alpha — reads 1721µs, which puts the 44
+                // `Opacity` saveLayers at about half of what remains.
+                //
+                // **Why none of that is fixed here.** The fix is one
+                // `CustomPainter` drawing the shapes, the glows and the twinkle
+                // into a canvas on `repaint: motion.repaint` — exactly what
+                // `GoldFlecks` does, and the reason its flecks need no per-fleck
+                // rebuild. That is a **redesign of this widget's internals**, not
+                // a cheap half, and it has a visible consequence: a painter's
+                // shapes are not widget-tree nodes, so every finder in this
+                // file's suite would have to become a golden — and this suite is
+                // currently the only thing that can see a star at all (the B1
+                // shape regression was invisible in every other assertion).
+                // Phase 5 mounts the reader and is the phase that would pay for
+                // it. The measurement is recorded; the redesign is not.
+                //
+                // **Two cheap-looking changes, both measured as not worth it.**
+                // Hoisting the `Stack` out of the `ListenableBuilder` does
+                // nothing: the children are the same widget instances, so
+                // `Element.update` short-circuits on `identical(newWidget,
+                // oldWidget)` and the rebuild is already down to the two values
+                // that actually change. A `RepaintBoundary` per star is *worse*:
+                // every star changes every frame, so each becomes a layer
+                // invalidated immediately, and 44 of them are composited per frame
+                // where one is composited now.
                 Positioned.fill(
                   child: ListenableBuilder(
                     // The twinkle is derived from the shared float clock, so
@@ -818,17 +974,25 @@ class _SkyStars extends StatelessWidget {
     // own box, which is what the prototype's container does.
     return Stack(
       clipBehavior: Clip.hardEdge,
-      children: <Widget>[
-        // `lumen_canvas.dart:145`'s rule — an empty paint surface paints
-        // nothing — extended to the unbounded one. `size.width / 100` on an
-        // infinite box is `Infinity`, and a `Positioned` handed one throws in
-        // layout; a sky with no box is a programming error and renders nothing
-        // rather than taking the page down with it.
-        if (size.isFinite && !size.isEmpty)
-          for (final SkyEntry entry in entries) _star(entry),
-      ],
+      children: <Widget>[for (final SkyEntry entry in entries) _star(entry)],
     );
   }
+
+  /// The [Key] on the star's box for [entry].
+  ///
+  /// **One key per [SkyEntry.key], and it is there because a test has to be able
+  /// to say "the star for John:3:16".** The finder that used to say it — a
+  /// `find.byType(ClipPath)` — stopped working the moment [skyClipsPaint] was
+  /// corrected, and that is the measurement worth recording: `s-dot` reaches its
+  /// circle through `border-radius: 50%` (`eva/redesign.html:120`) and is
+  /// therefore **not** clip-pathed at all, so a `ClipPath` finder answered
+  /// **zero** stars for the *default* shape and broke four suites for a change
+  /// that was right.
+  ///
+  /// A test that reads a widget's internals is coupled to them, and this key is
+  /// the decoupling: it is the star's identity, not its mechanism.
+  static Key starKeyFor(SkyEntry entry) =>
+      ValueKey<String>('sky-star:${entry.key}');
 
   Widget _star(SkyEntry entry) {
     final SkyStarLayout layout = skyStarLayoutFor(
@@ -857,6 +1021,22 @@ class _SkyStars extends StatelessWidget {
       brightness: brightness,
     );
     final Color glow = skyStarGlow(colors, brightness);
+    final double sizePx = layout.size;
+
+    // The fill + halo, boxed. One method so the two branches below cannot
+    // drift apart in any field but [circle] — which is the *only* difference
+    // between the dot's element and the other three's.
+    Widget paint({required bool circle}) => DecoratedBox(
+      decoration: BoxDecoration(
+        color: fill,
+        shape: circle ? BoxShape.circle : BoxShape.rectangle,
+        boxShadow: <BoxShadow>[
+          BoxShadow(color: glow, blurRadius: near),
+          BoxShadow(color: glow, blurRadius: far),
+        ],
+      ),
+      child: SizedBox.square(key: starKeyFor(entry), dimension: sizePx),
+    );
 
     return Positioned(
       left: layout.leftPercent / 100 * size.width,
@@ -870,28 +1050,45 @@ class _SkyStars extends StatelessWidget {
             brightness: brightnessScale,
             triangle: triangle,
           ),
-          child: DecoratedBox(
-            // `BoxShape.circle` **only** for the dot, because
-            // `eva/redesign.html:120`'s `border-radius: 50%` rounds the
-            // element's `box-shadow` as well as its background — a clip-path
-            // would round the fill and leave the halo square, which is a
-            // different star. The three polygons get a square glow, which is
-            // what their prototype element has.
-            decoration: BoxDecoration(
-              color: fill,
-              shape: shape == SkyStarShape.dot
-                  ? BoxShape.circle
-                  : BoxShape.rectangle,
-              boxShadow: <BoxShadow>[
-                BoxShadow(color: glow, blurRadius: near),
-                BoxShadow(color: glow, blurRadius: far),
-              ],
-            ),
-            child: ClipPath(
-              clipper: SkyStarClipper(shape),
-              child: SizedBox.square(dimension: layout.size),
-            ),
-          ),
+          // ## THE ORDER OF THESE TWO IS THE WHOLE SHAPE
+          //
+          // `DecoratedBox` paints `color` **and** `boxShadow` in its own
+          // `paint()`, at its own layer. So a `ClipPath` **below** it clips a
+          // child that has not painted yet: the decoration covers the full
+          // square and the polygon cuts nothing. That was this tree, and it
+          // rendered all three polygons as byte-identical solid squares
+          // (measured `lit=72 box=[131..138]x[16..24]`, top row 8/8 lit, where
+          // an apex should be one pixel) while every test stayed green.
+          //
+          // `ClipPath` **above** it clips the decoration's whole `paint()`
+          // output, which is what the prototype's two mechanisms do — and they
+          // do it with opposite results, which is why this is a branch and not
+          // a uniform `ClipPath`:
+          //
+          // | class | prototype mechanism | what it clips | what survives |
+          // | --- | --- | --- | --- |
+          // | `s-dot` | `border-radius: 50%` (`:120`) | rounds the **border box**, so the shadow follows the rounded outline | fill **and** halo |
+          // | `s-star` / `s-cross` / `s-diamond` | `clip-path: polygon(…)` (`:121-123`) | the element's whole rendering to a region **inside** the border box | fill only |
+          //
+          // The second row is not a subtlety this port invents. An **outer**
+          // `box-shadow` is drawn *outside the border edge only* — "it is
+          // clipped inside the border-box of the element" (CSS Backgrounds 3
+          // §6.1.1) — and `clip-path` clips the element's entire rendering,
+          // background and border included (MDN, `clip-path`). A polygon
+          // inscribed in the border box and a shadow lying outside it do not
+          // overlap, so `s-star` in the prototype has **no glow at all**, and
+          // that is reproduced here rather than smoothed over.
+          //
+          // The prototype still *declares* `starShadows` on those elements
+          // (`:1152`); it declares it and the clip-path throws it away. The
+          // declaration is kept below for the same reason and with the same
+          // honesty.
+          child: skyClipsPaint(shape)
+              ? ClipPath(
+                  clipper: SkyStarClipper(shape),
+                  child: paint(circle: false),
+                )
+              : paint(circle: true),
         ),
       ),
     );
@@ -927,7 +1124,7 @@ class _SkyConstellationPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // The same rule as `_SkyStars.build`: nothing to paint is nothing to
     // divide, and `lumen_canvas.dart:145` is where the idiom is.
-    if (points.length < 2 || !size.isFinite || size.isEmpty) return;
+    if (points.length < 2 || size.isEmpty) return;
     final Path path = Path()..moveTo(points.first.dx, points.first.dy);
     for (final Offset point in points.skip(1)) {
       path.lineTo(point.dx, point.dy);

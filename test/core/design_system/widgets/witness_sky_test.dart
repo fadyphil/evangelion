@@ -104,15 +104,74 @@ Future<List<int>> _pixels(WidgetTester tester) async {
   return bytes;
 }
 
-/// Every [ClipPath] under the sky — one per star, and nothing else.
+/// The box of every star under the sky — one per entry.
 ///
-/// The count is the observable for "renders N stars for N entries". A painter
-/// cannot answer it, which is the whole reason the four shapes are `ClipPath`s
-/// rather than paths drawn into one canvas.
+/// **The keyed [SizedBox], not the [ClipPath].** A `ClipPath` finder reads the
+/// widget's internals, and this widget's internals changed under it when
+/// `skyClipsPaint` was corrected: `s-dot` reaches its circle through
+/// `border-radius: 50%` (`eva/redesign.html:120`) and is therefore **not**
+/// clip-pathed at all, so a `ClipPath` finder reported **zero** stars for the
+/// default shape and four suites went red for a change that was correct.
+///
+/// A painter cannot answer "how many stars are on screen" either — which is why
+/// the shapes are widgets rather than paths in one canvas, and why the key is
+/// on the box rather than on the clip.
 Finder get _starClips => find.descendant(
   of: find.byType(WitnessSky),
-  matching: find.byType(ClipPath),
+  matching: find.byType(SizedBox),
 );
+
+/// The inked bounding box of a capture, in logical px.
+///
+/// Alpha and not colour: the sky is painted over a transparent layer, and a
+/// star's halo reaches zero alpha at its edge, so the alpha channel is the only
+/// thing that says where the ink is.
+class _Box {
+  _Box(this.minX, this.maxX, this.minY, this.maxY, this.lit);
+
+  final int minX;
+  final int maxX;
+  final int minY;
+  final int maxY;
+  final int lit;
+
+  int get width => maxX - minX + 1;
+
+  int get height => maxY - minY + 1;
+}
+
+/// The bounding box of every non-zero-alpha pixel in [rgba].
+_Box _inkBounds(List<int> rgba, int width) {
+  int lit = 0;
+  int minX = width, maxX = -1, minY = width, maxY = -1;
+  for (int y = 0; y < _shapeSurface.height; y++) {
+    for (int x = 0; x < width; x++) {
+      if (rgba[((y * width) + x) * 4 + 3] == 0) continue;
+      lit++;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return _Box(minX, maxX, minY, maxY, lit);
+}
+
+/// How many pixels of row [y] between [x0] and [x1] carry ink.
+int _litOnRow(List<int> rgba, int width, int x0, int x1, int y) {
+  int n = 0;
+  for (int x = x0; x <= x1; x++) {
+    if (rgba[((y * width) + x) * 4 + 3] != 0) n++;
+  }
+  return n;
+}
+
+/// The surface the four-shape measurements are taken at.
+///
+/// Small on purpose: one star at 200×200 keeps a capture to a fraction of the
+/// ambient goldens' 390×844 while leaving every polygon well above one pixel,
+/// and the numbers are only ever compared with numbers from this same surface.
+const Size _shapeSurface = Size(200, 200);
 
 /// The constellation's painter, found by its two-point minimum.
 Finder get _constellation => find.descendant(
@@ -149,6 +208,76 @@ void main() {
       }
     });
 
+    testWidgets('an unbounded box THROWS and names the fix', (
+      WidgetTester tester,
+    ) async {
+      // The corrected half of I3. The widget's doc once promised the sky
+      // "paints nothing rather than throwing" in an unbounded box, and carried a
+      // `size.isFinite` guard to make that true. Both were false: `Stack`
+      // asserts on unbounded constraints **before** any child of it builds, so
+      // the guard was unreachable and the promise was unfalsifiable. Measured
+      // before the fix: 25 cascading `FlutterError`s; after: the framework's one
+      // assertion, which names the remedy.
+      //
+      // The behaviour is the correct one and is asserted rather than tolerated:
+      // a caller who has put a full-bleed layer in a `Column` has a wiring
+      // mistake, and a silent empty sky would hide it.
+
+      // Captured through `FlutterError.onError` and NOT `tester.takeException()`,
+      // and that is mechanical rather than stylistic: once a second exception
+      // lands, the test framework **replaces** the pending exception with an
+      // aggregate whose message is "Multiple exceptions (24) were detected…"
+      // (`flutter_test/lib/src/binding.dart:1785-1790`), so every assertion on
+      // `takeException().toString()` would be reading the wrapper rather than
+      // what went wrong. That is a whole class of test that can only fail
+      // vacuously, and it is why the assertion is on `caught.first`.
+      final List<FlutterErrorDetails> caught = <FlutterErrorDetails>[];
+      final void Function(FlutterErrorDetails)? previous = FlutterError.onError;
+      FlutterError.onError = (FlutterErrorDetails d) {
+        if (caught.isEmpty) caught.add(d);
+        // **Forwarded, and that is load-bearing.** Swallowing the error keeps
+        // the framework's own bookkeeping out of step and the test hangs to the
+        // ten-minute timeout (measured: "Cannot close sink while adding stream",
+        // with `binding.dart:1773-1790` left believing no exception landed).
+        previous?.call(d);
+      };
+      addTearDown(() => FlutterError.onError = previous);
+
+      await tester.pumpWidget(
+        evaAmbientHarness(
+          animationsEnabled: false,
+          child: Column(
+            children: <Widget>[
+              WitnessSky(entries: <SkyEntry>[_entry('John', 3, 16)]),
+            ],
+          ),
+        ),
+      );
+
+      int total = 0;
+      while (tester.takeException() != null) {
+        total++;
+      }
+
+      expect(
+        caught,
+        isNotEmpty,
+        reason: 'an unbounded box must not pass silently',
+      );
+      expect(
+        caught.first.exception.toString(),
+        contains('bounded constraints'),
+        reason:
+            'the framework names the fix in the message, and that is the whole '
+            'reason this behaviour is worth keeping over a silent nothing',
+      );
+      // The cascade is the framework's own, and the count is RECORDED rather
+      // than asserted as an ideal: the old `size.isFinite` guard lived below the
+      // assert and so could not prevent any of them, which is exactly why the
+      // promise it was written to keep was false.
+      expect(total, greaterThan(0));
+    });
+
     testWidgets('an empty sky is the container and nothing else', (
       WidgetTester tester,
     ) async {
@@ -166,18 +295,32 @@ void main() {
         tester,
         _sky(entries: <SkyEntry>[_entry('John', 3, 16, flare: true)]),
       );
-      final SizedBox box = tester.widget<SizedBox>(
-        find.descendant(of: _starClips, matching: find.byType(SizedBox)).first,
-      );
+      final SizedBox box = tester.widget<SizedBox>(_starClips.first);
       expect(box.width, kSkyStarFlareSize);
       expect(box.height, kSkyStarFlareSize);
     });
 
-    testWidgets('the shape switch changes the clipper and the size', (
+    testWidgets('the shape switch changes the MECHANISM and the size', (
       WidgetTester tester,
     ) async {
-      // `SkyStarClipper` is a `CustomClipper`, not a `Widget`, so it is read off
-      // the `ClipPath` that carries it rather than through `tester.widget`.
+      // The first version of this test asserted
+      // `(ClipPath.clipper as SkyStarClipper).shape == SkyStarShape.dot` — a
+      // restatement of the value handed to the constructor, which cannot fail
+      // however the widget paints. It stayed green through a tree in which the
+      // clip was **inside** the decoration and all three polygons rendered as
+      // identical solid squares (measured: `lit=72 box=[131..138]x[16..24]` for
+      // star, cross and diamond alike, top row 8/8 lit where an apex should be
+      // one pixel). The pixels are the witness; see "the four shapes are four
+      // shapes" below.
+      //
+      // What is left here is the half that is about the tree rather than the
+      // paint, and it is the half [skyClipsPaint] decides: the dot has **no**
+      // `ClipPath` at all.
+      Finder clipsInSky() => find.descendant(
+        of: find.byType(WitnessSky),
+        matching: find.byType(ClipPath),
+      );
+
       await _pumpSky(
         tester,
         _sky(
@@ -186,21 +329,29 @@ void main() {
         ),
       );
       expect(
-        (tester.widget<ClipPath>(_starClips).clipper! as SkyStarClipper).shape,
-        SkyStarShape.dot,
+        clipsInSky(),
+        findsNothing,
+        reason:
+            '`:120` is `border-radius: 50%`, not a `clip-path`. A `ClipPath` '
+            'here would round the fill AND the halo — a different star.',
       );
 
-      await _pumpSky(
-        tester,
-        _sky(
-          entries: <SkyEntry>[_entry('John', 3, 16)],
-          shape: SkyStarShape.cross,
-        ),
-      );
-      expect(
-        (tester.widget<ClipPath>(_starClips).clipper! as SkyStarClipper).shape,
+      for (final SkyStarShape shape in const <SkyStarShape>[
+        SkyStarShape.star,
         SkyStarShape.cross,
-      );
+        SkyStarShape.diamond,
+      ]) {
+        await _pumpSky(
+          tester,
+          _sky(entries: <SkyEntry>[_entry('John', 3, 16)], shape: shape),
+        );
+        expect(
+          (tester.widget<ClipPath>(clipsInSky()).clipper! as SkyStarClipper)
+              .shape,
+          shape,
+          reason: '${shape.name} is `clip-path: polygon(…)`',
+        );
+      }
     });
 
     testWidgets('a non-dot shape paints a bigger star for the same key', (
@@ -213,13 +364,7 @@ void main() {
           shape: SkyStarShape.dot,
         ),
       );
-      final double dot = tester
-          .widget<SizedBox>(
-            find
-                .descendant(of: _starClips, matching: find.byType(SizedBox))
-                .first,
-          )
-          .width!;
+      final double dot = tester.widget<SizedBox>(_starClips.first).width!;
       await _pumpSky(
         tester,
         _sky(
@@ -227,13 +372,7 @@ void main() {
           shape: SkyStarShape.diamond,
         ),
       );
-      final double gem = tester
-          .widget<SizedBox>(
-            find
-                .descendant(of: _starClips, matching: find.byType(SizedBox))
-                .first,
-          )
-          .width!;
+      final double gem = tester.widget<SizedBox>(_starClips.first).width!;
       expect(gem, closeTo(dot * kSkyShapeSizeScale, 1e-9));
     });
 
@@ -281,6 +420,160 @@ void main() {
       expect(
         () => WitnessSky(entries: _three, brightness: 0),
         throwsA(isA<AssertionError>()),
+      );
+    });
+  });
+
+  group('the four shapes are four shapes, measured in PIXELS', () {
+    // THE B1 REGRESSION GROUP. Three of the four shapes rendered as a solid
+    // square, byte-identical to one another, and every assertion in the suite
+    // was green — because the only shape assertion read back the constructor
+    // argument. What follows reads the rendered pixels, which is the only
+    // instrument that can see a clip that is not clipping.
+    Future<List<int>> shapePixels(
+      WidgetTester tester,
+      SkyStarShape shape,
+    ) async {
+      // A small surface: one star, no twinkle (so nothing moves between the two
+      // captures a comparison needs), no constellation.
+      tester.view.physicalSize = _shapeSurface;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        evaAmbientHarness(
+          animationsEnabled: false,
+          child: RepaintBoundary(
+            key: _layerKey,
+            child: WitnessSky(
+              entries: <SkyEntry>[_entry('John', 3, 16)],
+              shape: shape,
+              twinkle: false,
+              showConstellation: false,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      return _pixels(tester);
+    }
+
+    testWidgets('each silhouette paints a different set of pixels', (
+      WidgetTester tester,
+    ) async {
+      final Map<SkyStarShape, List<int>> painted = <SkyStarShape, List<int>>{};
+      for (final SkyStarShape shape in SkyStarShape.values) {
+        painted[shape] = await shapePixels(tester, shape);
+      }
+
+      for (int i = 0; i < SkyStarShape.values.length; i++) {
+        for (int j = i + 1; j < SkyStarShape.values.length; j++) {
+          final SkyStarShape a = SkyStarShape.values[i];
+          final SkyStarShape b = SkyStarShape.values[j];
+          expect(
+            painted[a]!.toString(),
+            isNot(painted[b]!.toString()),
+            reason:
+                '${a.name} and ${b.name} render identically. Measured on the '
+                'pre-fix tree: all three polygons were lit=72 over '
+                '[131..138]x[16..24] with the top row 8/8 lit — a solid square.',
+          );
+        }
+      }
+    });
+
+    testWidgets("a star's top row is an APEX flanked by zero, not a lit edge", (
+      WidgetTester tester,
+    ) async {
+      // The sharpest single reading of "the polygon cuts the box". `s-star`'s
+      // first polygon point is `50% 0` and its second is `62% 38%`
+      // (eva/redesign.html:121), so on the topmost lit row only the middle of
+      // the box can be inked. A full row means the fill is the whole rectangle.
+      final List<int> px = await shapePixels(tester, SkyStarShape.star);
+      final _Box box = _inkBounds(px, 200);
+
+      final int topRow = _litOnRow(px, 200, box.minX, box.maxX, box.minY);
+      expect(
+        topRow,
+        lessThan(box.width),
+        reason:
+            'the topmost lit row runs ${box.width}px wide. An eight-point star '
+            'begins at a single apex (50% 0) and widens to 62% by 38% of the '
+            'height, so the first row can only be a point or two.',
+      );
+      // And the same row is not empty either — the apex is genuinely there, so
+      // this is not satisfied by a star that painted nothing at all.
+      expect(topRow, greaterThan(0));
+      expect(box.lit, greaterThan(0));
+    });
+
+    testWidgets('the dot keeps its halo and the polygons lose theirs', (
+      WidgetTester tester,
+    ) async {
+      // THE REASON THE THREE TREES DIFFER, asserted rather than argued.
+      //
+      // CSS draws an **outer** `box-shadow` outside the border edge only —
+      // "it is clipped inside the border-box of the element" (CSS Backgrounds
+      // 3 §6.1.1) — and `clip-path` clips the element's whole rendering, border
+      // and background included (MDN, `clip-path`). The prototype gives all four
+      // classes a `box-shadow` (`:1152`) but reaches it through `border-radius`
+      // for the dot (`:120`) and `clip-path: polygon(…)` for the rest
+      // (`:121-123`).
+      //
+      // | mechanism | what it clips | what survives |
+      // | --- | --- | --- |
+      // | `border-radius: 50%` | rounds the **border box**; the shadow follows it | a visible ring outside the disc |
+      // | `clip-path: polygon(…)` | the whole rendering to a region **inside** the border box | nothing — the shadow is already outside it |
+      //
+      // So the three polygons render as crisp cut-outs and the dot glows, and
+      // the difference is one mechanism rather than a colour or a blur radius.
+      final _Box dot = _inkBounds(
+        await shapePixels(tester, SkyStarShape.dot),
+        200,
+      );
+      final _Box star = _inkBounds(
+        await shapePixels(tester, SkyStarShape.star),
+        200,
+      );
+
+      // Each shape's OWN box, and the sizes genuinely differ: `:1148` multiplies a
+      // non-dot by 1.5. Comparing the dot's halo against the star's box would
+      // measure the scale factor rather than the clip, so each is read from the
+      // layout that produced it.
+      int boxOf(SkyStarShape shape) => skyStarLayoutFor(
+        key: 'John:3:16',
+        shape: shape,
+        field: SkyStarField.crown,
+        isFlare: false,
+      ).size.ceil();
+
+      // The dot's halo reaches past its own box: `border-radius: 50%` rounds the
+      // border box, so the shadow follows the rounded outline (`:120`).
+      // Measured: 4.97 logical px → 5 device px of box, 6 of ink.
+      expect(
+        dot.width,
+        greaterThan(boxOf(SkyStarShape.dot)),
+        reason:
+            'the dot inks ${dot.width}px across for a '
+            '${boxOf(SkyStarShape.dot)}px box. Its halo is what puts ink '
+            'outside, and `border-radius: 50%` preserves it.',
+      );
+      // The star's ink does NOT: the polygon is inside the box and the shadow
+      // outside it is what `clip-path` throws away (`:121` + CSS Backgrounds 3
+      // §6.1.1). Measured: 7.45 logical px → 8 of box, 8 of ink.
+      expect(
+        star.width,
+        lessThanOrEqualTo(boxOf(SkyStarShape.star)),
+        reason:
+            'the star inks ${star.width}px across for a '
+            '${boxOf(SkyStarShape.star)}px box — the polygon and nothing else. '
+            'Wider means the halo survived the clip.',
+      );
+      expect(
+        star.height,
+        lessThanOrEqualTo(boxOf(SkyStarShape.star)),
+        reason: 'and the same holds vertically',
       );
     });
   });
@@ -429,6 +722,198 @@ void main() {
         half.toString(),
         isNot(done.toString()),
         reason: 'the draw-on has to move pixels, or it is not drawing anything',
+      );
+    });
+
+    testWidgets('THE B2 CASE: lighting the 2nd star after mount DRAWS the line', (
+      WidgetTester tester,
+    ) async {
+      // The defect this commit fixed. `/reading` lights verses as they scroll
+      // into view (`eva/redesign.html:1208-1221`), so the real arrival order is
+      // one star at mount and two (then three) afterwards. Arming the draw-on
+      // only in `initState` left the controller at 0 forever and
+      // `extractPath(0, 0)` drew an empty path: measured, growing 1 → 2 entries
+      // produced a buffer **byte-identical** to a sky built with
+      // `showConstellation: false`.
+      //
+      // The two captures are the same tree at the same clock phase with the
+      // constellation the only variable, so the difference is the line itself.
+      await _pumpSky(tester, _sky(entries: <SkyEntry>[_entry('John', 3, 16)]));
+      expect(
+        _constellation,
+        findsNothing,
+        reason: '`:1170` — one star is not a constellation',
+      );
+
+      await _pumpSky(
+        tester,
+        _sky(entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)]),
+      );
+      // Past the 1.2s draw-on, so a finished line is compared and not a frame
+      // of a moving one.
+      await tester.pump(kSkyConstellationDrawDuration);
+      final List<int> grown = await _pixels(tester);
+
+      await _pumpSky(
+        tester,
+        _sky(
+          entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)],
+          showConstellation: false,
+        ),
+      );
+      await tester.pump(kSkyConstellationDrawDuration);
+      final List<int> without = await _pixels(tester);
+
+      expect(
+        grown.toString(),
+        isNot(without.toString()),
+        reason:
+            'the grown sky must have painted the line. Byte-identical buffers '
+            'are the exact signature of the B2 defect.',
+      );
+    });
+
+    testWidgets('a third star EXTENDS the line and does not replay it', (
+      WidgetTester tester,
+    ) async {
+      // The deliberate half of the replay rule. `:1156-1158` draws once per book,
+      // not once per star, so growth extends rather than restarts — a line a
+      // reader is watching is not yanked back to nothing because they scrolled.
+      //
+      // Measured by the controller's own value: at `1.0` the draw-on is over,
+      // and adding a star must leave it there.
+      await _pumpSky(
+        tester,
+        _sky(entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)]),
+      );
+      await tester.pump(kSkyConstellationDrawDuration);
+      final List<int> twoStars = await _pixels(tester);
+
+      await _pumpSky(
+        tester,
+        _sky(
+          entries: <SkyEntry>[
+            _entry('John', 3, 16),
+            _entry('John', 3, 17),
+            _entry('John', 3, 18),
+          ],
+        ),
+      );
+      final List<int> threeStars = await _pixels(tester);
+
+      expect(
+        threeStars.toString(),
+        isNot(twoStars.toString()),
+        reason: 'the third star is on screen, so the sky changed',
+      );
+      // And the extension is visible immediately: had the third star restarted
+      // the draw-on, the line would be mostly *absent* on this very frame.
+      await tester.pump(const Duration(milliseconds: 100));
+      final List<int> stillThere = await _pixels(tester);
+      expect(
+        stillThere.toString(),
+        threeStars.toString(),
+        reason:
+            '100ms after the third star the line is unchanged, which is what '
+            '"extended" means. A restart would have erased most of it.',
+      );
+    });
+
+    testWidgets('the Constellations switch replays on ONE tree', (
+      WidgetTester tester,
+    ) async {
+      // `:1484-1485` removes the `svg` and a later draw appends a fresh one that
+      // draws itself on again. Tested on a single mounted tree rather than by
+      // pumping a second widget, because "two mounts each arm in `initState`"
+      // and "one tree re-arms on the switch" are different mechanisms and only
+      // the second is this widget's rule.
+      await _pumpSky(
+        tester,
+        _sky(entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)]),
+      );
+      await tester.pump(kSkyConstellationDrawDuration);
+
+      await _pumpSky(
+        tester,
+        _sky(
+          entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)],
+          showConstellation: false,
+        ),
+      );
+      expect(_constellation, findsNothing);
+
+      // Back on, mid-draw-on: the line must be PARTLY drawn, which is only
+      // true of a controller that restarted from 0.
+      await _pumpSky(
+        tester,
+        _sky(entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)]),
+      );
+      await tester.pump();
+      final List<int> startOfReplay = await _pixels(tester);
+      await tester.pump(kSkyConstellationDrawDuration);
+      final List<int> endOfReplay = await _pixels(tester);
+
+      expect(
+        startOfReplay.toString(),
+        isNot(endOfReplay.toString()),
+        reason:
+            'the switch coming back must draw the line on again — identical '
+            'buffers mean it reappeared already finished, or not at all',
+      );
+    });
+
+    testWidgets('reduced motion draws the line FINISHED and ticks nothing', (
+      WidgetTester tester,
+    ) async {
+      // §14's "jump straight to the end state", and the half that is easy to get
+      // wrong: `forward()` reaches the end state too, and leaves a fifth
+      // transient callback running under a sky that has already finished. §13.2's
+      // budget is four, app-wide.
+      tester.view.physicalSize = _surface;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _sky(
+          entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)],
+          disableAnimations: true,
+          animationsEnabled: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        SchedulerBinding.instance.transientCallbackCount,
+        4,
+        reason:
+            'the four shared ambient clocks. A fifth is the draw-on still '
+            'ticking after it has reached its end state — measured at 5 on the '
+            'pre-fix tree.',
+      );
+
+      // And the end state is the FINISHED line, not an absent one. The control
+      // is the same reduced-motion sky with the constellation switched off — not
+      // the animated sky, whose stars are mid-twinkle at `--so * .35` and would
+      // differ for a dozen reasons that have nothing to do with the line.
+      final List<int> reduced = await _pixels(tester);
+      await tester.pumpWidget(
+        _sky(
+          entries: <SkyEntry>[_entry('John', 3, 16), _entry('John', 3, 17)],
+          showConstellation: false,
+          disableAnimations: true,
+          animationsEnabled: true,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        reduced.toString(),
+        isNot((await _pixels(tester)).toString()),
+        reason:
+            'reduced motion is the end state, and the end state of a draw-on is '
+            'a fully drawn line. Matching the constellation-off build would mean '
+            '"no motion" was achieved by deleting the thing.',
       );
     });
 
@@ -635,6 +1120,61 @@ void main() {
         reason: 'a full-bleed layer that ate taps would be a bug',
       );
     });
+  });
+
+  group('the four shapes in the goldens, not only in the dot', () {
+    // The goldens captured only `SkyStarShape.dot` — the **default** shape, and
+    // the one of the four the prototype's `clip-path` never touches (`:120` is
+    // `border-radius`). So the B1 regression was invisible in the goldens too:
+    // three of the four silhouettes had no reference image at all. A golden per
+    // theme is cheap here, and the shapes are the part most likely to be wrong
+    // again, so all four are captured in one strip per theme.
+    for (final (String label, ThemeData theme) in kEvaThemes) {
+      testWidgets('all four silhouettes on $label', (
+        WidgetTester tester,
+      ) async {
+        tester.view.physicalSize = _shapeSurface;
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        // Four small skies side by side, one per shape, each pinned to a known
+        // entry so the strip is deterministic: `twinkle: false` freezes the
+        // stars at full `--so` and unscaled, and the entries are the same key
+        // in each so the shapes are the only variable.
+        await tester.pumpWidget(
+          evaAmbientHarness(
+            theme: theme,
+            animationsEnabled: false,
+            child: RepaintBoundary(
+              key: _layerKey,
+              child: Row(
+                children: <Widget>[
+                  for (final SkyStarShape shape in SkyStarShape.values)
+                    SizedBox(
+                      width: _shapeSurface.width / 4,
+                      height: _shapeSurface.height,
+                      child: WitnessSky(
+                        entries: <SkyEntry>[_entry('John', 3, 16)],
+                        shape: shape,
+                        twinkle: false,
+                        showConstellation: false,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await expectLater(
+          find.byKey(_layerKey),
+          matchesGoldenFile('goldens/witness_sky_shapes_$label.png'),
+        );
+      });
+    }
   });
 
   group('theming', () {
