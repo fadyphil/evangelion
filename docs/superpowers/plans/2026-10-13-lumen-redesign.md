@@ -1070,17 +1070,101 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 ## Task 4.2: Restyle the widgets (24) + re-point their citations
 
+> **Status: research DONE (two parallel subagents). Scope corrected below, and
+> the four decisions the research flagged as not-the-implementer's-to-make are
+> now recorded here.**
+>
+> **The blast radius is 8 design-system widgets, not 13.** The plan's "13" summed
+> per-screen lists that mix design-system and feature widgets. The eight a
+> harness actually measures a *design-system* property on: `GlassSurface`,
+> `SealMonogram`, `EvaTextField`, `EvaButton` (weakly — sits in `Expanded`, so
+> the assertion reads the parent), `StreakFlame`, `TextLink` (weakly),
+> `IconActionButton`, `ProgressBeads` (loosely — an inequality only).
+>
+> **4 of the 5 harnesses are paint-safe. `/login` is not:** it asserts
+> `expect(form.tier, GlassTier.tint)` (`login_geometry_test.dart:726`), so
+> switching `/login`'s form to `GlassTier.bloom` is a *paint* change that turns
+> it red. **Do not switch `/login`'s form tier in this phase** — the bloom's
+> hosts are the `/` cards (Task 5.2).
+>
+> **Four structural landmines, all measured:**
+> `login_geometry_test.dart:720`, `home_geometry_test.dart:521`,
+> `result_geometry_test.dart:85,115` and `quiz_geometry_test.dart:146,153` use
+> **bare `find.byType`** — a second instance on the screen throws "too many
+> elements", which reads as a harness bug, not a restyle. `reading_geometry_test.dart:955`
+> takes `.first` in document order, so reordering `ReadingControls`' children
+> moves which button is measured.
+>
+> **The redesign deletes more glass than it adds.** Roles R3 (settings rows),
+> R4 (metric cell), R9 (list row), R11 (dock item) and R17 (progress dots) are
+> **flat** — hairline only, no fill, no radius. That is the single most
+> under-appreciated fact in the prototype and it drives decisions 2 and 3.
+
+### Decisions taken (recorded, not silently delegated)
+
+1. **`EvaButtonVariant.secondary` → the gold-rim role** (`redesign.html:363-368`
+   `.qnext`): transparent fill, 1px gold rim, gold ink, pill, mono-caps. The
+   redesign has exactly three action roles — filled gold (`:381-386`), gold-rim
+   (`:363-368`), glass-rim ghost (`:388-390`) — and `secondary` maps to the
+   second. This is a **role mapping**, recorded as such in the widget doc.
+2. **`SettingsTile` loses its tile.** `.srow` is `background:none`,
+   `border-radius:0`, `border-left/right/top:none`, a 1px `rgba(255,255,255,.06)`
+   bottom hairline, `padding:15px 4px`, `font-size:14.5px`, hover
+   `color:var(--gold); transform:translateX(4px)` (`:419-421`). 28 rows on
+   `/settings` go from r14 glass panels to flat rules. **This is the largest
+   visual change in the phase and it is the redesign's language, not a
+   regression** — R3 is flat by design. The blur-budget question evaporates:
+   there is no fill to budget.
+3. **`GlassTier.bloom`'s seam takes parameters, not a fifth tier member.** R18
+   (`.opt::after`, `:348-349`) is a seam at `bottom:0`, 72% wide, **gold**;
+   `.hor` is at `bottom:20%`, 72% wide, **white**. A quiz option cannot use
+   `.hor` unchanged, and a fifth `GlassTier` member would break
+   `glass_blur_budget_test`'s counting model. Add `seamAlignment`,
+   `seamWidthFactor`, `seamTint`, defaulted to the `.hor` values.
+4. **The light-mode wash dimmer becomes a token.** `redesign.html:73` dims all
+   four washes to `opacity:.55` in light and never re-hues `--bh` — which is
+   why `bloom` is correctly identical in both palettes. But a caller-state
+   opacity that **no caller sets** leaves the card family light-mode-wrong by
+   0.55× the moment it ships. Add a per-brightness `bloomOpacity`
+   (1.0 dark / 0.55 light). `orbOpacity` and `auroraOpacity` are the precedent —
+   both are per-brightness floats lerped per brightness, which also **retires**
+   the false "this design system has no convention for it" premise currently
+   sitting in `seamGlow`'s doc.
+5. **Deferred to the screen phases, with the reason recorded in-file:**
+   - `PassageDropCap` at 56px / `line-height:.82` and RTL-off (`:141`) — that is
+     a ratio tuned against a screen that does not exist. Phase 5.3.
+   - `StreakFlame`'s 13×17 CSS blob (`:242-243`) — two harnesses read its
+     rendered `14×18`. Phase 5.2.
+
 - [ ] **Step 3: Restyle the 24 widgets** to the redesign's glass/gold/bloom
   language, **by role, not by file** (the `4b53500` precedent: "the split is by
   role, not by widget"). Scope is the widget-level language — glass tiers,
   seams, bloom, accent use — **not** the base palette, which Phase 2 settled.
+  **Seven widgets are left alone** — `empty_state` and `error_view` have no
+  prototype, `focus_ring` is a §14 invention with no prototype line at all
+  (fabricating one would be the worst outcome of this task), `witness_sky` is
+  already built against `redesign.html`, `text_link` has no inline-link role in
+  the redesign, `hairline_divider`'s call sites still describe it, and
+  `sun_burst` is superseded by `.bigring` (`:447-452`) only when `/result`
+  becomes a modal in **Phase 6.2**.
 - [ ] **Step 4: Re-point citations per widget.** Move `eva/src/X.tsx:NNN` →
   `redesign.html:NNN` **only for widgets that actually changed**. A citation
   that still describes a surviving widget is not wrong; moving it would be
-  churn. **13 of 24 widgets sit in a harness's measurement path** (login 5,
-  home 6, reading 3, quiz 2, result 1), so a restyle will turn harnesses red
-  against numbers Phase 5 is about to obsolete — that is the harness firing,
-  not a regression to chase.
+  churn. **Eight widgets are partially frozen** — change the redesign-backed
+  half, keep the rest: `eva_section_header` (re-point `section` to `:422`, keep
+  `ProfileScreen.tsx:53` for `title`), `eva_text_field` (field box → `:376-379`,
+  keep `ds.tsx:297-300` for the label — `.field` is bare),
+  `font_size_stepper` (track/thumb → `:429-430`, keep `SettingsScreen.tsx:66`
+  for the range — the redesign's own slider is 16–26, a different model),
+  `settings_group` (label → `:422`, keep the `rowGap = 10` citation),
+  `stat_tile` (type → `:407-408`, keep `ds.tsx:462-478` for the panel),
+  `seal_monogram` (treatment → `:392-395`, keep `LoginScreen.tsx:19` for
+  `defaultSize = 60`), `neural_scaffold` (scrim → `:112-115`, keep all eight
+  `*.tsx` root citations), `eva_button` (radius/ripple → `:381-390`, keep the
+  height citation — `login_geometry_test` reads `kEvaButtonHeight == 52`).
+  **Never** let a restyle edit a number a harness asserts: `kEvaTextFieldHeight`
+  52, `EvaRadii.input` 14, `EvaSpacing.lg` 16, `kEvaButtonHeight` 52,
+  `SealMonogram` 60, `StreakFlame` 14×18, `IconActionButton` 44.
 
 ## Task 4.3: Prove the gates still fire, then re-record
 
