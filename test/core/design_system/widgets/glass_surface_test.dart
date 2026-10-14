@@ -63,6 +63,29 @@ class _BusyBackdrop extends StatelessWidget {
 /// the test", and disposing it in the body trips
 /// `'_outstandingHandles > 0': is not true`, because the framework already
 /// balanced the one it was holding.
+
+/// A glass panel whose content **shrink-wraps**, which is what makes the
+/// `Stack`'s fit observable at all.
+///
+/// The sibling tests in `GlassSurface.tint` pass `SizedBox(width: 40, height: 20)`
+/// as the content and therefore cannot see a loosened constraint: a `SizedBox` is
+/// `additionalConstraints`, and `BoxConstraints.enforce` collapses it back to
+/// whatever cell it is in. [kNarrowSurface]-wide `Row` + `Expanded` gives this one
+/// a *tight* width while the `Column` below shrink-wraps to its own child, so
+/// `passthrough` (160 × 20), `loose` (20 × 20) and `expand` (160 × 568) are three
+/// different answers.
+///
+/// `EdgeInsets.zero` so the numbers are the cell rather than the cell minus 40 —
+/// the padding is asserted by the test beside it, and two things at once would be
+/// two things to reason about.
+const Widget _shrinkWrappingPanel = GlassSurface(
+  padding: EdgeInsets.zero,
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[SizedBox(width: 20, height: 20)],
+  ),
+);
+
 void main() {
   group('GlassTier is an enum, not a bool', () {
     test('has exactly the three treatments §13.4 budgets', () {
@@ -167,6 +190,150 @@ void main() {
       );
       expect((box.decoration as BoxDecoration).border, isNull);
     });
+
+    // -------------------------------------------------------------------------
+    // THE SIZING CONTRACT, MEASURED ON THE CONTENT.
+    //
+    // Both tests below exist because the one test that used to state this was
+    // structurally blind: it read `tester.getSize(find.byType(GlassSurface))`,
+    // the OUTER box, under a fixture whose answer is the same whatever the
+    // `Stack`'s fit is. So it was green while `StatTile` had lost 109px of width
+    // per tile. The property is the INNER box — the widget inside the `Padding`
+    // — because that is the one the `Stack` moved.
+    // -------------------------------------------------------------------------
+
+    testWidgets('the content gets the panel\'s OWN constraints, not loosened ones', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS FIXTURE, AND WHY NOT THE ONE THE TINT GOLDENS USE
+      //
+      // A child that *fills* what it is handed cannot see a loosened
+      // constraint. `SizedBox` is `additionalConstraints`, so
+      // `SizedBox(width: 40, height: 20)` inside an `Expanded` is collapsed
+      // back to the cell by `BoxConstraints.enforce` — which is precisely why
+      // `goldens/glass_surface_tint_*.png` stayed byte-identical when
+      // 143dc56 slipped a `Stack` in at its default `StackFit.loose`, and why
+      // the test that guarded those goldens could not go red.
+      //
+      // So the child here **shrink-wraps**: a `Column` whose own child is 20
+      // wide. The parent is a `Row` of two `Expanded`, which makes the width
+      // **tight** — 160 each at [kNarrowSurface] — and leaves the height
+      // **loose**. Under `passthrough` the `Padding` is therefore `160 × 20`;
+      // under `loose` it would be `20 × 20` (the child shrink-wrapped); under
+      // `expand` it would be `160 × 568` (the whole cell). Three different
+      // numbers, so no fit other than the right one can satisfy this.
+      await pumpPrimitive(
+        tester,
+        const Row(
+          children: <Widget>[
+            Expanded(child: _shrinkWrappingPanel),
+            Expanded(child: _shrinkWrappingPanel),
+          ],
+        ),
+      );
+
+      final Finder padding = find.descendant(
+        of: find.byType(GlassSurface),
+        matching: find.byType(Padding),
+      );
+      expect(
+        padding,
+        findsNWidgets(2),
+        reason:
+            'one content `Padding` per surface, found as a descendant of '
+            'GlassSurface so an unrelated `Padding` higher in the harness '
+            'cannot be measured instead',
+      );
+
+      for (int i = 0; i < 2; i++) {
+        // Read as two numbers, never as a `Size`: a constrained size is a
+        // `_DebugSize` and `Size` equality requires an identical `runtimeType`,
+        // so `expect(size, const Size(…))` can never pass.
+        final Size size = tester.getSize(padding.at(i));
+        expect(
+          size.width,
+          closeTo(kNarrowSurface.width / 2, 1e-9),
+          reason:
+              'the tight width of the cell must reach the content unchanged. '
+              'Measured at `StackFit.loose`, this was 20 — the panel measured '
+              'the width of its own content instead of the width it was given, '
+              'which is the regression `StatTile` shipped.',
+        );
+        expect(
+          size.height,
+          closeTo(20, 1e-9),
+          reason:
+              'the height was already loose and must stay loose, so this also '
+              'rules out `StackFit.expand` — a gate that only pinned the width '
+              'would be satisfied by a `Stack` that fills instead of one that '
+              'passes its constraints through',
+        );
+      }
+    });
+
+    testWidgets(
+      'StatTile — the consumer this actually broke — measures its whole cell',
+      (WidgetTester tester) async {
+        // The same fixture as `goldens/stat_tile_{dark,light}.png`
+        // (`surfaces_test.dart`'s), because those two goldens are the *evidence*:
+        // at `StackFit.loose` they diffed by 2177px (1.20%) — the three panels
+        // had been re-drawn to the width of their own text.
+        //
+        // `StatTile` is the interesting consumer because it is the one shape
+        // that can see the difference: an `Expanded` in a `Row` (a **tight**
+        // width, which is the contract) wrapping a
+        // `Column(mainAxisSize: MainAxisSize.min)` (which **shrink-wraps**, so
+        // the contract is observable). A consumer that filled its box would
+        // pass either way, and that is the whole reason a shipped regression got
+        // through.
+        await pumpPrimitive(
+          tester,
+          const Align(
+            alignment: Alignment.topCenter,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: StatTile(value: '14', label: 'Read'),
+                ),
+                Expanded(
+                  child: StatTile(value: '9', label: 'Reflected'),
+                ),
+                Expanded(
+                  child: StatTile(value: '5/5', label: 'Best'),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        final Finder padding = find.descendant(
+          of: find.byType(GlassSurface),
+          matching: find.byType(Padding),
+        );
+        expect(padding, findsNWidgets(3));
+
+        for (int i = 0; i < 3; i++) {
+          final Size size = tester.getSize(padding.at(i));
+          expect(
+            size.width,
+            closeTo(kNarrowSurface.width / 3, 1e-9),
+            reason:
+                'tile $i must be as wide as the cell its `Expanded` gives it. '
+                'Measured at `StackFit.loose` the three read 50.8, 89.3 and '
+                '54.3 — each tile the width of its own caption.',
+          );
+        }
+        // The height never moved, so it is asserted rather than recomputed: a
+        // fix that made the content fill the cell would satisfy the widths above
+        // and break this, which is what caught nothing before.
+        expect(
+          tester.getSize(padding.at(0)).height,
+          closeTo(72, 1e-9),
+          reason:
+              '24 + 4 + the caption line, plus 14 of padding above and below',
+        );
+      },
+    );
   });
 
   group('GlassSurface.blur', () {
@@ -568,20 +735,6 @@ void main() {
         expect(wash(), findsNothing, reason: '$tier must not wash');
         expect(seam(), findsNothing, reason: '$tier must not seam');
       }
-    });
-
-    testWidgets('a tint surface is the size it was before the Stack existed', (
-      WidgetTester tester,
-    ) async {
-      // The wash is a `Stack` child, and a `Stack` sizes to its largest
-      // NON-positioned child. Both decoration layers are `Positioned` and the
-      // content is not, so the panel must measure exactly what `Padding` alone
-      // measured — which is what lets the existing `glass_surface_tint_*` goldens
-      // stand un-recaptured. If this fails, re-record them and say so.
-      await tester.pumpWidget(
-        _onSurface(const GlassSurface(child: SizedBox(width: 40, height: 20))),
-      );
-      expect(tester.getSize(find.byType(GlassSurface)), const Size(80, 60));
     });
 
     testWidgets('light seams gold and washes the same hue dark does', (

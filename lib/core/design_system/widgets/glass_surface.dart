@@ -426,13 +426,68 @@ class GlassSurface extends StatelessWidget {
         // `bottom:-46%` wash off. See [GlassTier.bloom]'s second substitution.
         borderRadius: borderRadius,
         child: Stack(
-          // A `Stack` sizes to its largest **non-positioned** child, and the only
-          // one here is the content — both decoration layers are `Positioned`,
-          // and they are the first children so they paint *behind* it. A tint or
-          // a blur surface therefore measures exactly what it measured before the
-          // bloom existed, which is why no golden had to be re-captured;
-          // `glass_surface_test.dart` asserts that size so a future change to
-          // this stack has to notice.
+          // ## THE FIT, AND WHY IT IS NOT THE DEFAULT
+          //
+          // The contract every existing consumer relies on: **the `Padding`
+          // receives the constraints this `GlassSurface` was given, unchanged.**
+          // Before the bloom existed the chain was
+          // `DecoratedBox > ClipRRect > Padding`, and both of those pass
+          // constraints through untouched — so a consumer that handed the surface
+          // a tight box got a tight box all the way down, and one that handed it
+          // loose constraints got content that sized to itself.
+          //
+          // `StackFit.loose` — the **default** — is `constraints.loosen()`, and
+          // inserting this `Stack` under it broke that contract for every
+          // consumer. Measured on `StatTile` (`stat_tile.dart:84`), which is an
+          // `Expanded` inside a `Row` — so its cell is a *tight* 320 ÷ 3 ≈ 106.67
+          // by 72, while its child is a `Column(mainAxisSize: MainAxisSize.min)`
+          // that shrink-wraps to its own caption:
+          //
+          // | build | the inner `Padding` |
+          // | --- | --- |
+          // | `9c64579`, `ClipRRect > Padding` | `Size(106.67, 72.0)` |
+          // | `143dc56`, `ClipRRect > Stack` (loose) | `Size(50.8, 72.0)`, `89.3`, `54.3` |
+          // | `ClipRRect > Stack(passthrough)` | `Size(106.67, 72.0)` |
+          //
+          // — three panels quietly re-drawn to the width of their own text, and
+          // `goldens/stat_tile_{dark,light}.png` diffed by **2177px (1.20%)**.
+          //
+          // ## WHY IT WAS NOT SEEN, WHICH IS THE PART WORTH KEEPING
+          //
+          // Two gates both looked at the wrong number, and neither could fail.
+          //
+          // 1. The comment this replaced claimed "a tint or a blur surface
+          //    therefore measures exactly what it measured before the bloom
+          //    existed, which is why no golden had to be re-captured". False. It
+          //    survived the fixture in `glass_surface_test.dart`, which pins a
+          //    `SizedBox(width: 40, height: 20)` child — a child whose own
+          //    constraints are *tight*, so loosening the ones above it changed
+          //    nothing about it and the golden stayed byte-identical by luck.
+          // 2. The test beside it asserted `tester.getSize(find.byType
+          //    (GlassSurface))` — the **outer** box, which the child determines,
+          //    and which the same lucky fixture fixed at `Size(80, 60)` under
+          //    either fit. Both numbers were true and neither was the one that
+          //    moved. `glass_surface_test.dart` now measures the content itself,
+          //    under a fixture whose answer *does* depend on the fit.
+          //
+          // ## WHY A FIT AND NOT A CONDITIONAL TREE
+          //
+          // `passthrough` hands non-positioned children `constraints` verbatim
+          // (`rendering/stack.dart`'s `_computeSize`), so the `Padding` sees
+          // exactly what it saw before the bloom and the `Stack` then measures the
+          // `Padding` — the pre-bloom chain, on all three tiers. Building the
+          // `Stack` only when `bloomed` was the other candidate and was rejected on
+          // the SDK's own source (`rendering/stack.dart`, and not on taste):
+          // `RenderStack.paint` pushes a clip only when `_hasVisualOverflow` is
+          // set, and that flag is raised **solely by positioned children** — which
+          // a tint or blur surface has none of. So the `Stack` costs such a panel
+          // one `RenderStack` and nothing else, and keeping one tree means the
+          // bloom's ordering claim stays a property of the same `Stack` every tier
+          // is built from.
+          fit: StackFit.passthrough,
+          // The two decoration layers are `Positioned` and come first, so they
+          // paint *behind* the content; both are `Positioned.fill`, so neither
+          // contributes to the size this `Stack` measures.
           children: <Widget>[
             if (bloomed) ..._wash(colors, bloomColor ?? colors.bloom),
             Padding(padding: padding, child: child),
