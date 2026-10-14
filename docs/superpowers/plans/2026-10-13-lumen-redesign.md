@@ -859,6 +859,58 @@ No changes. It passes AA everywhere and beats the current palette on every role.
 
 # Phase 3 — The witness sky
 
+> **Status: COMPLETE (commits `91db0bc`, `4805480`, `05bc3f7`, `0e93427`,
+> `526da03`, `28cfb76`, `7d89f37`, `67af41a`, `d10a2b0`).** Full gate green:
+> **2741 tests** (floor 2507), **98.49% coverage** (floor 98.25%), citations
+> 1107/1107. Three tasks, two-stage review each, mutation-verified fixes.
+>
+> **What the process caught (four findings that reading would have missed):**
+> 1. **Cold-start bug on the only runnable device.** `raw is List<String>` reads
+>    the persisted sky as EMPTY on every launch on Linux — the platform
+>    re-casts the outer map but leaves arrays `List<dynamic>`. `setMockInitialValues`
+>    is *more* faithful than the device, so the suite was blind. Element-wise
+>    narrowing + a `jsonDecode(jsonEncode(...))` regression fixture.
+> 2. **Three of four star shapes rendered as solid squares.** `ClipPath` sat
+>    *inside* `DecoratedBox`, so it clipped nothing — star/cross/diamond were
+>    byte-identical buffers while ~200 lines of pure-geometry code and green
+>    tests described silhouettes no pixel showed. Found by capturing alpha
+>    grids per shape, not by reading. Fixed by moving the clip outside, and the
+>    CSS question it surfaced is recorded in-code: an outer `box-shadow` is
+>    clipped inside the border-box, so the prototype's polygon stars have **no
+>    glow** while `border-radius:50%` (the dot) keeps its halo.
+> 3. **The constellation never drew.** The draw-on armed once in `initState`;
+>    `/reading` lights verses on scroll, so mount has one star and the line is
+>    never started. Every test mounted with ≥2 entries. Fixed to arm on the
+>    not-drawable→drawable transition; a third star extends, never replays.
+> 4. **Non-atomic `record()`** lost a star when two scrolled into view together.
+>    Serialized with a per-repository `Future` chain (`@lazySingleton` is load
+>    bearing: two adapters means two chains).
+>
+> **Deferred, on the record:** per-frame cost at the 44-star cap is **2214 µs**
+> (debug JIT, fake async — an upper bound, not device numbers); two thirds is
+> repaint, not rebuild. The fix is one `CustomPainter` on `repaint:` — the
+> `GoldFlecks` precedent — and it is Phase 5's call, because it would delete the
+> only assertions that can currently see a star. Measured numbers and both
+> rejected micro-fixes are in `witness_sky.dart:842-892`.
+>
+> **Phase 5 obligations recorded here (from this phase, do not lose them):**
+> * **Where does the cubit live?** `WitnessSky` takes `List<SkyEntry>` because
+>   `core/design_system` cannot import `features/sky` (Gate 2, verified by
+>   planting the import → exit 1). Three features need the sky; `AuthStatus`
+>   (`core/navigation/auth_status.dart`) is the precedent for a port three
+>   features share.
+> * **The reader's scroll observer.** `redesign.html:1208-1221` lights a verse
+>   at `threshold .6`, once, via `dataset.star` + `unobserve`. Build it as a
+>   `ScrollController` offset check in `/reading` (Task 5.3).
+> * **`orphan_widget_check`'s ALLOWLIST is no longer empty** — one entry,
+>   `WitnessSky`, with a written reason. The gate reports it STALE and exits 1
+>   the moment a page constructs it, so it cannot outlive its reason. Placing
+>   the widget is Task 5.3's job.
+> * **Flare sources to wire:** cheer `:1123`, selah `:1330`, quiz correct `:1428`.
+> * **`redesign.html:1145` gates lighting on `starsOn`**; Stars-off stops
+>   lighting *and* clears (`:1483`). The consumer must check the setting or a
+>   scrolled verse re-lights on the next pass.
+
 ## Task 3.1: The domain port — red-first
 
 Read by **three** features (reading lights, quiz fires flares, journey counts),
