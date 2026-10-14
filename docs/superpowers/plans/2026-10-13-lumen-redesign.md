@@ -1034,6 +1034,40 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
   name together; **zero** new `GlassTier.blur` lines; re-record
   `glass_surface_tint/_blur.png` per Step 7.
 
+> **Status: Task 4.1 COMPLETE (commits `143dc56`, `a673769`, `47c0410`).** Full
+> gate green: **2763 tests** (floor 2507), **98.50% coverage** (floor 98.25%),
+> citations 1164/1164. Three blocking defects, all found by measurement and none
+> by reading:
+>
+> 1. **A `Stack` replaced the content chain and shrink-wrapped every consumer.**
+>    `StackFit.loose` loosened the constraints `StatTile`'s content used to
+>    receive; its three tiles went `106.7 / 89.3 / 54.3` wide. The tint fixture's
+>    `SizedBox` is *additional* constraints, so `enforce` collapsed it back and
+>    the golden stayed byte-identical **by luck**. `StackFit.passthrough` restores
+>    it exactly; the test that should have caught it asserted the **outer** box,
+>    which `RenderStack` sizes to `constraints.biggest` regardless of fit.
+> 2. **The seam rendered at top 20%, not bottom 20%.** `bottom:20%` was
+>    converted with `-1 + 2 × 0.20` into an `Alignment` whose origin is
+>    **inverted** (`y = -1` is top). The exact mirror of correct.
+> 3. **The wash sat at 72% of the width, not 50%.** `FractionalOffset(0.5,1.0)`
+>    is `Alignment(0,1)` — `FractionalOffset` *extends* `Alignment` **converting**
+>    via `super(dx*2−1, dy*2−1)` (`fractional_offset.dart:54-56`), and `x` is
+>    centre-origin too. Measured centroid 201.1 of 280.
+>
+> **Three conventions, three origins — the lesson worth keeping:** CSS `bottom`
+> counts up from the bottom, `FractionalOffset.dy = 0` is the top, and
+> `Alignment.y = -1` is the top. A percentage that names an edge must never be
+> fed through another convention's arithmetic. Both original tests re-derived
+> the bug from the HTML and compared it to itself, which is why neither could
+> fail; they are now rendered-geometry assertions (seam rect vs bottom edge,
+> wash centroid vs centre line).
+>
+> **On re-recording goldens:** both bloom goldens were a regression lock on the
+> bug and had to be re-recorded — *after* the constants and tests were correct,
+> with the two files failing alone as the evidence. `stat_tile_*` and
+> `glass_surface_tint_*` were **not** touched, and that is the check that the
+> fix restored behaviour rather than re-baselined it.
+
 ## Task 4.2: Restyle the widgets (24) + re-point their citations
 
 - [ ] **Step 3: Restyle the 24 widgets** to the redesign's glass/gold/bloom
