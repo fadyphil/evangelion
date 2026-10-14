@@ -946,29 +946,125 @@ so the placement test puts it in `core/domain/`. **Pure Dart.**
 
 # Phase 4 — Design system restyle
 
-- [ ] **Step 1: Add `GlassTier.bloom`** — the `.bloom` radial wash (`--bh`
-  per-card) and the `.hor` light seam. These are the redesign's signature and
-  have no current equivalent.
-- [ ] **Step 2: Add no new blur.** The budget is **1** `BackdropFilter` in
-  `lib/features/`, already spent, and ADR-0020 §13 forbids `ImageFilter`.
-  `.bloom` and `.hor` are gradients — verify
-  `glass_blur_budget_test.dart` still passes.
-- [ ] **Step 3: Restyle the 23 widgets** to the redesign's glass/gold/bloom
-  language.
-- [ ] **Step 4: Re-point citations per widget.** Move
-  `eva/src/X.tsx:NNN` → `redesign.html:NNN` **only for widgets that actually
-  changed**. A citation that still describes a surviving widget is not wrong;
-  moving it would be churn.
-- [ ] **Step 5: Re-point the 5 geometry harnesses** — only those whose screen
-  changed — and **plant a violation in each** to prove it still fires. A harness
-  that passes vacuously is worse than no harness.
+> **Status: research DONE (two parallel subagents). The plan below is CORRECTED
+> against what they measured — four of the seven steps were not executable as
+> written.** Read the corrections before dispatching anything.
+>
+> * **There are 24 widgets, not 23** (`witness_sky.dart` landed in Phase 3).
+>   Only **one** — `witness_sky.dart` — cites `redesign.html` today; the other
+>   23 cite `eva/src/*.tsx`.
+> * **Step 5's premise is vacuous in this phase.** All five harnessed screens are
+>   rebuilt in **Phase 5** (and `/result` dies in Phase 6 Step 6.2), so *no*
+>   screen changes in Phase 4. Re-pointing harnesses here would leave them
+>   guarding to-be-deleted screens against to-be-deleted `eva/src` numbers. Step
+>   5 becomes a **liveness proof** (plant → confirm red → revert); re-pointing
+>   moves to Tasks 5.1–5.4.
+> * **Step 6's allowlist is not empty and cannot be emptied here.** Phase 3
+>   added one entry (`WitnessSky`, with a written reason). Its only consumers
+>   are Phase 5.3/5.4/5.6. Deleting the entry now ⇒ `ORPHAN WitnessSky` ⇒ exit 1.
+>   The gate's own message is *"place it, delete it, or allowlist it WITH a
+>   written reason — never suppress the failure."* Emptied in **Phase 5.3**.
+> * **The `ImageFilter` citation was wrong.** `ADR-0020` has no §13 and zero
+>   `ImageFilter` mentions; the rule is `docs/plans/09-quality-gates.md:146`
+>   (§13 mitigation 3), whose line **:161** is the direct authority for this
+>   phase — *"The prototype's `blur(72px)` is achieved by a soft radial gradient
+>   with a wide transparent stop — visually equivalent, effectively free."*
+>
+> **Two traps in the blur-budget gate, measured by the researcher — read these
+> before editing `glass_surface.dart`:**
+>
+> 1. `glass_surface.dart:244` is the **only** non-comment line in
+>    `lib/core/design_system/widgets/` containing the literal `GlassTier.blur`,
+>    and the ceiling is **1** (`glass_blur_budget_test.dart:216-224`). A tier
+>    dispatch must keep that literal on **exactly one** non-comment line. The
+>    scanner skips only *leading* `//`/`///` (`:186`) — a **trailing** comment
+>    after code on the same line **counts**.
+> 2. No line containing `BackdropFilter` or `ImageFilter.blur` may appear
+>    anywhere in `lib/core/design_system/widgets/` **outside
+>    `glass_surface.dart`** (`:294-303`). Gradients are clean; `MaskFilter.blur`
+>    is clean of those markers but is a paint filter — do not use it here.
+>
+> `glass_surface_test.dart:68-70` asserts `GlassTier.values == [tint, blur]` and
+> will fail on the new member: update the assertion **and** its test name
+> together (`:111-127`), and re-record its goldens (`:246-253`).
+
+## Task 4.1: `GlassTier.bloom` + the `.hor` seam
+
+The `.bloom` radial wash and the `.hor` light seam are the redesign's signature
+and have no current equivalent. Measured geometry (researcher, every line
+printed):
+
+| | `.hcard` | `.bcard` | `.medal` | `.podbar` |
+| --- | --- | --- | --- | --- |
+| inset l/r | 8% | 6% | 0 | 10% |
+| `bottom` | −46% | −52% | −60% | −55% |
+| height | 80% | 88% | 90% | 90% |
+| fade stop | 68% | 68% | 70% | 70% |
+| CSS `filter:blur` | 18px | 16px | 14px | 14px |
+
+All four are `radial-gradient(ellipse at 50% 100%, var(--bh), transparent 68%)`
+— bottom-anchored, centre on the bottom edge, fading at 68–70% of the radius.
+`.hor` exists on `.hcard` **only** (`redesign.html:256-257`, light `:72`):
+`linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent)`, l/r 14%,
+h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
+
+- [ ] **Step 1: Failing tests first** for the new tier (§6: token and motion
+  tables are red-first; the tier enum's existing test is already red-first).
+- [ ] **Step 2: Tokens.** `--bh` has no existing token and **must not** reuse
+  `ember` — Phase 2 measured and rejected converging on prototype gold, and the
+  14 prototype `--bh` values match none of the seven `StickerSlot` colours.
+  Add to `EvaColors` (constructor + dark + light + fields + **`copyWith`** +
+  `lerp**` — omitting either makes the token silently always-dark): `seam`
+  (`0xD9FFFFFF` / `0xCC9A7B19`), `seamGlow` (`0x99FFFFFF` / `0x809A7B19`), and
+  `bloom` (the `--bh` default `0x8CE457D6`, `redesign.html:254`).
+- [ ] **Step 3: `--bh` per card is a constructor parameter, not a token** — in
+  CSS it is *always* set inline per host element (24 occurrences, no global
+  definition). `GlassSurface({this.bloom, this.bloomColor})`.
+- [ ] **Step 4: The bloom is a gradient inside the existing `ClipRRect`**
+  (`glass_surface.dart:222`) — the prototype relies on `overflow:hidden` for
+  exactly this. A `BoxShadow` is a paint, not a `saveLayer`, so the seam's
+  `0 0 14px` glow costs nothing against the budget.
+- [ ] **Step 5: Dimmers are caller state, not tier** — light mode `opacity:.55`
+  (`redesign.html:73`) and `.bcard.sealed` `opacity:.35` (`:285`) are the same
+  mechanism as today's sealed dimmer. Do **not** make them tier members.
+- [ ] **Step 6: Correct the `ImageFilter` citation** to
+  `docs/plans/09-quality-gates.md:146` and quote `:161` as the authority for
+  dropping all four `filter:blur(Npx)`.
+- [ ] **Step 7: Update `glass_surface_test.dart`** — the enum assertion and its
+  name together; **zero** new `GlassTier.blur` lines; re-record
+  `glass_surface_tint/_blur.png` per Step 7.
+
+## Task 4.2: Restyle the widgets (24) + re-point their citations
+
+- [ ] **Step 3: Restyle the 24 widgets** to the redesign's glass/gold/bloom
+  language, **by role, not by file** (the `4b53500` precedent: "the split is by
+  role, not by widget"). Scope is the widget-level language — glass tiers,
+  seams, bloom, accent use — **not** the base palette, which Phase 2 settled.
+- [ ] **Step 4: Re-point citations per widget.** Move `eva/src/X.tsx:NNN` →
+  `redesign.html:NNN` **only for widgets that actually changed**. A citation
+  that still describes a surviving widget is not wrong; moving it would be
+  churn. **13 of 24 widgets sit in a harness's measurement path** (login 5,
+  home 6, reading 3, quiz 2, result 1), so a restyle will turn harnesses red
+  against numbers Phase 5 is about to obsolete — that is the harness firing,
+  not a regression to chase.
+
+## Task 4.3: Prove the gates still fire, then re-record
+
+- [ ] **Step 5: Liveness proof for all 5 harnesses** — plant a violation in
+  each, confirm it goes red, **revert**. A harness that passes vacuously is
+  worse than no harness. Re-pointing moves to Phase 5.1–5.4.
 - [ ] **Step 6: Export every new widget from `barrel.dart`** and run
-  `orphan_widget_check.py`. Its allowlist is **empty** (`ALLOWLIST = {}`):
-  place the widget, delete it, or allowlist it with a written reason.
-  **Never suppress the failure.**
+  `orphan_widget_check.py`. All 24 are already exported. The allowlist carries
+  **one** entry (`WitnessSky`) whose reason names Phase 5; the gate reports it
+  STALE and exits 1 the moment a page constructs it, so it cannot outlive its
+  reason. Emptied in Phase 5.3. **Never suppress the failure.**
 - [ ] **Step 7: Re-record goldens AFTER the citations are re-pointed.** Never
   the reverse — `CONTRIBUTING.md` names "re-recording goldens without
-  re-checking the citations" a review failure.
+  re-checking the citations" a review failure. Command is plain
+  `flutter test --update-goldens` (no custom script); scope it per test file —
+  two agents running it concurrently over the same directory would clobber each
+  other, which is why the restyle batches are sequential within a directory.
+  80 committed PNGs, `390×844` at `dpr 1.0` (`kAmbientSurface`).
 
 ---
 
