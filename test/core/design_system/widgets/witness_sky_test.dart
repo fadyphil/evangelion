@@ -123,9 +123,9 @@ Finder get _starClips => find.descendant(
 
 /// The inked bounding box of a capture, in logical px.
 ///
-/// Alpha and not colour: the sky is painted over a transparent layer, and a
-/// star's halo reaches zero alpha at its edge, so the alpha channel is the only
-/// thing that says where the ink is.
+/// Alpha and not colour: the sky is painted over a transparent layer, so the
+/// alpha channel is the only thing that says where the ink is. (There is no
+/// halo in these captures — see the shadow note on the shape test below.)
 class _Box {
   _Box(this.minX, this.maxX, this.minY, this.maxY, this.lit);
 
@@ -332,8 +332,10 @@ void main() {
         clipsInSky(),
         findsNothing,
         reason:
-            '`:120` is `border-radius: 50%`, not a `clip-path`. A `ClipPath` '
-            'here would round the fill AND the halo — a different star.',
+            '`:120` is `border-radius: 50%`, not a `clip-path`. On a device a '
+            '`ClipPath` here would round the fill AND the halo — a different '
+            'star. (In this suite the halo is not rasterised at all, so the '
+            'witness for the dot is its fill, in the shape test below.)',
       );
 
       for (final SkyStarShape shape in const <SkyStarShape>[
@@ -508,26 +510,40 @@ void main() {
       expect(box.lit, greaterThan(0));
     });
 
-    testWidgets('the dot keeps its halo and the polygons lose theirs', (
+    testWidgets("the dot's fill fills its box, the polygons' is cut to it", (
       WidgetTester tester,
     ) async {
-      // THE REASON THE THREE TREES DIFFER, asserted rather than argued.
+      // ## WHAT IS ACTUALLY MEASURED HERE, AND WHAT IS NOT
       //
-      // CSS draws an **outer** `box-shadow` outside the border edge only —
-      // "it is clipped inside the border-box of the element" (CSS Backgrounds
-      // 3 §6.1.1) — and `clip-path` clips the element's whole rendering, border
-      // and background included (MDN, `clip-path`). The prototype gives all four
-      // classes a `box-shadow` (`:1152`) but reaches it through `border-radius`
-      // for the dot (`:120`) and `clip-path: polygon(…)` for the rest
-      // (`:121-123`).
+      // **Not a halo.** `AutomatedTestWidgetsFlutterBinding.disableShadows` is
+      // `true` (`flutter_test/lib/src/binding.dart:2234`, assigned to
+      // `debugDisableShadows` at `:1079` — set in `flutter test`'s own
+      // `setupAll`, measured `true` here), so **`BoxShadow` is not rasterised
+      // anywhere in this suite**. Every pixel in these captures is the FILL.
+      // The previous name of this test said the dot "keeps its halo", and its
+      // reason strings said the halo is "what puts ink outside" — a mechanism
+      // the pixels do not contain, and a claim a reader would reasonably take
+      // for a witness. The name and the strings now say what the numbers are.
       //
-      // | mechanism | what it clips | what survives |
+      // The CSS reasoning that motivates the two trees is still true and is
+      // recorded below, but it is **reasoning, not measurement**: an **outer**
+      // `box-shadow` is drawn outside the border edge only — "it is clipped
+      // inside the border-box of the element" (CSS Backgrounds 3 §6.1.1) — and
+      // `clip-path` clips the element's whole rendering, background and border
+      // included (MDN, `clip-path`). The prototype gives all four classes a
+      // `box-shadow` (`:1152`) but reaches it through `border-radius` for the dot
+      // (`:120`) and `clip-path: polygon(…)` for the rest (`:121-123`):
+      //
+      // | mechanism | what it clips | what survives (on a device) |
       // | --- | --- | --- |
       // | `border-radius: 50%` | rounds the **border box**; the shadow follows it | a visible ring outside the disc |
       // | `clip-path: polygon(…)` | the whole rendering to a region **inside** the border box | nothing — the shadow is already outside it |
       //
-      // So the three polygons render as crisp cut-outs and the dot glows, and
-      // the difference is one mechanism rather than a colour or a blur radius.
+      // **What the pixels DO see is the other half of that table, and it is
+      // enough:** the dot is a filled disc sized to its whole box, while the
+      // polygons are filled only where their polygon is, and `clip-path` is what
+      // makes that true. That is the B1 regression, and it is what these two
+      // assertions read.
       final _Box dot = _inkBounds(
         await shapePixels(tester, SkyStarShape.dot),
         200,
@@ -538,9 +554,9 @@ void main() {
       );
 
       // Each shape's OWN box, and the sizes genuinely differ: `:1148` multiplies a
-      // non-dot by 1.5. Comparing the dot's halo against the star's box would
-      // measure the scale factor rather than the clip, so each is read from the
-      // layout that produced it.
+      // non-dot by 1.5. Comparing the dot against the star's box would measure
+      // the scale factor rather than the clip, so each is read from the layout
+      // that produced it.
       int boxOf(SkyStarShape shape) => skyStarLayoutFor(
         key: 'John:3:16',
         shape: shape,
@@ -548,32 +564,34 @@ void main() {
         isFlare: false,
       ).size.ceil();
 
-      // The dot's halo reaches past its own box: `border-radius: 50%` rounds the
-      // border box, so the shadow follows the rounded outline (`:120`).
-      // Measured: 4.97 logical px → 5 device px of box, 6 of ink.
+      // The dot's fill covers the box's **full fractional extent**: a 4.968px box
+      // starting at x = 131.05 runs to 136.02, and a rectangle that size inks six
+      // columns, not `ceil(4.968) == 5`. That is the signature of a fill that is
+      // not cut, and it is the assertion that fails when the dot is clip-pathed.
       expect(
         dot.width,
         greaterThan(boxOf(SkyStarShape.dot)),
         reason:
-            'the dot inks ${dot.width}px across for a '
-            '${boxOf(SkyStarShape.dot)}px box. Its halo is what puts ink '
-            'outside, and `border-radius: 50%` preserves it.',
+            'the dot\'s fill inks ${dot.width}px across a box whose size is '
+            '${boxOf(SkyStarShape.dot)}px. `ceil(4.968) == 5`, and an '
+            'uncut box starting at 131.05 ends at 136.02, so six columns are '
+            'correct for a full fill. Five would mean it was cut.',
       );
-      // The star's ink does NOT: the polygon is inside the box and the shadow
-      // outside it is what `clip-path` throws away (`:121` + CSS Backgrounds 3
-      // §6.1.1). Measured: 7.45 logical px → 8 of box, 8 of ink.
+      // The polygons' fill is cut to the polygon, which is inscribed in the box,
+      // so the ink can never exceed the box. Measured: 7.452px box → 8 columns.
       expect(
         star.width,
         lessThanOrEqualTo(boxOf(SkyStarShape.star)),
         reason:
-            'the star inks ${star.width}px across for a '
-            '${boxOf(SkyStarShape.star)}px box — the polygon and nothing else. '
-            'Wider means the halo survived the clip.',
+            'the star\'s fill inks ${star.width}px across a box of '
+            '${boxOf(SkyStarShape.star)}px. The polygon is inscribed in the box, '
+            'so it cannot ink more than the box; anything wider would mean the '
+            'box itself is being filled.',
       );
       expect(
         star.height,
         lessThanOrEqualTo(boxOf(SkyStarShape.star)),
-        reason: 'and the same holds vertically',
+        reason: 'and the same holds vertically — the fill is the whole story',
       );
     });
   });

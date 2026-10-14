@@ -392,7 +392,12 @@ void main() {
       // `clip-path: polygon(…)`. The two behave differently (a rounded border
       // box keeps its outer shadow; a clip-path inside the border box discards
       // it), so this is not `!= dot` for tidiness — it is the branch the star
-      // layer makes, and `WitnessSky`'s suite measures both sides of it.
+      // layer makes.
+      //
+      // `WitnessSky`'s suite measures both sides of it **from the fill**: its
+      // captures contain no halo, because `flutter test` sets
+      // `debugDisableShadows` (`flutter_test/lib/src/binding.dart:1079`, from
+      // `disableShadows` at `:2234`) and no `BoxShadow` is rasterised there.
       expect(skyClipsPaint(SkyStarShape.star), isTrue);
       expect(skyClipsPaint(SkyStarShape.cross), isTrue);
       expect(skyClipsPaint(SkyStarShape.diamond), isTrue);
