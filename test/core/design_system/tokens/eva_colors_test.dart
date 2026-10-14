@@ -580,10 +580,29 @@ void main() {
       // `#votdCard` (`:519`) and `#lastCard` (`:524`) are the two `.hcard`s.
       expect(html, contains('id="votdCard" style="--bh:rgba(228,87,214,.55)"'));
       expect(html, contains('id="lastCard" style="--bh:rgba(232,176,75,.35)"'));
-      // …and the four medals each carry their own.
+      // …and the medals: FOUR declarations, THREE new hues. `:600` is deliberately
+      // not asserted here, because it is not a new hue — `rgba(228,87,214,.5)`
+      // is the default's own hue at a lower alpha. That omission used to be
+      // papered over by a comment claiming "the four medals each carry their
+      // own", which is the same over-claim the doc above it makes and the same
+      // shape of error: four things declared, three asserted, the gap described
+      // as if it were not a gap.
       expect(html, contains('class="medal" style="--bh:rgba(244,227,178,.5)"'));
       expect(html, contains('class="medal" style="--bh:rgba(217,142,50,.5)"'));
       expect(html, contains('class="medal" style="--bh:rgba(79,116,255,.5)"'));
+      // The fourth one IS in the file, and its absence from the three above is
+      // the point: it repeats `:254`'s hue, which is why a single `bloom` token
+      // cannot reach it at `.5`. So it is asserted as the *repeat* rather than
+      // as a fourth hue — which is a stronger claim, because it would fail if
+      // the prototype's fourth medal were given a hue of its own.
+      expect(html, contains('class="medal" style="--bh:rgba(228,87,214,.5)"'));
+      expect(
+        const EvaColors.dark().bloom,
+        const Color(0x8CE457D6),
+        reason:
+            'so `:600` differs from the token in **alpha only**, which is the '
+            'reason a caller parameter exists rather than a hue list',
+      );
     });
   });
 

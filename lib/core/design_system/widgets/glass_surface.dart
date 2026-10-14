@@ -30,6 +30,19 @@ import 'package:flutter/material.dart';
 /// the choice has to be visible in a diff and greppable — not because it is
 /// budgeted. See its own doc for the four hosts it is transcribed from.
 ///
+/// **No screen calls it yet, and that is the plan rather than an oversight:**
+/// `docs/superpowers/plans/2026-10-13-lumen-redesign.md` Task 4.2 Step 3
+/// restyles the 24 widgets "to the redesign's glass/gold/bloom language, **by
+/// role, not by file**" — so adoption is a per-role decision inside that step
+/// and there is no call site this phase can honestly name in advance. What the
+/// prototype does fix is the *shape*: `.hcard` (`redesign.html:253-257`) is the
+/// only one of the four hosts carrying both a wash and a seam, so what Phase
+/// 4.2 moves to [bloom] is the card/panel family, not the inline controls. Until
+/// then the tier is reachable only from `GlassSurface(tier: …)` directly and
+/// `glass_surface_test.dart` is its only caller — so a reader who greps
+/// `lib/features/` for `GlassTier.bloom` and finds nothing is looking at a
+/// deliberate gap, not at a tier nobody finished.
+///
 /// ## **THE TOP BAR IS NOT ONE OF THEM** — corrected in Phase 6
 ///
 /// This table used to read "the today's-reading panel **and the top bar**", and the
@@ -204,11 +217,42 @@ const double kGlassBloomRadius = 1.0;
 
 /// The wash's centre — `redesign.html:254`'s `at 50% 100%`.
 ///
-/// The dispatch spells this `FractionalOffset(0.5, 1.0)`. `Alignment` **extends**
-/// `FractionalOffset`, so the two are the same coordinates; `RadialGradient`'s
-/// parameter is typed `AlignmentGeometry`, which is why the declaration is
-/// spelled `Alignment` here.
-const Alignment kGlassBloomCenter = Alignment(0.5, 1);
+/// ## WHY IT IS `Alignment(0, 1)` AND **NOT** `Alignment(0.5, 1)`
+///
+/// The prototype's spelling is a `FractionalOffset`, and `FractionalOffset`
+/// **extends** `Alignment` (`painting/fractional_offset.dart:54`) with
+/// `const FractionalOffset(dx, dy) : super(dx * 2.0 - 1.0, dy * 2.0 - 1.0)`
+/// (`:56`) — it *converts on the way in* rather than sharing a coordinate
+/// space. So the two are **not** the same numbers, and the direction of the
+/// mistake is not obvious either:
+///
+/// | prototype | as a `FractionalOffset` | as an `Alignment` |
+/// | --- | --- | --- |
+/// | `at 50% 100%` | `FractionalOffset(0.5, 1.0)` | `Alignment(0.0, 1.0)` |
+///
+/// The x **and** the y are converted. Verified at runtime rather than read off
+/// the constructor, because the whole point is that it is not obvious:
+///
+/// ```text
+/// FractionalOffset(0.5, 1.0) == Alignment(0, 1)   → true
+/// FractionalOffset(0.5, 1.0) == Alignment(0.5, 1) → false
+/// Alignment(0, 1)   .alongSize(Size(280, 180)) → Offset(140.0, 180.0)
+/// Alignment(0.5, 1) .alongSize(Size(280, 180)) → Offset(210.0, 180.0)
+/// ```
+///
+/// **The y was already right** — `at … 100%` is the bottom edge and `Alignment`'s
+/// `y = +1` is the bottom edge (`painting/alignment.dart:367`,
+/// `Alignment.bottomCenter`) — so the defect was `x` alone, and it was invisible
+/// for the reason the doc above used to get wrong: `Alignment`'s `x` is
+/// centre-origin, so `x = 0.5` is **75%** of the width, not half of it, and a
+/// wash centred three-quarters across a card is close enough to look deliberate
+/// in a small golden. `redesign.html:254` says `50%`, and `50%` of 280 is 140.
+///
+/// Spelled `Alignment` rather than `FractionalOffset` because
+/// `RadialGradient.center` is typed `AlignmentGeometry`, and the SDK's own doc
+/// for the subclass says so: "[Alignment] is better for most purposes than
+/// [FractionalOffset]" (`painting/fractional_offset.dart:44-46`).
+const Alignment kGlassBloomCenter = Alignment(0, 1);
 
 /// The seam's width as a fraction of the surface — `redesign.html:256`'s
 /// `left:14%;right:14%`.
@@ -217,9 +261,60 @@ const double kGlassSeamWidthFactor = 0.72;
 /// The seam's height, `redesign.html:256`'s `height:2px`.
 const double kGlassSeamHeight = 2;
 
-/// Where the seam sits — `redesign.html:256`'s `bottom:20%`, which in an
-/// [Alignment] is `-1 + 2 × 0.20`.
-const Alignment kGlassSeamAlignment = Alignment(0, -0.6);
+/// The seam's corner rounding, `redesign.html:256`'s `border-radius:2px`.
+///
+/// ## NAMED BESIDE [kGlassSeamHeight] DESPITE BEING THE SAME NUMBER
+///
+/// `height:2px` and `border-radius:2px` are two separate declarations on
+/// `redesign.html:256` and they happen to read alike today. They are different
+/// properties, and `glass_surface_test.dart` asserts them as two so that a
+/// change to one cannot ride along on the other — a gate that compares them to
+/// each other (`expect(radius.group(1), height.group(1))`) only pins that the
+/// *prototype* still says the same thing twice, which is a claim about
+/// `redesign.html` and not about this widget. Splitting them here is what lets
+/// that test stay honest: if the prototype's two numbers diverge, the two
+/// constants diverge with them and nothing has to be edited to allow it.
+const double kGlassSeamCornerRadius = 2;
+
+/// Where the seam sits — `redesign.html:256`'s `bottom:20%`.
+///
+/// ## THE SIGN FLIPS, AND THAT IS THE WHOLE OF IT
+///
+/// Three coordinate conventions meet on this one line and **none of them
+/// agrees with the other two**:
+///
+/// | convention | "the top edge" | "the bottom edge" |
+/// | --- | --- | --- |
+/// | CSS `bottom:20%` | — | measured **upwards from the bottom edge** |
+/// | `FractionalOffset` | `dy = 0` | `dy = 1` (`painting/fractional_offset.dart:97-121`) |
+/// | `Alignment` | `y = −1` | `y = +1` (`painting/alignment.dart:349`, `:367`) |
+///
+/// A CSS `bottom` fraction `b` is therefore
+///
+/// ```text
+/// CSS bottom:20%  → FractionalOffset dy = 1 − b = 0.8  → Alignment y = 2(0.8) − 1 = 0.6
+/// ```
+///
+/// and the value here is `2(1 − b) − 1 = 1 − 2b`. The constant shipped as
+/// `-1 + 2 × 0.20` = **−0.6**, which is `−(1 − 2b)`: the exact mirror. Because
+/// `b = 0.20` is small the result still *looked* plausible — a bar in the panel,
+/// the right width, the right colour — and it was only its 19.8% offset **from
+/// the top** that gave it away. Verified at runtime, seam top on a 280 × 180
+/// panel: `Alignment(0, −0.6)` → `y = 35.6`, `Alignment(0, 0.6)` → `y = 142.4`.
+///
+/// ## AND THE `0.4px` THIS COSTS, STATED RATHER THAN ROUNDED AWAY
+///
+/// `Align` maps its alignment onto the **free** space (`H − h`), not onto `H`,
+/// so a `bottom`-derived constant lands `b · h` below the CSS position: `0.2 ×
+/// 2 = 0.4px` on a 180-tall panel. Sub-pixel, one fifth of the seam's own
+/// thickness, and it does not grow — it is `b · h` on every panel, which is
+/// 0.4px on the 280 × 180 goldens. The alternative (a `Positioned` driven by a
+/// `LayoutBuilder`) would be exact and would take the fractional position into
+/// `build`, so the two pixels are paid for the simpler tree.
+///
+/// Verified against the rendered rect rather than re-derived from this formula,
+/// which is the only way to catch a sign error in a formula like this one.
+const Alignment kGlassSeamAlignment = Alignment(0, 0.6);
 
 /// The seam's glow radius — `redesign.html:257`'s `0 0 14px`.
 ///
@@ -364,17 +459,31 @@ class GlassSurface extends StatelessWidget {
   /// them is a global definition. Every one is either a read
   /// (`var(--bh, …)` on `:254`, `var(--bh)` on `:279`, `:299`, `:415`) or an
   /// inline declaration on a host element — `style="--bh:…"` on `#votdCard`
-  /// (`:519`), `#lastCard` (`:524`) and four medals (`:599-602`), and
+  /// (`:519`), `#lastCard` (`:524`), the four medals (`:599-602`) **and the
+  /// `.podbar` template's own `.bloom` div (`:1094`)**, plus
   /// `style.setProperty('--bh', …)` in the two loops that build book cards
-  /// (`:1312`, `:1315`). `glass_surface_test.dart` walks all thirteen and fails
-  /// on a fourth shape, because a fourth shape is a global definition and a
-  /// global definition is something a token table *could* express.
+  /// (`:1312`, `:1315`). That is **nine** inline declarations, and the ninth is
+  /// the one this list originally left out: `:1094` writes
+  /// `style="--bh:${p.gl}"` on the `.bloom` **inside** `.podbar`, so it is
+  /// neither a `var()` read nor a `setProperty` call and a reader scanning for
+  /// those two shapes walks straight past it.
+  /// `glass_surface_test.dart` walks all thirteen and fails on a fourth shape,
+  /// because a fourth shape is a global definition and a global definition is
+  /// something a token table *could* express.
   ///
   /// And the values genuinely disagree: `#votdCard` washes with
-  /// `rgba(228,87,214,.55)` and `#lastCard` with `rgba(232,176,75,.35)`, and the
-  /// four medals carry four more hues. A `bloom` token is a *default*, in
-  /// precisely the sense `var(--bh, …)` is a default — which is what
-  /// [EvaColors.bloom] is, and the only thing it claims to be.
+  /// `rgba(228,87,214,.55)` and `#lastCard` with `rgba(232,176,75,.35)`, and
+  /// three of the four medals carry a hue the default does not (`#f4e3b2`,
+  /// `#d98e32`, `#4f74ff`). **The fourth (`:600`) does not** — it is the
+  /// default's own hue at `.5` instead of `.55`, so the medals are four
+  /// declarations and *three* new hues, which is what the numbers are and not a
+  /// tidier-sounding four. The alpha difference is itself the argument for a
+  /// parameter: `:600` is not reachable by any colour token that also has to
+  /// serve `:254`'s default.
+  ///
+  /// A `bloom` token is a *default*, in precisely the sense `var(--bh, …)` is a
+  /// default — which is what [EvaColors.bloom] is, and the only thing it claims
+  /// to be.
   ///
   /// ## AND WHY THERE IS NO `bool bloom` BESIDE IT
   ///
@@ -606,7 +715,9 @@ class GlassSurface extends StatelessWidget {
             widthFactor: kGlassSeamWidthFactor,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.all(Radius.circular(2)),
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(kGlassSeamCornerRadius),
+                ),
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,

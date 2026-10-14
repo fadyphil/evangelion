@@ -516,17 +516,84 @@ void main() {
       expect(wash(), findsOneWidget, reason: 'one wash, or it is a smear');
       final RadialGradient g =
           decorationOf(tester, wash()).gradient! as RadialGradient;
-      // `redesign.html:254` — `radial-gradient(ellipse at 50% 100%, …)`. The
-      // dispatch spells the centre `FractionalOffset(0.5, 1.0)`, and
-      // `Alignment extends FractionalOffset`, so the value is that object; the
-      // parameter is typed `AlignmentGeometry`, which is why the constructor name
-      // differs.
-      expect(g.center, const Alignment(0.5, 1));
-      expect(
-        FractionalOffset((g.center as Alignment).x, (g.center as Alignment).y),
-        const FractionalOffset(0.5, 1.0),
-      );
+
+      // `redesign.html:254` — `radial-gradient(ellipse at 50% 100%, …)`.
+      //
+      // ## WHY THIS COMPARES AGAINST A `FractionalOffset` AND NOT AN `Alignment`
+      //
+      // The constant is typed `Alignment` because `RadialGradient.center` is
+      // `AlignmentGeometry`, and the previous version of this test re-read the
+      // `Alignment`'s own `x`/`y` back into a `FractionalOffset` to "prove" they
+      // were the same. That round trip is the exact operation that **manufactured**
+      // the bug it was checking: `FractionalOffset extends Alignment` *converting*
+      // on the way in (`painting/fractional_offset.dart:56`,
+      // `super(dx * 2.0 - 1.0, dy * 2.0 - 1.0)`), so it is not an identity, and
+      // the assertion compared `Alignment(0.5, 1)` to `FractionalOffset(1.0, 2.0)`
+      // — a value to itself, and green while the wash sat at 75% of the width.
+      //
+      // This compares the two constants directly, which is the only comparison
+      // that can fail:
+      expect(kGlassBloomCenter, const FractionalOffset(0.5, 1.0));
+      expect(g.center, kGlassBloomCenter);
+      // …and the two conventions disagree, pinned so the equality above cannot be
+      // satisfied by accident by a value that happens to be both.
+      expect(kGlassBloomCenter, isNot(const Alignment(0.5, 1)));
+
       expect(g.colors.first, const EvaColors.dark().bloom);
+    });
+
+    testWidgets('the wash renders horizontally CENTRED, not three-quarters across', (
+      WidgetTester tester,
+    ) async {
+      // The rendered half of the claim, because a constant comparison only proves
+      // the widget holds the constant it holds. Measured off the pixels: the wash
+      // is the only magenta thing on the panel (`EvaColors.dark().bloom` is
+      // `0x8CE457D6` — R = B ≫ G; the seam is white and the glass fill is
+      // neutral), so a magenta-weighted centroid is the wash's own centre of mass.
+      tester.view.physicalSize = const Size(280, 180);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        evaAmbientHarness(
+          child: const RepaintBoundary(
+            child: SizedBox(
+              width: 280,
+              height: 180,
+              child: GlassSurface(
+                tier: GlassTier.bloom,
+                padding: EdgeInsets.zero,
+                child: SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final Offset centroid = await _washCentroid(
+        tester,
+        find.byType(RepaintBoundary).first,
+        const Size(280, 180),
+      );
+      // `at 50% 100%` — half of 280 is 140. A gradient centred at `x = 0.5` in
+      // `Alignment` coordinates is at 0.75 of the width, i.e. **210**, and that is
+      // the number the shipped constant produced.
+      expect(centroid.dx, closeTo(140, 1.5));
+      // Tolerance is 1.5px, and it is here because the centroid is a *pixel*
+      // measurement of a sample that excludes the seam: the seam's own white bar
+      // sits across the gradient's midline and is rejected by the magenta test,
+      // so what is left is not quite symmetric about `x = 140`. Measured on the
+      // fixed constant: `Offset(139.5, 152.5)`, i.e. **49.8%** of 280. (The y is
+      // not asserted: the gradient's centre is the panel's **bottom edge**
+      // (`at … 100%`), so an intensity-weighted centroid sitting at 85% of the
+      // height is a property of the fade stop, not a position worth pinning.)
+      //
+      // `lessThan(0.6 × width)` is the belt to that `closeTo`'s braces: the two
+      // are redundant for the right constant, and only the second one can tell a
+      // reader that the failure is a *centre* failure rather than a rounding one.
+      expect(centroid.dx, lessThan(const Size(280, 180).width * 0.6));
     });
 
     testWidgets('the wash fades to nothing at 68%, clamped', (
@@ -641,11 +708,53 @@ void main() {
       expect(seamSize.height, 2.0);
       expect(kGlassSeamWidthFactor, 0.72);
       expect(kGlassSeamHeight, 2.0);
+      expect(kGlassSeamCornerRadius, 2.0);
+
+      // ## AND IT SITS AT `bottom:20%` — FROM THE **BOTTOM**
+      //
+      // Width and height are the two numbers that happened to be right while the
+      // seam was mirrored, because neither depends on the alignment. The
+      // alignment is the whole of `bottom:20%`, so it is asserted here on the
+      // **rendered rect** and from the edge CSS names, not by re-deriving the
+      // constant from the percentage the way the transcription test below used
+      // to (`-1 + 2 × bottom/100` re-applied the same inverted arithmetic, so it
+      // could not fail for any `bottom` value at all).
+      final Size surface = tester.getSize(find.byType(GlassSurface));
+      final Rect rect = tester.getRect(seam());
+      final double fromBottom = surface.height - rect.bottom;
+      expect(
+        fromBottom,
+        closeTo(surface.height * 0.20, 0.5),
+        reason:
+            '`redesign.html:256` says `bottom:20%` — the seam\'s bottom edge is '
+            '20% of the panel height above the panel\'s bottom edge. 0.5px of '
+            'tolerance is `b · h` — `Align` maps its alignment onto the FREE '
+            'space, not onto the full height, so a `bottom`-derived constant '
+            'lands 0.2 × 2 = 0.4px below the CSS position on any panel. '
+            'Measured: $fromBottom of ${surface.height}.',
+      );
+      expect(
+        rect.center.dy,
+        greaterThan(surface.height / 2),
+        reason:
+            'the mirror of this bug is the same number read from the other '
+            'edge: at `Alignment(0, -0.6)` the seam rendered 19.8% from the '
+            'TOP, which also reads as "20%" if you never say which edge. This '
+            'assertion names the half of the panel it has to be in.',
+      );
       expect(
         kGlassSeamAlignment,
-        const Alignment(0, -0.6),
-        reason: '`bottom:20%`',
+        const Alignment(0, 0.6),
+        reason:
+            'an `Alignment` y is centre-origin and +1 is the BOTTOM '
+            '(`painting/alignment.dart:367`, `Alignment.bottomCenter`), so a '
+            'CSS `bottom` fraction b is `y = 1 − 2b`. The `Alignment` doc for '
+            'the subclass that made this confusing: `FractionalOffset extends '
+            'Alignment` CONVERTING (`painting/fractional_offset.dart:56`).',
       );
+      // …and the constant is NOT the CSS-convention translation of the same
+      // number, so this cannot be satisfied by re-introducing the mirror.
+      expect(kGlassSeamAlignment, isNot(const Alignment(0, -0.6)));
     });
 
     testWidgets('the caller\'s `--bh` reaches the gradient', (
@@ -735,6 +844,70 @@ void main() {
         expect(wash(), findsNothing, reason: '$tier must not wash');
         expect(seam(), findsNothing, reason: '$tier must not seam');
       }
+    });
+
+    testWidgets('a bloom surface survives an unbounded height', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS SHAPE AND NOT THE THREE THAT WERE ALREADY COVERED
+      //
+      // Bounded, bounded, tight and `SizedBox.expand` all size the same, because
+      // they all end up with finite constraints by the time they reach the
+      // `Stack`. An **unbounded height** — what a `Column` hands a non-flexible
+      // child — is the one shape that can reach `RenderStack` with
+      // `maxHeight == double.infinity`, and `RenderStack._computeSize` asserts
+      // `size.isFinite` there ("A Stack requires bounded constraints from its
+      // parent"). The pre-bloom tree was `DecoratedBox > ClipRRect > Padding` and
+      // `RenderDecoratedBox` has no such assert, so **the bloom's `Stack` is what
+      // introduced the possibility of a debug crash here** — and a panel dropped
+      // into a `Column` with no `SizedBox` around it is the most ordinary thing a
+      // caller does.
+      //
+      // The tint path is not at risk (`it has no positioned children, so
+      // `constraints.biggest` is never consulted), which is why this asserts the
+      // bloom tier specifically: that is where the two `Positioned.fill` layers
+      // are.
+      await tester.pumpWidget(
+        _onSurface(
+          const Column(
+            children: <Widget>[
+              GlassSurface(
+                tier: GlassTier.bloom,
+                padding: EdgeInsets.zero,
+                child: SizedBox(width: 100, height: 30),
+              ),
+            ],
+          ),
+        ),
+      );
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'a `Column` gives a non-flexible child an unbounded height, and '
+            '`RenderStack` asserts `size.isFinite` on one — so a bloom panel in a '
+            'Column would be a debug-mode crash, not a layout that looks wrong',
+      );
+      // It also has to still be laid out *correctly*, not merely not throw: the
+      // content sizes itself, and the two `Positioned.fill` layers fill the panel
+      // they actually got rather than reaching for infinity.
+      expect(tester.getSize(find.byType(GlassSurface)), const Size(100, 30));
+      // It also has to still be laid out *correctly*, not merely not throw: the
+      // content sizes itself, and the two `Positioned.fill` layers fill the panel
+      // they actually got rather than reaching for infinity.
+      final Rect seamRect = tester.getRect(seam());
+      expect(seamRect.width, closeTo(72, 1e-9), reason: '72% of 100');
+      // `Align` maps its alignment onto the FREE space: `0.8 × (30 − 2) = 22.4`.
+      // The seam stays 6px above this panel's bottom edge (`30 − 24.4`), which is
+      // the 20% the constant is for — and it is still **below the midpoint**,
+      // which is the property the mirrored constant broke.
+      expect(seamRect.top, closeTo(22.4, 1e-9));
+      expect(seamRect.bottom, closeTo(24.4, 1e-9));
+      expect(
+        seamRect.center.dy,
+        greaterThan(tester.getSize(find.byType(GlassSurface)).height / 2),
+        reason: 'the seam belongs in the lower half of its panel, at any size',
+      );
     });
 
     testWidgets('light seams gold and washes the same hue dark does', (
@@ -827,11 +1000,43 @@ void main() {
         kGlassSeamWidthFactor,
         1 - (int.parse(left.group(1)!) + int.parse(right.group(1)!)) / 100,
       );
-      expect(kGlassSeamAlignment.y, -1 + 2 * int.parse(bottom.group(1)!) / 100);
       expect(kGlassBloomFadeStop, double.parse(fade.group(1)!) / 100);
       // The seam's radius is the `border-radius` above, and it is NOT the height
       // just because the two read alike today.
       expect(radius.group(1), height.group(1));
+
+      // ## `bottom:` IS NOT TRANSLATED HERE, AND THAT IS THE POINT
+      //
+      // The previous line was
+      // `expect(kGlassSeamAlignment.y, -1 + 2 * int.parse(bottom.group(1)!) / 100)`
+      // and it could not fail for **any** value of `bottom`: it re-applied the
+      // very arithmetic that produced the bug, to the very number it was
+      // supposed to check against, so the constant and the formula were the same
+      // statement twice. It passed with `Alignment(0, -0.6)` — the seam rendered
+      // 19.8% from the **top** — and it passes now for the same reason.
+      //
+      // So `bottom:20%` is asserted as the two things it can be asserted as, and
+      // neither is a re-derivation:
+      //
+      // - as **text**, above: `expect(html[255], contains('bottom:20%'))`, which
+      //   pins that the prototype still says what this widget is transcribing;
+      // - as **rendered geometry**, in the seam test above: the rect's distance
+      //   from the panel's bottom edge.
+      //
+      // What is left in this test is only the arithmetic with no convention
+      // inside it: `left`/`right`/`height`/`border-radius`/`transparent N%` are
+      // unit-ful declarations that need no origin, so re-deriving them from the
+      // CSS text is a genuine check rather than a tautology.
+      expect(
+        bottom.group(1),
+        '20',
+        reason:
+            'recorded so a change to the prototype\'s `bottom` shows up HERE, in '
+            'the transcription test, rather than only as a mysterious failure in '
+            'the rendered-geometry test — which would be the gate firing, but a '
+            'gate whose failure names a constant instead of a source line is '
+            'one step removed from being diagnosable',
+      );
     });
 
     test(
@@ -1297,6 +1502,71 @@ const Set<String> _cutSites = <String>{
   'PassageCard',
   'SealFAB button',
 };
+
+/// The magenta-weighted centre of mass of the [GlassTier.bloom] wash inside
+/// [boundary], in logical px.
+///
+/// ## WHY A PIXEL MEASUREMENT AND NOT A CONSTANT COMPARISON
+///
+/// Comparing `kGlassBloomCenter` against a literal can only prove the widget
+/// holds the constant it holds — the same reason a `StackFit` read back off the
+/// widget would not have caught the sizing regression. The wash's rendered
+/// position is a different claim from its declared position, and it is the one
+/// the prototype is about.
+///
+/// `EvaColors.dark().bloom` is `0x8CE457D6`: R = B = 228 against G = 87, so
+/// "red and blue both well above green" is the wash and nothing else on the
+/// panel — the seam is white (`R = G = B`) and the glass fill is neutral. The
+/// weight is `mean(R, B) − G` so the centroid follows the gradient's intensity
+/// rather than the bounding box of "anything at all magenta".
+///
+/// Fails closed. A centroid over an empty sample would be `Offset.zero`, which
+/// is also a position a wrong constant could produce, so an empty sample throws
+/// naming itself instead of returning a number that reads like a measurement.
+Future<Offset> _washCentroid(
+  WidgetTester tester,
+  Finder boundary,
+  Size size,
+) async {
+  final RenderRepaintBoundary layer = tester
+      .renderObject<RenderRepaintBoundary>(boundary);
+  final List<int>? bytes = await tester.runAsync<List<int>>(() async {
+    final ui.Image image = layer.toImageSync(pixelRatio: 1.0);
+    final ByteData data = (await image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    ))!;
+    image.dispose();
+    return data.buffer.asUint8List();
+  });
+  if (bytes == null) {
+    throw StateError('the bloom layer produced no pixels to measure');
+  }
+
+  double sumX = 0;
+  double sumY = 0;
+  double weight = 0;
+  for (int y = 0; y < size.height; y++) {
+    for (int x = 0; x < size.width; x++) {
+      final int i = (y * size.width.toInt() + x) * 4;
+      final int r = bytes[i];
+      final int g = bytes[i + 1];
+      final int b = bytes[i + 2];
+      if (r > g + 8 && b > g + 8) {
+        final double m = (r + b) / 2 - g;
+        sumX += x * m;
+        sumY += y * m;
+        weight += m;
+      }
+    }
+  }
+  if (weight == 0) {
+    throw StateError(
+      'no magenta pixels in the sampled layer — the wash did not paint, so a '
+      'centroid here would be a measurement of nothing',
+    );
+  }
+  return Offset(sumX / weight, sumY / weight);
+}
 
 Future<List<int>> _screenPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester

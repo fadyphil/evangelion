@@ -311,11 +311,35 @@ class EvaColors extends ThemeExtension<EvaColors> {
   ///
   /// **The two palettes' glow radii differ (14 and 12) and this widget ships 14
   /// in both**, because the radius is a `BoxShadow.blurRadius` on a
-  /// `DecoratedBox` — a paint, not a colour — and a per-brightness *float* token
-  /// for a 2px difference on a decorative glow would be a token this design
-  /// system has no convention for. Stated rather than smoothed over: if a reader
-  /// needs the light value, the right home is the widget's geometry constants,
-  /// not this table.
+  /// `DecoratedBox` — a paint, not a colour — and **a colour table is the wrong
+  /// home for a length**. `seamGlow` is a `Color`; a per-brightness float token
+  /// beside it would mean a `Color` field that no longer has anything to say
+  /// about the glow's own radius.
+  ///
+  /// ## IT USED TO CLAIM THIS SYSTEM HAS NO PER-BRIGHTNESS FLOAT TOKENS. IT HAS TWO.
+  ///
+  /// The sentence this replaces read "a per-brightness *float* token for a 2px
+  /// difference on a decorative glow would be a token this design system has no
+  /// convention for". **That premise is false and was checked only now:**
+  /// [orbOpacity] (0.55 dark / 0.18 light) and [auroraOpacity] (0.18 / 0.10) are
+  /// both per-brightness floats, both lerped per brightness, and both predate
+  /// this tier. So the convention exists and was available the whole time.
+  ///
+  /// What survives is only the judgement, and it is a judgement about the
+  /// **ratio**, not about the table: 14 against 12 is a 14% difference on a
+  /// 14px-radius `BoxShadow.blurRadius` beneath a 2px bar, which is not
+  /// perceptible on either palette and is well inside the difference the two
+  /// palettes' *colours* already make — `.6` vs `.5` alpha on
+  /// `rgba(255,255,255,…)` vs `rgba(154,123,25,…)`. Spending a token on the
+  /// smaller of two differences in the same effect is how a token table starts
+  /// carrying numbers nobody reads.
+  ///
+  /// Recorded rather than smoothed over, and it is a decision not a gap: if the
+  /// light value is ever wanted, `glass_surface.dart`'s `kGlassSeamGlowBlur` is
+  /// the constant to parameterise per brightness, and `GlassSurface` — not this
+  /// table — is where the geometry lives. (Spelled as a code span rather than a
+  /// `[kGlassSeamGlowBlur]` link because that constant lives in a file that
+  /// imports *this* one, and a dartdoc reference cannot go backwards.)
   final Color seamGlow;
 
   /// The `.bloom` wash — the soft radial of colour that rises from a card's
