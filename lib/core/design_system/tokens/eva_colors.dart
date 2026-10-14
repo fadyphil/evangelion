@@ -51,6 +51,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     required this.glassFill,
     required this.glassBorder,
     required this.glassShadow,
+    required this.seam,
+    required this.seamGlow,
+    required this.bloom,
     required this.sticker,
   });
 
@@ -85,6 +88,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
       glassFill = const Color(0x0DFFFFFF),
       glassBorder = const Color(0x14FFFFFF),
       glassShadow = const Color(0x59000000),
+      seam = const Color(0xD9FFFFFF),
+      seamGlow = const Color(0x99FFFFFF),
+      bloom = const Color(0x8CE457D6),
       sticker = EvaStickerPalette.colors;
 
   /// The light palette — `03-design-system.md` §5.1, light table.
@@ -171,6 +177,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
       glassFill = const Color(0x0A000000),
       glassBorder = const Color(0x14000000),
       glassShadow = const Color(0x1F120E28),
+      seam = const Color(0xCC9A7B19),
+      seamGlow = const Color(0x809A7B19),
+      bloom = const Color(0x8CE457D6),
       sticker = EvaStickerPalette.colors;
 
   /// The page backdrop — the bottom-most layer of the three.
@@ -280,6 +289,61 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// shadow: see `eva_elevations.dart` for why every elevation is flat.
   final Color glassShadow;
 
+  /// The `.hor` seam — the hairline of light that crosses a card at 20% of its
+  /// height. `GlassTier.bloom`'s other half.
+  ///
+  /// `redesign.html:257` is `rgba(255,255,255,.85)` in dark, and
+  /// `redesign.html:72` re-points it at `rgba(154,123,25,.8)` in light — the
+  /// prototype's **gold** (`#9A7B19`, `redesign.html:58`'s `--gold`), not a white
+  /// at a lower alpha. So this is two hues, not one value at two opacities, and
+  /// [emberInk] is not the light value either: it is that hue at 53% rather than
+  /// the 80% the gradient's centre stop declares.
+  ///
+  /// ## NOT A `03-design-system.md` §5.1 TOKEN
+  ///
+  /// §5.1 publishes fourteen per brightness and names no seam. This is
+  /// transcribed from the redesign reference, which is the design source of truth
+  /// for the surfaces that paint it.
+  final Color seam;
+
+  /// The seam's glow — `box-shadow:0 0 14px rgba(255,255,255,.6)` in dark and
+  /// `0 0 12px rgba(154,123,25,.5)` in light (`redesign.html:257` / `:72`).
+  ///
+  /// **The two palettes' glow radii differ (14 and 12) and this widget ships 14
+  /// in both**, because the radius is a `BoxShadow.blurRadius` on a
+  /// `DecoratedBox` — a paint, not a colour — and a per-brightness *float* token
+  /// for a 2px difference on a decorative glow would be a token this design
+  /// system has no convention for. Stated rather than smoothed over: if a reader
+  /// needs the light value, the right home is the widget's geometry constants,
+  /// not this table.
+  final Color seamGlow;
+
+  /// The `.bloom` wash — the soft radial of colour that rises from a card's
+  /// bottom edge. `redesign.html:254`'s `rgba(228,87,214,.55)`, which is also the
+  /// `--bh` default and therefore the fallback for every host that does not set
+  /// its own.
+  ///
+  /// ## WHY IT IS THE **SAME VALUE** IN BOTH PALETTES
+  ///
+  /// `redesign.html:73` dims every `.bloom` in light mode — `.hcard`, `.bcard`,
+  /// `.medal` and `.podbar` alike — with `opacity:.55`, and never re-hues the
+  /// `--bh` colour. A per-brightness value here would be a second copy of a
+  /// decision the prototype makes with an opacity, and it would be a decision
+  /// this client cannot take: the dimmer is **caller state**, so it belongs to
+  /// whatever puts the wash on a card, not to a token or a tier member.
+  /// `eva_colors_test.dart`'s shared-value inventory carries this as a named
+  /// exception to "a shared token means one theme ships the wrong colour".
+  ///
+  /// ## AND WHY IT IS A TOKEN AT ALL, GIVEN THAT `--bh` IS PER-HOST
+  ///
+  /// Because a token for the *default* is not the same claim as a token for
+  /// *every* value. `GlassSurface` reads [bloom] when its caller passes no
+  /// `bloomColor`, and that default is what `redesign.html:254` writes in the
+  /// `var()` fallback. The per-host values — 13 occurrences of `--bh` in
+  /// `redesign.html`, none of them a global definition — are the caller's, and
+  /// `glass_surface.dart` records why they cannot be a token table.
+  final Color bloom;
+
   /// The seven decorative sticker slots, keyed by slot.
   final Map<StickerSlot, Color> sticker;
 
@@ -305,6 +369,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     Color? glassFill,
     Color? glassBorder,
     Color? glassShadow,
+    Color? seam,
+    Color? seamGlow,
+    Color? bloom,
     Map<StickerSlot, Color>? sticker,
   }) => EvaColors(
     canvas: canvas ?? this.canvas,
@@ -327,6 +394,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
     glassFill: glassFill ?? this.glassFill,
     glassBorder: glassBorder ?? this.glassBorder,
     glassShadow: glassShadow ?? this.glassShadow,
+    seam: seam ?? this.seam,
+    seamGlow: seamGlow ?? this.seamGlow,
+    bloom: bloom ?? this.bloom,
     sticker: sticker ?? this.sticker,
   );
 
@@ -373,6 +443,9 @@ class EvaColors extends ThemeExtension<EvaColors> {
       glassFill: c(glassFill, other.glassFill),
       glassBorder: c(glassBorder, other.glassBorder),
       glassShadow: c(glassShadow, other.glassShadow),
+      seam: c(seam, other.seam),
+      seamGlow: c(seamGlow, other.seamGlow),
+      bloom: c(bloom, other.bloom),
       sticker: {
         for (final StickerSlot slot in StickerSlot.values)
           slot: c(EvaStickerPalette.of(slot), other.sticker[slot]!),

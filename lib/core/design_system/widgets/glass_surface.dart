@@ -3,7 +3,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
 
-/// Which of the two glass treatments a surface gets.
+/// Which of the three glass treatments a surface gets.
 ///
 /// ## WHY AN ENUM AND NOT A BOOL
 ///
@@ -23,6 +23,12 @@ import 'package:flutter/material.dart';
 /// | `/quiz` | [tint] | four stacked cards; four `saveLayer`s over content |
 /// | `/` (Home) | [blur] **only** the today's-reading panel | the only place on `/` where glass sits over the animated background |
 /// | everything else | [tint] | |
+///
+/// **[bloom] is not on that table**, and its absence is the point of it: the
+/// budget is about [blur] sites, and [bloom] is a paint that spends none. It is
+/// an enum member rather than a `bool bloom` for the same reason [blur] is one —
+/// the choice has to be visible in a diff and greppable — not because it is
+/// budgeted. See its own doc for the four hosts it is transcribed from.
 ///
 /// ## **THE TOP BAR IS NOT ONE OF THEM** — corrected in Phase 6
 ///
@@ -77,7 +83,151 @@ enum GlassTier {
   /// panel and nothing else**. See the enum's doc for why the top bar is not a
   /// second one; `ds.tsx:499-530` has no `backdropFilter` in it at all.
   blur,
+
+  /// The `.bloom` radial wash **and** the `.hor` seam, over the same fill, rim
+  /// and ambient — and **no** `saveLayer`.
+  ///
+  /// ## WHAT IT IS FOR, IN ONE LINE
+  ///
+  /// A *paint*, not a filter. §13.4's budget is a count of `BackdropFilter`s, and
+  /// this tier exists so a card can have the redesign's colour without buying one:
+  /// two `DecoratedBox`es and a `BoxShadow` cost nothing against the rule that
+  /// [blur] is measured by. `glass_blur_budget_test.dart` finds exactly one
+  /// `GlassTier.blur` line in this file and one `BackdropFilter` in this file,
+  /// and both are unaffected by this member.
+  ///
+  /// ## THE FOUR HOSTS IT IS TRANSCRIBED FROM, MEASURED
+  ///
+  /// Every `.bloom` in `redesign.html` is one of four declarations, and they are
+  /// **not** the same declaration:
+  ///
+  /// | host | inset / size | fade stop | `filter:blur()` | own `opacity` |
+  /// | --- | --- | --- | --- | --- |
+  /// | `.hcard` (`redesign.html:253-254`) | `left:8%` `right:8%` `bottom:-46%` `height:80%` | `68%` | `18px` | `.85` |
+  /// | `.bcard` (`redesign.html:279`) | `left:6%` `right:6%` `bottom:-52%` `height:88%` | `68%` | `16px` | — |
+  /// | `.medal` (`redesign.html:415`) | `left:0` `right:0` `bottom:-60%` `height:90%` | `70%` | `14px` | — |
+  /// | `.podbar` (`redesign.html:299`) | `left:10%` `right:10%` `bottom:-55%` `height:90%` | `70%` | `14px` | — |
+  ///
+  /// All four are `radial-gradient(ellipse at 50% 100%, var(--bh, …), transparent
+  /// N%)`, all four hang below their host's bottom edge by more than half their
+  /// own height, and **only `.hcard` has a `.hor` seam** (`redesign.html:256-257`
+  /// — `.bcard`, `.medal` and `.podbar` have none).
+  ///
+  /// ### WHAT ONE WIDGET PICKS OUT OF FOUR DECLARATIONS, AND WHY
+  ///
+  /// `.hcard`'s numbers, for two reasons that are not taste:
+  ///
+  /// 1. **it is the only host with a seam**, so it is the only one whose full
+  ///    treatment this tier carries. The other three's hosts are a book card, a
+  ///    medal and a progress bar, and those are composites rather than a
+  ///    `GlassSurface` — one of them (`podbar`) is a `Stack` of several bars.
+  /// 2. **`68%` rather than `70%`.** Two of the four say `70%`; the two that say
+  ///    `68%` are `.hcard` and `.bcard`. The tie is broken by (1), and the
+  ///    difference is two percent of a gradient — recorded here so a reader does
+  ///    not assume the `70%` was overlooked.
+  ///
+  /// The other hosts' insets are **not** reproduced, and that is the honest
+  /// reading: `left:6%`/`10%`/`0` are three different horizontal insets on hosts
+  /// of three different aspect ratios, and a percentage of what is really a
+  /// composition-specific box has no meaning once the box is one widget. What
+  /// ships is one full-bleed wash with one fade stop.
+  ///
+  /// ## THE THREE SUBSTITUTIONS, EACH FOR A REASON
+  ///
+  /// **1. `filter:blur(18px)` → the wide transparent stop.**
+  /// `09-quality-gates.md:161` already settled the general case: "The
+  /// prototype's `blur(72px)` is achieved by a soft radial gradient with a wide
+  /// transparent stop — visually equivalent, effectively free." `blur(18px)` here
+  /// is the same trade at a smaller radius. A `MaskFilter` or an `ImageFilter`
+  /// would be the alternative spelling and is refused twice over: an
+  /// `ImageFilter` on a saved layer is a `saveLayer` per frame, which is exactly
+  /// what this tier exists to avoid, and §13.4's gate refuses a
+  /// `BackdropFilter`/`ImageFilter.blur` outside this file by name.
+  ///
+  /// **2. `bottom:-46%` + `overflow:hidden` → the `ClipRRect` that is already
+  /// here.** The prototype's wash hangs below its host and is cut off by the
+  /// host's own `overflow:hidden` (the `.hcard` rule at `redesign.html:250`
+  /// carries `overflow:hidden`). The wash therefore paints full-bleed inside a
+  /// clip that was already required for the corner radius — one fewer mechanism
+  /// than the CSS has, and no new widget.
+  ///
+  /// **3. `ellipse` → a circle.** The only one of the three that is a genuine
+  /// approximation rather than a substitution. CSS's `radial-gradient(ellipse …)`
+  /// with no size resolves against `farthest-corner` of the box; Flutter's
+  /// `RadialGradient` is circular and `radius` is in units of `rect.shortestSide`,
+  /// so [kGlassBloomRadius] = 1.0 is the closest circular stand-in that still
+  /// reaches the panel's full height. On a card three times wider than it is tall
+  /// the wash is then a little narrower at the top than the CSS would draw it.
+  /// Rejected: a `FractionalTransform` squashing the circle into an ellipse,
+  /// which would be the faithful spelling and would put a second coordinate
+  /// system on a decoration.
+  ///
+  /// ## THE DIMMERS ARE CALLER STATE, AND ARE DELIBERATELY NOT MEMBERS
+  ///
+  /// `redesign.html:73` sets `opacity:.55` on all four `.bloom`s in light mode,
+  /// and `redesign.html:285` sets `opacity:.35` on `.bcard.sealed .bloom`. Neither
+  /// is a tier: `.sealed` is a **state of a book card** (its title is dimmed at
+  /// `:286` too, and it carries a lock badge), and light mode is a theme rather
+  /// than a treatment. A tier member called `sealedBloom` would be a fifth value
+  /// whose only meaning is "0.35 of the colour I already had", and
+  /// `GlassTier`'s whole reason for being an enum is that each member is a
+  /// *decision about the surface*, countable and greppable. A caller that wants a
+  /// dimmed wash wraps this one in an `Opacity`, which costs a `saveLayer` — and
+  /// `Opacity` is the caller's to spend, not this widget's, exactly as a blur is
+  /// (§13.4 budgets saveLayers; a decorative wash must not quietly add one).
+  ///
+  /// ## THE SEAM, AND ITS ONE DIVERGENCE
+  ///
+  /// `.hor` is `height:2px` `border-radius:2px` at `bottom:20%`, spanning
+  /// `left:14%` to `right:14%` — hence [kGlassSeamWidthFactor] 0.72 — with
+  /// `box-shadow:0 0 14px rgba(255,255,255,.6)` (`redesign.html:256-257`).
+  /// [EvaColors.light] re-points both the seam and its glow at gold
+  /// (`redesign.html:72`) and at **`12px`**, not 14; this widget ships 14 in both
+  /// palettes. See `seamGlow`'s doc for why that is a geometry constant rather
+  /// than a per-brightness token.
+  bloom,
 }
+
+/// Where [GlassTier.bloom]'s wash has reached nothing — `redesign.html:254`'s
+/// `transparent 68%`, and the substitution that replaces `filter:blur(18px)`.
+///
+/// Two of the four prototype hosts say `70%` (`.medal` `:415`, `.podbar`
+/// `:299`); `.hcard` and `.bcard` say `68%`. See the tier's doc.
+const double kGlassBloomFadeStop = 0.68;
+
+/// The wash's radius, in units of `rect.shortestSide`.
+///
+/// CSS's default radial extent is `farthest-corner`; Flutter's `RadialGradient`
+/// takes a radius as a fraction of the **shortest** side, so `1.0` reaches the
+/// panel's full height from its bottom edge. See the tier's third substitution.
+const double kGlassBloomRadius = 1.0;
+
+/// The wash's centre — `redesign.html:254`'s `at 50% 100%`.
+///
+/// The dispatch spells this `FractionalOffset(0.5, 1.0)`. `Alignment` **extends**
+/// `FractionalOffset`, so the two are the same coordinates; `RadialGradient`'s
+/// parameter is typed `AlignmentGeometry`, which is why the declaration is
+/// spelled `Alignment` here.
+const Alignment kGlassBloomCenter = Alignment(0.5, 1);
+
+/// The seam's width as a fraction of the surface — `redesign.html:256`'s
+/// `left:14%;right:14%`.
+const double kGlassSeamWidthFactor = 0.72;
+
+/// The seam's height, `redesign.html:256`'s `height:2px`.
+const double kGlassSeamHeight = 2;
+
+/// Where the seam sits — `redesign.html:256`'s `bottom:20%`, which in an
+/// [Alignment] is `-1 + 2 × 0.20`.
+const Alignment kGlassSeamAlignment = Alignment(0, -0.6);
+
+/// The seam's glow radius — `redesign.html:257`'s `0 0 14px`.
+///
+/// A `BoxShadow.blurRadius` on a `DecoratedBox`: a paint, so it costs nothing
+/// against §13.4's `saveLayer` budget. It is deliberately **not** a
+/// [MaskFilter], which would blur the shape itself and is neither cheaper nor
+/// what the CSS says.
+const double kGlassSeamGlowBlur = 14;
 
 /// The Gaussian sigma of the [GlassTier.blur] backdrop, in logical px.
 ///
@@ -131,7 +281,7 @@ enum GlassTier {
 const double kGlassBlurSigma = 24;
 
 /// The one true surface: a translucent fill, a hairline rim, and optionally a
-/// backdrop blur.
+/// backdrop blur or the redesign's `.bloom` wash.
 ///
 /// Collapses the eight glass sites in `eva/src/components/ds.tsx` plus two
 /// inline ones into one widget (`04-widget-inventory.md` §3). The recipe is the
@@ -143,6 +293,8 @@ const double kGlassBlurSigma = 24;
 /// | `border: 1px solid rgba(#fff \| #000, 0.08)` | [EvaColors.glassBorder] |
 /// | `boxShadow: 0 4px 24px rgba(#000, 0.35 \| 0.08)` | [EvaColors.glassShadow] |
 /// | `backdropFilter: blur(Npx)` | [GlassTier.blur] + [kGlassBlurSigma] |
+/// | `.bloom` radial wash | [GlassTier.bloom] + [EvaColors.bloom] + [bloomColor] |
+/// | `.hor` seam | [EvaColors.seam] / [EvaColors.seamGlow] + [kGlassSeamGlowBlur] |
 ///
 /// ## THE SHADOW IS NOT AN ELEVATION
 ///
@@ -150,7 +302,9 @@ const double kGlassBlurSigma = 24;
 /// system is `0` because the prototype has no z-axis — every `box-shadow` there
 /// is either a zero-offset ember glow or this one glass ambient. This
 /// `BoxShadow` is that ambient: it is decoration on a `DecoratedBox`, not a
-/// Material elevation, and it does not reintroduce a ramp.
+/// Material elevation, and it does not reintroduce a ramp. The seam's glow is the
+/// same kind of object for the same reason — a paint on a `DecoratedBox`, and a
+/// per-element one rather than a global ambient.
 class GlassSurface extends StatelessWidget {
   /// A glass panel around [child].
   const GlassSurface({
@@ -161,13 +315,15 @@ class GlassSurface extends StatelessWidget {
     this.border = true,
     this.onTap,
     this.semanticLabel,
+    this.bloomColor,
     super.key,
   });
 
   /// The surface's content.
   final Widget child;
 
-  /// Tint (no `saveLayer`) or blur. See [GlassTier] for the per-screen budget.
+  /// Tint (no `saveLayer`), blur, or the `.bloom` wash. See [GlassTier] for the
+  /// per-screen budget and for why the wash is a tier rather than a flag.
   final GlassTier tier;
 
   /// Corner rounding. [EvaRadii.card] by default; the prototype's sites range
@@ -198,10 +354,51 @@ class GlassSurface extends StatelessWidget {
   /// does not add a node to the semantics tree at all.
   final String? semanticLabel;
 
+  /// The wash's colour — the prototype's per-host `--bh`, `redesign.html:254`'s
+  /// `var(--bh, …)`. `null` means [EvaColors.bloom], which is that `var()`
+  /// fallback.
+  ///
+  /// ## WHY THIS IS A PARAMETER AND NOT A TOKEN, MEASURED
+  ///
+  /// Because in `redesign.html` `--bh` has **13** occurrences and **none** of
+  /// them is a global definition. Every one is either a read
+  /// (`var(--bh, …)` on `:254`, `var(--bh)` on `:279`, `:299`, `:415`) or an
+  /// inline declaration on a host element — `style="--bh:…"` on `#votdCard`
+  /// (`:519`), `#lastCard` (`:524`) and four medals (`:599-602`), and
+  /// `style.setProperty('--bh', …)` in the two loops that build book cards
+  /// (`:1312`, `:1315`). `glass_surface_test.dart` walks all thirteen and fails
+  /// on a fourth shape, because a fourth shape is a global definition and a
+  /// global definition is something a token table *could* express.
+  ///
+  /// And the values genuinely disagree: `#votdCard` washes with
+  /// `rgba(228,87,214,.55)` and `#lastCard` with `rgba(232,176,75,.35)`, and the
+  /// four medals carry four more hues. A `bloom` token is a *default*, in
+  /// precisely the sense `var(--bh, …)` is a default — which is what
+  /// [EvaColors.bloom] is, and the only thing it claims to be.
+  ///
+  /// ## AND WHY THERE IS NO `bool bloom` BESIDE IT
+  ///
+  /// Because [tier] already is the switch. Two parameters that mean one thing
+  /// (`tier == GlassTier.bloom` and a `bool bloom`) can contradict each other,
+  /// and a caller that sets the colour and forgets the flag gets a colour that
+  /// is never painted — which is the failure mode a `GlassSurface(bloomColor: …)`
+  /// has to not have. The tier is also the parameter this widget's whole argument
+  /// is built on: it is what makes a treatment greppable at the call site and
+  /// countable in a gate, and a `bool` beside it would be the invisible version
+  /// of the thing the enum was introduced to stop.
+  ///
+  /// Ignored on every other tier, deliberately: the wash belongs to
+  /// [GlassTier.bloom] and nowhere else, so this parameter alone cannot turn a
+  /// tint panel into a blooming one.
+  final Color? bloomColor;
+
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
     final BorderRadius borderRadius = BorderRadius.circular(radius);
+    // The tier is the only switch. `bloomColor` on its own paints nothing, so
+    // there is no way to reach the wash without asking for it in the diff.
+    final bool bloomed = tier == GlassTier.bloom;
 
     final DecoratedBox surface = DecoratedBox(
       decoration: BoxDecoration(
@@ -223,8 +420,24 @@ class GlassSurface extends StatelessWidget {
         // The clip, not `clipBehavior` on the `Material`: the corner radius is a
         // parameter here, and a `Material` with a non-zero elevation-less
         // shape would round its *shadow* too.
+        //
+        // It is also the `.bloom` overflow clip — `redesign.html:250`'s
+        // `overflow:hidden` on `.hcard`, which is what cuts the prototype's
+        // `bottom:-46%` wash off. See [GlassTier.bloom]'s second substitution.
         borderRadius: borderRadius,
-        child: Padding(padding: padding, child: child),
+        child: Stack(
+          // A `Stack` sizes to its largest **non-positioned** child, and the only
+          // one here is the content — both decoration layers are `Positioned`,
+          // and they are the first children so they paint *behind* it. A tint or
+          // a blur surface therefore measures exactly what it measured before the
+          // bloom existed, which is why no golden had to be re-captured;
+          // `glass_surface_test.dart` asserts that size so a future change to
+          // this stack has to notice.
+          children: <Widget>[
+            if (bloomed) ..._wash(colors, bloomColor ?? colors.bloom),
+            Padding(padding: padding, child: child),
+          ],
+        ),
       ),
     );
 
@@ -241,7 +454,11 @@ class GlassSurface extends StatelessWidget {
       ),
     );
 
-    final Widget body = tier == GlassTier.blur ? blur : surface;
+    final Widget body = switch (tier) {
+      GlassTier.tint => surface,
+      GlassTier.blur => blur,
+      GlassTier.bloom => surface,
+    };
 
     if (onTap == null) {
       return body;
@@ -282,4 +499,89 @@ class GlassSurface extends StatelessWidget {
       ),
     );
   }
+
+  /// [GlassTier.bloom]'s two paint layers, in painting order: the wash, then the
+  /// seam over it.
+  ///
+  /// Every widget here is either a `DecoratedBox` or positions one. Nothing in
+  /// this list reads the backdrop, so nothing in it can become a `saveLayer` —
+  /// which is the entire difference between this tier and [GlassTier.blur], and
+  /// the reason §13.4's gate is unaffected by this file growing a third tier.
+  ///
+  /// [bloomColour] is already resolved by the caller — [bloomColor] if given,
+  /// [EvaColors.bloom] otherwise — so this method makes no decision about colour.
+  List<Widget> _wash(EvaColors colors, Color bloomColour) => <Widget>[
+    // `.bloom` — `redesign.html:253-254`.
+    Positioned.fill(
+      // `pointer-events:none`, transcribed. `RenderDecoratedBox` does not absorb
+      // hits today, so this is belt-and-braces rather than a fix — but the CSS
+      // says it and a decoration that starts absorbing a tap on a card's padding
+      // is exactly the kind of regression nothing else here would catch.
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: kGlassBloomCenter,
+              radius: kGlassBloomRadius,
+              colors: <Color>[bloomColour, Colors.transparent],
+              // `transparent 68%` — the whole of the substituted
+              // `filter:blur(18px)`.
+              stops: const <double>[0, kGlassBloomFadeStop],
+              // Past the last stop there is nothing left of the gradient, and
+              // `clamp` is what says so — the alternative tiles the colour back.
+              tileMode: TileMode.clamp,
+            ),
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    ),
+    // `.hor` — `redesign.html:256-257`, and the light override at `:72`.
+    Positioned.fill(
+      child: IgnorePointer(
+        // `Align` and not `Positioned(bottom: …)`: the seam sits at a *fraction*
+        // of the surface (`bottom:20%`) and `Positioned` takes logical px only.
+        // `Align` also loosens the constraints its child receives, which is what
+        // lets `FractionallySizedBox` pin the width at 72% while the height stays
+        // the prototype's 2px — give the same widget a tight height and it would
+        // stretch the bar to the full panel.
+        child: Align(
+          alignment: kGlassSeamAlignment,
+          child: FractionallySizedBox(
+            widthFactor: kGlassSeamWidthFactor,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(2)),
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: <Color>[
+                    Colors.transparent,
+                    colors.seam,
+                    Colors.transparent,
+                  ],
+                  // Written out rather than left null. `null` is Flutter's
+                  // "even evenly" spelling and would paint identically; being
+                  // explicit is what lets a test read the three stops off the
+                  // gradient the way the prototype's three colour stops are read
+                  // off `:257`.
+                  stops: const <double>[0, 0.5, 1],
+                ),
+                // `box-shadow:0 0 14px rgba(255,255,255,.6)`. A PAINT: one
+                // `BoxShadow` on a `DecoratedBox`, not a `saveLayer`, which is
+                // why the seam is allowed to glow at all under §13.4.
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: colors.seamGlow,
+                    blurRadius: kGlassSeamGlowBlur,
+                  ),
+                ],
+              ),
+              child: const SizedBox(height: kGlassSeamHeight),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ];
 }

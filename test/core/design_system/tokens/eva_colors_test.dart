@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:evangelion/core/design_system/tokens/eva_colors.dart';
@@ -204,11 +205,23 @@ Map<String, Object> _snapshot(EvaColors c) => <String, Object>{
   'glassFill': c.glassFill.toARGB32(),
   'glassBorder': c.glassBorder.toARGB32(),
   'glassShadow': c.glassShadow.toARGB32(),
+  // Decision 153's three accent inks. They were **absent from this snapshot**
+  // while being present on the class, which is why `every token is reachable
+  // through copyWith` could not see them: the probe table below is checked
+  // against `snapshotKeys`, so a token missing from the snapshot is a token the
+  // walk silently does not cover. Found while adding the three `bloom` tokens.
+  'emberInk': c.emberInk.toARGB32(),
+  'okInk': c.okInk.toARGB32(),
+  'errInk': c.errInk.toARGB32(),
+  // Phase 4 — `GlassTier.bloom`'s palette, transcribed from `redesign.html`.
+  'seam': c.seam.toARGB32(),
+  'seamGlow': c.seamGlow.toARGB32(),
+  'bloom': c.bloom.toARGB32(),
   for (final StickerSlot slot in StickerSlot.values)
     'sticker.${slot.name}': c.sticker[slot]!.toARGB32(),
 };
 
-/// The 24 names [_snapshot] produces — seventeen tokens plus the seven sticker
+/// The 30 names [_snapshot] produces — twenty-three tokens plus the seven sticker
 /// slots. If the snapshot and this list ever drift, a `copyWith` "nothing else
 /// changed" assertion would silently start comparing fewer fields than it claims
 /// to. The count is asserted where it matters; this list is the readable
@@ -231,6 +244,12 @@ const List<String> snapshotKeys = <String>[
   'glassFill',
   'glassBorder',
   'glassShadow',
+  'emberInk',
+  'okInk',
+  'errInk',
+  'seam',
+  'seamGlow',
+  'bloom',
   'sticker.sky',
   'sticker.lavender',
   'sticker.pink',
@@ -254,16 +273,15 @@ void main() {
   // =========================================================================
   // BYTE-PIN INVENTORY, RECORDED SO THE NEXT READER DOES NOT RECOUNT WRONG.
   //
-  // The two spec tests below pin 30 colours as packed hexes — 15 per palette
+  // The two spec tests below pin 42 colours as packed hexes — 18 per palette
   // (canvas, surface, raised, ink, ink2, ink3, line, ember, emberDeep, onEmber,
-  // ok, err, glassFill, glassBorder, glassShadow) — plus the 6 Decision-153 ink
-  // pins (emberInk, okInk, errInk × dark/light), for 36 hex pins total. The 4
-  // opacity expects (orb/aurora × dark/light) bring the two tests to 40
+  // ok, err, glassFill, glassBorder, glassShadow, seam, seamGlow, bloom) plus
+  // the 6 Decision-153 ink pins (emberInk, okInk, errInk × dark/light). The 4
+  // opacity expects (orb/aurora × dark/light) bring the two tests to 46
   // expect() calls. The plan's "34 hexes" counted total expect() calls (17 × 2:
   // 15 colours + 2 opacities) and mislabelled them hexes; its "23 single-line +
   // 9 split-line" breakdown reads 23 only because a repo-wide `expect(_hex`
-  // grep also catches the lerp interior test's 2. Recounted inside the two
-  // spec tests: 21 single-line + 9 split-line = 30, + 6 ink pins = 36.
+  // grep also catches the lerp interior test's 2.
   group('the dark palette', () {
     test('carries every dark token value from the spec', () {
       final EvaColors dark = const EvaColors.dark();
@@ -319,6 +337,28 @@ void main() {
         _hex(dark.glassShadow),
         _argb(0x00, 0x00, 0x00, 0x59),
         reason: 'glassShadow — rgba(0,0,0,0.35)',
+      );
+
+      // Phase 4 — the `.hor` seam and the `.bloom` wash, from `redesign.html`.
+      // These are **not** `03-design-system.md` §5.1 values: §5.1 publishes
+      // fourteen tokens per brightness and names no seam and no wash. They are
+      // transcribed from the redesign reference, which is the design source of
+      // truth for the surfaces they paint, and each pin carries the line it came
+      // from so a wrong citation is a wrong number.
+      expect(
+        _hex(dark.seam),
+        _argb(0xFF, 0xFF, 0xFF, 0xD9),
+        reason: 'seam — rgba(255,255,255,.85), redesign.html:257',
+      );
+      expect(
+        _hex(dark.seamGlow),
+        _argb(0xFF, 0xFF, 0xFF, 0x99),
+        reason: 'seamGlow — rgba(255,255,255,.6), redesign.html:257',
+      );
+      expect(
+        _hex(dark.bloom),
+        _argb(0xE4, 0x57, 0xD6, 0x8C),
+        reason: 'bloom — rgba(228,87,214,.55), redesign.html:254',
       );
     });
 
@@ -404,11 +444,36 @@ void main() {
         _argb(0x12, 0x0E, 0x28, 0x1F),
         reason: 'glassShadow — rgba(18,14,40,0.12), NOT the brief’s #221C15',
       );
+
+      // Phase 4 — the light `.hor`, `redesign.html:72`:
+      // `linear-gradient(90deg,transparent,rgba(154,123,25,.8),transparent)`
+      // over `box-shadow:0 0 12px rgba(154,123,25,.5)`.
+      expect(
+        _hex(light.seam),
+        _argb(0x9A, 0x7B, 0x19, 0xCC),
+        reason: 'seam — rgba(154,123,25,.8), redesign.html:72',
+      );
+      expect(
+        _hex(light.seamGlow),
+        _argb(0x9A, 0x7B, 0x19, 0x80),
+        reason: 'seamGlow — rgba(154,123,25,.5), redesign.html:72',
+      );
+      // …and the wash is the SAME value light uses as dark, because
+      // `redesign.html:73` dims `.bloom` with `opacity:.55` and never re-hues
+      // it. That is the whole of why this token is not per-brightness, and it is
+      // asserted rather than asserted-by-omission below.
+      expect(
+        _hex(light.bloom),
+        _argb(0xE4, 0x57, 0xD6, 0x8C),
+        reason:
+            'bloom — rgba(228,87,214,.55), redesign.html:254; light dims it '
+            'with opacity, redesign.html:73',
+      );
     });
   });
 
   group('the two palettes are genuinely different', () {
-    test('every colour and opacity token differs, except the sticker map', () {
+    test('every colour and opacity token differs, except the stickers and the wash', () {
       final Map<String, Object> dark = _snapshot(const EvaColors.dark());
       final Map<String, Object> light = _snapshot(const EvaColors.light());
 
@@ -419,7 +484,18 @@ void main() {
           if (dark[key] == light[key]) key,
       ];
       expect(shared, <String>[
-        // The ONLY values permitted to match are the seven stickers: §5.1
+        // …and the bloom wash, for a DIFFERENT and stronger reason: the
+        // prototype's own light override (`redesign.html:73`) dims `.bloom`
+        // with `opacity:.55` and never touches the `--bh` colour, so light and
+        // dark wash the same hue. A second light value here would be a token the
+        // redesign reference does not have. The dimmer is the caller's, which is
+        // why `GlassTier.bloom` owns no opacity of its own.
+        //
+        // It leads the list because that is `_snapshot`'s own key order, and the
+        // assertion compares the list — so a token added to `_snapshot` in the
+        // wrong place shows up here rather than being absorbed.
+        'bloom',
+        // The OTHER values permitted to match are the seven stickers: §5.1
         // publishes one palette with no light variant.
         'sticker.sky',
         'sticker.lavender',
@@ -429,7 +505,7 @@ void main() {
         'sticker.leaf',
         'sticker.sun',
       ], reason: 'a shared token means one theme ships the wrong colour');
-      expect(shared.length, 7);
+      expect(shared.length, 8);
     });
 
     test('both palettes carry the shared sticker map', () {
@@ -447,6 +523,67 @@ void main() {
           reason: 'a slot missing from one palette throws during lerp',
         );
       }
+    });
+  });
+
+  // =========================================================================
+  group("GlassTier.bloom's palette — seam, seamGlow, bloom", () {
+    // These three are not `03-design-system.md` §5.1 tokens. §5.1 publishes
+    // fourteen per brightness and names no seam and no wash; they are
+    // transcribed from `eva/redesign.html`, which is the design source of truth
+    // for the cards they paint. Their values are pinned above; what this group
+    // asserts is the *reason* the palette looks the way it does, because a
+    // well-formed hex nobody can account for is a colour that will be "tidied"
+    // by the next reader.
+
+    test('the seam is white in dark and gold in light, from two overrides', () {
+      // `redesign.html:257` (base) and `:72` (`[data-mode=light]`). The alpha is
+      // a separate claim from the hue, so both are stated: `.85`/`.8` for the
+      // seam and `.6`/`.5` for its glow.
+      expect(const EvaColors.dark().seam, const Color(0xD9FFFFFF));
+      expect(const EvaColors.light().seam, const Color(0xCC9A7B19));
+      expect(const EvaColors.dark().seamGlow, const Color(0x99FFFFFF));
+      expect(const EvaColors.light().seamGlow, const Color(0x809A7B19));
+      // The glow is a **lower** alpha than the seam it glows, in both palettes:
+      // `rgba(…, .6)` behind `rgba(…, .85)` and `rgba(…, .5)` behind `rgba(…, .8)`.
+      expect(
+        const EvaColors.dark().seamGlow.a,
+        lessThan(const EvaColors.dark().seam.a),
+      );
+      expect(
+        const EvaColors.light().seamGlow.a,
+        lessThan(const EvaColors.light().seam.a),
+      );
+    });
+
+    test('the wash is one hue in both palettes, because light dims it', () {
+      // The counterfactual matters: a test that only asserted equality would pass
+      // if the token were forgotten in the light constructor and defaulted to the
+      // dark value. `EvaColors.light()` is a required-parameter constructor with
+      // no defaults, so a forgotten field is a compile error — and this asserts
+      // the *value* the light palette declares rather than the dark one it
+      // happens to equal.
+      expect(const EvaColors.light().bloom, const Color(0x8CE457D6));
+      expect(const EvaColors.dark().bloom, const Color(0x8CE457D6));
+      // `rgba(228,87,214,.55)` — the `--bh` default in `redesign.html:254`.
+      expect(const EvaColors.dark().bloom.a, closeTo(0.55, 0.005));
+    });
+
+    test('a per-host `--bh` is a caller parameter, not a token', () {
+      // The claim that decides the widget's shape, asserted against the
+      // reference rather than against this repository's taste. `glass_surface_test`
+      // walks every `--bh` occurrence in the file; here the claim is only that
+      // the two host elements already disagree, so no single token can serve
+      // both.
+      final String html = File('eva/redesign.html').readAsStringSync();
+
+      // `#votdCard` (`:519`) and `#lastCard` (`:524`) are the two `.hcard`s.
+      expect(html, contains('id="votdCard" style="--bh:rgba(228,87,214,.55)"'));
+      expect(html, contains('id="lastCard" style="--bh:rgba(232,176,75,.35)"'));
+      // …and the four medals each carry their own.
+      expect(html, contains('class="medal" style="--bh:rgba(244,227,178,.5)"'));
+      expect(html, contains('class="medal" style="--bh:rgba(217,142,50,.5)"'));
+      expect(html, contains('class="medal" style="--bh:rgba(79,116,255,.5)"'));
     });
   });
 
@@ -730,7 +867,7 @@ void main() {
       );
     });
 
-    test('changes one token and leaves the other twenty-three untouched', () {
+    test('changes one token and leaves the other twenty-nine untouched', () {
       final EvaColors dark = const EvaColors.dark();
       // Built through a runtime expression so the replacement cannot be the
       // canonicalised `ink` object `dark.ink` already holds.
@@ -869,12 +1006,22 @@ void main() {
         'glassFill': base.copyWith(glassFill: probe(0x1D)),
         'glassBorder': base.copyWith(glassBorder: probe(0x1E)),
         'glassShadow': base.copyWith(glassShadow: probe(0x1F)),
+        // Decision 153's three accent inks. Absent until Phase 4 added them to
+        // [_snapshot] — which is the point of the `snapshotKeys` equality below:
+        // it is the check that turns "a token nobody walks" into a red.
+        'emberInk': base.copyWith(emberInk: probe(0x20)),
+        'okInk': base.copyWith(okInk: probe(0x21)),
+        'errInk': base.copyWith(errInk: probe(0x22)),
+        // Phase 4's `.hor` / `.bloom` palette.
+        'seam': base.copyWith(seam: probe(0x23)),
+        'seamGlow': base.copyWith(seamGlow: probe(0x24)),
+        'bloom': base.copyWith(bloom: probe(0x25)),
         'orbOpacity': base.copyWith(orbOpacity: 0.11),
         'auroraOpacity': base.copyWith(auroraOpacity: 0.12),
       };
 
-      // Seventeen mutable tokens: fifteen colours and the two opacities. The
-      // sticker map is covered by its own test above.
+      // Twenty-three mutable tokens: twenty-one colours and the two opacities.
+      // The sticker map is covered by its own test above.
       expect(
         probes.keys.toSet(),
         snapshotKeys.where((String key) => !key.startsWith('sticker.')).toSet(),
@@ -947,6 +1094,11 @@ void main() {
         'ember',
         'err',
         'glassShadow',
+        // Phase 4's `.hor` pair — the two tokens whose light values differ from
+        // their dark ones in BOTH hue and alpha, so a lerp that pinned either
+        // would show up here.
+        'seam',
+        'seamGlow',
       ]) {
         final Color from = _colorNamed(dark, name);
         final Color to = _colorNamed(light, name);
@@ -1039,6 +1191,11 @@ void main() {
       // 255 — the default when `t` is applied per-channel on a 0xAARRGGBB int —
       // would render glass as an opaque slab mid-transition and pass every
       // opaque-colour assertion above.
+      //
+      // CORRECTED IN PHASE 4: they were **not** the only such tokens. `seam`,
+      // `seamGlow` and `bloom` are three more, and this test's own doc claimed
+      // exhaustiveness it did not have — the same defect class as a `_snapshot`
+      // missing a field, in a paragraph rather than in a table.
       final EvaColors dark = const EvaColors.dark();
       final EvaColors light = const EvaColors.light();
       final EvaColors mid = dark.lerp(light, 0.5);
@@ -1056,6 +1213,27 @@ void main() {
         closeTo((dark.glassShadow.a + light.glassShadow.a) / 2, 0.01),
       );
       expect(mid.glassFill.a, lessThan(1.0), reason: 'not fully opaque');
+
+      // The six translucent tokens, walked rather than listed, so a seventh is
+      // covered by being added.
+      for (final String name in <String>[
+        'glassFill',
+        'glassBorder',
+        'glassShadow',
+        'seam',
+        'seamGlow',
+        'bloom',
+      ]) {
+        expect(
+          _colorNamed(mid, name).a,
+          closeTo(
+            (_colorNamed(dark, name).a + _colorNamed(light, name).a) / 2,
+            0.01,
+          ),
+          reason: '$name.a must interpolate, not snap',
+        );
+      }
+
       expect(
         dark.glassFill.a,
         closeTo(0x0D / 0xFF, 1e-9),
@@ -1115,6 +1293,44 @@ void main() {
       );
       expect(light.sticker[StickerSlot.sun], const Color(0xFFF5C84C));
       expect(mid.sticker[StickerSlot.sun], const Color(0xFF00FF00));
+    });
+
+    test('a custom bloom still interpolates, which is the only way to see it', () {
+      // **A GAP THIS GROUP HAD, FOUND BY MUTATION.** Both stock palettes declare
+      // the *same* `bloom` — `redesign.html:73` dims the wash with an opacity and
+      // never re-hues it — so on the stock pair `c(bloom, other.bloom)` and a bare
+      // `bloom` produce identical results at every `t`. Writing `bloom: bloom`
+      // into `lerp` therefore leaves **every other test in this file green**,
+      // including `t = 1 reproduces the other palette exactly` and the
+      // alpha-interpolation walk, because the field it drops is one that happens
+      // to agree with itself.
+      //
+      // The witness is a palette the caller built, which is exactly what
+      // `copyWith(bloom: …)` produces and the only shape in which the two
+      // spellings differ. Same mechanism as the sticker-map aliasing assertions
+      // above, and for the same reason: the palette is one palette, so a correct
+      // interpolation is indistinguishable from a dropped field by value.
+      final EvaColors custom = const EvaColors.dark().copyWith(
+        bloom: const Color(0xFF00FF00),
+      );
+      expect(custom.bloom, const Color(0xFF00FF00), reason: 'precondition');
+
+      final EvaColors mid = custom.lerp(const EvaColors.light(), 0.5);
+      expect(mid.bloom, isNot(custom.bloom), reason: 'the field never moved');
+      expect(mid.bloom, isNot(const EvaColors.light().bloom));
+      expect(
+        mid.bloom,
+        Color.lerp(const Color(0xFF00FF00), const EvaColors.light().bloom, 0.5),
+      );
+
+      // …and the stock pair still satisfies both spellings, which is why it is
+      // not the witness.
+      expect(
+        const EvaColors.dark().lerp(const EvaColors.light(), 0.5).bloom,
+        const EvaColors.dark().bloom,
+        reason:
+            'dark and light agree, so nothing here could ever distinguish them',
+      );
     });
 
     test('a null other returns this unchanged at every t, including t = 1', () {
@@ -1258,6 +1474,12 @@ Color _colorNamed(EvaColors c, String name) => switch (name) {
   'onEmber' => c.onEmber,
   'ok' => c.ok,
   'err' => c.err,
+  'emberInk' => c.emberInk,
+  'okInk' => c.okInk,
+  'errInk' => c.errInk,
+  'seam' => c.seam,
+  'seamGlow' => c.seamGlow,
+  'bloom' => c.bloom,
   'glassFill' => c.glassFill,
   'glassBorder' => c.glassBorder,
   'glassShadow' => c.glassShadow,
