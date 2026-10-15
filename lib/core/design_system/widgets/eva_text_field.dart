@@ -2,13 +2,17 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
-/// The field's border, fill, ink and focus glow, for one state combination.
+/// The field's rim, fill, ink and focus glow, for one state combination.
 ///
 /// §6 says a widget's conditionals belong in a testable function, and this one
 /// earns it twice over: prototype defect #8 made the field `readOnly` and
 /// defect #10 made its focus and error states literals, so "which state is this
 /// field in" had never been a question the prototype asked. Naming the answer is
 /// the fix.
+///
+/// The **box** is `redesign.html:376-379`'s; the **label** above it is still
+/// `ds.tsx:297-300`'s, because `.field` in the redesign is bare and declares no
+/// label at all. The split is recorded on [EvaTextField.label] and not here.
 @immutable
 class EvaTextFieldStyle {
   /// A field treatment.
@@ -45,32 +49,72 @@ class EvaTextFieldStyle {
       Object.hash(background, foreground, border, Object.hashAll(glow));
 }
 
+/// The field box's rim width. `redesign.html:376` — `border: 1px solid
+/// var(--glass-line)`.
+///
+/// **1px, where `ds.tsx:307` wrote `1.5px`.** This is the only geometry number
+/// the box's restyle moves, and it moves because the redesign's single
+/// declaration for a field box is 1px and the old prototype's was 1.5.
+///
+/// It does **not** move the focused rim: §14's ring is 2px
+/// ([evaFocusRingSpec]) and `focus_ring_gate_test` and `login_geometry_test`
+/// both read it. §14 is the mandatory list and a widget that put a 1px rim where
+/// §14 says 2px would be trading an accessibility guarantee for a
+/// millimetre.
+///
+/// **It is `1`, which is `Border.all`'s own default width**, so the one
+/// `Border.all` it feeds does not spell it — the same trade
+/// `IconActionButton.pillRimWidth` makes, and for the same reason: an argument
+/// that matches the default says nothing the default does not already say, and
+/// `avoid_redundant_argument_values` (a `dart analyze --fatal-infos` gate) says
+/// so too. What keeps the number honest is a test asserting this constant, which
+/// is `eva_text_field_test.dart`'s `1.5` rows replaced below.
+const double kEvaTextFieldRimWidth = 1;
+
 /// Resolves the field treatment.
 ///
-/// Three inputs and one answer, transcribed from `ds.tsx`'s `Input`:
+/// Three inputs and one answer. The **box** is `redesign.html`'s; the **states**
+/// are `ds.tsx`'s, because `.field input` declares no error state at all — it
+/// has a `:focus` rule (`:378`) and nothing else:
 ///
-/// | state | `ds.tsx` | here |
+/// | state | `redesign.html` | here |
 /// | --- | --- | --- |
-/// | idle rim | `1.5px solid rgba(#fff \| #000, 0.1)` (:307) | [EvaColors.glassBorder], 1.5 |
-/// | error rim | `hex.err` (:307) | `colors.err`, 1.5 |
-/// | focused rim | `hex.ember`, opaque (:307) | **`evaFocusRingBorder`** — see below |
-/// | idle fill | `rgba(#fff \| #000, 0.03)` (:308) | `glassFill` (5% dark / 3% light) |
-/// | focused fill | `rgba(#fff \| #000, 0.06)` (:308) | `ink` at 6% |
-/// | focus glow | `0 0 0 3px rgba(ember,.18), 0 0 20px rgba(ember,.12)` (:310) | as written |
-/// | error text | `T.err`, 12, w500 (:320) | `colors.err`, `bodySmall` w500 |
+/// | idle rim | `1px solid var(--glass-line)` (:376) | [EvaColors.glassBorder] at [kEvaTextFieldRimWidth] |
+/// | error rim | **no line.** `ds.tsx:307` — `hex.err` | `colors.err`, same 1px |
+/// | focused rim | `rgba(232,176,75,.6)` (:378) | **`evaFocusRingBorder`** — see below |
+/// | idle fill | `rgba(255,255,255,.04)` (:376) | `glassFill` (5% dark / 3% light) |
+/// | focused fill | **no line.** `ds.tsx:308` — `rgba(#fff \| #000, .06)` | `ink` at 6% |
+/// | focus glow | `0 0 0 3px rgba(232,176,75,.12)` (:378) | as written |
+/// | error text | `var(--ember)` (:379) | `errInk`, `bodySmall` w500 |
+///
+/// ## TWO HALOS BECOME ONE, AND THE COUNT IS THE WHOLE CHANGE
+///
+/// `ds.tsx:310` wrote two shadows — `0 0 0 3px rgba(ember,.18)` (a spread ring)
+/// **and** `0 0 20px rgba(ember,.12)` (a fog). `redesign.html:378` writes one:
+/// `0 0 0 3px rgba(232,176,75,.12)`. So the 20px fog is dropped and the spread
+/// ring's alpha goes from `.18` to `.12`.
+///
+/// Dropping it is not a loss of accessibility signal and it is not a
+/// simplification: the 3px spread ring is the part §14's focus row is about, and
+/// the fog was a second, weaker copy of the same statement in a different
+/// channel. Two halos meant the indicator's strength varied with what was behind
+/// the field.
 ///
 /// ## THE ONE VALUE §14 OVERRIDES, AND WHY IT IS NOT A TRANSCRIPTION
 ///
-/// `ds.tsx:307` gives a focused field `1.5px solid ember` at **full opacity**.
+/// `redesign.html:378` gives a focused field `border-color:
+/// rgba(232,176,75,.6)` — a 60%-alpha gold rim on a 1px border.
 /// `09-quality-gates.md` §14 mandates "a 2px `ember` ring at 40% alpha on every
-/// interactive widget". Both describe the same 2px band around the same box, so
-/// they cannot both hold.
+/// interactive widget". Both describe a band around the same box, so they cannot
+/// both hold.
 ///
-/// §14 wins. The prototype's focused rim is not a focus *indicator* — `focused`
-/// is a literal prop that defect #10 records as baked in, so nothing in the app
-/// ever moved it. There is no accessibility behaviour behind 100% alpha, only a
-/// still picture of one, and §14's list is the mandatory-fix list. The
-/// prototype's **glow** is transcribed unchanged, because a glow is a different
+/// §14 wins, and it won before this restyle too — the rule it displaced was
+/// `ds.tsx:307`'s `1.5px solid ember` at **full** opacity, and the reason has not
+/// changed. `focused` was a literal prop that defect #10 records as baked in, so
+/// nothing in the app ever moved it. There is no accessibility behaviour behind
+/// either alpha, only a still picture of one, and §14's list is the
+/// mandatory-fix list. So the focused rim stays [evaFocusRingBorder], and the
+/// redesign's **halo** is transcribed unchanged, because a halo is a different
 /// effect from a rim and it is the part that reads as "this field is live".
 ///
 /// ## AND AN ERRORED FIELD THAT IS FOCUSED STILL SHOWS THE RING
@@ -78,7 +122,7 @@ class EvaTextFieldStyle {
 /// Focus is the reader's cursor position, so it wins the rim; the error is
 /// carried by the helper text, an icon and the semantics label instead. §14
 /// bans colour-only state, which is precisely why losing the red rim here costs
-/// nothing — and `eva_text_field_test.dart` asserts the three carriers exist.
+/// nothing — and `chip_beads_field_test.dart` asserts the three carriers exist.
 EvaTextFieldStyle resolveTextFieldStyle({
   required EvaColors colors,
   required bool focused,
@@ -88,46 +132,60 @@ EvaTextFieldStyle resolveTextFieldStyle({
   final bool showRing = focused && enabled;
   // `ds.tsx:308` — `rgba(#fff | #000, focused ? 0.06 : 0.03)`.
   //
-  // The idle fill is `glassFill`, not a second literal copy of 0.03: the token is
-  // 5% in dark and 3% in light, so the light palette is exact and dark is two
-  // points heavier. The focused fill stays a literal because `glassFill` is a
-  // different number and Phase 1 published no token for it.
+  // **No redesign line.** `redesign.html:376` gives one background for the field
+  // and `:378` changes only `border-color` and `box-shadow` — so a focused field
+  // in the redesign has the *same* fill as an idle one, where `ds.tsx:308` had
+  // two. The old value is kept and this row is why: the redesign says nothing,
+  // which is a gap in the reference rather than an instruction to flatten the
+  // fill.
+  //
+  // The idle fill is `glassFill`, not a second literal copy of 0.04: the token is
+  // 5% in dark and 3% in light, so the light palette is exact and dark is one
+  // point heavier. `redesign.html:15` and `:57` agree with each other and not
+  // with the token, which is the Phase-2 non-repair recorded on
+  // `EvaColors.glassFill`. The focused fill stays a literal because `glassFill`
+  // is a different number and Phase 1 published no token for it.
   final Color fill = !enabled
       // No prototype value: the prototype's `Input` has no `disabled` prop at
-      // all. `ink` at 2% is "the field is there and cannot be typed in", which
-      // is the state a login field is in while the request is in flight.
+      // all, and `redesign.html`'s `.field input` has none either. `ink` at 2%
+      // is "the field is there and cannot be typed in", which is the state a
+      // login field is in while the request is in flight.
       ? colors.ink.withValues(alpha: 0.02)
       : focused
       ? colors.ink.withValues(alpha: 0.06)
       : colors.glassFill;
   return EvaTextFieldStyle(
     background: fill,
-    // `ds.tsx:309` — `color: T.ink`. A disabled field inks with `ink3`, the
-    // token's documented role for disabled text.
+    // `redesign.html:376` — `color: var(--ink-0)`; `ds.tsx:309` — `color: T.ink`.
+    // A disabled field inks with `ink3`, the token's documented role for
+    // disabled text.
     foreground: enabled ? colors.ink : colors.ink3,
     border: showRing
         ? evaFocusRingBorder(colors)
         : Border.all(
-            // `ds.tsx:307` — `error ? hex.err : rgba(#fff | #000, 0.1)`, both
-            // at `1.5px`. A disabled field drops the error rim: it cannot be
-            // corrected, so a red rim on it is an unfixable complaint.
+            // `redesign.html:376` — `error ? … : var(--glass-line)`, at
+            // [kEvaTextFieldRimWidth]. `ds.tsx:307` is the only line in either
+            // prototype that names an **error** rim (`hex.err`), and it is kept
+            // at the redesign's width. A disabled field drops the error rim: it
+            // cannot be corrected, so a red rim on it is an unfixable complaint.
             color: hasError && enabled ? colors.err : colors.glassBorder,
-            width: 1.5,
+            // **No `width:`** — see the constant's doc. This is `Border.all`'s own
+            // default of 1, so naming it here would restate the default rather
+            // than cite the prototype, and `eva_text_field_test.dart` is what
+            // keeps the number honest rather than a redundant argument.
           ),
-    // `ds.tsx:310` — `focused ? ... : 'none'`.
+    // `redesign.html:378` — `box-shadow: 0 0 0 3px rgba(232,176,75,.12)`.
     glow: showRing
         ? <BoxShadow>[
-            // The first shadow has zero offset and zero blur, which makes it a
-            // 3px *spread ring* rather than a glow; `spreadRadius` is what that
-            // is, and transcribing it as a blur would put a visible fog around
-            // the field instead of a halo.
-            BoxShadow(
-              color: colors.ember.withValues(alpha: 0.18),
-              spreadRadius: 3,
-            ),
+            // Zero offset and zero blur, which makes this a 3px *spread ring*
+            // rather than a glow; `spreadRadius` is what that is, and
+            // transcribing it as a blur would put a visible fog around the field
+            // instead of a halo. The `ds.tsx:310` fog this replaced was
+            // `0 0 20px rgba(ember,.12)`, the same `.12` at a different radius —
+            // which is why only the radius and not the alpha had to move.
             BoxShadow(
               color: colors.ember.withValues(alpha: 0.12),
-              blurRadius: 20,
+              spreadRadius: 3,
             ),
           ]
         : const <BoxShadow>[],
@@ -135,17 +193,48 @@ EvaTextFieldStyle resolveTextFieldStyle({
 }
 
 /// The prototype's field height. `ds.tsx:306` — `height: 52`.
+///
+/// **Kept, and the redesign's divergence is recorded here rather than chased.**
+/// `redesign.html:377` gives `.field input` `padding: 14px 16px` and a 14px
+/// label beside it, and no height — so the redesign's field is roughly
+/// **14 + 14 + 14 + 1 = 43–45px** where this one is 52. Two harnesses read
+/// 52: `login_geometry_test`'s `dsClaims` asserts `kEvaTextFieldHeight == 52` as
+/// a transcription claim against `ds.tsx:306`, and §14's affordance floor is the
+/// same number on every screen this field appears on. A 45px field is 7px
+/// shorter than a 52px control standing beside it on `/login` — the CTA — and a
+/// form whose two fields do not agree in height reads as a mistake even when
+/// every value in it is transcribed.
+///
+/// So the gap is **43–45 vs 52**, it is named here, and it is a decision to be
+/// revisited in Phase 5.1 rather than a value nobody looked at.
 const double kEvaTextFieldHeight = 52;
 
 /// The prototype's field radius. `ds.tsx:306` — `borderRadius: 14`, which is
 /// [EvaRadii.input].
+///
+/// **Kept, and it is worth saying why, because the box is otherwise the
+/// redesign's.** `redesign.html:376` writes `border-radius: 14px` — the same
+/// number — and that is the one piece of the box's geometry that did *not*
+/// become a pill. The restyle moved the rim's width from 1.5px to 1px and the
+/// halo from two to one, and left the corners alone, because a text field is not
+/// a button: a pill you tap once is a command, and a pill you type into is a
+/// surface with a lot of content on it. `EvaTextFieldHeight` is asserted at 52
+/// by the same harness that asserts `EvaRadii.input == 14`, so both halves are
+/// visible in one place.
 const double kEvaTextFieldRadius = EvaRadii.input;
 
 /// The prototype's inner padding. `ds.tsx:309` — `padding: '0 44px 0 16px'`.
 ///
 /// The 44 is a literal because it is not a scale step: it is the `rightIcon`'s
 /// inset (14, `ds.tsx:315`) plus the icon's own 18, and the prototype wrote the
-/// sum. 16 **is** a token — [EvaSpacing.lg].
+/// sum. 16 **is** a token — [EvaSpacing.lg] — and `redesign.html:377` writes
+/// the same `14px 16px` horizontally, so this row is a transcription that two
+/// prototypes agree on.
+///
+/// It is the *vertical* half that diverges and it does not: `redesign.html:377`
+/// pads 14px top and bottom where this widget pads none and fixes the height at
+/// 52 instead. Same trade, same reason, same place to revisit it
+/// ([kEvaTextFieldHeight]).
 const EdgeInsets kEvaTextFieldPadding = EdgeInsets.only(
   left: EvaSpacing.lg,
   right: 44,
@@ -159,6 +248,22 @@ const EdgeInsets kEvaTextFieldPadding = EdgeInsets.only(
 const double kEvaTextFieldStackGap = 6;
 
 /// A real text field.
+///
+/// ## WHAT IS THE REDESIGN'S AND WHAT IS **NOT**, AND WHERE EACH ONE IS CITED
+///
+/// | | source | note |
+/// | --- | --- | --- |
+/// | the box: 1px rim, halo, fill | `redesign.html:376-379` | moved this restyle |
+/// | the 52 height, the 14 radius, the 16/44 insets | `ds.tsx:306,309` | **kept** — [kEvaTextFieldHeight] names the `43–45 vs 52` divergence |
+/// | the label | `ds.tsx:297-300` | **kept** — see [label]; the redesign has none |
+/// | the error text | `redesign.html:379` | colour only; size and weight are `ds.tsx:320` |
+/// | `blur(8px)` | **nothing** | §13.4's budget, collapsed to [GlassTier.tint] at the call site |
+///
+/// The fourth row is the one that is easiest to misread as a gap. `EvaTextField`
+/// does not blur and never has; `.field input` in the redesign is a flat
+/// `rgba(255,255,255,.04)` and the blur that used to be here was
+/// `ds.tsx:308`'s `backdrop-filter`, collapsed to the tint tier by the §13.4
+/// budget before this restyle and untouched by it.
 ///
 /// ## WHAT MAKES IT REAL, AND WHAT THE PROTOTYPE DID NOT HAVE
 ///
@@ -191,6 +296,22 @@ class EvaTextField extends StatefulWidget {
 
   /// The mono-caps label above the field, and the field's accessible name
   /// (§14: "`EvaTextField` supplies `Semantics(label: label)` to the field").
+  ///
+  /// ## WHY THIS KEEPS `ds.tsx:297-300` AND THE BOX MOVED TO `redesign.html`
+  ///
+  /// Because the redesign's field has **no label**. `redesign.html:376-379` is
+  /// three rules — the input, its `:focus`, and `.field .msg` — and not one of
+  /// them mentions a `<label>`; `.field` itself (`:376`) is a bare wrapper with a
+  /// `margin-bottom`. Re-pointing this parameter's citation to `:376` would make
+  /// the number resolve *and* be about the wrong line, which is recorded decision
+  /// 8's own "a citation can resolve and still be about the wrong line" — the
+  /// failure `IconActionButton`'s `pilled` doc also found and fixed.
+  ///
+  /// So the split is the honest one and it is the one the Task 4.2 status block
+  /// records: **the box is the redesign's, the label is the React prototype's.**
+  /// `ds.tsx:297-300` is `F.mono, 10, 700, letterSpacing 0.12em,
+  /// textTransform: uppercase, color: T.ink2` — which is what renders above the
+  /// field on all six screens.
   final String label;
 
   /// Greyed placeholder text drawn while the field is empty. `null` means none.
@@ -569,6 +690,21 @@ class _Placeholder extends StatelessWidget {
 }
 
 /// The error helper text: `ds.tsx:320` — `F.ui, 12, 500, color: T.err`.
+///
+/// ## THE COLOUR IS NOW ALSO THE REDESIGN'S, AND IT IS `errInk` NOT `err`
+///
+/// `redesign.html:379` — `.field .msg{font-family:var(--mono);font-size:9.5px;
+/// letter-spacing:.1em;margin-top:5px;min-height:13px;color:var(--ember)}` — is
+/// the second prototype's line for this text, and it agrees on the hue. It does
+/// not agree on the size (9.5 against 12), the family (`mono` against `ui`) or
+/// the letter-spacing, and **none of the three moved**: the redesign's own
+/// `[dir=rtl]` arm (`:380`) replaces all three at once, so applying half of a
+/// rule whose other half is a direction branch would be applying a declaration
+/// the prototype then withdraws.
+///
+/// `errInk` rather than `err` is Decision 153, and it was already right before
+/// this restyle — verified rather than changed. In light, `err` measures 3.73:1
+/// as text, and this is error copy on `/login` and `/settings`.
 ///
 /// Plus the icon and the semantics label §14 demands, because an error signalled
 /// by the rim's colour alone is exactly the colour-only state the section bans —

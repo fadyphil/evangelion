@@ -15,10 +15,17 @@ import 'package:flutter_test/flutter_test.dart';
 /// makes the field real; the widget around them is layout.
 void main() {
   group('resolveTextFieldStyle — idle', () {
-    test('is a 1.5px rim on the neutral glass fill', () {
-      // `ds.tsx:307-308` —
-      //   border `1.5px solid rgba(#fff | #000, 0.1)`
-      //   background `rgba(#fff | #000, 0.03)`
+    test('is a 1px rim on the neutral glass fill', () {
+      // `redesign.html:376` — `border: 1px solid var(--glass-line)`,
+      // `background: rgba(255,255,255,.04)`.
+      //
+      // **1px, where this asserted `1.5px` against `ds.tsx:307`** until the
+      // Task 4.2 restyle re-pointed the box. The width is now
+      // [kEvaTextFieldRimWidth] rather than a literal, because the widget's
+      // `Border.all` cannot spell it — it *is* `Border.all`'s default, so
+      // naming it there would have been a redundant argument
+      // (`avoid_redundant_argument_values`) — and a constant with no reader is
+      // a constant with nothing keeping it honest. This is the reader.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
         EvaColors.light(),
@@ -29,7 +36,8 @@ void main() {
           hasError: false,
           enabled: true,
         );
-        expect(style.border.top.width, 1.5);
+        expect(style.border.top.width, kEvaTextFieldRimWidth);
+        expect(kEvaTextFieldRimWidth, 1.0);
         expect(style.border.top.color, colors.glassBorder);
         expect(style.glow, isEmpty);
       }
@@ -105,8 +113,14 @@ void main() {
       }
     });
 
-    test('keeps the prototype\'s two-part focus glow', () {
-      // `ds.tsx:310` — `0 0 0 3px rgba(ember, 0.18), 0 0 20px rgba(ember, 0.12)`.
+    test('keeps the redesign\'s single focus halo', () {
+      // `redesign.html:378` — `box-shadow: 0 0 0 3px rgba(232,176,75,.12)`,
+      // one shadow. `ds.tsx:310` wrote **two**: that ring at `.18` and a
+      // `0 0 20px rgba(ember,.12)` fog. The Task 4.2 restyle dropped the fog, so
+      // the **count** is the assertion — "the glow is still there" would have
+      // passed with both of them, and it is the second one that made a
+      // field's focus strength depend on what was painted behind it.
+      //
       // The 3px one has zero blur and zero offset, which makes it a ring rather
       // than a glow; it is transcribed as `spreadRadius: 3` because that is what
       // a zero-blur, zero-offset shadow *is*, and dropping it would lose the
@@ -118,19 +132,19 @@ void main() {
         hasError: false,
         enabled: true,
       );
-      expect(style.glow, hasLength(2));
-      expect(style.glow[0].color, colors.ember.withValues(alpha: 0.18));
-      expect(style.glow[0].offset, Offset.zero);
-      expect(style.glow[0].blurRadius, 0.0);
-      expect(style.glow[0].spreadRadius, 3.0);
-      expect(style.glow[1].color, colors.ember.withValues(alpha: 0.12));
-      expect(style.glow[1].blurRadius, 20.0);
+      expect(style.glow, hasLength(1));
+      expect(style.glow.single.color, colors.ember.withValues(alpha: 0.12));
+      expect(style.glow.single.offset, Offset.zero);
+      expect(style.glow.single.blurRadius, 0.0);
+      expect(style.glow.single.spreadRadius, 3.0);
     });
   });
 
   group('resolveTextFieldStyle — error', () {
     test('the idle rim turns `err`, per the prototype', () {
-      // `ds.tsx:307` — `error ? hex.err : …`.
+      // `ds.tsx:307` — `error ? hex.err : …`. The **hue** is still that
+      // prototype's, because `redesign.html` declares no error rim at all;
+      // the **width** is the redesign's, per `kEvaTextFieldRimWidth`.
       const EvaColors colors = EvaColors.dark();
       final EvaTextFieldStyle style = resolveTextFieldStyle(
         colors: colors,
@@ -139,7 +153,7 @@ void main() {
         enabled: true,
       );
       expect(style.border.top.color, colors.err);
-      expect(style.border.top.width, 1.5);
+      expect(style.border.top.width, kEvaTextFieldRimWidth);
     });
 
     test('an errored field that is focused still shows the focus ring', () {

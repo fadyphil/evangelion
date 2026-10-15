@@ -163,16 +163,26 @@ void main() {
   });
 
   group('the row', () {
-    // ## `gap: 8` IS THE SPACE **BETWEEN** BEADS
+    // ## `gap: 6` IS THE SPACE **BETWEEN** BEADS
     //
-    // `ds.tsx:355` is a CSS `gap`, and a CSS gap is the space between adjacent
-    // items — never after the last one. The widget padded **every** bead, so a row
-    // measured `10n + 8n` where the prototype's arithmetic is `10n + 8(n − 1)`:
+    // `redesign.html:328` is `gap: 6px`, and a CSS `gap` is the space between
+    // adjacent items — never after the last one. The widget padded **every** bead
+    // when it was written against `ds.tsx:355`'s `gap: 8`, so a row measured
+    // `10n + 8n` where the prototype's arithmetic was `10n + 8(n − 1)`:
     // `total: 1` rendered 18 against 10, `total: 3` rendered 54 against 46,
     // `total: 5` rendered 90 against 82. Eight pixels of dead space at the end of
-    // the row, invisible left-aligned and visible the moment the row is centred or
-    // sits in a `space-between` `Row` — which is exactly where it is going, in a
-    // quiz header between a title and a counter.
+    // the row, invisible left-aligned and visible the moment the row is centred
+    // or sits in a `space-between` `Row` — which is exactly where it is going,
+    // in a quiz header between a title and a counter.
+    //
+    // ## AND THE ARITHMETIC IS NO LONGER A FORMULA, BECAUSE THE PILL IS 26
+    //
+    // `redesign.html:330` gives `.dot.cur` `width: 26px`, so a row's width is no
+    // longer `size × n` and there is nothing to write out by hand. It is
+    // [progressBeadsWidth] — one function, in the widget, under test — and this
+    // group measures the **rendered** row against it rather than against a second
+    // copy of the formula. A second copy is the thing this test file spent its
+    // whole life guarding against.
     Future<double> rowWidth(
       WidgetTester tester, {
       required int total,
@@ -194,38 +204,57 @@ void main() {
       return tester.getSize(find.byType(ProgressBeads)).width;
     }
 
-    /// The prototype's own arithmetic, written out rather than re-derived from the
-    /// widget: `n` beads of [kProgressBeadSize] with `n − 1` gaps between them.
-    double prototypeWidth(int total) =>
-        kProgressBeadSize * total + kProgressBeadGap * (total - 1);
-
-    testWidgets('renders `total` beads and `total - 1` gaps', (
+    testWidgets('renders the row `progressBeadsWidth` says it should', (
       WidgetTester tester,
     ) async {
+      // One current pill and `n − 1` short dots, with `n − 1` gaps.
       for (final int total in <int>[1, 2, 3, 5, 8]) {
+        final List<ProgressBeadState> states = beadStates(
+          total: total,
+          completed: 0,
+          current: 0,
+        );
         expect(
-          await rowWidth(tester, total: total),
-          prototypeWidth(total),
+          await rowWidth(tester, total: total, current: 0),
+          progressBeadsWidth(states),
           reason:
-              'total: $total — ${kProgressBeadSize * total}px of beads plus '
-              '${kProgressBeadGap * (total - 1)}px of gaps. A trailing gap after '
-              'the last bead is ${kProgressBeadGap}px the prototype never draws.',
+              'total: $total — one 26px pill, ${total - 1} dots of '
+              '${kProgressBeadSize}px and ${total - 1} gaps of '
+              '${kProgressBeadGap}px. A trailing gap after the last bead is '
+              '${kProgressBeadGap}px the prototype never draws.',
         );
       }
-      expect(kProgressBeadSize, 10.0, reason: 'ds.tsx:361 — `width: 10`');
-      expect(kProgressBeadGap, 8.0, reason: 'ds.tsx:355 — `gap: 8`');
+      expect(kProgressBeadSize, 8.0, reason: 'redesign.html:329 — 8×8');
+      expect(kProgressBeadGap, 6.0, reason: 'redesign.html:328 — `gap: 6px`');
+      expect(
+        kProgressBeadCurrentWidth,
+        26.0,
+        reason: 'redesign.html:330 — `.dot.cur{width: 26px}`',
+      );
     });
 
-    testWidgets('a single bead is 10px wide, not 18', (
+    testWidgets('a row with no current bead is `n` dots and `n − 1` gaps', (
       WidgetTester tester,
     ) async {
-      // The case that makes the arithmetic unarguable: at `total: 1` the old
-      // padding was half the row's width.
+      // `current: -1` — the fixture's own default, and the state a quiz is in
+      // **before** its payload lands. It is the case where the row's width is
+      // exactly the CSS gap rule with nothing else in it, so it is the
+      // arithmetic this file was written for, restated against the redesign's
+      // two numbers. The argument is omitted because it *is* the default —
+      // spelling it out would be `avoid_redundant_argument_values`.
       expect(
         await rowWidth(tester, total: 1),
         kProgressBeadSize,
         reason: 'there is nothing for a gap to sit between',
       );
+      for (final int total in <int>[2, 3, 5]) {
+        expect(
+          await rowWidth(tester, total: total),
+          kProgressBeadSize * total + kProgressBeadGap * (total - 1),
+          reason:
+              'total: $total, no pill — so the old formula, with new numbers',
+        );
+      }
     });
 
     testWidgets(
