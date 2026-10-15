@@ -217,11 +217,16 @@ Map<String, Object> _snapshot(EvaColors c) => <String, Object>{
   'seam': c.seam.toARGB32(),
   'seamGlow': c.seamGlow.toARGB32(),
   'bloom': c.bloom.toARGB32(),
+  // …and the light-mode dimmer `redesign.html:73` declares as `opacity:.55`.
+  // It is in the snapshot for the same reason the three accent inks above had to
+  // be: `t = 1 reproduces the other palette exactly` is a whole-map comparison,
+  // so a token missing here is a token that comparison silently cannot see.
+  'bloomOpacity': c.bloomOpacity,
   for (final StickerSlot slot in StickerSlot.values)
     'sticker.${slot.name}': c.sticker[slot]!.toARGB32(),
 };
 
-/// The 30 names [_snapshot] produces — twenty-three tokens plus the seven sticker
+/// The 31 names [_snapshot] produces — twenty-four tokens plus the seven sticker
 /// slots. If the snapshot and this list ever drift, a `copyWith` "nothing else
 /// changed" assertion would silently start comparing fewer fields than it claims
 /// to. The count is asserted where it matters; this list is the readable
@@ -250,6 +255,7 @@ const List<String> snapshotKeys = <String>[
   'seam',
   'seamGlow',
   'bloom',
+  'bloomOpacity',
   'sticker.sky',
   'sticker.lavender',
   'sticker.pink',
@@ -276,8 +282,8 @@ void main() {
   // The two spec tests below pin 42 colours as packed hexes — 18 per palette
   // (canvas, surface, raised, ink, ink2, ink3, line, ember, emberDeep, onEmber,
   // ok, err, glassFill, glassBorder, glassShadow, seam, seamGlow, bloom) plus
-  // the 6 Decision-153 ink pins (emberInk, okInk, errInk × dark/light). The 4
-  // opacity expects (orb/aurora × dark/light) bring the two tests to 46
+  // the 6 Decision-153 ink pins (emberInk, okInk, errInk × dark/light). The 6
+  // opacity expects (orb/aurora/bloom × dark/light) bring the two tests to 48
   // expect() calls. The plan's "34 hexes" counted total expect() calls (17 × 2:
   // 15 colours + 2 opacities) and mislabelled them hexes; its "23 single-line +
   // 9 split-line" breakdown reads 23 only because a repo-wide `expect(_hex`
@@ -322,6 +328,15 @@ void main() {
 
       expect(dark.orbOpacity, 0.55, reason: 'orbOpacity');
       expect(dark.auroraOpacity, 0.18, reason: 'auroraOpacity');
+      // `redesign.html:73` dims the wash in **light only**, so dark is 1.0 — an
+      // absence of a rule, asserted rather than defaulted.
+      expect(
+        dark.bloomOpacity,
+        1.0,
+        reason:
+            'bloomOpacity — dark is undimmed; the .55 is light\'s, '
+            'redesign.html:73',
+      );
 
       expect(
         _hex(dark.glassFill),
@@ -460,14 +475,23 @@ void main() {
       );
       // …and the wash is the SAME value light uses as dark, because
       // `redesign.html:73` dims `.bloom` with `opacity:.55` and never re-hues
-      // it. That is the whole of why this token is not per-brightness, and it is
-      // asserted rather than asserted-by-omission below.
+      // it. The dimmer is `bloomOpacity` and it IS per-brightness — which is
+      // what makes the shared hue below correct rather than accidental.
       expect(
         _hex(light.bloom),
         _argb(0xE4, 0x57, 0xD6, 0x8C),
         reason:
             'bloom — rgba(228,87,214,.55), redesign.html:254; light dims it '
             'with opacity, redesign.html:73',
+      );
+      expect(
+        light.bloomOpacity,
+        0.55,
+        reason:
+            'bloomOpacity — `opacity:.55` on all four `.bloom`s, '
+            'redesign.html:73. NOT caller state: a caller-state dimmer that no '
+            'caller sets leaves the card family light-mode-wrong the moment it '
+            'lands',
       );
     });
   });
@@ -487,9 +511,10 @@ void main() {
         // …and the bloom wash, for a DIFFERENT and stronger reason: the
         // prototype's own light override (`redesign.html:73`) dims `.bloom`
         // with `opacity:.55` and never touches the `--bh` colour, so light and
-        // dark wash the same hue. A second light value here would be a token the
-        // redesign reference does not have. The dimmer is the caller's, which is
-        // why `GlassTier.bloom` owns no opacity of its own.
+        // dark wash the same hue. The dimmer is a **separate** token
+        // (`bloomOpacity`, 1.0 / 0.55) precisely because this one is not — so the
+        // exception below is about the hue alone and the light palette is not
+        // shipping the wash at full strength.
         //
         // It leads the list because that is `_snapshot`'s own key order, and the
         // assertion compares the list — so a token added to `_snapshot` in the
@@ -506,6 +531,126 @@ void main() {
         'sticker.sun',
       ], reason: 'a shared token means one theme ships the wrong colour');
       expect(shared.length, 8);
+    });
+
+    // =====================================================================
+    // `bloomOpacity` — the light-mode wash dimmer, and the token this group
+    // exists for.
+    //
+    // It is the one per-brightness float whose **omission from `lerp` is
+    // invisible**: `EvaColors`'s constructor is `required`, but `this.bloomOpacity`
+    // satisfies a dropped argument, so the row compiles, the whole-suite green
+    // stays green, and the wash arrives in a light theme at full strength. The
+    // mutation below is the proof that the tests here can see it.
+    // =====================================================================
+    group('bloomOpacity is the prototype\'s light-mode dimmer', () {
+      test('1.0 dark / 0.55 light, and the .55 is redesign.html:73\'s', () {
+        // Read against the prototype rather than against a literal, so a change
+        // to `redesign.html` shows up here and not as a mysterious golden diff
+        // in `glass_surface_test.dart`.
+        final List<String> html = File('eva/redesign.html').readAsLinesSync();
+
+        expect(html[72], contains('.bloom{opacity:.55}'));
+        expect(const EvaColors.dark().bloomOpacity, 1.0);
+        expect(const EvaColors.light().bloomOpacity, 0.55);
+
+        // …and the token is a **number**, not a colour: the prototype's dimmer
+        // is `opacity:`, not a re-hued `--bh`, which is why `bloom` above is
+        // shared and this is not.
+        expect(html[72], contains('opacity:.55'), reason: 'an opacity, not a hue');
+        expect(
+          html[72],
+          isNot(contains('--bh')),
+          reason:
+              'if the prototype ever re-hued the wash instead of dimming it, '
+              'the exception on `bloom` above would be wrong and the dimmer '
+              'would belong inside the colour',
+        );
+      });
+
+      test('and it is the THIRD per-brightness float, all three lerped', () {
+        // The claim `seamGlow`'s doc's corrected premise now rests on. Written
+        // as an inventory rather than as three hand-written expectations, so a
+        // fourth per-brightness float arriving without a doc update is visible
+        // here and not three months later in a review of that doc.
+        final Map<String, double> darkFloats = <String, double>{
+          'orbOpacity': const EvaColors.dark().orbOpacity,
+          'auroraOpacity': const EvaColors.dark().auroraOpacity,
+          'bloomOpacity': const EvaColors.dark().bloomOpacity,
+        };
+        final EvaColors mid = const EvaColors.dark().lerp(
+          const EvaColors.light(),
+          0.5,
+        );
+
+        for (final String key in darkFloats.keys) {
+          expect(snapshotKeys, contains(key), reason: '$key must be snapshotted');
+        }
+        expect(
+          mid.bloomOpacity,
+          closeTo((darkFloats['bloomOpacity']! + 0.55) / 2, 1e-9),
+          reason: 'the third float is lerped like the first two',
+        );
+        expect(
+          mid.bloomOpacity,
+          greaterThan(const EvaColors.light().bloomOpacity),
+          reason:
+              'and lands strictly between the endpoints — 1.0 and 0.55 cannot '
+              'be interior at either, so this is what a `lerp` that kept '
+              '`this` cannot satisfy',
+        );
+      });
+
+      test('MUTATION PROOF — two mutations, and only one of them compiles', () {
+        // Not a runtime check; a record of what was done to prove the tests
+        // above are load-bearing. Both mutations were applied to `EvaColors`
+        // .lerp and `eva_colors_test.dart` was run.
+        //
+        // **1. Delete the `bloomOpacity:` row entirely.**
+        //
+        // ```text
+        // lib/core/design_system/tokens/eva_colors.dart:499:21: Error:
+        //   Required named parameter 'bloomOpacity' must be provided.
+        // ```
+        //
+        // A **compile error**, not a silent always-dark. The plan's Step 2 for
+        // this token says an `lerp` omission "makes the token silently
+        // always-dark", and that is **false for this class**: every field of
+        // `EvaColors`'s constructor is `required`, so a dropped row cannot
+        // compile. The premise holds for a class whose constructor defaults its
+        // fields, and `EvaColors` is explicitly the opposite — its own doc says
+        // "Every field is required rather than defaulted… a palette that
+        // silently picks up a default is a palette where 'which colour is
+        // this?' has two answers." So the compiler is already the gate here,
+        // and the instruction's fear is not this class's failure mode.
+        //
+        // **2. Keep the row but lerp it to itself** —
+        // `d(bloomOpacity, bloomOpacity)` instead of
+        // `d(bloomOpacity, other.bloomOpacity)`.
+        //
+        // This one **compiles**, and it is the real failure: the wash arrives in
+        // a light theme at 1.0. Red on `eva_colors_test.dart`:
+        //
+        // - `t = 1 reproduces the other palette exactly` — whole-map compare,
+        //   light's 0.55 vs the lerped 1.0.
+        // - `the midpoint sits genuinely between the endpoints` and `the
+        //   midpoint is strictly interior, not one endpoint in disguise` —
+        //   both name `bloomOpacity` explicitly.
+        // - `and it is the THIRD per-brightness float, all three lerped`.
+        //
+        // **Not** red, and worth recording: `the two palettes are genuinely
+        // different`, because that test reads two `EvaColors` constructors and
+        // never calls `lerp`. "These two palettes differ" and "a transition
+        // between them interpolates" are different claims, and only the second
+        // is about `lerp`.
+        //
+        // Both mutations were reverted. `expect(snapshotKeys,
+        // contains('bloomOpacity'))` below is the standing reminder that the
+        // *snapshot* is what made mutation 2 observable at all: without the key,
+        // the `t = 1` comparison would have compared 30 fields and reported
+        // success.
+        expect(snapshotKeys, contains('bloomOpacity'));
+      });
     });
 
     test('both palettes carry the shared sticker map', () {
@@ -1037,9 +1182,14 @@ void main() {
         'bloom': base.copyWith(bloom: probe(0x25)),
         'orbOpacity': base.copyWith(orbOpacity: 0.11),
         'auroraOpacity': base.copyWith(auroraOpacity: 0.12),
+        // The third per-brightness float, and the one whose `lerp` omission is
+        // the easiest to write: `EvaColors`'s constructor is `required`, so a
+        // `lerp` that leaves the row out still compiles — `this.bloomOpacity`
+        // satisfies it — and the token would arrive in a light theme at 1.0.
+        'bloomOpacity': base.copyWith(bloomOpacity: 0.77),
       };
 
-      // Twenty-three mutable tokens: twenty-one colours and the two opacities.
+      // Twenty-four mutable tokens: twenty-one colours and the three opacities.
       // The sticker map is covered by its own test above.
       expect(
         probes.keys.toSet(),
@@ -1152,6 +1302,14 @@ void main() {
         mid.auroraOpacity,
         closeTo((dark.auroraOpacity + light.auroraOpacity) / 2, 1e-9),
       );
+      // The one whose omission is silent. `t = 1` above already catches a dropped
+      // row, but this states the *shape* of the claim — three per-brightness
+      // floats, all lerped — rather than leaving the reader to infer it from a
+      // whole-map comparison they have to trust.
+      expect(
+        mid.bloomOpacity,
+        closeTo((dark.bloomOpacity + light.bloomOpacity) / 2, 1e-9),
+      );
     });
 
     test('the midpoint is strictly interior, not one endpoint in disguise', () {
@@ -1170,11 +1328,16 @@ void main() {
       );
 
       // The doubles are the cheapest interior proof because they need no channel
-      // decoding: 0.55 → 0.18 cannot be interior at 0.55 or at 0.18.
+      // decoding: 0.55 → 0.18 cannot be interior at 0.55 or at 0.18. And 1.0 →
+      // 0.55 cannot be interior at either end, which is the case that would fail
+      // for a `lerp` that silently kept `this` — exactly what a dropped
+      // `bloomOpacity` row does.
       expect(mid.orbOpacity, greaterThan(light.orbOpacity));
       expect(mid.orbOpacity, lessThan(dark.orbOpacity));
       expect(mid.auroraOpacity, greaterThan(light.auroraOpacity));
       expect(mid.auroraOpacity, lessThan(dark.auroraOpacity));
+      expect(mid.bloomOpacity, greaterThan(light.bloomOpacity));
+      expect(mid.bloomOpacity, lessThan(dark.bloomOpacity));
     });
 
     test('t is honoured monotonically across the whole range', () {

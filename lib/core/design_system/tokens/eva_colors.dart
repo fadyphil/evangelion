@@ -54,6 +54,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     required this.seam,
     required this.seamGlow,
     required this.bloom,
+    required this.bloomOpacity,
     required this.sticker,
   });
 
@@ -62,7 +63,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `canvas` #05081A · `surface` #0D1224 · `raised` #141A2E · `ink` #EAE8F5 ·
   /// `ink2` #8A8FAD · `ink3` #424669 · `line` #1C2238 · `ember` #E8A33D ·
   /// `emberDeep` #C77F1F · `onEmber` #0D0A04 · `ok` #4ECCA3 · `err` #FF6B6B ·
-  /// `orbOpacity` 0.55 · `auroraOpacity` 0.18.
+  /// `orbOpacity` 0.55 · `auroraOpacity` 0.18 · `bloomOpacity` 1.0.
   const EvaColors.dark()
     : canvas = const Color(0xFF05081A),
       surface = const Color(0xFF0D1224),
@@ -91,6 +92,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
       seam = const Color(0xD9FFFFFF),
       seamGlow = const Color(0x99FFFFFF),
       bloom = const Color(0x8CE457D6),
+      bloomOpacity = 1.0,
       sticker = EvaStickerPalette.colors;
 
   /// The light palette — `03-design-system.md` §5.1, light table.
@@ -98,7 +100,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `canvas` #F0EEFF · `surface` #FFFFFF · `raised` #E8E4FF · `ink` #120E28 ·
   /// `ink2` #5A5480 · `ink3` #9B97B8 · `line` #D5D0EF · `ember` #D4891A ·
   /// `emberDeep` #B56C0C · `ok` #1A8C6A · `err` #D63B3B ·
-  /// `orbOpacity` 0.18 · `auroraOpacity` 0.10.
+  /// `orbOpacity` 0.18 · `auroraOpacity` 0.10 · `bloomOpacity` 0.55.
   ///
   /// **`onEmber` is #3A1E00, NOT the spec's #FFF8EE.** This is the one token in
   /// the file that deliberately diverges from `03-design-system.md`, and the
@@ -180,6 +182,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
       seam = const Color(0xCC9A7B19),
       seamGlow = const Color(0x809A7B19),
       bloom = const Color(0x8CE457D6),
+      bloomOpacity = 0.55,
       sticker = EvaStickerPalette.colors;
 
   /// The page backdrop — the bottom-most layer of the three.
@@ -243,6 +246,39 @@ class EvaColors extends ThemeExtension<EvaColors> {
 
   /// Peak alpha of the aurora band. Also "(was dead — wire it)".
   final double auroraOpacity;
+
+  /// The `.bloom` wash's peak alpha — `1.0` dark / `0.55` light.
+  ///
+  /// The **third** per-brightness float in this table, and the reason
+  /// [seamGlow]'s doc says the first two are the precedent rather than
+  /// pretending there are none. Its own doc carries the derivation.
+  ///
+  /// ## WHAT THE PROTOTYPE SAYS, AND WHY IT IS A TABLE ROW AND NOT A NOTE
+  ///
+  /// `redesign.html:73` sets `opacity:.55` on all four `.bloom`s in light mode
+  /// and nothing in dark. The wash's colour is [bloom], which is deliberately
+  /// identical in both palettes **because** the prototype expresses the dimmer
+  /// as an opacity rather than by re-hueing `--bh`. Splitting those two halves
+  /// across two fields is what lets each one be right: the hue stays shared and
+  /// named as an exception, and the alpha is per-brightness like every other
+  /// opacity in this table — this is the **third** such float, which is what
+  /// makes it the test of whether the convention is a convention.
+  ///
+  /// ## WHY IT WAS NOT LEFT AS CALLER STATE
+  ///
+  /// `GlassTier.bloom`'s doc used to say the dimmers "are caller state", and for
+  /// the `.bcard.sealed` dimmer at `redesign.html:285` that is still true — a
+  /// sealed card is a **state of a book card**, not a theme. But light mode *is*
+  /// a theme, and a caller-state opacity that **no caller sets** leaves every
+  /// card in the family light-mode-wrong by 0.55× the moment it lands. "The
+  /// prototype declares it on the element" is a claim about CSS, not a
+  /// mechanism; a token is the mechanism, and it is the same mechanism
+  /// [orbOpacity] and [auroraOpacity] already use.
+  ///
+  /// `GlassSurface` applies this to the wash layer only. The **sealed** dimmer
+  /// is still the caller's, and this table has no `sealedOpacity` — a second
+  /// float for a state no widget has would be a token with no reader.
+  final double bloomOpacity;
 
   /// Translucent white on dark / translucent black on light — the tint behind a
   /// glass panel.
@@ -310,36 +346,50 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `0 0 12px rgba(154,123,25,.5)` in light (`redesign.html:257` / `:72`).
   ///
   /// **The two palettes' glow radii differ (14 and 12) and this widget ships 14
-  /// in both**, because the radius is a `BoxShadow.blurRadius` on a
-  /// `DecoratedBox` — a paint, not a colour — and **a colour table is the wrong
-  /// home for a length**. `seamGlow` is a `Color`; a per-brightness float token
-  /// beside it would mean a `Color` field that no longer has anything to say
-  /// about the glow's own radius.
+  /// in both**, and the reason is a **judgement about the ratio**, not a missing
+  /// convention. That distinction used to be argued on a premise that was false
+  /// twice over, and the corrections are worth keeping because the *shape* of the
+  /// mistake is the lesson.
   ///
-  /// ## IT USED TO CLAIM THIS SYSTEM HAS NO PER-BRIGHTNESS FLOAT TOKENS. IT HAS TWO.
+  /// ## IT USED TO ARGUE THAT NO PER-BRIGHTNESS FLOAT CONVENTION EXISTS. IT DOES.
   ///
   /// The sentence this replaces read "a per-brightness *float* token for a 2px
   /// difference on a decorative glow would be a token this design system has no
-  /// convention for". **That premise is false and was checked only now:**
-  /// [orbOpacity] (0.55 dark / 0.18 light) and [auroraOpacity] (0.18 / 0.10) are
-  /// both per-brightness floats, both lerped per brightness, and both predate
-  /// this tier. So the convention exists and was available the whole time.
+  /// convention for". Two claims, and both are wrong now:
   ///
-  /// What survives is only the judgement, and it is a judgement about the
-  /// **ratio**, not about the table: 14 against 12 is a 14% difference on a
-  /// 14px-radius `BoxShadow.blurRadius` beneath a 2px bar, which is not
+  /// - [orbOpacity] (0.55 dark / 0.18 light) and [auroraOpacity] (0.18 / 0.10)
+  ///   were per-brightness floats, both lerped per brightness, and both
+  ///   predated this tier. The convention existed when the sentence was written.
+  /// - [bloomOpacity] (1.0 / 0.55) joined them *after* the sentence was
+  ///   corrected once, which is the sharper half: the table grew a third
+  ///   per-brightness float **and kept the old reasoning**. A premise that
+  ///   survives its own refutation does not rot, it is load-bearing — and it was
+  ///   carrying an argument, which is the dangerous place for one.
+  ///
+  /// What survives is only the judgement. 14 against 12 is a 14% difference on
+  /// a 14px-radius `BoxShadow.blurRadius` beneath a 2px bar, which is not
   /// perceptible on either palette and is well inside the difference the two
   /// palettes' *colours* already make — `.6` vs `.5` alpha on
   /// `rgba(255,255,255,…)` vs `rgba(154,123,25,…)`. Spending a token on the
   /// smaller of two differences in the same effect is how a token table starts
   /// carrying numbers nobody reads.
   ///
+  /// ## AND WHY IT IS NOT A COLOUR TABLE'S BUSINESS EITHER
+  ///
+  /// The second argument is the one that would still hold if the convention were
+  /// retracted: this is a **colour** table. [bloomOpacity] and its siblings are
+  /// alphas — an alpha is a colour's property, and the prototype writes them as
+  /// `rgba(…)` or `opacity:`. A `BoxShadow.blurRadius` is geometry, and the
+  /// geometry of the seam lives in `GlassSurface`, which already names
+  /// `kGlassSeamGlowBlur` and owns every other number on `.hor`. Putting a
+  /// radius here would put half of one effect's geometry in each of two files.
+  ///
   /// Recorded rather than smoothed over, and it is a decision not a gap: if the
   /// light value is ever wanted, `glass_surface.dart`'s `kGlassSeamGlowBlur` is
-  /// the constant to parameterise per brightness, and `GlassSurface` — not this
-  /// table — is where the geometry lives. (Spelled as a code span rather than a
-  /// `[kGlassSeamGlowBlur]` link because that constant lives in a file that
-  /// imports *this* one, and a dartdoc reference cannot go backwards.)
+  /// the constant to parameterise per brightness — in that file, as
+  /// `GlassSurface` is where the geometry lives. (Spelled as a code span rather
+  /// than a `[kGlassSeamGlowBlur]` link because that constant lives in a file
+  /// that imports *this* one, and a dartdoc reference cannot go backwards.)
   final Color seamGlow;
 
   /// The `.bloom` wash — the soft radial of colour that rises from a card's
@@ -351,12 +401,12 @@ class EvaColors extends ThemeExtension<EvaColors> {
   ///
   /// `redesign.html:73` dims every `.bloom` in light mode — `.hcard`, `.bcard`,
   /// `.medal` and `.podbar` alike — with `opacity:.55`, and never re-hues the
-  /// `--bh` colour. A per-brightness value here would be a second copy of a
-  /// decision the prototype makes with an opacity, and it would be a decision
-  /// this client cannot take: the dimmer is **caller state**, so it belongs to
-  /// whatever puts the wash on a card, not to a token or a tier member.
-  /// `eva_colors_test.dart`'s shared-value inventory carries this as a named
-  /// exception to "a shared token means one theme ships the wrong colour".
+  /// `--bh` colour. So the **hue** is one value and the **dimmer** is a
+  /// separate thing — which is what [bloomOpacity] is for, and why it exists
+  /// rather than this field carrying two numbers.
+  /// `eva_colors_test.dart`'s shared-value inventory carries `bloom` as a named
+  /// exception to "a shared token means one theme ships the wrong colour", and
+  /// it says there *why* that exception is correct rather than accidental.
   ///
   /// ## AND WHY IT IS A TOKEN AT ALL, GIVEN THAT `--bh` IS PER-HOST
   ///
@@ -396,6 +446,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     Color? seam,
     Color? seamGlow,
     Color? bloom,
+    double? bloomOpacity,
     Map<StickerSlot, Color>? sticker,
   }) => EvaColors(
     canvas: canvas ?? this.canvas,
@@ -421,6 +472,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     seam: seam ?? this.seam,
     seamGlow: seamGlow ?? this.seamGlow,
     bloom: bloom ?? this.bloom,
+    bloomOpacity: bloomOpacity ?? this.bloomOpacity,
     sticker: sticker ?? this.sticker,
   );
 
@@ -470,6 +522,23 @@ class EvaColors extends ThemeExtension<EvaColors> {
       seam: c(seam, other.seam),
       seamGlow: c(seamGlow, other.seamGlow),
       bloom: c(bloom, other.bloom),
+      // THE PLAN SAYS AN OMISSION HERE "MAKES THE TOKEN SILENTLY ALWAYS-DARK".
+      // IT WOULD NOT. It is a compile error, and the class's own doc is why.
+      //
+      // Every field of this constructor is `required` — deliberately, per the
+      // class doc: a defaulted field is a palette where "which colour is this?"
+      // has two answers. So a `lerp` that forgets a row cannot compile
+      // (`Required named parameter 'bloomOpacity' must be provided.`, measured
+      // by deleting this line and running `eva_colors_test.dart`). The plan's
+      // premise is true of a class that defaults its constructor and false of
+      // this one, and it was worth measuring rather than repeating.
+      //
+      // The failure that IS silent is the one this line cannot catch: a `d` that
+      // reads `bloomOpacity` twice instead of once — `d(a, a)` compiles, keeps
+      // the dark value through the whole transition, and lands a light theme at
+      // 1.0. `eva_colors_test.dart`'s mutation proof names that one and the
+      // three tests that catch it.
+      bloomOpacity: d(bloomOpacity, other.bloomOpacity),
       sticker: {
         for (final StickerSlot slot in StickerSlot.values)
           slot: c(EvaStickerPalette.of(slot), other.sticker[slot]!),
