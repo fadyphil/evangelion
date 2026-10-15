@@ -94,6 +94,24 @@ void main() {
       expect(PassageDropCap.capHeightRatio, 0.7);
     });
 
+    // Task 4.2 Decision 5: `:172` is NOT adopted for the size. Both halves of
+    // "not adopted" are pinned, because "we left it alone" is the one claim in
+    // this file that a later reader would most want to undo.
+    test('and NOT `redesign.html:172`\'s 56px / line-height .82', () {
+      // `:172` is `font-size:56px; line-height:.82`. This widget derives its size
+      // from its body instead, so a 3-line cap over a 19px body is 146.57. Tuning
+      // the ratio means reading it on a screen, and there is no `.vline` anywhere
+      // in `redesign.html` — `/reading` does not exist in the prototype at all.
+      // Phase 5.3 owns it.
+      expect(PassageDropCap.lineHeight, 1.8);
+      expect(PassageDropCap.lineHeight, isNot(0.82));
+      expect(const PassageDropCap(letter: 'I').fontSizeFor(19), isNot(56.0));
+      expect(
+        const PassageDropCap(letter: 'I').fontSizeFor(19),
+        closeTo(3 * 1.8 * 19 / 0.7, 1e-9),
+      );
+    });
+
     test('four lines is taller than three', () {
       expect(
         const PassageDropCap(letter: 'I', lines: 4).fontSizeFor(19),
@@ -140,6 +158,89 @@ void main() {
         letter: 'I',
       ).span(_body.copyWith(color: const EvaColors.dark().ink)) as WidgetSpan;
       expect((span.child as Text).style!.color, const EvaColors.dark().ink);
+    });
+  });
+
+  group('the halo — `redesign.html:172`, adopted', () {
+    // The one thing this file takes from `:172`. `:172` writes
+    // `text-shadow: 0 0 26px rgba(232,176,75,.6)` — zero offset, a 26px blur,
+    // and the gold at 60%.
+    test('is one zero-offset 26px shadow at 0.6', () {
+      final TextStyle style = const PassageDropCap(letter: 'I').capStyle(_body);
+      expect(style.shadows, hasLength(1));
+      final Shadow shadow = style.shadows!.single;
+      expect(shadow.offset, Offset.zero, reason: '`:172` — `0 0 26px`');
+      expect(shadow.blurRadius, 26.0);
+      expect(shadow.color.a, closeTo(0.6, 1e-9));
+      expect(PassageDropCap.capShadowBlur, 26.0);
+      expect(PassageDropCap.capShadowAlpha, 0.6);
+    });
+
+    test('and the colour is `rgba(232,176,75)` — in BOTH modes', () {
+      // `:172` writes `rgba(232,176,75,…)`, and `:76` overrides **only
+      // `color`** in light mode (`.screen[data-mode=light] .vline.drop::first-letter
+      // {color:#9A7B19}`). Nothing overrides the `text-shadow`, so the halo is
+      // `#E8B04B` on a dark canvas and on a light one alike — which is
+      // [EvaColors.dark]'s `ember`, and is why reading a *dark* token here is the
+      // transcription rather than a shortcut.
+      final Shadow shadow = const PassageDropCap(letter: 'I')
+          .capStyle(_body)
+          .shadows!
+          .single;
+      expect(
+        shadow.color.toARGB32(),
+        const EvaColors.dark().ember.withValues(alpha: 0.6).toARGB32(),
+      );
+      expect(
+        shadow.color.toARGB32() & 0x00FFFFFF,
+        const EvaColors.dark().ember.toARGB32() & 0x00FFFFFF,
+        reason:
+            'and it is NOT the light palette\'s ember: `:76` re-hued the letter '
+            'and deliberately left the halo alone',
+      );
+    });
+
+    testWidgets('it reaches the rendered glyph, not just the style object', (
+      WidgetTester tester,
+    ) async {
+      // A style property is not a painted shadow. `Text` resolves
+      // `TextStyle.shadows` inside `TextPainter`, so the assertion is that a
+      // pumped widget carries a style with the shadow — and the golden beside
+      // it is what actually shows the blur.
+      await tester.pumpWidget(_bare(letter: 'I', direction: TextDirection.ltr));
+      final Text glyph = tester.widget<Text>(_capIn(find.byKey(_paragraphKey)));
+      expect(glyph.style!.shadows, PassageDropCap.capShadow);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the ink is `emberInk`, not `ember` — decision 153', () {
+    // `:172` writes one name, `var(--gold)`, for the letter. This client has two:
+    // `ember` fills and `emberInk` writes. A 56px letter is text at every size
+    // WCAG recognises, so it is the writing half — and on the light palette the
+    // two are a factor of four apart in luminance.
+    test('a caller that passes `emberInk` gets `emberInk`', () {
+      for (final EvaColors colors in const <EvaColors>[
+        EvaColors.dark(),
+        EvaColors.light(),
+      ]) {
+        final WidgetSpan span = PassageDropCap(
+          letter: 'I',
+          color: colors.emberInk,
+        ).span(_body) as WidgetSpan;
+        expect((span.child as Text).style!.color, colors.emberInk);
+      }
+    });
+
+    test('and the two names differ where it matters — the light palette', () {
+      // In dark they are the same value by design (decision 153's own note), so
+      // asserting only `isNot` would pass against a palette that had collapsed
+      // back to one name.
+      expect(
+        const EvaColors.light().emberInk,
+        isNot(const EvaColors.light().ember),
+      );
+      expect(const EvaColors.dark().emberInk, const EvaColors.dark().ember);
     });
   });
 
@@ -220,6 +321,38 @@ void main() {
       );
       expect(rtlParagraphLeft, closeTo(ltrParagraphLeft, 0.01));
     });
+
+    // `redesign.html:141` is `[dir=rtl] .vline.drop::first-letter{all:unset}` —
+    // the prototype *removes* the cap in Arabic rather than mirroring it. Task
+    // 4.2 Decision 5 keeps the capability and records the divergence, so this is
+    // the test that says the removal has not happened.
+    testWidgets(
+      'RTL still MIRRORS the cap — `:141`\'s `all:unset` is recorded, '
+      'not implemented',
+      (WidgetTester tester) async {
+        expect(const PassageDropCap(letter: 'I').direction, TextDirection.ltr);
+        expect(
+          const PassageDropCap(
+            letter: 'I',
+            direction: TextDirection.rtl,
+          ).direction,
+          TextDirection.rtl,
+          reason:
+              'removing a capability is a behaviour change, and this batch is scoped '
+              'to paint. Phase 5.3 owns the decision \u2014 and `today_reading_panel` '
+              'reaches `paragraph()` only on the English arm, so `:141` describes a '
+              'screen this client does not have yet',
+        );
+        await tester.pumpWidget(
+          _paragraph(
+            const PassageDropCap(letter: 'I', direction: TextDirection.rtl),
+          ),
+        );
+        await tester.pump();
+        expect(_capIn(find.byKey(_paragraphKey)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('both directions fit the same column', (
       WidgetTester tester,

@@ -2,6 +2,70 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// Which way a curtain closes.
+///
+/// ## ONE CSS CLASS, THREE `data-shape` OVERRIDES, THREE DIFFERENT GEOMETRIES
+///
+/// `eva/redesign.html:112-115` declares `.scrim` **once** and then overrides the
+/// whole `background` per `data-shape` on the `.screen` element:
+///
+/// | line | shape | CSS gradient |
+/// | --- | --- | --- |
+/// | `:113` | (default) | `linear-gradient(180deg, transparent 0%, … 22%, … 46%, … 100%)` |
+/// | `:114` | `bottom` | `linear-gradient(0deg, transparent 0%, … 22%, … 46%, … 100%)` |
+/// | `:115` | `sides` | `linear-gradient(90deg, … .88 0%, transparent 20% 80%, … .88 100%)` |
+///
+/// So the shape is not a direction on one ramp; it selects **between two different
+/// ramps**. `:113`/`:114` are the same four stops running in opposite directions,
+/// and `:115` is a different pair of alphas (`.88`, not `.92`) with a flat centre
+/// band written as a CSS double-position stop `transparent 20% 80%`.
+enum CurtainShape {
+  /// `.scrim`'s default, `eva/redesign.html:113` — `180deg`, dark top to bottom.
+  top,
+
+  /// `.screen[data-shape="bottom"] .scrim`, `:114` — the same ramp, `0deg`.
+  ///
+  /// **The shape this widget actually paints.** `ReadingEnScreen.tsx:80-86` puts
+  /// its gradient on the sticky CTA, and a CTA's shade closes downward; every
+  /// screen that sets [NeuralScaffold.bottomFade] gets this one.
+  bottom,
+
+  /// `.screen[data-shape="sides"] .scrim`, `:115` — `90deg`, opaque at both
+  /// edges and clear through the middle 60%.
+  sides,
+}
+
+/// The `180deg` ramp's four stops — `eva/redesign.html:113` and `:114`.
+///
+/// `0 / .22 / .46 / 1`. `:113` is
+/// `linear-gradient(180deg, transparent 0%, rgba(6,7,12,.30) 22%,
+/// rgba(6,7,12,.80) 46%, rgba(6,7,12,.92) 100%)` — four stops and **three
+/// different alphas**, and a ramp is only as good as its weakest stop: taking the
+/// `.80` alone, or carrying the `.92` to `46%`, gives a gradient that is not the
+/// one the prototype draws. That the transcription used to be a *two*-stop
+/// `[0, 0.40]` is the subject of [kNeuralCurtain]'s doc.
+const List<double> curtainStops = <double>[0, 0.22, 0.46, 1];
+
+/// The `180deg` ramp's four alphas, dark — `:113`.
+const List<double> curtainAlphasDark = <double>[0, 0.30, 0.80, 0.92];
+
+/// The `180deg` ramp's four alphas, light — `eva/redesign.html:61`.
+const List<double> curtainAlphasLight = <double>[0, 0.35, 0.82, 0.94];
+
+/// The `90deg` ramp's stops — `eva/redesign.html:115`.
+///
+/// The CSS writes `transparent 20% 80%`, which is one colour pinned at **two**
+/// positions. Flutter has no double-position stop, so it is two stops with the
+/// same colour between them, and the pair is what makes the middle a flat
+/// clearing rather than a slow fade through it.
+const List<double> curtainSideStops = <double>[0, 0.2, 0.8, 1];
+
+/// The `90deg` ramp's edge alpha, dark — `:115`'s `rgba(6,7,12,.88)`.
+const double curtainSideAlphaDark = 0.88;
+
+/// The `90deg` ramp's edge alpha, light — `eva/redesign.html:63`'s `rgba(245,242,234,.9)`.
+const double curtainSideAlphaLight = 0.9;
+
 /// The screen root: canvas, ambient background, safe area, status-bar inversion.
 ///
 /// Six copies collapse to one (`04-widget-inventory.md` §3). Each prototype
@@ -33,6 +97,42 @@ import 'package:flutter/services.dart';
 ///   from the ambient brightness here, in the one widget that is guaranteed to be
 ///   on every screen.
 ///
+/// ## D3 — THE SCRIM'S CITATION MOVED, AND THE ROOT'S EIGHT DID NOT
+///
+/// This widget is **partially frozen**, and the split is the whole of Task 4.2's
+/// rule for it: move the citation for what changed, keep it for what survived.
+///
+/// - **Kept, all eight:** `LoginScreen.tsx:11`, `HomeScreen.tsx:14`,
+///   `SettingsScreen.tsx:35`, `QuizScreen.tsx:41`, `ReadingEnScreen.tsx:9`,
+///   `ReadingArScreen.tsx:9`, `ResultScreen.tsx:34` and `App.tsx:99` above. They
+///   describe the **root role** — the five-line container every prototype screen
+///   writes by hand — and not one word of that container changed. Defect **#9** and
+///   the overlay-style half of the fix are exactly where they were.
+/// - **Moved:** the scrim. `ReadingEnScreen.tsx:83`'s
+///   `linear-gradient(to bottom, transparent, rgba(#05081A, 0.95) 40%)` is
+///   replaced by `eva/redesign.html:112-115` (and its light-mode twin at `:61-63`).
+///   See [kNeuralCurtain] for the ramp and [curtain] for the shape.
+///
+/// ### THE PROTOTYPE HAS **TWO** SCRIMS AND THIS WIDGET HAS ONE
+///
+/// `redesign.html:112`'s `.scrim` is `position:absolute; inset:0; z-index:1` with
+/// `data-shape` on the **`.screen`** element: a **full-screen** curtain over
+/// everything the route draws, re-declared per screen. The other one is
+/// `ReadingEnScreen.tsx:80-86`'s, on the sticky CTA, which is what this widget
+/// paints.
+///
+/// **They are different layers with different extents, and only one of them has a
+/// name in this design system.** `CurtainShape` describes the ramp `:112-115`
+/// gives the full-screen one; the extent here is still
+/// [kNeuralScaffoldFadeHeight], which is the CTA block. Adding the full-bleed
+/// curtain would be a second layer, a second parameter, and the question of
+/// which screens get it — a screen-level decision for Phase 5, not a paint
+/// change. Recorded so the two are never confused into one.
+///
+/// `kNeuralScaffoldFadeHeight`'s own doc still cites `ReadingEnScreen.tsx:79-86`,
+/// and that is correct and unchanged: it is the **extent** the prototype's CTA
+/// occupies, which the redesign does not restate anywhere.
+
 /// ## D1 — THERE IS NO ELEVATION TOKEN, AND THE ANSWER IS "STRUCTURALLY 0"
 ///
 /// Phase 1 decision 7 froze every Material elevation at `0` because
@@ -103,6 +203,7 @@ class NeuralScaffold extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: EvaSpacing.lg),
     this.overlay,
     this.bottomFade = false,
+    this.curtain = CurtainShape.bottom,
     this.tier,
     super.key,
   });
@@ -157,14 +258,31 @@ class NeuralScaffold extends StatelessWidget {
 
   /// Whether to draw the sticky-CTA scrim along the bottom edge.
   ///
-  /// `ReadingEnScreen.tsx:80-86` — a `linear-gradient(to bottom, transparent,
-  /// canvas 95%)` reaching 40% of its own height, over
-  /// `padding: '20px 24px 32px'`. The gradient's own extent is the CTA's height
-  /// plus that padding, so it cannot be a constant here; [kNeuralScaffoldFadeHeight]
-  /// is the prototype's number at its smallest (`ReadingEnScreen.tsx:26` — the
-  /// content's `130px` bottom padding) and the gradient is drawn to the bottom of
-  /// the viewport above it.
+  /// **The extent** is `ReadingEnScreen.tsx:80-86`'s: the gradient is the sticky
+  /// CTA's `background`, and the CTA's own `padding: '20px 24px 32px'`, so the
+  /// gradient cannot be a constant — [kNeuralScaffoldFadeHeight] is the prototype's
+  /// number at its smallest and the gradient is drawn to the bottom of the
+  /// viewport above it.
+  ///
+  /// **The ramp is `eva/redesign.html:112-115`'s, and it used to be the React
+  /// app's.** `ReadingEnScreen.tsx:83` is
+  /// `linear-gradient(to bottom, transparent, rgba(#05081A, 0.95) 40%)` — two
+  /// stops, reaching `.95` at 40% of the scrim's height. `:113` is four stops,
+  /// reaching **.92** at 100% of it, with two intermediate rungs at `.30` and
+  /// `.80`. See [curtain] and `kNeuralCurtain` for the whole of it.
   final bool bottomFade;
+
+  /// Which way [bottomFade]'s scrim closes — `eva/redesign.html:112-115`.
+  ///
+  /// **The shape, never the extent.** [kNeuralScaffoldFadeHeight] still decides
+  /// how tall the scrim is, for every shape, because this widget paints the
+  /// **CTA's** gradient rather than the full-screen curtain `:112` describes.
+  /// Adding a full-bleed curtain would be a second layer with its own
+  /// [NeuralScaffold] parameter and its own question about which screens get it.
+  ///
+  /// Defaults to [CurtainShape.bottom] so the one screen that asks for a scrim
+  /// today (`/reading`, whose CTA sits at the foot) keeps the shade it has.
+  final CurtainShape curtain;
 
   /// Forces a [NeuralTier] instead of resolving one. `null` resolves from the
   /// viewport and the reader's reduced-motion preference — see [NeuralBackground].
@@ -173,6 +291,11 @@ class NeuralScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
+    // Read once, beside [colors], for the scrim's light-mode ramp —
+    // `eva/redesign.html:61-63` re-states `.scrim` under
+    // `.screen[data-mode=light]`, so a per-brightness ramp is the prototype's own
+    // shape and not something this widget invents.
+    final Brightness brightness = Theme.of(context).brightness;
 
     return Scaffold(
       // D1 — see the class doc. There is no `elevation:` line here because
@@ -243,18 +366,12 @@ class NeuralScaffold extends StatelessWidget {
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: <Color>[
-                            // `ReadingEnScreen.tsx:83` —
-                            // `linear-gradient(to bottom, transparent,
-                            // rgba(#05081A, 0.95) 40%)`.
-                            colors.canvas.withValues(alpha: 0),
-                            colors.canvas.withValues(alpha: 0.95),
-                          ],
-                          stops: const <double>[0, 0.40],
-                        ),
+                        // `eva/redesign.html:112-115` — see [kNeuralCurtain], which
+                        // is where the ramps live and where the substitution is
+                        // named. The three shapes are three different
+                        // `background` declarations in the prototype, not one
+                        // gradient with three directions.
+                        gradient: kNeuralCurtain(curtain, colors, brightness),
                       ),
                     ),
                   ),
@@ -266,6 +383,122 @@ class NeuralScaffold extends StatelessWidget {
     );
   }
 }
+
+/// The scrim's gradient — `eva/redesign.html:112-115` (dark) and `:61-63` (light).
+///
+/// ## WHAT `:112-115` REPLACED, AND WHY THE NEW RAMP IS **BETTER**
+///
+/// `ReadingEnScreen.tsx:83` was `linear-gradient(to bottom, transparent,
+/// rgba(#05081A, 0.95) 40%)` — two stops, and the second one is the problem.
+///
+/// **The old ramp never resolved to anything.** `transparent` at `0` and `canvas`
+/// at `.95` at stop `0.40` means the gradient is *still climbing* when it runs out
+/// of stops, so the last 60% of the scrim is an unbroken linear ramp from 0 to
+/// .95 that reaches `.95` only at the very bottom edge — and CSS/Flutter both hold
+/// the final colour across the remainder, so the bottom of the scrim is a flat
+/// `.95` plate. `:113` ends at **`.92`**, which is *lighter*, and adds rungs at
+/// `.30` and `.80` so the curve is a ramp with a shoulder rather than a ramp that
+/// ends in a step. The reader sees less plate and more gradient, and the plate is
+/// the part that painted verses over.
+///
+/// **Measured, because "better" is not a number.** The prototype's own opaque
+/// region began `1 - 0.40 = 60%` of the scrim's height above the bottom edge;
+/// `:113`'s is `1 - 0.46 = 54%`, and its peak alpha is `.92` rather than `.95`.
+/// At 390px wide the scrim is 104px, so the shade now starts its shoulder at
+/// 56.2px instead of 62.4px — 6.2px earlier, against a content reserve of 130px.
+/// `neural_scaffold_test.dart` asserts the *relationship* (shoulder inside the
+/// reserve) rather than either number.
+///
+/// ## THE COLOUR IS A NAMED SUBSTITUTION, NOT A TRANSCRIPTION
+///
+/// `:113` shades with `rgba(6,7,12,…)` and `:61` with `rgba(245,242,234,…)`.
+///
+/// Those are the prototype's **own** floor colours — `#06070C` beside a `#05081A`
+/// canvas, `#F5F2EA` beside a `#F0EEFF` one — and neither is a token. They are
+/// substituted by [EvaColors.canvas], following `skyStarFill`'s precedent: the
+/// ramp's *shape* is the prototype's and the *pigment* is this design system's.
+/// A scrim shaded in a colour that is not the surface it covers would be a second
+/// canvas, and a screen with two canvases has no canvas.
+///
+/// The **alphas** are transcribed verbatim in all three tables above, because an
+/// alpha is the one part of an `rgba()` that is not a palette decision.
+///
+/// ## THE THREE SHAPES ARE THREE DIFFERENT RAMPS
+///
+/// `:113` (`top`) and `:114` (`bottom`) share their stops and alphas and differ
+/// only in direction; `:115` (`sides`) is a **different** pair of alphas (`.88`,
+/// not `.92`) with a flat transparent centre. Reading the enum as "a direction on
+/// one ramp" is the reading that would get `sides` wrong, which is why
+/// [CurtainShape]'s doc says so and why this is a `switch` over the shape rather
+/// than a `begin`/`end` pair plus a shared table.
+///
+/// `[dir=rtl]` does **not** mirror a curtain. `:114` is selected by a
+/// `data-shape` attribute, not by direction, and the prototype ships no RTL
+/// override for `.scrim` — an RTL screen shades its CTA from the same edge.
+LinearGradient kNeuralCurtain(
+  CurtainShape shape,
+  EvaColors colors,
+  Brightness brightness,
+) => switch (shape) {
+  // `:113` / `:61` — the `180deg` ramp.
+  CurtainShape.top => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: curtainRamp(colors, curtainAlphasFor(brightness)),
+    stops: curtainStops,
+  ),
+  // `:114` / `:62` — the same ramp at `0deg`. The only screen that asks for a
+  // scrim today is `/reading`, whose CTA is at the foot of the viewport.
+  CurtainShape.bottom => LinearGradient(
+    begin: Alignment.bottomCenter,
+    end: Alignment.topCenter,
+    colors: curtainRamp(colors, curtainAlphasFor(brightness)),
+    stops: curtainStops,
+  ),
+  // `:115` / `:63` — the `90deg` ramp. `begin`/`end` are omitted because
+  // `LinearGradient`'s own default axis is already `centerLeft → centerRight`,
+  // which is what `:115`'s `90deg` means; saying so in a comment is cheaper than
+  // saying it in an argument the linter would then call redundant.
+  //
+  // Its alphas are `[.88, 0, 0, .88]` — the **same** value at both edges and
+  // nothing in the middle — which is why it is a second table rather than a
+  // shared one with a flag. `:115` writes `transparent 20% 80%`: one colour at
+  // two positions, and Flutter has no double-position stop.
+  CurtainShape.sides => LinearGradient(
+    colors: curtainSideRamp(
+      colors,
+      brightness == Brightness.dark
+          ? curtainSideAlphaDark
+          : curtainSideAlphaLight,
+    ),
+    stops: curtainSideStops,
+  ),
+};
+
+/// The `90deg` ramp's colours — `.88`, clear, clear, `.88` at [alpha].
+///
+/// The mirror of [kNeuralCurtain]'s third arm, as a function so the two ends of
+/// one declaration sit next to each other.
+List<Color> curtainSideRamp(EvaColors colors, double alpha) => <Color>[
+  colors.canvas.withValues(alpha: alpha),
+  colors.canvas.withValues(alpha: 0),
+  colors.canvas.withValues(alpha: 0),
+  colors.canvas.withValues(alpha: alpha),
+];
+
+/// The `180deg` ramp's alphas for [brightness] — `:113` dark, `:61` light.
+List<double> curtainAlphasFor(Brightness brightness) =>
+    brightness == Brightness.dark ? curtainAlphasDark : curtainAlphasLight;
+
+/// [alphas] laid onto one colour, in order.
+///
+/// **One function for the two `180deg` arms**, because `canvas` is the only
+/// colour in the scrim and three copies of the same `withValues` ladder is three
+/// places for the substitution above to be re-decided in. `sides` is not in here
+/// — its alpha table is `[.88, 0, 0, .88]`, which is not a ramp.
+List<Color> curtainRamp(EvaColors colors, List<double> alphas) => <Color>[
+  for (final double alpha in alphas) colors.canvas.withValues(alpha: alpha),
+];
 
 /// How tall the sticky-CTA scrim is for [constraints].
 ///

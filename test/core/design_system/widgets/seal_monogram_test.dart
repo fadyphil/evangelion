@@ -49,7 +49,8 @@ void main() {
   });
 
   group('the decoration is the prototype\'s', () {
-    // LoginScreen.tsx:17-26.
+    // `eva/redesign.html:392-395` — `.jorb`, the orb this seal is the counterpart
+    // of. `LoginScreen.tsx:17-26` still owns the 60px box and the two shadows.
     testWidgets('a circle with a radial ember wash', (
       WidgetTester tester,
     ) async {
@@ -65,12 +66,30 @@ void main() {
       );
     });
 
-    testWidgets('the wash starts at 35% 35%', (WidgetTester tester) async {
+    testWidgets('the wash starts at 35% 30% — redesign.html:393', (
+      WidgetTester tester,
+    ) async {
+      // `circle at 35% 30%`. The `y` moved from the old `35% 35%`: the redesign
+      // raises the wash's centre by five points, and that is the whole of the
+      // `:393` contribution this widget adopts.
+      //
       // CSS measures the centre from the top-left; `Alignment` measures y from the
-      // bottom, so 35% from the top is 0.35 * 2 - 1 = -0.3.
-      expect(SealMonogram.sealGlowCenter, const Alignment(-0.3, -0.3));
+      // top too, so 35% from the top is `0.35 * 2 - 1 = -0.3` and 30% from the top
+      // is `0.30 * 2 - 1 = -0.4`. Two different numbers, which is the point: a
+      // test that asserted `-0.3` for both axes would pass against the old value.
+      expect(SealMonogram.sealGlowCenter, const Alignment(-0.3, -0.4));
       expect(SealMonogram.sealGlowCenter.x, -0.3);
-      expect(SealMonogram.sealGlowCenter.y, -0.3);
+      expect(SealMonogram.sealGlowCenter.y, -0.4);
+    });
+
+    test('and the box stays 60, which is LoginScreen.tsx:19 and NOT :392', () {
+      // `redesign.html:392` says `width: 74px`. The redesign's `/login`
+      // (`:503-511`) draws `.lmark` + `.field` + `.cta` and no orb; the orb is the
+      // Journey avatar (`:586`, `<div class="jorb">M</div>`). So 74 is a number
+      // belonging to a screen that does not exist in this client, and `login_geometry
+      // _test.dart` asserts the painted seal is `60` by literal.
+      expect(SealMonogram.defaultSize, 60.0);
+      expect(SealMonogram.defaultSize, isNot(74.0));
     });
 
     testWidgets('a 1.5px ember rim at 0x66', (WidgetTester tester) async {
@@ -86,6 +105,9 @@ void main() {
     });
 
     testWidgets('two zero-offset ember glows', (WidgetTester tester) async {
+      // Kept from `LoginScreen.tsx:17-26`. `redesign.html:394` writes ONE
+      // `0 0 34px rgba(232,176,75,.5)`, and adopting it would mean deleting a
+      // glow pair that no harness reads but every golden does.
       await tester.pumpWidget(_seal());
       final List<BoxShadow> shadows = _decoration(tester).boxShadow!;
       expect(shadows, hasLength(2));
@@ -97,9 +119,13 @@ void main() {
       }
     });
 
-    testWidgets('the glyph is 28px display 600 in ember at the default size', (
+    testWidgets('the glyph is 28px display 600 in onEmber', (
       WidgetTester tester,
     ) async {
+      // `redesign.html:394` — `color: #1c1608`. That is not a §5.1 value, and
+      // `onEmber` is the role's token: gold fills, `onEmber` writes. The old
+      // value was `ember` — the *same* token as the wash underneath it, which on
+      // the light palette is `#D4891A` on an ember wash at 2.0:1.
       await tester.pumpWidget(_seal());
       final Text glyph = tester.widget<Text>(
         find.descendant(
@@ -111,7 +137,18 @@ void main() {
       expect(style.fontFamily, EvaTypography.displayFamily);
       expect(style.fontSize, closeTo(28.0, 0.05));
       expect(style.fontWeight, FontWeight.w600);
-      expect(style.color, const EvaColors.dark().ember);
+      expect(style.color, const EvaColors.dark().onEmber);
+    });
+
+    test('and the ink is NOT the wash, in either palette', () {
+      // The defect `:394` fixes, asserted as the relationship rather than as a
+      // colour: a gold disc with a gold letter on it is the same token twice.
+      for (final EvaColors colors in const <EvaColors>[
+        EvaColors.dark(),
+        EvaColors.light(),
+      ]) {
+        expect(colors.onEmber, isNot(colors.ember));
+      }
     });
 
     testWidgets('the glyph scales with the seal', (WidgetTester tester) async {
@@ -123,6 +160,14 @@ void main() {
         ),
       );
       expect(glyph.style!.fontSize, closeTo(14.0, 0.05));
+    });
+
+    test('and the ratio is `LoginScreen.tsx:25`, not `:394`\'s', () {
+      // `:394` is `font-size: 30px` on a **74px** orb — 0.405. This is
+      // `LoginScreen.tsx:25`'s 28 on a 60px seal. Two marks at two sizes have two
+      // ratios, and the 60 is held by `login_geometry_test.dart` by literal.
+      expect(SealMonogram.glyphRatio, closeTo(28 / 60, 1e-4));
+      expect(SealMonogram.glyphRatio, isNot(closeTo(30 / 74, 1e-4)));
     });
   });
 
@@ -180,7 +225,7 @@ void main() {
       });
     }
 
-    testWidgets('light mode uses the light ember everywhere', (
+    testWidgets('light mode uses the light ink and the light ember', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(_seal(theme: EvaThemeLight.theme));
@@ -190,7 +235,18 @@ void main() {
           matching: find.byType(Text),
         ),
       );
-      expect(glyph.style!.color, const EvaColors.light().ember);
+      // The **ink** is `onEmber` (`#3A1E00` in light), not the light `ember`
+      // (`#D4891A`). Asserting `ember` here is what the pre-restyle test did, and
+      // it is exactly the 2.0:1 pairing `:394`'s `color: #1c1608` exists to fix.
+      expect(glyph.style!.color, const EvaColors.light().onEmber);
+      final RadialGradient wash =
+          _decoration(tester).gradient! as RadialGradient;
+      expect(
+        wash.colors.first.toARGB32() & 0x00FFFFFF,
+        const EvaColors.light().ember.toARGB32() & 0x00FFFFFF,
+        reason:
+            'the wash is the gold that FILLS; the glyph is the ink that WRITES',
+      );
     });
   });
 }

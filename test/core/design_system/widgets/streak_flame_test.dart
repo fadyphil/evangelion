@@ -94,7 +94,7 @@ Future<Uint8List> _inkPixels(WidgetTester tester) async {
   return (width: width, height: height);
 }
 
-/// The bounding box of every pixel carrying visible ink.
+/// The bounding box of every pixel carrying visible ink **from the fill**.
 ///
 /// Alpha, not colour: the harness surface behind the glyph is opaque, so "is
 /// there ink here" has to be asked of the glyph's own contribution. The
@@ -105,11 +105,38 @@ Future<Uint8List> _inkPixels(WidgetTester tester) async {
 /// occupies **two** pixels, and `Rect.fromLTRB(2, y, 3, y)` reports a width of 1.
 /// The count is what "how wide is the ink" means, and it is what the
 /// prototype's x 2…14 actually claims.
-Rect _inkBounds(Uint8List rgba, int width, int height) {
+///
+/// ## THE [minAlpha] FLOOR, AND WHY IT IS NOT `!= 0`
+///
+/// This used to count **any** non-zero alpha. `redesign.html:243`'s glow — an
+/// outward `MaskFilter` halo at 0.85 — now paints ink beyond the path, so
+/// "alpha != 0" measures the halo and every ratio below would read `1.0`. The
+/// silhouette is recovered by asking for alpha **at or above
+/// [StreakFlame.flameSolidAlpha]**, which the measured halo (0.1529) is below and
+/// the fill (1.0) is above; that constant's doc carries the measurement.
+///
+/// **The floor costs nothing at either end of the box**: at `size: 20` and at
+/// `size: 64` it returns exactly `x 2…14` and `y 0…20` — the path's own
+/// bounds — so the tolerances below stayed at `1e-9` and `0.02` rather than being
+/// widened to accommodate a halo. That is the outcome worth having: the change is
+/// in *what* is counted, not in how precisely the answer is checked.
+/// [_haloBounds] is the control that says so.
+///
+/// Alpha, not colour: the harness surface behind the glyph is opaque, so "is
+/// there ink here" has to be asked of the glyph's own contribution. The
+/// `RepaintBoundary` is tight around the flame and nothing is painted behind it
+/// inside that box, so any non-zero alpha in the buffer IS the flame.
+///
+/// Inclusive rather than the raw pixel indices: a glyph covering columns 2 and 3
+/// occupies **two** pixels, and `Rect.fromLTRB(2, y, 3, y)` reports a width of 1.
+/// The count is what "how wide is the ink" means, and it is what the
+/// prototype's x 2…14 actually claims.
+Rect _inkBounds(Uint8List rgba, int width, int height, {double? minAlpha}) {
+  final double floor = minAlpha ?? StreakFlame.flameSolidAlpha;
   int minX = width, minY = height, maxX = -1, maxY = -1;
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
-      if (rgba[((y * width) + x) * 4 + 3] == 0) continue;
+      if (rgba[((y * width) + x) * 4 + 3] / 255.0 < floor) continue;
       minX = minX > x ? x : minX;
       maxX = maxX < x ? x : maxX;
       minY = minY > y ? y : minY;
@@ -121,6 +148,17 @@ Rect _inkBounds(Uint8List rgba, int width, int height) {
   }
   return Rect.fromLTRB(minX.toDouble(), minY.toDouble(), maxX + 1, maxY + 1);
 }
+
+/// The bounding box of **every** pixel carrying any ink at all — halo included.
+///
+/// [StreakFlame.flameSolidAlpha] is the one claim the silhouette measurement
+/// rests on, and a claim about a threshold deserves the test that breaks if it is
+/// wrong. This is that test: with `minAlpha` at one 8-bit step the ink reaches
+/// the box's corners, and with it at [StreakFlame.flameSolidAlpha] the ink is
+/// exactly the path. If the glow ever grew strong enough inside the box to cross
+/// the floor, the two rects would coincide and the pair assertion goes red.
+Rect _haloBounds(Uint8List rgba, int width, int height) =>
+    _inkBounds(rgba, width, height, minAlpha: 1 / 255);
 
 /// The most common **fully opaque** colour in [rgba].
 ///
@@ -183,6 +221,26 @@ void main() {
     test('is closed and finite', () {
       expect(flamePath.computeMetrics().length, greaterThan(0));
       expect(flamePath.contains(Offset.zero), isFalse);
+    });
+
+    // `ds.tsx:514`'s `d`, read back off the object rather than off the screen.
+    // A pixel measurement says "the ink is 12 columns wide"; this says "the path
+    // spans x 2…14 of a 16-wide viewBox", which is the same fact with the
+    // numbers the transcription is supposed to have used written into it. The
+    // pixel tests below then answer the separate question — does the *painter*
+    // map that viewBox onto the box — which is the half a path assertion cannot
+    // see.
+    test('spans x 2…14 and y 0…20 of the 16x20 viewBox', () {
+      final Rect bounds = flamePath.getBounds();
+      expect(bounds.left, closeTo(2, 1e-6));
+      expect(bounds.right, closeTo(14, 1e-6));
+      expect(bounds.top, closeTo(0, 1e-6));
+      expect(bounds.bottom, closeTo(20, 1e-6));
+    });
+
+    test('and the box is 16 wide, so 12/16 is the ink the path claims', () {
+      expect(StreakFlame.aspect * 20, 16.0);
+      expect(14 - 2, 12);
     });
 
     testWidgets('covers roughly the prototype\'s box', (
@@ -254,6 +312,114 @@ void main() {
           reason: 'at size $size',
         );
       }
+    });
+
+    // The glow's whole cost, in one assertion pair: it paints where the fill
+    // does not, and the fill is still readable underneath it.
+    testWidgets('and the halo reaches past the silhouette the fill draws', (
+      WidgetTester tester,
+    ) async {
+      // Two measurements of one capture, and the second is the control the first
+      // depends on. If the glow were removed entirely the two rects would be the
+      // same — which is the failure this file would otherwise not be able to
+      // see, because the silhouette ratios above are satisfied by a halo that had
+      // swallowed the box.
+      _pinSurface(tester);
+      await tester.pumpWidget(_inkOnly());
+      await tester.pump();
+
+      final Uint8List rgba = await _inkPixels(tester);
+      final ({int height, int width}) box = _inkSize(tester, rgba);
+      final Rect silhouette = _inkBounds(rgba, box.width, box.height);
+      final Rect halo = _haloBounds(rgba, box.width, box.height);
+
+      expect(
+        halo.width,
+        greaterThan(silhouette.width),
+        reason:
+            'the box is ${box.width} wide and the path spans 12 of its 16 viewBox '
+            'columns, so the glow has to reach the 2-column margin each side',
+      );
+      expect(
+        halo.height,
+        silhouette.height,
+        reason:
+            'and **exactly** the silhouette\'s height, because the flame is flush '
+            'with the top and bottom of the viewBox already — there is no room '
+            'for the glow to grow into. A halo taller than the box would mean the '
+            'painter had started drawing outside it',
+      );
+      expect(
+        halo.width,
+        box.width,
+        reason:
+            'the halo reaches both edges of the box, which is the whole of '
+            'why the ink bounds need a threshold',
+      );
+    });
+  });
+
+  group('the glow — redesign.html:243, adopted', () {
+    test('the sigma is half the CSS blur radius, not the radius itself', () {
+      // CSS Backgrounds 3 §3.3: a `blur()` radius is twice the Gaussian's
+      // standard deviation. Copying 14 into `MaskFilter.blur` would draw a 28px
+      // halo, which at this widget's 14x18 box is a different mark entirely.
+      expect(StreakFlame.flameGlowBlur, 14.0);
+      expect(StreakFlame.flameGlowSigma, 7.0);
+      expect(StreakFlame.flameGlowSigma, StreakFlame.flameGlowBlur / 2);
+    });
+
+    test('the alpha is `:243`\'s own 0.85', () {
+      expect(StreakFlame.flameGlowAlpha, 0.85);
+    });
+
+    test('and the solid-ink threshold sits between the halo and the fill', () {
+      // The constant the whole silhouette measurement rests on, pinned against
+      // the two numbers it exists to separate. If either moved far enough for the
+      // band to close, the pixel tests above would be measuring the halo — and
+      // the control in the previous group is what would catch it.
+      expect(StreakFlame.flameSolidAlpha, greaterThan(0.1529));
+      expect(StreakFlame.flameSolidAlpha, lessThan(1.0));
+    });
+
+    testWidgets('the glow is the same ember as the fill', (
+      WidgetTester tester,
+    ) async {
+      // One hue at two alphas. `:243`'s `rgba(232,176,75,…)` is `--gold`, which
+      // §5.1 publishes as `ember`; `#ff7a18` — the gradient's third stop and the
+      // second `box-shadow` — is a Phase-2 palette decision and is not here.
+      _pinSurface(tester);
+      await tester.pumpWidget(_inkOnly(theme: EvaThemeDark.theme));
+      await tester.pump();
+      final Uint8List rgba = await _inkPixels(tester);
+      // A pixel outside the path but inside the box: the glow, and nothing else.
+      // Column 0 of a 16-wide box is gutter — the path starts at x 2 — so the
+      // alpha there is the halo's tail and the fill has no part in it. Row 0 is
+      // the flame's own apex, where the path *is* painted.
+      expect(
+        rgba[3] / 255,
+        greaterThan(0.0),
+        reason: 'the glow reaches the gutter column 0',
+      );
+      expect(
+        rgba[3] / 255,
+        lessThan(StreakFlame.flameSolidAlpha),
+        reason:
+            'and it is BELOW the solid-ink floor, which is what makes the '
+            'silhouette measurements above mean what they say',
+      );
+      expect(
+        rgba[3] / 255,
+        lessThan(StreakFlame.flameGlowAlpha),
+        reason: 'a blurred tail of a 0.85 shadow, never the shadow itself',
+      );
+      expect(
+        rgba[7] / 255,
+        greaterThan(rgba[3] / 255),
+        reason:
+            'and it is a *falloff*, not a tint: column 1 is nearer the path than '
+            'column 0, so it is brighter',
+      );
     });
   });
 

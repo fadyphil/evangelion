@@ -159,13 +159,37 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// five flecks are `emberHex`, i.e. [EvaColors.ember], and that is why they are a
 /// different colour from the rays in the prototype (`ResultScreen.tsx:19-24`).
 ///
-/// ## THE GLOW IS NOT HERE
+/// ## THE GLOW IS NOT HERE, AND `.bigring` IS WHAT REPLACES IT
 ///
 /// `ResultScreen.tsx:38` wraps the burst in
 /// `filter: drop-shadow(0 0 36px rgba(#F5C84C, 0.55))`. That is a property of the
 /// **container**, not of the svg — `SunBurst` is the svg, so the glow belongs to
 /// whatever places it (Phase 8's `ResultPage`) and adding it here would invent a
 /// shape the prototype does not have.
+///
+/// ## THIS WIDGET IS **SUPERSEDED**, AND NOT AT ALL — THE RESTYLE IS PHASE 6.2
+///
+/// `eva/redesign.html`'s result modal has no sun burst. Its mark is `.bigring`
+/// (`:447-452`): a 132×132 box, an `svg` rotated `-90deg`, two `circle`s at
+/// `stroke-width: 8` with round caps, a `.bgc` track at `rgba(255,255,255,.08)`,
+/// an `.fgc` arc drawing itself on over 1s from `stroke-dashoffset: 339`, and the
+/// score as a `.val` label in the middle at `font-size: 34px`.
+///
+/// **A faithful restyle would therefore delete this widget — and the glow with
+/// it.** `.bigring` declares no `box-shadow` and no `filter` at all: a progress
+/// ring is a precise instrument and does not glow. So the honest statement of
+/// what happens next is not "this widget gets restyled in Phase 4" but **"this
+/// widget stops existing in Phase 6.2"**, and nothing in Task 4.2 changed it for
+/// that reason.
+///
+/// `/result` becomes a modal in **Phase 6.2**, which is also where `.bigring`
+/// arrives. Until then this burst is what the screen shows, the two 40/80 glows
+/// on `SealMonogram` are the closest thing this design system has to a
+/// celebration glow, and `ResultScreen.tsx:4-27` — fourteen rays, three discs,
+/// five flecks — is still the only ray table the prototype has. **Nothing here is
+/// transcribed from `.bigring`** and nothing here should be read as if it were:
+/// the two marks are a burst and a ring, and the resemblance is a coincidence of
+/// both being round and gold.
 ///
 /// ## SEMANTICS
 ///

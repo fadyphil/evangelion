@@ -5,26 +5,97 @@ import 'package:flutter/material.dart';
 
 /// The oversized opening letter of a passage.
 ///
-/// ## D6 — THERE IS NO PROTOTYPE FOR THIS WIDGET
+/// ## D6 — "NO PROTOTYPE", WHICH WAS TRUE OF `eva/src/` AND FALSE OF `redesign.html`
 ///
-/// `04-widget-inventory.md:32` claims it is "reached through
-/// `ScriptureVerse.dropCap`" in `ReadingEnScreen`. **Neither exists.** A search
-/// of `eva/src/` for a drop cap returns nothing — the only hits are a pasted-text
-/// attachment describing a *different*, discarded design (an oversized Cormorant
-/// "I" opening "In the beginning…" in a Home hero that was cut with the library).
-/// And `05-domain-model.md` §9.1's `Verse` has no `dropCap` member, so the field
-/// the inventory names was invented alongside the widget.
+/// **This doc used to say there was not, and that was true of `eva/src/` and
+/// false of the prototype this client is now built from.** `eva/src/` is the
+/// React app the Phase-3 inventory describes, and a search of it for a drop cap
+/// returns nothing — the only hits are a pasted-text attachment describing a
+/// *different*, discarded design (an oversized Cormorant "I" opening "In the
+/// beginning…" in a Home hero that was cut with the library), and
+/// `05-domain-model.md` §9.1's `Verse` has no `dropCap` member, so the field the
+/// inventory names was invented alongside the widget.
 ///
-/// So there is nothing to be faithful to. What is implemented is the signature
-/// the inventory gives, plus the one requirement that is not negotiable:
-/// **it must work in both reading directions.** The values below are the
-/// prototype's *type scale* — scripture 19px on a 1.8 line height
-/// (`03-design-system.md` §5.2 and the pasted-text note) — and the geometry is
-/// derived from those.
+/// **`eva/redesign.html` has one.** `redesign.html:172` is the whole of it:
 ///
-/// Recorded so Phase 7 does not go looking for a prototype that was never built,
-/// and so `ScriptureVerse.dropCap` is treated as new work rather than a
-/// transcription.
+/// ```css
+/// .vline.drop::first-letter{font-family:var(--scr);font-size:56px;float:left;
+///   line-height:.82;padding:6px 10px 0 0;color:var(--gold);
+///   text-shadow:0 0 26px rgba(232,176,75,.6)}
+/// ```
+///
+/// and `redesign.html:141` is the other half of it —
+/// `[dir=rtl] .vline.drop::first-letter{all:unset}` — the Arabic arm.
+///
+/// So the widget is no longer new work with a borrowed type scale. It is a
+/// transcription of one CSS rule, and this file says which halves of that rule
+/// shipped and which did not rather than leaving the reader to infer it from a
+/// doc that claimed there was nothing to transcribe.
+///
+/// ## WHAT `:172` GAVE THIS WIDGET
+///
+/// | `:172` | here | |
+/// | --- | --- | --- |
+/// | `text-shadow: 0 0 26px rgba(232,176,75,.6)` | [capShadow] | **adopted** |
+/// | `color: var(--gold)` | [color] | **adopted**, with Decision 153's split applied by the two call sites |
+/// | `font-family: var(--scr)` | [EvaTypography.scriptureFamily] | already in place |
+/// | `float: left` | [PlaceholderAlignment.baseline] + [paragraph]'s `textDirection` | already in place, and the reason it is [paragraph] and not a `Text` |
+/// | `font-size: 56px` | derived from `19 × 3 × 1.8 / 0.7` | **not adopted** — see below |
+/// | `line-height: .82` | [PassageDropCap.lineHeight] = `1.8`, the *body*'s | **not adopted** — the same reason |
+/// | `padding: 6px 10px 0 0` | [widthFor]'s `0.5 ×` glyph-width estimate | not adopted |
+///
+/// ## THE SIZE IS **NOT** `:172`'s, AND THAT IS A PHASE 5.3 DECISION
+///
+/// `:172` wants 56px at `line-height: .82`, which is a cap spanning `56 × 0.82
+/// ≈ 46px` of ink against a body whose own line box this client does not know.
+/// This widget derives its size from its **body**: `lines × lineHeight ×
+/// bodyFontSize / capHeightRatio`, so a 3-line cap over a 19px body on a 1.8 line
+/// height is `146.57px`. That is a ratio (3 body lines), and a ratio is the right
+/// thing for a widget that does not own the paragraph; 56 is an absolute
+/// transcribed from one screen's one rule.
+///
+/// **Tuning the ratio means re-reading it on a screen.** `/reading` does not
+/// exist in the redesign — there is no `.vline` anywhere in `redesign.html` — so
+/// changing the multiplier here would be tuning against a screen that has not
+/// been built and cannot be measured. Phase 5.3 owns it. `reading_page_test.dart`
+/// prints `fontSizeFor(17)` into its own failure messages, so the number this
+/// produces is visible wherever it matters.
+///
+/// ## RTL IS NOT REMOVED, AND THAT IS ALSO PHASE 5.3'S
+///
+/// `redesign.html:141` does not mirror the cap under `[dir=rtl]` — it **removes
+/// it**, `all: unset`. This widget mirrors instead: [span] hands the glyph a
+/// [TextDirection], [paragraph] hands the paragraph the same one, and a reader
+/// gets an oversized opening letter on the right of an Arabic passage.
+///
+/// **Removing a capability is a behaviour change, and this batch is scoped to
+/// paint.** Two arguments for keeping it, both load-bearing rather than
+/// sentimental:
+///
+/// - `today_reading_panel.dart` reaches [paragraph] only on the **English** arm
+///   — the Arabic arm renders its preview whole — so `:141` describes a screen
+///   that does not exist in this client yet, exactly like `:172`'s font size.
+/// - Unsetting a drop cap in Arabic is not a restyle, it is a typographic
+///   decision about a right-to-left scripture tradition that this widget does not
+///   own and that no document here has taken.
+///
+/// So `:141` is recorded, cited, and not implemented. What the widget keeps is a
+/// capability; what `:141` would take away is not a paint.
+///
+/// ## THE INK IS `emberInk`, NOT `ember`, AND THAT IS DECISION 153
+///
+/// `:172` writes `color: var(--gold)` — gold, one name, no split. **This client
+/// has two names for that role**: `ember` **fills** and `emberInk` **writes**
+/// (decision 153). A 56px letter is *text* at every size WCAG recognises, so it is
+/// the writing half, and on the light palette the two differ by a factor of four
+/// in luminance (`#845610` against `#D4891A`).
+///
+/// [color] stays a nullable pass-through rather than gaining a default, because
+/// the widget is handed the ink by the two call sites that own it —
+/// `scripture_block.dart` and `today_reading_panel.dart`, both of which already
+/// pass `colors.emberInk` — and a default here would be a third answer to a
+/// question two callers have already answered. `null` inherits the body style,
+/// which is what the tests below pin.
 class PassageDropCap extends StatelessWidget {
   /// A drop cap for the first [letter] of a passage.
   const PassageDropCap({
@@ -55,12 +126,59 @@ class PassageDropCap extends StatelessWidget {
   /// pasted-text note's "3-line Cormorant ember drop-cap".
   final int lines;
 
-  /// The cap's ink. Null resolves to [EvaColors.ember] at the call site through
-  /// `context.colors`, which is what the note calls it ("ember drop-cap").
+  /// The cap's ink. Null inherits the body style's colour.
+  ///
+  /// **`:172` writes `color: var(--gold)`; both call sites pass
+  /// `colors.emberInk`.** See the class doc's Decision 153 note: gold fills and
+  /// `emberInk` writes, a 56px letter is text, and the light palette measures
+  /// `#D4891A` at 2.0:1 against the pale surfaces around it.
   final Color? color;
 
+  /// `redesign.html:172`'s halo — `text-shadow: 0 0 26px rgba(232,176,75,.6)`.
+  ///
+  /// ## WHY [EvaColors.dark] AND NOT THE AMBIENT PALETTE
+  ///
+  /// `:172` writes `color: var(--gold)`, and `redesign.html:76` overrides
+  /// **only the colour** in light mode —
+  /// `.screen[data-mode=light] .vline.drop::first-letter{color:#9A7B19}`.
+  /// **Nothing overrides the `text-shadow`.** So `rgba(232,176,75,.6)` is the
+  /// same value on both, and `#E8B04B` is [EvaColors.dark]'s `ember`.
+  ///
+  /// That makes this one of the few places in the design system where reading a
+  /// dark token is the faithful transcription rather than a shortcut: the halo is
+  /// a constant the prototype never re-hued. Naming `EvaColors.dark()` says
+  /// *that*; writing `colors.ember` would say *whatever this screen's palette
+  /// is*, and in light mode it would silently be a different colour from the
+  /// one the prototype draws. The shadow is light in both modes by design — a
+  /// dark halo behind `#9A7B19` would read as a smudge, which is presumably why
+  /// `:76` re-hued the letter and left this alone.
+  ///
+  /// A [Shadow] rather than a `BoxShadow`: the rule is a **text**-shadow, so it
+  /// belongs to the run of text, scales with the glyph's em box and follows the
+  /// glyph's own outline. A box shadow around the [Text] widget would be a
+  /// rectangle's worth of blur on the wrong side of every stroke.
+  ///
+  /// `static final`, not `const`, because [Color.withValues] is not a const
+  /// constructor in this SDK — the values are fixed, the *spelling* is not.
+  static final List<Shadow> capShadow = <Shadow>[
+    Shadow(
+      color: const EvaColors.dark().ember.withValues(alpha: capShadowAlpha),
+      blurRadius: capShadowBlur,
+    ),
+  ];
+
   /// One body line's height, `19px × 1.8` from the pasted-text note.
+  ///
+  /// **Not `:172`'s `line-height: .82`.** That is the *cap's* line height inside
+  /// CSS's `float` box, and this constant is the **body's** — the one the cap has
+  /// to divide. See the class doc.
   static const double lineHeight = 1.8;
+
+  /// `redesign.html:172`'s `text-shadow` radius, `0 0 26px`.
+  static const double capShadowBlur = 26;
+
+  /// `redesign.html:172`'s shadow alpha, `rgba(232,176,75,.6)`.
+  static const double capShadowAlpha = 0.6;
 
   /// The multiplier from one line's height to the cap's cap-height.
   ///
@@ -81,6 +199,13 @@ class PassageDropCap extends StatelessWidget {
     fontSize: fontSizeFor(bodyStyle.fontSize ?? 16),
     fontWeight: FontWeight.w400,
     color: color,
+    // `redesign.html:172` — the only thing this file takes from that rule. See
+    // [capShadow] for why the halo is a constant of the rule rather than a
+    // per-brightness colour.
+    shadows: capShadow,
+    // `height: 1` and not `:172`'s `line-height: .82`: the cap is a
+    // [WidgetSpan] hung on the paragraph's first baseline, so it has no line box
+    // of its own to lead with. See the class doc on the size.
     height: 1,
   );
 

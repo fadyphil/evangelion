@@ -39,11 +39,13 @@ void main() {
     NeuralVariant variant = NeuralVariant.home,
     bool scrollable = true,
     bool bottomFade = false,
+    CurtainShape curtain = CurtainShape.bottom,
     Widget? child,
   }) => NeuralScaffold(
     variant: variant,
     scrollable: scrollable,
     bottomFade: bottomFade,
+    curtain: curtain,
     child: child ?? const SizedBox.shrink(),
   );
 
@@ -243,6 +245,7 @@ void main() {
           'scrollable',
           'padding',
           'bottomfade',
+          'curtain',
           'tier',
           'overlay',
           'key',
@@ -261,7 +264,14 @@ void main() {
             '(`ds.tsx:162`), so an overlay is the shape the prototype had rather than a '
             'second mechanism invented for Flutter. `null` on the five screens that '
             'have none, and `bottomFade` still paints over it so a scrolling screen\'s '
-            'CTA gradient covers a bottom-right overlay instead of the other way round.',
+            'CTA gradient covers a bottom-right overlay instead of the other way round.\n\n'
+            '**`curtain` is the seventh, added with `:112-115`.** '
+            '`eva/redesign.html` '
+            'declares `.scrim` once and overrides its whole `background` per '
+            '`data-shape`, so a shape here is not a direction on one ramp \u2014 it picks '
+            'between two different ones, and `:115`\'s `.88`-at-both-edges / '
+            'nothing-in-the-middle is neither. A single `LinearGradient` hard-wired '
+            'to the CTA\'s would have been a ramp the prototype does not have.',
       );
       expect(
         _scaffoldConstructorParameters(),
@@ -325,11 +335,146 @@ void main() {
       final BoxDecoration decoration = _scrimDecorations(tester).single;
       final LinearGradient gradient = decoration.gradient! as LinearGradient;
       expect(gradient.colors.first.a, 0);
-      expect(
-        gradient.colors.last,
-        const EvaColors.dark().canvas.withValues(alpha: 0.95),
+      // `eva/redesign.html:113` — `rgba(6,7,12,.30) 22%`, `.80 46%`, `.92 100%`.
+      // The last stop was `.95` (`ReadingEnScreen.tsx:83`) and the whole ramp was
+      // two stops; `:113` is four, and its peak is *lighter*, which is the point
+      // — a two-stop ramp that ends in a step paints a plate over the last verses.
+      expect(gradient.stops, <double>[0, 0.22, 0.46, 1]);
+      expect(gradient.colors, <Color>[
+        const EvaColors.dark().canvas.withValues(alpha: 0),
+        const EvaColors.dark().canvas.withValues(alpha: 0.30),
+        const EvaColors.dark().canvas.withValues(alpha: 0.80),
+        const EvaColors.dark().canvas.withValues(alpha: 0.92),
+      ]);
+      expect(gradient.colors.last.a, isNot(closeTo(0.95, 1e-9)));
+    });
+
+    testWidgets('the light ramp is `:61`\'s, and it is not the dark one', (
+      WidgetTester tester,
+    ) async {
+      // `eva/redesign.html:61` re-states `.scrim` under
+      // `.screen[data-mode=light]` with its own four alphas — `.35 / .82 / .94`
+      // against the dark ramp's `.30 / .80 / .92`. A per-brightness ramp is the
+      // prototype's own shape, so this is a transcription rather than an
+      // invention, and those three numbers are what distinguish it.
+      await pumpAt(
+        tester,
+        scaffold(bottomFade: true),
+        theme: EvaThemeLight.theme,
       );
-      expect(gradient.stops, <double>[0, 0.40]);
+      final LinearGradient gradient =
+          _scrimDecorations(tester).single.gradient! as LinearGradient;
+      expect(gradient.stops, <double>[0, 0.22, 0.46, 1]);
+      expect(
+        gradient.colors.map((Color color) => color.a).toList(),
+        orderedEquals(<Object>[
+          0.0,
+          closeTo(0.35, 1e-9),
+          closeTo(0.82, 1e-9),
+          closeTo(0.94, 1e-9),
+        ]),
+        reason: ':61 carries an alpha no other table has',
+      );
+    });
+
+    testWidgets('the substituted colour is `canvas`, and it says so', (
+      WidgetTester tester,
+    ) async {
+      // `:113` shades with `rgba(6,7,12,…)` and `:61` with
+      // `rgba(245,242,234,…)` — the prototype's own floor colours, beside a
+      // `#05081A` canvas and a `#F0EEFF` one, and **neither is a token**. They are
+      // substituted by `canvas` (`skyStarFill`'s precedent): the ramp's *shape* is
+      // the prototype's and the *pigment* is this design system's. The alphas
+      // above are the prototype's verbatim, which is why they are asserted.
+      for (final (String label, ThemeData theme) in kEvaThemes) {
+        await pumpAt(tester, scaffold(bottomFade: true), theme: theme);
+        final LinearGradient gradient =
+            _scrimDecorations(tester).single.gradient! as LinearGradient;
+        for (final Color color in gradient.colors) {
+          expect(
+            color.toARGB32() & 0x00FFFFFF,
+            theme.extension<EvaColors>()!.canvas.toARGB32() & 0x00FFFFFF,
+            reason: label,
+          );
+        }
+      }
+    });
+
+    testWidgets('the three shapes are three DIFFERENT ramps', (
+      WidgetTester tester,
+    ) async {
+      // `:113`/`:114` share a table and differ only in direction; `:115` has its
+      // own alphas (`.88`, not `.92`) and a flat transparent centre. Reading the
+      // enum as "a direction on one ramp" is the reading that gets `sides` wrong.
+      await pumpAt(tester, scaffold(bottomFade: true));
+      final LinearGradient bottom =
+          _scrimDecorations(tester).single.gradient! as LinearGradient;
+      expect(bottom.begin, Alignment.bottomCenter);
+      expect(bottom.end, Alignment.topCenter);
+
+      await pumpAt(
+        tester,
+        scaffold(bottomFade: true, curtain: CurtainShape.top),
+      );
+      final LinearGradient top =
+          _scrimDecorations(tester).single.gradient! as LinearGradient;
+      expect(top.begin, Alignment.topCenter);
+      expect(top.end, Alignment.bottomCenter);
+      expect(
+        top.stops,
+        bottom.stops,
+        reason: '`:113` and `:114` share a table',
+      );
+      expect(
+        top.colors.map((Color c) => c.a).toList(),
+        bottom.colors.map((Color c) => c.a).toList(),
+      );
+
+      await pumpAt(
+        tester,
+        scaffold(bottomFade: true, curtain: CurtainShape.sides),
+      );
+      final LinearGradient sides =
+          _scrimDecorations(tester).single.gradient! as LinearGradient;
+      expect(sides.stops, <double>[0, 0.2, 0.8, 1]);
+      expect(
+        sides.colors.map((Color c) => c.a).toList(),
+        <double>[0.88, 0, 0, 0.88],
+        reason:
+            '`:115` — `.88` at both edges and `transparent 20% 80%` between, '
+            'which Flutter spells as two stops of nothing',
+      );
+    });
+
+    testWidgets('the shape does NOT change the scrim\'s extent', (
+      WidgetTester tester,
+    ) async {
+      // `:112`'s `.scrim` is `position:absolute; inset:0` — the **full-screen**
+      // curtain, a different layer from the reader CTA's
+      // (`ReadingEnScreen.tsx:80-86`), and this widget paints the latter. So the
+      // shape picks the ramp and [kNeuralScaffoldFadeHeight] still picks the
+      // height; a `sides` curtain that suddenly went full-bleed would be the other
+      // scrim arriving through this parameter.
+      double scrimHeight() => tester
+          .widget<Positioned>(
+            find.descendant(
+              of: find.byType(NeuralScaffold),
+              matching: find.byType(Positioned),
+            ),
+          )
+          .height!;
+
+      await pumpAt(tester, scaffold(bottomFade: true));
+      final double bottomHeight = scrimHeight();
+      await pumpAt(
+        tester,
+        scaffold(bottomFade: true, curtain: CurtainShape.sides),
+      );
+      expect(
+        scrimHeight(),
+        bottomHeight,
+        reason: 'the extent is the CTA block for every shape',
+      );
     });
 
     testWidgets('its height follows the viewport, not a constant', (
@@ -387,7 +532,12 @@ void main() {
       // The assertion is the RELATIONSHIP, not a number, so it holds at any width
       // and cannot be satisfied by re-deriving the same mistake.
       const double contentReserve = 130; // ReadingEnScreen.tsx:26
-      const double opaqueFraction = 1 - 0.40; // stops: [0, 0.40]
+      // `eva/redesign.html:113`'s last rung is at 46%, so the shoulder begins
+      // `1 - 0.46 = 54%` of the scrim's height above the bottom edge. The old
+      // `stops: [0, 0.40]` made it `60%` — so `:113` moved the shoulder 6.2px
+      // earlier at 390 wide (56.2 rather than 62.4) AND lowered its peak from .95
+      // to .92. The relationship, not the number, is what is asserted here.
+      const double opaqueFraction = 1 - 0.46; // stops: [0, .22, .46, 1]
 
       for (final double width in <double>[320, 390, 430]) {
         await pumpAt(
@@ -439,6 +589,40 @@ void main() {
       expect(NeuralTier.values, contains(NeuralTier.low));
     });
   });
+
+  // The golden that actually sees the scrim. The two above pump `scaffold()`
+  // **without** `bottomFade`, so `:112-115`'s four-stop ramp is not in either of
+  // them — a restyle of the scrim is invisible in every other golden in this
+  // file, which is the kind of coverage that reads as coverage until the one
+  // change it cannot see is made. This one has the verses a shade would be
+  // painting over, so the ramp's shoulder is measured rather than asserted.
+  for (final (String theme, ThemeData data) in kEvaThemes) {
+    testWidgets('a golden of the scrim per theme — $theme', (
+      WidgetTester tester,
+    ) async {
+      await pumpAt(
+        tester,
+        scaffold(
+          scrollable: false,
+          bottomFade: true,
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: <Widget>[
+              Text('The Word was in the beginning.'),
+              Text('And the Word was with God.'),
+              SizedBox(height: 40),
+            ],
+          ),
+        ),
+        theme: data,
+      );
+      await tester.pump();
+      await expectLater(
+        find.byType(NeuralScaffold),
+        matchesGoldenFile('goldens/neural_scaffold_scrim_$theme.png'),
+      );
+    });
+  }
 
   for (final (String theme, ThemeData data) in kEvaThemes) {
     testWidgets('a golden per theme — $theme', (WidgetTester tester) async {

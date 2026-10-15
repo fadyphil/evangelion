@@ -10,6 +10,11 @@ import 'package:flutter/material.dart';
 /// [flamePath] unchanged — every curve command, every coordinate. Re-deriving a
 /// flame shape from a description would be a different flame.
 ///
+/// **That citation is KEPT, and it now owns only the shape.** The redesign's
+/// `.flame` is a *different* mark with the same job, and the two are cited
+/// separately rather than merged: `ds.tsx:514` says what the flame **is**,
+/// `redesign.html:242-244` says what it is lit like.
+///
 /// ## SIZE
 ///
 /// [size] is the **height**, and the width follows the viewBox's `16:20` ratio,
@@ -19,6 +24,62 @@ import 'package:flutter/material.dart';
 /// difference is the viewBox's own horizontal padding (the path spans x 2…14 of
 /// a 16-wide box), and scaling the box uniformly rather than reproducing the
 /// element's pixel box is the choice that keeps the shape honest at any size.
+///
+/// ## THE GLOW — `redesign.html:243`, ADOPTED
+///
+/// `eva/redesign.html:243` ends `.flame` with
+/// `box-shadow: 0 0 14px rgba(232,176,75,.85), 0 0 30px rgba(255,122,24,.35)`.
+/// The **first** shadow is transcribed: a blurred copy of the silhouette in
+/// [EvaColors.ember] at [flameGlowAlpha] with a Gaussian of [flameGlowSigma],
+/// painted *underneath* the solid fill. `rgba(232,176,75, …)` is the prototype's
+/// `--gold`, which §5.1 publishes as `ember`.
+///
+/// A CSS blur *radius* is two standard deviations, so a 14px radius is a sigma of
+/// 7 — that division is the one arithmetic step between `:243`'s number and
+/// [MaskFilter.blur]'s, and it is a division rather than a copy because copying
+/// would give a 28px radius.
+///
+/// ## WHAT `:242-246` SAYS AND THIS WIDGET DOES **NOT** DO
+///
+/// Four things are declined, each for its own reason. None of them is a
+/// transcription slip.
+///
+/// | `:242-246` | why it is not here |
+/// | --- | --- |
+/// | `width: 13px; height: 17px` | **Decision 5 — the CSS blob is not adopted.** `:242-243` draws the flame as a `border-radius: 50% 50% 46% 46%/62% 62% 38% 38%` box — two radii per axis on a rounded rectangle, which is a *CSS shape* and not a path. `ds.tsx:514`'s `<path>` is the only flame outline in the prototype that is data. `home_geometry_test.dart` reads the rendered `14 × 18` and `result_geometry_test.dart` reads `width ≤ 14.5`, `height ≈ 18 ± 0.5`; changing the box is Phase 5.2's decision. |
+/// | `rgba(255,122,24,.35)` at `0 0 30px` | **`#ff7a18` is not in the palette.** Publishing it — or substituting a token for it — is a Phase-2 palette decision, and a palette decision made inside a decorative widget is exactly the failure `eva_colors.dart`'s header forbids. Recorded here rather than added. |
+/// | `radial-gradient(circle at 50% 78%, #fff 0%, --gold 42%, #ff7a18 72%, rgba(255,122,24,0) 100%)` | the same third stop, twice over: `rgba(255,122,24,0)` **is** `#ff7a18`, and `#fff 0%` has no token either. A half-adopted ramp — gold to nothing with the middle stop missing — is a different flame than either prototype, and it would take the readable silhouette with it; see the next section. |
+/// | `@keyframes flick` (`:246`) and `.flame.burst`'s one-shot `flare` (`:245`) | **motion, not paint.** Task 4.2's Decision 5 scopes this batch to *paint only*, and a second ambient controller is barred twice over: §13.2 collapses the app's ambient motion to four shared clocks, and `NeuralBackground`'s orbs already spend them. `EvaMotion.achievementSpring`'s doc names `StreakFlame`'s flare as its own case — the **one-shot** `flare`, not the ambient `flick`. The one-shot belongs to "your streak went up", which is a moment this widget is not told about. |
+///
+/// ## WHY THE FILL STAYS A SOLID SILHOUETTE
+///
+/// The prototype's fill is a *gradient that fades to nothing at its own edge*, so
+/// the flame's outline is only as visible as the gradient makes it. Here it is a
+/// flat fill at full alpha under the glow — and the reason is not conservatism:
+///
+/// `streak_flame_test.dart`'s proof that [flamePath] was transcribed character for
+/// character is a **pixel** measurement — it reads the painted bounds and asks
+/// them to cover `12/16` of the box horizontally and all of it vertically, because
+/// a path rescaled to fill its box measures `1.0` and `1.0`. With an outward
+/// [flameGlowSigma] halo the ink reaches the box's corners, and with a
+/// transparent-edged gradient there is **no alpha threshold anywhere that
+/// separates the silhouette from the light around it** — at the path's own edge the
+/// composite is the same whether the sample fell just inside or just outside.
+///
+/// Adopting the ramp would delete the only test that can see the transcription.
+/// That is a worse outcome than a subtler flame, so the fill stays solid and the
+/// glow is drawn around it. The glow and the ramp are separable: one is a shadow
+/// on the element, the other is its background.
+///
+/// ## THE SIGMA SCALES WITH THE WIDGET, AND CSS'S DOES NOT
+///
+/// CSS's `14px` is an absolute length: a 13×17 element and a 130×170 element get
+/// the same halo. [flameGlowSigma] is in **viewBox units**, and this painter
+/// scales the canvas by the widget's size before drawing, so the halo grows with
+/// the flame. That is the one deliberate difference, and it is this widget's
+/// existing convention rather than a new one: [flamePath] is in viewBox units and
+/// scales the same way, and a halo that stayed fixed while its silhouette doubled
+/// would be a different mark at every size.
 ///
 /// ## SEMANTICS
 ///
@@ -42,8 +103,51 @@ class StreakFlame extends StatelessWidget {
   /// The width [size] implies.
   double get width => size * aspect;
 
+  /// `redesign.html:243`'s glow radius — `0 0 14px rgba(232,176,75,.85)`.
+  ///
+  /// A CSS blur radius, kept as the prototype wrote it. [flameGlowSigma] is the
+  /// number this painter draws with.
+  static const double flameGlowBlur = 14;
+
+  /// The Gaussian sigma [flameGlowBlur] denotes — `14 / 2 = 7`.
+  ///
+  /// CSS's `blur()` radius is defined as *twice* the standard deviation of the
+  /// Gaussian (CSS Backgrounds 3 §3.3, "the resulting shadow edge is a standard
+  /// deviation blur"), and [MaskFilter.blur] takes the standard deviation. In
+  /// viewBox units, so the halo scales with [size]; see the class doc.
+  static const double flameGlowSigma = flameGlowBlur / 2;
+
+  /// The glow's alpha — `rgba(232,176,75,.85)` at `:243`.
+  static const double flameGlowAlpha = 0.85;
+
+  /// The alpha above which a pixel is the **solid fill** rather than the glow.
+  ///
+  /// ## THE THRESHOLD, MEASURED, AND WHY IT IS NOT A NUMBER ANYONE GUESSED
+  ///
+  /// The glow is the silhouette blurred by [flameGlowSigma] and drawn at
+  /// [flameGlowAlpha], so **inside the widget's own box** — the only region a
+  /// pixel test can read — the halo is a *tail*, not a halo. The viewBox leaves
+  /// two units of horizontal margin either side of the path and
+  /// [flameGlowBlur] ÷ 2 is 3.5 of those units, so almost all of the glow falls
+  /// outside the box and what lands in the margin is the far side of the
+  /// Gaussian. Measured over the whole box at `size: 20` and at `size: 64`, the
+  /// brightest halo pixel is **`0.1529` at both**; the fill's own interior is
+  /// `1.0`. A quarter sits between them with margin on both sides.
+  ///
+  /// It is `0.25` and not the more obvious `0.5` because `0.5` is **not** safe
+  /// here: measured at `size: 20`, a threshold of `0.5` clips the flame's apex —
+  /// the top row is 19% alpha there — and the vertical ratio reads `0.95` rather
+  /// than `1.0`. That failure is silent, a row late, and it is exactly what a
+  /// threshold exists to prevent.
+  ///
+  /// Published rather than written at the call site because it is a property of
+  /// [flameGlowAlpha] and [flameGlowBlur] **together**: raise either and the
+  /// measurement above has to be taken again, which is why it sits next to both.
+  static const double flameSolidAlpha = 0.25;
+
   @override
   Widget build(BuildContext context) {
+    final EvaColors colors = context.colors;
     return Semantics(
       image: true,
       label: semanticLabel,
@@ -51,7 +155,7 @@ class StreakFlame extends StatelessWidget {
       child: SizedBox(
         width: width,
         height: size,
-        child: CustomPaint(painter: _FlamePainter(context.colors.ember)),
+        child: CustomPaint(painter: _FlamePainter(colors.ember)),
       ),
     );
   }
@@ -62,6 +166,11 @@ class StreakFlame extends StatelessWidget {
 /// Transcribed from `ds.tsx:514`'s `d` attribute. Kept in viewBox units so the
 /// painter can scale the canvas rather than rescale 40 numbers — a rescale is
 /// where a transcription goes wrong.
+///
+/// Its bounds are `x 2…14`, `y 0…20` of the 16×20 viewBox, and
+/// `streak_flame_test.dart` asserts that as a **literal** — which is a tighter
+/// transcription pin than reading it back off the screen, because the screen
+/// cannot say *which* numbers were intended.
 final Path flamePath = Path()
   ..moveTo(8, 0)
   ..cubicTo(8, 0, 4, 5, 4, 9)
@@ -83,11 +192,35 @@ final Path flamePath = Path()
 class _FlamePainter extends CustomPainter {
   const _FlamePainter(this.color);
 
+  /// The silhouette's own fill — §5.1's `ember`, which is `--gold`.
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.scale(size.width / 16, size.height / 20);
+
+    // ## THE GLOW FIRST, AND IT IS **NOT** A `BoxShadow`
+    //
+    // `redesign.html:243`'s `box-shadow` is a shadow of the *border box*; with a
+    // `border-radius` that is a shadow of the rounded box. What this widget has is
+    // a path, so the faithful spelling is a blurred copy of the **path** — which
+    // is what `MaskFilter` does: it replaces the geometry with a blurred version
+    // and fills it with the paint's colour, so no second path is built and no
+    // `saveLayer` is taken. §13.4's budget is spent on `BackdropFilter`s, which
+    // read back the frame; this reads nothing.
+    //
+    // Drawn *before* the fill so the fill sits on top, exactly as a CSS
+    // `box-shadow` sits behind its element's own background.
+    canvas.drawPath(
+      flamePath,
+      Paint()
+        ..color = color.withValues(alpha: StreakFlame.flameGlowAlpha)
+        ..maskFilter = const MaskFilter.blur(
+          BlurStyle.normal,
+          StreakFlame.flameGlowSigma,
+        ),
+    );
+
     canvas.drawPath(flamePath, Paint()..color = color);
   }
 
