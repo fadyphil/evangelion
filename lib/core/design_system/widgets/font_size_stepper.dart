@@ -86,22 +86,54 @@ class FontSizeStepperLabels {
 
 /// The Settings font-size control.
 ///
-/// The prototype's row (`SettingsScreen.tsx:63-69`) is a small `A`, a native
-/// range input `80px` wide with `accentColor: ember`, and a large `A`. The
-/// native input is gone in Flutter — it has no themed track and no themed thumb
-/// on desktop — so it is rebuilt here out of tokens:
+/// ## IT IS NOT A MATERIAL `Slider`, AND THAT IS WORTH SAYING BEFORE THE NUMBERS
+///
+/// The obvious implementation of a font-size stepper is `Slider`, and the obvious
+/// question when restyling one is "which of `Slider`'s parts do I override". This
+/// widget is **not** a `Slider` and never was: `_Track` is a hand-built `Stack` of a
+/// rule and a `Positioned` thumb inside a `GestureDetector`, publishing
+/// `Semantics(slider: true, increasedValue:, decreasedValue:)`. That matters because
+/// `Slider`'s geometry is Material's — a 4px track and a 20px thumb with an
+/// overlay ring — and **none of those three numbers is the prototype's**. The
+/// redesign's rule is 3px with a 15px thumb (`redesign.html:429-430`), so a
+/// `Slider` would have had to be overridden on track height, thumb radius and thumb
+/// overlay radius before it drew anything the prototype draws. Rebuilding the two
+/// boxes by hand costs 30 lines and keeps the geometry in this file where the
+/// citations are.
+///
+/// ## WHAT CAME FROM WHERE — THE THREE SOURCES, AND WHY THE MIX IS NOT A MISTAKE
 ///
 /// | prototype | here |
 /// | --- | --- |
-/// | small `A`, `ui` 12, `ink3` | `labelMedium` + `ink3` |
-/// | large `A`, `ui` 17, `ink3` | `titleMedium` + `ink3` |
-/// | `accentColor: ember` | the filled portion of the track |
-/// | thumb | a 14px `ember` disc |
-/// | `min=1 max=5` | [kFontStepMin] / [kFontStepMax] |
+/// | `redesign.html:429` — `input[type=range]`, `height:3px`, `rgba(#fff,.14)` | [trackHeight] + the rule's own colour |
+/// | `redesign.html:430` — `::-webkit-slider-thumb`, 15px, `var(--gold)`, `0 0 10px rgba(232,176,75,.7)` | [thumbSize] + the gold disc and its glow |
+/// | `redesign.html:95` — the same track re-pointed at `rgba(20,22,30,.18)` in light mode | `EvaColors.ink` at 14% |
+/// | `SettingsScreen.tsx:65`,`:67` — the small `A` at `ui 12` and the large one at `ui 17`, both `ink3` | `_ScaleLetter`, `ui` family, `ink2` |
+/// | `SettingsScreen.tsx:66` — `width: 80`, `min={1} max={5}` | [trackWidth], [kFontStepMin], [kFontStepMax] |
+/// | `SettingsScreen.tsx:66` — `accentColor: hex.ember` | **nothing** — see the fill below |
 ///
-/// `−` and `+` are added because the native range input supplied its own
-/// stepper affordances on every platform and a Flutter widget has to; they are
-/// [IconActionButton]s, so they bring their own §14 focus ring.
+/// The letters keep `ink2` where the React prototype wrote `T.ink3`: `ink3` is this
+/// design system's *disabled* ink, and `#9B97B8` in light is below any text floor on
+/// a pale row. It is a recorded divergence, not an oversight, and it predates this
+/// restyle.
+///
+/// ## THE FILLED PORTION OF THE TRACK IS GONE, DELIBERATELY
+///
+/// `SettingsScreen.tsx:66`'s `accentColor: hex.ember` is what painted the ember
+/// bar from the left edge to the thumb, and `redesign.html:429-430` has **no such
+/// thing**: a CSS range input is one uniform rule with one gold thumb on it, and
+/// that is what this now draws. The thumb's position was already the state carrier
+/// (and `Semantics(value:)` publishes the step), so nothing that carries state was
+/// lost — and a 3px rule half-filled with ember under a gold thumb is two accents
+/// fighting over 3 rows of pixels.
+///
+/// ## `−` AND `+` HAVE NO REDESIGN ANALOGUE, AND KEEP THEIR OWN CITATION
+///
+/// `redesign.html:429` is the redesign's type-size row, and it is a bare
+/// `input[type=range]` with a `.prevline` preview beside it — no steppers. The two
+/// buttons exist because the React native input supplied its own stepper affordances
+/// on every platform and a Flutter widget has to; they are [IconActionButton]s, so
+/// they bring their own §14 focus ring.
 class FontSizeStepper extends StatelessWidget {
   /// A stepper sitting on [step].
   const FontSizeStepper({
@@ -122,15 +154,27 @@ class FontSizeStepper extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   /// The prototype's track width. `SettingsScreen.tsx:66` — `width: 80`.
+  ///
+  /// **Kept at 80 against `redesign.html:429`'s `width:120px`,** and the reason is
+  /// the same one keeps the range: the redesign's own slider is a *different
+  /// control* — 16–26px, sized for a 120px rule on a settings row that has no `A`
+  /// letters and no steppers. Transposing its width onto a five-step scale whose
+  /// steps are `0.88×…1.22×` would make step 1 and step 5 two thirds of a row
+  /// apart on a control whose meaning is *discrete*. Recorded rather than silently
+  /// dropped, because "the width is 120 in the design reference" is the first thing
+  /// a reviewer reads in the CSS.
   static const double trackWidth = 80;
 
-  /// The track's thickness, and the thumb's radius. No prototype value: the
-  /// native input's own geometry, chosen to read as a 4px line with a 14px
-  /// thumb. Named so it is one edit rather than three literals.
-  static const double trackHeight = 4;
+  /// The rule's thickness. `redesign.html:429` — `height: 3px`, and the same rule
+  /// names `border-radius: 3px`, so it is a stadium at both ends.
+  ///
+  /// Was 4, chosen for "a 4px line with a 14px thumb" when the thumb was
+  /// `SettingsScreen.tsx`'s unspecified native one. The redesign names a 3px rule
+  /// and a 15px thumb, and the ratio between them is the thing that reads.
+  static const double trackHeight = 3;
 
-  /// The thumb's diameter.
-  static const double thumbSize = 14;
+  /// The thumb's diameter. `redesign.html:430` — `width: 15px, height: 15px`.
+  static const double thumbSize = 15;
 
   @override
   Widget build(BuildContext context) {
@@ -206,12 +250,18 @@ class _ScaleLetter extends StatelessWidget {
   );
 }
 
-/// The track, the fill and the thumb.
+/// The rule and the thumb.
 ///
 /// Draggable, because the prototype's row was a slider and a stepper with no
 /// drag is a pair of buttons with a decoration between them. The drag reports a
 /// clamped step, and `Semantics(slider:)` publishes it as a slider so a screen
 /// reader can raise and lower it without hunting for the buttons.
+///
+/// The `Stack` here is **not** the one `glass_surface.dart` warns about. That one
+/// was *inserted* into a chain whose consumers relied on the constraints arriving
+/// unchanged and took them away with `StackFit.loose`; this one has always been
+/// here, its children are positioned or shrink-wrapping by construction, and
+/// `controls_test.dart` measures the rule rather than the `Stack`.
 class _Track extends StatelessWidget {
   const _Track({
     required this.step,
@@ -274,20 +324,20 @@ class _Track extends StatelessWidget {
               Container(
                 height: FontSizeStepper.trackHeight,
                 decoration: BoxDecoration(
-                  // `rgba(#fff | #000, 0.1)` — the same neutral the unselected
-                  // segmented control uses, so the two controls in the Settings
-                  // appearance group read as siblings.
-                  color: colors.glassBorder,
-                  borderRadius: BorderRadius.circular(EvaRadii.chip),
-                ),
-              ),
-              Container(
-                width: travel == 0
-                    ? 0
-                    : FontSizeStepper.thumbSize / 2 + travel * fraction,
-                height: FontSizeStepper.trackHeight,
-                decoration: BoxDecoration(
-                  color: colors.ember,
+                  // `redesign.html:429` — `background: rgba(255,255,255,.14)`,
+                  // re-pointed at `rgba(20,22,30,.18)` for light mode at `:95`.
+                  // `EvaColors.ink` is near-white in dark and near-black in light,
+                  // so one token covers both arms and the 14% is the dark value; the
+                  // three-point difference in light is the same "the smaller
+                  // difference between two values is not a token" judgement
+                  // `EvaColors.seamGlow` records for a 14-vs-12 glow radius.
+                  //
+                  // It was `glassBorder` — `rgba(#fff | #000, .08)` — because the
+                  // React control had no themed track and this borrowed the
+                  // segmented control's neutral so the two appearance controls read
+                  // as siblings. The redesign names its own 14%, and that is the
+                  // citation now.
+                  color: colors.ink.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(EvaRadii.chip),
                 ),
               ),
@@ -297,16 +347,21 @@ class _Track extends StatelessWidget {
                   width: FontSizeStepper.thumbSize,
                   height: FontSizeStepper.thumbSize,
                   decoration: BoxDecoration(
+                    // `redesign.html:430` — `background: var(--gold)`, which is
+                    // [EvaColors.ember] here. The fill this knob used to sit at the
+                    // end of is gone; see the class doc.
                     color: colors.ember,
                     shape: BoxShape.circle,
-                    // `PassageCard`'s progress bar carries
-                    // `0 0 8px rgba(ember, 0.5)` (`ds.tsx:401`) — the prototype's
-                    // one accent glow on a thin ember element, and the closest
-                    // thing in `ds.tsx` to what a slider thumb is.
+                    // The same line: `box-shadow: 0 0 10px rgba(232,176,75,.7)`.
+                    // It replaces the `0 0 8px rgba(ember, .5)` this borrowed from
+                    // `ds.tsx:401`'s passage progress bar — a longer radius and a
+                    // higher alpha, because on a 3px rule the thumb is the only
+                    // accent on the control and a 50% glow around a 14px disc read
+                    // as a smudge.
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: colors.ember.withValues(alpha: 0.50),
-                        blurRadius: 8,
+                        color: colors.ember.withValues(alpha: 0.7),
+                        blurRadius: 10,
                       ),
                     ],
                   ),
