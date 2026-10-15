@@ -16,6 +16,18 @@ analyzer:
     - ios/**
     - linux/**
 
+    # I ADDED THOSE
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.gr.dart"
+    - "**/*.config.dart"
+
+  # I ADDED THOSE
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
@@ -94,3 +106,14 @@ linter:
     # half-translated set (English left in the Arabic arm, or a value dropped
     # from one language) compiles and ships silently.
     - no_adjacent_strings_in_list
+
+    # I ADDED THOSE, revise the need for keeping, adding to or removing some of them
+    - always_use_package_imports
+    - avoid_relative_lib_imports
+    - use_build_context_synchronously
+    - avoid_type_to_string
+    - prefer_const_declarations
+    - avoid_redundant_argument_values
+    - avoid_unused_constructor_parameters
+    - avoid_unnecessary_containers
+    - prefer_asserts_with_message

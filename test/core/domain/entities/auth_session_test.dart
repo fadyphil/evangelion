@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///   a stale one that looks current.
 void main() {
   /// A fixed instant, so no assertion depends on the clock.
-  final DateTime created = DateTime.utc(2026, 1, 1);
+  final DateTime created = DateTime.utc(2026);
 
   AuthSession session({
     String userId = '11111111-1111-1111-1111-111111111111',

@@ -79,14 +79,21 @@ void main() {
     });
 
     test('`UserSettings()` IS the default install', () {
-      expect(
-        const UserSettings(),
-        const UserSettings(
-          themeMode: AppThemeMode.dark,
-          fontStep: kDefaultFontStep,
-          reducedMotion: false,
-        ),
-      );
+      // WHY THIS ASSERTS FIELDS RATHER THAN COMPARING TWO CONSTRUCTORS. It
+      // used to read `expect(const UserSettings(), const UserSettings(
+      // themeMode: AppThemeMode.dark, fontStep: kDefaultFontStep,
+      // reducedMotion: false))` — but the declared defaults ARE those
+      // literals, so the two sides could never differ and the test could not
+      // fail. `avoid_redundant_argument_values` named the redundancy; the
+      // fix is to assert what the name promises. These are the four fields a
+      // reader who has chosen nothing gets, and each one fails if its default
+      // moves.
+      const UserSettings settings = UserSettings();
+
+      expect(settings.themeMode, AppThemeMode.dark);
+      expect(settings.fontStep, kDefaultFontStep);
+      expect(settings.language, isNull);
+      expect(settings.reducedMotion, false);
     });
   });
 

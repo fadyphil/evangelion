@@ -210,7 +210,7 @@ void main() {
     final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
 
     String? resolve(String rawPath) {
-      final List<RouteMatch>? matches = router.matcher.match(rawPath);
+      final List<RouteMatch<dynamic>>? matches = router.matcher.match(rawPath);
       expect(matches, isNotNull, reason: 'nothing matched $rawPath at all');
       return matches!.single.path;
     }

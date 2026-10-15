@@ -233,7 +233,7 @@ void main() {
       // registration. `EvangelionApp` still resolves the router from the locator,
       // so this is the production path with a different session behind it.
       await resetServiceLocator();
-      final FakeAuthStatus status = FakeAuthStatus(authenticated: true);
+      final FakeAuthStatus status = FakeAuthStatus();
       final ManualAuthChanges changes = ManualAuthChanges();
       final AppRouter router = AppRouter(status, changes);
       addTearDown(router.dispose);

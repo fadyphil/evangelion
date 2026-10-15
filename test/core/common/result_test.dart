@@ -330,7 +330,11 @@ void main() {
         // What IS observable at run time is asserted here: both arms hand back a
         // value of the value type, never a fallback smuggled in through a
         // widening type parameter.
-        const stringFailure = Left(boom);
+        // Explicit on both arms, because the claim is about them: the point is
+        // that `Left`'s value type is `String` and the fallback is typed `T` —
+        // spelled `Left<Failure, String>` to match the `Right<Failure, String>`
+        // it is compared against. Inferred, the same call reads as a widening.
+        const stringFailure = Left<Failure, String>(boom);
 
         expect(stringFailure.getOrElse((_) => 'unavailable'), 'unavailable');
         expect(

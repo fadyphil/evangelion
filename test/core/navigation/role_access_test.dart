@@ -58,7 +58,7 @@ void main() {
     test('and one class implements it with no help from the shipped one', () {
       // The `auth_status_test.dart` parallel: the shape a feature or a test is
       // asked to produce, built here from nothing but the interface.
-      final UserRole held = UserRole.kid;
+      const UserRole held = UserRole.kid;
       final RoleAccess access = _MutableRoleAccess(() => held);
 
       expect(access.role, UserRole.kid);
@@ -205,7 +205,7 @@ void main() {
       // Never reassigned, and that is the point of the test rather than an
       // oversight: it isolates *how many times* the source was consulted from
       // *what it said*, so a cache is the only thing that can fail it.
-      final UserRole held = UserRole.kid;
+      const UserRole held = UserRole.kid;
       final RoleAccess access = LiveRoleAccess(() {
         reads++;
         return held;

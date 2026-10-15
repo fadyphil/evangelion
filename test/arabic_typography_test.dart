@@ -308,7 +308,6 @@ void main() {
         tester,
         screen: '/login',
         expectedArabic: arabic,
-        vacuousBecause: null,
       );
     });
 
@@ -498,7 +497,6 @@ void main() {
         // `Actual: Set:['تحقق من الإجابة']` while the rendered tree said
         // `السؤال التالي`.
         expectedArabic: <String>[...arabic, ar.quizCheckAnswer],
-        vacuousBecause: null,
       );
     });
 
@@ -543,7 +541,6 @@ void main() {
           ar.quizVerdictCorrect,
           ar.quizNextQuestion,
         ],
-        vacuousBecause: null,
       );
     });
 
@@ -628,7 +625,6 @@ void main() {
         tester,
         screen: '/result',
         expectedArabic: arabic,
-        vacuousBecause: null,
       );
     });
 
@@ -714,7 +710,6 @@ void main() {
           ar.resultReflectAgain,
           ar.resultBackHome,
         ],
-        vacuousBecause: null,
       );
     });
 
@@ -828,7 +823,6 @@ void main() {
         tester,
         screen: '/settings',
         expectedArabic: arabic,
-        vacuousBecause: null,
       );
       await expectNoTofuInAnyRun(tester, screen: '/settings');
     });
@@ -892,7 +886,6 @@ void main() {
           ar.settingsLanguageSheetTitle,
           ...ReadingLanguage.values.map(ar.languageLabelFor),
         ],
-        vacuousBecause: null,
       );
     });
   });

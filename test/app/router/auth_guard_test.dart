@@ -132,10 +132,7 @@ void main() {
     // mutation that follows — swapping the two outcomes — turns both tests here
     // red. It is the smallest unit of the guard and the only genuinely pure part.
     test('a session allows the navigation', () {
-      expect(
-        AuthGuard(FakeAuthStatus(authenticated: true)).decide(),
-        GuardDecision.allow,
-      );
+      expect(AuthGuard(FakeAuthStatus()).decide(), GuardDecision.allow);
     });
 
     test('no session sends the user to the login route', () {
@@ -169,7 +166,7 @@ void main() {
       // navigation, so a guard that cached its first answer would keep allowing
       // after a logout — which is the failure `reevaluateListenable` exists to
       // catch, and one these two decisions make visible without a Navigator.
-      final FakeAuthStatus status = FakeAuthStatus(authenticated: true);
+      final FakeAuthStatus status = FakeAuthStatus();
       final AuthGuard guard = AuthGuard(status);
 
       expect(guard.decide(), GuardDecision.allow);

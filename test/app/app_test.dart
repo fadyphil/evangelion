@@ -334,7 +334,7 @@ void main() {
       (WidgetTester tester) async {
         await pumpApp(tester);
         final ThemeData theme = _materialAppIn(tester).darkTheme!;
-        final EvaColors colors = const EvaColors.dark();
+        const EvaColors colors = EvaColors.dark();
 
         // Spot-checks across four different token families, because a theme can be
         // "partly" Eva — the failure mode where the accent was wired but the
