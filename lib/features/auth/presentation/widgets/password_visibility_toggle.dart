@@ -82,11 +82,9 @@ class PasswordVisibilityToggle extends StatelessWidget {
       onTap: onPressed,
       excludeSemantics: true,
       child: EvaFocusRing(
-        enabled: true,
-        // `null`: the field's own rim is the ring while it is focused, and a
-        // second border here would draw one the prototype does not have. See
-        // `GlassSurface`'s identical argument for the same case.
-        idleBorder: null,
+        // No `idleBorder:` is passed, which is `null`: the field's own rim is the
+        // ring while it is focused, and a second border here would draw one the
+        // prototype does not have. See `GlassSurface`'s identical case.
         radius: EvaSpacing.xs,
         child: EvaInk(
           onPressed: onPressed,

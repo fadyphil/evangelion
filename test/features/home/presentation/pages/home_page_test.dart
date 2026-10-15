@@ -93,7 +93,7 @@ const EdgeInsets subtitleRowPadding = EdgeInsets.only(bottom: EvaSpacing.xxl);
 /// empty `Text` at `bodyMedium` is 20.0 tall (14sp × 1.4, rounded by the engine) and
 /// 0.0 wide, and `EvaSpacing.xxl` is 24. Written as arithmetic on the two measured
 /// parts rather than as `44`, so a reader can see which half is which.
-final double reservedRowHeight = 20 + EvaSpacing.xxl;
+const double reservedRowHeight = 20 + EvaSpacing.xxl;
 
 void main() {
   group('the live payload, both languages', () {
@@ -957,7 +957,7 @@ void main() {
         streak: const Left<Failure, StreakSummary>(streakFailure),
       );
 
-      await pumpHome(tester, bloc: loading.bloc, textScale: 1.0);
+      await pumpHome(tester, bloc: loading.bloc);
       final double atOne = _subtitleRow(tester);
 
       await pumpHome(tester, bloc: loading.bloc, textScale: 1.22);

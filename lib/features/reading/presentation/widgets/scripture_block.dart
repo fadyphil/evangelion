@@ -326,12 +326,11 @@ class ScriptureBlock extends StatelessWidget {
     required TextStyle markerStyle,
     required PassageDropCap? cap,
   }) => RichText(
-    // `TextAlign.start`, not `TextAlign.left`: the prototype writes no `textAlign`
-    // on the English arm and `textAlign: 'right'` on the Arabic one
-    // (`ReadingArScreen.tsx:47`), and `start` resolves to exactly those two under
-    // the ambient direction. Spelling `right` for Arabic would be a second source
-    // of truth for something the direction already decides.
-    textAlign: TextAlign.start,
+    // `TextAlign.start` — `RichText`'s own default — not `TextAlign.left`: the
+    // prototype writes no `textAlign` on the English arm and `textAlign: 'right'`
+    // on the Arabic one (`ReadingArScreen.tsx:47`), and `start` resolves to exactly
+    // those two under the ambient direction. Spelling `right` for Arabic would be
+    // a second source of truth for something the direction already decides.
     // `RichText.textScaler` is **non-nullable** in this SDK, so the ambient value is
     // read here rather than inherited — which is the same value a `Text` would have
     // resolved, because `EvaTypeScale` installs the reader's step above this widget.
@@ -411,14 +410,14 @@ class ScriptureBlock extends StatelessWidget {
     if (cap.letter.isEmpty) return null;
     return PassageDropCap(
       letter: cap.letter,
-      lines: dropCapLines,
+      // No `lines:` — `PassageDropCap`'s own default is the 3 `dropCapLines`
+      // records, and the measurement behind that number is argued on the
+      // constant rather than restated at the call.
       color: colors.emberInk,
       // The only arm that reaches here is the Latin one, so the direction is LTR
-      // and is stated rather than inherited — `PassageDropCap`'s own doc says the
-      // parameter is defensive and unobservable for a one-glyph box, and a caller
-      // that guesses a direction for a paragraph is the mistake its `paragraph`
-      // method exists to prevent.
-      direction: TextDirection.ltr,
+      // and is `PassageDropCap`'s own default rather than something this call
+      // guesses at — `paragraph` exists precisely so a caller does not have to
+      // state a direction for a paragraph it does not own.
     );
   }
 }

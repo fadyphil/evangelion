@@ -155,15 +155,13 @@ void main() {
     test('and drops `total_ranked`, which is the returned count and not the cohort', () {
       // The board has no field to render "3 of N" from. Asserted structurally: the
       // entity has no such member, and this test fails if one is added.
-      expect(mapped(board(totalRanked: 2)), isA<Result<LeaderboardBoard>>());
+      expect(mapped(board()), isA<Result<LeaderboardBoard>>());
       // There is deliberately **no** `expect(parsed.totalRanked, …)` here, and the
       // absence is the test: Dart will not compile a reference to a member the entity
       // does not have. A "the field is not mapped" assertion cannot be written in a
       // statically typed language — which is exactly why dropping the field beats
       // mapping it and documenting what it really means.
-      final LeaderboardBoard parsed = expectSuccess(
-        mapped(board(totalRanked: 2)),
-      );
+      final LeaderboardBoard parsed = expectSuccess(mapped(board()));
       expect(
         parsed.toString(),
         isNot(contains('totalRanked')),
@@ -183,9 +181,7 @@ void main() {
     });
 
     test('a null object is no standing at all', () {
-      final LeaderboardBoard parsed = expectSuccess(
-        mapped(board(myStanding: null)),
-      );
+      final LeaderboardBoard parsed = expectSuccess(mapped(board()));
       expect(parsed.standing, isNull);
     });
 

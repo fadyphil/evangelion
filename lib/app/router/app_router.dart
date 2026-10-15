@@ -1,11 +1,4 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:evangelion/app/router/auth_guard.dart';
-import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
-import 'package:evangelion/core/navigation/app_routes.dart';
-import 'package:evangelion/core/navigation/auth_status.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/widgets.dart';
-
 // The generated `*Route` classes, and the ONLY bridge to the six features.
 //
 // auto_route_generator emits `app_router.gr.dart` as a separate library named
@@ -18,7 +11,13 @@ import 'package:flutter/widgets.dart';
 //
 // Losing this import is six `undefined_identifier` errors — the cheap way to find
 // out that the router and its routes have come apart.
-import 'app_router.gr.dart';
+import 'package:evangelion/app/router/app_router.gr.dart';
+import 'package:evangelion/app/router/auth_guard.dart';
+import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart';
 
 /// The app's six routes plus the catch-all, with the global transition and the
 /// auth gate installed.
@@ -76,7 +75,10 @@ import 'app_router.gr.dart';
 /// Measured, and the number is worth having in the repository rather than only in
 /// git history: moving the wildcard to the front turns **46 tests** red. An earlier
 /// commit message claimed nine, which was wrong in both direction and magnitude.
-@AutoRouterConfig(replaceInRouteName: 'Page|Screen,Route')
+// `replaceInRouteName` is `auto_route`'s own default — `'Page|Screen,Route'` — so it
+// is not written out. `docs/plans/06-navigation.md` transcribes the annotation with
+// it and the generated `*Route` class names are the same either way.
+@AutoRouterConfig()
 class AppRouter extends RootStackRouter {
   /// Builds the router over the current session [authStatus] and its change
   /// signal [authChanges], positionally and in that order — the order

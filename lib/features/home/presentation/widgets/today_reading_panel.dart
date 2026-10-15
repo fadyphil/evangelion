@@ -192,8 +192,9 @@ class TodayReadingPanel extends StatelessWidget {
   /// The preview's body size. `HomeScreen.tsx:57` — `fontSize: 17`.
   static const double previewFontSize = 17;
 
-  /// The drop cap's lines. `PassageDropCap`'s own default, restated because this
-  /// is the call site that fixes it.
+  /// The drop cap's lines. `PassageDropCap`'s own default, recorded here because this
+  /// is where `/` fixes it — the call site passes nothing, so this constant is the
+  /// only statement of the number on this screen.
   static const int dropCapLines = 3;
 
   /// The `Continue` label's family, for [language].
@@ -347,7 +348,6 @@ class TodayReadingPanel extends StatelessWidget {
         _Beads(reading: today, strings: strings),
         const SizedBox(height: actionsTopGap),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             Expanded(
               child: EvaButton(
@@ -358,7 +358,6 @@ class TodayReadingPanel extends StatelessWidget {
                 // docs keep making.
                 labelFamily: continueFamilyFor(today.language),
                 onPressed: onOpenReading,
-                expanded: true,
               ),
             ),
             const SizedBox(width: actionsGap),
@@ -465,7 +464,9 @@ class _Preview extends StatelessWidget {
 
     final PassageDropCap cap = PassageDropCap(
       letter: split.letter,
-      lines: TodayReadingPanel.dropCapLines,
+      // No `lines:` — `PassageDropCap`'s own default is the 3 `dropCapLines`
+      // records, and the measurement behind that number is argued on the
+      // constant rather than restated at the call.
       color: colors.emberInk,
     );
     return cap.paragraph(

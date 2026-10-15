@@ -64,12 +64,7 @@ void main() {
       final AuthBloc bloc = buildTestBloc();
       addTearDown(bloc.close);
 
-      await pumpLogin(
-        tester,
-        bloc: bloc,
-        size: kNarrowSurface,
-        textScale: kEvaRequiredTextScale,
-      );
+      await pumpLogin(tester, bloc: bloc, textScale: kEvaRequiredTextScale);
       // The whole form, not just what is on screen: the content is taller than
       // 568 at this scale, which is why `NeuralScaffold.scrollable` is true and why
       // an overflow inside a `SingleChildScrollView` is a real layout failure rather
@@ -84,12 +79,7 @@ void main() {
     ) async {
       final AuthBloc bloc = buildTestBloc();
       addTearDown(bloc.close);
-      await pumpLogin(
-        tester,
-        bloc: bloc,
-        size: kNarrowSurface,
-        textScale: kEvaRequiredTextScale,
-      );
+      await pumpLogin(tester, bloc: bloc, textScale: kEvaRequiredTextScale);
 
       // The worst realistic case: both fields in error, so the form grows by two
       // error rows, at the largest text scale, on the narrowest phone. An error
@@ -110,12 +100,7 @@ void main() {
     ) async {
       final AuthBloc bloc = buildTestBloc();
       addTearDown(bloc.close);
-      await pumpLogin(
-        tester,
-        bloc: bloc,
-        size: kNarrowSurface,
-        textScale: kEvaRequiredTextScale,
-      );
+      await pumpLogin(tester, bloc: bloc, textScale: kEvaRequiredTextScale);
 
       // "No overflow" and "reachable" are different claims. At 1.22× the social
       // buttons are below the fold, so a screen that merely avoids an overflow by
@@ -279,7 +264,6 @@ void main() {
           tester,
           bloc: bloc,
           locale: locale,
-          size: kNarrowSurface,
           textScale: kEvaRequiredTextScale,
         );
 
@@ -334,7 +318,6 @@ void main() {
       await pumpLogin(
         tester,
         bloc: buildTestBloc(),
-        size: kNarrowSurface,
         textScale: kEvaRequiredTextScale,
         child: const Column(
           children: <Widget>[SizedBox(height: 600), SizedBox(height: 600)],

@@ -276,10 +276,7 @@ void main() {
       // would look correct in every test: the request "worked", the field just
       // never arrived. `SubmitAnswerResult` has seven keys and a reader could
       // plausibly send them; this assertion is what keeps that from being silent.
-      await submit(
-        questionId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        answer: 'A',
-      );
+      await submit();
 
       final Object? body = sent.single.data;
       expect(body, isA<Map<String, Object?>>());

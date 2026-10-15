@@ -146,7 +146,9 @@ class _LanguageSheet extends StatelessWidget {
     final EvaColors colors = context.colors;
 
     return GlassSurface(
-      tier: GlassTier.tint,
+      // `GlassTier.tint` is `GlassSurface`'s own default, so no `tier:` is passed.
+      // This class's doc is the argument for that default being right here, and it
+      // is what `glass_blur_budget_test.dart` reads.
       radius: EvaRadii.heroPanel,
       padding: padding,
       child: Column(
@@ -244,8 +246,6 @@ class _LanguageRow extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       child: EvaFocusRing(
-        enabled: true,
-        radius: EvaRadii.button,
         child: EvaInk(
           onPressed: onTap,
           borderRadius: BorderRadius.circular(EvaRadii.button),

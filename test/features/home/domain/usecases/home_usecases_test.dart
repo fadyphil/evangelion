@@ -57,7 +57,7 @@ void main() {
   late MockStreakRepository streaks;
   late MockAuthRepository auth;
 
-  final TodayReading today = const TodayReading(
+  const TodayReading today = TodayReading(
     readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     groupId: 3,
     scheduledDate: '2026-10-03',
@@ -73,7 +73,7 @@ void main() {
     currentStreak: 4,
   );
 
-  final StreakSummary summary = const StreakSummary(
+  const StreakSummary summary = StreakSummary(
     currentStreak: 0,
     longestStreak: 6,
     lastCompletedDate: '2026-09-29',

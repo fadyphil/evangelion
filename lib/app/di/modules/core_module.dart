@@ -169,7 +169,6 @@ abstract class CoreModule {
     baseUrl: baseUrl,
     identity: IdentityHeadersInterceptor(
       userId: kSeedUserId,
-      groupId: kSeedGroupId,
       role: kSeedUserRole.wireValue,
     ),
     connectTimeout: AppConfig.connectTimeout,

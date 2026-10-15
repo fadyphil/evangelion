@@ -97,9 +97,7 @@ class SkyCubit extends Cubit<SkyState> {
     switch (result) {
       case Right<Failure, List<SkyEntry>>(:final List<SkyEntry> value):
         _confirmed = List<SkyEntry>.of(value);
-        emit(
-          SkyState(status: SkyStatus.ready, entries: _confirmed, failure: null),
-        );
+        emit(SkyState(status: SkyStatus.ready, entries: _confirmed));
       case Left<Failure, List<SkyEntry>>(value: final Failure failure):
         emit(
           SkyState(

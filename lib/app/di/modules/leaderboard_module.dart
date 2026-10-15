@@ -70,7 +70,4 @@ abstract class LeaderboardModule {
 /// `const`, so the choice is made at compile time and cannot flip between two lookups
 /// of the same singleton — which is what would happen with a `bool` read through a
 /// getter that re-read an environment value per call.
-const bool useStubLeaderboard = bool.fromEnvironment(
-  'USE_STUB_LEADERBOARD',
-  defaultValue: false,
-);
+const bool useStubLeaderboard = bool.fromEnvironment('USE_STUB_LEADERBOARD');

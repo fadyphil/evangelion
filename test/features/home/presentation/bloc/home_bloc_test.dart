@@ -81,7 +81,7 @@ void main() {
   // 09:30 local, so [GreetingPeriod.morning].
   DateTime clock() => DateTime(2026, 10, 3, 9, 30);
 
-  final TodayReading liveReading = const TodayReading(
+  const TodayReading liveReading = TodayReading(
     readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     groupId: 3,
     scheduledDate: '2026-10-03',
@@ -217,7 +217,7 @@ void main() {
         ),
         // 3. The reading, and its `is_fully_completed` — the *reading* endpoint's
         //    answer, not the streak endpoint's `today_completed`.
-        HomeState(
+        const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
           readerInitials: 'DM',
@@ -227,7 +227,7 @@ void main() {
         ),
         // 4. The streak, and its `currentStreak: 0` — **not** reconciled with the
         //    reading's `4`.
-        HomeState(
+        const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
           readerInitials: 'DM',
@@ -243,7 +243,7 @@ void main() {
         //    happens to resolve first. A fifth frame appearing here is the card being
         //    requested; a fifth frame NOT appearing would mean it silently stopped
         //    being.
-        HomeState(
+        const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
           readerInitials: 'DM',
@@ -468,7 +468,7 @@ void main() {
           streakStatus: HomeSectionStatus.ready,
           streak: liveStreak,
         ),
-        HomeState(
+        const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
           readerInitials: 'DM',
@@ -491,7 +491,7 @@ void main() {
 
     blocTest<HomeBloc, HomeState>(
       'a streak retry does not touch the reading port',
-      seed: () => HomeState(
+      seed: () => const HomeState(
         greetingPeriod: GreetingPeriod.morning,
         readerName: 'David Mina',
         readerInitials: 'DM',
@@ -535,7 +535,7 @@ void main() {
 
     blocTest<HomeBloc, HomeState>(
       'a retry with nothing failed emits nothing at all',
-      seed: () => HomeState(
+      seed: () => const HomeState(
         greetingPeriod: GreetingPeriod.morning,
         readerName: 'David Mina',
         readerInitials: 'DM',

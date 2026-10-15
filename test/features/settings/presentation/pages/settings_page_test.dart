@@ -203,7 +203,7 @@ void main() {
     ) async {
       final SettingsCubit cubit = await pumpSettings(
         tester,
-        stored: const UserSettings(fontStep: 3),
+        stored: const UserSettings(),
       );
 
       await tester.tap(find.byIcon(Icons.add).first);
@@ -972,9 +972,10 @@ void main() {
       // The claim under test is about the *bridge*, so the handles are the smallest
       // thing that can carry it: a read closure over a literal, and a write closure that
       // drops the mutation.
-      final SettingsHandle first = _handleOver(
-        const UserSettings(themeMode: AppThemeMode.dark),
-      );
+      // `themeMode` is `UserSettings`' own `dark` default, so the first handle is an
+      // explicit dark only by being spelled — the *pair* is what this test is
+      // about, and the two handles have to differ.
+      final SettingsHandle first = _handleOver(const UserSettings());
       final SettingsHandle second = _handleOver(
         const UserSettings(themeMode: AppThemeMode.light),
       );

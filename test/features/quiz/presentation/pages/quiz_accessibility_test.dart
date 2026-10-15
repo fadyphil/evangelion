@@ -57,8 +57,9 @@ void main() {
   /// of them wrapped. A suite that built its own `SubmitResult` for the wrong arm
   /// would be a fourth transcription of a shape two already exist in, and the two
   /// copies could disagree about which numbers a wrong answer moves.
-  final Result<SubmitResult> wrongSubmission =
-      const Right<Failure, SubmitResult>(contractWrongAnswerFixture);
+  const Result<SubmitResult> wrongSubmission = Right<Failure, SubmitResult>(
+    contractWrongAnswerFixture,
+  );
 
   group('no unlabeled interactive node', () {
     /// Sweeps one state.

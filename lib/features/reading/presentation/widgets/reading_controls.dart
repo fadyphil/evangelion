@@ -193,10 +193,10 @@ class ReadingControls extends StatelessWidget {
                   // precedent for the avatar, for the same reason: `ReadingEnScreen
                   // .tsx:19-21` draws a bookmark `<button>` with no handler and the
                   // backend has **no** endpoint and **no** port for one, so there
-                  // is nothing to call. `onPressed: null` means `IconActionButton`
-                  // publishes `Semantics(enabled: false)` and no tap action — the
-                  // control is not announced as an enabled button — and the name
-                  // carries why.
+                  // is nothing to call. Passing no `onPressed:` at all is what makes
+                  // `IconActionButton` publish `Semantics(enabled: false)` and no tap
+                  // action — the control is not announced as an enabled button — and
+                  // the name carries why.
                   IconActionButton(
                     icon: Icons.bookmark_border,
                     tooltip:
@@ -204,7 +204,6 @@ class ReadingControls extends StatelessWidget {
                     // Defect #2's sixth Arabic site, and the longest string on the
                     // screen: 19 codepoints including an em dash.
                     tooltipFamily: tooltipFamily,
-                    onPressed: null,
                   ),
                 ],
               ),

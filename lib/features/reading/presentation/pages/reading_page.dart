@@ -353,8 +353,8 @@ class _ReadingBodyState extends State<_ReadingBody> {
         ReadingLanguage.english => NeuralVariant.readingEn,
         ReadingLanguage.arabic => NeuralVariant.readingAr,
       },
-      // The body owns its own scrollable — see [ReadingPage]'s doc.
-      scrollable: false,
+      // `scrollable` stays at its `false` default — the body owns its own, see
+      // [ReadingPage]'s doc.
       bottomFade: true,
       // Each row owns its own gutter; see [ReadingPage.contentPadding]'s doc.
       padding: EdgeInsets.zero,
@@ -485,8 +485,6 @@ class _ArabicBand extends StatelessWidget {
               ReadingPage.arabicBandDash / ReadingPage.arabicBandPitch,
               1,
             ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
             // `repeating-linear-gradient(90deg, …)` — a repeat along **x**, which in
             // Flutter is a left-to-right gradient with `TileMode.repeated`.
             tileMode: TileMode.repeated,

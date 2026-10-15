@@ -114,6 +114,5 @@ AuthSession seedAuthSession({required DateTime createdAt}) => AuthSession(
   email: kSeedEmail,
   displayName: kSeedDisplayName,
   initials: 'DM',
-  role: kSeedUserRole,
   createdAt: createdAt,
 );

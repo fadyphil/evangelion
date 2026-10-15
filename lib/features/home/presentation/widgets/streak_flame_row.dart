@@ -69,6 +69,10 @@ class StreakFlameRow extends StatelessWidget {
   final VoidCallback? onRetry;
 
   /// The flame's height. `ds.tsx:514` — `width="14" height="18"`.
+  ///
+  /// The record of the prototype number rather than a value this widget passes:
+  /// `StreakFlame`'s own `size` default is the same 18, so the call site passes
+  /// nothing and this constant is where the transcription is written down.
   static const double flameSize = 18;
 
   /// The gap between the flame and the number. `ds.tsx:513` — `gap: 5`. (`ds.tsx:512`
@@ -88,7 +92,11 @@ class StreakFlameRow extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            StreakFlame(size: flameSize, semanticLabel: semanticLabel),
+            // `StreakFlame.size` defaults to the same 18, so no `size:` is passed — `flameSize`
+            // is this row's record of `ds.tsx:514`'s `height="18"`, not a second
+            // source of truth. `home_geometry_test.dart` asserts the rendered 18 and
+            // 14, and names `flameSize` as where the number is transcribed.
+            const StreakFlame(),
             const SizedBox(width: gap),
             // `ds.tsx:516` — `F.mono 13 / 700 / ink`.
             Text(

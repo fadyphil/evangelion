@@ -458,7 +458,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     // that sometimes rebases is the two-writers shape this file's own docs refuse.
     // Recorded for Phase 9, where the language switch is a shipped feature.
     final SubmitResult? before = state.lastResult;
-    emit(QuizState(status: QuizStatus.loading, lastResult: before));
+    emit(QuizState(lastResult: before));
     _emitReading(await _startSession(event.language), before, emit);
   }
 
@@ -492,7 +492,7 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     final QuizSession? before = state.session;
     final int beforeIndex = state.currentIndex;
 
-    emit(QuizState(status: QuizStatus.loading, lastResult: state.lastResult));
+    emit(QuizState(lastResult: state.lastResult));
 
     final Result<RefreshedOutcome> refreshed = await _refreshSessionQuestions(
       event.language,

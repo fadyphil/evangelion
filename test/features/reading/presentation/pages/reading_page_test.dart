@@ -159,7 +159,7 @@ void main() {
           reason:
               'the cap is the first character of a string from the wire; a space '
               'here renders nothing at '
-              '${const PassageDropCap(letter: 'I', lines: 3).fontSizeFor(17)} logical px',
+              '${const PassageDropCap(letter: 'I').fontSizeFor(17)} logical px',
         );
         // …and the cap is a **rune**, not a code unit. `isWellFormedUtf16` and not
         // `runes.length == length`, because `runes` yields an unpaired surrogate as

@@ -92,7 +92,6 @@ class QuizHeader extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: bottomGap),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         IconActionButton(
           icon: Icons.close,
@@ -110,7 +109,6 @@ class QuizHeader extends StatelessWidget {
             ReadingLanguage.arabic => EvaTypography.arabicFamily,
           },
           onPressed: onExit,
-          size: endWidth,
         ),
         ProgressBeads(
           total: total,

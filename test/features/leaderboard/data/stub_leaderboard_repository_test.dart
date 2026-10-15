@@ -124,7 +124,7 @@ void main() {
 
   group('the cohort size goes through the real derivation', () {
     test('known when the cap does not bind', () async {
-      final LeaderboardBoard result = await board(limit: 50);
+      final LeaderboardBoard result = await board();
       // Five rows against a limit of fifty ⇒ `rowsReturned < limit` ⇒ 5, which is the
       // `2 / 5` line on the card.
       expect(result.cohortSize, 5);

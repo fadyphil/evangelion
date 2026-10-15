@@ -96,7 +96,7 @@ class _SealFabState extends State<SealFab> {
                     // prototype's name for a surface arriving, which is what a pill is,
                     // so `MotionMoment.screen` is the matching moment and its duration
                     // and curve are the tokens — no literal reaches this call site.
-                    effects: <Effect>[
+                    effects: <Effect<dynamic>>[
                       MotionMoment.screen.fadeIn(),
                       MotionMoment.screen.slide(
                         direction == TextDirection.rtl
@@ -237,7 +237,9 @@ class SealFabTrigger extends StatelessWidget {
             // count is a deliberate act and a floating affordance is a poor reason to
             // spend it on.
             child: GlassSurface(
-              tier: GlassTier.tint,
+              // `GlassTier.tint` — `GlassSurface`'s own default, so no `tier:` is
+              // passed, which is the whole of the argument above: this pill is one
+              // of the eight sites the budget refuses.
               radius: diameter / 2,
               padding: EdgeInsets.zero,
               // The rim above is the outline. `GlassSurface`'s own hairline would be a
@@ -328,10 +330,10 @@ class SealFabPill extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(radius),
-            // `GlassTier.tint`, for the reason the trigger's doc gives: `/`'s one
-            // blurred site is the passage panel, and a pill does not get a second one.
+            // `GlassTier.tint` is `GlassSurface`'s own default, so no `tier:` is passed — for
+            // the reason the trigger's doc gives: `/`'s one blurred site is the
+            // passage panel, and a pill does not get a second one.
             child: GlassSurface(
-              tier: GlassTier.tint,
               radius: radius,
               // `ds.tsx:550` — `padding: '8px 18px'`. 18 is `md` plus `xs` on the
               // 4px scale and 8 is `sm`, so both land on tokens without rounding.

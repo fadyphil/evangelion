@@ -415,14 +415,14 @@ class _LoginFormState extends State<_LoginForm> {
             _Brand(strings: strings),
             const SizedBox(height: LoginPage.kBrandBottomGap),
             GlassSurface(
-              // `GlassTier.tint`, **not** `.blur`. §13.4 is explicit: "Login:
+              // `GlassTier.tint` — `GlassSurface`'s own default, so no `tier:` is
+              // passed — and **not** `.blur`. §13.4 is explicit: "Login:
               // `.tint` — it is a full-screen field cluster, so a blur buys
               // nothing", and the prototype's `backdropFilter: blur(24px)` at
               // `LoginScreen.tsx:40` is one of the eight sites the budget refuses.
               // Spending one here would also break
               // `glass_blur_budget_test.dart`'s two-site ceiling, which names
               // Home's panel and Home's top bar as the only two.
-              tier: GlassTier.tint,
               radius: LoginPage.kFormRadius,
               padding: LoginPage.kFormPadding,
               child: Column(
@@ -486,8 +486,8 @@ class _LoginFormState extends State<_LoginForm> {
                   Center(
                     child: TextLink(
                       label: strings.authForgotPassword,
-                      // Inert. See the class doc's element table.
-                      onPressed: null,
+                      // Inert — no `onPressed:` is passed at all. See the class doc's
+                      // element table.
                     ),
                   ),
                   const SizedBox(height: LoginPage.kFormGap),
@@ -550,7 +550,7 @@ class _SignUpRow extends StatelessWidget {
         ).copyWith(color: context.colors.ink2),
       ),
       const SizedBox(width: LoginPage.kSignUpRowGap),
-      TextLink(label: strings.authCreateAccount, onPressed: null),
+      TextLink(label: strings.authCreateAccount),
     ],
   );
 }

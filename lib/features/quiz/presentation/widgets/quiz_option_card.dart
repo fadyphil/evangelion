@@ -461,8 +461,10 @@ class QuizOptionCard extends StatelessWidget {
     // records in its own comment.
     final Widget pressable = interactive
         ? EvaFocusRing(
-            enabled: true,
-            idleBorder: null,
+            // `enabled` and `idleBorder` are both left at their defaults: `true`
+            // and `null`. `null` because this card's **resting** border is already
+            // painted by the `DecoratedBox` above — drawing it twice would be the
+            // same defect `GlassSurface` records in its own comment.
             radius: radius,
             child: EvaInk(
               onPressed: onTap,

@@ -83,7 +83,6 @@
 library;
 
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -503,7 +502,6 @@ Future<List<({String message, RenderedRun run})>> _tooltipRuns(
     final Finder target = find.byType(Tooltip).at(index);
     final TestGesture gesture = await tester.startGesture(
       tester.getCenter(target),
-      kind: PointerDeviceKind.touch,
     );
     // The tooltip's own `showDuration`/`enterDuration` are what this waits out. A
     // fixed 12 pumps was tried first and is a second number to get wrong.
@@ -624,7 +622,7 @@ List<RenderedRun> _paintedRuns(WidgetTester tester, String fallback) {
   for (final RichText rich in tester.widgetList<RichText>(
     find.byType(RichText),
   )) {
-    collectSpan(rich.text, rich.text.toPlainText(), null);
+    collectSpan(rich.text, rich.text.toPlainText());
   }
   return runs;
 }

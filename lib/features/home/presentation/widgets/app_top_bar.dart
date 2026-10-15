@@ -1,7 +1,6 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/features/home/presentation/widgets/streak_flame_row.dart';
 import 'package:flutter/material.dart';
-
-import 'streak_flame_row.dart';
 
 /// The transparent bar across the top of `/`: wordmark, streak, avatar.
 ///
@@ -318,8 +317,6 @@ class _Avatar extends StatelessWidget {
       // `IconActionButton` documents.
       onTap: onTap,
       child: EvaFocusRing(
-        enabled: true,
-        idleBorder: null,
         // Circular, so the ring is a circle. `EvaFocusRing`'s default radius is a
         // button's 14, which on a 32px badge would draw a squircle inside a circle.
         radius: AppTopBar.avatarDiameter / 2,

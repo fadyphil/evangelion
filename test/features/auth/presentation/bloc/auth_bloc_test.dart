@@ -650,7 +650,7 @@ void main() {
       // A bloc state is printed by `bloc_test` on every mismatch and by
       // `flutter_bloc`'s debug transition logging, so Equatable's default would
       // put the reader's secret in a build's console as a matter of course.
-      final AuthState state = const AuthState(
+      const AuthState state = AuthState(
         status: AuthSessionStatus.signingIn,
         email: email,
         password: 'hunter2-hunter2',

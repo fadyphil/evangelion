@@ -865,12 +865,7 @@ void main() {
                 : liveArabicPassage,
           ),
         );
-        await pumpReading(
-          tester,
-          cubit: h.cubit,
-          locale: locale,
-          size: kGeometrySurface,
-        );
+        await pumpReading(tester, cubit: h.cubit, locale: locale);
 
         final TextStyle body = _bodyStyleOf(scriptureElements(tester)[0]);
         expect(body.fontSize, ScriptureBlock.fontSizeFor(arm));

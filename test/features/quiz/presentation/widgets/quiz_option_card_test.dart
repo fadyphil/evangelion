@@ -55,8 +55,6 @@ void main() {
     await tester.pumpWidget(
       evaPrimitiveHarness(
         theme: EvaThemeDark.theme,
-        locale: const Locale('en'),
-        textDirection: TextDirection.ltr,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
         child: Center(
@@ -404,7 +402,6 @@ void main() {
           letter: arm.$1 == ReadingLanguage.arabic ? 'أ' : 'A',
           text: arm.$2,
           semanticLabel: 'x',
-          width: 320,
         );
         expect(tester.takeException(), isNull, reason: arm.$1.name);
       }

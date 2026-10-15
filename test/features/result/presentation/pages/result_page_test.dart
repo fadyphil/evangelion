@@ -209,7 +209,7 @@ void main() {
       // fourth, or as a value swapped into one of the two that were already there.
       await pumpResult(tester, result: aSentinelResult);
 
-      final String headline = '1234';
+      const String headline = '1234';
       // `.first`, because a `StatTile` draws **two** `Text`s — the value over the
       // caption — and `tester.widget` on a two-element finder throws
       // `Bad state: Too many elements`. The value is first in `StatTile.build`'s
@@ -442,11 +442,13 @@ void main() {
             'the harness flag reaches the `MediaQuery` above the background',
       );
       expect(
+        // `override` is left at its `null` default, which is the claim: the
+        // background passes no override, and a call that merely omitted it
+        // would say nothing.
         NeuralTiers.resolve(
           size: MediaQuery.sizeOf(context),
           animationsEnabled:
               !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
-          override: null,
         ),
         NeuralTier.low,
         reason:
@@ -473,11 +475,13 @@ void main() {
           reason: 'the default call does not disable animations',
         );
         expect(
+          // `override` is left at its `null` default, which is the claim: the
+          // background passes no override, and a call that merely omitted it
+          // would say nothing.
           NeuralTiers.resolve(
             size: MediaQuery.sizeOf(context),
             animationsEnabled:
                 !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
-            override: null,
           ),
           NeuralTier.mid,
           reason: '430×932 is a `mid` viewport, so the flag is what changed it',

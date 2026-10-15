@@ -84,12 +84,14 @@ void main() {
       // from the string the card builds, so a page that passed the verdict in anyway
       // would have nothing to spell.
       expect(en.optionLabel(letter: 'A', text: 'Nicodemus'), 'A. Nicodemus');
+      // `suffix` is left at its `null` default on both Arabic arms: the claim is
+      // "no suffix at all", and the two-worded assertion below is what proves it.
       expect(
-        en.optionLabel(letter: 'A', text: 'نيقوديموس', suffix: null),
+        en.optionLabel(letter: 'A', text: 'نيقوديموس'),
         isNot(contains(en.quizCorrectSuffix)),
       );
       expect(
-        en.optionLabel(letter: 'A', text: 'نيقوديموس', suffix: null),
+        en.optionLabel(letter: 'A', text: 'نيقوديموس'),
         isNot(contains(en.quizIncorrectSuffix)),
       );
     });

@@ -28,14 +28,14 @@ import '../../../../support/home_harness.dart';
 /// would leave the error view's long repository message untested at 1.22×, which is
 /// precisely where a long string overflows.
 void main() {
-  /// The surface and the scale, named so a failure reads as §14's own words.
-  const Size surface = kNarrowSurface;
+  /// The scale, named so a failure reads as §14's own words. The surface is
+  /// `kNarrowSurface`, which is `pumpHome`'s own default and so is not passed.
   const double scale = kEvaRequiredTextScale;
 
   group('at 320x568 and 1.22x, no state overflows', () {
     testWidgets('ready, English', (WidgetTester tester) async {
       final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
+      await pumpHome(tester, bloc: h.bloc, textScale: scale);
 
       expect(tester.takeException(), isNull);
       _expectNoOverflow(tester);
@@ -54,7 +54,6 @@ void main() {
         tester,
         bloc: h.bloc,
         locale: const Locale('ar'),
-        size: surface,
         textScale: scale,
       );
 
@@ -85,7 +84,6 @@ void main() {
           onStartReflection: null,
           onRetry: null,
         ),
-        size: surface,
         textScale: scale,
       );
 
@@ -99,7 +97,7 @@ void main() {
       final HomeHarness h = harness(
         reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
-      await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
+      await pumpHome(tester, bloc: h.bloc, textScale: scale);
 
       expect(tester.takeException(), isNull);
       _expectNoOverflow(tester);
@@ -109,7 +107,7 @@ void main() {
       final HomeHarness h = harness(
         streak: const Left<Failure, StreakSummary>(streakFailure),
       );
-      await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
+      await pumpHome(tester, bloc: h.bloc, textScale: scale);
 
       expect(tester.takeException(), isNull);
       _expectNoOverflow(tester);
@@ -119,7 +117,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness(signedIn: false);
-      await pumpHome(tester, bloc: h.bloc, size: surface, textScale: scale);
+      await pumpHome(tester, bloc: h.bloc, textScale: scale);
 
       expect(tester.takeException(), isNull);
       _expectNoOverflow(tester);
@@ -137,7 +135,6 @@ void main() {
       await pumpHome(
         tester,
         bloc: h.bloc,
-        size: surface,
         textScale: evaScalerFor(5).scale(14) / 14,
       );
 

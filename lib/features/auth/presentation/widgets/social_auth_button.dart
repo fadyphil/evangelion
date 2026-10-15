@@ -124,7 +124,7 @@ class SocialAuthButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.glassFill,
           borderRadius: BorderRadius.circular(EvaRadii.button),
-          border: Border.all(color: colors.glassBorder, width: 1),
+          border: Border.all(color: colors.glassBorder),
         ),
         child: SizedBox(
           height: kSocialButtonHeight,

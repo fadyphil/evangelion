@@ -128,10 +128,8 @@ Future<Uint8List> backgroundPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
       .renderObject<RenderRepaintBoundary>(_backgroundBoundary(tester));
   final Uint8List? bytes = await tester.runAsync<Uint8List>(() async {
-    final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData? data = await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    );
+    final ui.Image image = boundary.toImageSync();
+    final ByteData? data = await image.toByteData();
     image.dispose();
     if (data == null) {
       throw StateError('the background layer produced no pixels');

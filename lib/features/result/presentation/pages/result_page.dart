@@ -190,7 +190,6 @@ class ResultPage extends StatelessWidget {
     // than optically centred** at §14's surface. Centring it properly needs a bounded
     // height, and a bounded height is the thing that overflows.
     mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.center,
     children: <Widget>[
       Padding(
         padding: const EdgeInsets.only(bottom: burstGap),
@@ -441,9 +440,12 @@ class _StreakPill extends StatelessWidget {
             width: ResultPage.pillFlameWidth,
             height: ResultPage.pillFlameHeight,
             child: FittedBox(
-              fit: BoxFit.contain,
+              // `BoxFit.contain` — `FittedBox`'s own default — so the square icon
+              // is drawn into the 14×18 box above at the prototype's shape.
               child: StreakFlame(
-                size: ResultPage.pillFlameHeight,
+                // `size` is `pillFlameHeight` — `StreakFlame`'s own default is the
+                // same 18 — and it is the height half of the 14×18 pair argued
+                // above; the width half is the `SizedBox`.
                 // The pill's label already says the streak; a second node saying
                 // "Streak" would be two names for one number.
                 semanticLabel: strings.resultDay,

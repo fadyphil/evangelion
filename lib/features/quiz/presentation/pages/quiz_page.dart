@@ -249,10 +249,9 @@ class _QuizBodyState extends State<_QuizBody> {
   }) => switch (state.status) {
     QuizStatus.loading => const NeuralScaffold(
       variant: NeuralVariant.quiz,
-      // `QuizScreen.tsx:76` gives the options `flex: 1` in a column, which is the
-      // prototype's own scrollable and is why this screen is `scrollable: false`
-      // for the same reason `/reading` is: the body owns its own.
-      scrollable: false,
+      // `scrollable` is left at its `false` default, which is what
+      // `QuizScreen.tsx:76`'s `flex: 1` options column asks for: the prototype's own
+      // scrollable, and the reason `/reading` and this screen agree.
       padding: EdgeInsets.zero,
       child: SizedBox.shrink(),
     ),
@@ -289,7 +288,6 @@ class _QuizBodyState extends State<_QuizBody> {
 
     return NeuralScaffold(
       variant: NeuralVariant.quiz,
-      scrollable: false,
       padding: QuizPage.rootPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -867,7 +865,6 @@ class _FailedOrEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) => NeuralScaffold(
     variant: NeuralVariant.quiz,
-    scrollable: false,
     padding: QuizPage.rootPadding,
     child: Center(
       child: empty

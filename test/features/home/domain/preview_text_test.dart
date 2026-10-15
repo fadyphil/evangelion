@@ -11,26 +11,25 @@ import '../../../support/utf16.dart';
 /// which makes it a real function rather than a guard, and makes the cut
 /// observable: the word after the cut is `Nicodemus,`, and a cut that ran to the
 /// space before it would read `…a ruler of the Jews:` for a much shorter prefix.
+///
+/// **The 56-character budget is left to `previewText`'s own default on every call
+/// below**, and the fixtures are written against it — `'a' * 56`, `'a' * 57`,
+/// `'x' * 55`. `kPreviewMaxChars` is the same number named once; repeating it at
+/// each call site would be a second place to change it.
 void main() {
   group('shorter than the budget', () {
     test('is returned unchanged, with no ellipsis', () {
-      expect(previewText('There was a man.', maxChars: 56), 'There was a man.');
+      expect(previewText('There was a man.'), 'There was a man.');
     });
 
     test('and exactly at the budget is unchanged too', () {
       final String exact = 'a' * 56;
-      expect(previewText(exact, maxChars: 56), exact);
-      expect(
-        previewText(exact, maxChars: 56),
-        isNot(contains(kPreviewEllipsis)),
-      );
+      expect(previewText(exact), exact);
+      expect(previewText(exact), isNot(contains(kPreviewEllipsis)));
     });
 
     test('one character over is cut', () {
-      expect(
-        previewText('a' * 57, maxChars: 56),
-        '${'a' * 56}$kPreviewEllipsis',
-      );
+      expect(previewText('a' * 57), '${'a' * 56}$kPreviewEllipsis');
     });
 
     test('an empty string stays empty — no ellipsis on nothing', () {
@@ -115,7 +114,7 @@ void main() {
       // Arabic and a Hebrew class of text both do this, and the earlier verse is
       // the measured example: `text_clean` has no ASCII spaces in most of its
       // length, so this arm is live rather than defensive.
-      final String preview = previewText('أ' * 80, maxChars: 56);
+      final String preview = previewText('أ' * 80);
 
       expect(preview.length, kPreviewMaxChars + kPreviewEllipsis.length);
       expect(preview, '${'أ' * 56}$kPreviewEllipsis');
@@ -179,7 +178,7 @@ void main() {
 
     test('one unit short of the pair also keeps nothing half-formed', () {
       expect(
-        previewText('${'x' * 55}\u{1F600} tail', maxChars: 56),
+        previewText('${'x' * 55}\u{1F600} tail'),
         '${'x' * 55}$kPreviewEllipsis',
       );
     });

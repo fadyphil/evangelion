@@ -84,8 +84,11 @@ void main() {
       // Named because the function *could* have read more: a "good morning" that
       // meant "the first hour after 05:00 on a Tuesday" would be a different
       // function, and `HomeScreen.tsx:26` gives nothing to support it.
+      // The explicit `0, 0, 0` is the assertion: it is the same hour written with
+      // every lower field filled in, which is what "minutes, seconds, day and
+      // month make no difference" has to mean to be a claim rather than a tautology.
       expect(
-        greetingPeriodFor(DateTime(2026, 1, 1, 9, 0, 0, 0)),
+        greetingPeriodFor(DateTime(2026, 1, 1, 9)),
         greetingPeriodFor(DateTime(1999, 12, 31, 9, 59, 59, 999)),
       );
     });

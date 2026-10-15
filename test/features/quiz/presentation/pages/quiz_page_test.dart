@@ -405,11 +405,13 @@ void main() {
           // it passes them from. A literal `resolve(…, animationsEnabled: false)`
           // would assert the pure function against itself and survive the background
           // ceasing to read the flag.
+          // `override` is left at its `null` default, which is the claim: the
+          // background passes no override, and a call that merely omitted it
+          // would say nothing.
           tier: NeuralTiers.resolve(
             size: MediaQuery.sizeOf(background),
             animationsEnabled:
                 !(MediaQuery.maybeDisableAnimationsOf(background) ?? false),
-            override: null,
           ),
         );
       }

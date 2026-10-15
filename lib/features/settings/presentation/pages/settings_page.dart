@@ -475,7 +475,9 @@ class _SettingsFailureNotice extends StatelessWidget {
         bottom: SettingsPage.groupGap,
       ),
       child: GlassSurface(
-        tier: GlassTier.tint,
+        // `GlassTier.tint` is `GlassSurface`'s own default, so no `tier:` is
+        // passed — which is the same decision this class's doc records: §13.4 rows
+        // `/settings` under `tint`, and the screen had to be *chosen*, not left.
         radius: SettingsTile.radius,
         padding: padding,
         child: Column(
