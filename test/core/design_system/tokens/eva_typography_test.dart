@@ -217,7 +217,7 @@ void main() {
       // invisible, so the theme has to push the palette's own ink in — this is
       // the assertion that catches a `textTheme` built from `Typography` and
       // never recoloured.
-      final EvaColors light = const EvaColors.light();
+      const EvaColors light = EvaColors.light();
       final TextTheme themed = EvaTypography.textTheme(light);
 
       expect(themed.displayLarge!.color, light.ink);
@@ -234,8 +234,8 @@ void main() {
     test(
       'is a distinct object per palette, and reflects the ink it was given',
       () {
-        final EvaColors dark = const EvaColors.dark();
-        final EvaColors light = const EvaColors.light();
+        const EvaColors dark = EvaColors.dark();
+        const EvaColors light = EvaColors.light();
         final TextTheme a = EvaTypography.textTheme(dark);
         final TextTheme b = EvaTypography.textTheme(light);
 
@@ -250,7 +250,7 @@ void main() {
   // =========================================================================
   group('the scripture styles, which have no Material slot', () {
     test('use EB Garamond for latin and Amiri for arabic', () {
-      final EvaColors colors = const EvaColors.dark();
+      const EvaColors colors = EvaColors.dark();
       expect(
         EvaTypography.scriptureLatin(colors).fontFamily,
         EvaTypography.scriptureFamily,
@@ -267,7 +267,7 @@ void main() {
       // check. This is the token-level half: it cannot see a widget that builds
       // its own `TextStyle`, but it does pin the pairing that the half that can
       // will walk looking for, and it fails today if the two styles are swapped.
-      final EvaColors colors = const EvaColors.dark();
+      const EvaColors colors = EvaColors.dark();
       expect(
         EvaTypography.scriptureArabic(colors).fontFamily,
         isNot(EvaTypography.monoFamily),
@@ -290,7 +290,7 @@ void main() {
       // style were a size larger or smaller the line height of the paragraph
       // would jump as the text changed language. The spec gives no scripture
       // size, so both take the same geometry from the Material scale.
-      final EvaColors colors = const EvaColors.light();
+      const EvaColors colors = EvaColors.light();
       expect(
         EvaTypography.scriptureLatin(colors).fontSize,
         EvaTypography.scriptureArabic(colors).fontSize,
@@ -306,7 +306,7 @@ void main() {
       // long-form surface, and anything at or below `labelSmall`'s 11sp is a
       // legibility regression. The spec fixes no size, so this pins only the
       // bound the design cannot cross.
-      final EvaColors colors = const EvaColors.dark();
+      const EvaColors colors = EvaColors.dark();
       expect(
         EvaTypography.scriptureLatin(colors).fontSize,
         greaterThanOrEqualTo(16.0),
@@ -318,7 +318,7 @@ void main() {
     });
 
     test('the mono-caps style uses Space Mono and nothing else', () {
-      final EvaColors colors = const EvaColors.dark();
+      const EvaColors colors = EvaColors.dark();
       expect(
         EvaTypography.monoCaps(colors).fontFamily,
         EvaTypography.monoFamily,

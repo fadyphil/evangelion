@@ -67,7 +67,7 @@ void main() {
         tester,
         const Column(
           children: <Widget>[
-            _Live(initial: 'Dark', onPicked: null),
+            _Live(initial: 'Dark'),
             EvaButton(
               labelFamily: EvaTypography.uiFamily,
               label: 'After',
@@ -104,7 +104,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final List<String> seen = <String>[];
-      await pump(tester, selected: 'Dark', onPicked: seen.add);
+      await pump(tester, onPicked: seen.add);
       await tabUntilFocused(tester, controlFinder);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -123,7 +123,7 @@ void main() {
 
     testWidgets('ArrowLeft steps back and wraps', (WidgetTester tester) async {
       final List<String> seen = <String>[];
-      await pump(tester, selected: 'Dark', onPicked: seen.add);
+      await pump(tester, onPicked: seen.add);
       await tabUntilFocused(tester, controlFinder);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
@@ -140,7 +140,7 @@ void main() {
     ) async {
       // The load-bearing half of "selects via keyboard": a control that reports a
       // new value but does not *move its selection* has not selected anything.
-      await pump(tester, selected: 'Dark');
+      await pump(tester);
       await tabUntilFocused(tester, controlFinder);
 
       final Color darkFill =
@@ -196,12 +196,7 @@ void main() {
       // §14 and prototype defect #2 in the same place: a control whose "forward"
       // ignores `Directionality` is the same bug as Arabic laid out LTR.
       final List<String> seen = <String>[];
-      await pump(
-        tester,
-        selected: 'Dark',
-        onPicked: seen.add,
-        direction: TextDirection.rtl,
-      );
+      await pump(tester, onPicked: seen.add, direction: TextDirection.rtl);
       await tabUntilFocused(tester, controlFinder);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -211,7 +206,7 @@ void main() {
 
     testWidgets('Home and End jump to the ends', (WidgetTester tester) async {
       final List<String> seen = <String>[];
-      await pump(tester, selected: 'Dark', onPicked: seen.add);
+      await pump(tester, onPicked: seen.add);
       await tabUntilFocused(tester, controlFinder);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.end);
@@ -227,7 +222,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final List<String> seen = <String>[];
-      await pump(tester, selected: 'Dark', onPicked: seen.add);
+      await pump(tester, onPicked: seen.add);
       await tester.tap(find.text('LIGHT'));
       await tester.pump();
       expect(seen, <String>['Light']);
@@ -246,7 +241,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pump(tester, selected: 'Dark');
+      await pump(tester);
       handle.dispose();
 
       final chosen = semanticsOf(tester, find.text('DARK'));
@@ -270,7 +265,7 @@ void main() {
       // Asserted over the whole tree and filtered on the **action**, because the
       // question is about what a reader can press; the harness's own nodes come
       // back with no actions at all, so nothing else is in the list.
-      await pump(tester, selected: 'Dark');
+      await pump(tester);
       final List<SemanticsData> actionable = nodesOffering(
         tester,
         SemanticsAction.tap,
@@ -310,7 +305,7 @@ void main() {
       // **Tab cannot reach at all**, which is a worse §14 defect than an unnamed
       // one. Reachability itself is `focus_ring_gate_test.dart`'s assertion; this
       // is the naming half.
-      await pump(tester, selected: 'Dark');
+      await pump(tester);
       final List<SemanticsData> actionable = nodesOffering(
         tester,
         SemanticsAction.tap,

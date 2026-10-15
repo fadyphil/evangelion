@@ -367,7 +367,7 @@ void main() {
       // at its OWN 3–7s period, so the phase is the clock scaled by
       // `kFloatPeriod / period` — the same derivation `GoldFlecks` publishes as
       // `flecksPerFloatCycle`, with a per-star divisor instead of a shared one.
-      final Duration star = const Duration(seconds: 5);
+      const Duration star = Duration(seconds: 5);
       final double cycles = kFloatPeriod.inMicroseconds / star.inMicroseconds;
       expect(cycles, closeTo(4.0, 1e-9));
       // A tenth of the float clock is 2 real seconds, which is 0.4 of this

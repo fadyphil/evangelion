@@ -513,7 +513,7 @@ class GlassSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.glassFill,
         borderRadius: borderRadius,
-        border: border ? Border.all(color: colors.glassBorder, width: 1) : null,
+        border: border ? Border.all(color: colors.glassBorder) : null,
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: colors.glassShadow,
@@ -641,19 +641,21 @@ class GlassSurface extends StatelessWidget {
         // focus node of its own, so Tab never reached the surface at all. Phase 3
         // owns the ring; this is its first application to an already-shipped
         // widget, and `focus_ring_gate_test.dart` counts it.
-        enabled: true,
-        // `null`, deliberately — and this line is the whole of M4's fix. Phase 3
-        // first passed `Border.all(colors.glassBorder, width: 1)` here, which is
-        // *the same border at the same 1px inset* that the `DecoratedBox` above
-        // already paints, so `onTap: null → () {}` double-drew the rim on every
-        // interactive panel. The focus ring is supposed to **replace** the idle
-        // border in the same band (see `EvaFocusRing`), and this surface already
-        // owns its resting border in its own decoration — so the ring's idle state
-        // has nothing to add, and [border] is honoured exactly once.
+        //
+        // `idleBorder` stays `null` deliberately — and that absence is the whole
+        // of M4's fix. Phase 3 first passed `Border.all(colors.glassBorder, width:
+        // 1)` here, which is *the same border at the same 1px inset* that the
+        // `DecoratedBox` above already paints, so `onTap: null → () {}` double-drew
+        // the rim on every interactive panel. The focus ring is supposed to
+        // **replace** the idle border in the same band (see `EvaFocusRing`), and
+        // this surface already owns its resting border in its own decoration — so
+        // the ring's idle state has nothing to add, and [border] is honoured
+        // exactly once. `null` is the parameter's default, so the deliberate
+        // absence and the undeliberate one look the same in the source; that is
+        // what this comment is for.
         //
         // Losing nothing: the 2px ember ring is *wider* than the 1px rim it
         // covers, so a focused panel still shows it completely.
-        idleBorder: null,
         radius: radius,
         child: EvaInk(
           onPressed: onTap,
@@ -692,8 +694,8 @@ class GlassSurface extends StatelessWidget {
               // `filter:blur(18px)`.
               stops: const <double>[0, kGlassBloomFadeStop],
               // Past the last stop there is nothing left of the gradient, and
-              // `clamp` is what says so — the alternative tiles the colour back.
-              tileMode: TileMode.clamp,
+              // `clamp` — Flutter's default `tileMode` — is what says so; the
+              // alternative tiles the colour back.
             ),
           ),
           child: const SizedBox.expand(),
@@ -718,9 +720,11 @@ class GlassSurface extends StatelessWidget {
                 borderRadius: const BorderRadius.all(
                   Radius.circular(kGlassSeamCornerRadius),
                 ),
+                // Left to right, which is the seam's `90deg` and is
+                // `LinearGradient`'s own `centerLeft` → `centerRight` default.
+                // `glass_surface_test.dart` reads both ends back off this gradient
+                // so the direction cannot drift.
                 gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
                   colors: <Color>[
                     Colors.transparent,
                     colors.seam,

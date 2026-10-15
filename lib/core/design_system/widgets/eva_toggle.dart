@@ -203,7 +203,6 @@ class EvaToggle extends StatelessWidget {
       // reader flips it. A toggle has no disabled state, so this is never null.
       onTap: () => onChanged(!value),
       child: EvaFocusRing(
-        enabled: true,
         // A switch is a stadium, so the ring has to be too — and it is the ring on
         // the **tap target** that a keyboard reader sees, which is the outer box.
         radius: tapTarget.height / 2,

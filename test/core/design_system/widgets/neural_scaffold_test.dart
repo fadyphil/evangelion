@@ -304,12 +304,7 @@ void main() {
     testWidgets('light canvas gets dark status-bar icons', (
       WidgetTester tester,
     ) async {
-      await pumpAt(
-        tester,
-        scaffold(),
-        theme: EvaThemeLight.theme,
-        size: const Size(390, 844),
-      );
+      await pumpAt(tester, scaffold(), theme: EvaThemeLight.theme);
       final AnnotatedRegion<SystemUiOverlayStyle> region = tester
           .widget<AnnotatedRegion<SystemUiOverlayStyle>>(
             find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
@@ -353,11 +348,7 @@ void main() {
           )
           .height!;
 
-      await pumpAt(
-        tester,
-        scaffold(bottomFade: true),
-        size: const Size(390, 844),
-      );
+      await pumpAt(tester, scaffold(bottomFade: true));
       final double narrow = scrimHeight();
       await pumpAt(
         tester,

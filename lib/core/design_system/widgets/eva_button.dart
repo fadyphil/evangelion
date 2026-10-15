@@ -445,7 +445,6 @@ class _EvaButtonState extends State<EvaButton> {
         // agree or Tab would stop on a control that cannot be activated.
         enabled: enabled,
         idleBorder: style.border,
-        radius: EvaRadii.button,
         child: EvaInk(
           onPressed: widget.onPressed,
           onHighlightChanged: (bool value) {

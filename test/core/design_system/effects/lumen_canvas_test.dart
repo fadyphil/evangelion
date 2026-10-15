@@ -117,9 +117,7 @@ Future<Uint8List> captureFrame(
       size.width.round(),
       size.height.round(),
     );
-    final ByteData? data = await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    );
+    final ByteData? data = await image.toByteData();
     image.dispose();
     if (data == null) {
       throw StateError('the Lumen frame produced no pixels');
@@ -239,9 +237,7 @@ Future<Uint8List> captureFrameWithRawSlots(
       size.width.round(),
       size.height.round(),
     );
-    final ByteData? data = await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    );
+    final ByteData? data = await image.toByteData();
     image.dispose();
     if (data == null) {
       throw StateError('the Lumen frame produced no pixels');
@@ -994,12 +990,12 @@ void main() {
       final Uint8List captured = await captureFrame(
         tester,
         program: program,
-        uniforms: fixture(shape: 0),
+        uniforms: fixture(),
         clock: LumenClock.fixed(3.7),
       );
       final ({int worst, int x, int y, int channel}) delta = worstChannelError(
         captured,
-        referenceFrame(fixture(shape: 0), flipY: false),
+        referenceFrame(fixture(), flipY: false),
       );
       expect(
         delta.worst,
@@ -1136,7 +1132,7 @@ void main() {
     ) async {
       final LumenProgram program = await LumenProgram.load();
       // `white: 0` isolates the rays term — see `observedNoiseFactors`.
-      final LumenUniforms quiet = fixture(rays: 0, white: 0);
+      final LumenUniforms quiet = fixture(white: 0);
       final Uint8List flat = await captureFrame(
         tester,
         program: program,

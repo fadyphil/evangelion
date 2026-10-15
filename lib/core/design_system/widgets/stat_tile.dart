@@ -82,8 +82,8 @@ class StatTile extends StatelessWidget {
     // need it and why the widget has no `isArabic` branch.
     final TextDirection direction = Directionality.of(context);
     return GlassSurface(
-      // See the class doc for why this is `tint` and not the prototype's blur.
-      tier: GlassTier.tint,
+      // Left at [GlassTier.tint], which is [GlassSurface]'s own default — see the
+      // class doc for why this is `tint` and not the prototype's blur.
       radius: radius,
       padding: padding,
       child: Column(

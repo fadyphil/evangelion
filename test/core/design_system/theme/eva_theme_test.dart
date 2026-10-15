@@ -707,7 +707,7 @@ void main() {
       // draft of `EvaTheme.build` itself, at static-initialisation time, from
       // inside `eva_theme_dark.dart`. Asserted against a `copyWith` too, since
       // that is the other way a caller ends up holding a non-canonical palette.
-      final EvaColors darkCopy = const EvaColors.dark();
+      const EvaColors darkCopy = EvaColors.dark();
       expect(
         EvaTheme.build(darkCopy).colorScheme.brightness,
         Brightness.dark,

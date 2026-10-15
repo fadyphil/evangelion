@@ -65,7 +65,7 @@ class SettingsTile extends StatelessWidget {
     final bool interactive = onTap != null;
 
     final Widget row = GlassSurface(
-      tier: GlassTier.tint,
+      // `tint` is [GlassSurface]'s default tier.
       radius: radius,
       padding: padding,
       child: ConstrainedBox(
@@ -129,8 +129,9 @@ class SettingsTile extends StatelessWidget {
       // the subtree would leave a screen reader with a button that does nothing
       // when activated.
       child: EvaFocusRing(
-        enabled: true,
-        radius: radius,
+        // Both are this widget's standing values and both are the ring's own
+        // defaults: [radius] is [EvaRadii.button], which is `ds.tsx:488`'s
+        // `borderRadius: 14`, and the ring is enabled whenever the row is.
         child: EvaInk(
           onPressed: onTap,
           borderRadius: BorderRadius.circular(radius),

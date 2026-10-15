@@ -204,6 +204,12 @@ class IconActionButton extends StatefulWidget {
 
   /// The pill's rim width. `redesign.html:151` — `border: 1px solid
   /// var(--glass-line)`, which is [EvaColors.glassBorder].
+  ///
+  /// Named here rather than passed to [Border.all] on the `rim` switch below,
+  /// because that switch's three arms all take `Border.all`'s own default width
+  /// of `1.0` — this constant *is* `1`, so writing it at those call sites would
+  /// only restate the default. What keeps the number honest is
+  /// `controls_test.dart`, which asserts this constant and not the rendered rim.
   static const double pillRimWidth = 1;
 
   /// The glyph inside a pill. `redesign.html:155` — `.iconbtn svg{width:15px;
@@ -266,23 +272,20 @@ class _IconActionButtonState extends State<IconActionButton> {
     final Border? rim = switch ((widget.lit, _hovered && widget.pilled)) {
       (true, _) => Border.all(
         color: colors.ember.withValues(alpha: IconActionButton.litRimAlpha),
-        width: IconActionButton.pillRimWidth,
       ),
       (false, true) => Border.all(
         color: colors.ember.withValues(alpha: IconActionButton.hoverRimAlpha),
-        width: IconActionButton.pillRimWidth,
       ),
       // `redesign.html:151`'s idle rim is `var(--glass-line)`, which is
       // [EvaColors.glassBorder]. `null` is `.chev`'s `border: none` (`:149`) — not a
       // transparent border, because a transparent one still takes a layout decision
       // about its width and this widget's non-pill half has no rim at all.
+      //
+      // No `width:` on any of the three arms: [IconActionButton.pillRimWidth] is
+      // `1`, which is `Border.all`'s own default, so writing it out would say
+      // nothing the default does not already say.
       (false, false) =>
-        widget.pilled
-            ? Border.all(
-                color: colors.glassBorder,
-                width: IconActionButton.pillRimWidth,
-              )
-            : null,
+        widget.pilled ? Border.all(color: colors.glassBorder) : null,
     };
 
     final Icon icon = Icon(
@@ -346,12 +349,11 @@ class _IconActionButtonState extends State<IconActionButton> {
             // 44px box (see the class doc), so it cannot be an `idleBorder` here —
             // that paints on the *outer* box, which would draw a 44px rim and take
             // the hover and lit states with it. Two rims on one control is one too
-            // many.
-            idleBorder: null,
+            // many. Left at the parameter's `null` default for that reason.
+            //
             // Square. A ring on a circle would need a different radius, and the ring
             // goes around the **tap target** in both roles — which is a square box —
-            // not around the pill inside it.
-            radius: EvaRadii.button,
+            // not around the pill inside it. `EvaRadii.button` is the default too.
             child: EvaInk(
               onPressed: widget.onPressed,
               onHighlightChanged: _setPressed,

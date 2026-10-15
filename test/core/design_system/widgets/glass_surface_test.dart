@@ -1222,10 +1222,8 @@ void main() {
               ),
             );
         final List<int>? bytes = await tester.runAsync<List<int>>(() async {
-          final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-          final ByteData data = (await image.toByteData(
-            format: ui.ImageByteFormat.rawRgba,
-          ))!;
+          final ui.Image image = boundary.toImageSync();
+          final ByteData data = (await image.toByteData())!;
           image.dispose();
           return data.buffer.asUint8List();
         });
@@ -1531,10 +1529,8 @@ Future<Offset> _washCentroid(
   final RenderRepaintBoundary layer = tester
       .renderObject<RenderRepaintBoundary>(boundary);
   final List<int>? bytes = await tester.runAsync<List<int>>(() async {
-    final ui.Image image = layer.toImageSync(pixelRatio: 1.0);
-    final ByteData data = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ))!;
+    final ui.Image image = layer.toImageSync();
+    final ByteData data = (await image.toByteData())!;
     image.dispose();
     return data.buffer.asUint8List();
   });
@@ -1572,10 +1568,8 @@ Future<List<int>> _screenPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
       .renderObject<RenderRepaintBoundary>(find.byType(RepaintBoundary).first);
   final List<int>? bytes = await tester.runAsync<List<int>>(() async {
-    final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData data = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ))!;
+    final ui.Image image = boundary.toImageSync();
+    final ByteData data = (await image.toByteData())!;
     image.dispose();
     return <int>[
       for (int i = 0; i < data.lengthInBytes; i += 997) data.getUint8(i),

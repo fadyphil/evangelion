@@ -83,10 +83,8 @@ Future<List<int>> _pixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
       .renderObject<RenderRepaintBoundary>(find.byKey(_layerKey));
   final List<int>? bytes = await tester.runAsync<List<int>>(() async {
-    final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData? data = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ));
+    final ui.Image image = boundary.toImageSync();
+    final ByteData? data = (await image.toByteData());
     image.dispose();
     if (data == null) {
       throw StateError('the witness-sky layer produced no byte data');
@@ -321,13 +319,7 @@ void main() {
         matching: find.byType(ClipPath),
       );
 
-      await _pumpSky(
-        tester,
-        _sky(
-          entries: <SkyEntry>[_entry('John', 3, 16)],
-          shape: SkyStarShape.dot,
-        ),
-      );
+      await _pumpSky(tester, _sky(entries: <SkyEntry>[_entry('John', 3, 16)]));
       expect(
         clipsInSky(),
         findsNothing,
@@ -359,13 +351,7 @@ void main() {
     testWidgets('a non-dot shape paints a bigger star for the same key', (
       WidgetTester tester,
     ) async {
-      await _pumpSky(
-        tester,
-        _sky(
-          entries: <SkyEntry>[_entry('John', 3, 16)],
-          shape: SkyStarShape.dot,
-        ),
-      );
+      await _pumpSky(tester, _sky(entries: <SkyEntry>[_entry('John', 3, 16)]));
       final double dot = tester.widget<SizedBox>(_starClips.first).width!;
       await _pumpSky(
         tester,
@@ -383,13 +369,7 @@ void main() {
     ) async {
       Rect boxOf(WidgetTester t) => t.getRect(_starClips.first);
 
-      await _pumpSky(
-        tester,
-        _sky(
-          entries: <SkyEntry>[_entry('John', 3, 16)],
-          field: SkyStarField.crown,
-        ),
-      );
+      await _pumpSky(tester, _sky(entries: <SkyEntry>[_entry('John', 3, 16)]));
       final Rect crown = boxOf(tester);
 
       await _pumpSky(
@@ -414,7 +394,7 @@ void main() {
     testWidgets('brightness paints, and 0 is refused rather than erased', (
       WidgetTester tester,
     ) async {
-      await _pumpSky(tester, _sky(brightness: 1.0));
+      await _pumpSky(tester, _sky());
       final List<int> normal = await _pixels(tester);
       await _pumpSky(tester, _sky(brightness: 0.3));
       expect((await _pixels(tester)).toString(), isNot(normal.toString()));
@@ -962,7 +942,6 @@ void main() {
       await _pumpSky(
         tester,
         _sky(disableAnimations: true, animationsEnabled: true),
-        settle: const Duration(milliseconds: 100),
       );
       final List<int> before = await _pixels(tester);
       await tester.pump(const Duration(seconds: 6));

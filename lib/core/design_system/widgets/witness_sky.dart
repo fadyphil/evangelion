@@ -968,12 +968,12 @@ class _SkyStars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // `hardEdge` for `eva/redesign.html:116`'s `overflow:hidden`. Without it the
-    // halo of a star in the last 8% of the columns would reach past the screen's
-    // right edge and the punch-hole at `:501`; with it the sky is clipped to its
-    // own box, which is what the prototype's container does.
+    // `hardEdge` for `eva/redesign.html:116`'s `overflow:hidden`, and it is
+    // [Stack]'s own default. Without it the halo of a star in the last 8% of the
+    // columns would reach past the screen's right edge and the punch-hole at `:501`;
+    // with it the sky is clipped to its own box, which is what the prototype's
+    // container does.
     return Stack(
-      clipBehavior: Clip.hardEdge,
       children: <Widget>[for (final SkyEntry entry in entries) _star(entry)],
     );
   }

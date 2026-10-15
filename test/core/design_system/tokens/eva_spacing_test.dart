@@ -100,8 +100,8 @@ void main() {
       // the two paddings are used on the same screen (a page gutter and a card
       // inside it), so a mismatch between them is visible on one screen rather
       // than in two places.
-      final double gutter = EvaSpacing.screenHorizontal;
-      final double padding = EvaSpacing.card;
+      const double gutter = EvaSpacing.screenHorizontal;
+      const double padding = EvaSpacing.card;
       expect(
         (gutter - padding).abs(),
         lessThan(1e-12),

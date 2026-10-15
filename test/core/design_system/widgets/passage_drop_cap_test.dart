@@ -343,10 +343,7 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         await tester.pumpWidget(
-          _paragraph(
-            PassageDropCap(letter: 'I', direction: direction),
-            rest: 'n the beginning was the Word.',
-          ),
+          _paragraph(PassageDropCap(letter: 'I', direction: direction)),
         );
         await tester.pump();
         await expectLater(

@@ -83,7 +83,6 @@ class EmptyState extends StatelessWidget {
           padding: const EdgeInsets.all(EvaSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               SizedBox(
                 width: iconBox,

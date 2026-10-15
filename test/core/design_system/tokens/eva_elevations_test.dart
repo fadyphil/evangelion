@@ -103,8 +103,8 @@ void main() {
       // reachable and non-opaque here keeps the two files honest about each
       // other — a "flat" system that still had a shadow ramp would contradict
       // this, and one with no shadow at all would leave `glassShadow` orphaned.
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
 
       expect(dark.glassShadow.a, lessThan(1.0));
       expect(light.glassShadow.a, lessThan(1.0));

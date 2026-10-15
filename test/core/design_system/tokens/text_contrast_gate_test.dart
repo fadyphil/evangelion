@@ -307,7 +307,7 @@ void main() {
     });
 
     test('is symmetric', () {
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
       final int a = dark.ink.toARGB32();
       final int b = dark.raised.toARGB32();
       expect(contrastRatio(a, b), closeTo(contrastRatio(b, a), 1e-9));

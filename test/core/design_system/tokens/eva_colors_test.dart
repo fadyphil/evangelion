@@ -290,7 +290,7 @@ void main() {
   // grep also catches the lerp interior test's 2.
   group('the dark palette', () {
     test('carries every dark token value from the spec', () {
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
 
       expect(_hex(dark.canvas), _argb(0x05, 0x08, 0x1A), reason: 'canvas');
       expect(_hex(dark.surface), _argb(0x0D, 0x12, 0x24), reason: 'surface');
@@ -399,7 +399,7 @@ void main() {
 
   group('the light palette', () {
     test('carries every light token value from the spec', () {
-      final EvaColors light = const EvaColors.light();
+      const EvaColors light = EvaColors.light();
 
       expect(_hex(light.canvas), _argb(0xF0, 0xEE, 0xFF), reason: 'canvas');
       expect(_hex(light.surface), _argb(0xFF, 0xFF, 0xFF), reason: 'surface');
@@ -557,7 +557,11 @@ void main() {
         // …and the token is a **number**, not a colour: the prototype's dimmer
         // is `opacity:`, not a re-hued `--bh`, which is why `bloom` above is
         // shared and this is not.
-        expect(html[72], contains('opacity:.55'), reason: 'an opacity, not a hue');
+        expect(
+          html[72],
+          contains('opacity:.55'),
+          reason: 'an opacity, not a hue',
+        );
         expect(
           html[72],
           isNot(contains('--bh')),
@@ -584,7 +588,11 @@ void main() {
         );
 
         for (final String key in darkFloats.keys) {
-          expect(snapshotKeys, contains(key), reason: '$key must be snapshotted');
+          expect(
+            snapshotKeys,
+            contains(key),
+            reason: '$key must be snapshotted',
+          );
         }
         expect(
           mid.bloomOpacity,
@@ -1020,7 +1028,7 @@ void main() {
   // =========================================================================
   group('copyWith replaces exactly what it is handed', () {
     test('with no arguments returns an equal, distinct instance', () {
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
       final EvaColors copy = dark.copyWith();
 
       expect(_snapshot(copy), _snapshot(dark));
@@ -1032,10 +1040,10 @@ void main() {
     });
 
     test('changes one token and leaves the other twenty-nine untouched', () {
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
       // Built through a runtime expression so the replacement cannot be the
       // canonicalised `ink` object `dark.ink` already holds.
-      final Color replacement = const Color.fromARGB(0xFF, 0x11, 0x22, 0x33);
+      const Color replacement = Color.fromARGB(0xFF, 0x11, 0x22, 0x33);
       final EvaColors copy = dark.copyWith(ink: replacement);
 
       final Map<String, Object> before = _snapshot(dark);
@@ -1147,7 +1155,7 @@ void main() {
       // exactly one changed key. A token that `copyWith` silently ignores — a
       // parameter the implementation declares but never consumes — shows up
       // here as a zero-length change list, which is the failure this catches.
-      final EvaColors base = const EvaColors.dark();
+      const EvaColors base = EvaColors.dark();
       final Map<String, Object> baseSnapshot = _snapshot(base);
 
       // A colour no palette entry uses, so "changed" cannot be confused with
@@ -1207,7 +1215,7 @@ void main() {
   // =========================================================================
   group('lerp interpolates rather than picking an endpoint', () {
     test('t = 0 reproduces this palette exactly', () {
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
       final Map<String, Object> start = _snapshot(dark);
       final Map<String, Object> blended = _snapshot(
         dark.lerp(const EvaColors.light(), 0),
@@ -1225,8 +1233,8 @@ void main() {
       // `t`, always returns `this`, or — the subtle one — a `lerp` that drops a
       // field from its constructor call. A dropped field keeps its value from
       // `this` and therefore *looks* right at t = 0 and wrong only here.
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
 
       expect(_snapshot(dark.lerp(light, 1)), _snapshot(light));
       expect(_snapshot(light.lerp(dark, 1)), _snapshot(dark));
@@ -1238,8 +1246,8 @@ void main() {
       // `other.x` off an unsound path is the classic self-lerp crash, and with a
       // lerp that skipped work when `other == this` this proves the skip is
       // value-correct rather than merely fast.
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
 
       for (final EvaColors palette in <EvaColors>[dark, light]) {
         expect(
@@ -1253,8 +1261,8 @@ void main() {
     });
 
     test('the midpoint sits genuinely between the endpoints', () {
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
       final EvaColors mid = dark.lerp(light, 0.5);
 
       for (final String name in <String>[
@@ -1313,8 +1321,8 @@ void main() {
     });
 
     test('the midpoint is strictly interior, not one endpoint in disguise', () {
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
       final EvaColors mid = dark.lerp(light, 0.5);
 
       // `canvas`: dark #05081A → light #F0EEFF. A lerp that clamped, snapped or
@@ -1341,8 +1349,8 @@ void main() {
     });
 
     test('t is honoured monotonically across the whole range', () {
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
 
       double opacityAt(double t) => dark.lerp(light, t).orbOpacity;
       expect(opacityAt(0), closeTo(dark.orbOpacity, 1e-12));
@@ -1378,8 +1386,8 @@ void main() {
       // `seamGlow` and `bloom` are three more, and this test's own doc claimed
       // exhaustiveness it did not have — the same defect class as a `_snapshot`
       // missing a field, in a paragraph rather than in a table.
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
       final EvaColors mid = dark.lerp(light, 0.5);
 
       expect(
@@ -1429,8 +1437,8 @@ void main() {
     });
 
     test('interpolates every sticker slot into a map of its own', () {
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
       final EvaColors mid = dark.lerp(light, 0.5);
 
       expect(
@@ -1521,7 +1529,7 @@ void main() {
       // *blend* would be impossible (there is nothing to blend toward) but
       // returning a `copyWith`-with-nulls copy is not — so assert on values
       // across the range, not just on non-nullness.
-      final EvaColors dark = const EvaColors.dark();
+      const EvaColors dark = EvaColors.dark();
       for (final double t in <double>[0, 0.25, 0.5, 0.75, 1]) {
         expect(_snapshot(dark.lerp(null, t)), _snapshot(dark), reason: 't=$t');
       }
@@ -1536,8 +1544,8 @@ void main() {
       // therefore the strongest claim that is actually true of the framework,
       // and it is still far stronger than "both are non-null": a lerp that
       // ignored `t`, clamped it, or always returned `this` is off by hundreds.
-      final EvaColors dark = const EvaColors.dark();
-      final EvaColors light = const EvaColors.light();
+      const EvaColors dark = EvaColors.dark();
+      const EvaColors light = EvaColors.light();
       final EvaColors forward = dark.lerp(light, 0.3);
       final EvaColors backward = light.lerp(dark, 0.7);
 

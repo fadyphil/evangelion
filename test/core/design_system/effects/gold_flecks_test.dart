@@ -61,10 +61,8 @@ Future<List<int>> _pixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
       .renderObject<RenderRepaintBoundary>(find.byKey(_layerKey));
   final List<int>? bytes = await tester.runAsync<List<int>>(() async {
-    final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData? data = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ));
+    final ui.Image image = boundary.toImageSync();
+    final ByteData? data = (await image.toByteData());
     image.dispose();
     if (data == null) {
       throw StateError('the flecks layer produced no byte data');

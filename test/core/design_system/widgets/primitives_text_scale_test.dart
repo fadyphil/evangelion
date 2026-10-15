@@ -167,7 +167,6 @@ void main() {
       await pumpPrimitive(
         tester,
         Align(alignment: Alignment.topCenter, child: build()),
-        size: kNarrowSurface,
         textScale: kEvaRequiredTextScale,
       );
       await tester.pump();
@@ -192,7 +191,6 @@ void main() {
       await pumpPrimitive(
         tester,
         Align(alignment: Alignment.topCenter, child: build()),
-        size: kNarrowSurface,
         textScale: kEvaRequiredTextScale,
         textDirection: TextDirection.rtl,
       );
@@ -246,7 +244,6 @@ void main() {
           ],
         ),
       ),
-      size: kNarrowSurface,
       textScale: kEvaRequiredTextScale,
     );
     await tester.pump();
@@ -301,7 +298,6 @@ void main() {
         await pumpPrimitive(
           tester,
           Align(alignment: Alignment.topCenter, child: entry.build()),
-          size: kNarrowSurface,
           textScale: kEvaRequiredTextScale,
         );
         await tester.pump();
@@ -364,7 +360,6 @@ void main() {
             textDirection: TextDirection.ltr,
             textScaler: const TextScaler.linear(kEvaRequiredTextScale),
             maxLines: maxLines,
-            textAlign: TextAlign.start,
           )..layout();
           final double intrinsic = painter.height;
           painter.dispose();
@@ -491,7 +486,7 @@ void main() {
         ('_box', _box),
         ('_toggleBox', _toggleBox),
       ]) {
-        await pumpPrimitive(tester, slot, size: kNarrowSurface);
+        await pumpPrimitive(tester, slot);
         await tester.pump();
         expect(
           find.byType(Text),
@@ -514,7 +509,6 @@ void main() {
         await pumpPrimitive(
           tester,
           Align(alignment: Alignment.topCenter, child: cases[row]!()),
-          size: kNarrowSurface,
           textScale: kEvaRequiredTextScale,
         );
         await tester.pump();
@@ -547,7 +541,6 @@ void main() {
               ),
           ],
         ),
-        size: kNarrowSurface,
         textScale: kEvaRequiredTextScale,
       );
       await tester.pump();

@@ -189,7 +189,6 @@ void main() {
             current: current,
           ),
         ),
-        size: kNarrowSurface,
       );
       await tester.pump();
       return tester.getSize(find.byType(ProgressBeads)).width;
@@ -244,7 +243,6 @@ void main() {
             alignment: Alignment.topCenter,
             child: ProgressBeads(total: 5, completed: 99, current: 1),
           ),
-          size: kNarrowSurface,
         );
         await tester.pump();
         expect(
@@ -259,7 +257,6 @@ void main() {
             alignment: Alignment.topCenter,
             child: ProgressBeads(total: 5, completed: 2, current: 2),
           ),
-          size: kNarrowSurface,
         );
         await tester.pump();
         expect(
@@ -272,7 +269,6 @@ void main() {
             alignment: Alignment.topCenter,
             child: ProgressBeads(total: 5, completed: -4, current: -1),
           ),
-          size: kNarrowSurface,
         );
         await tester.pump();
         expect(

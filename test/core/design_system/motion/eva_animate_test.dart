@@ -36,7 +36,7 @@ AnimationController controllerOf(WidgetTester tester) =>
 Future<void> pumpEva(
   WidgetTester tester, {
   required bool disableAnimations,
-  List<Effect> effects = const <Effect>[],
+  List<Effect<dynamic>> effects = const <Effect<dynamic>>[],
   Object? trigger,
 }) async {
   await tester.pumpWidget(
@@ -46,7 +46,7 @@ Future<void> pumpEva(
         textDirection: TextDirection.ltr,
         child: EvaAnimate(
           effects: effects.isEmpty
-              ? <Effect>[MotionMoment.routine.fadeIn()]
+              ? <Effect<dynamic>>[MotionMoment.routine.fadeIn()]
               : effects,
           trigger: trigger,
           child: const Text('x', textDirection: TextDirection.ltr),
@@ -64,7 +64,7 @@ void main() {
       // timing, so a `null` here would mean a timing was *lost* rather than defaulted.
       expect(MotionMoment.values, hasLength(4));
       for (final MotionMoment moment in MotionMoment.values) {
-        final List<Effect> effects = <Effect>[
+        final List<Effect<dynamic>> effects = <Effect<dynamic>>[
           moment.fadeIn(),
           moment.fadeOut(),
           moment.slide(const Offset(0, 8)),
@@ -72,7 +72,7 @@ void main() {
           moment.shake(),
           moment.saturate(end: MotionMoment.desaturated),
         ];
-        for (final Effect effect in effects) {
+        for (final Effect<dynamic> effect in effects) {
           expect(effect.duration, moment.duration, reason: '$moment');
           expect(effect.curve, moment.curve, reason: '$moment');
         }
@@ -213,7 +213,7 @@ void main() {
       await pumpEva(
         tester,
         disableAnimations: false,
-        effects: <Effect>[MotionMoment.screen.fadeIn()],
+        effects: <Effect<dynamic>>[MotionMoment.screen.fadeIn()],
       );
       expect(controllerOf(tester).duration, EvaMotion.screen);
     });
@@ -224,7 +224,7 @@ void main() {
       await pumpEva(
         tester,
         disableAnimations: false,
-        effects: <Effect>[MotionMoment.routine.fadeIn()],
+        effects: <Effect<dynamic>>[MotionMoment.routine.fadeIn()],
       );
       expect(controllerOf(tester).duration, EvaMotion.base);
     });

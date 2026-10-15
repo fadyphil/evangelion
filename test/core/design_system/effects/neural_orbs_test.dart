@@ -753,7 +753,7 @@ void main() {
     test('the fade finishes inside the orb box so no corner is tinted', () {
       // The farthest corner is 0.877 orb-widths from the gradient centre; the
       // stop must land before it, or the corners are never fully transparent.
-      final double ray = (1 - kOrbGradientCentre) * 1.4142135623730951;
+      const double ray = (1 - kOrbGradientCentre) * 1.4142135623730951;
       expect(kOrbGradientRadius, lessThan(ray));
     });
   });

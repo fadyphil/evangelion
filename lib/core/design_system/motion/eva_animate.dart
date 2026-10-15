@@ -37,7 +37,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 ///
 /// ```dart
 /// EvaAnimate(
-///   effects: <Effect>[MotionMoment.routine.fadeIn()],
+///   effects: <Effect<dynamic>>[MotionMoment.routine.fadeIn()],
 ///   child: content,
 /// )
 /// ```
@@ -62,7 +62,7 @@ class EvaAnimate extends StatefulWidget {
   });
 
   /// What to animate, already carrying its duration and curve.
-  final List<Effect> effects;
+  final List<Effect<dynamic>> effects;
 
   /// The subtree.
   final Widget child;
@@ -104,7 +104,7 @@ class _EvaAnimateState extends State<EvaAnimate>
   /// `null` for an empty list, since there is nothing to divide by.
   Duration? get _longest {
     Duration? longest;
-    for (final Effect effect in widget.effects) {
+    for (final Effect<dynamic> effect in widget.effects) {
       final Duration duration = effect.duration ?? EvaMotion.base;
       if (longest == null || duration > longest) longest = duration;
     }
@@ -171,9 +171,10 @@ class _EvaAnimateState extends State<EvaAnimate>
     _controller.value = 0.0;
     final Duration? longest = _longest;
     if (longest != null) _controller.duration = longest;
-    // `linear` on the controller because the easing belongs on the *effect*, and
-    // putting [EvaMotion.interactiveCurve] here as well would apply it twice.
-    _controller.animateTo(1.0, curve: Curves.linear);
+    // Left at `Curves.linear` — Flutter's own default — because the easing belongs
+    // on the *effect*, and putting [EvaMotion.interactiveCurve] here as well would
+    // apply it twice.
+    _controller.animateTo(1.0);
   }
 
   @override

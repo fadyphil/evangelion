@@ -95,7 +95,10 @@ abstract final class EvaTheme {
       cardTheme: CardThemeData(
         color: colors.surface,
         elevation: EvaElevations.card,
-        surfaceTintColor: null,
+        // No `surfaceTintColor`: the card and the bottom sheet below are the two
+        // surfaces Material would still tint from the colour scheme, and this
+        // palette's glass edges are drawn by [GlassSurface]'s own rim instead.
+        // Left at its `null` default, which is what un-tints them.
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(EvaRadii.card)),
         ),
@@ -135,7 +138,7 @@ abstract final class EvaTheme {
         backgroundColor: colors.surface,
         elevation: EvaElevations.bottomSheet,
         modalElevation: EvaElevations.none,
-        surfaceTintColor: null,
+        // No `surfaceTintColor`, for the same reason as the card above.
         // Only the top corners are on screen; a bottom sheet that rounds all
         // four reads as a floating card.
         shape: const RoundedRectangleBorder(

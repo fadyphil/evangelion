@@ -56,10 +56,8 @@ Future<Uint8List> _inkPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
       .renderObject<RenderRepaintBoundary>(find.byKey(_inkKey));
   final Uint8List? bytes = await tester.runAsync<Uint8List>(() async {
-    final ui.Image image = boundary.toImageSync(pixelRatio: 1.0);
-    final ByteData? data = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    ));
+    final ui.Image image = boundary.toImageSync();
+    final ByteData? data = (await image.toByteData());
     image.dispose();
     if (data == null) throw StateError('the ink layer produced no pixels');
     return data.buffer.asUint8List();
@@ -202,7 +200,7 @@ void main() {
       // which in this harness is `MaterialApp`'s and therefore includes the
       // padding, the surface and the harness backdrop.
       _pinSurface(tester);
-      await tester.pumpWidget(_inkOnly(size: 20));
+      await tester.pumpWidget(_inkOnly());
       await tester.pump();
 
       final Uint8List rgba = await _inkPixels(tester);
@@ -331,10 +329,7 @@ void main() {
         evaAmbientHarness(
           child: const Row(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              StreakFlame(semanticLabel: 'Streak'),
-              Text('12'),
-            ],
+            children: <Widget>[StreakFlame(), Text('12')],
           ),
         ),
       );

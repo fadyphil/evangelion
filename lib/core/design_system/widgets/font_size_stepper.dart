@@ -280,11 +280,11 @@ class _Track extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int span = kFontStepMax - kFontStepMin;
+    const int span = kFontStepMax - kFontStepMin;
     final double fraction = span == 0 ? 0 : (step - kFontStepMin) / span;
     // The thumb travels between two centres rather than across the full width,
     // so the first and last steps are not drawn half off the track.
-    final double travel =
+    const double travel =
         FontSizeStepper.trackWidth - FontSizeStepper.thumbSize;
 
     return Semantics(
