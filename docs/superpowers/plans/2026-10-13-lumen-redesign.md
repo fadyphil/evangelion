@@ -1072,9 +1072,22 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 ## Task 4.2: Restyle the widgets (24) + re-point their citations
 
-> **Status: research DONE (two parallel subagents). Scope corrected below, and
-> the four decisions the research flagged as not-the-implementer's-to-make are
-> now recorded here.**
+> **Status: COMPLETE (batches `f849415` A-controls · `cb51c21` C-actions/fields
+> · `c1abb62` B-surfaces · `fe46efb` D-marks/scrim · review fixes + lint sweep
+> `b21e144`).** Full gate green: **2860 tests** (floor 2507), **98.53%
+> coverage** (floor 98.25%), citations 1556/1556, orphan gate green, analyzer 0
+> under the adopted strict config. Seven widgets left alone as planned
+> (`empty_state`, `error_view`, `focus_ring`, `witness_sky`, `text_link`,
+> `hairline_divider`, `sun_burst`). Bloom seam parameters shipped instead of a
+> fifth tier (`seamAlignment`/`seamWidthFactor`/`seamTint`); `bloomOpacity`
+> token per decision 4 (`cbfb402`). Two blocking review findings fixed and now
+> test-guarded: SegmentedControl thumb paints **under** the selected label (a
+> rendered-pixel contrast assertion holds ≥ 4.5:1 — the defect measured
+> 1.12:1), and SettingsTile's hover duration order (`animate ?
+> hoverDuration : Duration.zero`) plus `EvaFocusRing radius: 0` on the flat
+> row. Deferred with reasons in-file: `StreakFlame` 13×17 blob → 5.2,
+> `PassageDropCap` 56px/.82 → 5.3. The research status below is retained for
+> the harness landmine inventory, which Phase 5 must respect.
 >
 > **The blast radius is 8 design-system widgets, not 13.** The plan's "13" summed
 > per-screen lists that mix design-system and feature widgets. The eight a
@@ -1170,15 +1183,24 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 ## Task 4.3: Prove the gates still fire, then re-record
 
-- [ ] **Step 5: Liveness proof for all 5 harnesses** — plant a violation in
+> **Status: COMPLETE (`b21e144`, goldens re-recorded in the batch commits).**
+> Step 5 liveness proof: all five harnesses go **red on plant** (a violation
+> planted in each turns it red) and **green on revert** — re-pointing moves to
+> Phase 5.1–5.4 as planned. Step 6: barrel exports 24/24; `orphan_widget_check`
+> green with the single allowlisted `WitnessSky` entry; the STALE mechanism was
+> itself verified (constructing it from a page is reported and exits 1). Step 7:
+> goldens re-recorded after citations moved, per-file scoped. Citations
+> 1556/1556 after the sweep.
+
+- [x] **Step 5: Liveness proof for all 5 harnesses** — plant a violation in
   each, confirm it goes red, **revert**. A harness that passes vacuously is
   worse than no harness. Re-pointing moves to Phase 5.1–5.4.
-- [ ] **Step 6: Export every new widget from `barrel.dart`** and run
+- [x] **Step 6: Export every new widget from `barrel.dart`** and run
   `orphan_widget_check.py`. All 24 are already exported. The allowlist carries
   **one** entry (`WitnessSky`) whose reason names Phase 5; the gate reports it
   STALE and exits 1 the moment a page constructs it, so it cannot outlive its
   reason. Emptied in Phase 5.3. **Never suppress the failure.**
-- [ ] **Step 7: Re-record goldens AFTER the citations are re-pointed.** Never
+- [x] **Step 7: Re-record goldens AFTER the citations are re-pointed.** Never
   the reverse — `CONTRIBUTING.md` names "re-recording goldens without
   re-checking the citations" a review failure. Command is plain
   `flutter test --update-goldens` (no custom script); scope it per test file —
