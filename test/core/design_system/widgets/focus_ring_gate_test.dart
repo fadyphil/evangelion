@@ -377,6 +377,124 @@ class Demo extends StatelessWidget {
       });
     });
 
+    group('and a member access is not a callback declaration', () {
+      // The false positive that made this rule report `seal_monogram.dart` — a
+      // widget with no callback, no gesture and no focus node — as an
+      // interactive surface with no ring. `colors.onEmber,` is a *read* of a
+      // colour token through a member access; `\b` matches across the `.`, so the
+      // rule answered `true` and the file had to be dealt with. The two available
+      // answers were both wrong — hand-listing a non-interactive widget as
+      // interactive, or inventing a ring for it — so the rule was fixed instead.
+      //
+      // The second test below is the one that keeps the fix honest: it is the
+      // *only* job this rule has (a callback spelled with a type the
+      // [_callbackTypeNames] list does not name), so a control that only the name
+      // rule can catch must still be caught.
+      const String memberAccess = '''
+class Seal extends StatelessWidget {
+  const Seal({required this.semanticLabel, super.key});
+  final String semanticLabel;
+  @override
+  Widget build(BuildContext context) => Text(
+    letter,
+    style: TextStyle(color: colors.onEmber),
+  );
+}''';
+
+      test('a token read through a member access is not a callback', () {
+        expect(
+          _declaresACallback(withoutDartComments(memberAccess)),
+          isFalse,
+          reason:
+              '`colors.onEmber` names a colour token, not a callback. Reporting '
+              'it as one is how a widget with no interactive surface at all ends '
+              'up on a hand-list of "delegates the ring".',
+        );
+      });
+
+      test('but a real declaration of an unlisted type still is', () {
+        // `RitualCallback` is deliberately absent from [_callbackTypeNames] —
+        // that is what makes this the name rule's own test rather than a rerun of
+        // the type list's. The spelling is `required this.onSelected`, which is
+        // how every public callback field in this package is written, and it is
+        // the `\bthis\.` alternative that keeps it matched after the member-access
+        // fix above.
+        const String unlistedTypedef = '''
+class Demo extends StatelessWidget {
+  const Demo({required this.onSelected, super.key});
+  final RitualCallback onSelected;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+        expect(
+          _declaresACallback(withoutDartComments(unlistedTypedef)),
+          isTrue,
+          reason:
+              'a field-initialiser is a declaration whatever is before the dot; '
+              'dropping the `this.` alternative would silence a real callback',
+        );
+      });
+
+      test('and so is a bare name of that type at a parameter site', () {
+        const String bareName = '''
+class Demo extends StatelessWidget {
+  const Demo({required this.onSelected, super.key}) : flag = false;
+  final RitualCallback onSelected;
+  final bool flag;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}''';
+        expect(
+          _declaresACallback(bareName),
+          isTrue,
+          reason:
+              'the three shapes the doc lists — `onPanUpdate,` in a parameter '
+              'list, `onSwipe:` … and `onPressed = null` — are all '
+              '`on…` followed by `,`, `=` or `)`, and all survive the prefix '
+              'change. A **bare** `final RitualCallback onSelected;` is not one of '
+              'them — it ends in `;` — which is why this uses the parameter site '
+              'the rule documents rather than the declaration a reader would '
+              'guess.',
+        );
+      });
+
+      test('and the seeded file it stopped flagging really has no ring need', () {
+        // Closes the loop on the file the false positive named: read it from
+        // disk rather than from this file's memory of it, and assert it builds no
+        // interactive surface at all. If a future change gave `SealMonogram` a
+        // callback, this goes red and the gate's own walk reports it as an
+        // offender — the correct outcome, reached by the normal path.
+        final File seal = File.fromUri(
+          packageRoot.uri.resolve(
+            'lib/core/design_system/widgets/seal_monogram.dart',
+          ),
+        );
+        expect(
+          seal.existsSync(),
+          isTrue,
+          reason: 'the widget under discussion',
+        );
+        final String code = withoutDartComments(seal.readAsStringSync());
+        expect(
+          _unattributedSurfaces(
+            'lib/core/design_system/widgets/seal_monogram.dart',
+            code,
+          ),
+          isEmpty,
+        );
+        for (final String surface in _interactiveSurfaces) {
+          expect(
+            code.contains('$surface('),
+            isFalse,
+            reason:
+                'SealMonogram now builds $surface(, so it declares an '
+                'interactive surface — and then the ring question is a real '
+                'question for this file rather than a detector artefact',
+          );
+        }
+      });
+    });
+
     test('the delegation list is a decision, and its claims are checked', () {
       // The first version of this test asserted only `entry.reason.isNotEmpty`, so
       // a reason could be any string at all — including one that had quietly
@@ -625,7 +743,33 @@ final RegExp _inlineFunctionType = RegExp(
 ///
 /// `on[A-Z]…` followed by `,`, `=` or `)`, so `onPanUpdate`, `onSwipe:` and
 /// `onPressed = null` are caught while a field called `only` is not.
-final RegExp _callbackShapedName = RegExp(r'\bon[A-Z]\w*\s*[,=)]');
+///
+/// ## THE PREFIX ALTERNATIVE, AND THE FALSE POSITIVE IT EXISTS FOR
+///
+/// The leading `(?:^|[^.\w]|\bthis\.)` is **not** an exemption and it does not
+/// narrow what the rule can catch — it removes a class of text that was never a
+/// declaration.
+///
+/// `\b` matches between `.` and `o`, so `colors.onEmber,` inside a `TextStyle`
+/// matched, and a file with no callback at all was reported as an interactive
+/// widget. The first instance was `seal_monogram.dart`, which has no `on*` field,
+/// no gesture and no focus node at all: it has a glyph whose colour is
+/// `EvaColors.onEmber`, read through a member access. That is the worst shape a
+/// false positive takes in this gate — the two available responses are to hand-list
+/// a non-interactive widget as interactive, or to build it a ring, and both are
+/// worse than the defect.
+///
+/// So the reference has to *begin* the `on…` identifier, which is what the three
+/// alternatives spell: start of file, a character that is neither a word character
+/// nor a `.`, or a `this.` field-initialiser prefix. The last one is why this is
+/// not a plain `(?<!\.)`: `required this.onSelected,` **is** a declaration of a
+/// public callback, it is written with a dot, and dropping the `\bthis\.`
+/// alternative would have silenced a real one. Everything the old rule caught —
+/// a bare named argument, a field-initialiser, a `super.`-free positional
+/// callback — still matches here.
+final RegExp _callbackShapedName = RegExp(
+  r'(?:^|[^.\w]|\bthis\.)on[A-Z]\w*\s*[,=)]',
+);
 
 /// The named callback typedefs Flutter and this design system actually use.
 ///

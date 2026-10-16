@@ -106,77 +106,94 @@ void main() {
     });
   });
 
-  group(
-    '`SettingsGroup` and the screen share the IDENTICAL `SegmentedControl`',
-    () {
-      // ## THE PLAN'S VERIFICATION, AND WHY IT IS A TYPE IDENTITY
-      //
-      // "SettingsGroup and the settings screen share the identical SegmentedControl
-      // instance type." Two look-alike classes would satisfy every behavioural
-      // assertion in this file — same keyboard model, same semantics, same goldens — and
-      // satisfy it by being two implementations of one idea, which is the defect this
-      // repository has already paid for in `qa`/`santa` shape ("a name-checker with
-      // false positives"). So the assertion is on the **runtime type** of the widget the
-      // tree actually holds, read off the element.
-      testWidgets(
-        'the theme control is the barrel\'s `SegmentedControl<AppThemeMode>`',
-        (WidgetTester tester) async {
-          await pumpSettings(tester);
-
-          expect(find.byType(SegmentedControl<AppThemeMode>), findsOneWidget);
-          // **The failing direction is the same line**: a second, private `SegmentedControl`
-          // in `features/settings/` would satisfy nothing here, because the barrel's generic
-          // type is not what the tree would hold.
-          expect(
-            tester
-                .widget(find.byType(SegmentedControl<AppThemeMode>))
-                .runtimeType,
-            SegmentedControl<AppThemeMode>,
-          );
-          // And no other `SegmentedControl` at all, so the "identical instance type" claim
-          // is not satisfied by two instances of two types.
-          expect(find.byType(SegmentedControl<Object>), findsNothing);
-        },
-      );
-
-      testWidgets('and it carries the barrel\'s own constants, not copies', (
-        WidgetTester tester,
-      ) async {
+  group('`SettingsGroup` and the screen share the IDENTICAL `SegmentedControl`', () {
+    // ## THE PLAN'S VERIFICATION, AND WHY IT IS A TYPE IDENTITY
+    //
+    // "SettingsGroup and the settings screen share the identical SegmentedControl
+    // instance type." Two look-alike classes would satisfy every behavioural
+    // assertion in this file — same keyboard model, same semantics, same goldens — and
+    // satisfy it by being two implementations of one idea, which is the defect this
+    // repository has already paid for in `qa`/`santa` shape ("a name-checker with
+    // false positives"). So the assertion is on the **runtime type** of the widget the
+    // tree actually holds, read off the element.
+    testWidgets(
+      'the theme control is the barrel\'s `SegmentedControl<AppThemeMode>`',
+      (WidgetTester tester) async {
         await pumpSettings(tester);
 
-        final SegmentedControl<AppThemeMode> control = tester.widget(
-          find.byType(SegmentedControl<AppThemeMode>),
-        );
+        expect(find.byType(SegmentedControl<AppThemeMode>), findsOneWidget);
+        // **The failing direction is the same line**: a second, private `SegmentedControl`
+        // in `features/settings/` would satisfy nothing here, because the barrel's generic
+        // type is not what the tree would hold.
         expect(
-          control.values,
-          AppThemeMode.values,
-          reason:
-              'the theme picker is the prototype\'s three options in the prototype\'s '
-              'order, and `AppThemeMode.values` is where that list lives',
+          tester
+              .widget(find.byType(SegmentedControl<AppThemeMode>))
+              .runtimeType,
+          SegmentedControl<AppThemeMode>,
         );
-        expect(control.selected, AppThemeMode.dark);
-        expect(SegmentedControl.trackRadius, 8);
-      });
+        // And no other `SegmentedControl` at all, so the "identical instance type" claim
+        // is not satisfied by two instances of two types.
+        expect(find.byType(SegmentedControl<Object>), findsNothing);
+      },
+    );
 
-      testWidgets('a tap on a segment writes the setting', (
-        WidgetTester tester,
-      ) async {
-        final SettingsCubit cubit = await pumpSettings(tester);
+    testWidgets('and it carries the barrel\'s own constants, not copies', (
+      WidgetTester tester,
+    ) async {
+      await pumpSettings(tester);
 
-        await tester.tap(find.text('LIGHT'));
-        await tester.pump();
+      final SegmentedControl<AppThemeMode> control = tester.widget(
+        find.byType(SegmentedControl<AppThemeMode>),
+      );
+      expect(
+        control.values,
+        AppThemeMode.values,
+        reason:
+            'the theme picker is the prototype\'s three options in the prototype\'s '
+            'order, and `AppThemeMode.values` is where that list lives',
+      );
+      expect(control.selected, AppThemeMode.dark);
+      // ## RE-POINTED IN PHASE 4.2, AND THE CLAIM DID NOT WEAKEN
+      //
+      // This was `8` — `SettingsScreen.tsx:51`'s `borderRadius: 8`, the React
+      // prototype's number. `redesign.html:178` replaces it with
+      // `border-radius:999px`, and `SegmentedControl.trackRadius` is now
+      // [EvaRadii.chip], which is that. The assertion's *subject* is unchanged
+      // and is the point of the test: the screen must read the **barrel's own**
+      // constant, not a copy of it. Spelling `8` here made this a second source
+      // of truth that would have had to be edited in lockstep with the widget —
+      // and it was, in fact, missed by the whole first pass of the restyle,
+      // because nothing on the feature side was looking at it.
+      //
+      // So it now asserts the token by name. A copy (`999` written out) would
+      // satisfy the number and not the claim, which is exactly the defect this
+      // group exists to catch.
+      expect(SegmentedControl.trackRadius, EvaRadii.chip);
+      expect(
+        EvaRadii.chip,
+        999.0,
+        reason: '`redesign.html:178` — `border-radius:999px`',
+      );
+    });
 
-        expect(
-          cubit.state.settings.themeMode,
-          AppThemeMode.light,
-          reason:
-              'the picker is a **controlled** component — it reports and the caller feeds '
-              'the value back — so the control moving and the setting changing are two '
-              'claims and this is the second',
-        );
-      });
-    },
-  );
+    testWidgets('a tap on a segment writes the setting', (
+      WidgetTester tester,
+    ) async {
+      final SettingsCubit cubit = await pumpSettings(tester);
+
+      await tester.tap(find.text('LIGHT'));
+      await tester.pump();
+
+      expect(
+        cubit.state.settings.themeMode,
+        AppThemeMode.light,
+        reason:
+            'the picker is a **controlled** component — it reports and the caller feeds '
+            'the value back — so the control moving and the setting changing are two '
+            'claims and this is the second',
+      );
+    });
+  });
 
   group('the font stepper is the shared widget, and it writes through', () {
     testWidgets('it is `FontSizeStepper`, sitting on the stored step', (

@@ -323,14 +323,22 @@ void main() {
                 '54.3 — each tile the width of its own caption.',
           );
         }
-        // The height never moved, so it is asserted rather than recomputed: a
-        // fix that made the content fill the cell would satisfy the widths above
-        // and break this, which is what caught nothing before.
+        // The height is a "nothing **else** moved" guard: a fix that made the content
+        // fill the cell would satisfy the widths above and break this, which is
+        // what caught nothing before.
+        //
+        // **Was 72, now 58, and the type change is the only reason.** The old
+        // tile drew its figure in the display serif at 24 (`ds.tsx:474`);
+        // `redesign.html:407-408` replaced it with mono 11 over a mono 8.5
+        // caption, so the content is 14px shorter and the row is 14px shorter.
+        // The width above is untouched, which is the part of this test that was
+        // written to catch `StackFit.loose` — the whole cell is still filled.
         expect(
           tester.getSize(padding.at(0)).height,
-          closeTo(72, 1e-9),
+          closeTo(58, 1e-9),
           reason:
-              '24 + 4 + the caption line, plus 14 of padding above and below',
+              '11 (`:407`\'s value) + 4 + the `:408` caption line, plus 14 of '
+              'padding above and below',
         );
       },
     );
@@ -931,18 +939,181 @@ void main() {
       expect(d.boxShadow!.single.color, isNot(const EvaColors.dark().seamGlow));
 
       // …and light mode dims the wash with `opacity:.55` (`redesign.html:73`),
-      // which is the CALLER's business, so the token hue is unchanged. Painting
-      // a second, lighter bloom here would be a tier-owned opacity that the
-      // prototype does not have.
+      // which since Phase 4.2 is [EvaColors.bloomOpacity] — a **token the widget
+      // applies**, not caller state.
+      //
+      // **Multiply.** `redesign.html:254`'s gradient stop is itself
+      // `rgba(228,87,214,.55)` — which is the alpha `EvaColors.bloom` carries as
+      // `0x8C` — and `:73`'s `opacity:.55` is a *second* factor on the element.
+      // A CSS opacity multiplies, so light is `.55 × .55 ≈ .302`, not `.55` and
+      // not `.302` of a replaced channel. Replacing rather than multiplying is
+      // what painted dark at 1.0 and diffed `glass_surface_bloom_dark.png` by
+      // 46.07% on the first attempt; this test is the regression for it.
       expect(
         (decorationOf(tester, wash()).gradient! as RadialGradient).colors.first,
-        const EvaColors.light().bloom,
+        const Color(0x8CE457D6).withValues(alpha: 0x8C / 255 * 0.55),
+      );
+      expect(
+        const EvaColors.light().bloomOpacity,
+        0.55,
+        reason: '`redesign.html:73` — `opacity:.55`, on all four washes',
       );
       expect(
         const EvaColors.light().bloom,
         const EvaColors.dark().bloom,
         reason: '`redesign.html:73` changes `opacity`, never the `--bh` colour',
       );
+    });
+
+    testWidgets('the wash is undimmed in dark — `.55` is light\'s alone', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _onSurface(const GlassSurface(tier: GlassTier.bloom, child: panel)),
+      );
+      expect(const EvaColors.dark().bloomOpacity, 1.0);
+      expect(
+        (decorationOf(tester, wash()).gradient! as RadialGradient).colors.first,
+        const EvaColors.dark().bloom,
+        reason: 'at `bloomOpacity` 1.0 the alpha multiply is a no-op',
+      );
+    });
+
+    // -----------------------------------------------------------------------
+    // The seam's three parameters (Phase 4.2, decision 3).
+    //
+    // `.hor` is one of TWO prototype seams: `.opt::after` (`redesign.html:348-349`)
+    // is at `bottom:0`, 84% wide and gold. A quiz option cannot draw `.hor`
+    // unchanged, and a fifth `GlassTier` member would break
+    // `glass_blur_budget_test`'s counting model — so the seam takes parameters.
+    //
+    // The claim under test is **two-sided and both halves matter**: the defaults
+    // are `.hor`, and a caller who passes them produces the same pixels. The
+    // second half is the one a parameter set can quietly fail — a default that
+    // *approximates* `.hor` (say 0.70 rather than 0.72) is still "the default", and
+    // the goldens would simply move with nobody reading a diff. That is why
+    // `goldens/glass_surface_bloom_{dark,light}.png` were run unmodified after
+    // these three parameters landed, and that is also what the first test below
+    // pins by reading the constants rather than the pixels.
+    // -----------------------------------------------------------------------
+    group('the seam takes parameters, and its defaults are `.hor`', () {
+      test(
+        'the defaults are the prototype\'s `.hor` numbers, not near-misses',
+        () {
+          expect(
+            kGlassSeamAlignment,
+            const Alignment(0, 0.6),
+            reason: 'bottom:20%',
+          );
+          expect(kGlassSeamWidthFactor, 0.72, reason: 'left:14%;right:14%');
+          expect(
+            const GlassSurface(child: SizedBox.shrink()).seamAlignment,
+            isNull,
+          );
+          expect(
+            const GlassSurface(child: SizedBox.shrink()).seamWidthFactor,
+            isNull,
+          );
+          expect(const GlassSurface(child: SizedBox.shrink()).seamTint, isNull);
+        },
+      );
+
+      testWidgets('a surface that names nothing resolves to `.hor`', (
+        WidgetTester tester,
+      ) async {
+        await tester.pumpWidget(
+          _onSurface(
+            const GlassSurface(
+              tier: GlassTier.bloom,
+              padding: EdgeInsets.zero,
+              child: SizedBox(width: 100, height: 30),
+            ),
+          ),
+        );
+        final Rect on = tester.getRect(find.byType(GlassSurface));
+        expect(
+          tester.getRect(seam()).width,
+          closeTo(72, 1e-9),
+          reason: '72% of 100',
+        );
+        // Measured against the surface, not the window — `_onSurface` centres the
+        // panel, so an absolute `y` says which test harness this file uses and
+        // nothing about the seam.
+        expect(tester.getRect(seam()).top - on.top, closeTo(22.4, 1e-9));
+        expect(
+          (decorationOf(tester, seam()).gradient! as LinearGradient).colors[1],
+          const EvaColors.dark().seam,
+        );
+      });
+
+      testWidgets('`.opt::after` is expressible: bottom edge, 84%, gold', (
+        WidgetTester tester,
+      ) async {
+        // `redesign.html:348` — `left:8%;right:8%;bottom:0`, and `:349`'s
+        // `linear-gradient(90deg,transparent,var(--gold),transparent)`.
+        await tester.pumpWidget(
+          _onSurface(
+            const GlassSurface(
+              tier: GlassTier.bloom,
+              padding: EdgeInsets.zero,
+              seamAlignment: Alignment(0, 1),
+              seamWidthFactor: 0.84,
+              seamTint: Color(0xFFE8B04B),
+              child: SizedBox(width: 100, height: 30),
+            ),
+          ),
+        );
+
+        final Rect rect = tester.getRect(seam());
+        final Rect surface = tester.getRect(find.byType(GlassSurface));
+        expect(
+          rect.width,
+          closeTo(84, 1e-9),
+          reason: 'left:8%;right:8% of 100',
+        );
+        expect(
+          rect.bottom,
+          closeTo(surface.bottom, 1e-9),
+          reason: '`bottom:0` is the surface\'s own bottom edge',
+        );
+        expect(
+          rect.height,
+          closeTo(2, 1e-9),
+          reason:
+              'the seam is still `height:2px` — the parameters move it, '
+              'they do not resize it',
+        );
+        expect(
+          (decorationOf(tester, seam()).gradient! as LinearGradient).colors[1],
+          const Color(0xFFE8B04B),
+          reason: 'the centre stop, and only the centre stop, takes the hue',
+        );
+        // Both outer stops stay transparent whichever hue the middle takes — both
+        // prototype rules are `transparent, X, transparent`.
+        final LinearGradient g =
+            decorationOf(tester, seam()).gradient! as LinearGradient;
+        expect(g.colors.first, Colors.transparent);
+        expect(g.colors.last, Colors.transparent);
+      });
+
+      testWidgets('the parameters reach nothing but the bloom', (
+        WidgetTester tester,
+      ) async {
+        // A tint surface has no seam at all, so no combination of the three can
+        // make it grow one — the guard that keeps them from becoming a second
+        // tier's worth of surface.
+        await tester.pumpWidget(
+          _onSurface(
+            const GlassSurface(
+              seamAlignment: Alignment(0, 1),
+              seamWidthFactor: 0.84,
+              seamTint: Color(0xFFE8B04B),
+              child: panel,
+            ),
+          ),
+        );
+        expect(seam(), findsNothing);
+      });
     });
 
     // -----------------------------------------------------------------------

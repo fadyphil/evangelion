@@ -1,4 +1,5 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +16,24 @@ void main() {
   Finder findHeader() => find.byType(EvaSectionHeader);
   Finder findEmpty() => find.byType(EmptyState);
   Finder findError() => find.byType(ErrorView);
+
+  /// The style a [SettingsTile]'s title renders with.
+  ///
+  /// On the `AnimatedDefaultTextStyle` and not the `Text`, since Phase 4.2: the
+  /// hover colour has to transition (`redesign.html:419`'s `transition:.2s`),
+  /// and an explicit `Text.style` beats the ambient default — so reading
+  /// `Text.style` would report `null` and, if it did not, would report the
+  /// resting colour forever.
+  TextStyle rowStyleOf(WidgetTester tester) => tester
+      .widget<AnimatedDefaultTextStyle>(
+        find
+            .descendant(
+              of: findRow(),
+              matching: find.byType(AnimatedDefaultTextStyle),
+            )
+            .first,
+      )
+      .style;
 
   Future<void> pumpAt(
     WidgetTester tester,
@@ -62,20 +81,61 @@ void main() {
       await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
       final Text caption = tester.widget<Text>(find.text('READ'));
       expect(caption.style!.fontFamily, EvaTypography.monoFamily);
-      // `ink2`, not `ink3` — decision 149. A tile's caption is content, and `ink3`
-      // measures 1.65:1 on dark glass. `ink3` is reserved for inactive controls and
-      // decoration, the two things WCAG 1.4.3 exempts by name.
+      // `redesign.html:408` — `font-size:8.5px;letter-spacing:.14em`, no weight.
+      expect(StatTile.labelSize, 8.5);
+      expect(caption.style!.fontSize, 8.5);
+      // `.14em` **premultiplied**: Flutter's `letterSpacing` is a logical-pixel
+      // advance and CSS's `em` is relative to the element's own font, so
+      // 8.5 × 0.14 = 1.19.
+      expect(caption.style!.letterSpacing, closeTo(1.19, 1e-9));
+      expect(caption.style!.fontWeight, FontWeight.w400);
+
+      // **The ink does NOT move to `--ink-1`.** `redesign.html:408` ends
+      // `color:var(--ink-1)` and `EvaColors` has no `ink1`: it publishes `ink`,
+      // `ink2` and an `ink3` with no prototype counterpart, so the middle ink of
+      // the prototype's three cannot be named. Decision 149 already moved this
+      // run off `ink3` (1.65:1 on dark glass) onto `ink2` (4.73:1) and that
+      // argument is untouched by the redesign.
       expect(caption.style!.color, const EvaColors.dark().ink2);
     });
 
-    testWidgets('the value is the display serif at the prototype\'s 24', (
+    testWidgets('the value is the redesign\'s mono 11, not the 24pt serif', (
       WidgetTester tester,
     ) async {
       await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
       final Text value = tester.widget<Text>(find.text('14'));
-      expect(value.style!.fontFamily, EvaTypography.displayFamily);
-      expect(value.style!.fontSize, 24.0);
-      expect(value.style!.height, 1.0);
+      // `redesign.html:407` — `font-family:var(--mono);font-size:11px`, no
+      // `font-weight`. Was `ds.tsx:474`'s `F.display, 24, 600`.
+      expect(value.style!.fontFamily, EvaTypography.monoFamily);
+      expect(value.style!.fontFamily, isNot(EvaTypography.displayFamily));
+      expect(value.style!.fontSize, 11.0);
+      expect(StatTile.valueSize, 11.0);
+      expect(value.style!.fontWeight, FontWeight.w400);
+      // `:407` ends `color:var(--ink-0)`, which is this palette's `ink`.
+      expect(value.style!.color, const EvaColors.dark().ink);
+      // `:407` declares no `letter-spacing`, so it is none — and that is a
+      // change, because `monoCaps` inherits `labelMedium`'s 0.5.
+      expect(value.style!.letterSpacing, 0.0);
+    });
+
+    testWidgets('the panel is still `ds.tsx`\'s — radius 16, padding 14/10', (
+      WidgetTester tester,
+    ) async {
+      // The other half of the split, asserted so it cannot move by accident: the
+      // redesign *replaces* this tile with `.ringbox`'s ring (`redesign.html:
+      // 403-409`, a `CustomPaint`), which has no panel to copy, so the panel
+      // stayed on `ds.tsx:462-478` and only the type was re-pointed.
+      await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
+      expect(StatTile.radius, 16);
+      expect(
+        StatTile.padding,
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      );
+      expect(
+        find.descendant(of: findTile(), matching: find.byType(GlassSurface)),
+        findsOneWidget,
+        reason: 'the `ds.tsx` panel survives until Phase 6.2 builds the ring',
+      );
     });
 
     testWidgets('it is a tint, not a blur — §13.4\'s budget', (
@@ -120,15 +180,158 @@ void main() {
   });
 
   group('SettingsTile', () {
-    testWidgets('the 56px prototype height is a floor, not a fixed height', (
+    testWidgets('the row is flat — no glass, no radius, one hairline', (
       WidgetTester tester,
     ) async {
       await pumpAt(tester, const SettingsTile(title: 'Theme', trailing: _box));
+
+      // `redesign.html:419` — `background:none`, `border-radius:0`, no
+      // left/right/top border. **The largest visual change in Phase 4.2** and the
+      // redesign's own language (R3 is flat by design), not a regression.
+      expect(
+        find.descendant(of: findRow(), matching: find.byType(GlassSurface)),
+        findsNothing,
+        reason: '`.srow` has no fill, so there is no panel to be tinted',
+      );
+
+      // The bottom hairline, and only that edge.
+      final DecoratedBox row = tester.widget<DecoratedBox>(
+        find.descendant(of: findRow(), matching: find.byType(DecoratedBox)),
+      );
+      final BoxDecoration d = row.decoration as BoxDecoration;
+      expect(d.color, isNull, reason: '`background:none`');
+      expect(d.borderRadius, isNull, reason: '`border-radius:0`');
+      // `BorderSide` rather than `BoxBorder`: only `Border` has four sides, and
+      // this is the assertion that there is exactly **one** of them.
+      final Border b = d.border! as Border;
+      expect(b.top, BorderSide.none, reason: '`border-top:none`');
+      expect(b.left, BorderSide.none, reason: '`border-left:none`');
+      expect(b.right, BorderSide.none, reason: '`border-right:none`');
+      expect(b.bottom.width, 1.0, reason: '`border-bottom:1px solid`');
+      expect(
+        b.bottom.color,
+        const EvaColors.dark().ink.withValues(
+          alpha: SettingsTile.hairlineAlpha,
+        ),
+      );
+      expect(SettingsTile.hairlineAlpha, 0.06);
+
+      // `padding: 15px 4px`, replacing `ds.tsx:488`'s `'0 16px'`.
+      expect(
+        SettingsTile.padding,
+        const EdgeInsets.symmetric(horizontal: 4, vertical: 15),
+      );
+    });
+
+    testWidgets('the title is 14.5px at the face\'s own weight', (
+      WidgetTester tester,
+    ) async {
+      await pumpAt(tester, const SettingsTile(title: 'Theme', trailing: _box));
+      // On the `AnimatedDefaultTextStyle`, not on the `Text` — see `rowStyleOf`.
+      final TextStyle style = rowStyleOf(tester);
+      // `redesign.html:419` — `font-size:14.5px` and no `font-weight`.
+      expect(style.fontFamily, EvaTypography.uiFamily);
+      expect(style.fontSize, 14.5);
+      expect(SettingsTile.titleSize, 14.5);
+      expect(style.fontWeight, FontWeight.w400);
+      // `color:var(--ink-0)` at rest, and `:420`'s `var(--gold)` on hover.
+      expect(style.color, const EvaColors.dark().ink);
+    });
+
+    testWidgets('hovering turns the title gold and slides the row 4px', (
+      WidgetTester tester,
+    ) async {
+      await pumpAt(tester, const SettingsTile(title: 'Theme', trailing: _box));
+      await tester.pumpAndSettle();
+
+      final Rect atRest = tester.getRect(findRow());
+      expect(rowStyleOf(tester).color, isNot(const EvaColors.dark().emberInk));
+      // The row's **painted** box, not `find.byType(SettingsTile)` and not
+      // `find.byType(AnimatedContainer)`. Both of those resolve to a box that
+      // sits **outside** the transform — `AnimatedContainer` is its own first
+      // RenderObject, and `getTopLeft` does not include an object's own paint
+      // transform — so both report a 0px slide while the row has plainly moved.
+      // The `DecoratedBox` is inside the `Transform`, so its global position is
+      // the painted one.
+      final Finder painted = find.descendant(
+        of: findRow(),
+        matching: find.byType(DecoratedBox),
+      );
+      // Captured **before** the hover. Reading it afterwards and then comparing
+      // it to itself would have compared the hovered position to itself, and the
+      // first version of this test did exactly that and asserted a 8px slide
+      // against an actual 4px.
+      final double atRestLeft = tester.getTopLeft(painted).dx;
+
+      final TestGesture hover = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      // `addPointer` alone registers the device; a `MouseRegion` only sees a
+      // **hover**, so the pointer has to actually move onto the row.
+      await hover.addPointer(location: Offset.zero);
+      await hover.moveTo(atRest.center);
+      await tester.pumpAndSettle();
+
+      // `:420` — `.srow:hover{color:var(--gold);transform:translateX(4px)}`.
+      expect(SettingsTile.hoverShift, 4.0);
+      expect(rowStyleOf(tester).color, const EvaColors.dark().emberInk);
+      expect(
+        tester.getTopLeft(painted).dx,
+        closeTo(atRestLeft + SettingsTile.hoverShift, 0.01),
+        reason: 'the whole row translates, hairline included — as CSS does',
+      );
+      expect(
+        tester.getTopLeft(findRow()).dx,
+        closeTo(atRestLeft, 0.01),
+        reason: '…but the hover region stays where the pointer is',
+      );
+
+      await hover.removePointer();
+      await tester.pumpAndSettle();
+      expect(rowStyleOf(tester).color, const EvaColors.dark().ink);
+      expect(tester.getTopLeft(painted).dx, closeTo(atRestLeft, 0.01));
+    });
+
+    testWidgets('the 56px floor is kept, and is the row\'s TOTAL', (
+      WidgetTester tester,
+    ) async {
+      // `redesign.html:419` has no height at all — the row is `content + 30`.
+      // The floor is **kept** anyway, and re-composed against the new padding so
+      // the total is still 56 and not 56 + 30. See `SettingsTile.minHeight`'s doc
+      // for why it could not simply be deleted: two harnesses read it.
       expect(SettingsTile.minHeight, 56);
+      expect(SettingsTile.contentFloor, 26);
+      expect(SettingsTile.contentFloor + 2 * 15, SettingsTile.minHeight);
+
+      // **Both halves of the arithmetic, separately.** A trailing control shorter
+      // than the floor leaves the floor binding; a taller one wins and the row is
+      // `content + 30`. Asserting only the constant would have passed with
+      // `contentFloor` off by one whole padding — which is exactly the bug this
+      // test was written after.
+      //
+      // The floor case measures **57, not 56**: `BoxDecoration.padding` is the
+      // border's dimensions, so the 1px hairline occupies a pixel of its own. A
+      // border that took no space would paint outside the box and be clipped.
+      await pumpAt(
+        tester,
+        const SettingsTile(
+          title: 'T',
+          trailing: SizedBox(width: 10, height: 10),
+        ),
+      );
+      expect(tester.getSize(findRow()).height, SettingsTile.minHeight + 1);
+
+      await pumpAt(
+        tester,
+        const SettingsTile(
+          title: 'T',
+          trailing: SizedBox(width: 10, height: 40),
+        ),
+      );
       expect(
         tester.getSize(findRow()).height,
-        greaterThanOrEqualTo(40),
-        reason: 'minHeight minus the vertical padding — see the widget doc',
+        40 + 2 * SettingsTile.verticalPadding + 1,
+        reason: 'content + 30 + the hairline — the prototype\'s row, no floor',
       );
     });
 
@@ -143,7 +346,11 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(findRow()).height, greaterThan(56 - 16));
+      expect(
+        tester.getSize(findRow()).height,
+        greaterThan(SettingsTile.minHeight),
+        reason: 'a tall trailing control pushes the row past its floor',
+      );
     });
 
     testWidgets('an inert row adds no semantics node of its own', (
@@ -225,6 +432,33 @@ void main() {
       expect(SettingsGroup.rowGap, 10);
     });
 
+    testWidgets('the group opens with 20px above its label, `:422`', (
+      WidgetTester tester,
+    ) async {
+      await pumpAt(
+        tester,
+        const SettingsGroup(
+          label: 'Appearance',
+          children: <Widget>[
+            SettingsTile(title: 'Theme', trailing: _box),
+            SettingsTile(title: 'Font size', trailing: _box),
+          ],
+        ),
+      );
+      // `redesign.html:422` — `.sgroup{margin:20px 0 6px}`. The **20** is applied
+      // as `topGap`.
+      expect(SettingsGroup.topGap, 20.0);
+      final Rect group = tester.getRect(findGroup());
+      final Rect label = tester.getRect(findHeader());
+      expect(label.top - group.top, SettingsGroup.topGap);
+
+      // **The 6 is not applied**, and that is the point. `:422`'s bottom margin
+      // is the space under a *label*, which in the redesign a `.srow`'s own
+      // `padding:15px 4px` supplies; adding 6 here would open the group with a
+      // narrower gap than the 10 it keeps internally.
+      expect(SettingsGroup.rowGap, 10, reason: 'kept from SettingsScreen.tsx');
+    });
+
     testWidgets('an empty group is a bare label and no gap', (
       WidgetTester tester,
     ) async {
@@ -259,15 +493,41 @@ void main() {
   });
 
   group('EvaSectionHeader', () {
-    testWidgets('the section size is the Settings mono-caps label', (
+    testWidgets('the section size is `.mono`, and gold', (
       WidgetTester tester,
     ) async {
       await pumpAt(tester, const EvaSectionHeader(label: 'Reading'));
       final Text header = tester.widget<Text>(find.text('READING'));
       expect(header.style!.fontFamily, EvaTypography.monoFamily);
-      // `ink2`, not `ink3` — decision 149, same reason as `StatTile`'s caption: a
-      // heading that names a section is content, not decoration.
-      expect(header.style!.color, const EvaColors.dark().ink2);
+      // `redesign.html:30` — `.mono{font-size:10.5px;letter-spacing:.16em}`.
+      //
+      // **Not 10px / `.2em`.** The prototype's `.sgroup` (`:422`) is
+      // `margin:20px 0 6px` and types nothing; the eight `.sgroup` elements
+      // (`:645`-`:696`) carry `class="sgroup mono"`, and `.mono` at `:30` is
+      // where the size and the tracking live. Citing `:422` for a size would be
+      // a reference a reader cannot follow.
+      expect(header.style!.fontSize, 10.5);
+      expect(EvaSectionHeader.sectionSize, 10.5);
+      // `.16em` **premultiplied** by the size — Flutter's `letterSpacing` is a
+      // logical-pixel advance, CSS's `em` is relative to the element's own font.
+      expect(header.style!.letterSpacing, closeTo(10.5 * 0.16, 1e-9));
+      expect(EvaSectionHeader.sectionTracking, 0.16);
+      // `:30` declares no weight and `:31` (`.mono b`) declares `600` only for a
+      // `<b>` this label does not have, so the label is normal.
+      expect(header.style!.fontWeight, FontWeight.w400);
+
+      // `redesign.html:31` — `.mono b{color:var(--gold)}`, applied to the label.
+      //
+      // **This is `emberInk`, not `ink2`** (decision 149) and not `ink3`
+      // (`:422` era). In dark the two "gold" words are the same colour; in light
+      // they differ, and `emberInk` is the one that clears AA as a label.
+      expect(header.style!.color, const EvaColors.dark().emberInk);
+      expect(header.style!.color, const EvaColors.dark().ember);
+      expect(
+        const EvaColors.light().emberInk,
+        isNot(const EvaColors.light().ember),
+        reason: 'and this is where the two spellings part company',
+      );
     });
 
     testWidgets('the title size is the bold UI form', (

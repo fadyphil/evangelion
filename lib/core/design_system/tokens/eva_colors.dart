@@ -55,6 +55,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     required this.seamGlow,
     required this.bloom,
     required this.bloomOpacity,
+    required this.emberSheen,
     required this.sticker,
   });
 
@@ -63,7 +64,8 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `canvas` #05081A · `surface` #0D1224 · `raised` #141A2E · `ink` #EAE8F5 ·
   /// `ink2` #8A8FAD · `ink3` #424669 · `line` #1C2238 · `ember` #E8A33D ·
   /// `emberDeep` #C77F1F · `onEmber` #0D0A04 · `ok` #4ECCA3 · `err` #FF6B6B ·
-  /// `orbOpacity` 0.55 · `auroraOpacity` 0.18 · `bloomOpacity` 1.0.
+  /// `orbOpacity` 0.55 · `auroraOpacity` 0.18 · `bloomOpacity` 1.0 ·
+  /// `emberSheen` #47FFFFFF.
   const EvaColors.dark()
     : canvas = const Color(0xFF05081A),
       surface = const Color(0xFF0D1224),
@@ -93,6 +95,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
       seamGlow = const Color(0x99FFFFFF),
       bloom = const Color(0x8CE457D6),
       bloomOpacity = 1.0,
+      emberSheen = const Color(0x47FFFFFF),
       sticker = EvaStickerPalette.colors;
 
   /// The light palette — `03-design-system.md` §5.1, light table.
@@ -100,7 +103,8 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `canvas` #F0EEFF · `surface` #FFFFFF · `raised` #E8E4FF · `ink` #120E28 ·
   /// `ink2` #5A5480 · `ink3` #9B97B8 · `line` #D5D0EF · `ember` #D4891A ·
   /// `emberDeep` #B56C0C · `ok` #1A8C6A · `err` #D63B3B ·
-  /// `orbOpacity` 0.18 · `auroraOpacity` 0.10 · `bloomOpacity` 0.55.
+  /// `orbOpacity` 0.18 · `auroraOpacity` 0.10 · `bloomOpacity` 0.55 ·
+  /// `emberSheen` #47FFFFFF — the same, and deliberately so; see its doc.
   ///
   /// **`onEmber` is #3A1E00, NOT the spec's #FFF8EE.** This is the one token in
   /// the file that deliberately diverges from `03-design-system.md`, and the
@@ -183,6 +187,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
       seamGlow = const Color(0x809A7B19),
       bloom = const Color(0x8CE457D6),
       bloomOpacity = 0.55,
+      emberSheen = const Color(0x47FFFFFF),
       sticker = EvaStickerPalette.colors;
 
   /// The page backdrop — the bottom-most layer of the three.
@@ -418,6 +423,38 @@ class EvaColors extends ThemeExtension<EvaColors> {
   /// `glass_surface.dart` records why they cannot be a token table.
   final Color bloom;
 
+  /// The inner highlight on a gold fill — `redesign.html:181`'s
+  /// `inset 0 0 10px rgba(255,255,255,.28)` on `.segp .thumb`, the sliding
+  /// thumb of the segmented picker.
+  ///
+  /// ## IT IS THE SAME VALUE IN BOTH PALETTES, AND THAT IS THE **STATED** CASE
+  ///
+  /// `redesign.html:178-191` is `.segp` in full and `:73` — the light-mode
+  /// override block that carries `bloomOpacity`, the `segp` track and the `.qcta`
+  /// — **does not mention `.thumb`**. So the thumb is one declaration in both
+  /// modes: gold at `.95`→`.72` with a white sheen inside it. `eva_colors_test`
+  /// 's shared-value inventory therefore carries this beside [bloom], with this
+  /// paragraph as its reason rather than an accident.
+  ///
+  /// ## WHY IT IS A TOKEN AND NOT A LITERAL IN `segmented_control.dart`
+  ///
+  /// Because there is no white to reach for. §5.1 publishes three inks and
+  /// [ink] is the opposite way round in each mode — `#EAE8F5` dark, `#120E28`
+  /// light — so `ink` at `.28` is a *dark* sheen on the light palette's gold
+  /// thumb, which is a shadow the prototype never drew. [surface] inverts the
+  /// same way. [seam] is white in dark and **gold** in light, and [glassBorder]
+  /// is white at `.08`, not `.28`. `eva_toggle.dart` hit the identical wall for
+  /// the switch knob's `#FFFFFF` and resolved it with a file-scoped exemption to
+  /// `no_colour_literals_test.dart`; this is the same value reached from the
+  /// other side, and a token is the better resolution — it needs no exemption,
+  /// because `tokens/**` is where a colour is *supposed* to be introduced.
+  ///
+  /// Rejected: reusing [seamGlow] and letting the light thumb glow gold. That is
+  /// a real prototype value on a real element — `redesign.html:72` re-points
+  /// `.hcard .hor` at gold — and it is the wrong one here, because `.segp`'s
+  /// light override re-points the **track** (`:69`) and never the thumb.
+  final Color emberSheen;
+
   /// The seven decorative sticker slots, keyed by slot.
   final Map<StickerSlot, Color> sticker;
 
@@ -447,6 +484,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     Color? seamGlow,
     Color? bloom,
     double? bloomOpacity,
+    Color? emberSheen,
     Map<StickerSlot, Color>? sticker,
   }) => EvaColors(
     canvas: canvas ?? this.canvas,
@@ -473,6 +511,7 @@ class EvaColors extends ThemeExtension<EvaColors> {
     seamGlow: seamGlow ?? this.seamGlow,
     bloom: bloom ?? this.bloom,
     bloomOpacity: bloomOpacity ?? this.bloomOpacity,
+    emberSheen: emberSheen ?? this.emberSheen,
     sticker: sticker ?? this.sticker,
   );
 
@@ -539,6 +578,12 @@ class EvaColors extends ThemeExtension<EvaColors> {
       // 1.0. `eva_colors_test.dart`'s mutation proof names that one and the
       // three tests that catch it.
       bloomOpacity: d(bloomOpacity, other.bloomOpacity),
+      // Same value in both palettes, so this row is `c` on two equal endpoints —
+      // see [emberSheen]'s doc for why that is the stated case and not an
+      // omission. `c` rather than a literal repeat of the constant, because a
+      // token that `lerp` hands back as `this.emberSheen` is how a transition
+      // silently stops interpolating a colour.
+      emberSheen: c(emberSheen, other.emberSheen),
       sticker: {
         for (final StickerSlot slot in StickerSlot.values)
           slot: c(EvaStickerPalette.of(slot), other.sticker[slot]!),

@@ -222,11 +222,16 @@ Map<String, Object> _snapshot(EvaColors c) => <String, Object>{
   // be: `t = 1 reproduces the other palette exactly` is a whole-map comparison,
   // so a token missing here is a token that comparison silently cannot see.
   'bloomOpacity': c.bloomOpacity,
+  // Phase 4 — `.segp .thumb`'s `inset 0 0 10px rgba(255,255,255,.28)`
+  // (`redesign.html:181`). In the snapshot for the same reason as `bloom`: it is
+  // one value in both palettes, and the shared-value inventory below names it as
+  // a stated exception.
+  'emberSheen': c.emberSheen.toARGB32(),
   for (final StickerSlot slot in StickerSlot.values)
     'sticker.${slot.name}': c.sticker[slot]!.toARGB32(),
 };
 
-/// The 31 names [_snapshot] produces — twenty-four tokens plus the seven sticker
+/// The 32 names [_snapshot] produces — twenty-five tokens plus the seven sticker
 /// slots. If the snapshot and this list ever drift, a `copyWith` "nothing else
 /// changed" assertion would silently start comparing fewer fields than it claims
 /// to. The count is asserted where it matters; this list is the readable
@@ -256,6 +261,7 @@ const List<String> snapshotKeys = <String>[
   'seamGlow',
   'bloom',
   'bloomOpacity',
+  'emberSheen',
   'sticker.sky',
   'sticker.lavender',
   'sticker.pink',
@@ -520,6 +526,13 @@ void main() {
         // assertion compares the list — so a token added to `_snapshot` in the
         // wrong place shows up here rather than being absorbed.
         'bloom',
+        // The segmented picker's thumb sheen, and the SECOND stated exception.
+        // `redesign.html:178-191` is `.segp` in full and the light override at
+        // `:69` re-points only the track, so `.thumb`'s `inset …rgba(255,255,255,.28)`
+        // is one declaration in both modes — the same reason [bloom] leads, and
+        // the reason the thumb is not lit with [seamGlow] (which *is* re-hued to
+        // gold at `:72`, on a different element).
+        'emberSheen',
         // The OTHER values permitted to match are the seven stickers: §5.1
         // publishes one palette with no light variant.
         'sticker.sky',
@@ -530,7 +543,7 @@ void main() {
         'sticker.leaf',
         'sticker.sun',
       ], reason: 'a shared token means one theme ships the wrong colour');
-      expect(shared.length, 8);
+      expect(shared.length, 9);
     });
 
     // =====================================================================
@@ -1195,9 +1208,10 @@ void main() {
         // `lerp` that leaves the row out still compiles — `this.bloomOpacity`
         // satisfies it — and the token would arrive in a light theme at 1.0.
         'bloomOpacity': base.copyWith(bloomOpacity: 0.77),
+        'emberSheen': base.copyWith(emberSheen: probe(0x26)),
       };
 
-      // Twenty-four mutable tokens: twenty-one colours and the three opacities.
+      // Twenty-five mutable tokens: twenty-two colours and the three opacities.
       // The sticker map is covered by its own test above.
       expect(
         probes.keys.toSet(),

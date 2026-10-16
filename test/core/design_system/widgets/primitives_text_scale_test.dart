@@ -257,7 +257,8 @@ void main() {
     // The sweep above cannot fail for a widget that is allowed to grow. The **four**
     // controls below are the ones the design gives a **fixed** height or a floor:
     // `EvaButton` 52 (`ds.tsx:240`), `EvaTextField`'s shell 52 (`ds.tsx:306`), the
-    // settings row's 56 floor (`ds.tsx:488`), and `IconActionButton`'s 44
+    // settings row's floor (`ds.tsx:488`'s 56, re-composed by Phase 4.2 to 57 —
+    // see the `SettingsTile` entry), and `IconActionButton`'s 44
     // (`SettingsScreen.tsx:39`). Those are the places where Phase-1 decision 5's
     // 57sp `displayLarge` would actually break the layout, so they are the places
     // a text-size regression has to be caught.
@@ -403,8 +404,9 @@ void main() {
     // | `EmptyState` `headlineMedium` → `displayLarge` | yes | `surfaces_test.dart`, the goldens |
     // | `EvaSectionHeader` `titleMedium` → `displayMedium` | yes | the goldens |
     // | `EvaTextField` `bodyLarge` → `headlineMedium` | yes | the goldens |
-    // | `SettingsTile` padding `sm` → `lg` | yes | the goldens |
-    // | `SettingsTile` title `bodyLarge` → `headlineMedium` | yes | `surfaces_test.dart`, the goldens |
+    // | `SettingsTile` padding `15/4` → `sm`/`lg` | yes | the goldens, `surfaces_test.dart`'s padding assertion |
+    // | `SettingsTile` title `14.5` → `headlineMedium` | yes | `surfaces_test.dart`, the goldens |
+    // | `SettingsTile.contentFloor` `26` → `56` | **no** | **this group** — the row renders 87 against a 57 floor |
     // | `EvaButton` `titleMedium` → `headlineMedium` | yes | **nothing** — 42px still fits 52, see above |
     // | `EvaTextField` shell height 52 → 72 | **no** | **nothing**, before this change |
     // | `IconActionButton` size 44 → 72 | **no** | **nothing**, before this change |
@@ -422,6 +424,26 @@ void main() {
       expect(kEvaButtonHeight, 52.0, reason: 'ds.tsx:240 — `height: 52`');
       expect(kEvaTextFieldHeight, 52.0, reason: 'ds.tsx:306 — `height: 52`');
       expect(SettingsTile.minHeight, 56.0, reason: 'ds.tsx:488 — `height: 56`');
+      // And the **rendered** floor the entry above is measured against. Spelled
+      // out here because the entry reads the constant, and a constant that is only
+      // ever compared against itself cannot catch anything: this is the line that
+      // says the floor is 57 and the other line says the widget is.
+      expect(
+        SettingsTile.renderedFloor,
+        57.0,
+        reason:
+            '`ds.tsx:488`\'s 56 plus the 1px bottom hairline `redesign.html:419` '
+            'gives the row — `BoxDecoration.padding` is the border\'s dimensions, '
+            'so the rule takes a pixel of its own',
+      );
+      expect(
+        SettingsTile.renderedFloor - SettingsTile.minHeight,
+        1.0,
+        reason:
+            'the two floors differ by exactly the hairline and nothing else — '
+            '`BoxDecoration.padding` is the border\'s dimensions, so the rule '
+            '`redesign.html:419` adds takes a pixel of its own',
+      );
       expect(_fixed, hasLength(4), reason: 'four controls, not five');
     });
   });
@@ -673,22 +695,68 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
     styleOf: null,
   ),
   (
-    label: 'SettingsTile at its 56 floor',
+    label: 'SettingsTile at its rendered floor',
     build: () =>
         const SettingsTile(title: 'Notifications', trailing: _toggleBox),
     box: () => find.byType(SettingsTile),
-    finderReason: 'the row is its own box — it sets the `minHeight` constraint',
-    height: SettingsTile.minHeight,
+    finderReason: 'the row is its own box — it sets the floor constraint',
+    // ## RE-POINTED IN PHASE 4.2, AND WHY IT MOVED
+    //
+    // This was `SettingsTile.minHeight` — 56 — and it went red at `57.0 > 56.0`.
+    // The cause is not a text-scale regression and not a loosened claim: decision 2
+    // made the row flat (`redesign.html:419`'s `.srow`, `padding:15px 4px`, a
+    // 1px bottom hairline and no panel), and the floor was **re-composed** rather
+    // than re-spelled. `contentFloor` is `minHeight − 2 × 15`, so the rendered row
+    // is `26 + 30 + 1`.
+    //
+    // The `+ 1` is the hairline. `BoxDecoration.padding` is the border's
+    // dimensions, so `RenderDecoratedBox` lays the child out inside the edge — a
+    // border that took no space would be painted outside the box and clipped. So
+    // **57 is the real floor of the real widget**, and the honest repair is to
+    // measure against it.
+    //
+    // The two repairs that were refused, because each would have made this group
+    // unable to fail on the thing it exists for:
+    //
+    // - **Relaxing the bound to `<= 58`** (or `<= 57.0 + epsilon`) would let the row
+    //   grow by a pixel per revision and stay green. The bound is still `<=`, and
+    //   the floor is still a number the widget publishes.
+    // - **Dropping `SettingsTile` from [_fixed]** would delete the only fixed-height
+    //   entry that can be moved by a type-scale change, which is the group's whole
+    //   claim.
+    //
+    // What this group is for, from its own header: §14's "text scales to 1.22×
+    // without overflow" can only fail where a control cannot grow. The row still
+    // cannot shrink below its floor, so the measurement is still load-bearing, and
+    // the mutation proof lives in the widget's own doc — `contentFloor` off by one
+    // whole padding renders 87 and turns this red.
+    height: SettingsTile.renderedFloor,
     heightReason:
-        "The constraint is a **floor**, not a fixed height (`settings_tile.dart`'s "
-        'doc says so at length), and the row is allowed to exceed it when its '
-        'content needs the room. What §14 asks is that 1.22× does not *force* it '
-        'past its floor — so the bound is `<=` and the row passing at exactly 56 is '
-        'the passing case, not a tautology.',
+        'The floor is `max(content, 26) + 2 × 15 + 1` — `ds.tsx:488`\'s 56 '
+        're-composed against `redesign.html:419`\'s padding, plus the hairline. '
+        "It is a **floor**, not a fixed height (`settings_tile.dart`'s doc says "
+        'so at length), and the row is allowed to exceed it when its content needs '
+        'the room. What §14 asks is that 1.22× does not *force* it past its floor '
+        '— so the bound is `<=` and the row passing at exactly '
+        '${SettingsTile.renderedFloor} is the passing case, not a tautology.',
     text: 'Notifications',
     textReason: (String data) => 'the row title is the text under test',
-    styleOf: (WidgetTester tester) =>
-        tester.widget<Text>(find.text('Notifications')).style!,
+    // `styleOf` reads the `AnimatedDefaultTextStyle`, not `Text.style`. Phase 4.2
+    // moved the title's style up onto it, because the hover colour has to
+    // transition (`redesign.html:419`'s `transition:.2s`) and an explicit
+    // `Text.style` beats the ambient default — so `Text.style` is `null` here and
+    // the old `style!` would have thrown rather than measured. The entry's whole
+    // second claim depends on reading the style the text actually renders with.
+    styleOf: (WidgetTester tester) => tester
+        .widget<AnimatedDefaultTextStyle>(
+          find
+              .descendant(
+                of: find.byType(SettingsTile),
+                matching: find.byType(AnimatedDefaultTextStyle),
+              )
+              .first,
+        )
+        .style,
     noText: null,
   ),
 ];

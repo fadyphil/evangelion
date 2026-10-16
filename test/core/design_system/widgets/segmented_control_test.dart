@@ -34,15 +34,74 @@ void main() {
     textDirection: direction,
   );
 
-  AnimatedContainer segmentAt(WidgetTester tester, int index) =>
-      tester.widget<AnimatedContainer>(
+  /// The sliding thumb — `redesign.html:179-182` — or `null` while it is not yet
+  /// measured.
+  ///
+  /// `null` for exactly one frame after the first layout, because the thumb's
+  /// width is the **selected segment's** width and that is only knowable once the
+  /// tree has laid out. See the widget's `_measureThumb` doc for why no
+  /// `LayoutBuilder` can answer it, and why nothing else measures differently in
+  /// its absence.
+  AnimatedPositioned? thumb(WidgetTester tester) {
+    final Finder f = find.descendant(
+      of: controlFinder,
+      matching: find.byType(AnimatedPositioned),
+    );
+    return f.evaluate().isEmpty ? null : tester.widget<AnimatedPositioned>(f);
+  }
+
+  /// The thumb's painted rectangle, or `null` while it is not painted.
+  Rect? thumbRect(WidgetTester tester) {
+    final Finder f = find.descendant(
+      of: controlFinder,
+      matching: find.byType(AnimatedPositioned),
+    );
+    return f.evaluate().isEmpty ? null : tester.getRect(f);
+  }
+
+  /// Every segment's rendered rect, in `values` order — `Light`, `Dark`,
+  /// `System`.
+  ///
+  /// Read off the segments' own `InkWell`s and **scoped to the `Row`**, because
+  /// `EvaInk` builds an `InkWell` too: a bare
+  /// `find.byType(InkWell)` inside the control matches the track's as well, and
+  /// the track is first in document order.
+  ///
+  /// The `InkWell` rather than the `Text`, because the thumb's `width` is the
+  /// **segment's** width — `redesign.html:179` sizes it to the button, not to
+  /// the label — and a label is narrower than its button by `segmentPadding` on
+  /// each side.
+  List<Rect> segmentRects(WidgetTester tester) {
+    final Finder wells = find.descendant(
+      of: find.descendant(of: controlFinder, matching: find.byType(Row)),
+      matching: find.byType(InkWell),
+    );
+    return <Rect>[
+      for (int i = 0; i < wells.evaluate().length; i++)
+        tester.getRect(wells.at(i)),
+    ];
+  }
+
+  /// The style a segment's label renders with — which since Phase 4.2 is the
+  /// `AnimatedDefaultTextStyle`'s, not the `Text`'s.
+  ///
+  /// Scoped to the segment's own `InkWell` because `Material`, `EvaInk` and the
+  /// harness all put `AnimatedDefaultTextStyle`s in the tree, and a bare
+  /// descendant finder resolves to whichever came first in document order rather
+  /// than to the one painting this label.
+  TextStyle segmentStyleOf(WidgetTester tester, String label) => tester
+      .widget<AnimatedDefaultTextStyle>(
         find
             .descendant(
-              of: controlFinder,
-              matching: find.byType(AnimatedContainer),
+              of: find.ancestor(
+                of: find.text(label.toUpperCase()),
+                matching: find.byType(InkWell),
+              ),
+              matching: find.byType(AnimatedDefaultTextStyle),
             )
-            .at(index),
-      );
+            .first,
+      )
+      .style;
 
   group('Phase 3 gate — selects via keyboard', () {
     testWidgets('Tab reaches the control, and it is one stop', (
@@ -50,11 +109,8 @@ void main() {
     ) async {
       await pump(tester);
       await tabUntilFocused(tester, controlFinder);
-      expect(
-        segmentAt(tester, 1).duration,
-        EvaMotion.base,
-        reason: 'the middle segment is the selected one',
-      );
+      await tester.pump();
+      expect(thumb(tester), isNotNull, reason: 'the thumb settled onto Dark');
     });
 
     testWidgets('one Tab leaves the control, so it is not three stops', (
@@ -135,32 +191,94 @@ void main() {
       expect(seen.last, 'System');
     });
 
-    testWidgets('the fill follows the selection, not just the callback', (
+    testWidgets('the thumb follows the selection, not just the callback', (
       WidgetTester tester,
     ) async {
       // The load-bearing half of "selects via keyboard": a control that reports a
       // new value but does not *move its selection* has not selected anything.
+      //
+      // Rewritten in Phase 4.2. It used to compare each segment's fill colour,
+      // which is the half the redesign deleted: `redesign.html:183` gives
+      // `button` `background:none` and the selection is now drawn by one thumb
+      // behind the labels (`:179`). Comparing pixels of a fill that no longer
+      // exists would have kept passing while asserting nothing.
       await pump(tester);
+      // The arrow key is handled by `EvaFocusRing`'s `onKeyEvent`, so the control
+      // must hold focus first — the Phase 3 model is "one tab stop, arrows move
+      // within it", and without the Tab the key goes nowhere and the thumb
+      // correctly does not move.
       await tabUntilFocused(tester, controlFinder);
+      await tester.pump();
 
-      final Color darkFill =
-          (segmentAt(tester, 1).decoration as BoxDecoration).color!;
-      final Color lightFill =
-          (segmentAt(tester, 0).decoration as BoxDecoration).color!;
-      expect(darkFill, isNot(lightFill));
+      final List<Rect> before = segmentRects(tester);
+      expect(before, hasLength(3));
+      final Rect? onDark = thumbRect(tester);
+      expect(onDark, isNotNull);
+      // The thumb is on the *middle* segment — `Dark` is the initial selection.
+      expect(onDark!.left, closeTo(before[1].left, 0.01));
+      expect(onDark.width, closeTo(before[1].width, 0.01));
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
 
+      final List<Rect> after = segmentRects(tester);
+      final Rect? onLight = thumbRect(tester);
+      expect(onLight!.left, closeTo(after[0].left, 0.01));
+      expect(onLight.width, closeTo(after[0].width, 0.01));
+      // **Not** "the widths differ". Measured on the harness's 320-wide surface
+      // the three segments come out at 104 each — `redesign.html:183`'s `flex:1`
+      // *is* honoured, because `RenderFlex` shares `maxMainSize` between flex
+      // children whenever the incoming width is finite — so the thumb's `width`
+      // is constant on this fixture and only `left` moves. The width assertion
+      // that matters is the one above, that it is the segment's width and not a
+      // fraction of the track; the `the thumb spans the segment` test below is
+      // what rules out the guess. On a narrower fixture, or with labels of very
+      // different lengths, the two would differ and both assertions still hold.
       expect(
-        (segmentAt(tester, 0).decoration as BoxDecoration).color,
-        darkFill,
-        reason: 'Light now carries the selected fill Dark had',
+        onLight.left,
+        isNot(closeTo(onDark.left, 0.01)),
+        reason: 'the thumb actually moved — that is the whole claim',
       );
+    });
+
+    testWidgets('the thumb spans the segment, not the label inside it', (
+      WidgetTester tester,
+    ) async {
+      // The one assertion that keeps `widthFactor`-style guessing out: if the
+      // thumb were the label's width it would be narrower than its segment by
+      // `segmentPadding` on each side.
+      await pump(tester);
+      await tester.pump();
+      final List<Rect> segments = segmentRects(tester);
+      final Rect t = thumbRect(tester)!;
+      expect(t.width, greaterThan(segments[1].width - 0.01));
+      expect(t.width, closeTo(segments[1].width, 0.01));
+
+      // And it spans the segment **vertically** — `top:0;bottom:0`, which is
+      // `redesign.html:179`'s `top:3px;bottom:3px` expressed inside a padding box
+      // that is already inset by the track's own 3. `:179` is a `position:
+      // absolute` rule with two offsets, so under a stretched `.segp` the thumb
+      // stretches with the buttons, and that is what CSS draws.
+      //
+      // **Why this is asserted at all, given the golden already shows it.** In
+      // this harness the control fills its parent: `pumpPrimitive` hands the
+      // subtree loose constraints, but the `Material` + `InkWell` + `Align`
+      // chain takes them as bounded and fills — a factorless `Align` sizes to
+      // `constraints.biggest`, measured rather than assumed — so the three
+      // segments are **560px** tall inside a 568px surface. That is
+      // **pre-existing**: the committed `segmented_control_dark.png` is a 320×568
+      // frame and `icon_action_button_dark.png` is too. So the tall gold pill in
+      // the re-recorded golden is the fixture, not a defect the thumb introduced,
+      // and stating it here means the next reader who opens the PNG finds the
+      // explanation in a test rather than concluding the widget draws a
+      // viewport-tall pill in the app.
+      expect(t.height, closeTo(segments[1].height, 0.01));
       expect(
-        (segmentAt(tester, 1).decoration as BoxDecoration).color,
-        lightFill,
+        t.top,
+        closeTo(segments[1].top, 0.01),
+        reason: 'the thumb is inset by the track padding, not by anything else',
       );
+      expect(t.bottom, closeTo(segments[1].bottom, 0.01));
     });
 
     testWidgets('focus does not leave the control while arrowing', (
@@ -228,11 +346,18 @@ void main() {
       expect(seen, <String>['Light']);
     });
 
-    testWidgets('with animations off the selection fill lands at once', (
+    testWidgets('with animations off the thumb lands at once', (
       WidgetTester tester,
     ) async {
       await pump(tester, disableAnimations: true);
-      expect(segmentAt(tester, 0).duration, Duration.zero);
+      await tester.pump();
+      expect(thumb(tester)!.duration, Duration.zero);
+      final List<Rect> segments = segmentRects(tester);
+      expect(
+        thumbRect(tester)!.left,
+        closeTo(segments[1].left, 0.01),
+        reason: 'no in-between frame, so it is already on Dark',
+      );
     });
   });
 
@@ -375,31 +500,147 @@ void main() {
       WidgetTester tester,
     ) async {
       await pump(tester);
-      // `SettingsScreen.tsx:51` — one `background: rgba(…, 0.06)` wrapper with
-      // `overflow: hidden`, not three separate pills.
+      // `redesign.html:178` — one `border-radius:999px` wrapper with a fill and
+      // a 1px rim, not three separate pills. **Was** `SettingsScreen.tsx:51`'s
+      // `borderRadius: 8` with no `border` at all; `:178` is the redesign's own.
       final Container track = tester.widget<Container>(
         find
             .descendant(of: controlFinder, matching: find.byType(Container))
             .first,
       );
+      final BoxDecoration d = track.decoration! as BoxDecoration;
       expect(
-        (track.decoration! as BoxDecoration).borderRadius,
+        d.borderRadius,
         BorderRadius.circular(SegmentedControl.trackRadius),
       );
-      expect(SegmentedControl.trackRadius, 8.0);
+      expect(SegmentedControl.trackRadius, EvaRadii.chip);
+      expect(SegmentedControl.trackRadius, 999.0);
+      expect(
+        d.border,
+        isNotNull,
+        reason: '`border:1px solid var(--glass-line)`',
+      );
+      expect(d.border!.top.color, const EvaColors.dark().glassBorder);
+      // `:178` — `padding:3px`, which is also the thumb's `top/bottom/left`
+      // inset (`:179`). Same number, so it is named once.
+      expect(SegmentedControl.trackPadding, 3);
+      expect(track.padding, const EdgeInsets.all(3));
+    });
+
+    testWidgets('the thumb is the prototype\'s gold pill, glowing and sheened', (
+      WidgetTester tester,
+    ) async {
+      await pump(tester);
+      await tester.pump();
+      // `redesign.html:180-181`. Two shadows, and both matter: the outer glow is
+      // what makes the thumb read as lit, the inset is what makes it read as
+      // *gold* rather than as a flat orange rectangle.
+      final DecoratedBox box = tester.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: find.byType(AnimatedPositioned),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      final BoxDecoration d = box.decoration as BoxDecoration;
+
+      final LinearGradient fill = d.gradient! as LinearGradient;
+      expect(fill.begin, Alignment.topCenter, reason: '`180deg`');
+      expect(fill.end, Alignment.bottomCenter);
+      expect(fill.colors, <Color>[
+        const EvaColors.dark().ember.withValues(
+          alpha: SegmentedControl.thumbFillTop,
+        ),
+        const EvaColors.dark().ember.withValues(
+          alpha: SegmentedControl.thumbFillBottom,
+        ),
+      ]);
+      expect(SegmentedControl.thumbFillTop, 0.95);
+      expect(SegmentedControl.thumbFillBottom, 0.72);
+
+      expect(d.boxShadow, hasLength(2));
+      expect(
+        d.boxShadow!.first.color,
+        const EvaColors.dark().ember.withValues(
+          alpha: SegmentedControl.thumbGlowAlpha,
+        ),
+      );
+      expect(d.boxShadow!.first.blurRadius, 14);
+      expect(d.boxShadow!.last.color, const EvaColors.dark().emberSheen);
+      expect(d.boxShadow!.last.blurRadius, 10);
+
+      // `:182` — `transition:left .35s`, and 350ms is not a token, which is why
+      // the widget names it rather than rounding to `EvaMotion.screen`.
+      expect(thumb(tester)!.duration, SegmentedControl.thumbDuration);
+      expect(SegmentedControl.thumbDuration, const Duration(milliseconds: 350));
+    });
+
+    testWidgets('the selected label is `onEmber` — in dark that is not gold', (
+      WidgetTester tester,
+    ) async {
+      await pump(tester);
+      await tester.pump();
+      // `redesign.html:185` — `.segp button.on{color:#1c1608}`.
+      //
+      // The regression this pins: the label used to be `emberInk`, which in dark
+      // **is** `ember` — the thumb's own fill. Gold on gold is the defect the
+      // redesign's `.on` rule exists to fix, and `onEmber` is this palette's name
+      // for the fix.
+      expect(thumbRect(tester), isNotNull, reason: 'the thumb is behind it');
+      expect(
+        tester.widget<Text>(find.text('DARK')).style?.color,
+        isNull,
+        reason:
+            'the colour is on the `AnimatedDefaultTextStyle`, not the `Text`',
+      );
+      final AnimatedDefaultTextStyle selected = tester
+          .widget<AnimatedDefaultTextStyle>(
+            find
+                .descendant(
+                  of: find.ancestor(
+                    of: find.text('DARK'),
+                    matching: find.byType(InkWell),
+                  ),
+                  matching: find.byType(AnimatedDefaultTextStyle),
+                )
+                .first,
+          );
+      expect(selected.style.color, const EvaColors.dark().onEmber);
+      expect(selected.style.color, isNot(const EvaColors.dark().ember));
+      expect(selected.style.color, isNot(const EvaColors.dark().emberInk));
+      // The unselected arms, for contrast: `:184`'s button is `--ink-2`.
+      expect(
+        segmentStyleOf(tester, 'Light').color,
+        const EvaColors.dark().ink2,
+      );
+      expect(
+        segmentStyleOf(tester, 'Light').color,
+        isNot(const EvaColors.dark().onEmber),
+      );
     });
 
     testWidgets('the labels are the prototype\'s mono caps', (
       WidgetTester tester,
     ) async {
       await pump(tester);
-      final Text label = tester.widget<Text>(find.text('DARK'));
+      expect(find.text('DARK'), findsOneWidget);
       expect(
-        label.data,
-        'DARK',
-        reason: 'uppercased — Flutter has no CSS-style',
+        find.text('Dark'),
+        findsNothing,
+        reason: 'uppercased — Flutter has no CSS-style `text-transform`',
       );
-      expect(label.style!.fontFamily, EvaTypography.monoFamily);
+      // **From Phase 4.2: on the `AnimatedDefaultTextStyle`, not on the `Text`.**
+      // The colour has to transition (`:183`'s `transition:color .3s`), and an
+      // explicit `Text.style` wins over the ambient default — so the style moved
+      // up and this assertion moved with it. Reading `Text.style` would have
+      // thrown on a null, which is the only reason this line changed shape.
+      final Text label = tester.widget<Text>(find.text('DARK'));
+      expect(label.style, isNull, reason: 'it inherits the animated default');
+      expect(
+        segmentStyleOf(tester, 'Dark').fontFamily,
+        EvaTypography.monoFamily,
+      );
     });
   });
 
@@ -407,6 +648,13 @@ void main() {
     testWidgets('a golden per theme — $theme', (WidgetTester tester) async {
       await pump(tester, theme: data);
       await tester.pump();
+      // **The golden must contain the thumb.** It is measured one frame after
+      // the first layout, and a golden re-recorded on the frame before it
+      // settled would be a picture of the control *without* its defining
+      // feature — which every later reader would take as the design. Asserting
+      // it here makes "the thumb is missing" a red instead of a PNG nobody
+      // re-examines.
+      expect(thumb(tester), isNotNull);
       await expectLater(
         controlFinder,
         matchesGoldenFile('goldens/segmented_control_$theme.png'),
@@ -418,6 +666,7 @@ void main() {
     await pump(tester);
     await tabUntilFocused(tester, controlFinder);
     await tester.pump();
+    expect(thumb(tester), isNotNull);
     await expectLater(
       controlFinder,
       matchesGoldenFile('goldens/segmented_control_state_focused.png'),

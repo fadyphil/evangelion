@@ -21,6 +21,22 @@ class SettingsGroup extends StatelessWidget {
 
   /// The section label. Rendered by [EvaSectionHeader] at its default size,
   /// which is the prototype's `SectionLabel`.
+  ///
+  /// **`redesign.html:422`'s label, re-pointed here and on that widget.**
+  /// `.sgroup` is a `div` carrying `class="sgroup mono"` — `:645`, `:649`, `:651`,
+  /// `:666`, `:682`, `:690`, `:696` — and the class list means the *type* comes
+  /// from `.mono` (`:30`) and the **margin** from `.sgroup` (`:422`). Phase 4.2
+  /// moved both: the label is gold (`redesign.html:31`, `.mono b`) and 20px of
+  /// top margin arrives as [topGap].
+  ///
+  /// **The word "gold" is doing two jobs and they differ in light.** This widget
+  /// has no label of its own — it delegates to [EvaSectionHeader]'s
+  /// `section` variant — so there is one implementation, and it is
+  /// [EvaColors.emberInk]. In dark that *is* `--gold` (`#E8B04B` ≈ `emberInk`
+  /// `#E8A33D`); in light `emberInk` is `#845610` where `--gold` is `#9A7B19` and
+  /// `ember` is `#8A6D15`. `emberInk` was chosen because it is the palette's
+  /// **text** gold (decision 153: `ember` fills, `emberInk` writes) and because
+  /// it is the one that clears AA as a label — 5.54:1 against `ember`'s 4.387:1.
   final String label;
 
   /// The rows, in order.
@@ -34,18 +50,43 @@ class SettingsGroup extends StatelessWidget {
   ///
   /// 10, not `EvaSpacing.md + EvaSpacing.xs` (16). The prototype's number is not
   /// on the 4px scale and the nearest step that would be 16 is 60% further apart.
+  ///
+  /// ## `redesign.html:422` SAYS `margin-bottom:6px` AND IS **NOT** APPLIED
+  ///
+  /// `.sgroup` is `margin:20px 0 6px` — 20 above the label, 6 below it. The 20
+  /// **is** applied, as [topGap]. The 6 is not, and the reason is that it is not
+  /// the gap between rows at all: `:422` describes the space under a *label*, and
+  /// in the redesign a label sits directly above the first `.srow`, whose own
+  /// `padding:15px 4px` (`:419`) supplies the separation. Applying 6 here would
+  /// put a 6px gap above the first row **and** keep 10 between the rows, so the
+  /// group would open with a narrower gap than it has internally.
+  ///
+  /// So `rowGap` keeps its `SettingsScreen.tsx` citation: 10 is that file's number
+  /// and no `redesign.html` line replaces it. The divergence is recorded rather
+  /// than smoothed, and the citation is re-pointed for **the label only** — which
+  /// is [EvaSectionHeader]'s job, not this widget's.
   static const double rowGap = 10;
 
+  /// The space above the label. `redesign.html:422` — `margin:20px 0 6px`, top.
+  ///
+  /// Re-pointed from `SettingsScreen.tsx:45-124`'s implicit layout, where this
+  /// widget had no margin of its own and the column's spacing came from
+  /// `SettingsPage.groupGap`.
+  static const double topGap = 20;
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: <Widget>[
-      EvaSectionHeader(label: label),
-      for (int i = 0; i < children.length; i++) ...<Widget>[
-        if (i > 0) const SizedBox(height: rowGap),
-        children[i],
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: topGap),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        EvaSectionHeader(label: label),
+        for (int i = 0; i < children.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(height: rowGap),
+          children[i],
+        ],
       ],
-    ],
+    ),
   );
 }

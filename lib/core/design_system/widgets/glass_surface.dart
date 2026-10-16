@@ -175,21 +175,37 @@ enum GlassTier {
   /// which would be the faithful spelling and would put a second coordinate
   /// system on a decoration.
   ///
-  /// ## THE DIMMERS ARE CALLER STATE, AND ARE DELIBERATELY NOT MEMBERS
+  /// ## THE DIMMERS ARE CALLER STATE — AND THE LIGHT ONE STOPPED BEING
   ///
   /// `redesign.html:73` sets `opacity:.55` on all four `.bloom`s in light mode,
-  /// and `redesign.html:285` sets `opacity:.35` on `.bcard.sealed .bloom`. Neither
-  /// is a tier: `.sealed` is a **state of a book card** (its title is dimmed at
-  /// `:286` too, and it carries a lock badge), and light mode is a theme rather
-  /// than a treatment. A tier member called `sealedBloom` would be a fifth value
-  /// whose only meaning is "0.35 of the colour I already had", and
-  /// `GlassTier`'s whole reason for being an enum is that each member is a
-  /// *decision about the surface*, countable and greppable. A caller that wants a
-  /// dimmed wash wraps this one in an `Opacity`, which costs a `saveLayer` — and
-  /// `Opacity` is the caller's to spend, not this widget's, exactly as a blur is
-  /// (§13.4 budgets saveLayers; a decorative wash must not quietly add one).
+  /// and `redesign.html:285` sets `opacity:.35` on `.bcard.sealed .bloom`.
   ///
-  /// ## THE SEAM, AND ITS ONE DIVERGENCE
+  /// **The light-mode dimmer is now [EvaColors.bloomOpacity] and this tier paints
+  /// it.** It used to be caller state, and the paragraph that said so was wrong in
+  /// the way `seamGlow`'s was: "a caller that wants a dimmed wash wraps this one in
+  /// an `Opacity`, which costs a `saveLayer`". No caller wrapped anything — the
+  /// only caller of this tier is `glass_surface_test.dart` — so the wash shipped
+  /// to a light theme at **1.0×** the prototype's strength, and the mechanism the
+  /// paragraph recommended is one §13.4 budgets. The token is the mechanism
+  /// [EvaColors.orbOpacity] and [EvaColors.auroraOpacity] already use.
+  ///
+  /// **The sealed dimmer is still caller state, and that half stands.**
+  /// `redesign.html:285`'s `.35` belongs to `.sealed`, which is a **state of a book
+  /// card** — its title is dimmed at `:286` too and it carries a lock badge — and
+  /// light mode is a theme rather than a treatment. A tier member called
+  /// `sealedBloom` would be a value whose only meaning is "0.35 of the colour I
+  /// already had", and `GlassTier`'s whole reason for being an enum is that each
+  /// member is a *decision about the surface*. `EvaColors` has no `sealedOpacity`
+  /// for the same reason it has no `emberInk2`: a float for a state no widget has
+  /// is a token with no reader, and **Phase 5.2** is where the first one appears.
+  ///
+  /// What the light change does cost: `goldens/glass_surface_bloom_{dark,light}.png`
+  /// moved. That is the honest outcome and it is stated rather than re-recorded
+  /// quietly — the proof that the *seam parameters* cost nothing is that the same
+  /// two files were run **unmodified** the moment the three parameters landed, and
+  /// only moved when the dimmer did.
+  ///
+  /// ## THE SEAM, ITS ONE GEOMETRIC DIVERGENCE, AND ITS PARAMETERS
   ///
   /// `.hor` is `height:2px` `border-radius:2px` at `bottom:20%`, spanning
   /// `left:14%` to `right:14%` — hence [kGlassSeamWidthFactor] 0.72 — with
@@ -198,6 +214,15 @@ enum GlassTier {
   /// (`redesign.html:72`) and at **`12px`**, not 14; this widget ships 14 in both
   /// palettes. See `seamGlow`'s doc for why that is a geometry constant rather
   /// than a per-brightness token.
+  ///
+  /// **The prototype's second seam is not a fifth tier.** `.opt::after`
+  /// (`redesign.html:348-349`) is `bottom:0`, 84% wide and gold, and a quiz
+  /// option cannot draw `.hor` unchanged. Its position, width and hue are
+  /// therefore parameters — [seamAlignment], [seamWidthFactor] and [seamTint] —
+  /// each defaulting to the `.hor` value, so a caller that names nothing gets
+  /// byte-identical pixels to the version that had no parameters at all. The
+  /// glow's radius and hue still cannot be expressed, and [seamTint]'s doc says
+  /// which two divergences remain and who owns them.
   bloom,
 }
 
@@ -408,6 +433,9 @@ class GlassSurface extends StatelessWidget {
     this.radius = EvaRadii.card,
     this.padding = const EdgeInsets.all(EvaSpacing.card),
     this.border = true,
+    this.seamAlignment,
+    this.seamWidthFactor,
+    this.seamTint,
     this.onTap,
     this.semanticLabel,
     this.bloomColor,
@@ -432,6 +460,57 @@ class GlassSurface extends StatelessWidget {
   /// Whether to draw the 1px [EvaColors.glassBorder] rim. Off is for surfaces
   /// that sit on a background of their own and would double the edge.
   final bool border;
+
+  /// Where the [GlassTier.bloom] seam sits vertically. `null` is [kGlassSeamAlignment]
+  /// — `redesign.html:256`'s `bottom:20%` — and is what `.hor` draws.
+  ///
+  /// ## WHY A PARAMETER, AND WHAT IT IS STILL NOT ENOUGH FOR
+  ///
+  /// Two prototype hosts carry a seam and they do not agree:
+  ///
+  /// | host | position | width | tint | glow |
+  /// | --- | --- | --- | --- | --- |
+  /// | `.hor` (`redesign.html:256-257`) | `bottom:20%` | `left:14%;right:14%` → 72% | white | `0 0 14px rgba(255,255,255,.6)` |
+  /// | `.opt::after` (`:348-349`) | `bottom:0` | `left:8%;right:8%` → **84%** | **gold** | **`0 0 16px var(--gold)`** |
+  ///
+  /// `.opt` is a quiz option and cannot borrow `.hor` unchanged — a correct-answer
+  /// seam pinned to the card's bottom edge in gold is the whole of R18's visual
+  /// signal, and at `bottom:20%` in white it would read as a decorative hairline
+  /// on every option whether it is right or not.
+  ///
+  /// A fifth `GlassTier` member was the other candidate and was refused on
+  /// `glass_blur_budget_test`'s counting model: that gate walks the source for
+  /// `GlassTier.blur` and refuses a tier it cannot classify, and `GlassTier`'s
+  /// whole argument is that each member is a countable *decision about the
+  /// surface*. A seam's position, width and hue are not decisions about the
+  /// surface — they are decisions about the **element inside it**, and R18 is a
+  /// quiz option, not a glass panel.
+  ///
+  /// **The glow is the part this cannot express, and it is named rather than
+  /// hidden.** `.opt::after` glows `16px` in `var(--gold)` and this widget ships
+  /// [kGlassSeamGlowBlur] in [EvaColors.seamGlow], which is white in dark and
+  /// gold in light. So `seamTint: <gold>` gives R18 its hue and its geometry and
+  /// leaves two divergences: the radius (14 against 16, the same judgement
+  /// `seamGlow`'s doc records for light's 12) and the glow's own hue in dark.
+  /// Fixing both means parameterising `kGlassSeamGlowBlur` and `seamGlow` per
+  /// host, which is **Phase 5.4's** call to make — it is the first caller, and a
+  /// fifth parameter added for a caller that does not exist is the same token-
+  /// table bloat `seamGlow`'s doc declines.
+  final Alignment? seamAlignment;
+
+  /// The seam's width as a fraction of the surface. `null` is
+  /// [kGlassSeamWidthFactor] — 0.72, `redesign.html:256`'s `left:14%;right:14%`.
+  /// `.opt::after` is `left:8%;right:8%`, so a quiz option passes `0.84`.
+  final double? seamWidthFactor;
+
+  /// The seam's centre-stop hue. `null` is [EvaColors.seam], which is that
+  /// `var()`-less `rgba(255,255,255,.85)` in dark and gold in light
+  /// (`redesign.html:257` / `:72`).
+  ///
+  /// The gradient's two outer stops stay [Colors.transparent] whatever this is:
+  /// both prototype rules are `linear-gradient(90deg, transparent, X, transparent)`,
+  /// so only the middle stop is a colour.
+  final Color? seamTint;
 
   /// Makes the surface tappable and announces it as a button.
   ///
@@ -598,7 +677,14 @@ class GlassSurface extends StatelessWidget {
           // paint *behind* the content; both are `Positioned.fill`, so neither
           // contributes to the size this `Stack` measures.
           children: <Widget>[
-            if (bloomed) ..._wash(colors, bloomColor ?? colors.bloom),
+            if (bloomed)
+              ..._wash(
+                colors,
+                bloomColor ?? colors.bloom,
+                seamAt: seamAlignment ?? kGlassSeamAlignment,
+                seamWidth: seamWidthFactor ?? kGlassSeamWidthFactor,
+                seamHue: seamTint ?? colors.seam,
+              ),
             Padding(padding: padding, child: child),
           ],
         ),
@@ -676,7 +762,39 @@ class GlassSurface extends StatelessWidget {
   ///
   /// [bloomColour] is already resolved by the caller — [bloomColor] if given,
   /// [EvaColors.bloom] otherwise — so this method makes no decision about colour.
-  List<Widget> _wash(EvaColors colors, Color bloomColour) => <Widget>[
+  ///
+  /// It is the **alpha** of that colour, not the colour, that the palette decides
+  /// per brightness: [EvaColors.bloomOpacity] is 1.0 in dark and 0.55 in light,
+  /// which is `redesign.html:73`'s `opacity:.55` on all four washes.
+  ///
+  /// ## IT MULTIPLIES, AND THAT IS NOT A DETAIL — IT IS WHAT KEPT DARK STILL
+  ///
+  /// [EvaColors.bloom] is `0x8CE457D6`: its alpha is **already** `.55`, because
+  /// `redesign.html:254`'s own gradient stop is `rgba(228,87,214,.55)`. So the
+  /// two numbers are independent and both apply — the hue token carries the stop's
+  /// alpha, and [EvaColors.bloomOpacity] carries the element's `opacity:`.
+  /// `Color.withValues(alpha:)` **replaces** the channel, so writing
+  /// `bloomColour.withValues(alpha: colors.bloomOpacity)` would discard `.55` in
+  /// dark and paint the wash at `1.0` — and `goldens/glass_surface_bloom_dark.png`
+  /// diffed by **46.07%, 23220px** on the first attempt, which is how this was
+  /// found. Multiplying gives `.55 × 1.0 = .55` in dark (**byte-identical, the
+  /// golden did not move**) and `.55 × .55 ≈ .302` in light, which is what a CSS
+  /// `opacity:.55` on a `.55` gradient actually composites to.
+  ///
+  /// See [GlassTier.bloom]'s doc for why the dimmer is a token and not caller
+  /// state.
+  ///
+  /// The three seam arguments are resolved by the caller too, each with `null`
+  /// meaning its `.hor` default, so the *defaults* of the whole surface are the
+  /// prototype's `.hcard` and a caller can only ever change the seam by naming a
+  /// difference.
+  List<Widget> _wash(
+    EvaColors colors,
+    Color bloomColour, {
+    required Alignment seamAt,
+    required double seamWidth,
+    required Color seamHue,
+  }) => <Widget>[
     // `.bloom` — `redesign.html:253-254`.
     Positioned.fill(
       // `pointer-events:none`, transcribed. `RenderDecoratedBox` does not absorb
@@ -689,7 +807,21 @@ class GlassSurface extends StatelessWidget {
             gradient: RadialGradient(
               center: kGlassBloomCenter,
               radius: kGlassBloomRadius,
-              colors: <Color>[bloomColour, Colors.transparent],
+              colors: <Color>[
+                // `opacity:.55` in light (`redesign.html:73`), and 1.0 in dark —
+                // [EvaColors.bloomOpacity], applied to the **wash layer only**.
+                // The hue stays [EvaColors.bloom] in both palettes, because `:73`
+                // dims with an opacity and never re-hues `--bh`.
+                //
+                // **Multiply, not replace** — [bloomColour] already carries `:254`'s
+                // own `.55` and `withValues` overwrites the channel rather than
+                // scaling it. `redesign.html:254` × `:73` is `.55` dark and `.302`
+                // light.
+                bloomColour.withValues(
+                  alpha: bloomColour.a * colors.bloomOpacity,
+                ),
+                Colors.transparent,
+              ],
               // `transparent 68%` — the whole of the substituted
               // `filter:blur(18px)`.
               stops: const <double>[0, kGlassBloomFadeStop],
@@ -703,6 +835,8 @@ class GlassSurface extends StatelessWidget {
       ),
     ),
     // `.hor` — `redesign.html:256-257`, and the light override at `:72`.
+    // `.opt::after` (`:348-349`) is the other prototype seam and the reason
+    // [seamAlignment], [seamWidthFactor] and [seamTint] exist; see each of them.
     Positioned.fill(
       child: IgnorePointer(
         // `Align` and not `Positioned(bottom: …)`: the seam sits at a *fraction*
@@ -712,9 +846,9 @@ class GlassSurface extends StatelessWidget {
         // the prototype's 2px — give the same widget a tight height and it would
         // stretch the bar to the full panel.
         child: Align(
-          alignment: kGlassSeamAlignment,
+          alignment: seamAt,
           child: FractionallySizedBox(
-            widthFactor: kGlassSeamWidthFactor,
+            widthFactor: seamWidth,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.all(
@@ -727,7 +861,7 @@ class GlassSurface extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: <Color>[
                     Colors.transparent,
-                    colors.seam,
+                    seamHue,
                     Colors.transparent,
                   ],
                   // Written out rather than left null. `null` is Flutter's

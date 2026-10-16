@@ -12,17 +12,43 @@ import 'package:flutter/material.dart';
 ///
 /// | | `SectionLabel` | `ScreenSectionHeader` |
 /// | --- | --- | --- |
-/// | source | `SettingsScreen.tsx:28-32` | `ProfileScreen.tsx:53` / `HomeScreen.tsx:78` |
+/// | source | `SettingsScreen.tsx:28-32` → **`redesign.html:30-31`, `:422`** | `ProfileScreen.tsx:53` / `HomeScreen.tsx:78` |
 /// | family | `F.mono` | `F.ui` |
-/// | size | 9 | 16–17 |
-/// | ink | `ink3` | `ink` |
+/// | size | 9 → **10.5** | 16–17 |
+/// | ink | `ink3` → **`ink2` → gold** | `ink` |
 ///
 /// The Settings label is the one with a surviving call site — the profile screen
-/// was cut — so [section] is the mono-caps `ink3` form and is the default. [title]
-/// is the bold UI form, for a header that introduces a screen rather than a group
+/// was cut — so [section] is the mono-caps form and is the default. [title] is
+/// the bold UI form, for a header that introduces a screen rather than a group
 /// inside one.
+///
+/// ## THE INK WALKED THROUGH THREE VALUES AND ONLY THE LAST ONE IS THE
+/// PROTOTYPE'S
+///
+/// `SettingsScreen.tsx:29` said `T.ink3`. Decision 149 moved it to `ink2`,
+/// because `ink3` measures 1.65:1 on dark glass and a heading is content, not
+/// decoration — that move was a **contrast** decision and it was right. Phase
+/// 4.2 moved it again, to [EvaColors.emberInk], because that is what
+/// `redesign.html:31`'s `.mono b` is and gold is what the redesign's settings
+/// page is made of.
+///
+/// It is worth being explicit that 149's argument does not survive, because it
+/// is the kind of argument that gets cited later without being re-checked: gold
+/// measures **6.97:1** on the worst dark surface and `emberInk` **5.54:1** in
+/// light, so the label is *more* legible than the `ink2` decision 149 put it on,
+/// not less. The decision 149 rejected was `ink3`, and nothing here is `ink3`.
+///
+/// ## EIGHT GOLD LABELS ON `/settings` IS A DESIGN CALL, NOT A TRANSCRIPTION
+///
+/// `redesign.html` has eight `.sgroup` elements (`:645`, `:649`, `:651`, `:666`,
+/// `:682`, `:690`, `:696`), so `/settings` ships eight of these. Whether eight
+/// gold labels stacked down one screen reads as a section index or as a ransom
+/// note is a question about the composition, and the prototype is the only
+/// evidence available — it chose it. Recorded so that a reader who thinks it is
+/// too much knows it was **looked at** and not **overlooked**, and so that
+/// changing it later is a decision someone makes on purpose.
 enum EvaSectionHeaderSize {
-  /// The Settings group label: mono-caps, `ink3`. `SettingsScreen.tsx:28-32`.
+  /// The Settings group label: `.mono`, gold. `redesign.html:30-31`.
   section,
 
   /// A screen title inside a body: UI sans, bold, `ink`. `ProfileScreen.tsx:53`.
@@ -72,6 +98,18 @@ class EvaSectionHeader extends StatelessWidget {
   /// affordance there. `null` for the Settings group labels.
   final Widget? trailing;
 
+  /// The [EvaSectionHeaderSize.section] label's size. `redesign.html:30` —
+  /// `font-size:10.5px`.
+  ///
+  /// Was `9` under `SettingsScreen.tsx:29`, and `12` in practice: the widget drew
+  /// [EvaTypography.monoCaps], which is `labelMedium`'s geometry, so the shipped
+  /// label was neither prototype number until Phase 4.2 named one.
+  static const double sectionSize = 10.5;
+
+  /// The [EvaSectionHeaderSize.section] label's tracking. `redesign.html:30` —
+  /// `letter-spacing:.16em`.
+  static const double sectionTracking = 0.16;
+
   /// `SettingsScreen.tsx:29` — `marginBottom: 10`, which is
   /// [EvaSpacing.md] + [EvaSpacing.xs].
   static const double bottomGap = EvaSpacing.md + EvaSpacing.xs;
@@ -102,13 +140,40 @@ class EvaSectionHeader extends StatelessWidget {
       // caller that remembered to wrap would be a per-call-site tax on a rule that is
       // not the caller's to remember.
       style: arabicAware(switch (size) {
-        // `SettingsScreen.tsx:29` — `F.mono, 9, 700, letterSpacing 0.14em,
-        // textTransform: uppercase, color: T.ink3`.
-        EvaSectionHeaderSize.section => EvaTypography.monoCaps(
-          colors,
-        ).copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+        // `redesign.html:30` — `.mono{font-family:var(--mono);font-size:10.5px;
+        // letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}`, and
+        // `:31` — `.mono b{color:var(--gold);font-weight:600}`.
+        //
+        // **The label is `.mono`, not something `.sgroup` says.** `:422`'s
+        // `.sgroup` is `margin:20px 0 6px` and nothing else; the eight `.sgroup`
+        // elements in the markup (`:645`-`:696`) carry `class="sgroup mono"`, and
+        // `.mono` is what types them. So the size and tracking are `:30`'s and the
+        // gold is `:31`'s — the only `.mono` in the prototype that is gold is the
+        // `<b>` **inside** one, and `SettingsGroup` has no `<b>`. Applying `.mono
+        // b`'s gold to the whole label is the one reading under which
+        // `SettingsGroup`'s label is gold at all.
+        //
+        // `letterSpacing` is the em value **premultiplied by the size**, because
+        // Flutter's is a logical-pixel advance and CSS's is relative to the
+        // element's own font: `.16em` at 10.5px is 1.68. `EvaTypography.monoCaps`
+        // deliberately leaves Material's `labelMedium` tracking alone (§5.2 gives
+        // `mono` no tracking), which is why this reads as a much wider label than
+        // the 0.5 that slot carries.
+        //
+        // `weight: w400`, because neither `:30` nor `:31` declares a weight on the
+        // element this widget paints and the prototype **is** explicit about weight
+        // when it wants it (`:31` `.mono b`, `:185` `.segp button.on`). Silence
+        // there is `normal`, and the redesign's small mono labels are all quiet.
+        EvaSectionHeaderSize.section => EvaTypography.monoCaps(colors).copyWith(
+          fontSize: sectionSize,
+          letterSpacing: sectionSize * sectionTracking,
+          color: colors.emberInk,
+          fontWeight: FontWeight.w400,
+        ),
         // `ProfileScreen.tsx:53` — `F.ui, 16, 700, color: T.ink`. `titleMedium`
-        // is Material 3's 16sp slot, so the prototype's 16 lands exactly.
+        // is Material 3's 16sp slot, so the prototype's 16 lands exactly. **Kept,
+        // not re-pointed**: the redesign has no screen-title role, because the
+        // profile screen it belonged to was cut.
         EvaSectionHeaderSize.title =>
           Theme.of(context).textTheme.titleMedium!
               .copyWith(color: colors.ink, fontWeight: FontWeight.w700),

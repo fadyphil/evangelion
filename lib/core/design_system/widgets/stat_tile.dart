@@ -3,8 +3,33 @@ import 'package:flutter/material.dart';
 
 /// A number and its caption, in a tinted panel.
 ///
-/// `ds.tsx:462-478`, the Result screen's three-tile row
-/// (`ResultScreen.tsx:69-73`).
+/// **Split provenance, deliberately, and Phase 4.2 moved only one half.**
+///
+/// | | prototype | re-pointed? |
+/// | --- | --- | --- |
+/// | the panel | `ds.tsx:462-478` — radius 16, padding `14px 10px`, `tint` | **no** |
+/// | the type | `ds.tsx:474-475` → **`redesign.html:407-408`** | **yes** |
+///
+/// ## WHY THE PANEL STAYS AND THE TYPE GOES
+///
+/// The redesign does not restyle this tile — it **replaces** it. `.ringbox`
+/// (`redesign.html:403-409`) is a `CustomPaint` ring with a stroked arc, a value
+/// and a label, and Phase 6.2 is when `/result` becomes a modal built on it.
+/// There is no `.ringbox` panel to transcribe because there is no panel: it is a
+/// circle with a gap in it.
+///
+/// So the honest move is to split the widget's provenance rather than pretend the
+/// redesign has an answer for all of it. The **glass panel** stays on
+/// `ds.tsx:462-478` because that is where it still comes from and the redesign
+/// says nothing about it until Phase 6.2 deletes it. The **type** is re-pointed
+/// to `redesign.html:407-408`, because that is where the redesign *does* state a
+/// value for the same two lines of text — same words, smaller, mono, quieter —
+/// and a prototype number that exists is a prototype number.
+///
+/// The result is a tile that is the redesign's lettering inside Phase 2's panel,
+/// and that is stated here rather than left for a reader to infer from the two
+/// citations. `stat_tile_{dark,light}.png` move because of the type alone; the
+/// panel is `ds.tsx`'s to the pixel.
 ///
 /// ## `.tint`, NOT `.blur`, DESPITE THE PROTOTYPE
 ///
@@ -49,17 +74,44 @@ class StatTile extends StatelessWidget {
   /// A tile showing [value] over [label].
   const StatTile({required this.value, required this.label, super.key});
 
-  /// The figure. Rendered in the display serif, as the prototype does.
+  /// The figure. **Mono, 11px** — `redesign.html:407`'s `.ringbox .rv`, which is
+  /// `font-family:var(--mono);font-size:11px;color:var(--ink-0)` and declares no
+  /// `font-weight`, so the weight is normal.
+  ///
+  /// Was the display serif at 24 w600 (`ds.tsx:474`), which is what
+  /// `headlineSmall` gave it. The redesign replaces the whole figure: where the
+  /// old tile shouted a number in a 24px serif, `.ringbox` reads it out quietly
+  /// in mono next to the arc. See the class doc for why the panel survives this
+  /// change and the figure does not.
   final String value;
 
-  /// The caption under it. Mono, uppercase, `ink3` — the prototype's
-  /// `F.mono, 9, 700, letterSpacing 0.12em, T.ink3` (`ds.tsx:475`).
+  /// The caption under it. **Mono, 8.5px, `.14em`, uppercase** —
+  /// `redesign.html:408`'s `.ringbox .rl`. Was `F.mono, 9, 700, 0.12em, T.ink3`
+  /// (`ds.tsx:475`) and, since decision 149, `ink2`.
+  ///
+  /// ## THE INK IS `ink2` AND `:408` SAYS `--ink-1`, WHICH IS NOT A TOKEN
+  ///
+  /// `redesign.html:408` ends `color:var(--ink-1)`. `EvaColors` has no `ink1`: it
+  /// publishes `ink`, `ink2` and `ink3`, which map onto `--ink-0`, `--ink-2` and
+  /// a §5.1-only tertiary that the redesign has no counterpart for. The middle ink
+  /// of the prototype's three therefore **cannot be named here**, and `ink2`
+  /// stands.
+  ///
+  /// Standing rather than moving, because decision 149 already moved this exact
+  /// run once and for a reason that still holds: `ink3` is 1.65:1 on dark glass,
+  /// and `ink2` is 4.73:1. Picking `ink` because it is "the one above `ink2`"
+  /// would make the caption brighter than the value above it and invert the
+  /// hierarchy the redesign is establishing. Recorded, not silently resolved.
   final String label;
 
   /// The prototype's radius. `ds.tsx:469` — `borderRadius: 16`. Not a token:
   /// [EvaRadii] has 14 (button/input), 18 (card/quiz option), 24 and 28, and
   /// inventing an eighteenth step for one widget is worse than naming the number
   /// where it is used.
+  ///
+  /// **Kept** through Phase 4.2 even though the tile's type was re-pointed: the
+  /// radius belongs to the `ds.tsx` panel half of the split, and the redesign has
+  /// no radius for a ring.
   static const double radius = 16;
 
   /// `ds.tsx:470` — `padding: '14px 10px'`.
@@ -73,7 +125,26 @@ class StatTile extends StatelessWidget {
   );
 
   /// Gap between the value and the caption. `ds.tsx:471` — `gap: 4`.
+  ///
+  /// **Kept** from the `ds.tsx` half of the split. `.ringbox` puts `margin-top`
+  /// on `.rv` (`:407`) and `.rl` (`:408`) rather than a flex `gap` on a shared
+  /// parent — `margin-top:-34px` to pull the value up into the ring, and `16px`
+  /// above the label — so there is no one gap token to move and re-deriving one
+  /// from two different margins would be inventing it.
   static const double stackGap = EvaSpacing.xs;
+
+  /// The figure's size. `redesign.html:407` — `font-size:11px`.
+  static const double valueSize = 11;
+
+  /// The caption's size. `redesign.html:408` — `font-size:8.5px`.
+  static const double labelSize = 8.5;
+
+  /// The caption's tracking. `redesign.html:408` — `letter-spacing:.14em`.
+  ///
+  /// **Premultiplied by [labelSize] into a logical-pixel value where it is used**,
+  /// because Flutter's `letterSpacing` is an absolute advance and CSS's `em` is
+  /// relative to the element's own font. `.14em` at 8.5px is **1.19**.
+  static const double labelTracking = 0.14;
 
   @override
   Widget build(BuildContext context) {
@@ -92,16 +163,27 @@ class StatTile extends StatelessWidget {
           Text(
             value,
             textAlign: TextAlign.center,
-            // `ds.tsx:474` — `F.display, 24, 600, lineHeight 1`.
+            // `redesign.html:407` — `font-family:var(--mono);font-size:11px`,
+            // no `font-weight`, `color:var(--ink-0)`.
             //
-            // `headlineSmall` is Material 3's 24sp slot, so the prototype's 24
-            // lands exactly — the first widget in this phase where the phase-1
-            // decision to keep M3's scale costs nothing.
+            // **No `headlineSmall` any more.** The old style took M3's 24sp slot
+            // and then overrode the family to the display serif, which is how a
+            // 24px serif got here in the first place; there is no slot that
+            // yields mono at 11, so this is `monoCaps`' family with the prototype's
+            // own size and the slot's `w400` — the weight `monoCaps` inherits from
+            // `labelMedium` and `:407`'s silence agrees with.
             style: arabicAware(
-              Theme.of(context).textTheme.headlineSmall!.copyWith(
+              EvaTypography.monoCaps(colors).copyWith(
+                fontSize: valueSize,
+                // `:407` declares **no** `letter-spacing`, so it is `normal` —
+                // written out rather than left inherited, because
+                // [EvaTypography.monoCaps] carries `labelMedium`'s **0.5** and
+                // `.mono`'s `.16em` is not this element's anyway. Same reasoning
+                // as the weight: the redesign states a weight where it wants one
+                // (`:185`, `:31`) and this is not one of those rules.
+                letterSpacing: 0,
                 color: colors.ink,
-                fontWeight: FontWeight.w600,
-                height: 1,
+                fontWeight: FontWeight.w400,
               ),
               direction,
             ),
@@ -110,9 +192,18 @@ class StatTile extends StatelessWidget {
           Text(
             label.toUpperCase(),
             textAlign: TextAlign.center,
+            // `redesign.html:408` — `font-family:var(--mono);font-size:8.5px;
+            // letter-spacing:.14em;text-transform:uppercase`. The
+            // `text-transform` is the widget's own, as everywhere else here.
             style: arabicAware(
-              EvaTypography.monoCaps(colors)
-                  .copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+              EvaTypography.monoCaps(colors).copyWith(
+                fontSize: labelSize,
+                letterSpacing: labelSize * labelTracking,
+                // [EvaColors.ink2], and the class doc says why `:408`'s
+                // `--ink-1` cannot be spelled and why 149's `ink3` is still wrong.
+                color: colors.ink2,
+                fontWeight: FontWeight.w400,
+              ),
               direction,
             ),
           ),
