@@ -283,9 +283,28 @@ class _SettingsTileState extends State<SettingsTile> {
                 // survives to be announced alongside the row's name.
                 child: ExcludeSemantics(
                   child: AnimatedDefaultTextStyle(
+                    // ## `animate ? hoverDuration : Duration.zero`, AND THE ORDER IS
+                    // THE WHOLE ARGUMENT
+                    //
+                    // This read `animate ? Duration.zero : SettingsTile.hoverDuration`,
+                    // which is **inverted**, and every other animation in this
+                    // repository has always had it the other way round:
+                    // [SettingsTile]'s own `AnimatedContainer` twenty lines above,
+                    // `eva_button.dart`'s press, `segmented_control.dart`'s thumb.
+                    //
+                    // Measured before the fix: **0 ms with animations on** — so
+                    // `redesign.html:419`'s `transition:.2s` was lost on the one
+                    // thing in the row that changes *colour* — and **200 ms under
+                    // reduced motion**, which is §14 inverted:
+                    // `09-quality-gates.md:184` requires a disabled animation to
+                    // "jump straight to the end state", and 200 ms of transition is
+                    // the exact opposite.
+                    //
+                    // The colour does have to transition (`:419`), and the style
+                    // lives here rather than on the `Text` so that it can.
                     duration: animate
-                        ? Duration.zero
-                        : SettingsTile.hoverDuration,
+                        ? SettingsTile.hoverDuration
+                        : Duration.zero,
                     curve: EvaMotion.baseCurve,
                     // `arabicAware` here for the same reason as
                     // [EvaSectionHeader]: the row's title is painted by this
@@ -330,6 +349,21 @@ class _SettingsTileState extends State<SettingsTile> {
         // the subtree would leave a screen reader with a button that does nothing
         // when activated.
         child: EvaFocusRing(
+          // ## `radius: 0`, AND THE ARGUMENT IS THE FIX — NOT THE INK's
+          //
+          // `EvaInk` below is told `BorderRadius.zero` and this was not, so the
+          // ring drew its **default**, `EvaFocusRing`'s `EvaRadii.button` = 14,
+          // around a row that has no corners. The class doc says exactly this:
+          // "a focus ring and an ink response rounded to 14 around a row with no
+          // fill and no rim would draw corners the row does not have" — and the
+          // code fixed the ink and not the ring, which is the more visible of the
+          // two: the ring is the thing that appears on keyboard focus, so the
+          // defect was on screen exactly when §14 is looking.
+          //
+          // **`radius: 0`, not `BorderRadius.zero`.** `EvaFocusRing`'s parameter
+          // is a `double` radius, so the same value is spelled the same way as
+          // `EvaInk`'s sibling argument rather than in a different type.
+          radius: 0,
           child: EvaInk(
             onPressed: widget.onTap,
             // `BorderRadius.zero`, not [SettingsTile.radius]: the ring and the

@@ -1,9 +1,40 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/design_system_harness.dart';
+
+/// The `RepaintBoundary` the painted-pixel assertions read.
+///
+/// A `GlobalKey` rather than a `ValueKey` because each of those assertions pumps
+/// its own tree: two `ValueKey`s of the same name in two trees is fine, and two in
+/// one tree is the ambiguity a `GlobalKey` turns into a loud failure instead.
+final GlobalKey _surfaceKey = GlobalKey(debugLabel: 'segmented-control-surface');
+
+/// The WCAG relative luminance of the pixel whose RGBA starts at [offset].
+///
+/// The same piecewise curve `eva_colors_test.dart` and
+/// `text_contrast_gate_test.dart` use, and deliberately **not** Flutter's
+/// `Color.computeLuminance()`: that one takes a `Color` this project could have
+/// read off a style object, and the whole point of this helper is that the colour
+/// is only knowable after compositing — the glyph, the thumb's gradient, the
+/// track fill and the canvas are all painted into one pixel before anyone can ask
+/// what colour it is.
+double _luminanceOf(Uint8List bytes, int offset) {
+  double channel(int index) {
+    final double v = bytes[offset + index] / 255.0;
+    return v <= 0.03928
+        ? v / 12.92
+        : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
+}
 
 /// The Phase 3 keyboard gate: `SegmentedControl` **selects via keyboard**, not
 /// just via taps. `08-build-phases.md` §Phase 3 names it as the phase's verify
@@ -102,6 +133,167 @@ void main() {
             .first,
       )
       .style;
+
+  /// The greatest WCAG contrast between any two **painted pixels** inside [region].
+  ///
+  /// ## WHY THIS EXISTS AND WHY IT READS THE LAYER
+  ///
+  /// Every other assertion in this file reads the widget tree: a `Rect` off a
+  /// `RenderBox`, or a `TextStyle` off an `AnimatedDefaultTextStyle`. Both were
+  /// correct while the control was **wrong**. `redesign.html:183`'s `z-index:2`
+  /// puts the labels above the thumb and `:182`'s `pointer-events:none` makes the
+  /// thumb inert; the first version of this widget put the thumb **last** in the
+  /// `Stack`, so `:180`'s gold gradient at 0.95→0.72 alpha painted over the
+  /// selected label. Every style assertion below still passed — the label's
+  /// `TextStyle` really was `onEmber` — while the label was invisible.
+  ///
+  /// Measured here, by sampling the label's own rectangle: **1.015:1 dark,
+  /// 1.033:1 light** before the fix, **8.486:1 / 5.066:1** after. §14 asks 4.5:1.
+  ///
+  /// `toImageSync` rather than `toImage`, and `runAsync` around `toByteData` only,
+  /// for the reasons `design_system_harness.dart`'s [backgroundPixels] records at
+  /// length: `toImage` schedules a frame that never arrives under `flutter_test`'s
+  /// fake async and the await hangs to the ten-minute timeout instead of failing.
+  ///
+  /// Max-over-pixels rather than a mean, and that is deliberate: a mean over a
+  /// 512-pixel box is dominated by the thumb's fill and would read ~1.0 whether
+  /// or not a single glyph survived, which is the failure this has to catch. The
+  /// maximum is the deepest glyph pixel against the brightest fill pixel, which
+  /// is the number a reader's eye gets.
+  Future<double> paintedContrast(WidgetTester tester, Rect region) async {
+    final RenderRepaintBoundary boundary = tester
+        .renderObject<RenderRepaintBoundary>(find.byKey(_surfaceKey));
+    final RenderBox box = boundary;
+    final Uint8List bytes = (await tester.runAsync<Uint8List>(() async {
+      final ui.Image image = boundary.toImageSync();
+      final ByteData? data = await image.toByteData();
+      image.dispose();
+      if (data == null) {
+        throw StateError('the control produced no pixels');
+      }
+      return data.buffer.asUint8List();
+    }))!;
+
+    final int width = box.size.width.toInt();
+    const double lo = 1.0;
+    double lowest = lo;
+    double highest = 0.0;
+    int sampled = 0;
+    final Rect local = region.shift(-boundary.localToGlobal(Offset.zero));
+    for (
+      int y = local.top.floor();
+      y < local.bottom.ceil();
+      y++
+    ) {
+      for (
+        int x = local.left.floor();
+        x < local.right.ceil();
+        x++
+      ) {
+        final int offset = (y * width + x) * 4;
+        final double l = _luminanceOf(bytes, offset);
+        if (l < lowest) lowest = l;
+        if (l > highest) highest = l;
+        sampled++;
+      }
+    }
+    expect(
+      sampled,
+      greaterThan(0),
+      reason: 'the region must contain pixels or this measures nothing',
+    );
+    return (highest + 0.05) / (lowest + 0.05);
+  }
+
+  group('the labels paint ABOVE the thumb — the z-order is the fix', () {
+    // `redesign.html:183`'s `z-index:2` on `button`, `:182`'s `pointer-events:none`
+    // on the thumb. A `Stack` paints last-on-top, so this is the assertion that
+    // knows the list order is not cosmetic: it fails at the order the widget used
+    // to ship, which every tree-reading assertion in this file could not.
+    for (final (String theme, ThemeData data) in kEvaThemes) {
+      testWidgets('the selected label is readable against the thumb — $theme', (
+        WidgetTester tester,
+      ) async {
+        // A control-sized box, not the 560px-tall one `pumpPrimitive` gives a
+        // `SegmentedControl` (see the thumb-geometry group's own note). The label
+        // is measured, not the frame, so this only has to not clip it.
+        tester.view.physicalSize = const Size(320, 120);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          evaPrimitiveHarness(
+            theme: data,
+            child: RepaintBoundary(
+              key: _surfaceKey,
+              child: const Align(
+                alignment: Alignment.topCenter,
+                child: _Live(initial: 'Dark'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        // The label's own box, which lies wholly inside the selected segment and
+        // therefore wholly on the thumb — so every pixel in it is either ink or
+        // thumb, and the max ratio between them is the label's legibility.
+        final Rect label = tester.getRect(find.text('DARK'));
+        final Rect? thumb = thumbRect(tester);
+        expect(thumb, isNotNull, reason: 'the thumb has to be measured');
+        expect(
+          thumb!.left <= label.left && thumb.top <= label.top,
+          isTrue,
+          reason:
+              'the label must lie on the thumb for this to measure label-against-'
+              'thumb rather than label-against-track: label=$label thumb=$thumb',
+        );
+
+        final double ratio = await paintedContrast(tester, label);
+        expect(
+          ratio,
+          greaterThanOrEqualTo(4.5),
+          reason:
+              '§14 asks 4.5:1 for text. The thumb painting over the label measured '
+              '1.015:1 (dark) and 1.033:1 (light) — not "low contrast", gone.',
+        );
+      });
+    }
+
+    testWidgets('and the UNSELECTED label survives the same thumb pass too', (
+      WidgetTester tester,
+    ) async {
+      // The other direction, and the one a thumb-left-of-the-labels fix would
+      // break if it were done by hiding the thumb instead: an unselected label
+      // sits on the track fill, not on the thumb, and must still read.
+      tester.view.physicalSize = const Size(320, 120);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          child: RepaintBoundary(
+            key: _surfaceKey,
+            child: const Align(
+              alignment: Alignment.topCenter,
+              child: _Live(initial: 'Dark'),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final double ratio = await paintedContrast(
+        tester,
+        tester.getRect(find.text('LIGHT')),
+      );
+      expect(ratio, greaterThanOrEqualTo(4.5), reason: '§14 on the track fill');
+    });
+  });
 
   group('Phase 3 gate — selects via keyboard', () {
     testWidgets('Tab reaches the control, and it is one stop', (

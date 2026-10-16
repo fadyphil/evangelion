@@ -429,12 +429,20 @@ class EvaColors extends ThemeExtension<EvaColors> {
   ///
   /// ## IT IS THE SAME VALUE IN BOTH PALETTES, AND THAT IS THE **STATED** CASE
   ///
-  /// `redesign.html:178-191` is `.segp` in full and `:73` — the light-mode
-  /// override block that carries `bloomOpacity`, the `segp` track and the `.qcta`
-  /// — **does not mention `.thumb`**. So the thumb is one declaration in both
-  /// modes: gold at `.95`→`.72` with a white sheen inside it. `eva_colors_test`
-  /// 's shared-value inventory therefore carries this beside [bloom], with this
-  /// paragraph as its reason rather than an accident.
+  /// `redesign.html:178-191` is `.segp` in full, and the light-mode override
+  /// block — **`:69`** (`.segp`'s own background and border), **`:70`**
+  /// (`.segp button`'s colour), **`:71`** (`.qcta`) and **`:73`** (the `.bloom`
+  /// opacity) — **does not mention `.thumb`**. So the thumb is one declaration
+  /// in both modes: gold at `.95`→`.72` with a white sheen inside it.
+  /// `eva_colors_test`'s shared-value inventory therefore carries this beside
+  /// [bloom], with this paragraph as its reason rather than an accident.
+  ///
+  /// **This paragraph used to attribute all three of those to `:73`.** `:73` is
+  /// the `.bloom` opacity line and nothing else; the `.segp` track override is
+  /// `:69` and `.qcta` is `:71`, and this file's own [glassFill] / [glassBorder]
+  /// docs cite `:69` correctly. The conclusion is unaffected — no line in `:69`
+  /// through `:73` mentions `.thumb` — but a citation that names the wrong line
+  /// is the one thing a reader cannot check for themselves.
   ///
   /// ## WHY IT IS A TOKEN AND NOT A LITERAL IN `segmented_control.dart`
   ///

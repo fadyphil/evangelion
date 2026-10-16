@@ -24,10 +24,21 @@ class SettingsGroup extends StatelessWidget {
   ///
   /// **`redesign.html:422`'s label, re-pointed here and on that widget.**
   /// `.sgroup` is a `div` carrying `class="sgroup mono"` — `:645`, `:649`, `:651`,
-  /// `:666`, `:682`, `:690`, `:696` — and the class list means the *type* comes
-  /// from `.mono` (`:30`) and the **margin** from `.sgroup` (`:422`). Phase 4.2
-  /// moved both: the label is gold (`redesign.html:31`, `.mono b`) and 20px of
-  /// top margin arrives as [topGap].
+  /// `:666`, `:682`, `:690`, `:696`, **seven** of them — and the class list means
+  /// the *type* comes from `.mono` (`:30`) and the **margin** from `.sgroup`
+  /// (`:422`). Phase 4.2 moved both, and the two moved for different reasons:
+  ///
+  /// * the **20px** top margin is `:422`'s, applied as [topGap];
+  /// * the label's **gold** is a **design decision, not a transcription**.
+  ///   `:30` ends `color:var(--ink-2)`, and `:31`'s `.mono b{color:var(--gold)}`
+  ///   styles a `<b>` **child** — and **none of the seven `.sgroup` elements
+  ///   contains one**. So the prototype's group label is `ink2` and this is not.
+  ///
+  /// What the gold rests on is `redesign.html:39` — `.rail h4{font-family:var
+  /// (--mono);…;color:var(--gold);text-transform:uppercase}` — the prototype's
+  /// own mono-caps gold heading, which is the same role as this label.
+  /// `EvaSectionHeader`'s `section` variant carries the full argument; it is
+  /// stated here because **this** is the widget whose doc a reader opens first.
   ///
   /// **The word "gold" is doing two jobs and they differ in light.** This widget
   /// has no label of its own — it delegates to [EvaSectionHeader]'s

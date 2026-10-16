@@ -473,25 +473,28 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
         fit: StackFit.passthrough,
         key: _trackKey,
         children: <Widget>[
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              for (final (int i, T value) in widget.values.indexed)
-                Flexible(
-                  child: _Segment<T>(
-                    key: _segmentKeys[i],
-                    label: widget.labelOf(value),
-                    selected: value == widget.selected,
-                    colors: colors,
-                    animate: _animate,
-                    // Taps are per segment, so the segments are individual
-                    // `InkWell`s — but they take **no** focus node, because the
-                    // control's single tab stop is the ring's node above them.
-                    onTap: () => widget.onChanged(value),
-                  ),
-                ),
-            ],
-          ),
+          // ## THE THUMB IS THE **FIRST** CHILD, AND THE ORDER IS THE FIX
+          //
+          // `redesign.html:183` puts `z-index:2` on the `button` and `:182` puts
+          // `pointer-events:none` on the thumb: in the prototype the **labels paint
+          // above** the thumb. A `Stack` paints its children in list order, last on
+          // top, so the labels have to come **second**.
+          //
+          // The first version of this widget had it the other way round, and the
+          // thumb's own fill — `:180`'s gold gradient at 0.95→0.72 alpha — painted
+          // over the selected label. Measured by reading the rendered pixels
+          // rather than the style objects: the selected label against the thumb
+          // beneath it was **1.015:1 dark and 1.033:1 light**, where §14 asks
+          // 4.5:1. It is not that the label was "low contrast" — at 0.95 alpha it
+          // was gone.
+          //
+          // **Why no test caught it**, stated because it is the generalisable part:
+          // every assertion in this file's suite read the widget tree or a
+          // `TextStyle`, and both are correct while the pixels are not. The suite
+          // was green for a control whose selected label was invisible. The fix is
+          // only durable if something reads the **painted result**, so
+          // `segmented_control_test.dart` now samples the label's own rectangle
+          // out of the rendered layer.
           if (_thumbLeft != null && _thumbWidth != null)
             AnimatedPositioned(
               // `:179` — `top:3px;bottom:3px`, and the `left`/`width` that
@@ -555,6 +558,27 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
                 ),
               ),
             ),
+          // **Second, and only because it is second.** See the z-order block above
+          // the thumb: `redesign.html:183`'s `z-index:2` is this line.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (final (int i, T value) in widget.values.indexed)
+                Flexible(
+                  child: _Segment<T>(
+                    key: _segmentKeys[i],
+                    label: widget.labelOf(value),
+                    selected: value == widget.selected,
+                    colors: colors,
+                    animate: _animate,
+                    // Taps are per segment, so the segments are individual
+                    // `InkWell`s — but they take **no** focus node, because the
+                    // control's single tab stop is the ring's node above them.
+                    onTap: () => widget.onChanged(value),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -657,6 +681,28 @@ class _Segment<T> extends StatelessWidget {
             // [EvaColors.onEmber] is this design system's name for "legible ink
             // on `ember`", at 9.17:1 in dark and 5.41:1 in light.
             color: selected ? colors.onEmber : colors.ink2,
+            // ## THE UNSELECTED LABEL'S COLOUR IS **NOT** TRANSCRIBED IN LIGHT
+            //
+            // `redesign.html:184` gives `.segp button` `color:var(--ink-2)`, which
+            // is the dark value and is what `colors.ink2` is in dark. The prototype
+            // then **re-points it in light** at `:70` —
+            // `.screen[data-mode=light] .segp button{color:#707684}` — and `:70` is
+            // not transcribed: this widget paints light `ink2` (`#5A5480`) where the
+            // prototype writes `#707684`.
+            //
+            // ## NOT CHANGED HERE, AND WHY THAT IS A DECISION
+            //
+            // Phase 2 owns the palette mapping, and §5.2/§5.3 own the choice of
+            // which prototype hex becomes which token; re-pointing `ink2` for one
+            // widget's sake would move a **shared** token under every other
+            // `ink2` consumer. So it is **recorded** rather than silently kept or
+            // silently fixed — the third divergence this widget carries, with the
+            // other two (the `w500` above and [EvaColors.onEmber]) named beside it.
+            //
+            // What it costs: light-mode unselected labels are *darker* than the
+            // prototype's, i.e. more contrast against the track, not less. §14 is
+            // therefore not at risk from this gap; a reader relying on the exact
+            // hex is, which is why it is written down at all.
             // **Not** `:185`'s `font-weight:600`. `:184`'s unselected button
             // declares no weight either, and the weight stays whatever
             // `monoCaps` carries (`labelMedium`'s `w500`) so the two arms differ

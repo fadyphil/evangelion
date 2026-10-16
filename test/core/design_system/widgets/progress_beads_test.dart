@@ -233,6 +233,49 @@ void main() {
       );
     });
 
+    test('the width table in `ProgressBeads`\'s doc is the function\'s own', () {
+      // The loop above compares the rendered row against [progressBeadsWidth], so
+      // a wrong constant moves both sides together and the **doc's table** is
+      // never checked. Its `n = 8` row was `138 | 134 | −4` — two literals and a
+      // delta that neither formula produces; the true row is `136 | 124 | −12`.
+      //
+      // `n = 8` is the row that matters: it is the only length at which the row
+      // gets **narrower** than `ds.tsx`'s, because `4n − 4` finally overtakes
+      // the flat 18 the 26px pill pushes out. So it is asserted against both
+      // columns and against the delta the doc claims.
+      const Map<int, (double old, double now)> expected = <int, (
+        double,
+        double,
+      )>{
+        1: (10, 26),
+        2: (28, 40),
+        3: (46, 54),
+        5: (82, 82),
+        8: (136, 124),
+      };
+      for (final MapEntry<int, (double, double)> row in expected.entries) {
+        final List<ProgressBeadState> states = beadStates(
+          total: row.key,
+          completed: 0,
+          current: 0,
+        );
+        expect(
+          progressBeadsWidth(states),
+          row.value.$2,
+          reason: "total: ${row.key} — the doc's `redesign.html` column",
+        );
+        // `ds.tsx`'s column, `10n + 8(n − 1)`, spelled out here so the delta is
+        // a measured difference rather than a number copied twice.
+        final double old = 10 * row.key + 8 * (row.key - 1);
+        expect(old, row.value.$1, reason: "total: ${row.key} — `ds.tsx`'s column");
+        expect(
+          row.value.$2 - row.value.$1,
+          progressBeadsWidth(states) - old,
+          reason: 'total: ${row.key} — the delta column is the difference',
+        );
+      }
+    });
+
     testWidgets('a row with no current bead is `n` dots and `n − 1` gaps', (
       WidgetTester tester,
     ) async {

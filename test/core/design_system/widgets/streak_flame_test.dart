@@ -112,8 +112,14 @@ Future<Uint8List> _inkPixels(WidgetTester tester) async {
 /// outward `MaskFilter` halo at 0.85 — now paints ink beyond the path, so
 /// "alpha != 0" measures the halo and every ratio below would read `1.0`. The
 /// silhouette is recovered by asking for alpha **at or above
-/// [StreakFlame.flameSolidAlpha]**, which the measured halo (0.1529) is below and
-/// the fill (1.0) is above; that constant's doc carries the measurement.
+/// [StreakFlame.flameSolidAlpha]**, which the measured halo is below and the fill
+/// (1.0) is above; that constant's doc carries the measurement.
+///
+/// **The floor's tightest case is `size: 64`, not `size: 20`.** At 20 the path
+/// leaves a two-unit gutter and the brightest sub-floor pixel is `0.2353`; at 64
+/// the flame fills its 51px box and the brightest is `0.2431`, leaving `0.0069`
+/// of clearance. So a threshold move that looks safe against the gutter figure is
+/// not.
 ///
 /// **The floor costs nothing at either end of the box**: at `size: 20` and at
 /// `size: 64` it returns exactly `x 2…14` and `y 0…20` — the path's own
@@ -378,7 +384,14 @@ void main() {
       // the two numbers it exists to separate. If either moved far enough for the
       // band to close, the pixel tests above would be measuring the halo — and
       // the control in the previous group is what would catch it.
-      expect(StreakFlame.flameSolidAlpha, greaterThan(0.1529));
+      //
+      // **`0.2431`, not `0.1529`.** This bound used to be the older number, which
+      // is a `size: 20` **gutter** reading. At `size: 64` the flame is 51.2 logical
+      // px wide in a 51px box, so there is no gutter at all and the brightest
+      // pixel under the floor is `0.2431` — a bound at `0.1529` would have passed
+      // with the tail 0.09 above it. `StreakFlame.flameSolidAlpha`'s doc carries
+      // the per-size table and the `0.0069` of clearance this leaves.
+      expect(StreakFlame.flameSolidAlpha, greaterThan(0.2431));
       expect(StreakFlame.flameSolidAlpha, lessThan(1.0));
     });
 

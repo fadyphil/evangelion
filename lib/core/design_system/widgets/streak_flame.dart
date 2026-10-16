@@ -126,13 +126,33 @@ class StreakFlame extends StatelessWidget {
   ///
   /// The glow is the silhouette blurred by [flameGlowSigma] and drawn at
   /// [flameGlowAlpha], so **inside the widget's own box** — the only region a
-  /// pixel test can read — the halo is a *tail*, not a halo. The viewBox leaves
-  /// two units of horizontal margin either side of the path and
-  /// [flameGlowBlur] ÷ 2 is 3.5 of those units, so almost all of the glow falls
-  /// outside the box and what lands in the margin is the far side of the
-  /// Gaussian. Measured over the whole box at `size: 20` and at `size: 64`, the
-  /// brightest halo pixel is **`0.1529` at both**; the fill's own interior is
-  /// `1.0`. A quarter sits between them with margin on both sides.
+  /// pixel test can read — the halo is a *tail*, not a halo. Measured over the
+  /// whole box, and **the answer is not the same at both sizes**, which is what
+  /// this paragraph used to get wrong:
+  ///
+  /// | size | box | brightest pixel **below** [flameSolidAlpha] | clearance |
+  /// | --- | --- | --- | --- |
+  /// | 20 | 16×20 | **0.2353** | 0.0147 |
+  /// | 64 | 51×64 | **0.2431** | **0.0069** |
+  ///
+  /// **Why the two differ.** At `size: 20` the path leaves two units of gutter
+  /// either side, so the outer columns are pure halo and the brightest of them is
+  /// `0.1529`. At `size: 64` the flame is 51.2 logical px wide in a 51px box —
+  /// **there is no gutter at all** — so the brightest pixel under the floor is one
+  /// lying *against* the fill's antialiased edge, and it is higher.
+  ///
+  /// This doc used to say "the brightest halo pixel is `0.1529` **at both**". The
+  /// `0.1529` is a `size: 20` **gutter** measurement, stated as a both-sizes fact
+  /// about a quantity that is a different quantity at `size: 64` — the same shape
+  /// as a citation that resolves and is about the wrong line.
+  ///
+  /// **And the 0.0069 is the real cost of not choosing `0.5`.** The floor clears
+  /// the halo, but at `size: 64` by two thirds of one percent: raise
+  /// [flameGlowAlpha] or [flameGlowBlur] far enough for the tail to cross `0.25`
+  /// and every silhouette measurement in `streak_flame_test.dart` silently starts
+  /// counting halo. That is why the constant sits next to both inputs rather than
+  /// at a call site, and why the test that guards it asserts the **0.2431** figure
+  /// rather than the older, looser `0.1529`.
   ///
   /// It is `0.25` and not the more obvious `0.5` because `0.5` is **not** safe
   /// here: measured at `size: 20`, a threshold of `0.5` clips the flame's apex —

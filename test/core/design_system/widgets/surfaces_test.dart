@@ -292,6 +292,124 @@ void main() {
       expect(tester.getTopLeft(painted).dx, closeTo(atRestLeft, 0.01));
     });
 
+    testWidgets('the hover colour transitions 200ms — and only when it may', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS READS THE **DURATION** AND NOT THE SETTLED COLOUR
+      //
+      // The hover test above ends in `pumpAndSettle`, and `pumpAndSettle` is
+      // perfectly happy with a 0 ms animation: it has already finished by the
+      // time the pointer arrives. So that test **cannot** fail on an inverted
+      // duration, and it did not — it watched a title turn gold over zero
+      // milliseconds and called it a pass.
+      //
+      // `AnimatedDefaultTextStyle` publishes its own `duration`, so the claim is
+      // a property of the widget, readable without hovering at all.
+      //
+      // The bug: `animate ? Duration.zero : SettingsTile.hoverDuration`. Inverted,
+      // and every other animation in the repository has it the other way round.
+      // Measured before the fix — **0 ms with animations on** (so
+      // `redesign.html:419`'s `transition:.2s` was lost on the row's only
+      // colour change) and **200 ms under reduced motion**, which is §14 backwards:
+      // `09-quality-gates.md:184` requires a disabled animation to "jump straight
+      // to the end state".
+      Future<Duration> titleDurationOf({required bool disableAnimations}) async {
+        tester.view.physicalSize = const Size(320, 200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await pumpPrimitive(
+          tester,
+          const Align(
+            alignment: Alignment.topCenter,
+            child: SettingsTile(
+              title: 'Theme',
+              trailing: _box,
+              onTap: _noop,
+            ),
+          ),
+          disableAnimations: disableAnimations,
+        );
+        // **`.first` of the title's ancestors, and the reason is a measured trap.** A
+        // **tappable** tile contains **two** `AnimatedDefaultTextStyle`s: the one
+        // `EvaInk`'s `Material` inserts (14px, whose `duration` defaults to
+        // `kThemeAnimationDuration` = 200ms) and the one this widget owns (14.5px
+        // — the one whose colour `:420` turns gold).
+        // `find.descendant(...).first` reads the **Material's**, which reports
+        // 200ms in *both* directions and therefore cannot fail on this bug at
+        // all. The tile's own is the **nearest ancestor of the title's `Text`**,
+        // and `find.ancestor` yields **nearest first** — the reverse of
+        // `find.descendant`, which is what makes `.first` correct here and
+        // `.last` wrong. Measured, not assumed: `.last` resolved to the
+        // Material's 14.0 and the anti-vacuity assertion below caught it. The
+        // file's [rowStyleOf] helper is safe only because its callers pump an
+        // **inert** tile, which has no `EvaInk` and so only one.
+        final AnimatedDefaultTextStyle found = tester
+            .widget<AnimatedDefaultTextStyle>(
+              find
+                  .ancestor(
+                    of: find.text('Theme'),
+                    matching: find.byType(AnimatedDefaultTextStyle),
+                  )
+                  .first,
+            );
+        // Anti-vacuity: if the finder resolved to `EvaInk`'s `Material`, this
+        // reads 14.0 and the whole test would be measuring the wrong widget.
+        expect(
+          found.style.fontSize,
+          SettingsTile.titleSize,
+          reason: "this must be the TILE's animation, not the Material's",
+        );
+        return found.duration;
+      }
+
+      expect(
+        await titleDurationOf(disableAnimations: false),
+        SettingsTile.hoverDuration,
+        reason: '`:419`\'s `transition:.2s`, which the colour has to honour',
+      );
+      expect(SettingsTile.hoverDuration, const Duration(milliseconds: 200));
+      expect(
+        await titleDurationOf(disableAnimations: true),
+        Duration.zero,
+        reason: '§14 — reduced motion jumps straight to the end state',
+      );
+    });
+
+    testWidgets('the focus ring is square, like the row it wraps', (
+      WidgetTester tester,
+    ) async {
+      // `EvaInk` is told `BorderRadius.zero` and `EvaFocusRing` was not, so the
+      // ring drew its **default** — `EvaRadii.button`, 14 — around a row with no
+      // fill, no rim and no corners. The class doc argues exactly that this is
+      // wrong; the code fixed the ink and left the ring.
+      //
+      // The ring is the *more* visible of the two mistakes, because it only
+      // appears on keyboard focus: the defect was on screen exactly when §14 is
+      // looking at it.
+      await pumpAt(
+        tester,
+        const SettingsTile(title: 'Theme', trailing: _box, onTap: _noop),
+      );
+      expect(
+        find.descendant(of: findRow(), matching: find.byType(EvaFocusRing)),
+        findsOneWidget,
+        reason: 'an interactive row is wrapped in the ring; a static one is not',
+      );
+      final EvaFocusRing ring = tester.widget<EvaFocusRing>(
+        find.descendant(of: findRow(), matching: find.byType(EvaFocusRing)),
+      );
+      expect(ring.radius, 0.0);
+      expect(
+        ring.radius,
+        isNot(EvaRadii.button),
+        reason: '14 is the default a button wants and a flat row does not',
+      );
+      // And the anti-vacuity half: the default really is 14, so asserting `0`
+      // above is not passing because the parameter does not exist or is ignored.
+      expect(EvaRadii.button, 14.0);
+    });
+
     testWidgets('the 56px floor is kept, and is the row\'s TOTAL', (
       WidgetTester tester,
     ) async {

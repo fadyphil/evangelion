@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 /// `eva/src/components/ds.tsx` declared `ButtonPrimary` (:222-250),
 /// `ButtonSecondary` (:253-268) and `ButtonText` (:271-286) as three separate
 /// components with three separate CSS blocks. `04-widget-inventory.md` §3
-/// collapses them into one widget across seven surviving call sites, and this
+/// collapses them into one widget across eight surviving call sites, and this
 /// enum is the collapse.
 ///
 /// ## THE ROLE MAPPING, AND IT IS A **ROLE** MAPPING, NOT A LINE MAP
@@ -74,7 +74,7 @@ enum EvaButtonVariant {
 ///
 /// Extracted from the widget because §6 says a widget's conditionals are not
 /// where logic lives, and because the prototype's numbers are in CSS and would
-/// otherwise be retyped at each of seven call sites' worth of widgets.
+/// otherwise be retyped at each of eight call sites' worth of widgets.
 ///
 /// ## WHY THE HOVER HALF IS A FIELD AND NOT A `setState` IN THE WIDGET
 ///

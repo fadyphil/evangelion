@@ -865,6 +865,7 @@ No changes. It passes AA everywhere and beats the current palette on every role.
 > 1107/1107. Three tasks, two-stage review each, mutation-verified fixes.
 >
 > **What the process caught (four findings that reading would have missed):**
+>
 > 1. **Cold-start bug on the only runnable device.** `raw is List<String>` reads
 >    the persisted sky as EMPTY on every launch on Linux — the platform
 >    re-casts the outer map but leaves arrays `List<dynamic>`. `setMockInitialValues`
@@ -894,20 +895,21 @@ No changes. It passes AA everywhere and beats the current palette on every role.
 > rejected micro-fixes are in `witness_sky.dart:842-892`.
 >
 > **Phase 5 obligations recorded here (from this phase, do not lose them):**
-> * **Where does the cubit live?** `WitnessSky` takes `List<SkyEntry>` because
+>
+> - **Where does the cubit live?** `WitnessSky` takes `List<SkyEntry>` because
 >   `core/design_system` cannot import `features/sky` (Gate 2, verified by
 >   planting the import → exit 1). Three features need the sky; `AuthStatus`
 >   (`core/navigation/auth_status.dart`) is the precedent for a port three
 >   features share.
-> * **The reader's scroll observer.** `redesign.html:1208-1221` lights a verse
+> - **The reader's scroll observer.** `redesign.html:1208-1221` lights a verse
 >   at `threshold .6`, once, via `dataset.star` + `unobserve`. Build it as a
 >   `ScrollController` offset check in `/reading` (Task 5.3).
-> * **`orphan_widget_check`'s ALLOWLIST is no longer empty** — one entry,
+> - **`orphan_widget_check`'s ALLOWLIST is no longer empty** — one entry,
 >   `WitnessSky`, with a written reason. The gate reports it STALE and exits 1
 >   the moment a page constructs it, so it cannot outlive its reason. Placing
 >   the widget is Task 5.3's job.
-> * **Flare sources to wire:** cheer `:1123`, selah `:1330`, quiz correct `:1428`.
-> * **`redesign.html:1145` gates lighting on `starsOn`**; Stars-off stops
+> - **Flare sources to wire:** cheer `:1123`, selah `:1330`, quiz correct `:1428`.
+> - **`redesign.html:1145` gates lighting on `starsOn`**; Stars-off stops
 >   lighting *and* clears (`:1483`). The consumer must check the setting or a
 >   scrolled verse re-lights on the next pass.
 
@@ -950,21 +952,21 @@ so the placement test puts it in `core/domain/`. **Pure Dart.**
 > against what they measured — four of the seven steps were not executable as
 > written.** Read the corrections before dispatching anything.
 >
-> * **There are 24 widgets, not 23** (`witness_sky.dart` landed in Phase 3).
+> - **There are 24 widgets, not 23** (`witness_sky.dart` landed in Phase 3).
 >   Only **one** — `witness_sky.dart` — cites `redesign.html` today; the other
 >   23 cite `eva/src/*.tsx`.
-> * **Step 5's premise is vacuous in this phase.** All five harnessed screens are
+> - **Step 5's premise is vacuous in this phase.** All five harnessed screens are
 >   rebuilt in **Phase 5** (and `/result` dies in Phase 6 Step 6.2), so *no*
 >   screen changes in Phase 4. Re-pointing harnesses here would leave them
 >   guarding to-be-deleted screens against to-be-deleted `eva/src` numbers. Step
 >   5 becomes a **liveness proof** (plant → confirm red → revert); re-pointing
 >   moves to Tasks 5.1–5.4.
-> * **Step 6's allowlist is not empty and cannot be emptied here.** Phase 3
+> - **Step 6's allowlist is not empty and cannot be emptied here.** Phase 3
 >   added one entry (`WitnessSky`, with a written reason). Its only consumers
 >   are Phase 5.3/5.4/5.6. Deleting the entry now ⇒ `ORPHAN WitnessSky` ⇒ exit 1.
 >   The gate's own message is *"place it, delete it, or allowlist it WITH a
 >   written reason — never suppress the failure."* Emptied in **Phase 5.3**.
-> * **The `ImageFilter` citation was wrong.** `ADR-0020` has no §13 and zero
+> - **The `ImageFilter` citation was wrong.** `ADR-0020` has no §13 and zero
 >   `ImageFilter` mentions; the rule is `docs/plans/09-quality-gates.md:146`
 >   (§13 mitigation 3), whose line **:161** is the direct authority for this
 >   phase — *"The prototype's `blur(72px)` is achieved by a soft radial gradient

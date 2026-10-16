@@ -38,17 +38,28 @@ import 'package:flutter/material.dart';
 /// light, so the label is *more* legible than the `ink2` decision 149 put it on,
 /// not less. The decision 149 rejected was `ink3`, and nothing here is `ink3`.
 ///
-/// ## EIGHT GOLD LABELS ON `/settings` IS A DESIGN CALL, NOT A TRANSCRIPTION
+/// ## SEVEN GOLD LABELS ON `/settings` IS A DESIGN CALL, NOT A TRANSCRIPTION
 ///
-/// `redesign.html` has eight `.sgroup` elements (`:645`, `:649`, `:651`, `:666`,
-/// `:682`, `:690`, `:696`), so `/settings` ships eight of these. Whether eight
-/// gold labels stacked down one screen reads as a section index or as a ransom
-/// note is a question about the composition, and the prototype is the only
-/// evidence available — it chose it. Recorded so that a reader who thinks it is
-/// too much knows it was **looked at** and not **overlooked**, and so that
-/// changing it later is a decision someone makes on purpose.
+/// `redesign.html` has **seven** `.sgroup` elements (`:645`, `:649`, `:651`,
+/// `:666`, `:682`, `:690`, `:696`), so `/settings` ships seven of these. This
+/// said "eight" and then listed seven — the list was always right and the count
+/// was not, which is the shape a claim takes when it is written from memory and
+/// checked against nothing.
+///
+/// Whether seven gold labels stacked down one screen reads as a section index or
+/// as a ransom note is a question about the composition, and the prototype is the
+/// only evidence available — it chose gold for its own headings at `:39`
+/// (`.rail h4`). Recorded so that a reader who thinks it is too much knows it was
+/// **looked at** and not **overlooked**, and so that changing it later is a
+/// decision someone makes on purpose.
+///
+/// **The gold is a decision, not a transcription.** The section variant's own
+/// comment says so at length; the short form is that `.mono` (`:30`) says
+/// `ink2`, `.mono b` (`:31`) needs a `<b>` that no `.sgroup` contains, and `:39`
+/// is the prototype's mono-caps gold heading.
 enum EvaSectionHeaderSize {
-  /// The Settings group label: `.mono`, gold. `redesign.html:30-31`.
+  /// The Settings group label: `.mono` from `redesign.html:30`, and **gold by
+  /// decision** on the evidence of `:39` — not from `:31`, which does not apply.
   section,
 
   /// A screen title inside a body: UI sans, bold, `ink`. `ProfileScreen.tsx:53`.
@@ -141,17 +152,41 @@ class EvaSectionHeader extends StatelessWidget {
       // not the caller's to remember.
       style: arabicAware(switch (size) {
         // `redesign.html:30` — `.mono{font-family:var(--mono);font-size:10.5px;
-        // letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}`, and
-        // `:31` — `.mono b{color:var(--gold);font-weight:600}`.
+        // letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}`.
         //
-        // **The label is `.mono`, not something `.sgroup` says.** `:422`'s
-        // `.sgroup` is `margin:20px 0 6px` and nothing else; the eight `.sgroup`
-        // elements in the markup (`:645`-`:696`) carry `class="sgroup mono"`, and
-        // `.mono` is what types them. So the size and tracking are `:30`'s and the
-        // gold is `:31`'s — the only `.mono` in the prototype that is gold is the
-        // `<b>` **inside** one, and `SettingsGroup` has no `<b>`. Applying `.mono
-        // b`'s gold to the whole label is the one reading under which
-        // `SettingsGroup`'s label is gold at all.
+        // ## THE COLOUR IS A **DESIGN DECISION**, NOT A TRANSCRIPTION — AND THE
+        // CITATION THIS USED TO GIVE DOES NOT SAY IT
+        //
+        // This block used to read "the gold is `:31`'s" — `.mono
+        // b{color:var(--gold);font-weight:600}` — which was **not** a
+        // transcription and was not verifiable:
+        //
+        // * `redesign.html` has **seven** `<div class="sgroup mono">` elements
+        //   (`:645`, `:649`, `:651`, `:666`, `:682`, `:690`, `:696`).
+        // * **None contains a `<b>`.** Measured: zero matches over those seven.
+        //   `:31` styles a `<b>` **child**, so here it has no subject at all.
+        // * `:30` therefore applies unmodified, and it ends
+        //   `color:var(--ink-2)`. The label was **`ink2`** in the prototype and
+        //   Phase 4.2 **changed** it.
+        //
+        // A citation that resolves and is about the wrong line is exactly what
+        // `eva_text_field.dart:300-305` refuses to accept, so the old sentence is
+        // replaced rather than softened.
+        //
+        // **What the gold rests on instead.** `redesign.html:39` —
+        // `.rail h4{font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+        // color:var(--gold);text-transform:uppercase;margin-bottom:8px}` — is the
+        // prototype's own **mono-caps gold section heading**, and a `.sgroup`
+        // label is that same role in another part of the screen. So the design
+        // language is **mono caps in gold mark section structure** (§5.1 makes
+        // gold the structural accent, and `:420` gives the same gold to a hovered
+        // `.srow`). Painting the section label that way **widens `:39`'s role**,
+        // deliberately; it is not a reading of `:31`.
+        //
+        // Stated here because a reader who knows only `:30` will fairly ask why
+        // the prototype's `ink2` is not what this paints, and because if the
+        // decision is reversed the thing to change is **this paragraph**, not
+        // `:31`.
         //
         // `letterSpacing` is the em value **premultiplied by the size**, because
         // Flutter's is a logical-pixel advance and CSS's is relative to the
@@ -160,10 +195,12 @@ class EvaSectionHeader extends StatelessWidget {
         // `mono` no tracking), which is why this reads as a much wider label than
         // the 0.5 that slot carries.
         //
-        // `weight: w400`, because neither `:30` nor `:31` declares a weight on the
-        // element this widget paints and the prototype **is** explicit about weight
-        // when it wants it (`:31` `.mono b`, `:185` `.segp button.on`). Silence
-        // there is `normal`, and the redesign's small mono labels are all quiet.
+        // `weight: w400`, because `:30` declares no weight on the element this
+        // widget paints, and the prototype **is** explicit about weight when it
+        // wants one (`:39` declares none for `.rail h4`; `:185` `.segp
+        // button.on` does). Silence there is `normal`, and the redesign's small
+        // mono labels are quiet — the `600` on `:31` belongs to a `<b>` this
+        // label is not.
         EvaSectionHeaderSize.section => EvaTypography.monoCaps(colors).copyWith(
           fontSize: sectionSize,
           letterSpacing: sectionSize * sectionTracking,

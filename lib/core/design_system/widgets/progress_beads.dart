@@ -278,7 +278,15 @@ double progressBeadPulseOpacityAt(double elapsedSeconds) {
 /// | 2 | 28 | 40 | **+12** |
 /// | 3 | 46 | 54 | **+8** |
 /// | 5 | 82 | 82 | 0 |
-/// | 8 | 138 | 134 | **−4** |
+/// | 8 | 136 | 124 | **−12** |
+///
+/// **The `n = 8` row was wrong in both columns** — it read `138 | 134 | −4`, none
+/// of which either formula produces — and it is the row that makes the claim's
+/// shape visible: only at eight beads does the row get **narrower**, because the
+/// `4n − 4` the tighter dots and gaps pull in finally overtakes the flat 18 the
+/// pill pushes out. Recomputed from the two formulas: `10·8 + 8·7 = 136`, and
+/// `8·7 + 26 + 6·7 = 56 + 26 + 42 = 124`. `progressBeadsWidth` implements the
+/// second, and `progress_beads_test.dart` asserts the first and the delta.
 ///
 /// Five is the crossover, and a reader who compared only the five-bead row would
 /// conclude the row did not change width. It did: the dot lost 8px and the pill
