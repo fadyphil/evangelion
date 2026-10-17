@@ -217,10 +217,12 @@ class NeuralScaffold extends StatelessWidget {
 
   /// Whether the content scrolls.
   ///
-  /// `false` is correct for `/reading` and `/quiz`, whose bodies own their own
-  /// scrollables (`ReadingEnScreen.tsx:26` — `overflowY: 'auto'` on the content
-  /// div, not the root) so a sticky CTA can overlay it. `true` is correct for
-  /// `/login`, `/` and `/settings`, whose root scrolls (`LoginScreen.tsx:11`).
+  /// `false` is correct for `/reading`, `/quiz` and the redesigned `/login`,
+  /// whose bodies own their own scrollables or centre without one
+  /// (`eva/redesign.html:369` — `.login` is `justify-content:center` with no
+  /// overflow of its own). `true` is correct for `/` and `/settings`, whose
+  /// roots scroll (`HomeScreen.tsx:11`). The redesigned login was the first
+  /// screen to move between the two groups, in Phase 5.1.
   final bool scrollable;
 
   /// Horizontal inset around [child]. Defaults to `EvaSpacing.lg`.

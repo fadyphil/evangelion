@@ -5,21 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// ## WHERE THE RULES COME FROM, HONESTLY
 ///
-/// The prototype has a password error and no password rule.
-/// `LoginScreen.tsx:52` writes `error="That password's too short"` on the
-/// password field — a literal, like the rest of defect #10 — and nothing anywhere
-/// in `eva/src` states a minimum. There is also no server to state one: there is
-/// no auth endpoint at all (AGENT_CONTEXT §2, decision 3), so
-/// `FakeAuthRepository` cannot defer to anybody.
+/// **Both rules are the redesign's, stated in its own JavaScript.** The React
+/// prototype stated a password error and no rule behind it —
+/// `LoginScreen.tsx:52` is a literal with no minimum anywhere in `eva/src` —
+/// which is why the first version of `login_credentials.dart` chose eight. The
+/// redesign **states the rule**: `eva/redesign.html:1306` is
+/// `pw.length>=4?'':tr('pwErr')`, so [kMinPasswordLength] is transcribed (4) and
+/// the message it produces is `:976`'s `pwErr` verbatim. The address rule is
+/// `:1305`'s `^\S+@\S+\.\S+$` — the same local-part-and-dotted-domain shape the
+/// first version derived from `type="email"` — and its one message is `:976`'s
+/// `emErr`.
 ///
-/// So **[kMinPasswordLength] is chosen here, not transcribed**, and this is the
-/// single place it is written down. Eight is the conventional figure and no
-/// document in this repository argues for another. The *message* it produces,
-/// "That password's too short", **is** the prototype's and is used verbatim.
-///
-/// Everything else follows from the two facts the prototype does state: the
-/// fields are `type="email"` and `type="password"` (`LoginScreen.tsx:49-51`),
-/// which is where "must look like an address" and "must not be empty" come from.
+/// One message per field is the redesign's own framing: `:1305-1306` collapse
+/// blank and malformed into a single sentence each, and the old
+/// `kRequiredMessage` is gone with the prototype that framed it. The page
+/// renders the localized sentence **by presence** (`state.emailError != null`),
+/// never by matching this file's wording — see `authEmailInvalid`'s arb
+/// description.
 void main() {
   group('validateLogin — the email rule', () {
     test('accepts an ordinary address', () {
@@ -39,15 +41,18 @@ void main() {
     test('requires something before the @', () {
       expect(
         validateLogin(email: '', password: 'correct horse').emailError,
-        isNotNull,
+        kInvalidEmailMessage,
+        reason:
+            'the redesign has one message per field — an empty address '
+            'fails `:1305`\'s regex just as a malformed one does',
       );
       expect(
         validateLogin(email: '   ', password: 'correct horse').emailError,
-        isNotNull,
+        kInvalidEmailMessage,
       );
       expect(
         validateLogin(email: '@evangelion.app', password: 'x' * 12).emailError,
-        isNotNull,
+        kInvalidEmailMessage,
       );
     });
 
@@ -104,25 +109,27 @@ void main() {
     test('never reports an error for a field the reader has not reached', () {
       // Not a rule of the validator — it validates whatever it is given — but the
       // property `AuthBloc` relies on: an error is only ever attached to
-      // something that was actually typed. A blank field's "error" is
-      // "required", which is a complaint about a form the reader has not filled
-      // in yet.
+      // something that was actually typed. The redesign's single message per
+      // field (see the file doc) makes the wording a UI concern; the *presence*
+      // of an error is what the bloc gates on.
       expect(validateLogin(email: '', password: '').isValid, isFalse);
       expect(validateLogin(email: '', password: '').emailError, isNotNull);
     });
   });
 
   group('validateLogin — the password rule', () {
-    test('uses the prototype\'s own message for a short password', () {
-      // `LoginScreen.tsx:52`, verbatim. A golden would ratify any rewording and
-      // the prototype is the only source for the wording, so this is a
-      // transcription claim and the file says so.
+    test('uses the redesign\'s own message for a short password', () {
+      // `redesign.html:976` — `pwErr`, verbatim. A golden would ratify any
+      // rewording and the prototype is the only source for the wording, so this
+      // is a transcription claim and the file says so. Five characters is
+      // **above** `kMinPasswordLength` (the redesign's rule is 4), so the fixture
+      // is three.
       expect(
         validateLogin(
           email: 'david@evangelion.app',
-          password: 'short',
+          password: 'abc',
         ).passwordError,
-        "That password's too short",
+        'password too short',
       );
     });
 
@@ -142,21 +149,22 @@ void main() {
           email: 'david@evangelion.app',
           password: 'x' * (kMinPasswordLength - 1),
         ).passwordError,
-        isNotNull,
+        'password too short',
       );
     });
 
-    test('reports required rather than too short for an empty password', () {
-      // Two different complaints, and conflating them is a lie in one direction
-      // and uselessness in the other: "too short" on a field nobody has typed in
-      // yet is a criticism of a blank box.
+    test('answers an empty password with the same sentence as a short one', () {
+      // `redesign.html:1306` — `pw.length>=4` has no empty-case branch: an empty
+      // password is a password shorter than four characters, which is how the
+      // prototype treats it and how this file treats it. The old two-message
+      // model ("required" vs "too short") is the old prototype's framing and is
+      // gone; the page renders by presence, so the one sentence is all it needs.
       final LoginValidation blank = validateLogin(
         email: 'david@evangelion.app',
         password: '',
       );
 
-      expect(blank.passwordError, isNot(kShortPasswordMessage));
-      expect(blank.passwordError, isNotEmpty);
+      expect(blank.passwordError, kShortPasswordMessage);
     });
 
     test('does not trim, because a leading space can be part of a password', () {

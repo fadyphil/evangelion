@@ -1,21 +1,12 @@
 {
   "@@locale": "en",
-  "authWordmark": "Evangelion",
-  "authTagline": "Read. Reflect. Remember.",
   "authEmailLabel": "Email",
-  "authEmailHint": "you@example.com",
+  "authEmailHint": "email",
   "authPasswordLabel": "Password",
-  "authPasswordHint": "••••••••",
-  "authSignIn": "Sign in",
-  "authForgotPassword": "Forgot password?",
-  "authNewHere": "New here?",
-  "authCreateAccount": "Create account",
-  "authDivider": "or",
-  "authContinueWithGoogle": "Continue with Google",
-  "authContinueWithApple": "Continue with Apple",
-  "authShowPassword": "Show password",
-  "authHidePassword": "Hide password",
-  "authSealLabel": "Evangelion",
+  "authPasswordHint": "password",
+  "authEnterTheWord": "enter the word",
+  "authEmailInvalid": "email looks incomplete",
+  "authPasswordTooShort": "password too short",
   "authUnavailableSuffix": "unavailable in this build",
   "homeWordmark": "Evangelion",
   "homeGreetingMorning": "Good morning",
@@ -165,56 +156,29 @@
   "settingsLanguageArabic": "Arabic",
   "settingsAbout": "About",
   "settingsVersion": "Version",
-  "@authWordmark": {
-    "description": "The product's name, above the tagline. Transcribed: LoginScreen.tsx:29.\n\nDELIBERATELY THE SAME IN BOTH ARMS. The wordmark stays `Evangelion` in Arabic too: it is the product's name in every language, and transliterating a brand mark is a product decision rather than a translation. This is the ONLY auth/home string permitted to hold Latin script on the Arabic arm, and `test/l10n/app_localizations_test.dart` excepts exactly this key by name."
-  },
-  "@authTagline": {
-    "description": "Transcribed: LoginScreen.tsx:32.\n\nThe prototype is ENGLISH ONLY — `eva/src` has one `LoginScreen.tsx` and no Arabic variant — so every Arabic value in this file is written rather than transcribed, and none of them is presented as the prototype's. The three words are the product's own: the same three the design already carries, and reading and remembering are the point of a Sunday-school reading app."
-  },
   "@authEmailLabel": {
-    "description": "The email field's label, which is also its semantics name. Transcribed: LoginScreen.tsx:49."
+    "description": "The email field's accessible name, which `EvaTextField` puts in `Semantics(label:)`. Transcribed: redesign.html:506 — `placeholder=\"email\"`; the redesign's field has no `<label>`, so the placeholder word is the name a browser would read and the word carried here."
   },
   "@authEmailHint": {
-    "description": "The email field's placeholder. Transcribed: LoginScreen.tsx:49.\n\nDELIBERATELY LATIN ON THE ARABIC ARM. An email address is an ASCII-domain string by definition; transliterating it would produce an address that cannot be typed."
+    "description": "The email field's visible placeholder. Transcribed: redesign.html:506 — `placeholder=\"email\"`.\n\nLOCALIZED ON THE ARABIC ARM, unlike `you@example.com` before it. The old placeholder was an ASCII-domain sample string that no language translates; this one is a common noun naming what the reader should type, and the redesign's own dictionary translates every word a reader acts on (`emErr` carries `البريد`). The Arabic is the standard form, and it is the same noun `authEmailLabel` carries — placeholder and accessible name agree, as a browser's would."
   },
   "@authPasswordLabel": {
-    "description": "The password field's label. Transcribed: LoginScreen.tsx:51."
+    "description": "The password field's accessible name. Transcribed: redesign.html:507 — `placeholder=\"password\"`; see `authEmailLabel` for why the placeholder word is the name."
   },
   "@authPasswordHint": {
-    "description": "The password field's placeholder. Transcribed: LoginScreen.tsx:51.\n\nDELIBERATELY IDENTICAL IN BOTH ARMS, because Arabic digits and Latin digits both differ per locale and a masked placeholder that changed shape would be re-measuring the field on every locale switch."
+    "description": "The password field's visible placeholder. Transcribed: redesign.html:507 — `placeholder=\"password\"`, replacing the masked `••••••••` the React prototype drew.\n\nA WORD AND NOT A MASK, and that is the redesign's choice, not a change of mind about masks: the placeholder names the field the way a browser's `placeholder=\"password\"` does, and `authPasswordLabel` carries the same noun. Deliberately localized on the Arabic arm; the word is `كلمة المرور`, which is the exact noun `pwErr` (`redesign.html:976`) already carries — no new translation is invented."
   },
-  "@authSignIn": {
-    "description": "The primary button. Transcribed: LoginScreen.tsx:64."
+  "@authEnterTheWord": {
+    "description": "The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n=\"enter\"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:954` — `enter:[\"enter the word\",\"ادخل الكلمة\"]`). The Arabic is the prototype's own, not a new translation."
   },
-  "@authForgotPassword": {
-    "description": "The \"Forgot password?\" control. Transcribed: LoginScreen.tsx:66."
+  "@authEmailInvalid": {
+    "description": "The email field's error line. Transcribed: redesign.html:976 — `emErr:[\"email looks incomplete\",\"البريد غير مكتمل\"]`, announced by `redesign.html:1305`'s one regex test. The Arabic is the prototype's own.\n\nRENDERED BY PRESENCE, NOT BY MATCHING: the page draws this sentence when `state.emailError != null` and never compares the domain's message text, so the wording in `login_credentials.dart` is the log-canonical copy and this key is the reader's."
   },
-  "@authNewHere": {
-    "description": "The half of the sign-up row that is not a control. Transcribed: LoginScreen.tsx:69."
-  },
-  "@authCreateAccount": {
-    "description": "The \"Create account\" control. Transcribed: LoginScreen.tsx:71."
-  },
-  "@authDivider": {
-    "description": "The label in the divider. Transcribed: LoginScreen.tsx:78.\n\n`HairlineDivider`'s own doc records why this is a caller string at all: `LoginPage` passes this and has nothing else to say, so a hard-coded English literal in `core/` would be the half-translated UI this app exists not to ship."
-  },
-  "@authContinueWithGoogle": {
-    "description": "The Google button. Transcribed: LoginScreen.tsx:84.\n\nThis control, and the three beside it, SHIP DISABLED by design — there is no auth endpoint on the backend (AGENT_CONTEXT §2 decision 3) — which is why `authUnavailableSuffix` exists."
-  },
-  "@authContinueWithApple": {
-    "description": "The Apple button. Transcribed: LoginScreen.tsx:85. Ships disabled, as `authContinueWithGoogle` says."
-  },
-  "@authShowPassword": {
-    "description": "The password toggle's name while the password is masked. Written, not transcribed — the prototype's toggle is an icon-only `<button>` with no accessible name at all."
-  },
-  "@authHidePassword": {
-    "description": "The password toggle's name while the password is visible. Written, as `authShowPassword` says."
-  },
-  "@authSealLabel": {
-    "description": "The seal's accessible name. Transcribed from `SealMonogram.semanticLabel`.\n\nDELIBERATELY `Evangelion` AND NOT `authWordmark`'s transliterated form, because it names the SEAL — the monogram mark — and not the wordmark above it. The Arabic value is the prototype's brand form `إنجيل`; see `authWordmark` for why that is a different decision."
+  "@authPasswordTooShort": {
+    "description": "The password field's error line. Transcribed: redesign.html:976 — `pwErr:[\"password too short\",\"كلمة المرور قصيرة\"]`, announced by `redesign.html:1306`'s one length test. Rendered by presence, as `authEmailInvalid` says."
   },
   "@authUnavailableSuffix": {
-    "description": "Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.\n\nNAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.\n\nAPPENDED BY THE CALL SITE, NEVER BAKED IN — two inert controls on `/login` share labels, and a suffix inside the label would render \"unavailable in this build - unavailable in this build\"."
+    "description": "Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.\n\nNAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.\n\nAPPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render \"unavailable in this build - unavailable in this build\"."
   },
   "@homeWordmark": {
     "description": "The product's name, in the top bar. Transcribed: ds.tsx:508.\n\nDELIBERATELY LATIN ON THE ARABIC ARM, for `authWordmark`'s reason — it is a brand mark, not a sentence. `app_top_bar.dart` records a measurement here: replacing this with the Arabic transliteration was tried and reverted.\n\nNAMESPACED `home*` because `authWordmark` is a different control drawing the same mark."

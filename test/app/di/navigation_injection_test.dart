@@ -640,13 +640,21 @@ void main() {
       // keystroke rather than on submit. Asserted rather than assumed because a tap on
       // a disabled `EvaButton` does nothing at all — no throw, no state change — and
       // every assertion below would then fail for a reason three steps upstream.
+      // The finder is the **enabled** button and not `find.byType(EvaButton)`:
+      // the redesigned screen carries three of those, and the two ghost pills
+      // are permanently inert — the enabled one is the CTA by construction, and
+      // the count is the claim that the ghosts never wake up.
+      final Finder liveButton = find.byWidgetPredicate(
+        (Widget w) => w is EvaButton && w.onPressed != null,
+      );
       expect(
-        tester.widget<EvaButton>(find.byType(EvaButton)).onPressed,
+        tester.widget<EvaButton>(liveButton).onPressed,
         isNotNull,
         reason: 'the form is valid, so the button can be pressed',
       );
+      expect(find.byType(EvaButton), findsNWidgets(3));
 
-      await tester.tap(find.byType(EvaButton));
+      await tester.tap(liveButton);
 
       // A bounded loop in `EvaMotion.screen` steps. Two measured facts: the outgoing
       // form stays mounted through the transition, so the loop waits for `HomePage`

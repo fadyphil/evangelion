@@ -10,52 +10,25 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get authWordmark => 'Evangelion';
-
-  @override
-  String get authTagline => 'Read. Reflect. Remember.';
-
-  @override
   String get authEmailLabel => 'Email';
 
   @override
-  String get authEmailHint => 'you@example.com';
+  String get authEmailHint => 'email';
 
   @override
   String get authPasswordLabel => 'Password';
 
   @override
-  String get authPasswordHint => '••••••••';
+  String get authPasswordHint => 'password';
 
   @override
-  String get authSignIn => 'Sign in';
+  String get authEnterTheWord => 'enter the word';
 
   @override
-  String get authForgotPassword => 'Forgot password?';
+  String get authEmailInvalid => 'email looks incomplete';
 
   @override
-  String get authNewHere => 'New here?';
-
-  @override
-  String get authCreateAccount => 'Create account';
-
-  @override
-  String get authDivider => 'or';
-
-  @override
-  String get authContinueWithGoogle => 'Continue with Google';
-
-  @override
-  String get authContinueWithApple => 'Continue with Apple';
-
-  @override
-  String get authShowPassword => 'Show password';
-
-  @override
-  String get authHidePassword => 'Hide password';
-
-  @override
-  String get authSealLabel => 'Evangelion';
+  String get authPasswordTooShort => 'password too short';
 
   @override
   String get authUnavailableSuffix => 'unavailable in this build';

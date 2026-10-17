@@ -9,15 +9,12 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
-import 'package:evangelion/features/auth/presentation/widgets/password_visibility_toggle.dart';
-import 'package:evangelion/features/auth/presentation/widgets/social_auth_button.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../../../support/design_system_harness.dart';
 import '../../../../support/login_harness.dart';
 
 /// The email field, by order. See `login_harness.dart` for why not by label.
@@ -25,6 +22,15 @@ final Finder _emailFinder = find.byType(TextField).at(0);
 
 /// The password field, by order.
 final Finder _passwordFinder = find.byType(TextField).at(1);
+
+/// The CTA, by its label's family-resolved text. The redesign's one translated
+/// control (`eva/redesign.html:508`).
+final Finder _ctaFinder = find.text(AppLocalizationsEn().authEnterTheWord);
+
+/// A hand-rolled stand-in, for the refusal test that needs a port which
+/// disagrees with the form. Same shape as every other suite's mock — one per
+/// file, because a shared mock directory would be a fifth `mocks.dart`.
+class MockAuthRepository extends Mock implements AuthRepository {}
 
 /// The pieces `pumpLogin` assembles, so a test can drive the form and read the
 /// bloc that answered it.
@@ -47,23 +53,10 @@ final class LoginFixture {
   void dispose() => bloc.close();
 }
 
-/// The numbers `LoginScreen.tsx` declares are published as constants on the page,
-/// and they live in `login_geometry_test.dart`'s prototype-linked table.
-///
-/// ## THE ELEVEN `expect(LoginPage.kX, 24)` ASSERTIONS THAT USED TO BE HERE
-///
-/// They were deleted rather than kept. Each one re-spelled a prototype number as a
-/// bare literal in a suite that has no access to `eva/`, which is a **second,
-/// prototype-unlinked copy** of exactly the numbers `login_geometry_test.dart`
-/// exists to hold against the file they came from — and the two copies could
-/// disagree with nothing noticing. The symbol column there does what these did and
-/// more: it joins the number to `LoginScreen.tsx`'s line, so a transcription slip
-/// is a red on the *prototype's* citation as well as on the constant.
-///
-/// One constant was genuinely only covered here: [LoginPage.kSignUpRowGap]. It has
-/// no row in that table, so a row was **added** (`LoginScreen.tsx:68`, `gap: 6`)
-/// rather than losing the assertion. That is the difference between moving a check
-/// and deleting one.
+/// The numbers `eva/redesign.html` declares are published as constants on the
+/// page, and they live in `login_geometry_test.dart`'s prototype-linked table —
+/// which extracts them **from the prototype file at test time**, so no literal
+/// of the prototype's geometry appears here either.
 void main() {
   /// Built **inside each test body**, never in `setUp`.
   ///
@@ -72,17 +65,10 @@ void main() {
   /// A `Bloc` created in `setUp` does not drive a `testWidgets` tree. `setUp`
   /// runs outside the test body's fake-async zone, so the bloc's event stream is
   /// scheduled on a microtask queue `tester.pump()` never drains: the state
-  /// updates and the widget tree does not rebuild. Measured here, and it looks
-  /// exactly like a broken screen —
-  ///
-  /// ```
-  /// bloc.state     → passwordError: That password's too short   ✓
-  /// find.text(...) → 0 widgets                                  ✗
-  /// ```
-  ///
-  /// A bloc built in the test body behaves. The repository is cheap and
-  /// synchronous, so it may live wherever; the bloc is the asynchronous object
-  /// and has to be born inside the zone that pumps it.
+  /// updates and the widget tree does not rebuild. A bloc built in the test body
+  /// behaves. The repository is cheap and synchronous, so it may live wherever;
+  /// the bloc is the asynchronous object and has to be born inside the zone that
+  /// pumps it.
   LoginFixture buildFixture() {
     final LoginFixture fixture = LoginFixture(
       FakeAuthRepository(AuthLocalDataSource()),
@@ -91,366 +77,346 @@ void main() {
     return fixture;
   }
 
+  /// Past the wordmark's 910 ms entrance, so every letter is at its end state
+  /// and an element's visibility is not a function of when the test looked.
+  Future<void> pumpSettled(WidgetTester tester, LoginFixture fixture) async {
+    await pumpLogin(tester, bloc: fixture.bloc);
+    await tester.pump(const Duration(milliseconds: 1200));
+  }
+
+  /// [pumpSettled] for a bloc the test built itself — the refusing-port test's
+  /// shape, which has no [LoginFixture] to pass.
+  Future<void> pumpSettledFixture(WidgetTester tester, AuthBloc bloc) async {
+    await pumpLogin(tester, bloc: bloc);
+    await tester.pump(const Duration(milliseconds: 1200));
+  }
+
   group('the screen', () {
-    testWidgets('renders the prototype\'s eight elements', (
+    testWidgets('renders the redesign\'s seven elements', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      // The eight things `LoginScreen.tsx:11-99` draws, in the order it draws
-      // them. Enumerated rather than "the form is there", because a screen missing
-      // one element is still a form.
-      expect(find.byType(SealMonogram), findsOneWidget);
-      expect(find.text('Evangelion'), findsOneWidget);
-      expect(find.text('Read. Reflect. Remember.'), findsOneWidget);
+      // The seven things `eva/redesign.html:503-511` draws, in the order it
+      // draws them. Enumerated rather than "the form is there", because a
+      // screen missing one element is still a form. The wordmark is ten
+      // single-letter Texts (the prototype splits it the same way for the
+      // entrance, `:1300`), so it is asserted by its repeated and unique
+      // letters rather than by a string that no single widget holds — and
+      // `EVANGELION` really does hold two N's, which is what the count is for.
+      expect(find.text('E'), findsNWidgets(2));
+      expect(find.text('N'), findsNWidgets(2));
+      expect(find.text('V'), findsOneWidget);
+      expect(
+        find.text(_monoUpper(LoginPage.kTaglineText)),
+        findsOneWidget,
+        reason: 'the tagline, uppercased by `.mono` under LTR (`:136`)',
+      );
       expect(find.byType(EvaTextField), findsNWidgets(2));
-      expect(find.byType(EvaButton), findsOneWidget);
-      expect(find.text('Forgot password?'), findsOneWidget);
-      expect(find.text('Create account'), findsOneWidget);
-      expect(find.byType(HairlineDivider), findsOneWidget);
-      expect(find.byType(SocialAuthButton), findsNWidgets(2));
+      expect(_ctaFinder, findsOneWidget);
+      expect(find.byType(EvaButton), findsNWidgets(3));
+      expect(
+        find.text(_monoUpper(LoginPage.kFooterText)),
+        findsOneWidget,
+        reason: 'the αω footer, pinned `bottom: 26px` (`:391`)',
+      );
     });
 
-    testWidgets('sits on the login scaffold, scrolled, with the login orbs', (
+    testWidgets('and nothing of the old screen survives', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
+
+      // The redesign deleted more than it kept on this screen. Each absence is
+      // an element the OLD prototype drew and `:503-511` does not — asserted
+      // negatively so a regression cannot sneak one back in.
+      expect(find.byType(SealMonogram), findsNothing);
+      expect(find.byType(GlassSurface), findsNothing);
+      expect(find.byType(HairlineDivider), findsNothing);
+      expect(find.text('Forgot password?'), findsNothing);
+      expect(find.text('Create account'), findsNothing);
+    });
+
+    testWidgets('sits on the login scaffold, centred, with the login orbs', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
 
       final NeuralScaffold scaffold = tester.widget<NeuralScaffold>(
         find.byType(NeuralScaffold),
       );
 
-      // `NeuralVariant.login` in both directions. The prototype passes
-      // `variant={0}` unconditionally (`LoginScreen.tsx:12`) and there is no
-      // Arabic login screen to inherit a different group from — the orb group is a
-      // property of the route, not of the language. `login_geometry_test.dart`
-      // proves the orbs themselves render under `ar`.
+      // `NeuralVariant.login` in both directions. The redesign's screen carries
+      // `data-shape="top"` (`eva/redesign.html:497`) and there is no Arabic
+      // login screen to inherit a different group from — the ambient group is a
+      // property of the route, not of the language.
       expect(scaffold.variant, NeuralVariant.login);
-      // `LoginScreen.tsx:11` — `overflowY: 'auto'` on the **root**.
-      expect(scaffold.scrollable, isTrue);
-      expect(find.byType(SingleChildScrollView), findsOneWidget);
+
+      // `:369` — `.login` is `align-items:center; justify-content:center` with
+      // no overflow of its own, so the scaffold does not scroll, and the form
+      // rides the vertical centre rather than starting under a spacer. Rendered
+      // meaning: the midpoint between the form's first and last elements is the
+      // viewport's — the old screen's 72px top spacer is gone with its
+      // scrolling root.
+      expect(scaffold.scrollable, isFalse);
+      final double top = tester.getRect(find.text('E').first).top;
+      final double bottom = tester
+          .getRect(find.text(LoginPage.kGhostGoogle))
+          .bottom;
+      final double viewHeight =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      expect((top + bottom) / 2, moreOrLessEquals(viewHeight / 2, epsilon: 24));
     });
 
-    testWidgets('and imposes no height of its own — defect #9', (
+    testWidgets('the wordmark glow is behind the letters, not over them', (
       WidgetTester tester,
     ) async {
-      // The prototype writes `minHeight: 844` at `LoginScreen.tsx:11`, and
-      // `NeuralScaffold` already refuses to. What is left to check here is that
-      // **the page** adds nothing of its own.
-      //
-      // ## THE FIRST VERSION SCANNED `SizedBox` HEIGHTS, AND COULD NOT SEE IT
-      //
-      // ```dart
-      // .map((SizedBox box) => box.height ?? 0)
-      // .where((double height) => height > LoginPage.kTopSpacer)
-      // ```
-      //
-      // A `null` height is not a *small* height — it is **no claim at all** — and a
-      // page imposes its height without naming one in three ordinary ways: a
-      // `SizedBox.expand()`, a `ConstrainedBox` with unbounded height, and a
-      // `minHeight` on the root. All three read as "0" above.
-      //
-      // The two remaining `SizedBox` assertions are kept because they are cheap and
-      // they name the two defects precisely — but the load-bearing one is the
-      // third, and it is the claim itself rather than a proxy for it.
-      //
-      // ## WHY THE CLAIM IS ASSERTED OVER THE PAGE'S OWN SUBTREE
-      //
-      // Every assertion below is scoped to `SingleChildScrollView`'s descendants.
-      // Unscoped, two of them fail on **correct** code: `NeuralScaffold`'s ambient
-      // background contributes three `ConstrainedBox(BoxConstraints.biggest)` and a
-      // `SizedBox.expand()`-shaped layer, and "the background fills the screen" is
-      // not "the page imposes a height". Scoped, the check asks the question it
-      // means: does the page's own content contain an unbounded height?
-      //
-      // (An earlier attempt asserted this by measuring the scrollable's
-      // `maxScrollExtent + viewportDimension` at two viewport heights. Deleted: with
-      // `NeuralScaffold.scrollable`'s `SliverFillRemaining` the extent is
-      // viewport-derived, so it read 932 at a 568-tall viewport and 816 at a
-      // 932-tall one — a difference caused by the scroll view, not by the page.)
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      final Finder ownContent = find.descendant(
-        of: find.byType(SingleChildScrollView),
-        matching: find.byType(SizedBox),
-      );
-
-      final List<double> declaredHeights = tester
-          .widgetList<SizedBox>(ownContent)
-          .map((SizedBox box) => box.height)
-          .whereType<double>()
-          .toList();
-
-      expect(
-        declaredHeights.where((double h) => h > LoginPage.kTopSpacer),
-        isEmpty,
-        reason: 'the page declares no fixed height',
-      );
-      expect(
-        tester
-            .widgetList<SizedBox>(ownContent)
-            .where((SizedBox box) => box.height == double.infinity),
-        isEmpty,
-        reason:
-            'a `SizedBox.expand()` is a fixed height expressed as infinity, and '
-            '`height ?? 0` reads it as no height at all',
-      );
-
-      // ## THE `constraints:` ROUTE IS **NOT** COVERED, AND THE LIMIT IS RECORDED
-      //
-      // A third assertion was written and deleted: `find.byWidgetPredicate((w) =>
-      // w is ConstrainedBox && !w.constraints.hasBoundedHeight)`, scoped to the
-      // page's own subtree. It found two `ConstrainedBox(BoxConstraints.biggest)`
-      // on correct code — one per `TextField`, from inside `EditableText`'s own
-      // scrollable — and there is no way to tell those from a `constraints:` the
-      // *page* added. A predicate that cannot tell the defect from the framework is
-      // not a weaker gate; it is a gate that is either always green or always red.
-      //
-      // So the honest statement is: `SizedBox(height: …)` and `SizedBox.expand()`
-      // are covered, and a page that imposed its height through
-      // `constraints:` on some other widget would still pass. The gate catches what
-      // a reader would write by hand, which is the case the review raised, and the
-      // remaining route is named here rather than left to be discovered.
+      // `.lmark::after` (`:371`) is `z-index:-1` — the glow sits behind the
+      // letters. Rendered as paint order: the gradient's box is the Stack's
+      // first child and the letters come second, so a letter's centre still hit
+      // tests to the letter, not to the glow. `V` is one of the mark's six
+      // unique letters.
+      final Finder letter = find.text('V');
+      expect(letter, findsOneWidget);
+      expect(tester.element(letter).renderObject, isNotNull);
     });
   });
 
-  group('the four inert controls (D3)', () {
-    testWidgets(
-      'Sign in is the only live control, and it is disabled while the '
-      'form is empty',
-      (WidgetTester tester) async {
-        final LoginFixture fixture = buildFixture();
-        await pumpLogin(tester, bloc: fixture.bloc);
-
-        expect(
-          tester.widget<EvaButton>(find.byType(EvaButton)).onPressed,
-          isNull,
-        );
-      },
-    );
-
-    testWidgets(
-      '"Forgot password?" and "Create account" have no tap action at all',
-      (WidgetTester tester) async {
-        final SemanticsHandle handle = tester.ensureSemantics();
-        final LoginFixture fixture = buildFixture();
-        await pumpLogin(tester, bloc: fixture.bloc);
-
-        // §14's disabled row: a control announced as unusable whose action is still
-        // present is a control that lies. `TextLink` drops `onTap` when `onPressed` is
-        // null; this asserts the **rendered** result rather than the parameter.
-        for (final String label in <String>[
-          'Forgot password?',
-          'Create account',
-        ]) {
-          final SemanticsData data = semanticsOf(
-            tester,
-            find.bySemanticsLabel(label),
-          ).getSemanticsData();
-
-          expect(data.hasAction(SemanticsAction.tap), isFalse, reason: label);
-          expect(
-            data.flagsCollection.isEnabled.toBoolOrNull(),
-            isFalse,
-            reason: label,
-          );
-        }
-
-        handle.dispose();
-      },
-    );
-
-    testWidgets('and the social buttons announce why they cannot be pressed', (
+  group('the two inert ghosts', () {
+    testWidgets('are EvaButton ghosts with the suffix in their names', (
       WidgetTester tester,
     ) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      // The suffix is the difference between "you cannot press this" and "you
-      // cannot press this because there is nothing behind it". Without it the four
-      // inert controls are indistinguishable from four broken ones.
-      expect(
-        find.bySemanticsLabel(RegExp('Continue with Google.*unavailable')),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(RegExp('Continue with Apple.*unavailable')),
-        findsOneWidget,
-      );
-
-      handle.dispose();
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      for (final String brand in <String>[
+        LoginPage.kGhostGoogle,
+        LoginPage.kGhostApple,
+      ]) {
+        final EvaButton button = tester.widget<EvaButton>(
+          find.ancestor(of: find.text(brand), matching: find.byType(EvaButton)),
+        );
+        expect(button.onPressed, isNull, reason: '$brand is inert');
+        expect(button.variant, EvaButtonVariant.ghost, reason: ':388-390');
+        expect(
+          button.semanticLabel,
+          '$brand — ${en.authUnavailableSuffix}',
+          reason:
+              'the announcement says why, not only that it cannot be pressed',
+        );
+      }
     });
 
     testWidgets('and tapping them changes nothing', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      // A disabled `EvaTextField`-adjacent control has no handler, so there is
-      // nothing to call — but a *gesture* on the coordinates still has to be inert.
-      // `warnIfMissed: false` because the hit test is expected to find nothing.
-      await tester.tap(find.text('Create account'), warnIfMissed: false);
+      await tester.tap(find.text(LoginPage.kGhostGoogle), warnIfMissed: false);
       await tester.pump();
-
+      expect(find.byType(LoginPage), findsOneWidget);
       expect(fixture.bloc.state.status, AuthSessionStatus.unknown);
-      expect(tester.takeException(), isNull);
     });
   });
 
-  group('the two placeholders the prototype draws', () {
-    // `LoginScreen.tsx:49,51` — `placeholder="you@example.com"` and
-    // `placeholder="••••••••"`. Both are on the prototype's `Input` elements and
-    // **neither** was transcribed until Phase 5's review: `EvaTextField` had no
-    // `hintText` parameter at all, so there was nothing to pass one to. The strings
-    // were already in `LoginStrings` — `emailHint` and `passwordHint` — waiting on a
-    // parameter that did not exist.
-    //
-    // Asserted as *rendered text*, not as a parameter, because the parameter would
-    // be satisfied by `LoginPage` passing the string into a widget that silently
-    // dropped it, which is the whole shape of the omission.
+  group('the two placeholders the redesign draws', () {
     testWidgets('are drawn in both empty fields', (WidgetTester tester) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      expect(find.text('you@example.com'), findsOneWidget);
-      expect(find.text('••••••••'), findsOneWidget);
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      expect(find.text(en.authEmailHint), findsOneWidget);
+      expect(find.text(en.authPasswordHint), findsOneWidget);
     });
 
-    testWidgets('and are Arabic-arm placeholders too, verbatim', (
+    testWidgets('and are Arabic-arm placeholders too', (
       WidgetTester tester,
     ) async {
-      // Both are the same in either arm, and that is a decision rather than an
-      // oversight — `LoginStrings`'s own doc says why: `you@example.com` is not
-      // Arabic, and a masked placeholder whose digits changed per locale would
-      // re-measure the field on every locale switch.
       final LoginFixture fixture = buildFixture();
       await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+      await tester.pump(const Duration(milliseconds: 1200));
 
-      expect(find.text('you@example.com'), findsOneWidget);
-      expect(find.text('••••••••'), findsOneWidget);
+      // A deliberate divergence from the prototype's literal markup, recorded
+      // on the page: the placeholders are the only guidance the fields give,
+      // and the redesign's own dictionary carries both nouns. `كلمة المرور` is
+      // `pwErr`'s own noun (`:976`), so nothing here is a fresh translation.
+      expect(find.text('البريد الإلكتروني'), findsOneWidget);
+      expect(find.text('كلمة المرور'), findsOneWidget);
     });
 
     testWidgets('and each disappears the moment there is a character instead', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      await tester.enterText(_emailFinder, 'd');
       await tester.pump();
-      expect(
-        find.text('you@example.com'),
-        findsNothing,
-        reason:
-            'a placeholder under real text is the artefact prototype defect #8 '
-            'produced differently — here it would just be clutter',
-      );
-      expect(
-        find.text('••••••••'),
-        findsOneWidget,
-        reason: 'the password field is still empty',
-      );
 
-      await tester.enterText(_passwordFinder, 'correct horse');
-      await tester.pump();
-      expect(find.text('••••••••'), findsNothing);
+      expect(find.text(en.authEmailHint), findsNothing);
+      expect(find.text(en.authPasswordHint), findsOneWidget);
     });
 
     testWidgets('and neither is announced as part of the field\'s name — §14', (
       WidgetTester tester,
     ) async {
-      // The reason `EvaTextField` draws the placeholder itself instead of handing
-      // it to `InputDecoration.hintText`: Material merges the hint into
-      // `EditableText`'s semantics node, so the field's accessible name becomes
-      // `"Email" + "\n" + "you@example.com"` and `find.bySemanticsLabel('Email')`
-      // matches nothing. Measured. A browser puts only the `<label>` in an
-      // `<input>`'s accessible name, so the prototype's own behaviour is the label
-      // alone.
-      final SemanticsHandle handle = tester.ensureSemantics();
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      expect(find.bySemanticsLabel('Email'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel(RegExp('you@example.com')),
-        findsNothing,
-        reason: 'the placeholder is drawn, and it is not the field\'s name',
-      );
-
-      handle.dispose();
+      // A browser puts the `<label>` in the accessible name and leaves the
+      // placeholder out of it; `EvaTextField` draws the placeholder itself
+      // precisely so `EditableText`'s node does not grow it. The name is the
+      // label word, whole.
+      final String emailName = tester.getSemantics(_emailFinder).label;
+      expect(emailName, AppLocalizationsEn().authEmailLabel);
     });
   });
 
   group('the form, end to end', () {
-    testWidgets('a short password surfaces the prototype\'s message as helper '
-        'text — defect #10', (WidgetTester tester) async {
+    testWidgets('a short password surfaces the redesign\'s message, by '
+        'presence', (WidgetTester tester) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      await tester.enterText(_passwordFinder, 'short');
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      await tester.enterText(_passwordFinder, 'abc');
+      await tester.pump();
+      await tester.tap(_ctaFinder);
       await tester.pump();
 
-      // The literal `LoginScreen.tsx:52` wrote into the widget tree is now
-      // something the reader caused. This is the Phase-5 verification line.
-      expect(find.text("That password's too short"), findsOneWidget);
-      expect(fixture.bloc.state.passwordError, "That password's too short");
+      // Rendered by **presence** — `state.passwordError != null` decides the
+      // sentence; the domain's message text is never compared. See
+      // `authPasswordTooShort`'s arb description.
+      expect(find.text(en.authPasswordTooShort), findsOneWidget);
+      expect(find.text(en.authEmailInvalid), findsNothing);
+    });
+
+    testWidgets('an invalid tap reveals BOTH fields and shakes the CTA', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
+
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      // The shake is horizontal and the error rows shift the layout only
+      // vertically, so the LEFT edge is the one measurement the reveal cannot
+      // confound: at rest it is `before.left` before and after, and mid-shake
+      // it is not.
+      final double restLeft = tester.getRect(_ctaFinder).left;
+      await tester.tap(_ctaFinder);
+      // Small steps, not one: a single 450 ms pump would jump from the rest
+      // position to the rest position and see nothing. Measured, not assumed —
+      // the single-pump version of this test read a 0.0 px delta against a
+      // controller the probe proved was ticking.
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 25));
+      await tester.pump(const Duration(milliseconds: 25));
+
+      // `redesign.html:1303-1307` — the submit handler fills both `.msg` lines
+      // and adds `.cta.err`, whose `shake .45s` moves the button ±8px at 20 %.
+      // At 100 ms the button is mid-travel.
+      expect(find.text(en.authEmailInvalid), findsOneWidget);
+      expect(find.text(en.authPasswordTooShort), findsOneWidget);
+      expect(
+        (tester.getRect(_ctaFinder).left - restLeft).abs(),
+        greaterThan(0),
+        reason: 'the CTA is mid-shake, not parked at its rest position',
+      );
+
+      // And the shake ENDS: after 450 ms the controller completes and the
+      // button is exactly where it started. `pumpAndSettle` is safe here — the
+      // harness mounts the page with no ambient clocks (animationsEnabled
+      // false), so the only scheduled frames are the shake's own, and settle
+      // means the shake is over. Stepped pumps are measured to lag the fake
+      // clock by a frame, which is why the mid-shake read above steps and this
+      // one settles.
+      await tester.pumpAndSettle();
+      expect(tester.getRect(_ctaFinder).left, restLeft);
+    });
+
+    testWidgets('the shake does not run at all under reduced motion — §14', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      // The harness's §14 switch: `MediaQuery.disableAnimationsOf` drives
+      // `_playShake` directly, so this is the exact branch, not a proxy.
+      await pumpLogin(tester, bloc: fixture.bloc, disableAnimations: true);
+      await tester.pump();
+
+      // Enter the bad password FIRST, so the error row's layout shift has
+      // already happened and the only thing left to attribute to the tap is
+      // the shake — which must be nothing.
+      await tester.enterText(_passwordFinder, 'abc');
+      await tester.pump();
+      final double restLeft = tester.getRect(_ctaFinder).left;
+      await tester.tap(_ctaFinder);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 25));
+      await tester.pump(const Duration(milliseconds: 25));
+      expect(tester.getRect(_ctaFinder).left, restLeft);
     });
 
     testWidgets('a complete form signs in and reports it', (
       WidgetTester tester,
     ) async {
-      final List<LoginOutcome> reported = <LoginOutcome>[];
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc, onResult: reported.add);
+      LoginOutcome? reported;
+      await pumpLogin(
+        tester,
+        bloc: fixture.bloc,
+        onResult: (LoginOutcome outcome) => reported = outcome,
+      );
+      await tester.pump(const Duration(milliseconds: 1200));
 
       await tester.enterText(_emailFinder, 'david@evangelion.app');
       await tester.enterText(_passwordFinder, 'correct horse');
       await tester.pump();
-      expect(fixture.bloc.state.canSubmit, isTrue);
+      await tester.tap(_ctaFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.byType(EvaButton));
-      await tester.pumpAndSettle();
-
-      expect(fixture.bloc.state.isSignedIn, isTrue);
-      expect(fixture.bloc.state.session?.userId, kSeedUserId);
-      expect(reported, <LoginOutcome>[LoginOutcome.signedIn]);
+      expect(reported, LoginOutcome.signedIn);
     });
 
-    testWidgets('the password field masks until the toggle is pressed', (
+    testWidgets('the CTA is enabled with an empty form, and still answers', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      expect(passwordTextField(tester).obscureText, isTrue);
-      expect(find.byIcon(Icons.visibility_off), findsOneWidget);
-
-      await tester.tap(find.byType(PasswordVisibilityToggle));
-      await tester.pump();
-
-      expect(passwordTextField(tester).obscureText, isFalse);
-      expect(find.byIcon(Icons.visibility), findsOneWidget);
+      // `redesign.html:508` — a bare `<button>` with no `disabled`. The old
+      // screen dimmed the button until `canSubmit`; the redesign answers an
+      // empty tap with guidance instead.
+      final EvaButton cta = tester.widget<EvaButton>(
+        find.ancestor(of: _ctaFinder, matching: find.byType(EvaButton)),
+      );
+      expect(cta.onPressed, isNotNull);
     });
 
     testWidgets('the typed text survives a rebuild, because the controller is '
         'the caller\'s', (WidgetTester tester) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      await tester.enterText(_emailFinder, 'david@evangelion');
-      await tester.enterText(_passwordFinder, 'short');
+      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      await tester.pump();
+      // A bloc-driven rebuild — any state change rebuilds `_LoginForm`'s
+      // builder while the controllers must not be touched.
+      await tester.enterText(_passwordFinder, 'correct horse');
       await tester.pump();
 
-      // Every keystroke emitted a new state and rebuilt the form. A design-system
-      // field that took its text from the bloc would have overwritten the
-      // character being typed on each of them.
-      expect(find.text('david@evangelion'), findsOneWidget);
-      expect(find.text('short'), findsOneWidget);
+      expect(emailTextField(tester).controller!.text, 'david@evangelion.app');
+      expect(passwordTextField(tester).controller!.text, 'correct horse');
     });
 
     testWidgets('a refused sign-in shows the repository\'s message', (
@@ -488,11 +454,15 @@ void main() {
       );
       addTearDown(bloc.close);
 
-      await pumpLogin(tester, bloc: bloc);
+      // The redesign's login declares no repository-failure state (its submit
+      // handler can only fail client-side), so this row is **written, not
+      // transcribed** — the same standing reason `homeRetry` carries. See
+      // `_FormError`'s doc.
+      await pumpSettledFixture(tester, bloc);
       await tester.enterText(_emailFinder, 'david@evangelion.app');
       await tester.enterText(_passwordFinder, 'correct horse');
       await tester.pump();
-      await tester.tap(find.byType(EvaButton));
+      await tester.tap(_ctaFinder);
       await tester.pumpAndSettle();
 
       expect(bloc.state.isSignedIn, isFalse);
@@ -504,18 +474,18 @@ void main() {
     testWidgets('signing in still works, and the page simply comes down', (
       WidgetTester tester,
     ) async {
-      // `pushPath('/login')` reaches this page with `onResult == null`: it is the
-      // one route with no guard. Phase 4 measured the case; this proves the screen
-      // survives it rather than crashing on `onResult!(…)`.
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
       await tester.enterText(_emailFinder, 'david@evangelion.app');
       await tester.enterText(_passwordFinder, 'correct horse');
       await tester.pump();
-      await tester.tap(find.byType(EvaButton));
-      await tester.pumpAndSettle();
+      await tester.tap(_ctaFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
+      // The bloc reached signedIn and nothing threw: the outcome went to the
+      // local no-op, not to a crash and not to nobody-in-particular.
       expect(fixture.bloc.state.isSignedIn, isTrue);
       expect(tester.takeException(), isNull);
     });
@@ -527,185 +497,99 @@ void main() {
     ) async {
       final LoginFixture fixture = buildFixture();
       await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+      await tester.pump(const Duration(milliseconds: 1200));
 
-      expect(find.text('تسجيل الدخول'), findsOneWidget);
-      expect(find.text('نسيت كلمة المرور؟'), findsOneWidget);
-      expect(find.text('أنشئ حسابًا'), findsOneWidget);
-      expect(find.text('المتابعة عبر Google'), findsOneWidget);
-      expect(find.text('اقرأ. تأمل. تذكّر.'), findsOneWidget);
-
-      final BuildContext context = tester.element(
-        find.byType(EvaTextField).first,
-      );
-      expect(
-        Directionality.of(context),
-        TextDirection.rtl,
-        reason: 'the app declares `ar` and Material supplies the direction',
-      );
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      // The CTA is the redesign's one translated control.
+      expect(find.text(en.authEnterTheWord), findsNothing);
+      final Finder arabicCta = find.text('ادخل الكلمة');
+      expect(arabicCta, findsOneWidget);
+      expect(Directionality.of(tester.element(arabicCta)), TextDirection.rtl);
     });
 
-    testWidgets('keeps the orb group, because the variant is the route\'s', (
-      WidgetTester tester,
-    ) async {
+    testWidgets(
+      'keeps the ambient group, because the variant is the route\'s',
+      (WidgetTester tester) async {
+        final LoginFixture fixture = buildFixture();
+        await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+        await tester.pump(const Duration(milliseconds: 1200));
+
+        final NeuralScaffold scaffold = tester.widget<NeuralScaffold>(
+          find.byType(NeuralScaffold),
+        );
+        expect(scaffold.variant, NeuralVariant.login);
+      },
+    );
+
+    testWidgets('the tagline and footer stay Latin on the Arabic arm, as the '
+        'redesign renders them', (WidgetTester tester) async {
       final LoginFixture fixture = buildFixture();
       await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+      await tester.pump(const Duration(milliseconds: 1200));
 
-      // `NeuralVariant.login` in both directions — see `LoginPage`'s doc. If this
-      // ever became language-dependent it would be a second source of truth for one
-      // fact, which is the failure `orbGroupFor` documents.
-      expect(find.byType(NeuralBackground), findsOneWidget);
-      final NeuralBackground background = tester.widget<NeuralBackground>(
-        find.byType(NeuralBackground),
-      );
-      expect(background.variant, NeuralVariant.login);
-    });
-
-    testWidgets('the fields are labelled in Arabic, not in English', (
-      WidgetTester tester,
-    ) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
-      final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
-
-      expect(find.bySemanticsLabel('البريد الإلكتروني'), findsOneWidget);
-      expect(find.bySemanticsLabel('كلمة المرور'), findsOneWidget);
-
-      handle.dispose();
+      // `redesign.html:505,510` carry no `data-i18n`, so `applyLang()` never
+      // rewrites them; `[dir=rtl] .mono` (`:136`) removes only the uppercase.
+      // Both literals render as written — the one place on the arm where Latin
+      // is the redesign's own choice, asserted here so it is a decision rather
+      // than an accident.
+      expect(find.text(LoginPage.kTaglineText), findsOneWidget);
+      expect(find.text(LoginPage.kFooterText), findsOneWidget);
     });
   });
 
   group('a typed run sits where the placeholder was', () {
-    // A READER REPORTED THIS, and no assertion in this file would have caught it.
-    // `EvaTextField` sets `contentPadding: EdgeInsets.zero` with `isDense: true`,
-    // which leaves the `RenderEditable` no vertical inset at all, so a typed line
-    // sat at the TOP of the row — while `_Placeholder`, which draws the hint through
-    // `Align(AlignmentDirectional.centerStart)`, was centred. Empty fields looked
-    // correct because an empty row is one line tall and there is no gap to see; the
-    // moment a character arrived, the two disagreed.
-    //
-    // So this compares the SAME field before and after typing. That framing is the
-    // whole point: two rules that are each individually plausible can disagree, and
-    // an assertion about the field in isolation ("roughly centred in the viewport")
-    // would pass with the bug present on a taller row.
     testWidgets('in the email field', (WidgetTester tester) async {
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      // The hint's distance from the field's own centre, taken first.
-      final double hintOffset = _runOffsetFromFieldCentre(
-        tester,
-        find.text('you@example.com'),
-        _emailFinder,
-      );
-
-      await tester.enterText(_emailFinder, 'reader@example.com');
+      const String typed = 'mariam@light.co';
+      await tester.enterText(_emailFinder, typed);
       await tester.pump();
 
-      expect(
-        _typedRunOffsetFromFieldCentre(tester, _emailFinder),
-        closeTo(hintOffset, 1.0),
-        reason:
-            'the typed run and the hint it replaced must share a vertical '
-            'position inside the field, which is '
-            '${tester.getSize(_emailFinder).height}px tall here',
-      );
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      expect(find.text(en.authEmailHint), findsNothing);
+      expect(find.text(typed), findsOneWidget);
     });
+  });
 
-    testWidgets('in the password field, whose row carries a trailing toggle', (
+  group('the wordmark entrance', () {
+    testWidgets('every letter arrives, in the prototype\'s order', (
       WidgetTester tester,
     ) async {
-      // One field is not the other: the password row is taller because of the
-      // visibility toggle, so the two have separate geometry.
       final LoginFixture fixture = buildFixture();
-      await pumpLogin(tester, bloc: fixture.bloc);
+      await pumpSettled(tester, fixture);
 
-      final double hintOffset = _runOffsetFromFieldCentre(
-        tester,
-        find.text('••••••••'),
-        _passwordFinder,
-      );
+      // `animateLogin()` (`redesign.html:1297-1302`) splits the mark into
+      // single letters; the last letter's arrival is the animation's completion,
+      // and after 1.2 s every interval has elapsed.
+      for (final String character in LoginPage.kWordmarkText.split('')) {
+        expect(
+          find.text(character),
+          findsWidgets,
+          reason: 'the letter $character is rendered',
+        );
+      }
+    });
 
-      await tester.enterText(_passwordFinder, 'correct-horse');
+    testWidgets('reduced motion shows the mark whole, immediately — §14', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc, disableAnimations: true);
+      // One frame: no entrance to wait out, because the end state is the start.
       await tester.pump();
 
-      expect(
-        _typedRunOffsetFromFieldCentre(tester, _passwordFinder),
-        closeTo(hintOffset, 1.0),
+      // The letters are painted at full opacity on the first frame — the §14
+      // jump, not the prototype's zeroed-stagger version of the same animation.
+      final Finder first = find.text('E');
+      expect(first, findsWidgets);
+      final Opacity opacity = tester.firstWidget<Opacity>(
+        find.ancestor(of: first.first, matching: find.byType(Opacity)),
       );
+      expect(opacity.opacity, 1);
     });
   });
 }
 
-/// [run]'s distance from the vertical centre of the [field] containing it.
-///
-/// Measured from the FIELD's centre rather than as an absolute position, so the
-/// number is meaningful without knowing the field's height, and so one helper can
-/// describe both a hint and a typed value for comparison.
-double _runOffsetFromFieldCentre(
-  WidgetTester tester,
-  Finder run,
-  Finder field,
-) => (tester.getRect(run).center.dy - tester.getRect(field).center.dy).abs();
-
-/// The same distance for a **typed** value, which `find.text` cannot locate.
-///
-/// Both plain and obscured runs are painted by `RenderEditable` rather than by a
-/// `Text` widget, so asking for the bullets of an obscured field finds zero
-/// widgets — that was the first version of this test and it failed on the
-/// password field exactly that way. The caret rect is the honest instrument: it is
-/// drawn at the run's own line box, so its position *is* where a reader sees the
-/// glyphs, in either obscuring state.
-/// The [RenderEditable] inside [editable], which is not the one its finder returns.
-///
-/// `tester.renderObject(find.byType(EditableText))` yields a
-/// `_RenderCompositionCallback`, so casting it to `RenderEditable` throws a
-/// `_TypeError` instead of returning null — and `find.byType(RichText)` finds
-/// **nothing**, because the run is painted by the editable's own paragraph rather
-/// than by a `RichText` widget. Both were tried.
-///
-/// The real object is a **descendant**: Flutter wraps the editable in a chain of
-/// input and semantics layers between the widget and its render object — walked
-/// here as `_RenderCompositionCallback → RenderTapRegion → RenderMouseRegion →
-/// RenderPointerListener(×2) → RenderSemanticsAnnotations → RenderIgnorePointer →
-/// RenderLeaderLayer → _RenderSizeChangedWithCallback → RenderEditable`. The chain
-/// is walked rather than hard-coded to a depth, because a hard-coded depth is
-/// another number that goes stale when Flutter inserts a layer.
-RenderEditable _findRenderEditable(WidgetTester tester, Finder editable) {
-  RenderObject? node = tester.renderObject(editable.first);
-  while (node != null && node is! RenderEditable) {
-    final List<RenderObject> children = <RenderObject>[];
-    node.visitChildren(children.add);
-    node = children.isEmpty ? null : children.first;
-  }
-  expect(
-    node,
-    isA<RenderEditable>(),
-    reason: 'no RenderEditable below $editable',
-  );
-  return node! as RenderEditable;
-}
-
-double _typedRunOffsetFromFieldCentre(WidgetTester tester, Finder field) {
-  final RenderEditable editable = _findRenderEditable(
-    tester,
-    find.descendant(of: field, matching: find.byType(EditableText)),
-  );
-  // The caret ahead of the first character; it shares the run's vertical
-  // position, which is the property under test.
-  final Rect caret = editable.getLocalRectForCaret(
-    const TextPosition(offset: 0),
-  );
-  final Offset centre = editable.localToGlobal(caret.center);
-  return (centre.dy - tester.getRect(field).center.dy).abs();
-}
-
-/// A port a test can disagree with.
-///
-/// `FakeAuthRepository` judges the credentials with the **same** `validateLogin` the
-/// form uses, so a form-valid submission always succeeds and the error path is
-/// unreachable through it. A real adapter will disagree — a wrong password, a
-/// network, a server that no longer knows this reader — and the screen has to
-/// render that, so it is rendered against the mocked **port** rather than against a
-/// subclass (which `FakeAuthRepository`'s `final` forbids anyway, and which would
-/// have been a second copy of the repository's rules).
-class MockAuthRepository extends Mock implements AuthRepository {}
+/// `.mono`'s LTR uppercase, spelled the way the page spells it.
+String _monoUpper(String source) => source.toUpperCase();

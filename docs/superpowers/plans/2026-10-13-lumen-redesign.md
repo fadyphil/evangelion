@@ -1212,6 +1212,29 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 # Phase 5 — Screens
 
+> **Status: Task 5.1 COMPLETE** (full gate green: **2821 tests**, **98.50%
+> coverage** (floor 98.25%), citations 1584/1584, orphan gate green with the
+> `SealMonogram` allowlist entry naming Task 5.6, purity green, analyzer 0).
+> The screen was rebuilt against `eva/redesign.html:503-511`: glowing wordmark
+> with the ten-letter entrance, mono tagline, two bare fields (`EvaTextField
+> showLabel: false` — the caption hidden, the §14 name kept), the always-tappable
+> CTA with the `.cta.err` shake, two inert ghost pills (`EvaButton.semanticLabel`
+> carries the unavailable suffix), and the alpha-omega footer through
+> `NeuralScaffold.overlay`. Three defects the gates caught, not reading: the
+> footer's overlay stretched to the viewport and ate the CTA's tap
+> (`Positioned.fill` hands tight constraints down; `Align` fixes it), the
+> tagline/footer took `arabicAware`'s Amiri on the Arabic arm and tofu'd the
+> Greek letters (brand lines stay mono in both directions), and the wordmark
+> overflowed 320px at 1.22x (a brand mark scales — `FittedBox scaleDown` — it
+> does not wrap). Two numbers moved with the prototype: `kMinPasswordLength`
+> 8->4 (`:1306` states the rule the React prototype never did) and one message
+> per field (`:976`), the old `kRequiredMessage` gone with it; the page renders
+> the localized sentence **by presence**, never by matching domain text. The
+> harness re-pointed to `eva/redesign.html` — selector-keyed CSS extraction,
+> anchored to line starts because the light-mode override nests the login
+> selectors — and the field's message line is now reserved (`min-height:13`,
+> `:379`) so an error arriving moves nothing.
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |

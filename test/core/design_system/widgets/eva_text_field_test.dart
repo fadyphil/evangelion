@@ -1,5 +1,8 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../support/design_system_harness.dart';
 
 /// RED-FIRST — the part of `EvaTextField` that is a calculation rather than a
 /// widget: which border, which fill, and how strong the focus glow, for each of
@@ -252,6 +255,86 @@ void main() {
       // the 4px spacing scale, so it is a named constant here rather than a
       // round number invented at a call site.
       expect(kEvaTextFieldStackGap, 6.0);
+    });
+  });
+
+  group('showLabel — the redesign\'s login draws bare fields', () {
+    // `eva/redesign.html:506-507` is `<input placeholder="email">` — no
+    // `<label>` anywhere on the screen. [EvaTextField.showLabel] exists so the
+    // rebuilt `/login` can draw exactly that, and its contract is three claims:
+    // the caption row disappears, the accessible name does not, and the box
+    // geometry is untouched. `kEvaTextFieldHeight` is a harness-pinned number,
+    // which is why the third claim is asserted rather than assumed.
+
+    Future<void> pumpField(WidgetTester tester, {required bool showLabel}) =>
+        pumpPrimitive(
+          tester,
+          Align(
+            alignment: Alignment.topCenter,
+            child: Material(
+              type: MaterialType.transparency,
+              child: EvaTextField(
+                label: 'Email',
+                showLabel: showLabel,
+                controller: TextEditingController(),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('true renders the caption above the field', (
+      WidgetTester tester,
+    ) async {
+      await pumpField(tester, showLabel: true);
+
+      expect(find.text('EMAIL'), findsOneWidget);
+      // The separator between the caption and the shell is exactly the stack
+      // gap — one 6px `SizedBox`, the constant the widget names. (The gap
+      // between the *painted* boxes reads larger than 6 because the caption's
+      // `labelMedium` box carries its own 1.5× leading; the layout gap is the
+      // constant, and that is the claim.)
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is SizedBox && w.height == kEvaTextFieldStackGap,
+        ),
+        findsOneWidget,
+      );
+      final double captionBottom = tester.getBottomRight(find.text('EMAIL')).dy;
+      final double shellTop = tester.getTopLeft(find.byType(TextField)).dy;
+      expect(shellTop - captionBottom, greaterThan(0));
+    });
+
+    testWidgets('false drops the caption and keeps the name — §14', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpField(tester, showLabel: false);
+      handle.dispose();
+
+      // The visible caption is gone.
+      expect(find.text('EMAIL'), findsNothing);
+      // The accessible name is not: the field's own node still carries the
+      // label through `Semantics(label:)`, which is the whole point of the
+      // parameter being about visibility and not about identity.
+      final List<SemanticsData> named = <SemanticsData>[
+        for (final SemanticsData data in semanticsTree(tester))
+          if (data.label == 'Email') data,
+      ];
+      expect(
+        named,
+        isNotEmpty,
+        reason: 'a bare field still has a name — §14, no unlabeled node',
+      );
+      // And the box is the same box: hiding the caption is a change to what
+      // sits ABOVE the field, never to the field — the editable's height is
+      // byte-for-byte the shown-label variant's.
+      final double bareHeight = tester.getSize(find.byType(TextField)).height;
+      await pumpField(tester, showLabel: true);
+      expect(
+        tester.getSize(find.byType(TextField)).height,
+        bareHeight,
+        reason: 'the shell is untouched by the caption\'s absence',
+      );
     });
   });
 }

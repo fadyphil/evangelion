@@ -61,25 +61,30 @@ void main() {
   /// `wordmark`; `auth_strings_test.dart` had a `shared` set of three), and it is
   /// written out in one place so that a sixth Latin-holding key has to be argued for
   /// in a diff rather than typed into a test.
+  ///
+  /// ## THE LOGIN SCREEN'S LATIN IS NO LONGER IN THIS TABLE, AND THAT IS NOT AN
+  /// ## OMISSION
+  ///
+  /// Phase 5.1 rebuilt `/login` against `redesign.html:503-511`, whose login
+  /// translates exactly three strings and renders five as literal markup:
+  /// `EVANGELION`, `the word · illuminated`, `αω · nocturne v1.2`,
+  /// `google`/`apple`. Those five are **widget literals**, not ARB keys — the
+  /// redesign's own `applyLang()` (`:985`) rewrites only `[data-i18n]` elements
+  /// and touches none of them — so this ARB-level table no longer sees them.
+  /// Their Latin-on-the-Arabic-arm correctness is asserted where they are
+  /// painted: `arabic_typography_test.dart`'s `/login` group.
   const Set<String> latinIsCorrect = <String>{
-    'authWordmark', // the product's name; a brand mark is not translated
-    'homeWordmark', // the same mark, drawn by the top bar
-    'authEmailHint', // an example address, and ASCII by definition
-    'authPasswordHint', // bullets, not digits — identical so the field cannot re-measure
-    'authContinueWithGoogle', // the vendor's own name inside an Arabic sentence
-    'authContinueWithApple', // the vendor's own name inside an Arabic sentence
+    'homeWordmark', // the product's mark, drawn by the top bar
   };
 
   /// The keys whose two values are **identical**, and must stay identical.
   ///
   /// The successor to `auth_strings_test.dart`'s `shared` set. Every other key must
-  /// differ, which is what catches an untranslated string.
-  const Set<String> mustBeIdentical = <String>{
-    'authWordmark',
-    'authEmailHint',
-    'authPasswordHint',
-    'homeWordmark',
-  };
+  /// differ, which is what catches an untranslated string. The login placeholders
+  /// left this set in Phase 5.1: the redesign's placeholders are common nouns and
+  /// the app localizes them (`authEmailHint` says why), so the two arms now
+  /// legitimately differ.
+  const Set<String> mustBeIdentical = <String>{'homeWordmark'};
 
   group('the ARB pair, structurally', () {
     test('the walk finds the keys, so nothing below is vacuous', () {
@@ -89,7 +94,7 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        111,
+        102,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
@@ -128,7 +133,17 @@ void main() {
             '`sealFabLeaderboard` occupies the prototype\'s `Profile` slot: Profile is a '
             'cut screen with no endpoint, and a dial offering a dead route is why the '
             'component was cut. `seal_fab_test.dart` asserts Profile is absent so it '
-            'cannot creep back.',
+            'cannot creep back.\n\n'
+            '**111 → 102 in Phase 5.1**, for the redesigned login — '
+            '`eva/redesign.html:503-511`: twelve keys died with the screen\'s '
+            'dropped elements (the seal, the sign-in label it replaced, forgot/'
+            'sign-up/divider, the two full-width social labels, the show/hide '
+            'toggle pair) and three arrived as the redesign\'s own translated '
+            'trio — `authEnterTheWord`, `authEmailInvalid`, `authPasswordTooShort` '
+            '(`:508`, `:976`). The wordmark and the tagline left the table for '
+            'widget literals: the redesign renders them untranslated in both '
+            'directions, and `arabic_typography_test.dart` now asserts that '
+            'instead of this table.',
       );
       expect(keysOf(ar), isNotEmpty);
     });
@@ -296,11 +311,15 @@ void main() {
       // preservation is asserted rather than asserted-by-review. These are the keys
       // whose ARB descriptions carry a `file:line`; if one loses it, this fails.
       const Map<String, String> citations = <String, String>{
-        'authWordmark': 'LoginScreen.tsx:29',
-        'authTagline': 'LoginScreen.tsx:32',
-        'authSignIn': 'LoginScreen.tsx:64',
-        'authDivider': 'LoginScreen.tsx:78',
-        'authContinueWithGoogle': 'LoginScreen.tsx:84',
+        // Phase 5.1's redesigned login. The redesign's own i18n trio cites
+        // `redesign.html`, as does everything else the screen transcribed.
+        'authEmailLabel': 'redesign.html:506',
+        'authEmailHint': 'redesign.html:506',
+        'authPasswordLabel': 'redesign.html:507',
+        'authPasswordHint': 'redesign.html:507',
+        'authEnterTheWord': 'redesign.html:508',
+        'authEmailInvalid': 'redesign.html:976',
+        'authPasswordTooShort': 'redesign.html:976',
         'homeWordmark': 'ds.tsx:508',
         'homeStreakGlowing': 'HomeScreen.tsx:30',
         'homeContinueReading': 'HomeScreen.tsx:44',
@@ -395,8 +414,9 @@ void main() {
       // The other half, and not redundant: a table that replaced Arabic with
       // transliterated Latin passes "no English left" and fails this.
       for (final String key in <String>[
-        'authTagline',
-        'authSignIn',
+        'authEnterTheWord',
+        'authEmailInvalid',
+        'authPasswordTooShort',
         'homeGreetingMorning',
         'homeTodayReading',
         'homeRetry',

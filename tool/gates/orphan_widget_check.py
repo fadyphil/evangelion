@@ -112,6 +112,15 @@ ALLOWLIST: dict[str, str] = {
         "constructs it, and the gate reports that, so it cannot outlive its "
         "reason."
     ),
+    "SealMonogram": (
+        "Phase 5.1 rebuilt `/login` against eva/redesign.html:503-511, whose "
+        "brand block is a wordmark and a tagline — the seal is one of the "
+        "elements the redesign deleted from that screen. The widget survives "
+        "because Task 4.2 re-rolled its treatment to `.jorb` "
+        "(eva/redesign.html:392-395) and `/journey` draws that orb in Task 5.6; "
+        "between those two tasks it is genuinely unplaced. Same mechanism as "
+        "WitnessSky's entry: STALE the moment any page constructs it."
+    ),
 }
 
 

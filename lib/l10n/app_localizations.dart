@@ -98,121 +98,59 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
-  /// The product's name, above the tagline. Transcribed: LoginScreen.tsx:29.
-  ///
-  /// DELIBERATELY THE SAME IN BOTH ARMS. The wordmark stays `Evangelion` in Arabic too: it is the product's name in every language, and transliterating a brand mark is a product decision rather than a translation. This is the ONLY auth/home string permitted to hold Latin script on the Arabic arm, and `test/l10n/app_localizations_test.dart` excepts exactly this key by name.
-  ///
-  /// In en, this message translates to:
-  /// **'Evangelion'**
-  String get authWordmark;
-
-  /// Transcribed: LoginScreen.tsx:32.
-  ///
-  /// The prototype is ENGLISH ONLY — `eva/src` has one `LoginScreen.tsx` and no Arabic variant — so every Arabic value in this file is written rather than transcribed, and none of them is presented as the prototype's. The three words are the product's own: the same three the design already carries, and reading and remembering are the point of a Sunday-school reading app.
-  ///
-  /// In en, this message translates to:
-  /// **'Read. Reflect. Remember.'**
-  String get authTagline;
-
-  /// The email field's label, which is also its semantics name. Transcribed: LoginScreen.tsx:49.
+  /// The email field's accessible name, which `EvaTextField` puts in `Semantics(label:)`. Transcribed: redesign.html:506 — `placeholder="email"`; the redesign's field has no `<label>`, so the placeholder word is the name a browser would read and the word carried here.
   ///
   /// In en, this message translates to:
   /// **'Email'**
   String get authEmailLabel;
 
-  /// The email field's placeholder. Transcribed: LoginScreen.tsx:49.
+  /// The email field's visible placeholder. Transcribed: redesign.html:506 — `placeholder="email"`.
   ///
-  /// DELIBERATELY LATIN ON THE ARABIC ARM. An email address is an ASCII-domain string by definition; transliterating it would produce an address that cannot be typed.
+  /// LOCALIZED ON THE ARABIC ARM, unlike `you@example.com` before it. The old placeholder was an ASCII-domain sample string that no language translates; this one is a common noun naming what the reader should type, and the redesign's own dictionary translates every word a reader acts on (`emErr` carries `البريد`). The Arabic is the standard form, and it is the same noun `authEmailLabel` carries — placeholder and accessible name agree, as a browser's would.
   ///
   /// In en, this message translates to:
-  /// **'you@example.com'**
+  /// **'email'**
   String get authEmailHint;
 
-  /// The password field's label. Transcribed: LoginScreen.tsx:51.
+  /// The password field's accessible name. Transcribed: redesign.html:507 — `placeholder="password"`; see `authEmailLabel` for why the placeholder word is the name.
   ///
   /// In en, this message translates to:
   /// **'Password'**
   String get authPasswordLabel;
 
-  /// The password field's placeholder. Transcribed: LoginScreen.tsx:51.
+  /// The password field's visible placeholder. Transcribed: redesign.html:507 — `placeholder="password"`, replacing the masked `••••••••` the React prototype drew.
   ///
-  /// DELIBERATELY IDENTICAL IN BOTH ARMS, because Arabic digits and Latin digits both differ per locale and a masked placeholder that changed shape would be re-measuring the field on every locale switch.
+  /// A WORD AND NOT A MASK, and that is the redesign's choice, not a change of mind about masks: the placeholder names the field the way a browser's `placeholder="password"` does, and `authPasswordLabel` carries the same noun. Deliberately localized on the Arabic arm; the word is `كلمة المرور`, which is the exact noun `pwErr` (`redesign.html:976`) already carries — no new translation is invented.
   ///
   /// In en, this message translates to:
-  /// **'••••••••'**
+  /// **'password'**
   String get authPasswordHint;
 
-  /// The primary button. Transcribed: LoginScreen.tsx:64.
+  /// The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n="enter"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:954` — `enter:["enter the word","ادخل الكلمة"]`). The Arabic is the prototype's own, not a new translation.
   ///
   /// In en, this message translates to:
-  /// **'Sign in'**
-  String get authSignIn;
+  /// **'enter the word'**
+  String get authEnterTheWord;
 
-  /// The "Forgot password?" control. Transcribed: LoginScreen.tsx:66.
+  /// The email field's error line. Transcribed: redesign.html:976 — `emErr:["email looks incomplete","البريد غير مكتمل"]`, announced by `redesign.html:1305`'s one regex test. The Arabic is the prototype's own.
+  ///
+  /// RENDERED BY PRESENCE, NOT BY MATCHING: the page draws this sentence when `state.emailError != null` and never compares the domain's message text, so the wording in `login_credentials.dart` is the log-canonical copy and this key is the reader's.
   ///
   /// In en, this message translates to:
-  /// **'Forgot password?'**
-  String get authForgotPassword;
+  /// **'email looks incomplete'**
+  String get authEmailInvalid;
 
-  /// The half of the sign-up row that is not a control. Transcribed: LoginScreen.tsx:69.
+  /// The password field's error line. Transcribed: redesign.html:976 — `pwErr:["password too short","كلمة المرور قصيرة"]`, announced by `redesign.html:1306`'s one length test. Rendered by presence, as `authEmailInvalid` says.
   ///
   /// In en, this message translates to:
-  /// **'New here?'**
-  String get authNewHere;
-
-  /// The "Create account" control. Transcribed: LoginScreen.tsx:71.
-  ///
-  /// In en, this message translates to:
-  /// **'Create account'**
-  String get authCreateAccount;
-
-  /// The label in the divider. Transcribed: LoginScreen.tsx:78.
-  ///
-  /// `HairlineDivider`'s own doc records why this is a caller string at all: `LoginPage` passes this and has nothing else to say, so a hard-coded English literal in `core/` would be the half-translated UI this app exists not to ship.
-  ///
-  /// In en, this message translates to:
-  /// **'or'**
-  String get authDivider;
-
-  /// The Google button. Transcribed: LoginScreen.tsx:84.
-  ///
-  /// This control, and the three beside it, SHIP DISABLED by design — there is no auth endpoint on the backend (AGENT_CONTEXT §2 decision 3) — which is why `authUnavailableSuffix` exists.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue with Google'**
-  String get authContinueWithGoogle;
-
-  /// The Apple button. Transcribed: LoginScreen.tsx:85. Ships disabled, as `authContinueWithGoogle` says.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue with Apple'**
-  String get authContinueWithApple;
-
-  /// The password toggle's name while the password is masked. Written, not transcribed — the prototype's toggle is an icon-only `<button>` with no accessible name at all.
-  ///
-  /// In en, this message translates to:
-  /// **'Show password'**
-  String get authShowPassword;
-
-  /// The password toggle's name while the password is visible. Written, as `authShowPassword` says.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide password'**
-  String get authHidePassword;
-
-  /// The seal's accessible name. Transcribed from `SealMonogram.semanticLabel`.
-  ///
-  /// DELIBERATELY `Evangelion` AND NOT `authWordmark`'s transliterated form, because it names the SEAL — the monogram mark — and not the wordmark above it. The Arabic value is the prototype's brand form `إنجيل`; see `authWordmark` for why that is a different decision.
-  ///
-  /// In en, this message translates to:
-  /// **'Evangelion'**
-  String get authSealLabel;
+  /// **'password too short'**
+  String get authPasswordTooShort;
 
   /// Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.
   ///
   /// NAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.
   ///
-  /// APPENDED BY THE CALL SITE, NEVER BAKED IN — two inert controls on `/login` share labels, and a suffix inside the label would render "unavailable in this build - unavailable in this build".
+  /// APPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render "unavailable in this build - unavailable in this build".
   ///
   /// In en, this message translates to:
   /// **'unavailable in this build'**

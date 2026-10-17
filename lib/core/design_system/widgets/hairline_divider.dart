@@ -26,9 +26,12 @@ import 'package:flutter/material.dart';
 /// ## THE LABEL IS SWAPPED FOR THE AMBIENT ARM, AND `toUpperCase` IS A NO-OP THERE
 ///
 /// [label] is a caller's string with no family parameter, for [TextLink]'s reason:
-/// `LoginPage` passes `context.l10n.authDivider` and has nothing else to
-/// pass. So `أو` rendered in **Space Mono** — one tofu box — on a bilingual screen,
+/// `ReadingHeader` passes its caller's sentence and has nothing else to
+/// pass. So `أو` once rendered in **Space Mono** — one tofu box — on a bilingual screen,
 /// while the `EvaButton` two lines above it rendered its Arabic label in Amiri.
+/// (The `/login` call that motivated the rule is gone with the redesigned
+/// screen, which has no divider; the rule outlived the call site, and
+/// `reading_header.dart` is where it now earns its keep.)
 ///
 /// `text.toUpperCase()` is kept and is a no-op on the Arabic arm: Arabic has no
 /// case, so the transform is idempotent there and the prototype's uppercase rule

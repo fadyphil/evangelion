@@ -60,24 +60,31 @@ final class LoginCredentials with _$LoginCredentials {
 
 /// The shortest password this form accepts.
 ///
-/// **Chosen, not transcribed.** `eva/src` states no minimum anywhere;
-/// `LoginScreen.tsx:52` shows an error string ("That password's too short") with
-/// no rule behind it, and there is no server to ask — there is no auth endpoint
-/// (AGENT_CONTEXT §2, decision 3). Eight is the conventional figure and no
-/// document in this repository argues for another, so it is written down here,
-/// once, where a reader looking for the rule will find it.
+/// **Transcribed — superseding the "chosen, not transcribed" note below.** The
+/// React prototype stated no minimum anywhere, so the first version of this file
+/// chose eight as the conventional figure. The redesign **states the rule**:
+/// `eva/redesign.html:1306` — `pw.length>=4?'':tr('pwErr')`. A rule the reader
+/// can now discover is transcribed, not chosen, and four it is.
 ///
-/// The message it produces, [kShortPasswordMessage], **is** the prototype's and
-/// is verbatim.
-const int kMinPasswordLength = 8;
+/// The message it produces, [kShortPasswordMessage], is the redesign's own
+/// wording — see that constant.
+const int kMinPasswordLength = 4;
 
-/// The prototype's own short-password message. `LoginScreen.tsx:52`.
-const String kShortPasswordMessage = "That password's too short";
+/// The redesign's short-password message. `redesign.html:976` — `pwErr:
+/// ["password too short","كلمة المرور قصيرة"]`.
+const String kShortPasswordMessage = 'password too short';
 
-/// "Required" — used when a field is empty, which is a different complaint from
-/// [kShortPasswordMessage] and says so: a criticism of a blank box the reader
-/// has not typed in yet is not criticism of what they typed.
-const String kRequiredMessage = 'This field is required';
+/// The redesign's malformed-address message. `redesign.html:976` — `emErr:
+/// ["email looks incomplete","البريد غير مكتمل"]`.
+///
+/// The redesign has **one message per field**, not the old prototype's two
+/// (`kRequiredMessage` plus a validity complaint): an empty address and a
+/// malformed one are the same failure to `redesign.html:1305`'s single regex
+/// test. The old `kRequiredMessage` — a criticism of a blank box worded
+/// differently from a criticism of what was typed — is gone with the prototype
+/// that framed it, and the page renders the localized sentence by **presence**
+/// (`state.emailError != null`), never by matching this text.
+const String kInvalidEmailMessage = 'email looks incomplete';
 
 /// The verdict on one pair of credentials: at most one message per field.
 ///
@@ -121,12 +128,19 @@ final class LoginValidation with _$LoginValidation {
 
 /// Judges [email] and [password].
 ///
-/// Two rules, from two places, and neither is invented:
+/// Two rules, and the redesign states one of them outright:
 ///
-/// * **the address** must have a local part and a dotted domain, because the
-///   prototype types the field `type="email"` (`LoginScreen.tsx:49`);
+/// * **the address** must have a local part and a dotted domain, because
+///   `redesign.html:1305` tests `^\S+@\S+\.\S+$` — the same shape the first
+///   version derived from `LoginScreen.tsx:49`'s `type="email"`, now with the
+///   prototype's own regex as the citation;
 /// * **the password** must be at least [kMinPasswordLength] characters, which is
-///   the one rule this file chose rather than read — see that constant.
+///   `redesign.html:1306` verbatim — see that constant for how the rule arrived.
+///
+/// One message per field, in both cases the redesign's own word: the two
+/// complaints the first version carried (blank vs malformed, blank vs short) are
+/// the old prototype's framing, and `redesign.html:1305-1306` collapses each
+/// field to a single sentence — see [kInvalidEmailMessage].
 LoginValidation validateLogin({
   required String email,
   required String password,
@@ -139,31 +153,36 @@ LoginValidation validateLogin({
 ///
 /// `[local]@domain`, both non-empty, and the domain carrying a dot that is not
 /// its first or last character — which is what rejects `david@.app` and
-/// `david@evangelion.` while accepting `a@b.co`.
+/// `david@evangelion.` while accepting `a@b.co`. `redesign.html:1305`'s
+/// `^\S+@\S+\.\S+$` rejects exactly these and accepts exactly `a@b.co` too; the
+/// hand-rolled walk is kept over `RegExp` because Dart's `RegExp` would be the
+/// first regex in the domain layer for a rule two `if`s already state, and a
+/// scan gate would then have to decide whether domain regexes are a pattern it
+/// should watch. Empty and malformed share one message — see
+/// [kInvalidEmailMessage].
 String? _emailError(String email) {
   if (email.isEmpty) {
-    return kRequiredMessage;
+    return kInvalidEmailMessage;
   }
   final int at = email.lastIndexOf('@');
   if (at <= 0 || at == email.length - 1) {
-    return 'Enter a valid email address';
+    return kInvalidEmailMessage;
   }
   final String domain = email.substring(at + 1);
   final int dot = domain.indexOf('.');
   if (dot <= 0 || dot == domain.length - 1) {
-    return 'Enter a valid email address';
+    return kInvalidEmailMessage;
   }
   return null;
 }
 
 /// The password rule.
 ///
-/// Length only. No character-class rule is invented: the prototype states none,
-/// and a rule the reader cannot discover is worse than no rule at all.
+/// Length only. No character-class rule is invented: the redesign states none,
+/// and a rule the reader cannot discover is worse than no rule at all. Empty and
+/// short share one message — an empty password is a password shorter than
+/// [kMinPasswordLength], which is how `redesign.html:1306` treats it.
 String? _passwordError(String password) {
-  if (password.isEmpty) {
-    return kRequiredMessage;
-  }
   if (password.length < kMinPasswordLength) {
     return kShortPasswordMessage;
   }

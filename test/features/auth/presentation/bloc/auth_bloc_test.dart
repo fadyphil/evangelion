@@ -49,7 +49,10 @@ void main() {
 
   const String email = 'david@evangelion.app';
   const String goodPassword = 'correct horse';
-  const String shortPassword = 'short';
+  // Three characters: the redesign's minimum is 4 (`redesign.html:1306`),
+  // so a five-character fixture would *pass* and every short-password
+  // assertion below would be vacuous.
+  const String shortPassword = 'abc';
 
   /// The same bloc production builds: real use cases over a mocked port.
   AuthBloc build({Completer<Result<AuthSession>>? pending}) {
@@ -172,7 +175,7 @@ void main() {
         const AuthState(
           email: 'd',
           emailTouched: true,
-          emailError: 'Enter a valid email address',
+          emailError: kInvalidEmailMessage,
         ),
       ],
     );
@@ -185,7 +188,7 @@ void main() {
         const AuthState(
           email: 'david@',
           emailTouched: true,
-          emailError: 'Enter a valid email address',
+          emailError: kInvalidEmailMessage,
         ),
       ],
     );
@@ -200,7 +203,7 @@ void main() {
         const AuthState(
           email: 'david@',
           emailTouched: true,
-          emailError: 'Enter a valid email address',
+          emailError: kInvalidEmailMessage,
         ),
         const AuthState(email: email, emailTouched: true),
       ],
@@ -235,7 +238,7 @@ void main() {
         ..add(const AuthEmailChanged('')),
       expect: () => <AuthState>[
         const AuthState(email: email, emailTouched: true),
-        const AuthState(emailTouched: true, emailError: kRequiredMessage),
+        const AuthState(emailTouched: true, emailError: kInvalidEmailMessage),
       ],
     );
 
@@ -477,14 +480,14 @@ void main() {
         const AuthState(
           email: 'nope',
           emailTouched: true,
-          emailError: 'Enter a valid email address',
+          emailError: kInvalidEmailMessage,
         ),
         const AuthState(
           email: 'nope',
           emailTouched: true,
           passwordTouched: true,
-          emailError: 'Enter a valid email address',
-          passwordError: kRequiredMessage,
+          emailError: kInvalidEmailMessage,
+          passwordError: kShortPasswordMessage,
         ),
       ],
       verify: (AuthBloc bloc) {

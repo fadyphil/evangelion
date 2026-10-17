@@ -13,6 +13,7 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
+import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,10 +100,10 @@ void main() {
     // **A pump between the fields and the press.** `EvaTextField` reports its change
     // through a controller listener, so the cubit has not seen the second value until
     // a frame runs — and pressing sign in with the password still empty submits the
-    // `kRequiredMessage` validation instead. Measured: the first version tapped
+    // a validation failure instead. Measured: the first version tapped
     // immediately and landed back on `/login`.
     await tester.pump();
-    await tester.tap(find.text(AppLocalizationsEn().authSignIn));
+    await tester.tap(find.text(AppLocalizationsEn().authEnterTheWord));
     await pumpUntilFound(tester, find.byType(HomePage));
     expect(
       getIt<AppRouter>().currentPath,
@@ -274,7 +275,7 @@ void main() {
         await pumpApp(tester);
 
         expect(
-          find.text(AppLocalizationsEn().authSignIn),
+          find.text(AppLocalizationsEn().authEnterTheWord),
           findsOneWidget,
           reason: 'English is the default install',
         );
@@ -283,12 +284,13 @@ void main() {
         await tester.pump();
 
         expect(
-          find.text('تسجيل الدخول'),
+          find.text(AppLocalizationsAr().authEnterTheWord),
           findsOneWidget,
           reason:
               'the ARABIC value of the same key, rendered by the same widget. This is '
               'the half of the language switch that a `MaterialApp.locale` assertion '
-              'cannot see — it proves the string reached the screen.',
+              'cannot see — it proves the string reached the screen. The CTA is the '
+              'redesign\'s one translated control (`eva/redesign.html:508`).',
         );
         expect(
           Directionality.of(tester.element(find.byType(LoginPage))),

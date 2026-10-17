@@ -948,14 +948,32 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'CONVERTED, AND UNCHANGED. `GetCurrentSession`\'s half of the same '
             'claim.',
       ),
-  'test/features/auth/presentation/pages/login_accessibility_test.dart#and none of them is a Tab stop':
+  'test/features/auth/presentation/pages/login_accessibility_test.dart#and none of them is a Tab stop, while the CTA is':
       _Reviewed(
         sites: 1,
         converted: false,
         reason:
             '`Element` identity inside `find.byElementPredicate`: "the focused '
             'control is the one the focus node belongs to" is not expressible '
-            'by value. Untouched.',
+            'by value. Untouched. The row\'s key moved with the test in Phase '
+            '5.1, when the redesigned screen\'s tab walk gained its new name; '
+            'the site itself is the same one the first version of this row '
+            'reviewed.',
+      ),
+  'test/features/auth/presentation/pages/login_accessibility_test.dart#a refused sign-in is announced as a live region':
+      _Reviewed(
+        sites: 1,
+        converted: true,
+        reason:
+            'The SAME justification as the row above, attributed to a '
+            'different name: the site lives in the file\'s shared '
+            '`_ringAppearsOnTab` helper, and the audit\'s window attributes a '
+            'helper at end-of-file to the last test that runs before it — '
+            'which is the refusal test. FLAGGED TRUE only because the audit\'s '
+            'window names a converted type in the refusal test\'s own body '
+            '(`AuthSession`); the site compares `Element`s — "the focused '
+            'control is the one the focus node belongs to", not expressible by '
+            'value — and is untouched.',
       ),
   'test/features/reading/data/dio_repositories_test.dart#and the fake cannot throw either, because it is handed a Result':
       _Reviewed(

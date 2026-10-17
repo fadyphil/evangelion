@@ -5,7 +5,7 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:evangelion/features/auth/presentation/widgets/social_auth_button.dart';
+import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -86,7 +86,7 @@ void main() {
       // message is the longest string on this screen by a wide margin, and it is
       // the one that appears *after* the reader has already typed.
       await tester.enterText(find.byType(TextField).at(0), 'david@');
-      await tester.enterText(find.byType(TextField).at(1), 'short');
+      await tester.enterText(find.byType(TextField).at(1), 'abc');
       await tester.pump();
       bloc.add(const AuthSubmitted());
       await tester.pump();
@@ -95,27 +95,39 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsNWidgets(2));
     });
 
-    testWidgets('and it stays scrollable rather than clipped', (
+    testWidgets('and everything is on screen, scroll or no scroll', (
       WidgetTester tester,
     ) async {
       final AuthBloc bloc = buildTestBloc();
       addTearDown(bloc.close);
       await pumpLogin(tester, bloc: bloc, textScale: kEvaRequiredTextScale);
 
-      // "No overflow" and "reachable" are different claims. At 1.22× the social
-      // buttons are below the fold, so a screen that merely avoids an overflow by
-      // clipping them would pass every assertion above and be unusable.
-      final ScrollableState scrollable = tester.state<ScrollableState>(
-        find.byType(Scrollable).first,
-      );
+      // "No overflow" and "reachable" are different claims. The old screen was
+      // taller than the viewport at this scale and proved it *scrolled*; the
+      // redesign's login is compact enough that at 1.22× on the narrowest phone
+      // it measures `maxScrollExtent == 0` — everything is already on screen.
+      // The assertion is therefore: the ghosts are inside the viewport's bounds
+      // (not clipped, not scrolled off), and the centre-or-scroll wrapper is
+      // there for the day the content grows again.
+      tester.state<ScrollableState>(find.byType(Scrollable).first);
 
-      expect(scrollable.position.maxScrollExtent, greaterThan(0));
-
-      scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
-      await tester.pump();
+      final Size surface =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+      final Rect viewport = Offset.zero & surface;
+      for (final String ghost in <String>[
+        LoginPage.kGhostGoogle,
+        LoginPage.kGhostApple,
+      ]) {
+        final Rect rect = tester.getRect(find.text(ghost));
+        expect(
+          viewport.contains(rect.topLeft) &&
+              viewport.contains(rect.bottomRight),
+          isTrue,
+          reason: '$ghost is on screen at 1.22×, not clipped below the fold',
+        );
+      }
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(SocialAuthButton), findsNWidgets(2));
     });
   });
 
@@ -159,7 +171,7 @@ void main() {
       );
 
       await tester.enterText(find.byType(TextField).at(0), 'david@');
-      await tester.enterText(find.byType(TextField).at(1), 'short');
+      await tester.enterText(find.byType(TextField).at(1), 'abc');
       await tester.pump();
       bloc.add(const AuthSubmitted());
       await tester.pump();
@@ -173,7 +185,7 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(SocialAuthButton), findsNWidgets(2));
+      expect(find.byType(EvaButton), findsNWidgets(3));
     });
   });
 
@@ -199,7 +211,7 @@ void main() {
         );
 
         await tester.enterText(find.byType(TextField).at(0), 'david@');
-        await tester.enterText(find.byType(TextField).at(1), 'short');
+        await tester.enterText(find.byType(TextField).at(1), 'abc');
         await tester.pump();
         bloc.add(const AuthSubmitted());
         await tester.pump();
@@ -209,51 +221,37 @@ void main() {
           isNull,
           reason: 'the Arabic arm is longer for several of these strings',
         );
-        // Sanity: the toggle's own label is Arabic here, so this is not passing on
-        // an English tree.
-        expect(find.text('تسجيل الدخول'), findsOneWidget);
+        // Sanity: the CTA's label is the redesign's translated control, so this
+        // is not passing on an English tree.
+        expect(find.text('ادخل الكلمة'), findsOneWidget);
       });
     }
   });
 
-  group('the social labels FIT, which is not the same claim as "no overflow"', () {
+  group('the CTA label FITS, which is not the same claim as "no overflow"', () {
     // ## WHY THIS GROUP EXISTS, AND IT IS NOT REDUNDANT WITH THE ONE ABOVE
     //
     // Every test above asserts `tester.takeException()` is `null`, and every one of
-    // them was satisfiable by a button whose label read **"Continue with Go…"**.
+    // them was satisfiable by a button whose label read **"enter the wo…"**.
     //
-    // The mechanism: `SocialAuthButton` renders `maxLines: 1` with
+    // The mechanism: `EvaButton` renders its label with `maxLines: 2` and
     // `TextOverflow.ellipsis`, so an over-wide label clips its own **string**.
     // `RenderFlex` never overflows, so no `FlutterError` is raised, so
     // `takeException()` is `null`. §14's row — "text scales to 1.22× without
-    // overflow at 320px width" — was being satisfied by deleting the reader's
+    // overflow at 320px width" — was being satisfiable by deleting the reader's
     // words, and the negative control at the bottom of this file proves the suite
-    // detects overflow and that **nothing here detected truncation**.
-    //
-    // Measured at this surface before the fix, with the real `pumpLogin` and a
-    // `TextPainter` over the real style:
-    //
-    // ```
-    // available inner width                 192.0
-    // "Continue with Google"  @ titleMedium (16sp)  201.63  -> clipped by  9.63
-    // "المتابعة عبر Google"  @ titleMedium (16sp)  193.34  -> clipped by  1.34
-    // ```
-    //
-    // The English label truncated *more* than the Arabic, which is the opposite of
-    // this file's own stated intuition ("Arabic is longer than English for several
-    // of these strings"). `SocialAuthButton` moved to `bodyMedium` (14sp) as a
-    // result; these assertions hold it there.
+    // detects overflow and that nothing else detected truncation. The CTA is the
+    // screen's longest button label in both arms (`redesign.html:508`), so it is
+    // the one this assertion holds.
 
-    /// The widest the label may be: the button's own width less the horizontal
-    /// inset `SocialAuthButton` applies on each side.
+    /// The widest the label may be: the button's own width.
     double availableWidth(WidgetTester tester) =>
-        tester.getSize(find.byType(SocialAuthButton).first).width -
-        2 * EvaSpacing.lg;
+        tester.getSize(find.byType(EvaButton).first).width;
 
     for (final (String name, Locale locale, String longest)
         in <(String, Locale, String)>[
-          ('English', const Locale('en'), 'Continue with Google'),
-          ('Arabic', const Locale('ar'), 'المتابعة عبر Google'),
+          ('English', const Locale('en'), 'enter the word'),
+          ('Arabic', const Locale('ar'), 'ادخل الكلمة'),
         ]) {
       testWidgets('the $name label is not ellipsised', (
         WidgetTester tester,
@@ -267,16 +265,18 @@ void main() {
           textScale: kEvaRequiredTextScale,
         );
 
-        final Finder label = find.descendant(
-          of: find.byType(SocialAuthButton).first,
-          matching: find.byType(Text),
+        final Finder ctaButton = find.ancestor(
+          of: find.text(longest),
+          matching: find.byType(EvaButton),
         );
+        final Finder label = find.text(longest);
         final Text widget = tester.widget<Text>(label);
         expect(
           widget.data,
           longest,
           reason: 'the fixture is wrong if this is not the longest label',
         );
+        expect(ctaButton, findsOneWidget);
 
         // The **rendered** width, not a `TextPainter`'s: a `TextPainter` over the
         // style would measure the text the widget *would* draw, and the claim under

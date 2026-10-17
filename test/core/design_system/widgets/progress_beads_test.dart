@@ -243,16 +243,14 @@ void main() {
       // gets **narrower** than `ds.tsx`'s, because `4n − 4` finally overtakes
       // the flat 18 the 26px pill pushes out. So it is asserted against both
       // columns and against the delta the doc claims.
-      const Map<int, (double old, double now)> expected = <int, (
-        double,
-        double,
-      )>{
-        1: (10, 26),
-        2: (28, 40),
-        3: (46, 54),
-        5: (82, 82),
-        8: (136, 124),
-      };
+      const Map<int, (double old, double now)> expected =
+          <int, (double, double)>{
+            1: (10, 26),
+            2: (28, 40),
+            3: (46, 54),
+            5: (82, 82),
+            8: (136, 124),
+          };
       for (final MapEntry<int, (double, double)> row in expected.entries) {
         final List<ProgressBeadState> states = beadStates(
           total: row.key,
@@ -267,7 +265,11 @@ void main() {
         // `ds.tsx`'s column, `10n + 8(n − 1)`, spelled out here so the delta is
         // a measured difference rather than a number copied twice.
         final double old = 10 * row.key + 8 * (row.key - 1);
-        expect(old, row.value.$1, reason: "total: ${row.key} — `ds.tsx`'s column");
+        expect(
+          old,
+          row.value.$1,
+          reason: "total: ${row.key} — `ds.tsx`'s column",
+        );
         expect(
           row.value.$2 - row.value.$1,
           progressBeadsWidth(states) - old,

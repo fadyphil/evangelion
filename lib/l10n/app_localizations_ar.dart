@@ -10,52 +10,25 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get authWordmark => 'Evangelion';
-
-  @override
-  String get authTagline => 'اقرأ. تأمل. تذكّر.';
-
-  @override
   String get authEmailLabel => 'البريد الإلكتروني';
 
   @override
-  String get authEmailHint => 'you@example.com';
+  String get authEmailHint => 'البريد الإلكتروني';
 
   @override
   String get authPasswordLabel => 'كلمة المرور';
 
   @override
-  String get authPasswordHint => '••••••••';
+  String get authPasswordHint => 'كلمة المرور';
 
   @override
-  String get authSignIn => 'تسجيل الدخول';
+  String get authEnterTheWord => 'ادخل الكلمة';
 
   @override
-  String get authForgotPassword => 'نسيت كلمة المرور؟';
+  String get authEmailInvalid => 'البريد غير مكتمل';
 
   @override
-  String get authNewHere => 'جديد هنا؟';
-
-  @override
-  String get authCreateAccount => 'أنشئ حسابًا';
-
-  @override
-  String get authDivider => 'أو';
-
-  @override
-  String get authContinueWithGoogle => 'المتابعة عبر Google';
-
-  @override
-  String get authContinueWithApple => 'المتابعة عبر Apple';
-
-  @override
-  String get authShowPassword => 'إظهار كلمة المرور';
-
-  @override
-  String get authHidePassword => 'إخفاء كلمة المرور';
-
-  @override
-  String get authSealLabel => 'إنجيل';
+  String get authPasswordTooShort => 'كلمة المرور قصيرة';
 
   @override
   String get authUnavailableSuffix => 'غير متاح في هذه النسخة';

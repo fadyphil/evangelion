@@ -313,7 +313,9 @@ void main() {
       // colour change) and **200 ms under reduced motion**, which is §14 backwards:
       // `09-quality-gates.md:184` requires a disabled animation to "jump straight
       // to the end state".
-      Future<Duration> titleDurationOf({required bool disableAnimations}) async {
+      Future<Duration> titleDurationOf({
+        required bool disableAnimations,
+      }) async {
         tester.view.physicalSize = const Size(320, 200);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(tester.view.resetPhysicalSize);
@@ -322,11 +324,7 @@ void main() {
           tester,
           const Align(
             alignment: Alignment.topCenter,
-            child: SettingsTile(
-              title: 'Theme',
-              trailing: _box,
-              onTap: _noop,
-            ),
+            child: SettingsTile(title: 'Theme', trailing: _box, onTap: _noop),
           ),
           disableAnimations: disableAnimations,
         );
@@ -394,7 +392,8 @@ void main() {
       expect(
         find.descendant(of: findRow(), matching: find.byType(EvaFocusRing)),
         findsOneWidget,
-        reason: 'an interactive row is wrapped in the ring; a static one is not',
+        reason:
+            'an interactive row is wrapped in the ring; a static one is not',
       );
       final EvaFocusRing ring = tester.widget<EvaFocusRing>(
         find.descendant(of: findRow(), matching: find.byType(EvaFocusRing)),

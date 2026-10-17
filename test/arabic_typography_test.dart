@@ -225,30 +225,32 @@ void main() {
   });
 
   group('`/login`', () {
-    /// The ten Arabic runs `/login` renders.
+    /// The Arabic runs the redesigned login **paints** on an empty form.
     ///
-    /// **Nine of the ten were wrong before this phase**, and four of them are not in
-    /// recorded decision 73's list: `كلمة المرور` (the password field's label),
-    /// `جديد هنا؟`, `أنشئ حسابًا` and the divider's `أو`. Only `تسجيل الدخول` was
-    /// right, from decision 66's required `labelFamily`.
+    /// Phase 5.1 rebuilt the screen against `eva/redesign.html:503-511`, and the
+    /// rebuild changed both the set and the mechanism. The old screen painted ten
+    /// runs (labels, links, the divider, two social rows); the redesign paints
+    /// **three**: the two bare fields' placeholders and the CTA — the only
+    /// strings the prototype itself translates (`data-i18n="enter"` at `:508`,
+    /// `emErr`/`pwErr` at `:976`). The wordmark, the tagline, the footer and the
+    /// ghost labels are widget literals in both directions — the redesign renders
+    /// them untranslated, and `app_localizations_test.dart`'s Latin-exception
+    /// table says why that is a decision and not an omission.
+    ///
+    /// **The labels are deliberately NOT in this list, and that is the gate's own
+    /// trap again:** `EvaTextField.showLabel` is `false` on this screen (the
+    /// redesign's field is bare, `:506-507`), so `authEmailLabel`/
+    /// `authPasswordLabel` live only in `Semantics(label:)` — never painted — and
+    /// declaring them here fails the other half with `Declared but NOT rendered`.
+    /// They are asserted by `login_accessibility_test.dart`, which reads the
+    /// semantics tree, because that is the layer they exist on.
     ///
     /// Built from the string table, for the reason `/`'s list gives.
     final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
-      ar.authTagline,
-      // `EvaTextField` renders its label as `label.toUpperCase()`, and Arabic has no
-      // case — so the rendered run is the field value itself. Asserting the table's
-      // value is correct *because* the transform is a no-op here, and the widget's doc
-      // says so rather than leaving it to be re-derived.
-      ar.authEmailLabel,
-      ar.authPasswordLabel,
-      ar.authSignIn,
-      ar.authForgotPassword,
-      ar.authNewHere,
-      ar.authCreateAccount,
-      ar.authDivider,
-      ar.authContinueWithGoogle,
-      ar.authContinueWithApple,
+      ar.authEmailHint,
+      ar.authPasswordHint,
+      ar.authEnterTheWord,
     ];
 
     testWidgets('the Arabic arm, on the empty form', (
@@ -263,51 +265,60 @@ void main() {
       await expectNoTofuInAnyRun(tester, screen: '/login');
     });
 
-    testWidgets('the field validator\'s error is gated, and its **wording** is a '
-        'recorded English gap', (WidgetTester tester) async {
+    testWidgets('the field validator\'s error is localized now, and the gap '
+        'this gate used to pin is closed', (WidgetTester tester) async {
       await pumpLogin(tester, bloc: _authBloc(), locale: const Locale('ar'));
-      await tester.enterText(find.byType(TextField).at(1), 'short');
+      await tester.enterText(find.byType(TextField).at(1), 'abc');
       await tester.pump();
 
-      // **The family is the deliverable and it is asserted.** `EvaTextField`'s error
-      // text is `bodySmall` — DM Sans — and `arabicAware` now resolves it for the
-      // arm, so a localised validator message will render. That is the half this
-      // phase owns.
+      // **The family is the deliverable and it is asserted.** The error line is
+      // `EvaTextField`'s helper row; `arabicAware` resolves it for the arm, so
+      // the localized sentence renders in Amiri, not in a DM-Sans tofu box.
       expect(
-        familyOfText(tester, kShortPasswordMessage),
+        familyOfText(tester, ar.authPasswordTooShort),
         EvaTypography.arabicFamily,
         reason:
-            'the field\'s error helper text must take the ambient arm\'s face, '
-            'because the moment this message is Arabic it has to render.',
+            'the field\'s error line must take the ambient arm\'s face, '
+            'because the sentence is Arabic on this arm',
       );
 
-      // **And the wording is a recorded gap, pinned so it cannot be forgotten.**
-      // `kShortPasswordMessage` and `kRequiredMessage` are English literals in
-      // `features/auth/domain/login_credentials.dart` — a **pure-Dart domain file**,
-      // which by Gate 1 has no `Locale` and therefore cannot pick an arm. The fix is
-      // a validation-*code* enum on `LoginValidation` plus a message in
-      // `AppLocalizations`, which changes `AuthState`'s public shape and is a domain
-      // decision this typography gate does not own.
-      //
-      // **What Phase 9 inherits, stated:** two English sentences on the Arabic arm of
-      // `/login`, at `bodySmall`, in the right family. The family is done; the
-      // language is not, and this assertion goes red the day someone fixes it —
-      // which is the point.
+      // **The recorded gap is CLOSED, and this is its closure note.** Phase 9
+      // pinned `kShortPasswordMessage == "That password's too short"` and
+      // `kRequiredMessage == 'This field is required'` as English literals the
+      // Arabic arm would show, with the instruction: "this assertion goes red
+      // the day someone fixes it — which is the point." Phase 5.1 is that day:
+      // the redesign states one message per field (`redesign.html:1305-1306`),
+      // the domain constants carry that wording as the log-canonical copy, and
+      // the page renders the localized sentence **by presence**
+      // (`state.passwordError != null`) — never by matching the domain's text.
+      // The English literals are gone with the prototype that framed them.
       expect(
         kShortPasswordMessage,
-        "That password's too short",
+        'password too short',
         reason:
-            'this pins the recorded gap, not the wording. If you have localised the '
-            'validator, update this note in `login_credentials.dart` and delete the '
-            'expectation — do not leave a test that documents a defect nobody is '
-            'tracking.',
+            'the domain\'s log-canonical copy is the redesign\'s own wording '
+            '(`redesign.html:976`); the reader\'s sentence lives in the ARB, '
+            'not here',
       );
-      expect(kRequiredMessage, 'This field is required');
+      // `kRequiredMessage` is **deleted**, not reworded: the redesign's
+      // single-message-per-field model has no separate "required" complaint
+      // (`redesign.html:1305-1306`). Its death is visible in
+      // `login_credentials.dart` itself — the constant is gone, not deprecated —
+      // so there is nothing here to assert without resurrecting it.
 
+      // And the error state's painted set: the email placeholder is joined by
+      // the redesign's own Arabic error sentence. The password's placeholder is
+      // deliberately NOT declared — the reader has typed into that field, and a
+      // placeholder only paints while the field is empty; its slot now holds
+      // the typed value (masked) and the sentence below it.
       await expectArabicTypography(
         tester,
         screen: '/login',
-        expectedArabic: arabic,
+        expectedArabic: <String>[
+          ar.authEmailHint,
+          ar.authEnterTheWord,
+          ar.authPasswordTooShort,
+        ],
       );
     });
 

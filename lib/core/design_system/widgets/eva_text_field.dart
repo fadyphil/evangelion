@@ -244,8 +244,32 @@ const EdgeInsets kEvaTextFieldPadding = EdgeInsets.only(
 /// `ds.tsx:296` — `gap: 6`.
 ///
 /// 6 is not on the 4px scale, so it is named here rather than invented at each
-/// of the two gaps the column creates.
+/// of the two gaps the column creates. It is the **caption's** gap now: the
+/// redesign's own error line carries a different one, [kEvaTextFieldMsgGap].
 const double kEvaTextFieldStackGap = 6;
+
+/// Vertical gap between the field's box and its message line.
+/// `eva/redesign.html:379` — `.field .msg{margin-top:5px}`.
+///
+/// The redesign's own number, and not [kEvaTextFieldStackGap]: the 6 was
+/// `ds.tsx:296`'s column gap for a stack whose third row was the React
+/// prototype's helper text. The redesign's `.msg` is a sibling of the input
+/// with its own margin, and 5 is what that margin says.
+const double kEvaTextFieldMsgGap = 5;
+
+/// The message line's reserved height. `eva/redesign.html:379` — `min-height:13px`.
+///
+/// ## WHY THE LINE IS RESERVED EVEN WHEN THERE IS NO MESSAGE
+///
+/// Because the prototype reserves it — `.msg` is an always-present `<div>` whose
+/// `min-height` holds the line open whether or not `mEmail`/`mPass` ever carry
+/// text — and the difference is visible: without the reservation, the moment an
+/// error appears everything below the field jumps down 18px (5 + 13), and the
+/// CTA a reader is about to tap moves under their finger. The prototype's layout
+/// never jumps; this one stopped jumping when the reservation landed. An empty
+/// 13px box paints nothing, so the cost is 18px of always-reserved column per
+/// field — which the prototype pays too.
+const double kEvaTextFieldMsgMinHeight = 13;
 
 /// A real text field.
 ///
@@ -291,6 +315,7 @@ class EvaTextField extends StatefulWidget {
     this.textInputAction,
     this.onSubmitted,
     this.trailing,
+    this.showLabel = true,
     super.key,
   });
 
@@ -313,6 +338,25 @@ class EvaTextField extends StatefulWidget {
   /// textTransform: uppercase, color: T.ink2` — which is what renders above the
   /// field on all six screens.
   final String label;
+
+  /// Whether the mono-caps label row renders at all.
+  ///
+  /// ## WHY THIS EXISTS AT ALL
+  ///
+  /// Because the redesign's own login has **no labels anywhere on the screen**.
+  /// `redesign.html:506-507` — `<input placeholder="email">`, a bare input whose
+  /// only companion is the `.msg` error line — inside a section whose every other
+  /// element is a brand line or a pill. The label row this widget kept through
+  /// Phase 4 was the React prototype's (`ds.tsx:297-300`), and the redesign's
+  /// login is the first screen where that inheritance is visible: two
+  /// `EMAIL`/`PASSWORD` captions over fields that the prototype draws bare.
+  ///
+  /// `false` skips the visible `Text` **and nothing else**: the field's accessible
+  /// name is [label] through the `Semantics(label:)` below and is unaffected, the
+  /// box geometry is unaffected (`kEvaTextFieldHeight` is the shell's, not the
+  /// column's), and the error row is unaffected. Default `true` so the four
+  /// screens that read the label row keep it unchanged.
+  final bool showLabel;
 
   /// Greyed placeholder text drawn while the field is empty. `null` means none.
   ///
@@ -502,18 +546,25 @@ class _EvaTextFieldState extends State<EvaTextField> {
         // Excluded from semantics because the field's own node already carries this
         // exact string as its name; leaving both in makes a screen reader say
         // "Email, Email".
-        ExcludeSemantics(
-          child: Text(
-            // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
-            // no equivalent for.
-            widget.label.toUpperCase(),
-            style: arabicAware(
-              EvaTypography.monoCaps(colors),
-              Directionality.of(context),
-            ).copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+        //
+        // `showLabel: false` drops this row and its gap together — the redesign's
+        // login draws bare fields (`redesign.html:506-507`), and a caption above a
+        // field the prototype captions only from inside would be an element the
+        // screen does not have. See [EvaTextField.showLabel].
+        if (widget.showLabel) ...<Widget>[
+          ExcludeSemantics(
+            child: Text(
+              // `ds.tsx:299` — `textTransform: 'uppercase'`, which Flutter has
+              // no equivalent for.
+              widget.label.toUpperCase(),
+              style: arabicAware(
+                EvaTypography.monoCaps(colors),
+                Directionality.of(context),
+              ).copyWith(color: colors.ink2, fontWeight: FontWeight.w700),
+            ),
           ),
-        ),
-        const SizedBox(height: kEvaTextFieldStackGap),
+          const SizedBox(height: kEvaTextFieldStackGap),
+        ],
         _FieldShell(
           focusNode: _focus,
           hasError: _hasError,
@@ -586,10 +637,22 @@ class _EvaTextFieldState extends State<EvaTextField> {
                   ),
           ),
         ),
-        if (_hasError) ...<Widget>[
-          const SizedBox(height: kEvaTextFieldStackGap),
-          _ErrorText(message: widget.errorText!, colors: colors),
-        ],
+        // The message line is **always present** and **always reserved** —
+        // `eva/redesign.html:379` is an unconditional `<div class="msg">` with
+        // `min-height:13px`, not a conditional row. See
+        // [kEvaTextFieldMsgMinHeight] for why the reservation is the point: an
+        // error arriving must not move the rest of the form. The §14 machinery
+        // (icon, live region) stays conditional on there being something to
+        // say — an empty live region would be noise, not honesty.
+        const SizedBox(height: kEvaTextFieldMsgGap),
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: kEvaTextFieldMsgMinHeight,
+          ),
+          child: _hasError
+              ? _ErrorText(message: widget.errorText!, colors: colors)
+              : null,
+        ),
       ],
     );
   }

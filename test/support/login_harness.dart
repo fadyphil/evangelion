@@ -50,6 +50,7 @@ Future<void> pumpLogin(
   ThemeData? theme,
   TextDirection? textDirection,
   Widget? child,
+  bool disableAnimations = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -61,6 +62,10 @@ Future<void> pumpLogin(
       theme: theme,
       locale: locale,
       textScale: textScale,
+      // §14's reduced-motion switch, passed through for the tests that assert
+      // the disabled branch itself (`login_page_test.dart`'s entrance and
+      // shake groups read `MediaQuery.disableAnimationsOf` through the page).
+      disableAnimations: disableAnimations,
       // Derived from [locale], and **not** a parameter.
       //
       // `evaPrimitiveHarness` wraps its child in an explicit

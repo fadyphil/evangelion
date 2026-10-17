@@ -173,7 +173,7 @@ void main() {
       );
       expect(
         result.failureOrElse(_impossibleFailure).message,
-        kRequiredMessage,
+        kInvalidEmailMessage,
       );
     });
 
@@ -189,13 +189,13 @@ void main() {
       );
     });
 
-    test('refuses a short password with the prototype\'s own message', () async {
-      // `LoginScreen.tsx:52`, verbatim — the same string the form's helper text
-      // shows, so a player who sees it after pressing "Sign in" is reading the
-      // sentence they would have read while typing.
+    test('refuses a short password with the redesign\'s own message', () async {
+      // `redesign.html:976` — `pwErr`, verbatim — the same string the field's
+      // error line shows, so a reader who sees it after pressing the CTA is
+      // reading the sentence they would have read while typing.
       final Result<AuthSession> result = await repository.signIn(
         email: goodEmail,
-        password: 'short',
+        password: 'abc',
       );
 
       expect(result.isLeft(), isTrue);
@@ -206,7 +206,7 @@ void main() {
     });
 
     test('does not write the session when it refuses', () async {
-      await repository.signIn(email: goodEmail, password: 'short');
+      await repository.signIn(email: goodEmail, password: 'abc');
 
       final Result<AuthSession> current = await repository.getCurrentSession();
 
@@ -224,7 +224,7 @@ void main() {
         ('   ', '   '),
         ('not-an-email', ''),
         ('a@b.co', 'ok'),
-        ('david@evangelion.app', 'short'),
+        ('david@evangelion.app', 'abc'),
       ]) {
         await expectLater(
           repository.signIn(email: credentials.$1, password: credentials.$2),

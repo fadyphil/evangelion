@@ -46,14 +46,17 @@ void main() {
 
     test('and it cannot be fooled by a translation that coincides with English', () {
       // The failure the string-comparison scheme had. Both arms are the *same*
-      // string here, and the answer is still the locale's.
+      // string here, and the answer is still the locale's. The identical string
+      // is `homeWordmark` since Phase 5.1 — the wordmark left the ARB table's
+      // auth keys for a widget literal on the rebuilt login, and the top bar's
+      // copy is the one the ARB still carries.
       expect(en.homeStreakLabel, isNot(ar.homeStreakLabel));
-      expect(en.authWordmark, ar.authWordmark);
+      expect(en.homeWordmark, ar.homeWordmark);
       expect(
         en.isArabicArm,
         isFalse,
         reason:
-            '`authWordmark` is deliberately identical across the arms — a brand mark '
+            '`homeWordmark` is deliberately identical across the arms — a brand mark '
             'is not translated — and a comparison-against-a-string scheme would have '
             'reported this arm as Arabic',
       );

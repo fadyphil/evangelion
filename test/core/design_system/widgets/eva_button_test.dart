@@ -464,6 +464,36 @@ void _widgetTests() {
       expect(node.flagsCollection.isEnabled.toBoolOrNull(), isTrue);
     });
 
+    testWidgets('semanticLabel renames the node without touching the paint', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      const String painted = 'GOOGLE';
+      const String announced = 'GOOGLE — unavailable in this build';
+      await _pump(
+        tester,
+        const EvaButton(
+          labelFamily: EvaTypography.monoFamily,
+          label: painted,
+          // `onPressed` stays its default `null` — inertness is the subject.
+          semanticLabel: announced,
+        ),
+      );
+      handle.dispose();
+
+      // The paint is the brand mark; the node is the sentence. `/login`'s two
+      // inert ghosts are the reason the override exists (`eva/redesign.html:509`
+      // paints `google`/`apple`; `authUnavailableSuffix` says why they cannot
+      // be pressed) — and an override that leaked into the paint would render
+      // the suffix on screen, which is what the call site must not do.
+      expect(find.text(painted), findsOneWidget);
+      expect(find.text(announced), findsNothing);
+      final node = _nodeLabelled(tester, announced);
+      expect(node.label, announced);
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.flagsCollection.isEnabled.toBoolOrNull(), isFalse);
+    });
+
     testWidgets('a disabled button is not a button to a screen reader', (
       WidgetTester tester,
     ) async {

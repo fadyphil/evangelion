@@ -553,13 +553,14 @@ class EvaButton extends StatefulWidget {
     this.trailingChevron = false,
     this.expanded = true,
     this.height = kEvaButtonHeight,
+    this.semanticLabel,
     required this.labelFamily,
     super.key,
   });
 
-  /// The button's text. Also its accessible name — there is no separate
-  /// `semanticLabel`, because a button whose name can disagree with its text is
-  /// the §14 gap in a different shape.
+  /// The button's text. Also its accessible name — unless [semanticLabel]
+  /// overrides it, which exists for the inert-control suffix pattern and is
+  /// documented there.
   final String label;
 
   /// What to run on activation. `null` disables the button: `ds.tsx:245`'s
@@ -584,6 +585,21 @@ class EvaButton extends StatefulWidget {
   /// Button height. [kEvaButtonHeight] unless a caller needs otherwise.
   final double height;
 
+  /// The node's accessible name. `null` means [label].
+  ///
+  /// ## WHY THE NAME CAN DIFFER FROM WHAT IS PAINTED
+  ///
+  /// Because a permanently-inert control must say **why** it cannot be pressed,
+  /// and that sentence is not part of its design. `/login`'s two ghost pills
+  /// paint `GOOGLE` and `APPLE` (`redesign.html:509`) and announce
+  /// `"google — unavailable in this build"` — the suffix pattern
+  /// `authUnavailableSuffix` documents, appended by the call site because two
+  /// inert controls share labels and a suffix baked into the label would render
+  /// twice. `Semantics(label:)` below takes this when set; nothing painted
+  /// changes, and `excludeSemantics` keeps the painted text out of the node as
+  /// before.
+  final String? semanticLabel;
+
   /// The family [label] renders in.
   ///
   /// ## IT IS **REQUIRED**, AND THAT IS THE WHOLE POINT OF IT
@@ -605,8 +621,10 @@ class EvaButton extends StatefulWidget {
   /// style has to be **passed in and asserted at a call site**, and "required" is
   /// what forces the pass.
   ///
-  /// Every one of the four `EvaButton(` call sites in `lib/` now names its family,
-  /// and `ErrorView` — which builds one — grew a `retryFamily` for the same reason.
+  /// Every `EvaButton(` call site in `lib/` now names its family — ten of them
+  /// after Phase 5.1 put the redesigned `/login`'s CTA and two ghost pills on
+  /// the list — and `ErrorView` — which builds one — grew a `retryFamily` for
+  /// the same reason.
   ///
   /// ## WHY THIS EXISTS, AND IT IS BECAUSE OF A MEASURED FACT
   ///
@@ -885,7 +903,7 @@ class _EvaButtonState extends State<EvaButton> {
       child: Semantics(
         button: true,
         enabled: enabled,
-        label: widget.label,
+        label: widget.semanticLabel ?? widget.label,
         // The label text is already the accessible name; leaving it in the tree
         // as well makes a screen reader read "Sign in, Sign in".
         excludeSemantics: true,

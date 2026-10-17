@@ -14,7 +14,9 @@ import '../../../support/design_system_harness.dart';
 /// A `GlobalKey` rather than a `ValueKey` because each of those assertions pumps
 /// its own tree: two `ValueKey`s of the same name in two trees is fine, and two in
 /// one tree is the ambiguity a `GlobalKey` turns into a loud failure instead.
-final GlobalKey _surfaceKey = GlobalKey(debugLabel: 'segmented-control-surface');
+final GlobalKey _surfaceKey = GlobalKey(
+  debugLabel: 'segmented-control-surface',
+);
 
 /// The WCAG relative luminance of the pixel whose RGBA starts at [offset].
 ///
@@ -180,16 +182,8 @@ void main() {
     double highest = 0.0;
     int sampled = 0;
     final Rect local = region.shift(-boundary.localToGlobal(Offset.zero));
-    for (
-      int y = local.top.floor();
-      y < local.bottom.ceil();
-      y++
-    ) {
-      for (
-        int x = local.left.floor();
-        x < local.right.ceil();
-        x++
-      ) {
+    for (int y = local.top.floor(); y < local.bottom.ceil(); y++) {
+      for (int x = local.left.floor(); x < local.right.ceil(); x++) {
         final int offset = (y * width + x) * 4;
         final double l = _luminanceOf(bytes, offset);
         if (l < lowest) lowest = l;
