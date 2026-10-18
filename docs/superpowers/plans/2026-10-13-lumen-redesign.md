@@ -1212,28 +1212,56 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 # Phase 5 — Screens
 
-> **Status: Task 5.1 COMPLETE** (full gate green: **2821 tests**, **98.50%
-> coverage** (floor 98.25%), citations 1584/1584, orphan gate green with the
-> `SealMonogram` allowlist entry naming Task 5.6, purity green, analyzer 0).
-> The screen was rebuilt against `eva/redesign.html:503-511`: glowing wordmark
-> with the ten-letter entrance, mono tagline, two bare fields (`EvaTextField
-> showLabel: false` — the caption hidden, the §14 name kept), the always-tappable
-> CTA with the `.cta.err` shake, two inert ghost pills (`EvaButton.semanticLabel`
-> carries the unavailable suffix), and the alpha-omega footer through
-> `NeuralScaffold.overlay`. Three defects the gates caught, not reading: the
-> footer's overlay stretched to the viewport and ate the CTA's tap
-> (`Positioned.fill` hands tight constraints down; `Align` fixes it), the
-> tagline/footer took `arabicAware`'s Amiri on the Arabic arm and tofu'd the
-> Greek letters (brand lines stay mono in both directions), and the wordmark
-> overflowed 320px at 1.22x (a brand mark scales — `FittedBox scaleDown` — it
-> does not wrap). Two numbers moved with the prototype: `kMinPasswordLength`
-> 8->4 (`:1306` states the rule the React prototype never did) and one message
-> per field (`:976`), the old `kRequiredMessage` gone with it; the page renders
-> the localized sentence **by presence**, never by matching domain text. The
-> harness re-pointed to `eva/redesign.html` — selector-keyed CSS extraction,
-> anchored to line starts because the light-mode override nests the login
-> selectors — and the field's message line is now reserved (`min-height:13`,
-> `:379`) so an error arriving moves nothing.
+> **Status: Tasks 5.1–5.2 COMPLETE** (full gate green: **2868 tests**, **98.53%
+> coverage** (floor 98.25%), citations 1713/1713, orphan gate green with
+> `WitnessSky` (5.3), `SealMonogram` (5.6) and `TextLink` (5.5) allowlisted by
+> named consumer, purity green, analyzer 0). **5.1** (`13a8696`): the screen
+> rebuilt against `eva/redesign.html:503-511` — glowing wordmark with the
+> ten-letter entrance, mono tagline, two bare fields (`EvaTextField
+> showLabel: false` — the caption hidden, the §14 name kept), the
+> always-tappable CTA with the `.cta.err` shake, two inert ghost pills
+> (`EvaButton.semanticLabel` carries the unavailable suffix), and the
+> alpha-omega footer through `NeuralScaffold.overlay`. Three defects the gates
+> caught, not reading: the footer's overlay stretched to the viewport and ate
+> the CTA's tap (`Positioned.fill` hands tight constraints down; `Align` fixes
+> it), the tagline/footer took `arabicAware`'s Amiri on the Arabic arm and
+> tofu'd the Greek letters (brand lines stay mono in both directions), and the
+> wordmark overflowed 320px at 1.22x (a brand mark scales — `FittedBox
+> scaleDown` — it does not wrap). Two numbers moved with the prototype:
+> `kMinPasswordLength` 8->4 (`:1306` states the rule the React prototype never
+> did) and one message per field (`:976`), the old `kRequiredMessage` gone with
+> it; the page renders the localized sentence **by presence**, never by
+> matching domain text. The harness re-pointed to `eva/redesign.html` —
+> selector-keyed CSS extraction, anchored to line starts because the light-mode
+> override nests the login selectors — and the field's message line is now
+> reserved (`min-height:13`, `:379`) so an error arriving moves nothing.
+>
+> **5.2** (`3e89373`): `/` rebuilt against `:513-538` with ADR-0022 superseding
+> the plan's fiction table — the last light is **real** (`GET /streak`,
+> `history[0]`), the chip is `/streak/summary`, the verse of the day is
+> `TodayReading.firstVerseText + reference`, and the library is the prototype's
+> own six scrolls behind a repository port (order, names, counts and completion
+> are the fiction; per-book passage text is real). Four sections in `HomeBloc`
+> (`streakStatus`, `lastLightStatus`, `catalogueStatus`, reading), and
+> `withSection` derives all four so a retry can no longer wipe the board-era
+> leftovers. Twelve keys died with the elements they named, twenty-one arrived
+> as the redesign's rows (102 -> 111); the composed sentences live in
+> `home_l10n.dart` because an ARB placeholder would fail the Latin gate.
+> **Five defects the gates caught, not reading:** `LoadLastLight` swallowed its
+> failure (`getOrElse` -> `Result.map` — a failed `/streak` reached the card as
+> its *empty* state); the carousel's strip padding was `EvaSpacing.md` (12)
+> where `.carousel` says 14, which is not a token; the streak chip's
+> Arabic-Indic numerals rendered in EB Garamond (zero Arabic glyphs — the
+> prototype escapes through browser font fallback, this client through
+> `arabicAware`); the selah `✦` (U+2726) is in **no** bundled family and is now
+> a painted `_FourPointedStar`; and the shared CSS parser's first regex read
+> `opacity: .35` as `35` and `letter-spacing: .16em` as nothing — both fixed in
+> `cssPxList` with the measured reason. `GlassTier.blur` now paints the wash and
+> the seam beside its read-back (`:250` gives the budgeted site all three),
+> which moved the blur-budget gate from "count 1" to "the owner is exempt and
+> every other primitive is at 0", re-recorded `glass_surface_blur.png`, and the
+> collapsed margins are recomputed from the parsed CSS (`max()` where CSS
+> collapses, `+` where a padding blocks the collapse) rather than typed.
 
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
