@@ -186,6 +186,20 @@ Future<void> pumpReading(
     ),
   );
   await pumpReadingFrames(tester, frames);
+  // ## AND THEN PAST FOCUS MODE'S IDLE TIMER — THE HARNESS PAYS IT ONCE
+  //
+  // `reading_page.dart` arms an idle timer on entry (`eva/redesign.html:1377`'s
+  // `poke()`, four seconds), and `flutter_test` **fails a test with a pending
+  // timer** — so every suite that mounts this page and stops before it fires would
+  // fail on a timer it never asked about, with a message about timers rather than
+  // about the screen.
+  //
+  // One pump past `focusIdleDelay` settles it for all of them, and it settles it at
+  // the *dimmed* state, which is the state a reader spends most of their time in.
+  // A suite that wants to test the timer itself must not use this helper for that
+  // row — it drives the clock deliberately, which is the arrangement
+  // `reading_page_test.dart`'s focus rows should use.
+  await tester.pump(focusIdleDelay + const Duration(milliseconds: 100));
 }
 
 /// Advances [tester] by [count] frames.

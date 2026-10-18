@@ -1060,19 +1060,25 @@ void main() {
 
       // **The `Container`, not the glyph**: reading the circle's size off the
       // glyph asserted that a circle is a glyph. The circle is the 44px box, and
-      // the star inside it is PAINTED (`_FourPointedStar`), not typed — U+2726 is
-      // in no bundled family, which `arabic_typography_test.dart` measured before
-      // this row was written — so the finder is on the painter's box.
+      // the star inside it is PAINTED (`FourPointedStar`, shared with
+      // `/reading`'s `:544` bookmark button), not typed — U+2726 is in no bundled
+      // family, which `arabic_typography_test.dart` measured before this row was
+      // written — so the finder is on the widget, not on a `CustomPaint`.
+      //
+      // **And the star's own size is read off the rendered box**, where the
+      // selector below used to read `w.size == const Size.square(11.0)` off the
+      // painter's *declaration*. A predicate that matches a widget's field is a
+      // claim about the constructor argument; `getSize` is a claim about what the
+      // engine laid out, and only the second one can catch a box that stops
+      // being the one the prototype names.
       final Finder star = find
           .descendant(
             of: find.byType(SelahCard),
-            matching: find.byWidgetPredicate(
-              (Widget w) =>
-                  w is CustomPaint && w.size == const Size.square(11.0),
-            ),
+            matching: find.byType(FourPointedStar),
           )
           .first;
       expect(star, findsOneWidget);
+      expect(tester.getSize(star), const Size.square(SelahCard.glyphSize));
       final Rect circle = tester.getRect(
         find.ancestor(of: star, matching: find.byType(Container)).first,
       );

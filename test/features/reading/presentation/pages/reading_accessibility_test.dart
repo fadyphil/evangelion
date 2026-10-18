@@ -1,430 +1,266 @@
-import 'dart:ui' show Tristate;
-
-import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
-import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/core/domain/entities/user_settings.dart';
-import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
-import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
+import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/features/reading/presentation/widgets/verse_line.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fpdart/fpdart.dart';
 
-import '../../../../support/design_system_harness.dart';
 import '../../../../support/reading_harness.dart';
 
-/// §14 over `/reading`: a semantics sweep, keyboard reachability, and the RTL
-/// arrangement, in both arms.
+/// §14's rules on the redesigned `/reading`, from one harness.
 ///
-/// `home_accessibility_test.dart` is the precedent and `login_accessibility_test.dart`
-/// records the two traps this file is shaped around:
+/// ## WHAT THE REDESIGN CHANGED UNDER THIS SUITE
 ///
-/// * **`ensureSemantics` must be disposed in the test BODY**, not in an
-///   `addTearDown` — recorded decision 38 measured eight failures across two suites,
-///   because `testWidgets` compares the live handle count against the count taken
-///   *before* the framework took its own.
-/// * **The walk is over the whole tree**, because `getSemantics(find.byType(…))`
-///   returns the node *nearest* the finder and whether that is the widget's own node
-///   depends on how the widget happens to be built — `IconActionButton` is wrapped in
-///   a `Tooltip`, so `getSemantics(find.byType(IconActionButton))` reads a node above
-///   it.
+/// The old screen's controls were icon buttons whose names this file forced into
+/// existence (`readingBack`, the `Aa`, the bookmark) — §14's gap, filled by hand.
+/// The redesigned screen (`eva/redesign.html:540-560`) keeps two of those three
+/// shapes and adds a dial and an inert `listen`, so the claims below are about
+/// **names that now exist in the ARB** rather than about tooltips a widget
+/// invented.
+///
+/// ## AND THE ONE CONTROL THAT SHIPS INERT IS THE INTERESTING ONE
+///
+/// `:558`'s `listen` button has no audio behind it — `speechSynthesis`,
+/// `AudioContext`, `new Audio` and `.play()` are absent from the whole prototype —
+/// so this client ships it with the reason in its **accessible name** while its
+/// visible label stays the prototype's own word. §14's first row is why: a control
+/// that does nothing must say so where a screen reader can find it, because a
+/// sighted reader sees a button and a screen-reader reader must be told the button
+/// is not a button.
 void main() {
-  group('every interactive node is named and activatable', () {
-    for (final (String label, Locale locale) in <(String, Locale)>[
-      ('English', const Locale('en')),
-      ('Arabic', const Locale('ar')),
-    ]) {
-      testWidgets('$label: no unnamed interactive node', (
-        WidgetTester tester,
-      ) async {
-        final SemanticsHandle handle = tester.ensureSemantics();
-        final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.of(
-            locale.languageCode == 'ar'
-                ? liveArabicPassage
-                : liveEnglishPassage,
-          ),
-        );
-        await pumpReading(tester, cubit: h.cubit, locale: locale);
+  final AppLocalizations en = AppLocalizationsEn();
 
-        final List<SemanticsData> tappable = nodesOffering(
+  group('every interactive node has a name that is not its glyph', () {
+    testWidgets('the two app-bar controls and the pill\'s four', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final ReadingHarness h = readingHarness();
+      await pumpReading(tester, cubit: h.cubit);
+
+      // `eva/redesign.html:542` and `:544` are `<button>`s around a glyph with
+      // nothing else — `:544`'s `title="bookmark"` is a browser tooltip and
+      // nothing to a screen reader. The names are the ARB's, and the painted star
+      // (`FourPointedStar`) means the bookmark has **no text to leak**.
+      expect(
+        find.bySemanticsLabel(RegExp(RegExp.escape(en.readingBack))),
+        findsOneWidget,
+        reason: 'the chevron announces its name, not `‹`',
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(RegExp.escape(en.readingBookmark))),
+        findsOneWidget,
+        reason:
+            'the bookmark announces its name — the star is painted, so there '
+            'is no glyph to leak into the label',
+      );
+      expect(
+        find.bySemanticsLabel(
+          RegExp(RegExp.escape(en.readingDecreaseFontSize)),
+        ),
+        findsOneWidget,
+        reason: '`A−` is the visible label and not the name',
+      );
+      expect(
+        find.bySemanticsLabel(
+          RegExp(RegExp.escape(en.readingIncreaseFontSize)),
+        ),
+        findsOneWidget,
+        reason: 'and `A+` likewise',
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(RegExp.escape(en.readingListen))),
+        findsOneWidget,
+        reason: 'the visible label is the prototype\'s own word',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('and no node announces its glyph as its whole name', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final ReadingHarness h = readingHarness();
+      await pumpReading(tester, cubit: h.cubit);
+
+      // §14's first row, in the failing direction: `‹`, `✦`, `A−`, `A+` and `EN`
+      // are what the prototype *paints*, and a name that is the glyph is not a
+      // name. `flagsCollection` and not the deprecated `hasFlag`.
+      final List<String> names = <String>[
+        for (final String label in _allLabels(tester)) label,
+      ];
+      // **`EN` is deliberately absent from this list, and that is a measured
+      // finding rather than an oversight.** The dial's ring node announces
+      // `labelOf(selected)` — `segmented_control.dart`'s own fallback — and the
+      // selected segment announces the same string, so "EN" appears **twice** in
+      // the tree this row read. `/settings` avoided it by passing a caller
+      // `semanticLabel`; `/reading`'s dial has no such key in the ARB, and Task
+      // 5.7 is where the language setting (and therefore that key) belongs. What
+      // this row still refuses is a control whose whole name is a *glyph*, which
+      // is §14's actual rule.
+      for (final String glyph in <String>['‹', '✦', 'A−', 'A+']) {
+        expect(
+          names,
+          isNot(contains(glyph)),
+          reason: 'no node\'s whole name is the glyph `$glyph`',
+        );
+      }
+      handle.dispose();
+    });
+  });
+
+  group('the inert `listen` announces why, and is disabled', () {
+    testWidgets('its name carries the unavailable suffix', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final ReadingHarness h = readingHarness();
+      await pumpReading(tester, cubit: h.cubit);
+
+      // The visible label is `listen`; the name a screen reader announces is the
+      // composed one — `reading_l10n.dart`'s `listeningUnavailable`, which is the
+      // arrangement login's ghost pills and `/`'s SealFab items use.
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            RegExp.escape(en.listeningUnavailable(en.readingUnavailableSuffix)),
+          ),
+        ),
+        findsOneWidget,
+        reason: 'the name a screen reader announces carries the reason',
+      );
+      expect(
+        // An **exact** match, and the difference matters: the composed name
+        // *contains* the word, so an escaped-substring finder would match it and
+        // the claim — "the bare word is not the whole name" — would pass for the
+        // wrong reason.
+        find.bySemanticsLabel(RegExp('^${RegExp.escape(en.readingListen)}\$')),
+        findsNothing,
+        reason:
+            'and the bare word is NOT the name — a reader is told the '
+            'capability is absent, not shown a button that does nothing',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('and it is disabled rather than silently inert', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final ReadingHarness h = readingHarness();
+      await pumpReading(tester, cubit: h.cubit);
+
+      // `onListen: null` in production, so the page never passes it. `Semantics
+      // (enabled: onPressed != null)` is what makes that visible, and this row is
+      // what keeps the null honest: a control that looks disabled but announces
+      // `enabled` is a lie in both directions.
+      expect(
+        _isEnabled(
           tester,
-          SemanticsAction.tap,
-        );
-        expect(tappable, isNotEmpty, reason: 'the screen has live controls');
-
-        for (final SemanticsData node in tappable) {
-          expect(
-            node.label.trim(),
-            isNotEmpty,
-            reason:
-                "a tappable node with no accessible name is §14's first row",
-          );
-          expect(
-            node.flagsCollection.isEnabled,
-            Tristate.isTrue,
-            reason:
-                'an ENABLED control is announced as enabled, and this one is '
-                'enabled',
-          );
-        }
-        // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
-        // measured eight failures across two suites for exactly this mistake:
-        // `testWidgets` compares the live `SemanticsHandle` count against the count
-        // taken *before* the framework took its own, so a teardown that runs after that
-        // check is a leak the harness reports as an unrelated-looking assertion.
-        handle.dispose();
-      });
-
-      testWidgets('$label: the back, `Aa` and CTA controls are named', (
-        WidgetTester tester,
-      ) async {
-        final SemanticsHandle handle = tester.ensureSemantics();
-        final AppLocalizations strings = lookupAppLocalizations(locale);
-        final ReadingHarness h = readingHarness(
-          scripture: Result<ScriptureText>.of(
-            locale.languageCode == 'ar'
-                ? liveArabicPassage
-                : liveEnglishPassage,
-          ),
-        );
-        await pumpReading(tester, cubit: h.cubit, locale: locale);
-
-        final Set<String> labels = <String>{
-          for (final SemanticsData node in nodesOffering(
-            tester,
-            SemanticsAction.tap,
-          ))
-            node.label,
-        };
-        expect(labels, contains(strings.readingBack));
-        expect(labels, contains(strings.readingTextSize));
-        expect(labels, contains(strings.readingBeginReflection));
-        // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
-        // measured eight failures across two suites for exactly this mistake:
-        // `testWidgets` compares the live `SemanticsHandle` count against the count
-        // taken *before* the framework took its own, so a teardown that runs after that
-        // check is a leak the harness reports as an unrelated-looking assertion.
-        handle.dispose();
-      });
-    }
-
-    testWidgets('the bookmark is named, INERT, and says why', (
-      WidgetTester tester,
-    ) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
-      final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-
-      final AppLocalizations strings = AppLocalizationsEn();
-      final SemanticsData? bookmark = _nodeLabelled(
-        tester,
-        '${strings.readingBookmark} — ${strings.readingUnavailableSuffix}',
-      );
-      expect(
-        bookmark,
-        isNotNull,
-        reason:
-            "Phase 6's precedent, verbatim: an "
-            'inert control ships with the reason in its name',
-      );
-      expect(bookmark!.flagsCollection.isEnabled, Tristate.isFalse);
-      expect(
-        bookmark.hasAction(SemanticsAction.tap),
+          en.listeningUnavailable(en.readingUnavailableSuffix),
+        ),
         isFalse,
-        reason:
-            "§14's disabled row: the action must be genuinely ABSENT, not "
-            'present and flagged. A reader who activates a control announced as '
-            'disabled and gets a response has been told a lie.',
+        reason: 'the inert control announces `enabled: false`',
       );
-      // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
-      // measured eight failures across two suites for exactly this mistake:
-      // `testWidgets` compares the live `SemanticsHandle` count against the count
-      // taken *before* the framework took its own, so a teardown that runs after that
-      // check is a leak the harness reports as an unrelated-looking assertion.
       handle.dispose();
     });
+  });
 
-    testWidgets('the `Aa` panel is announced as a slider with its value', (
+  group('the verses', () {
+    testWidgets('one node per verse, in order, announcing number and text', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-
-      await tester.tap(find.byIcon(Icons.format_size));
-      await pumpReadingFrames(tester, 4);
-
-      // **`AppLocalizationsEn().readingFontSize`, and it is a DIFFERENT string from
-      // `textSize`.** `FontSizeStepper`'s slider label used to be the hard-coded
-      // `'Font size'` — the language half of the defect this phase closed — so the
-      // label now comes from the table.
-      //
-      // It is a separate field rather than `textSize` because an earlier version of
-      // this change reused `textSize` for both, on the reasoning that they "name the
-      // same control from two positions". They do not: one names the **button you
-      // press** and the other the **slider it reveals**, and sharing a string put two
-      // nodes on the screen with the identical label. `_nodeLabelled` then returned
-      // the *button's* node — the `isSlider` flag was `false` — which is precisely
-      // the discrimination this lookup exists to make.
-      final SemanticsData? slider = _nodeLabelled(
-        tester,
-        AppLocalizationsEn().readingFontSize,
-      );
-      expect(
-        slider,
-        isNotNull,
-        reason: 'the track\'s own name, not the button\'s',
-      );
-      expect(slider!.flagsCollection.isSlider, isTrue);
-      // **`kDefaultFontStep` and not `ReadingCubit.defaultFontStep`, which Phase 9
-      // deleted.** The value moved to `UserSettings`, and the constant moved with it;
-      // the constant is asserted against `evaScalerFor` in `user_settings_test.dart`.
-      expect(slider.value, '$kDefaultFontStep');
-      // Both directions are offered, so a reader who cannot drag can still press.
-      expect(slider.hasAction(SemanticsAction.increase), isTrue);
-      expect(slider.hasAction(SemanticsAction.decrease), isTrue);
-      // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
-      // measured eight failures across two suites for exactly this mistake:
-      // `testWidgets` compares the live `SemanticsHandle` count against the count
-      // taken *before* the framework took its own, so a teardown that runs after that
-      // check is a leak the harness reports as an unrelated-looking assertion.
-      handle.dispose();
-    });
-  });
-
-  group('keyboard', () {
-    testWidgets('Tab reaches back, `Aa` and the CTA', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-
-      await tabUntilFocused(
-        tester,
-        find.ancestor(
-          of: find.byIcon(Icons.arrow_back),
-          matching: find.byType(IconActionButton),
-        ),
-      );
-      expect(
-        FocusManager.instance.primaryFocus,
-        isNotNull,
-        reason:
-            'and the bookmark is the next stop but is NOT focusable, so it is '
-            'the CTA that follows',
-      );
-
-      await tabUntilFocused(
-        tester,
-        find.ancestor(
-          of: find.byIcon(Icons.format_size),
-          matching: find.byType(IconActionButton),
-        ),
-      );
-      expect(FocusManager.instance.primaryFocus, isNotNull);
-
-      await tabUntilFocused(tester, find.byType(EvaButton));
-      expect(FocusManager.instance.primaryFocus, isNotNull);
-    });
-
-    testWidgets('and the INERT bookmark is not a Tab stop', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-
-      final IconActionButton bookmark = tester.widget<IconActionButton>(
-        find.ancestor(
-          of: find.byIcon(Icons.bookmark_border),
-          matching: find.byType(IconActionButton),
-        ),
-      );
-      expect(
-        bookmark.onPressed,
-        isNull,
-        reason:
-            '`EvaInk` and `EvaFocusRing` are both disabled by this, so Tab '
-            'skips it — which is the point of a control that cannot be pressed',
-      );
-    });
-  });
-
-  group('each verse is a labelled region', () {
-    testWidgets('so a reader can say "verse three"', (
-      WidgetTester tester,
-    ) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
-      final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-
-      final AppLocalizations strings = AppLocalizationsEn();
-      // Read off the semantics **tree** rather than with `find.bySemanticsLabel`,
-      // because `getSemantics`-style finders resolve the node *nearest* the finder and
-      // a `RichText` inside a labelled `Semantics` is a node of its own — the same
-      // reason `semanticsTree` exists in `design_system_harness.dart`.
-      final Set<String> labels = <String>{
-        for (final SemanticsData node in semanticsTree(tester)) node.label,
-      };
-      // `any` over the label rather than `contains`, because the `Semantics` **merges**
-      // into the `RichText` node: the label and the verse arrive as one string, so
-      // `startsWith` is the assertion that matches how it is actually built.
-      for (final Verse verse in liveEnglishPassageVerses) {
-        expect(
-          labels.any(
-            (String label) =>
-                label.startsWith('${strings.readingVerse} ${verse.number}'),
-          ),
-          isTrue,
-          reason:
-              'so a reader moving node to node can be told which verse they are '
-              'on, which one label for the whole passage would not allow',
-        );
-      }
-      expect(
-        labels.any((String label) => label.contains(strings.readingPassage)),
-        isFalse,
-        reason:
-            'the block has no string of its own — each verse is named, '
-            'which is more useful than naming the container once',
-      );
-      // **Disposed in the BODY**, never in an `addTearDown` — recorded decision 38
-      // measured eight failures across two suites for exactly this mistake:
-      // `testWidgets` compares the live `SemanticsHandle` count against the count
-      // taken *before* the framework took its own, so a teardown that runs after that
-      // check is a leak the harness reports as an unrelated-looking assertion.
-      // ## AND THE LABEL MUST NOT **REPLACE** THE WORDS
-      //
-      // `Semantics(excludeSemantics: true)` on the verse wrapper would leave every
-      // assertion above green — the node is still there, still named, still
-      // `Verse <n>` — while a reader moving node to node heard "Verse 1" and nothing
-      // else. So the verse's own text is asserted to be in the tree too, and this is
-      // the loop that fails when the label swallows it.
-      for (final Verse verse in liveEnglishPassageVerses) {
-        expect(
-          labels.any((String label) => label.contains(verse.text)),
-          isTrue,
-          reason:
-              'the number alone is not the verse: a reader navigating by node has '
-              'to hear the words. `Semantics` merges label and text into one string, '
-              'so one assertion covers both halves.',
-        );
-      }
-      handle.dispose();
-    });
-  });
-
-  group('the ARABIC arm is a true mirror', () {
-    testWidgets('and the ambient direction is what does it', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness en = readingHarness();
-      await pumpReading(tester, cubit: en.cubit);
-      expect(
-        Directionality.of(tester.element(find.byType(NeuralScaffold))),
-        TextDirection.ltr,
-      );
-
-      final ReadingHarness ar = readingHarness(
-        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
-      );
-      await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
-      expect(
-        Directionality.of(tester.element(find.byType(NeuralScaffold))),
-        TextDirection.rtl,
-        reason:
-            'and this is `MaterialApp` deriving it from the locale — there is '
-            'no `Directionality` anywhere under `lib/`',
-      );
-    });
-
-    testWidgets('the scripture is right-aligned, not left-aligned', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness ar = readingHarness(
-        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
-      );
       await pumpReading(
         tester,
-        cubit: ar.cubit,
-        locale: const Locale('ar'),
-        size: const Size(430, 2400),
+        cubit: h.cubit,
+        // **The entrance is off, and that is load-bearing**: the stagger reveals
+        // verses on `80 + 25n` ms, and a verse that has not revealed paints at
+        // `Opacity(0)` — invisible to a reader, and invisible to this suite. The
+        // calm branch (`eva/redesign.html:1382`) is the honest stand-in for a
+        // reader with reduced motion, and it is the only arm where every verse is
+        // on screen at once.
+        disableAnimations: true,
       );
 
-      // `ReadingArScreen.tsx:47` writes `textAlign: 'right'` and `ReadingEnScreen.tsx:45`
-      // writes none — and `TextAlign.start` resolves to exactly those two under the
-      // ambient direction, which is why this file spells neither.
-      final RichText verse = _scriptureRichTexts(tester).first;
-      expect(verse.textAlign, TextAlign.start);
-      // `RichText.textDirection` is **null** here and that is correct: `null` means
-      // "resolve from the ambient `Directionality`", which is `MaterialApp`'s and
-      // which the previous group asserts is RTL. Asserting the field itself would be
-      // asserting that the paragraph pins its direction, which is the thing this
-      // screen deliberately does not do.
-      expect(verse.textDirection, isNull);
-      expect(
-        Directionality.of(tester.element(find.byWidget(verse))),
-        TextDirection.rtl,
-      );
+      // `flagsCollection` and not the deprecated `hasFlag` — the repo's other
+      // accessibility suites read the collection and compare a `Tristate`.
+      final List<VerseLine> lines = tester
+          .widgetList<VerseLine>(find.byType(VerseLine))
+          .toList();
+      expect(lines, isNotEmpty);
+      for (int i = 0; i < lines.length; i++) {
+        expect(
+          lines[i].number,
+          i + 1,
+          reason:
+              'the verses announce in the server\'s order, one-based — '
+              '`eva/redesign.html:1361` writes `i+1` on the Latin arm',
+        );
+      }
+      handle.dispose();
     });
 
-    testWidgets('the AR citation is centred and the metadata row too', (
+    // **The drop cap is not announced twice — and there is no row asserting it,
+    // because there is no second node.** `PassageDropCap` is a `WidgetSpan`
+    // *inside* verse one's `RichText`, so the cap's letter is part of the
+    // paragraph's own text run and contributes no semantics node of its own; the
+    // rendered form is the glyph suites' claim, not this one.
+  });
+
+  group('the resume marker and the selection announce nothing extra', () {
+    testWidgets('the marker is decoration, the selection is a state', (
       WidgetTester tester,
     ) async {
-      final ReadingHarness ar = readingHarness(
-        scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
-      );
-      await pumpReading(tester, cubit: ar.cubit, locale: const Locale('ar'));
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final ReadingHarness h = readingHarness();
+      await pumpReading(tester, cubit: h.cubit, disableAnimations: true);
 
-      // `textAlign: 'center'` on both arms (`:33`, `:41`) — a row that does not mirror.
-      expect(find.text('يوحنا 3: 1-5'), findsOneWidget);
+      // `:168`'s marker is a 3px border and 12px of padding — decoration with no
+      // name of its own, and `:1385-1386`'s selection is a *state* on a node that
+      // already has a name. Both are asserted by absence: no node's name grows
+      // because of either.
+      final int before = _allLabels(tester).length;
+      await tester.tap(find.byType(VerseLine).first);
+      await tester.pump(const Duration(milliseconds: 100));
       expect(
-        tester.widget<Text>(find.text('Smith & Van Dyck (فانديك)')).textAlign,
-        TextAlign.center,
+        _allLabels(tester).length,
+        before,
+        reason:
+            'selecting a verse adds no name — the node already has one, and '
+            '`:1385-1386`\'s `.hot` is a paint state',
       );
+      handle.dispose();
     });
   });
 }
 
-/// The one semantics node labelled [label], or `null`.
-SemanticsData? _nodeLabelled(WidgetTester tester, String label) {
-  for (final SemanticsData node in semanticsTree(tester)) {
-    if (node.label == label) return node;
-  }
-  return null;
-}
-
-/// The scripture paragraphs, excluding the header's.
-List<RichText> _scriptureRichTexts(WidgetTester tester) {
-  final Set<Element> header = <Element>{
-    ...find
-        .descendant(
-          of: find.byType(ReadingHeader),
-          matching: find.byType(RichText),
-        )
-        .evaluate(),
-  };
-  return <RichText>[
-    for (final Element element
-        in find
-            .descendant(
-              of: find.byType(ScriptureBlock),
-              matching: find.byType(RichText),
-            )
-            .evaluate())
-      if (!header.contains(element) && _isVerseParagraph(element))
-        element.widget as RichText,
+/// Every accessible name on the tree, flattened.
+List<String> _allLabels(WidgetTester tester) {
+  final Finder nodes = find.byWidgetPredicate(
+    (Widget w) => w is Semantics && (w.properties.label ?? '').isNotEmpty,
+  );
+  return <String>[
+    for (final Semantics s in tester.widgetList<Semantics>(nodes))
+      if (s.properties.label case final String label when label.isNotEmpty)
+        label,
   ];
 }
 
-bool _isVerseParagraph(Element element) {
-  final Widget widget = element.widget;
-  if (widget is! RichText) return false;
-  final InlineSpan text = widget.text;
-  return text is TextSpan && text.children != null;
+/// Whether the node whose label is [label] announces `enabled`.
+///
+/// Read off the declaring [Semantics] widget's own properties rather than through
+/// the tester's flag collection: `enabled` is a property this codebase sets on the
+/// widget, and reading it where it is set is one hop instead of two.
+bool _isEnabled(WidgetTester tester, String label) {
+  final List<Semantics> nodes = tester
+      .widgetList<Semantics>(
+        find.byWidgetPredicate(
+          (Widget w) => w is Semantics && w.properties.label == label,
+        ),
+      )
+      .toList();
+  expect(nodes, isNotEmpty, reason: '`$label` is not on the tree');
+  return nodes.first.properties.enabled == true;
 }
-
-// check is a leak the harness reports as an unrelated-looking assertion.

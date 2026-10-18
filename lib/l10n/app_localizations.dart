@@ -618,12 +618,6 @@ abstract class AppLocalizations {
   /// **'Bookmark'**
   String get readingBookmark;
 
-  /// The sticky CTA. Transcribed from BOTH prototype arms, and this is the only genuinely bilingual transcription in the file: ReadingEnScreen.tsx:87 — `ButtonPrimary` with `Begin reflection`; ReadingArScreen.tsx:85 — `ابدأ التأمل`.
-  ///
-  /// In en, this message translates to:
-  /// **'Begin reflection'**
-  String get readingBeginReflection;
-
   /// Appended to a control's name while that control is inert.
   ///
   /// The same wording, and the same reasoning, as `authUnavailableSuffix` and `homeUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; /quiz's is a different string.
@@ -653,22 +647,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get readingRetry;
-
-  /// The sticky CTA's caption for a number of questions. THIS IS A REAL ICU PLURAL, and it is the reason the whole migration is worth 302 renamed test references.
-  ///
-  /// WHAT IT REPLACED: two hand-rolled keys (`questionSingular`/`questionPlural`) plus a `count == 1 ? … : …` expression in Dart. That expression implemented exactly ONE boundary, and `reading_strings.dart` recorded the rest as acknowledged debt.
-  ///
-  /// THE ARABIC DEBT THIS PAYS OFF, MEASURED. Arabic plural agreement has FOUR classes the old table did not have — 2 dual (`سؤالان`), 3-10 plural (`أسئلة`), 11-99 singular accusative (`سؤالًا`). The old `captionFor(2)` returned `٢ أسئلة`, where correct Arabic is `٢ سؤالان`. That gap was accepted then on three grounds, and all three are now obsolete: `HomeStrings.streakLabel` had declined the same decision as out of scope, the live payload carried one question, and every other class needed a number the client had never seen. ICU supplies all six classes for free and `arabic_typography_test.dart` holds the dual.
-  ///
-  /// TWO PLACEHOLDERS, AND WHY. `count` (int) is the ICU SELECTOR — Arabic's agreement classes are a function of the integer, so selection genuinely needs the number. `digits` (String) is the RENDERED NUMERAL, and it is a String because `gen_l10n` emits the selector as a raw Dart `int` interpolation (`'$count'`), which renders LATIN digits on the Arabic arm. That would silently undo `arabicIndicDigits` — a domain function pinned by `arabic_digits_test.dart` and `font_coverage_test.dart` — and would leave the Arabic screens showing `٥` beside `٥`, half-translated. So the numeral is supplied by the caller, from the same domain function, and this key owns only the WORDING. Verified: `flutter gen-l10n` on a single-`{count}` version emitted `'$count أسئلة'` for the `few` branch.
-  ///
-  /// THE COUNT IS NEVER FAKE. ReadingEnScreen.tsx:89 hard-codes `5 questions` and the live reading carries ONE question, so the prototype's literal is false by a factor of five and a hard-coded 5 is fake data that happens to match nothing the server sends.
-  ///
-  /// NO DURATION, AND IT IS NOT COMING. ReadingEnScreen.tsx:31 (`Genesis · Chapter 1 · 4 min`) and :89 (`5 questions · about a minute`) both carry durations, and `GET /readings/today/{lang}` has NO duration field anywhere (verified live against HEAD = 4a1c834). Deriving one from a word count is inventing a measurement, so both durations are GONE and not replaced.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, zero{{digits} questions} one{{digits} question} other{{digits} questions}}'**
-  String readingCaptionFor(int count, String digits);
 
   /// The primary button. Transcribed: ResultScreen.tsx:77.
   ///
@@ -965,6 +943,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leaderboard'**
   String get sealFabLeaderboard;
+
+  /// `:967` — `verses:["verses","آيات"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences.
+  ///
+  /// In en, this message translates to:
+  /// **'verses'**
+  String get readingVerses;
+
+  /// `:967` — `quiz:["quiz","اختبار"]`. The caption the CTA is built around (`:1347`), not a heading: the prototype writes `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` ``.
+  ///
+  /// In en, this message translates to:
+  /// **'quiz'**
+  String get readingQuiz;
+
+  /// `:967` — `questions:["questions","أسئلة"]`. The unit beside the CTA's numeral. **Not a plural**: the prototype renders one word for every count, exactly as home's `verseCount` and `selahSeconds` do.
+  ///
+  /// In en, this message translates to:
+  /// **'questions'**
+  String get readingQuestions;
+
+  /// `:966` — `listen:["listen","استمع"]`. The pill's last button (`#listen`, `:559`).
+  ///
+  /// In en, this message translates to:
+  /// **'listen'**
+  String get readingListen;
+
+  /// `:969` — `sky:["sky","سماء"]`. The crumb's third clause (`` `${tr('sky')} ${N(skyN)}` ``, `:1346`) — the count of lit stars, which is `SkyState.count`.
+  ///
+  /// In en, this message translates to:
+  /// **'sky'**
+  String get readingSky;
+
+  /// `:975` — `bmk:["✦ bookmarked","✦ تم الحفظ"]`, and the leading `✦` is **deliberately dropped**: U+2726 is in no bundled family (measured — `arabic_typography_test.dart` failed with `[10022]` on the selah glyph before it became a painted star), so a toast carrying it would ship a tofu box. The glyph is decoration on a transient label; the word is the information. `readingBookmark` keeps the button's own name, which `:544` writes as `title="bookmark"` with no glyph at all.
+  ///
+  /// In en, this message translates to:
+  /// **'bookmarked'**
+  String get readingBookmarkOn;
+
+  /// `:975` — `bmkOff:["bookmark removed","أُزيل الحفظ"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind.
+  ///
+  /// In en, this message translates to:
+  /// **'bookmark removed'**
+  String get readingBookmarkOff;
 }
 
 class _AppLocalizationsDelegate

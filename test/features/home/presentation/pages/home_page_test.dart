@@ -379,16 +379,26 @@ void main() {
       // **The star is PAINTED, not typed** — and that is the measured correction
       // `SelahCard.glyph`'s doc records: U+2726 is in no bundled family, so the
       // first build typed the character and `arabic_typography_test.dart`'s tofu
-      // gate failed with `[10022]`. The claim here is that the circle carries a
-      // drawn star of the size the CSS names, asserted on the painter's box
-      // rather than on a `Text`, because there is no text any more.
+      // gate failed with `[10022]`. The shape is now the shared
+      // `core/design_system`'s `FourPointedStar`, which `/reading`'s bookmark
+      // button (`:544`) also needs and could not reach while it was private to
+      // this feature.
+      //
+      // Found by **type** and measured off the **rendered box**, and the second
+      // half is the change: the finder used to be
+      // `w is CustomPaint && w.size == const Size.square(11.0)`, which asserted
+      // the box's own *declaration* — it would still have matched after the star
+      // stopped being a `CustomPaint`, and it says nothing about what was laid
+      // out. `:269` writes `font-size: 11px`, and 11 is the em box a text glyph
+      // occupies, so `SelahCard.glyphSize` is the number and `getSize` is what
+      // the engine did with it.
       final Finder star = find.descendant(
         of: find.byType(SelahCard),
-        matching: find.byWidgetPredicate(
-          (Widget w) => w is CustomPaint && w.size == const Size.square(11.0),
-        ),
+        matching: find.byType(FourPointedStar),
       );
       expect(star, findsOneWidget);
+      expect(tester.getSize(star), const Size.square(11.0));
+      expect(SelahCard.glyphSize, 11.0, reason: '`:269` — `font-size: 11px`');
       // And the character the prototype wrote stays in the widget's *record*,
       // so the painted star and the record cannot silently disagree.
       expect(SelahCard.glyph, '✦');

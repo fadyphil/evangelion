@@ -236,9 +236,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingBookmark => 'Bookmark';
 
   @override
-  String get readingBeginReflection => 'Begin reflection';
-
-  @override
   String get readingUnavailableSuffix => 'unavailable in this build';
 
   @override
@@ -249,18 +246,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readingRetry => 'Try again';
-
-  @override
-  String readingCaptionFor(int count, String digits) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$digits questions',
-      one: '$digits question',
-      zero: '$digits questions',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get resultReflectAgain => 'Reflect again';
@@ -383,4 +368,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sealFabLeaderboard => 'Leaderboard';
+
+  @override
+  String get readingVerses => 'verses';
+
+  @override
+  String get readingQuiz => 'quiz';
+
+  @override
+  String get readingQuestions => 'questions';
+
+  @override
+  String get readingListen => 'listen';
+
+  @override
+  String get readingSky => 'sky';
+
+  @override
+  String get readingBookmarkOn => 'bookmarked';
+
+  @override
+  String get readingBookmarkOff => 'bookmark removed';
 }

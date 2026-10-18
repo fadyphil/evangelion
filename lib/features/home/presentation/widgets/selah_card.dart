@@ -104,19 +104,30 @@ class SelahCard extends StatelessWidget {
   /// The glyph. `redesign.html:531` — `<button class="breathing" …>✦</button>`.
   ///
   /// **Painted, not typed — and that is a measured correction, not a preference.**
-  /// The prototype writes the character, and `no bundled family carries U+2726`:
-  /// `font_coverage.dart` reads the twenty shipped `.ttf`s and none of them has
-  /// the codepoint (the first build typed it, and `arabic_typography_test.dart`'s
-  /// `expectNoTofuInAnyRun` failed with `[10022]` — the tofu this circle would
-  /// have shipped). A browser escapes that by falling back per character; this
-  /// client's `fontFamilyFallback` has nothing to fall back **to**, because the
-  /// glyph is in no bundled font at all.
+  /// The prototype writes the character and a browser falls back per character
+  /// to draw it; **no bundled family carries U+2726** (`0x2726` = `10022`), so the
+  /// first build typed it and `arabic_typography_test.dart`'s `expectNoTofuInAnyRun`
+  /// failed with `Actual: [10022]`. This client has nothing to fall back **to**:
+  /// the glyph is in no bundled font at all, so `fontFamilyFallback` would be a
+  /// longer list of misses.
   ///
-  /// So [_FourPointedStar] paints the shape the character denotes — a four-pointed
-  /// star, `11px` in the circle the CSS sizes — and the character itself is kept
-  /// in [glyph] as the *record* of what the prototype wrote, asserted by
+  /// So [FourPointedStar] paints the shape the character denotes at [glyphSize],
+  /// the box the CSS's `font-size` names, and the character itself is kept in
+  /// [glyph] as the *record* of what the prototype wrote — asserted by
   /// `home_geometry_test.dart` to be absent from the rendered text so the two
   /// cannot silently swap places.
+  ///
+  /// ## THE MEASUREMENT LIVES WITH THE SHAPE, NOT HERE
+  ///
+  /// Which fonts were checked, and how, is recorded in full on
+  /// `core/design_system/widgets/four_pointed_star.dart` — the file that owns the
+  /// decision, and the one a future call site reads. It is deliberately **not**
+  /// restated here: two copies of one measurement is one measurement and two
+  /// chances to be stale, and this file's copy already was one. It read "the
+  /// twenty shipped `.ttf`s" where `assets/fonts/` holds **nineteen**;
+  /// `AGENTS.md` and `test/support/font_coverage.dart`'s own header still say
+  /// twenty. None of those three is this slice's to edit, so the number is
+  /// measured on the shared file and published there rather than propagated.
   static const String glyph = '✦';
 
   @override
@@ -225,7 +236,16 @@ class _BreathingButton extends StatelessWidget {
           width: SelahCard.rimWidth,
         ),
       ),
-      child: const _FourPointedStar(size: SelahCard.glyphSize),
+      child: FourPointedStar(
+        size: SelahCard.glyphSize,
+        // `colors.ember` passed rather than baked into the star: `:267-268`'s
+        // `rgba(232,176,75,.6)` rim and `rgba(232,176,75,.08)` fill are the
+        // *circle's*, and the glyph inside it is the prototype's `--gold` at
+        // full strength — which on this palette is `ember`, not the 60%-alpha rim
+        // a reader would otherwise expect from a 44px ring. See
+        // `four_pointed_star.dart`'s `color` for why the widget takes it.
+        color: colors.ember,
+      ),
     );
 
     // **No `breatheRing` animation.** `redesign.html:269-270` is
@@ -244,62 +264,4 @@ class _BreathingButton extends StatelessWidget {
       child: Opacity(opacity: 0.45, child: circle),
     );
   }
-}
-
-/// The four-pointed star the prototype's `✦` denotes, painted rather than typed.
-///
-/// See [SelahCard.glyph] for the measured reason: U+2726 is in **no** bundled
-/// family, so the character renders as a tofu box in every face this app ships,
-/// and the browser that renders the prototype was silently substituting a system
-/// glyph for it.
-///
-/// The path is an astroid-style star — four concave arcs meeting at the points —
-/// sized to [size] and centred, which is the shape the character has at this
-/// scale. It is **decorative**: the circle's `Semantics` carries the whole name
-/// (`excludeSemantics: true` above), so a screen reader never meets the shape and
-/// there is no label to lose.
-class _FourPointedStar extends StatelessWidget {
-  const _FourPointedStar({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final EvaColors colors = context.colors;
-    return CustomPaint(
-      size: Size.square(size),
-      painter: _StarPainter(color: colors.ember),
-    );
-  }
-}
-
-class _StarPainter extends CustomPainter {
-  const _StarPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    // The waist: how far the four concave arcs bow toward the centre. A quarter
-    // of the box puts the arc's widest point at the middle of each edge, which is
-    // the proportion the character has — a `✦` is notably slimmer than a rotated
-    // square, and a half would have drawn exactly that.
-    const double waist = 0.25;
-    final Path path = Path()
-      ..moveTo(w / 2, 0)
-      // `conicTo` takes the control point, the end point and a weight; the
-      // default weight of 1 gives the gentle concavity the character has, and a
-      // heavier one would pull the arcs into a diamond's straight edges.
-      ..conicTo(w * (0.5 + waist), h * (0.5 - waist), w, h / 2, 1)
-      ..conicTo(w * (0.5 + waist), h * (0.5 + waist), w / 2, h, 1)
-      ..conicTo(w * (0.5 - waist), h * (0.5 + waist), 0, h / 2, 1)
-      ..conicTo(w * (0.5 - waist), h * (0.5 - waist), w / 2, 0, 1)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(_StarPainter oldDelegate) => oldDelegate.color != color;
 }

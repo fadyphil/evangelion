@@ -68,12 +68,10 @@
   "readingDecreaseFontSize": "تصغير الخط",
   "readingIncreaseFontSize": "تكبير الخط",
   "readingBookmark": "إشارة مرجعية",
-  "readingBeginReflection": "ابدأ التأمل",
   "readingUnavailableSuffix": "غير متاح في هذه النسخة",
   "readingPassage": "نص الآية",
   "readingVerse": "الآية",
   "readingRetry": "حاول مرة أخرى",
-  "readingCaptionFor": "{count, plural, zero{{digits} أسئلة} one{{digits} سؤال واحد} two{{digits} سؤالان} few{{digits} أسئلة} many{{digits} سؤالًا} other{{digits} سؤال}}",
   "resultReflectAgain": "تأمل مرة أخرى",
   "resultBackHome": "العودة",
   "resultThisAnswer": "هذه الإجابة",
@@ -125,5 +123,33 @@
   "sealFabLeaderboard": "الترتيب",
   "@sealFabLeaderboard": {
     "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
+  },
+  "readingVerses": "آيات",
+  "@readingVerses": {
+    "description": "`:966` — `verses:[\"verses\",\"آيات\"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences."
+  },
+  "readingQuiz": "اختبار",
+  "@readingQuiz": {
+    "description": "`:966` — `quiz:[\"quiz\",\"اختبار\"]`. The caption the CTA is built around (`:1347`), not a heading: the prototype writes `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` ``."
+  },
+  "readingQuestions": "أسئلة",
+  "@readingQuestions": {
+    "description": "`:966` — `questions:[\"questions\",\"أسئلة\"]`. The unit beside the CTA's numeral. **Not a plural**: the prototype renders one word for every count, exactly as home's `verseCount` and `selahSeconds` do."
+  },
+  "readingListen": "استمع",
+  "@readingListen": {
+    "description": "`:965` — `listen:[\"listen\",\"استمع\"]`. The pill's last button (`#listen`, `:559`)."
+  },
+  "readingSky": "سماء",
+  "@readingSky": {
+    "description": "`:968` — `sky:[\"sky\",\"سماء\"]`. The crumb's third clause (`` `${tr('sky')} ${N(skyN)}` ``, `:1346`) — the count of lit stars, which is `SkyState.count`."
+  },
+  "readingBookmarkOn": "تم الحفظ",
+  "@readingBookmarkOn": {
+    "description": "`:974` — `bmk:[\"✦ bookmarked\",\"✦ تم الحفظ\"]`, and the leading `✦` is **deliberately dropped**: U+2726 is in no bundled family (measured — `arabic_typography_test.dart` failed with `[10022]` on the selah glyph before it became a painted star), so a toast carrying it would ship a tofu box. The glyph is decoration on a transient label; the word is the information. `readingBookmark` keeps the button's own name, which `:544` writes as `title=\"bookmark\"` with no glyph at all."
+  },
+  "readingBookmarkOff": "أُزيل الحفظ",
+  "@readingBookmarkOff": {
+    "description": "`:974` — `bmkOff:[\"bookmark removed\",\"أُزيل الحفظ\"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind."
   }
 }

@@ -239,9 +239,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get readingBookmark => 'إشارة مرجعية';
 
   @override
-  String get readingBeginReflection => 'ابدأ التأمل';
-
-  @override
   String get readingUnavailableSuffix => 'غير متاح في هذه النسخة';
 
   @override
@@ -252,21 +249,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get readingRetry => 'حاول مرة أخرى';
-
-  @override
-  String readingCaptionFor(int count, String digits) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$digits سؤال',
-      many: '$digits سؤالًا',
-      few: '$digits أسئلة',
-      two: '$digits سؤالان',
-      one: '$digits سؤال واحد',
-      zero: '$digits أسئلة',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get resultReflectAgain => 'تأمل مرة أخرى';
@@ -391,4 +373,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sealFabLeaderboard => 'الترتيب';
+
+  @override
+  String get readingVerses => 'آيات';
+
+  @override
+  String get readingQuiz => 'اختبار';
+
+  @override
+  String get readingQuestions => 'أسئلة';
+
+  @override
+  String get readingListen => 'استمع';
+
+  @override
+  String get readingSky => 'سماء';
+
+  @override
+  String get readingBookmarkOn => 'تم الحفظ';
+
+  @override
+  String get readingBookmarkOff => 'أُزيل الحفظ';
 }

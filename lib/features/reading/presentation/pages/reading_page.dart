@@ -3,257 +3,193 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/settings_scope.dart';
+import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/features/reading/domain/reading_focus.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
-import 'package:evangelion/features/reading/presentation/widgets/reading_controls.dart';
-import 'package:evangelion/features/reading/presentation/widgets/reading_header.dart';
-import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
-import 'package:evangelion/features/reading/presentation/widgets/sticky_cta.dart';
+import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/features/reading/presentation/widgets/reading_app_bar.dart';
+import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
+import 'package:evangelion/features/reading/presentation/widgets/reading_quiz_cta.dart';
+import 'package:evangelion/features/reading/presentation/widgets/verse_line.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// `/reading` — the sanctuary. `ReadingEnScreen.tsx:8-93` and
-/// `ReadingArScreen.tsx:8-91`, one page, two arms.
+/// The reading sanctuary, rebuilt against `eva/redesign.html:540-560`.
 ///
-/// ## THE ROOT IS A **STACK**, AND THAT IS THE ONLY WAY THE CTA IS VISIBLE
+/// ## THE SCREEN IS A **COLUMN**, AND EVERY PART OF IT FOLLOWS FROM THAT
 ///
-/// `NeuralScaffold`'s `child` sits **below** its `bottomFade` in one `Stack`, and
-/// the fade is solid `canvas` at 95% from 40% of its own height down. The prototype
-/// puts the CTA at `zIndex: 2` **above** the content at `:1`
-/// (`ReadingEnScreen.tsx:85`), and `NeuralScaffold`'s doc says its `bottomFade`
-/// exists for "the sticky CTA's scrim" — so the CTA has to paint above it.
+/// `:128` gives `.route` `display:flex; flex-direction:column; overflow:hidden`,
+/// and the reader's five children are in source order: `.appbar`, `.appbar.sub`,
+/// `.versebox`, `.qcta`, `.pill`. Only `.versebox` grows — `:159` gives it
+/// `flex:1` and `overflow-y:auto` — so it is the screen's only scrollable and the
+/// other four keep their own heights, pinned top and bottom.
 ///
-/// **A `Stack` here rather than a parameter on `NeuralScaffold`.** The obvious fix is
-/// an `overlay` slot on the screen root, and it is declined for a reason that is
-/// already a test: `neural_scaffold_test.dart` pins the scaffold's constructor
-/// parameter set **exactly**, with the reasoning that "a new parameter on it is a
-/// decision every screen inherits, not a default". One screen needing one stacking
-/// order is not six screens needing a new argument — and
-/// `Stack(fit: StackFit.expand, children: [Positioned.fill(scaffold),
-/// Positioned(cta)])` says the same thing in the place that owns it.
+/// The previous version was a `Stack` over a scaffold with a header, a controls
+/// row, a passage block and a *sticky* CTA floated above the lot. Nothing here is
+/// floating: the CTA and the pill are siblings of the list, and the list scrolls
+/// between them.
 ///
-/// ## `scrollable: false`, BECAUSE THE BODY OWNS ITS OWN SCROLLABLE
+/// ## AND THE SKY IS BEHIND THE WHOLE COLUMN, NOT BEHIND THE VERSES
 ///
-/// `ReadingEnScreen.tsx:26` puts `overflowY: 'auto'` on the **content div**, not on
-/// the root — which is what lets the sticky CTA overlay it. `NeuralScaffold`'s own doc
-/// records this as the reason `false` is correct for `/reading` and `/quiz`, and
-/// `ScriptureBlock`'s `ListView.builder` is that scrollable. §13 rule 5's "no `Column`
-/// + `map` over unbounded data" is why it is a `ListView.builder` and not the
-/// prototype's `<div>` with five `<p>`s in it, and why the header travels **inside**
-/// it rather than above it.
-///
-/// ## THE TEXT SCALE IS **NOT** INSTALLED HERE, AND THAT IS PHASE 9'S CHANGE
-///
-/// Phase 7 wrapped this screen in a `MediaQuery` carrying `readingTextScalerFor`'s
-/// composed scaler — the reader's step times the platform's, capped at
-/// `03-design-system.md` §5.2's top row. That function is **deleted**, and this
-/// paragraph is what replaced the wrapper.
-///
-/// The step is one persisted preference now (`UserSettings.fontStep`), it is installed
-/// app-wide at `MaterialApp.builder`, and it reaches every widget on every screen —
-/// which is what removed the two recorded costs:
-///
-/// * the **dead zone**. Steps 3, 4 and 5 all rendered at 1.22× once the platform was
-///   above 1.109, so a reader who had raised their OS font size and then wanted Eva's
-///   larger steps got three identical positions. With one input there is one scale and
-///   the five positions are five distinct sizes on **every** device;
-/// * the **nonlinear platform scaler**. Composing across two `TextScaler`
-///   implementations has no `max`, so the product was forced linear and Android's
-///   curve was lost for this subtree only. There is no composition left to lose.
-///
-/// **What this screen still owns is the reading of it**: the `Aa` panel needs to know
-/// *where* the reader is on the table, which is `fontStepFromScaler` over the scaler
-/// `MediaApp` installed. So the step is read back out of the `MediaQuery` rather than
-/// held as a second copy, and the write goes through the app's settings handle — see
-/// `_fontStep` and `_onFontStepChanged`.
-///
-/// **And the reversal, stated plainly because it contradicts a recorded decision.**
-/// `eva_typography.dart` rejected "wrapping the platform's scaler in a way that
-/// ignores it" for the reason that it "would silently override a user who has raised
-/// the OS font size". That reason was scoped to **one screen**: "the one screen where
-/// reading is hardest is the one screen that ignores their accessibility setting."
-/// It dies when the control is app-wide, because there is no second screen to disagree
-/// with — every screen now honours the same one preference. What survives is the
-/// trade, and it is a real one: a reader who wants text larger than 1.22× has no
-/// control for it in this app, and `eva_typography.dart`'s table is where that ceiling
-/// is published rather than invented here.
-///
-/// ## DIRECTION IS THE **LOCALE**'S, AND NOTHING IN THIS FILE DECIDES IT
-///
-/// `MaterialApp` installs `Directionality` from `locale`, which is Phase 6's
-/// mechanism, and there is **no `Directionality` and no `startsWith('ar')` anywhere
-/// under `lib/`**. What this file passes down is a [ReadingLanguage], and every
-/// layout decision that depends on it is a named per-arm constant in the widget that
-/// owns it — `ScriptureBlock.fontSizeFor`, `ReadingHeader.ruleGapFor`,
-/// `StickyCta.captionLetterSpacingFor`, `ReadingControls.paddingFor`. A single
-/// shared number for any of them is the defect `home_geometry_test.dart`'s library doc
-/// names, so none is shared and `reading_geometry_test.dart` pins each against its own
-/// prototype line.
-///
-/// ## AND THE PAGE **RENDERS VERSES ONLY** — THE ANSWER IS NOT ON THIS SCREEN
-///
-/// **Measured live against `HEAD = 4a1c834`:** `GET /readings/today/{lang}` puts
-/// `user_answer: 'A'` and `is_correct: true` **inside the question object**. The
-/// server ships today's answer with today's reading, so any client that has read this
-/// screen's payload already holds the answer to `/quiz`.
-///
-/// This is the sanctuary — the one screen where a reader is asked to sit with the text
-/// — and drawing `is_correct` here would tell the reader the answer to `QuizPage`
-/// before they have chosen one. So [ScriptureText.questions] is carried and unread,
-/// exactly as `TodayReading.currentStreak` and `StreakSummary.nextMilestone` are
-/// carried and unread in Phase 6, and `reading_page_test.dart` asserts in the failing
-/// direction that neither the boolean, nor the letter, nor the option texts, nor the
-/// prompt reach the rendered tree — with the live payload, which has all four, behind
-/// it.
-///
-/// **A `ReadingPage` that rendered the reading's questions would be a bug, not a
-/// feature.** Phase 8's `QuizPage` is where they belong.
-///
-/// ## AND NOTHING ON THIS SCREEN **INVENTED** A NUMBER THE SERVER DID NOT SEND
-///
-/// The prototype's metadata row reads `Genesis · Chapter 1 · 4 min` and its caption
-/// reads `5 questions · about a minute`. The live payload carries **one** question,
-/// **no** duration field anywhere, and a `reference` rather than a passage name.
-/// `ReadingHeader` shows the `translation`, the citation shows the `reference`, and
-/// `StickyCta`'s caption is `captionFor(questionCount)` — pluralised, and derived.
-/// `reading_page_test.dart` asserts that no `min`, no `about a minute` and no
-/// prototype's `Genesis` reaches the screen, in the failing direction.
-@RoutePage()
+/// `#sky` (`:116`) is `position:absolute; inset:0` on the **screen**, and
+/// `WitnessSky`'s doc is explicit that it fills whatever box it is given. So it is
+/// the stack's first child at `Positioned.fill` and the column draws over it —
+/// which is what makes the pill's translucent fill read as glass even though the
+/// pill does not blur (§13.4's budget; `reading_pill.dart`'s doc carries the
+/// recorded consequence).
 class ReadingPage extends StatelessWidget {
-  /// The reading sanctuary.
   const ReadingPage({super.key, this.cubit});
 
-  /// The cubit to render.
-  ///
-  /// `null` means "resolve [ReadingCubit] from the locator", which is the production
-  /// path. A parameter rather than only a lookup because a widget test cannot reach
-  /// the locator without configuring the whole graph — the same arrangement as
-  /// `HomePage.bloc` and `LoginPage.bloc`, and for the same reason.
-  ///
-  /// **Substitution, not initialisation.** A passed-in cubit is loaded exactly as the
-  /// locator's is: [_ReadingBody] dispatches `load` unconditionally. See its doc.
+  /// The cubit, or `null` to resolve the registered singleton — the same two
+  /// sources for one cubit `HomePage` uses, and for its reason.
   final ReadingCubit? cubit;
-
-  /// The content column's padding. `ReadingEnScreen.tsx:26` —
-  /// `padding: '28px 24px 130px'`; `ReadingArScreen.tsx:32` — the same three.
-  ///
-  /// ## The bottom **130** IS NOT A CONVENTION, IT IS THE SCAFFOLD'S OWN NUMBER
-  ///
-  /// It is the clearance the prototype reserves so the passage is not hidden behind the
-  /// sticky CTA, and `kNeuralScaffoldFadeHeight` is built on the **same** `130`
-  /// (`contentReserve`), so the scrim and this reserve agree rather than merely being
-  /// close. `reading_geometry_test.dart` pins both against `ReadingEnScreen.tsx:26`.
-  ///
-  /// ## And each row owns its own gutter
-  ///
-  /// The scaffold's `padding` is a **uniform** gutter — `EvaSpacing.lg` by default —
-  /// and this screen's two rows have two different ones (the controls row is 20,
-  /// `ReadingControls.paddingFor`; this column is 24), so the scaffold takes
-  /// `EdgeInsets.zero` and each row supplies its own. `NeuralScaffold.padding`'s doc
-  /// says "a screen that wants 20 passes it"; here a screen wants two different values
-  /// and the honest answer is for the rows to carry them.
-  static const EdgeInsets contentPadding = EdgeInsets.fromLTRB(
-    EvaSpacing.xxl,
-    EvaSpacing.xxl + EvaSpacing.xs,
-    EvaSpacing.xxl,
-    130,
-  );
-
-  /// The Arabic arm's geometric band. `ReadingArScreen.tsx:13-16` —
-  /// `height: 5`, `repeating-linear-gradient(90deg, … 0 2px, transparent 2px 18px)`.
-  static const double arabicBandHeight = 5;
-
-  /// The band's dash width and pitch, in logical px. `ReadingArScreen.tsx:15`.
-  static const double arabicBandDash = 2;
-  static const double arabicBandPitch = 18;
-
-  /// The band's alpha. `ReadingArScreen.tsx:15` — `isDark ? 0.3 : 0.2`.
-  static double arabicBandAlpha(Brightness brightness) =>
-      brightness == Brightness.dark ? 0.3 : 0.2;
 
   @override
   Widget build(BuildContext context) {
-    // Two sources for one cubit, one provider either way — see [cubit].
     final ReadingCubit? passed = cubit;
     final ReadingCubit resolved = passed ?? getIt<ReadingCubit>();
 
     return BlocProvider<ReadingCubit>.value(
       value: resolved,
-      child: _ReadingBody(onBack: () => unawaited(context.router.maybePop())),
+      child: const _ReadingBody(),
     );
   }
 }
 
-/// Everything below the scaffold: the controls, the header, the passage, the CTA.
+/// Everything below the scaffold: the two bars, the verses, the CTA, the pill.
 ///
-/// A [StatefulWidget] for one reason: `load` must fire **once**, on entry. This is
-/// `HomePage`'s arrangement exactly, and `HomePage`'s doc gives the reason — a dispatch
-/// in `build` re-issues the request on every state change, which here is **every frame
-/// of the font stepper's drag**.
+/// A [StatefulWidget] for three reasons, and every one of them is a **clock or a
+/// measurement** with nowhere else to live: the entrance stagger
+/// (`eva/redesign.html:1383`), the star observer (`:1211-1219`), and focus mode
+/// (`:1286-1294`).
 ///
-/// ## AND IT FIRES FROM `didChangeDependencies`, NOT `initState`
+/// ## AND THE LOAD FIRES FROM `didChangeDependencies`, NOT `initState`
 ///
-/// `Localizations.localeOf` is an inherited-widget lookup and Flutter forbids those in
-/// `initState`. Phase 6 measured the exact failure text on four router suites, and the
-/// fix is the same here: `didChangeDependencies` is the phase the framework names for a
-/// lookup, and it is also the phase that **fires on a locale change** — the second
-/// trigger this screen needs, because Phase 9's language switch is a locale change and
-/// `/reading` must then show the *other* arm's passage, not the same text under new
+/// `Localizations.localeOf` is an inherited-widget lookup and Flutter forbids
+/// those in `initState`. The fix is the phase the framework names for a lookup,
+/// and it is also the phase that fires **on a locale change** — the second trigger
+/// this screen needs, because the pill's `EN`/`ع` control changes the locale and
+/// `/reading` must then show the other arm's passage, not the same text under new
 /// chrome.
 ///
-/// Guarded on [_requested] being a [ReadingLanguage] and not a `bool`, for `HomePage`'s
-/// reason: a `bool` cannot say **which** arm was asked for, so a locale change would
-/// re-issue no request and leave English chrome over Arabic scripture.
+/// Guarded on [_requested] being a [ReadingLanguage] and not a `bool`: a `bool`
+/// cannot say **which** arm was asked for, so a locale change would re-issue no
+/// request and leave English chrome over Arabic scripture.
 class _ReadingBody extends StatefulWidget {
-  const _ReadingBody({required this.onBack});
-
-  final VoidCallback onBack;
+  const _ReadingBody();
 
   @override
   State<_ReadingBody> createState() => _ReadingBodyState();
 }
 
 class _ReadingBodyState extends State<_ReadingBody> {
-  /// The arm of the corpus this screen has asked for, or `null` before the first
-  /// dispatch. A **getter**, because it reads an inherited widget — caching it in
+  /// The arm of the corpus on screen, or `null` before the first dispatch.
+  ///
+  /// A **getter**, because it reads an inherited widget — caching it in
   /// `initState` is the mistake [didChangeDependencies]'s doc describes.
   ReadingLanguage get _language =>
       ReadingLanguage.forLocale(Localizations.localeOf(context).languageCode);
 
   ReadingLanguage? _requested;
 
-  /// The reader's font step, **read back out of the installed scaler**.
+  /// The arm **on screen** — the dial's truth, and the page's own.
+  ///
+  /// ## WHY THIS IS A FIELD AND NOT ANOTHER LOCALE READ
+  ///
+  /// Because the reader can change it **without changing the locale**:
+  /// `eva/redesign.html:554`'s dial is on the screen's own face, and
+  /// `:1477-1480`'s `data-l` buttons set the arm in place. In production the dial
+  /// *also* writes `UserSettings.language`, and `app.dart` rebuilds the locale —
+  /// so the two agree. In a widget test that mounts the page over a bare
+  /// `MaterialApp.router`, nothing rebuilds the locale on a settings write, and a
+  /// getter would snap the dial's selection back to the locale's arm while the
+  /// passage below it was the other one — a screen that contradicts itself, which
+  /// is the failure this field exists to make unreachable.
+  ///
+  /// [_load] keeps it in step with the locale, so a settings change still wins:
+  /// the dial is a local override, the locale is the owner.
+  ReadingLanguage _arm = ReadingLanguage.english;
+
+  /// The reader's font step, read back out of the installed scaler.
   ///
   /// ## WHY A GETTER AND NOT A FIELD
   ///
   /// A field would have to be kept in step with `UserSettings`, and there is one
   /// writer of that value in the process (`SettingsCubit`). Reading it means this
   /// screen cannot hold a stale copy: `MediaApp`'s `builder` installs
-  /// `evaScalerFor(step)`, and `fontStepFromScaler` is the table's own inverse — the
-  /// function `font_size_stepper.dart` wrote for exactly this question, which is why
-  /// it exists and why this is not a lookup written here.
+  /// `evaScalerFor(step)`, and `fontStepFromScaler` is the table's own inverse.
   int get _fontStep => fontStepFromScaler(MediaQuery.textScalerOf(context));
 
-  /// Reports a new step, through the app's settings.
+  /// How many verses have finished their reveal.
   ///
-  /// **`SettingsHandle` and not the settings cubit**, and the reason is §3's
-  /// feature-independence rule read from the other direction: `features/reading` may
-  /// not name `features/settings`, and `tool/verify_purity.sh` Gate 2 fails on the
-  /// line. `lib/app/settings_scope.dart` is the composition-root seam that exists for
-  /// exactly this case, and its doc records the alternatives — a port reached directly
-  /// from here would give one store three writers.
-  void _onFontStepChanged(int step) {
-    // `unawaited` because §4 forbids dropping a `Future` as a bare expression
-    // statement, and the write is genuinely fire-and-forget from here: the optimistic
-    // emit in `SettingsCubit.apply` has already moved the app's scale by the time the
-    // next frame runs.
-    unawaited(SettingsScope.of(context).setFontStep(step));
-  }
+  /// **A count and not a set of indices**, because `reading_focus.dart`'s schedule
+  /// is strictly increasing (`80 + 25n`), so the revealed set is always a prefix
+  /// and a count is the whole of it. A set could describe a state the prototype
+  /// cannot reach, and a screen that reaches it has a bug nobody would notice.
+  int _revealed = 0;
+
+  /// The passage whose entrance is running or has run, so it runs **once** per
+  /// passage rather than on every state change.
+  ///
+  /// **Keyed on the reading id and not on the state object**, because the state is
+  /// freezed and a new instance arrives on every emit — including the font step's
+  /// and the focus timer's, which would restart a reader's stagger every time they
+  /// adjusted their text size.
+  String? _entranceFor;
+
+  /// The verse the reader last selected — `:1385-1386`'s `.hot`.
+  ///
+  /// **`null` until one is chosen, and that is the prototype's own default**:
+  /// nothing opens a sheet with a verse selected, and `:1443`'s 460 ms timer adds
+  /// `.hot` to the verse that was tapped.
+  int? _hot;
+
+  /// Whether focus mode is dimming the chrome. `:1292` adds `.focus` after the
+  /// idle delay; `:1290` removes it on any pointer press.
+  bool _focusDim = false;
+
+  /// The idle timer behind [_focusDim]. See [_poke].
+  Timer? _idle;
+
+  /// The timer chain running the entrance stagger.
+  Timer? _stagger;
+
+  /// The verse the reader left off at — `:1380`'s `.resume`, and the only state
+  /// on this screen that outlives the mount.
+  int? _resume;
+
+  /// Whether the bookmark is lit — `:154`'s `.iconbtn.lit`.
+  ///
+  /// **Local state and not persisted, and that is a recorded gap rather than an
+  /// oversight**: `:1394`'s toggle calls `haptic(12)` and a toast and nothing
+  /// else, and §2's route table has no bookmark endpoint — so a stored bookmark
+  /// would be a fiction in the one place this screen is otherwise entirely real.
+  /// It survives a rebuild and nothing else.
+  bool _bookmarked = false;
+
+  /// A key per built verse, so the observer can measure it.
+  ///
+  /// **Cleared whenever the passage changes**, which bounds it by the passage's
+  /// own length: a `GlobalKey` per verse for a 200-verse psalm is 200 keys, which
+  /// is why the map holds only verses `ListView.builder` has **built** — the ones
+  /// the observer can actually see — and the next passage starts from empty.
+  final Map<int, GlobalKey> _verseKeys = <int, GlobalKey>{};
+
+  /// The verses already credited with a star. `:1218`'s `vObs.unobserve(p)`.
+  final Set<int> _lit = <int>{};
+
+  /// The sky's seam.
+  ///
+  /// [SkyScope.read] and not [SkyScope.of], because the observer runs inside a
+  /// scroll callback: **subscribing** there would register a dependency during
+  /// layout and rebuild the reader on every frame a star was lit.
+  SkyHandle get _sky => SkyScope.read(context);
 
   @override
   void didChangeDependencies() {
@@ -265,7 +201,213 @@ class _ReadingBodyState extends State<_ReadingBody> {
   void _load() {
     final ReadingLanguage language = _language;
     _requested = language;
+    _arm = language;
     context.read<ReadingCubit>().load(language);
+  }
+
+  /// The dial's write: the arm changes here, immediately, and the setting follows.
+  ///
+  /// **`setState` before the write**, so the dial's thumb moves on the frame the
+  /// reader taps it rather than on the frame the store answers — the prototype's
+  /// own order (`:1477-1480` sets `lang`, then re-renders synchronously), and the
+  /// difference between a control that feels connected and one that waits for a
+  /// disk.
+  void _onLanguageChanged(ReadingLanguage chosen) {
+    setState(() {
+      _requested = chosen;
+      _arm = chosen;
+    });
+    unawaited(SettingsScope.of(context).setLanguage(chosen));
+    context.read<ReadingCubit>().load(chosen);
+  }
+
+  @override
+  void dispose() {
+    // **Every** timer this class owns. `flutter_test` fails a test on a pending
+    // timer, which is the cheap half; the other half is a reader who leaves the
+    // screen inside the entrance stagger and returns to a state advancing against
+    // a disposed object.
+    _idle?.cancel();
+    _stagger?.cancel();
+    super.dispose();
+  }
+
+  /// Runs `eva/redesign.html:1383`'s stagger, once per passage.
+  ///
+  /// ```js
+  /// [...el('verseBox').children].forEach((v,i)=>setTimeout(()=>v.classList.add('in'),80+i*25));
+  /// ```
+  ///
+  /// **One timer, chained** — not `verseEntranceSchedule` mapped over six timers.
+  /// The schedule is a pure list of delays (`reading_focus.dart` owns the
+  /// arithmetic and its 37 tests), and this walks it, so the *numbers* are TDD'd
+  /// and the *walking* is a loop a reader can follow. Six timers would fire in one
+  /// frame and produce the same result with a fifth of the bookkeeping.
+  ///
+  /// **[immediate] is the calm and reduced-motion branch** (`:1382`): every verse
+  /// `.in` synchronously, because the reader asked for no stagger.
+  /// `NeuralMotionScope` publishes the same setting the prototype's three paths
+  /// to it arrive at (`:882`, `:1490`, `:1530-1532`).
+  void _runEntrance(ScriptureText passage) {
+    _stagger?.cancel();
+    final int count = passage.verses.length;
+    if (count == 0) return;
+    // `MediaQuery.disableAnimations` and not the app's reduced-motion setting:
+    // this is a **per-gesture** question about whether to animate, and the OS
+    // signal is the one a screen can read without owning the settings store. The
+    // prototype's `:882`, `:1490` and `:1530-1532` are three paths to the same
+    // branch, and the harness's `disableAnimations:` flag drives this one.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      if (mounted) setState(() => _revealed = count);
+      return;
+    }
+    final List<Duration> schedule = verseEntranceSchedule(
+      count: count,
+      immediate: false,
+    );
+    int step = 0;
+    void next() {
+      if (!mounted || step >= schedule.length) return;
+      _stagger = Timer(schedule[step], () {
+        step++;
+        if (mounted) setState(() => _revealed = step);
+        next();
+      });
+    }
+
+    next();
+  }
+
+  /// Arms focus mode's idle timer, and disarms it on any press.
+  ///
+  /// ```js
+  /// // eva/redesign.html:1288-1294, verbatim
+  /// function poke(){
+  ///   const s=el('screen');
+  ///   if(s.classList.contains('focus')){ s.classList.remove('focus'); focusDim=false; }
+  ///   clearTimeout(idleT);
+  ///   if(cur==='reader') idleT=setTimeout(()=>{ s.classList.add('focus'); focusDim=true; },focusDelay*1000);
+  /// }
+  /// el('screen').addEventListener('pointerdown',poke);
+  /// ```
+  ///
+  /// **Four seconds, and `:1287` is the only place that is written.** `:683` is
+  /// a `<input type="range" min="2" max="15" value="4">` with **no `oninput`
+  /// anywhere in the file** — an unwired intent — so this port takes the value the
+  /// prototype actually runs. Task 5.7 wires the range and [focusIdleDelay] is
+  /// where the wired value lands.
+  void _poke() {
+    _idle?.cancel();
+    if (_focusDim && mounted) setState(() => _focusDim = false);
+    _idle = Timer(focusIdleDelay, () {
+      if (mounted) setState(() => _focusDim = true);
+    });
+  }
+
+  /// The scroll callback behind `:1211-1219`, and the line that **places
+  /// `WitnessSky`** — the widget Phase 3 built with no consumer, and the reason
+  /// `orphan_widget_check.py`'s allowlist entry for it names this task.
+  ///
+  /// ## WHAT IT DOES IN THIS CLIENT IS LESS THAN WHAT THE BROWSER'S DOES
+  ///
+  /// An `IntersectionObserver` reports an **intersection ratio**, so it fires
+  /// when a verse crosses `:1219`'s `threshold: .6` and `:1218` unobserves it —
+  /// one event per verse. A [ScrollNotification] carries no ratios, so this
+  /// measures the two rects itself and asks `verseVisibilityFor`, which is the
+  /// same arithmetic in Dart and is TDD'd in `reading_focus.dart`.
+  ///
+  /// ## AND IT IS **GUARDED**, or the sky would evict the reader's own stars
+  ///
+  /// The observer is one-shot per verse. Without [_lit], a scroll frame inside the
+  /// threshold records a star *every frame*, and `sky_star_cap`'s 44 would evict
+  /// the reader's earlier stars in a burst — the cap exists to trim the sky, not to
+  /// make a burst of it.
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (_verseKeys.isEmpty) return false;
+
+    final RenderBox? viewport = context.findRenderObject() as RenderBox?;
+    if (viewport == null || !viewport.hasSize) return false;
+    final Offset origin = viewport.localToGlobal(Offset.zero);
+
+    for (final MapEntry<int, GlobalKey> entry in _verseKeys.entries) {
+      final int number = entry.key;
+      if (_lit.contains(number)) continue;
+      final RenderObject? rendered = entry.value.currentContext
+          ?.findRenderObject();
+      if (rendered is! RenderBox || !rendered.hasSize) continue;
+      final Rect rect = rendered.localToGlobal(Offset.zero) & rendered.size;
+
+      final VerseVisibility visibility = verseVisibilityFor(
+        verseTop: rect.top - origin.dy,
+        verseBottom: rect.bottom - origin.dy,
+        viewportTop: 0,
+        viewportBottom: viewport.size.height,
+      );
+      if (visibility != VerseVisibility.inView) continue;
+
+      _lit.add(number);
+      _recordStar(number);
+    }
+    return false;
+  }
+
+  /// Lights a star for [number], and sets the resume marker the first time.
+  ///
+  /// ## AND THE BOOK IS ITS NUMBER, STRINGIFIED — A RECORDED KEY-SPACE MISMATCH
+  ///
+  /// `SkyEntry.book` is a [String]; the fiction's stars are keyed by name
+  /// (`'psalms'`), and the only stable book identity a passage carries is
+  /// `Verse.bookNumber` (43). `ScriptureText.reference` holds the name as text
+  /// (`John 3:1-5`) and is **documented as rendered verbatim and never parsed**,
+  /// so parsing it here would contradict that.
+  ///
+  /// So a star lit here is keyed `"43"` and will not match a constellation point,
+  /// which Phase 3 keyed by name. **Recorded rather than papered over**: the stars
+  /// render, the crumb's count is right, and the join between the two key spaces
+  /// belongs to Task 5.6, where the constellation and the rings meet.
+  void _recordStar(int number) {
+    final ScriptureText? passage = _passage;
+    if (passage == null) return;
+    final Verse? verse = passage.verses
+        .where((Verse v) => v.number == number)
+        .firstOrNull;
+    if (verse == null) return;
+    _resume ??= number;
+    // `unawaited` because §4 forbids dropping a `Future` as a bare statement, and
+    // the write is genuinely fire-and-forget: `SkyCubit.record` emits
+    // optimistically, so the sky has the star before this returns.
+    unawaited(
+      _sky.record(
+        SkyEntry(
+          book: '${verse.bookNumber}',
+          chapter: verse.chapter,
+          verse: verse.number,
+          // **Stamped here and not by the cubit**, because `SkyEntry.litAt` is
+          // required and the observer is the only thing that knows *when* a verse
+          // crossed the threshold. UTC for the same reason `AuthSession.createdAt`
+          // is: the sky is a ledger, and a ledger has one timezone.
+          litAt: DateTime.now().toUtc(),
+        ),
+      ),
+    );
+  }
+
+  /// The passage the current state holds, or `null`.
+  ScriptureText? get _passage => context.read<ReadingCubit>().state.scripture;
+
+  /// Reports a new font step, through the app's settings.
+  ///
+  /// **`SettingsScope` and not the settings cubit**, because §3 forbids
+  /// `features/reading` from naming `features/settings` and `tool/verify_purity.sh`
+  /// Gate 2 fails on the line. `lib/app/settings_scope.dart` is the
+  /// composition-root seam that exists for exactly this case.
+  void _onFontStepChanged(int step) {
+    // `unawaited` because §4 forbids dropping a `Future` as a bare expression
+    // statement, and the write is fire-and-forget from here: the optimistic emit
+    // in `SettingsCubit.apply` has already moved the app's scale by the time the
+    // next frame runs.
+    unawaited(SettingsScope.of(context).setFontStep(step));
   }
 
   @override
@@ -274,223 +416,262 @@ class _ReadingBodyState extends State<_ReadingBody> {
     final ReadingLanguage language = _language;
 
     return BlocBuilder<ReadingCubit, ReadingState>(
-      builder: (BuildContext context, ReadingState state) => Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          Positioned.fill(
-            child: _scaffold(context, language: language, state: state),
-          ),
-          // ## THE CTA IS GATED ON A QUESTION, NOT ON A PASSAGE
-          //
-          // It used to be `if (state.scripture case …)`, which is the right question
-          // about the **failure** state and the wrong one about a **succeeded** one.
-          // `questions: []` is reachable: `today_reading_mapper.dart` **skips** an
-          // unreadable question rather than refusing the passage (recorded decision
-          // 40), so a payload of four unreadable questions reports
-          // `questionCount == 0` — and `readingCaptionFor`'s own description says so.
-          //
-          // Measured: the caption rendered `"0 questions"` / `"٠ أسئلة"` and **Begin
-          // reflection was still offered**, so a reader with nothing to reflect on
-          // was invited through to an empty quiz. The principle was already stated —
-          // `reading_page_test.dart` says the CTA is gone "because there is nothing
-          // to reflect on" — and was applied only to a failed request.
-          //
-          // **The passage is untouched.** The sanctuary still renders in full; what
-          // goes is the invitation to a quiz that has no questions in it.
-          //
-          // A `when` guard on the existing `case` rather than a nested `if`, because
-          // §4 asks for the state branching to be in one place and this is one more
-          // condition on the same question, not a second question.
-          if (state.scripture case final ScriptureText passage
-              when passage.questionCount > 0)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              // Bottom only: the controls row's own `20px`/`16px` already sits
-              // inside the scaffold's `SafeArea`, and this block is outside it.
-              child: SafeArea(
-                top: false,
-                child: StickyCta(
-                  language: language,
-                  strings: strings,
-                  questionCount: passage.questionCount,
-                  onPressed: () => context.router.pushPath(AppRoutes.quiz),
+      builder: (BuildContext context, ReadingState state) {
+        final ScriptureText? passage = state.scripture;
+
+        // The entrance runs **once per passage**, keyed on its reading id — see
+        // [_entranceFor]'s note on why a state comparison would not do.
+        if (passage != null && _entranceFor != passage.readingId) {
+          _entranceFor = passage.readingId;
+          _lit.clear();
+          _verseKeys.clear();
+          _resume = _sky.lastLit?.verse;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _runEntrance(passage);
+            // **`:1377` arms focus mode on entry**, not on the first press:
+            // `enterReader(){ renderVerses(); observeVerses(); poke(); ... }`. A
+            // reader who opens the passage and reads without touching anything is
+            // exactly the reader focus mode exists for, so arming the idle timer
+            // only from `onPointerDown` would make the mode unreachable for them.
+            // [_poke] carries the four seconds and `:683`'s unwired slider.
+            _poke();
+          });
+        }
+
+        // The pointer that arms focus mode, wrapping the scaffold rather than
+        // sitting inside it: `:1294` listens for the **press itself** on the
+        // screen, not for a tap some child may have consumed — a pointer that
+        // lands on a verse and is swallowed by that verse's own gesture still
+        // counts as the reader being there. A [Listener] and not a
+        // `GestureDetector` because it wants the pointer, not the gesture arena.
+        return Listener(
+          onPointerDown: (PointerDownEvent _) => _poke(),
+          child: NeuralScaffold(
+            variant: language == ReadingLanguage.english
+                ? NeuralVariant.readingEn
+                : NeuralVariant.readingAr,
+            // `EdgeInsets.zero`: the route's own `padding` is `:142`'s and
+            // `:159`'s, transcribed by the two widgets that own them, and a second
+            // inset here would compose with them.
+            padding: EdgeInsets.zero,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                WitnessSky(entries: _sky.entries),
+                Column(
+                  children: <Widget>[
+                    _bars(context, strings, state),
+                    Expanded(child: _body(context, strings, state)),
+                    // ## AND THE CTA IS GATED ON A QUESTION, NOT ON A PASSAGE
+                    // `questionCount == 0` is reachable: `TodayReadingMapper`
+                    // **skips** an unreadable question rather than refusing the
+                    // passage (recorded decision 40), so four unreadable questions
+                    // report zero — and "Begin reflection" was still offered, so a
+                    // reader with nothing to reflect on was invited into an empty
+                    // quiz. The passage is untouched; the invitation goes.
+                    if (passage != null && passage.questionCount > 0)
+                      ReadingQuizCta(
+                        caption: strings.quizCaption(passage.questionCount),
+                        // **The CTA navigates and nothing else**: Phase 6 replaces
+                        // this with the route's own builder, and `:1404`'s
+                        // `el('qcta').onclick = () => openQuiz()` has no analogue in
+                        // a client that has not built `/quiz` against the redesign.
+                        onPressed: () =>
+                            unawaited(context.router.pushPath(AppRoutes.quiz)),
+                      ),
+                    ReadingPill(
+                      fontStep: _fontStep,
+                      onFontStepChanged: _onFontStepChanged,
+                      language: _arm,
+                      // **The dial writes the LANGUAGE SETTING, and the app's
+                      // own rebuild does the rest.** `eva/redesign.html:1477-1480`'s
+                      // `data-l` buttons set `lang` and re-render in place; this
+                      // client's equivalent of "the language" is
+                      // `UserSettings.language`, and `app.dart` rebuilds
+                      // `MaterialApp` with the locale it names — which is the
+                      // trigger [didChangeDependencies] exists for, and the reason
+                      // `_load` guards on which arm was *asked for* rather than on
+                      // a bool. Writing the setting is also what makes the choice
+                      // survive a restart, which a local `setState` would not.
+                      onLanguageChanged: _onLanguageChanged,
+
+                      // **`onListen` is deliberately not passed**, and that is
+                      // the whole of that control in this build: there is no audio
+                      // in the prototype and none here, so the button ships inert
+                      // with its accessible name carrying the reason. The analyzer
+                      // calls the omitted argument redundant and it is right — the
+                      // *record* belongs in this comment and in
+                      // `reading_pill.dart`'s doc, which carries the `grep` that
+                      // established it and why the `.wave` is not built either.
+                    ),
+                  ],
                 ),
-              ),
+              ],
             ),
-        ],
-      ),
-    );
-  }
-
-  /// The scaffold and everything inside it, at the reader's text scale.
-  Widget _scaffold(
-    BuildContext context, {
-    required ReadingLanguage language,
-    required ReadingState state,
-  }) {
-    final AppLocalizations strings = context.l10n;
-    final ReadingCubit cubit = context.read<ReadingCubit>();
-
-    // ## NO `MediaQuery` HERE ANY MORE, AND THE SENTENCE IT REPLACED WAS **TRUE**
-    //
-    // The wrapper this call site used to carry said: "Installing it here — above
-    // **everything** on the screen, controls and CTA included — is what makes 'Text
-    // size' mean *text size* rather than 'passage size', and it is why no widget below
-    // takes a `textScaler` it could forget to honour."
-    //
-    // That is still true, and it is now true of **one** install instead of one per
-    // screen: `MaterialApp.builder` puts the same `MediaQuery` above every route, so
-    // the wrapper here was a second statement of a fact `app.dart` already states, and
-    // a second one with a second rule. The `NeuralScaffold` is therefore the direct
-    // child of `_scaffold`'s stack slot again.
-    return NeuralScaffold(
-      // `NeuralScaffold`'s doc: `variant` is also "which language the reading
-      // screens are in", so this is the **only** place the language reaches the
-      // background and nothing re-derives it.
-      variant: switch (language) {
-        ReadingLanguage.english => NeuralVariant.readingEn,
-        ReadingLanguage.arabic => NeuralVariant.readingAr,
+          ),
+        );
       },
-      // `scrollable` stays at its `false` default — the body owns its own, see
-      // [ReadingPage]'s doc.
-      bottomFade: true,
-      // Each row owns its own gutter; see [ReadingPage.contentPadding]'s doc.
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (language == ReadingLanguage.arabic) const _ArabicBand(),
-          ReadingControls(
-            language: language,
-            strings: strings,
-            onBack: widget.onBack,
-            panelOpen: state.textSizePanelOpen,
-            onPanelToggled: cubit.toggleTextSizePanel,
-            fontStep: _fontStep,
-            onFontStepChanged: _onFontStepChanged,
-          ),
-          Expanded(
-            child: Padding(
-              padding: ReadingPage.contentPadding,
-              child: _passage(
-                context,
-                language: language,
-                state: state,
-                strings: strings,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  /// The passage, the failure, or nothing yet.
+  /// The two bars, and the chrome dimming focus mode applies to them.
   ///
-  /// **A `switch` over the enum and then a pattern over the payload**, and no
-  /// `if`-chain: §4 asks for exhaustive `switch` expressions for state branching, and
-  /// the enum arm means a fourth `ReadingStatus` is a compile error here rather than a
-  /// blank panel.
-  Widget _passage(
-    BuildContext context, {
-    required ReadingLanguage language,
-    required ReadingState state,
-    required AppLocalizations strings,
-  }) => switch (state.status) {
-    ReadingStatus.failed => ErrorView(
-      // The failure's **message**, not a string from the table. Phase 6's precedent:
-      // the mapper writes "Could not read today's reading: `verses` is absent …" and
-      // inventing a sentence here would hide the field that is actually wrong.
-      message: state.failure?.message ?? '',
-      onRetry: () => context.read<ReadingCubit>().retry(_language),
-      retryLabel: strings.readingRetry,
-      // `ErrorView.retryFamily`: the label above is the string table's, and on the
-      // Arabic arm it is Arabic text going into a button whose only family knob
-      // this is. **`StickyCta.ctaFamilyFor`**, not a new constant and not
-      // `metadataFamilyFor` — it is the same question ("which face renders this
-      // arm's primary button label"), already answered once per arm, and reusing it
-      // is what keeps a fourth call site from becoming a fourth answer.
-      retryFamily: StickyCta.ctaFamilyFor(language),
-    ),
-    // The other two arms fall through to the passage, which reads
-    // `state.scripture` and renders nothing while it is `null` — a `loading` screen
-    // and a `ready` screen are the same tree with different contents, and saying so
-    // here keeps the enum switch exhaustive without a duplicated arm.
-    ReadingStatus.loading || ReadingStatus.ready => switch (state.scripture) {
-      final ScriptureText passage => ScriptureBlock(
-        verses: passage.verses,
-        language: language,
-        strings: context.l10n,
-        // **Inside** the scrollable, so the metadata and citation travel with the
-        // passage — `ReadingEnScreen.tsx:26-77` puts all four in one `overflowY:
-        // 'auto'` div. A pinned header would be a different screen.
-        header: ReadingHeader(
-          language: language,
-          reference: passage.reference,
-          translation: passage.translation,
+  /// `:176` — `.screen.focus .appbar,.screen.focus .pill,.screen.focus .qcta
+  /// {opacity:.2;transition:opacity .9s var(--e-out)}` — dims **three** things
+  /// and the verse rows are not among them. `:177` is the rule that *would* have
+  /// touched them, and it is the one the plan records as the defect to correct
+  /// (1.000:1 in focus).
+  ///
+  /// **Only the bars are dimmed here**, which is faithful to `:176` and is also
+  /// the whole of the correction: the CTA and the pill carry
+  /// [chromeDimOpacity] from the same constant, and `VerseLine`'s three-state enum
+  /// is what makes "the verses are not dimmed" expressible rather than accidental.
+  Widget _bars(
+    BuildContext context,
+    AppLocalizations strings,
+    ReadingState state,
+  ) {
+    final ScriptureText? passage = state.scripture;
+
+    return AnimatedOpacity(
+      opacity: _focusDim ? chromeDimOpacity : 1,
+      duration: focusDimTransition,
+      curve: EvaMotion.interactiveCurve,
+      child: ReadingAppBar(
+        // `:1345` — `bookTitle(b)`. **The passage's own reference, and there is
+        // no better source**: §2's route table has no endpoint that enumerates
+        // books, so a book *name* here would be the catalogue fiction ADR-0022
+        // removed from `/`.
+        title: passage?.reference ?? '',
+        meta: strings.crumbMeta(
+          // **The book number, not a category word** — and the divergence from
+          // `:1346`'s `CATS[b.cat][li()]` is real. That clause is a `/`-side
+          // fiction (`LibraryCategory.label`, which `home_l10n.dart` owns because
+          // the `CATS` table is shared); a passage carries no category at all, and
+          // inventing one here would put a second book's metadata on a screen whose
+          // data is real. The number is what the passage knows.
+          category: passage == null || passage.verses.isEmpty
+              ? '—'
+              : '${passage.verses.first.bookNumber}',
+          verses: passage?.verses.length ?? 0,
+          litStars: _sky.litCount,
         ),
-      ),
-      // Nothing on screen while loading, and **no placeholder either**: there is no
-      // height to reserve, because the passage's own height is the content's and the
-      // controls row is already above it. Phase 6's `HomePage._StreakSubtitle`
-      // reserves a line because its row sits between two other blocks; here nothing
-      // is between anything, so a placeholder would be a blank screen with extra
-      // steps.
-      null => const SizedBox.shrink(),
-    },
-  };
-}
-
-/// The Arabic arm's geometric band. `ReadingArScreen.tsx:13-16`.
-///
-/// ## AND ITS COLOUR IS **SUBSTITUTED**, WITH THE REASON AND THE NUMBERS KEPT
-///
-/// The prototype's is `rgba('#B79CF0', .3 dark / .2 light)` and **`#B79CF0` is not a
-/// token** — `03-design-system.md` §5.1 publishes fourteen colours and violet is not
-/// among them, while `no_colour_literals_test.dart` refuses every colour in `lib/`
-/// that does not resolve through `EvaColors`. So the band is drawn in the **`ink` ramp
-/// at the prototype's own two alphas**, which is the same substitution `AppTopBar`'s
-/// avatar gradient records (recorded decision 31): the hue was never tokenable and the
-/// two alphas were, so the alphas are transcribed and the hue is recorded.
-///
-/// **The band's identity survives elsewhere.** `NeuralVariant.readingAr` paints the
-/// violet orb group (`ds.tsx:88-91`), so the Arabic arm is still the violet one and
-/// this ornament is not carrying that on its own.
-///
-/// **The English arm has no band at all**, which `ReadingEnScreen.tsx` confirms by
-/// having no such element — a per-arm structural difference rather than a per-arm
-/// colour, and the only one of its kind on this screen.
-class _ArabicBand extends StatelessWidget {
-  const _ArabicBand();
-
-  @override
-  Widget build(BuildContext context) {
-    final EvaColors colors = context.colors;
-    final Color ink = colors.ink.withValues(
-      alpha: ReadingPage.arabicBandAlpha(Theme.of(context).brightness),
-    );
-
-    return SizedBox(
-      height: ReadingPage.arabicBandHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: <Color>[ink, ink, Colors.transparent, Colors.transparent],
-            // 2px of dash in an 18px pitch, as fractions of one period.
-            stops: const <double>[
-              0,
-              ReadingPage.arabicBandDash / ReadingPage.arabicBandPitch,
-              ReadingPage.arabicBandDash / ReadingPage.arabicBandPitch,
-              1,
-            ],
-            // `repeating-linear-gradient(90deg, …)` — a repeat along **x**, which in
-            // Flutter is a left-to-right gradient with `TileMode.repeated`.
-            tileMode: TileMode.repeated,
-          ),
-        ),
+        onBack: () => unawaited(context.router.maybePop()),
+        onBookmarkToggled: () => setState(() => _bookmarked = !_bookmarked),
+        bookmarked: _bookmarked,
       ),
     );
   }
+
+  /// The screen's only scrollable — `.versebox`, `:159`.
+  Widget _body(
+    BuildContext context,
+    AppLocalizations strings,
+    ReadingState state,
+  ) => switch (state.status) {
+    // Nothing on screen but the request: `:162`'s hidden state is a property of a
+    // verse, and there is no verse to place, so this is a centred indicator.
+    ReadingStatus.loading => const Center(
+      child: CircularProgressIndicator(strokeWidth: 2),
+    ),
+    ReadingStatus.failed => Center(
+      child: Padding(
+        // `:159`'s own horizontal padding, so the failure sits on the inset the
+        // verses would have.
+        padding: const EdgeInsets.symmetric(horizontal: 26),
+        child: ErrorView(
+          message: state.failure?.message ?? '',
+          // The failure's **message**, not a string from the table — Phase 6's
+          // precedent, and `reading_page_test.dart`'s failure rows: the mapper
+          // writes "Could not read today's reading: `verses` is absent …" and
+          // inventing a sentence here would hide the field that is actually wrong.
+          onRetry: () => context.read<ReadingCubit>().retry(_language),
+          retryLabel: strings.readingRetry,
+          // The label is the string table's, and on the Arabic arm it is Arabic
+          // text in a button whose only family knob this is.
+          // **`arabicAwareFamily` and not a new switch** — the deleted
+          // `StickyCta.ctaFamilyFor` answered the same question per arm
+          // (`uiFamily` / `arabicFamily`), and that is exactly what the helper is;
+          // reusing it is what keeps a fourth call site from becoming a fourth
+          // answer.
+          retryFamily: arabicAwareFamily(
+            Directionality.of(context),
+            EvaTypography.uiFamily,
+          ),
+        ),
+      ),
+    ),
+    ReadingStatus.ready => _verseList(context, state.scripture!),
+  };
+
+  /// The verses themselves, each measured by the observer above.
+  Widget _verseList(
+    BuildContext context,
+    ScriptureText passage,
+  ) => NotificationListener<ScrollNotification>(
+    onNotification: _onScroll,
+    child: ListView.builder(
+      // `:159` — `padding: 14px 26px 12px`. **14 and 26 are not spacing
+      // tokens**, for the reason `VerseLine.verseGap` records.
+      padding: const EdgeInsets.fromLTRB(26, 14, 26, 12),
+      itemCount: passage.verses.length,
+      itemBuilder: (BuildContext context, int index) {
+        final Verse verse = passage.verses[index];
+        final GlobalKey key = _verseKeys.putIfAbsent(
+          verse.number,
+          GlobalKey.new,
+        );
+        return GestureDetector(
+          // `:1385-1386` — tapping a verse makes it the selected one and
+          // removes `.hot` from every other. **The sheet itself is not built**:
+          // `openSheet` opens a bottom sheet the redesign's reader route does
+          // not contain a trigger for beyond the verse itself, and Phase 7's
+          // ritual step is where it belongs. What this port keeps is the
+          // selection, which is the state a sheet would read.
+          onTap: () => setState(() => _hot = verse.number),
+          behavior: HitTestBehavior.opaque,
+          child: VerseLine(
+            key: key,
+            number: verse.number,
+            // **`Verse.text`, NOT `displayText`** — recorded decision 51, and
+            // the Arabic arm's typography gate is what caught this page getting
+            // it wrong: `displayText` is the *preview* projection
+            // (`textClean ?? text`), so the sanctuary was rendering every verse
+            // with its diacritics stripped, and the gate reported the fixture's
+            // diacritised `text` as a declared-but-unrendered run while the tree
+            // held the cleaned one. The reading screen shows scripture whole.
+            text: verse.text,
+            paint: versePaintFor(
+              // The **stagger's** answer, not the observer's. The prototype's
+              // `.in` class is what the schedule adds (`:1383`), so "revealed"
+              // is a question about the schedule and not about the scroll
+              // position — the observer's visibility answer is spent on
+              // *stars* (`_onScroll`), never on paint.
+              visibility: index < _revealed
+                  ? VerseVisibility.inView
+                  : VerseVisibility.outOfView,
+              hot: _hot == verse.number,
+              entranceComplete: index < _revealed,
+            ),
+            resume: _resume == verse.number,
+          ),
+        );
+      },
+    ),
+  );
 }
+
+/// `eva/redesign.html:1287`'s `focusDelay = 4`, in seconds.
+///
+/// **Four, and `:683`'s slider is not it**: that `<input type="range"
+/// min="2" max="15" value="4">` has no `oninput` handler anywhere in the file, so
+/// the prototype runs on the literal and the slider is an unwired intent. Task 5.7
+/// wires the range and this is the default it starts from.
+const Duration focusIdleDelay = Duration(seconds: 4);
+
+/// `eva/redesign.html:176`'s `opacity: .2` for the three dimmed surfaces.
+const double chromeDimOpacity = 0.2;
+
+/// `eva/redesign.html:176`'s `transition: opacity .9s var(--e-out)`.
+const Duration focusDimTransition = Duration(milliseconds: 900);

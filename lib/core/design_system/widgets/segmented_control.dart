@@ -116,8 +116,35 @@ class SegmentedControl<T> extends StatefulWidget {
     required this.labelOf,
     required this.onChanged,
     this.semanticLabel,
+    this.labelFamilyOf,
     super.key,
   });
+
+  /// The family an option's label renders in, **when the label's script needs a
+  /// different face from the control's**.
+  ///
+  /// ## WHY THIS EXISTS, MEASURED
+  ///
+  /// `redesign.html:186` — `.segp button[data-l=ar]{font-family:var(--ar);
+  /// font-size:13px; text-transform:none}` — keys that face on the **option**, and
+  /// `:191` keys the Latin option back to the mono face under RTL. So the rule is
+  /// two-sided, and it is not the direction: on the **English** arm the Arabic
+  /// option is still Amiri, because the selector is `data-l=ar`.
+  ///
+  /// A single `arabicAware` cannot express that — it is direction-keyed, so it is
+  /// the identity on an LTR screen and the family swap on an RTL one — and the
+  /// result on `/reading`'s dial was measured by the tofu gate: `ع` rendered in
+  /// **JetBrains Mono** on the English arm, a face with no Arabic glyphs, reported
+  /// as `(family: JetBrainsMono, label: ع)`. The Arabic arm was already correct,
+  /// which is exactly the signature of a direction-keyed rule standing in for a
+  /// label-keyed one.
+  ///
+  /// **`null` for every other caller**, because every other option in the app is
+  /// Latin script and `arabicAware` already serves `/settings`'s theme labels —
+  /// which are *wholly* Arabic, so the direction decides for them. The case here is
+  /// a label that is Arabic **inside a Latin screen**: one character of one
+  /// language, which only the option knows about.
+  final String Function(T value)? labelFamilyOf;
 
   /// Every option, in paint order.
   final List<T> values;
@@ -568,6 +595,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
                   child: _Segment<T>(
                     key: _segmentKeys[i],
                     label: widget.labelOf(value),
+                    labelFamily: widget.labelFamilyOf?.call(value),
                     selected: value == widget.selected,
                     colors: colors,
                     animate: _animate,
@@ -635,6 +663,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
 class _Segment<T> extends StatelessWidget {
   const _Segment({
     required this.label,
+    required this.labelFamily,
     required this.selected,
     required this.colors,
     required this.animate,
@@ -643,6 +672,11 @@ class _Segment<T> extends StatelessWidget {
   });
 
   final String label;
+
+  /// The label's own family, or `null` for the control's. See
+  /// [SegmentedControl.labelFamilyOf].
+  final String? labelFamily;
+
   final bool selected;
   final EvaColors colors;
   final bool animate;
@@ -666,8 +700,15 @@ class _Segment<T> extends StatelessWidget {
         // The style lives **here**, not on the `Text` below: an explicit
         // `Text.style` wins over the ambient default, so putting it on the `Text`
         // would make the colour snap and leave this animation painting nothing.
+        // **`labelFamily` inside the style and `arabicAware` outside it** — the
+        // order matters in one direction only: `arabicAware` is the identity on an
+        // LTR screen, so it cannot rescue a label whose script is Arabic on a
+        // screen that is not, and a `labelFamily` set here does exactly that. Under
+        // RTL the two agree for a caller that supplies both, because Amiri is what
+        // `arabicAware` resolves to anyway.
         style: arabicAware(
           EvaTypography.monoCaps(colors).copyWith(
+            fontFamily: labelFamily,
             // `redesign.html:185` — `.segp button.on{color:#1c1608;
             // font-weight:600}`.
             //

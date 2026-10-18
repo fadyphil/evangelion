@@ -4,6 +4,7 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
+import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
@@ -256,6 +257,19 @@ void main() {
       // graph is missing a registration". That is the trap this file exists to walk into
       // on purpose, and the registration list is where the trap is recorded.
       settingsHarness(loadImmediately: false);
+      // **The sky's seam, because `app.dart` publishes a `SkyScope`.** Task 5.3
+      // put the witness sky on `/reading` through `SkyScope`, and the scope's
+      // handle resolves from the locator at the composition root — so a test that
+      // hand-builds the graph this app runs on must register it, exactly as it
+      // registers the settings handle two lines up. The empty handle is the
+      // honest one here: this test's claim is about the *router*, and no sky is
+      // lit on the way through it.
+      getIt.registerSingleton<SkyHandle>(
+        SkyHandle(
+          entriesReader: () => const <SkyEntry>[],
+          recordEntry: (_) async {},
+        ),
+      );
       getIt
         ..registerLazySingleton<AuthStatus>(() => status)
         ..registerLazySingleton<ReevaluateListenable>(() => changes)

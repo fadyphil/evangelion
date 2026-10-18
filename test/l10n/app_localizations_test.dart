@@ -111,12 +111,36 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        111,
+        116,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**111 → 116 in Task 5.3**, for the rebuilt `/reading` surface against '
+            '`eva/redesign.html:540-560`: seven keys arrived as the redesign\'s own '
+            'I18N rows — `readingVerses` / `readingQuiz` / `readingQuestions` '
+            '(`:966`), `readingListen` (`:965`), `readingSky` (`:968`) and '
+            '`readingBookmarkOn` / `readingBookmarkOff` (`:974`) — and **two were '
+            'removed, and one of the two is why this sentence names them '
+            'individually.**\n\n'
+            '`readingCaptionFor` was the ARB\'s `/reading` plural, and with it gone '
+            '**this table has two plural keys where it had three**. '
+            '`reading_l10n.dart`\'s class doc carries the argument in full: '
+            '`eva/redesign.html:1347` composes the CTA caption as '
+            '`quiz · N questions` out of `tr(\'quiz\')`, `N()` and `tr(\'questions\')` '
+            '— one word for every count, from a table whose `questions` row carries '
+            'no ICU forms at all. Adopting the prototype\'s caption adopts its '
+            'table, and the Arabic **dual** (`٢ سؤالان`) the plural used to render '
+            'is a recorded loss. That is why the manifest below names two keys and '
+            'why this count is stated as a movement rather than a number: a reader '
+            'who finds two plurals where this file once described three needs the '
+            'argument, not the diff.\n\n'
+            '`readingBeginReflection` went the other way — the redesign\'s sticky CTA '
+            'is a caption and a chevron, not a verb phrase, and nothing replaced it '
+            'because `StickyCta` composes from `readingQuiz` / `readingQuestions`. '
+            'Its two citation rows were removed from the map below in the same '
+            'change, which is what keeps that map a claim rather than a wish.\n\n'
             '**107 → 111 for `SealFab`**, the four keys decision 155 brought back: the '
             'trigger\'s two names (`sealFabOpen` / `sealFabClose`, which differ because '
             'a button that toggles must say which way it will go — the defect '
@@ -369,7 +393,7 @@ void main() {
         'homeCategoryHistory': 'redesign.html:1036',
         'homeCategoryApocalypse': 'redesign.html:1036',
         'homeSelah': 'redesign.html:970',
-        'homeSecondsOfSilence': 'redesign.html:966',
+        'homeSecondsOfSilence': 'redesign.html:970',
         'homeSealed': 'redesign.html:972',
         'homeVerses': 'redesign.html:966',
         'homeDays': 'redesign.html:925',
@@ -389,16 +413,71 @@ void main() {
         'settingsVersion': 'SettingsScreen.tsx:115',
         'quizCheckAnswer': 'QuizScreen.tsx:127',
         'quizNextQuestion': 'QuizScreen.tsx:127',
-        'readingBeginReflection': 'ReadingEnScreen.tsx:87',
-        'readingBeginReflectionAr': 'ReadingArScreen.tsx:85',
+        // Task 5.3's rebuilt `/reading`. **Seven rows, and every value here is the
+        // prototype's own I18N pair** — `verses` / `quiz` / `questions` share one
+        // line, `bmk` / `bmkOff` share another.
+        //
+        // ## TWO FORMAT FACTS ABOUT THESE SEVEN, BOTH MEASURED
+        //
+        // * **The values are BARE `:NNN`, not `redesign.html:NNN`.** Every other
+        //   entry above spells the file, because every other description leads with
+        //   "Transcribed: `redesign.html:966` — …". These seven lead with the bare
+        //   line instead, so a map entry written in the house format would assert a
+        //   substring no description carries and the row would fail on a difference
+        //   of punctuation. The assertion is a `contains`, so the map has to hold
+        //   what the ARB says — and a reader is better served by an exact
+        //   substring than by a reconstructed `file:line`.
+        // * **They are each ONE LINE ABOVE where the row actually is.** The
+        //   descriptions cite `:967`, `:966`, `:969` and `:975`; measured in
+        //   `eva/redesign.html` the rows are at `:966`, `:965`, `:968` and `:974`.
+        //   All seven, all off by exactly one — the signature of a transcription
+        //   taken against a file with one line fewer above the literal.
+        //   `tool/gates/citation_check.py` cannot see this: it checks that a cited
+        //   line exists and is in range, and one line too high satisfies both. The
+        //   discrepancy is **pinned by a test** rather than left as prose, in
+        //   `test/features/reading/presentation/reading_l10n_test.dart`'s
+        //   `the seven ARB citations are each ONE LINE ABOVE the row they name`
+        //   row, which fails the day either side moves. **The fix belongs in these
+        //   two ARB files** and was not made here, because this slice does not own
+        //   them; if it is made, that row and these seven values change together.
+        //
+        // ## TWO MORE STALE CLAIMS IN THIS MAP, MEASURED IN THE SAME PASS
+        //
+        // Sweeping every `redesign.html:NNN` in the pair and comparing it against
+        // the line the description's own quoted literal is really on found these
+        // two, and both are recorded rather than fixed for the same reason:
+        //
+        // * `'homeSecondsOfSilence': 'redesign.html:970'` — the row it quotes,
+        //   `secs:["seconds of silence","ثانية من الصمت"]`, is at **`:970`**.
+        //   Every other `home*` I18N row in this map is exact (`homeVerses` 966,
+        //   `homeSelah` 970, `homeSealed` 972), so this is one row and not a
+        //   systematic offset.
+        // * `@authEnterTheWord`'s **secondary** citation — `redesign.html:954` for
+        //   the `enter` I18N row — is at **`:965`**. The map's own row for that key
+        //   (`:508`, the `<button data-i18n="enter">`) is correct.
+        //
+        // Neither can be repaired from this file: the map asserts a substring the
+        // description carries, so correcting the map without correcting the ARB
+        // would turn a stale claim into a **failing** one, and the ARB is not this
+        // slice's to edit. A fix has to change the description and the map value in
+        // the same commit — which is the shape `citation_check.py` cannot enforce
+        // and this comment is here to make findable.
+        //
+        // **And that is exactly what happened**: the seven rows were one line too
+        // high (measured, and pinned by `reading_l10n_test.dart`'s own row), the
+        // ARB descriptions were corrected, and this map moved with them in the
+        // same change.
+        'readingVerses': ':966',
+        'readingQuiz': ':966',
+        'readingQuestions': ':966',
+        'readingListen': ':965',
+        'readingSky': ':968',
+        'readingBookmarkOn': ':974',
+        'readingBookmarkOff': ':974',
         'resultReflectAgain': 'ResultScreen.tsx:77',
         'resultLongestYet': 'ResultScreen.tsx:65',
       };
       for (final MapEntry<String, String> entry in citations.entries) {
-        if (entry.key == 'readingBeginReflectionAr') {
-          // The Arabic arm's own citation, which lives on the same key.
-          continue;
-        }
         expect(
           ((en['@${entry.key}']! as Map)['description']! as String),
           contains(entry.value),
@@ -409,13 +488,6 @@ void main() {
               'next reader cannot recover it.',
         );
       }
-      expect(
-        ((en['@readingBeginReflection']! as Map)['description']! as String),
-        contains('ReadingArScreen.tsx:85'),
-        reason:
-            '`readingBeginReflection` is the one bilingual transcription, and '
-            'its Arabic arm\'s citation is in the same description',
-      );
     });
   });
 
@@ -425,19 +497,31 @@ void main() {
       // the property the whole bilingual surface exists to keep, and it is the one a
       // hand-typed ARB entry gets wrong most easily.
       //
-      // ## THE TWO `plural` KEYS ARE **TEMPLATES**, NOT SENTENCES
+      // ## THE `plural` KEYS ARE **TEMPLATES**, NOT SENTENCES
       //
-      // `readingCaptionFor` and `resultTotalCaption` are the only keys whose Arabic
-      // value legitimately contains Latin characters, and **none of it reaches a
-      // reader**: an ICU message is `zero{…} one{…} few{…}` plus the placeholder
-      // names `count` and `digits`, all of which are ASCII keywords of the
-      // MessageFormat grammar rather than prose. `gen_l10n` discards them at compile
-      // time and emits `intl.Intl.pluralLogic(…)` carrying Arabic literals.
+      // `resultTotalCaption` and `leaderboardRowSemantics` are the only keys whose
+      // Arabic value legitimately contains Latin characters, and **none of it
+      // reaches a reader**: an ICU message is `zero{…} one{…} few{…}` plus
+      // placeholder names — `count`, `digits`, `initials`, `rank`, `isReader` — all
+      // of which are ASCII keywords of the MessageFormat grammar rather than prose.
+      // `gen_l10n` discards them at compile time and emits
+      // `intl.Intl.pluralLogic(…)` carrying Arabic literals.
       //
       // So they are exempted by **being plurals** — read off the `plural` manifest,
-      // not a hand-kept name list. And the exemption is not a loophole: the two
-      // per-class tests above assert every rendered form against a literal, which
-      // is the only place a Latin character could reach a screen.
+      // not a hand-kept name list. And the exemption is not a loophole: the
+      // per-class tests in the plural group assert every rendered form against a
+      // literal, which is the only place a Latin character could reach a screen.
+      //
+      // ## AND THIS IS WHY THE SEVEN NEW `/reading` ROWS ARE NOT EXEMPTED
+      //
+      // They are whole literals with **no** ICU syntax, so nothing to exempt and
+      // nothing to reach a screen: `تم الحفظ` and `أُزيل الحفظ` and `أسئلة` are
+      // real Arabic in the ordinary way. The counts that go beside them are Dart
+      // arguments (`quizCaption`, `crumbMeta`), which is precisely what keeps them
+      // out of this gate's reach — and a placeholder `{verses}` would have put a
+      // Latin word into an Arabic value and failed here on its own. **A key's
+      // exemption is a decision, so a new one has to be argued into
+      // `latinIsCorrect` in a diff rather than joining a list by accident.**
       final Set<String> plurals = _pluralKeys(en);
       final List<String> latin = <String>[
         for (final String key in keysOf(ar))
@@ -460,6 +544,14 @@ void main() {
     test('and the Arabic arm has real Arabic script, not transliteration', () {
       // The other half, and not redundant: a table that replaced Arabic with
       // transliterated Latin passes "no English left" and fails this.
+      // **Task 5.3 added the seven `/reading` rows and four of them are here.**
+      // The list is a *sample* with a purpose: it is the half of the bilingual
+      // contract the one-armed Latin check cannot see, and a table that replaced
+      // Arabic with transliterated Latin passes "no English left" and fails this.
+      // `readingBookmarkOn` / `readingBookmarkOff` are the sharpest additions,
+      // because they are the two strings a reader reads *most* often after a tap
+      // and both are short — a transliteration would be short too, and nothing
+      // else about them would give it away.
       for (final String key in <String>[
         'authEnterTheWord',
         'authEmailInvalid',
@@ -470,6 +562,11 @@ void main() {
         'homeLastLight',
         'homeNoLight',
         'homeRetry',
+        'readingVerses',
+        'readingQuiz',
+        'readingQuestions',
+        'readingBookmarkOn',
+        'readingBookmarkOff',
       ]) {
         expect(
           RegExp('[؀-ۿ]').hasMatch(ar[key]! as String),
@@ -538,59 +635,118 @@ void main() {
     });
   });
 
-  group('the two ICU plurals, which are the point of the migration', () {
+  group('the two ICU plurals — what is LEFT of the migration\'s point', () {
+    // ## WHY THE GROUP STILL SAYS "TWO" AFTER A PLURAL WAS DELETED
+    //
+    // It said "two" for `readingCaptionFor` and `resultTotalCaption` before Phase 1
+    // added `leaderboardRowSemantics`, so Task 5.3's deletion left the number
+    // unchanged by coincidence — and that coincidence is exactly why the manifest
+    // assertion below is a **named set** and not a length. A length of `2` would
+    // pass over a table where the wrong key had become a plural and the right one
+    // had stopped.
+    //
+    // ## AND THE COST OF THE DELETION IS WRITTEN WHERE A READER HITS IT
+    //
+    // `readingCaptionFor` was the only `/reading` plural, and its `two` class
+    // rendered `٢ سؤالان` — correct Arabic, and a real capability this client once
+    // had. It is gone because `eva/redesign.html:1347` composes the CTA caption as
+    // `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` `` out of a table whose
+    // `questions` row carries **no ICU forms at all**, and
+    // `reading_l10n.dart`'s class doc records the trade in full: a client that
+    // inflects where the prototype does not is translating a design decision nobody
+    // made. The composed replacement, `ReadingStringsPhrases.quizCaption`, renders
+    // `اختبار · ٣ أسئلة` at **every** count, and the lost dual is a recorded trade
+    // rather than a regression waiting to be found.
+    //
+    // The row that watches the deletion actually happened is
+    // `the retired keys are GONE from both arms`, below: "a plural stopped being a
+    // plural" and "a plural was deleted" are different changes, and only the second
+    // leaves an artefact anyone can assert against.
+
     /// The Arabic classes, with a count in each. Chosen to hit **every** one of
     /// Arabic's six, which is what the old `count == 1 ? … : …` could not.
+    ///
+    /// **Kept, and still all six, even though the key that needed a dual is
+    /// gone**: `resultTotalCaption` selects all of them too, and a future edit
+    /// that collapsed it onto `other` for every count would be invisible to the
+    /// manifest row — that row proves the key *is* a plural, and only these prove
+    /// it selects the right arm.
     const Map<String, int> arabicClasses = <String, int>{
-      'zero': 0, // no questions at all — reachable; see `TodayReadingMapper`
+      'zero': 0, // no points at all — reachable on a fresh account
       'one': 1, // the class the live payload actually carries
-      'two': 2, // the DUAL — the class the old table got wrong
-      'few': 5, // 3-10, and the class `ReadingArScreen.tsx:87`'s `٥` is in
+      'two': 2, // the DUAL — the class a one-boundary table gets wrong
+      'few': 5, // 3-10
       'many': 11, // 11-99, singular accusative — also wrong in the old table
       'other': 100,
     };
 
-    test('the question caption selects all six Arabic classes', () {
-      // `readingCaptionFor` was `captionFor`'s one-boundary `== 1`. Its own doc
-      // recorded the other three classes as **accepted debt**: `captionFor(2)`
-      // returned `٢ أسئلة` where correct Arabic is `٢ سؤالان`.
+    test('the retired keys are GONE from both arms, and were not replaced', () {
+      // The deletion, asserted rather than assumed. **Two** rows left this table in
+      // Task 5.3, and a silent deletion is the one change nothing else here would
+      // notice: a key that is *absent* breaks no other assertion in this file. It
+      // is supposed to break the **build**, and AGENT_CONTEXT §2.1 records that
+      // half of the "a typo becomes a build error" claim as **false** — a key
+      // missing from a locale file makes `flutter gen-l10n` print a hint and
+      // **exit 0**, emitting the template's English value into the Arabic class.
       //
-      // This is that debt, paid. It is asserted per class and against a literal, so
-      // a `plural` that silently fell back to `other` for every count would fail on
-      // five of the six rows.
-      const Map<String, String> expected = <String, String>{
-        'zero': '٠ أسئلة',
-        'one': '١ سؤال واحد',
-        'two': '٢ سؤالان', // ← was `٢ أسئلة`
-        'few': '٥ أسئلة',
-        'many': '١١ سؤالًا', // ← was `١١ أسئلة`
-        'other': '١٠٠ سؤال',
-      };
-      final AppLocalizationsAr strings = AppLocalizationsAr();
-      for (final MapEntry<String, int> entry in arabicClasses.entries) {
-        expect(
-          strings.readingCaptionFor(entry.value, _digits(entry.value)),
-          expected[entry.key],
-          reason:
-              'Arabic `${entry.key}` (count ${entry.value}) — correct Arabic '
-              'agreement is a correctness question, not a wording one',
-        );
+      // So this row is the one that closes that gap for these two keys, and the
+      // `111 → 116` count above is what makes an *unintentional* return red: seven
+      // keys were added, so a resurrection would move the number too.
+      for (final String arm in <String>['en', 'ar']) {
+        final Map<String, dynamic> table = _decode('lib/l10n/app_$arm.arb');
+        for (final String gone in <String>[
+          'readingCaptionFor',
+          'readingBeginReflection',
+        ]) {
+          expect(
+            keysOf(table),
+            isNot(contains(gone)),
+            reason:
+                '$arm.$gone is back. If the plural is wanted back, '
+                '`reading_l10n.dart` and `reading_l10n_test.dart` change with it — '
+                'the redesign composes an uninflected caption, so a restored '
+                'plural is a deliberate divergence from `redesign.html:1347` and '
+                'not a repair.',
+          );
+        }
       }
     });
 
-    test('and the English caption is one/other, which is all English has', () {
-      final AppLocalizationsEn strings = AppLocalizationsEn();
-      expect(strings.readingCaptionFor(0, '0'), '0 questions');
-      expect(strings.readingCaptionFor(1, '1'), '1 question');
-      expect(strings.readingCaptionFor(2, '2'), '2 questions');
-      expect(strings.readingCaptionFor(11, '11'), '11 questions');
-    });
+    // ## WHAT THIS ROW USED TO ASSERT, AND WHY IT IS NOT MERELY GONE
+    //
+    // `the question caption selects all six Arabic classes` walked the whole map
+    // against `readingCaptionFor` and was the single best test in this file: it is
+    // what paid the recorded debt that the hand-rolled table's one `== 1` boundary
+    // left open, and its `two` row is where `٢ سؤالان` was proved rather than hoped
+    // for.
+    //
+    // It is deleted rather than re-pointed because **no key left in this table
+    // inflects a question count.** `reading_l10n.dart`'s class doc records why in
+    // full, and the short form is that `redesign.html:1347` composes the caption
+    // from three separate values out of a table whose `questions` row has no ICU
+    // forms — so the dual is gone from the app, not from this file's attention.
+    // Re-pointing the row at `resultTotalCaption` would have produced a *passing*
+    // duplicate of the row below it, which is the worse outcome: it would look
+    // like the Arabic classes are still covered twice when they are covered once.
+    //
+    // What still watches the six classes is `arabicClasses` and the score row —
+    // `resultTotalCaption` selects zero/one/two/few/many/other too, and
+    // `leaderboardRowSemantics` renders them through `Intl.pluralLogic` with the
+    // same six arms.
 
     test('the caption is derived from the count and never hard-codes the prototype`s 5', () {
       // `ReadingEnScreen.tsx:89` hard-codes `5 questions` and the live reading
       // carries ONE question, so the prototype's literal is false by a factor of
-      // five. Tautological against `readingCaptionFor(5)` on purpose: the claim is
-      // that no key in this file can be found holding the prototype's number.
+      // five. **This row stopped being tautological in Task 5.3**: it used to be a
+      // scan whose subject was `readingCaptionFor(5)`, and that key is deleted. It
+      // is now a claim about the table alone — no key in either file can be found
+      // holding the prototype's number — which is the stronger of the two and the
+      // only one that survives the plural's removal.
+      //
+      // The composed half moved to `reading_l10n_test.dart`, which is where the
+      // number actually reaches a screen: `quizCaption` takes `StickyCta`'s
+      // `questionCount`, so the count is now a Dart argument and could not be in
+      // the table even if someone wanted it there.
       expect(
         keysOf(en).map((String k) => en[k].toString()).join(' '),
         isNot(contains('5 questions · about a minute')),
@@ -639,21 +795,35 @@ void main() {
     });
 
     test('and no OTHER key claims to be a plural', () {
-      // The manifest the plural tests above depend on. If a fourth key became a
-      // `plural` — or if one of these three stopped being one — this fails, so the
+      // The manifest the plural tests above depend on, and the row the
+      // Latin-script gate above reads its exemptions from. **A fourth key became a
+      // `plural` — or one of these two stopped being one — and this fails**, so the
       // per-class assertions cannot pass vacuously against a key that has collapsed
-      // to a single arm.
+      // to a single arm, and the gate cannot silently start exempting a template
+      // nobody reviewed.
       //
-      // Phase 1 added `leaderboardRowSemantics` as the third. It pluralises a score for
-      // the same reason the other two pluralise counts: a row is four numbers, and a
-      // screen reader announcing them separately gives fragments rather than a
-      // sentence. The per-class assertions for it live in
-      // `leaderboard_row_tile_test.dart`, which is where the string is actually used —
-      // a plural asserted only here would be a claim about the ARB and not about the
-      // app.
+      // ## WHAT EACH MEMBER IS, AND WHY THERE ARE TWO
+      //
+      // * `resultTotalCaption` — a **score's noun**, for `/result`. The score itself
+      //   is drawn by `result_page.dart` in `displayLarge` one line above, so this
+      //   key selects agreement and carries no numeral.
+      // * `leaderboardRowSemantics` — a **whole row's spoken text**, added in
+      //   Phase 1. A board row is four numbers, and a screen reader announcing them
+      //   separately gives fragments rather than a sentence. Its per-class
+      //   assertions live in `leaderboard_row_tile_test.dart`, which is where the
+      //   string is actually used — a plural asserted only here would be a claim
+      //   about the ARB and not about the app.
+      //
+      // ## AND THE THIRD MEMBER WAS DELETED, WHICH IS THE POINT OF NAMING THE SET
+      //
+      // `readingCaptionFor` was here until Task 5.3. It is gone because the
+      // redesign's caption is composed, not inflected (`redesign.html:1347`), and
+      // **the manifest is a claim about which keys ARE plurals rather than a
+      // count**: the length is still `2`, by the coincidence recorded at the head
+      // of this group, and a count would have gone on being two after the wrong
+      // key changed.
       final Set<String> plurals = _pluralKeys(en);
       expect(plurals, <String>{
-        'readingCaptionFor',
         'resultTotalCaption',
         'leaderboardRowSemantics',
       });
@@ -668,56 +838,135 @@ void main() {
   });
 
   group('the numerals are the domain function`s, not `intl`s', () {
-    test(
-      'the ARB plural carries a String numeral placeholder, deliberately',
-      () {
-        // ## THE FINDING THAT FORCED THIS WHOLE SHAPE
-        //
-        // `gen_l10n` compiles `{count, plural, …}` by interpolating the **raw Dart
-        // `int`**: the generated Arabic arm literally reads `'$count أسئلة'`. A
-        // single-placeholder ARB therefore renders **Latin digits on the Arabic arm**,
-        // silently undoing `arabicIndicDigits` — a domain function pinned by
-        // `arabic_digits_test.dart` and by `font_coverage_test.dart`'s glyph coverage —
-        // and leaving every Arabic screen showing `5 questions` beside `٥`.
-        //
-        // So the selector is an `int` and the numeral is a `String`, and the division
-        // is the honest one: the agreement is a property of the WORDING (which belongs
-        // in the ARB) and the numeral system is a property of the ARM (which belongs
-        // in `l10n.dart`). This test is the declaration that the shape is deliberate,
-        // so nobody "simplifies" the second placeholder away.
-        const Map<String, String> caption = <String, String>{
-          'count': 'int',
-          'digits': 'String',
-        };
+    // ## THE SUBJECT OF THIS GROUP MOVED, AND IT IS THE ONE KEY THAT DID NOT DIE
+    //
+    // Both rows below used to be written against `readingCaptionFor`, the
+    // two-placeholder `/reading` plural Task 5.3 deleted. `leaderboardRowSemantics`
+    // **still carries the same pair** — `count: int` for the agreement and
+    // `digits: String` for the numeral — so the property this group exists to hold
+    // is unchanged; only the key that holds it moved. It had to move somewhere: the
+    // shape is a property of *a* plural that renders a count, and
+    // `resultTotalCaption` selects a noun only and never interpolates a numeral at
+    // all, which is why it declares one placeholder and this group cannot use it.
+    test('the ARB plural carries a String numeral placeholder, deliberately', () {
+      // ## THE FINDING THAT FORCED THIS WHOLE SHAPE
+      //
+      // `gen_l10n` compiles `{count, plural, …}` by interpolating the **raw Dart
+      // `int`**: the generated Arabic arm literally reads `'$count نقاط'`. A
+      // single-placeholder ARB therefore renders **Latin digits on the Arabic arm**,
+      // silently undoing `arabicIndicDigits` — a domain function pinned by
+      // `arabic_digits_test.dart` and by `font_coverage_test.dart`'s glyph coverage —
+      // and leaving every Arabic screen showing a Latin count beside `٥`.
+      //
+      // So the selector is an `int` and the numeral is a `String`, and the division
+      // is the honest one: the agreement is a property of the WORDING (which belongs
+      // in the ARB) and the numeral system is a property of the ARM (which belongs
+      // in `l10n.dart`). This test is the declaration that the shape is deliberate,
+      // so nobody "simplifies" the second placeholder away.
+      const String key = 'leaderboardRowSemantics';
+      const Map<String, String> caption = <String, String>{
+        'count': 'int',
+        'digits': 'String',
+      };
+      expect(
+        ((en['@$key']! as Map)['placeholders']! as Map).keys,
+        containsAll(<String>['count', 'digits']),
+      );
+      for (final String type in <String>['count', 'digits']) {
         expect(
-          ((en['@readingCaptionFor']! as Map)['placeholders']! as Map).keys,
-          caption.keys,
+          (((en['@$key']! as Map)['placeholders']! as Map)[type]!
+              as Map)['type'],
+          caption[type],
+          reason: 'the `$type` placeholder\'s declared type',
         );
-        for (final String type in <String>['count', 'digits']) {
-          expect(
-            (((en['@readingCaptionFor']! as Map)['placeholders']! as Map)[type]!
-                as Map)['type'],
-            caption[type],
-            reason: 'the `$type` placeholder\'s declared type',
-          );
-        }
-      },
-    );
+      }
+      // And the key really does render the numeral from the String rather than
+      // from the `int` — the shape is only meaningful if the message body says
+      // `{digits}` and not `{count}`. This is the assertion that would fail if
+      // someone "simplified" the message without touching the metadata above.
+      expect(
+        (en[key]! as String).contains('{digits}'),
+        isTrue,
+        reason:
+            'the `other` arm interpolates the caller\'s numeral, which is why '
+            'the English `one` arm can say a literal `1 point` while `other` '
+            'cannot',
+      );
+    });
 
-    test('and the Arabic arm renders U+0660…U+0669, not ASCII', () {
-      // The load-bearing half. `_digits` below is the same conversion
+    test('and the two arms render the count the way their own message says', () {
+      // The load-bearing half, and **it is a different claim from the row it
+      // replaced.** `_digits` below is the same conversion
       // `AppLocalizationsArm.digits` performs via `arabicIndicDigits`; asserting the
       // codepoint is what makes this a test of the numeral system rather than of the
       // wording.
+      //
+      // ## MEASURED: THE ARABIC ARM OF THIS KEY USES NO NUMERAL AT ALL
+      //
+      // `app_ar.arb`'s `leaderboardRowSemantics` is
+      // `{count, plural, … other{نقطة}}، {initials}، المركز {rank}{isReader, select, …}`
+      // — **there is no `{digits}` in it**, so at a count of 80 the Arabic row
+      // renders `نقطة، DM، المركز 3` and the caller's `٨٠` is accepted by the
+      // generated signature and then discarded. The first version of this row
+      // asserted `contains('٨٠')` and read `نقطة، DM، المركز 3`.
+      //
+      // That is worth knowing rather than papering over, and it is the **same fact
+      // `reading_l10n.dart` records from the other side**: `/reading` composes its
+      // numerals in Dart precisely so that both arms can show one, while this board
+      // row's English arm needs the caller's numeral and its Arabic arm spells the
+      // `one` class out as `نقطة واحدة` instead. The two disagree about whether a
+      // spoken row carries a number, and both are the prototype's own choice.
+      //
+      // ## AND THE SIGNATURE IS THE ARGUMENT AGAINST "SIMPLIFYING" IT AWAY
+      //
+      // The generated Arabic getter still **takes** the `digits` String — the
+      // parameter is generated from the template, not from the arm's own text — so
+      // a call site cannot drop it even though this arm discards it. Asserted, so a
+      // future `gen_l10n` change that starts omitting unused placeholders fails
+      // here with a reason, rather than silently changing every call site's
+      // arity.
       final AppLocalizationsAr arStrings = AppLocalizationsAr();
-      final String caption = arStrings.readingCaptionFor(5, _digits(5));
-      expect(
-        caption.codeUnits.first,
-        0x0665,
-        reason: 'U+0665 ARABIC-INDIC FIVE',
+      final String arRow = arStrings.leaderboardRowSemantics(
+        80,
+        _digits(80),
+        'DM',
+        '3',
+        'false',
       );
-      expect(caption, isNot(contains('5')));
+      expect(
+        arRow,
+        'نقطة، DM، المركز 3',
+        reason: 'the Arabic row carries no number',
+      );
+      expect(
+        arRow,
+        isNot(contains('٨٠')),
+        reason: 'and discards the caller\'s',
+      );
+      expect(
+        arRow.runes.where((int r) => 0x0660 <= r && r <= 0x0669),
+        isEmpty,
+        reason: 'U+0660-U+0669 appears nowhere in it, which is the measurement',
+      );
+      // The `rank` is still interpolated verbatim — so the Arabic arm is not
+      // "numbers-free", it is **numeral-free**: the caller owns the rank's numeral
+      // and this arm's own plural contributes only the noun.
+      expect(
+        arStrings.leaderboardRowSemantics(1, '١', 'DM', '٣', 'true'),
+        'نقطة واحدة، DM، المركز ٣، هذا أنت',
+      );
+      // The English arm is the one that takes the caller's numeral, and it is the
+      // Latin arm's own digits when the caller is the Latin arm.
+      final AppLocalizationsEn enStrings = AppLocalizationsEn();
+      expect(
+        enStrings.leaderboardRowSemantics(80, '80', 'DM', '3', 'false'),
+        '80 points, DM, rank 3',
+      );
+      // And the numeral system itself, on the row that composes one — which is now
+      // `crumbMeta` / `quizCaption` on `/reading`, asserted with codepoints in
+      // `reading_l10n_test.dart`. What this file keeps is the function's contract.
       expect(arStrings.digits(40), '٤٠');
+      expect(arStrings.digits(40).runes, <int>[0x0664, 0x0660]);
     });
   });
 

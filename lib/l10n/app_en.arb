@@ -52,7 +52,7 @@
   },
   "homeSecondsOfSilence": "seconds of silence",
   "@homeSecondsOfSilence": {
-    "description": "The selah card's second line, **without the number**. Transcribed: `redesign.html:966` — `secs:[\"seconds of silence\",\"ثانية من الصمت\"]`.\n\nThe prototype composes it: `el('selahSub').textContent = \\`${N(selahDur)} ${tr('secs')}\\`` (`:990`). Composing here rather than through a `{seconds}` placeholder is what keeps the Arabic value free of the ASCII placeholder name — `app_localizations_test.dart` fails any non-plural Arabic value holding Latin script, and see `readingCaptionFor`'s description for why the plural keys are the only ones exempt."
+    "description": "The selah card's second line, **without the number**. Transcribed: `redesign.html:970` — `secs:[\"seconds of silence\",\"ثانية من الصمت\"]`.\n\nThe prototype composes it: `el('selahSub').textContent = \\`${N(selahDur)} ${tr('secs')}\\`` (`:990`). Composing here rather than through a `{seconds}` placeholder is what keeps the Arabic value free of the ASCII placeholder name — `app_localizations_test.dart` fails any non-plural Arabic value holding Latin script, and see `readingCaptionFor`'s description for why the plural keys are the only ones exempt."
   },
   "homeTheLibrary": "the library",
   "@homeTheLibrary": {
@@ -186,12 +186,10 @@
   "readingDecreaseFontSize": "Decrease font size",
   "readingIncreaseFontSize": "Increase font size",
   "readingBookmark": "Bookmark",
-  "readingBeginReflection": "Begin reflection",
   "readingUnavailableSuffix": "unavailable in this build",
   "readingPassage": "Scripture passage",
   "readingVerse": "Verse",
   "readingRetry": "Try again",
-  "readingCaptionFor": "{count, plural, zero{{digits} questions} one{{digits} question} other{{digits} questions}}",
   "resultReflectAgain": "Reflect again",
   "resultBackHome": "Back",
   "resultThisAnswer": "This answer",
@@ -238,7 +236,7 @@
     "description": "The password field's visible placeholder. Transcribed: redesign.html:507 — `placeholder=\"password\"`, replacing the masked `••••••••` the React prototype drew.\n\nA WORD AND NOT A MASK, and that is the redesign's choice, not a change of mind about masks: the placeholder names the field the way a browser's `placeholder=\"password\"` does, and `authPasswordLabel` carries the same noun. Deliberately localized on the Arabic arm; the word is `كلمة المرور`, which is the exact noun `pwErr` (`redesign.html:976`) already carries — no new translation is invented."
   },
   "@authEnterTheWord": {
-    "description": "The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n=\"enter\"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:954` — `enter:[\"enter the word\",\"ادخل الكلمة\"]`). The Arabic is the prototype's own, not a new translation."
+    "description": "The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n=\"enter\"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:965` — `enter:[\"enter the word\",\"ادخل الكلمة\"]`). The Arabic is the prototype's own, not a new translation."
   },
   "@authEmailInvalid": {
     "description": "The email field's error line. Transcribed: redesign.html:976 — `emErr:[\"email looks incomplete\",\"البريد غير مكتمل\"]`, announced by `redesign.html:1305`'s one regex test. The Arabic is the prototype's own.\n\nRENDERED BY PRESENCE, NOT BY MATCHING: the page draws this sentence when `state.emailError != null` and never compares the domain's message text, so the wording in `login_credentials.dart` is the log-canonical copy and this key is the reader's."
@@ -333,9 +331,6 @@
   "@readingBookmark": {
     "description": "The bookmark control's accessible name, BEFORE any suffix. The bookmark has no endpoint and no port — ReadingEnScreen.tsx:19-21 draws one with no handler — so it ships INERT and says so via `readingUnavailableSuffix`."
   },
-  "@readingBeginReflection": {
-    "description": "The sticky CTA. Transcribed from BOTH prototype arms, and this is the only genuinely bilingual transcription in the file: ReadingEnScreen.tsx:87 — `ButtonPrimary` with `Begin reflection`; ReadingArScreen.tsx:85 — `ابدأ التأمل`."
-  },
   "@readingUnavailableSuffix": {
     "description": "Appended to a control's name while that control is inert.\n\nThe same wording, and the same reasoning, as `authUnavailableSuffix` and `homeUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; /quiz's is a different string."
   },
@@ -347,19 +342,6 @@
   },
   "@readingRetry": {
     "description": "`ErrorView.retryLabel`. The prototype has no error state at all — `eva/src` has no data layer that can fail — so this is written. NAMESPACED `reading*`; see `homeRetry` for the three-way collision."
-  },
-  "@readingCaptionFor": {
-    "description": "The sticky CTA's caption for a number of questions. THIS IS A REAL ICU PLURAL, and it is the reason the whole migration is worth 302 renamed test references.\n\nWHAT IT REPLACED: two hand-rolled keys (`questionSingular`/`questionPlural`) plus a `count == 1 ? … : …` expression in Dart. That expression implemented exactly ONE boundary, and `reading_strings.dart` recorded the rest as acknowledged debt.\n\nTHE ARABIC DEBT THIS PAYS OFF, MEASURED. Arabic plural agreement has FOUR classes the old table did not have — 2 dual (`سؤالان`), 3-10 plural (`أسئلة`), 11-99 singular accusative (`سؤالًا`). The old `captionFor(2)` returned `٢ أسئلة`, where correct Arabic is `٢ سؤالان`. That gap was accepted then on three grounds, and all three are now obsolete: `HomeStrings.streakLabel` had declined the same decision as out of scope, the live payload carried one question, and every other class needed a number the client had never seen. ICU supplies all six classes for free and `arabic_typography_test.dart` holds the dual.\n\nTWO PLACEHOLDERS, AND WHY. `count` (int) is the ICU SELECTOR — Arabic's agreement classes are a function of the integer, so selection genuinely needs the number. `digits` (String) is the RENDERED NUMERAL, and it is a String because `gen_l10n` emits the selector as a raw Dart `int` interpolation (`'$count'`), which renders LATIN digits on the Arabic arm. That would silently undo `arabicIndicDigits` — a domain function pinned by `arabic_digits_test.dart` and `font_coverage_test.dart` — and would leave the Arabic screens showing `٥` beside `٥`, half-translated. So the numeral is supplied by the caller, from the same domain function, and this key owns only the WORDING. Verified: `flutter gen-l10n` on a single-`{count}` version emitted `'$count أسئلة'` for the `few` branch.\n\nTHE COUNT IS NEVER FAKE. ReadingEnScreen.tsx:89 hard-codes `5 questions` and the live reading carries ONE question, so the prototype's literal is false by a factor of five and a hard-coded 5 is fake data that happens to match nothing the server sends.\n\nNO DURATION, AND IT IS NOT COMING. ReadingEnScreen.tsx:31 (`Genesis · Chapter 1 · 4 min`) and :89 (`5 questions · about a minute`) both carry durations, and `GET /readings/today/{lang}` has NO duration field anywhere (verified live against HEAD = 4a1c834). Deriving one from a word count is inventing a measurement, so both durations are GONE and not replaced.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "example": "5"
-      },
-      "digits": {
-        "type": "String",
-        "example": "5"
-      }
-    }
   },
   "@resultReflectAgain": {
     "description": "The primary button. Transcribed: ResultScreen.tsx:77."
@@ -481,5 +463,33 @@
   "sealFabLeaderboard": "Leaderboard",
   "@sealFabLeaderboard": {
     "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
+  },
+  "readingVerses": "verses",
+  "@readingVerses": {
+    "description": "`:966` — `verses:[\"verses\",\"آيات\"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences."
+  },
+  "readingQuiz": "quiz",
+  "@readingQuiz": {
+    "description": "`:966` — `quiz:[\"quiz\",\"اختبار\"]`. The caption the CTA is built around (`:1347`), not a heading: the prototype writes `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` ``."
+  },
+  "readingQuestions": "questions",
+  "@readingQuestions": {
+    "description": "`:966` — `questions:[\"questions\",\"أسئلة\"]`. The unit beside the CTA's numeral. **Not a plural**: the prototype renders one word for every count, exactly as home's `verseCount` and `selahSeconds` do."
+  },
+  "readingListen": "listen",
+  "@readingListen": {
+    "description": "`:965` — `listen:[\"listen\",\"استمع\"]`. The pill's last button (`#listen`, `:559`)."
+  },
+  "readingSky": "sky",
+  "@readingSky": {
+    "description": "`:968` — `sky:[\"sky\",\"سماء\"]`. The crumb's third clause (`` `${tr('sky')} ${N(skyN)}` ``, `:1346`) — the count of lit stars, which is `SkyState.count`."
+  },
+  "readingBookmarkOn": "bookmarked",
+  "@readingBookmarkOn": {
+    "description": "`:974` — `bmk:[\"✦ bookmarked\",\"✦ تم الحفظ\"]`, and the leading `✦` is **deliberately dropped**: U+2726 is in no bundled family (measured — `arabic_typography_test.dart` failed with `[10022]` on the selah glyph before it became a painted star), so a toast carrying it would ship a tofu box. The glyph is decoration on a transient label; the word is the information. `readingBookmark` keeps the button's own name, which `:544` writes as `title=\"bookmark\"` with no glyph at all."
+  },
+  "readingBookmarkOff": "bookmark removed",
+  "@readingBookmarkOff": {
+    "description": "`:974` — `bmkOff:[\"bookmark removed\",\"أُزيل الحفظ\"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind."
   }
 }

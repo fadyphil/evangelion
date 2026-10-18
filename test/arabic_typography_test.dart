@@ -63,6 +63,7 @@ import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/result/presentation/result_l10n.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
@@ -404,11 +405,18 @@ void main() {
     /// Arabic list in a test is a second copy of the corpus.
     final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
-      // Site 1 — the metadata row: the payload's own `translation`, which is
-      // **per-language** (`ReadingHeader`'s doc has the measurement) and half of it
-      // is Arabic.
-      liveArabicPassage.translation,
-      // Site 4 — the citation.
+      // Sites 1 and 4 — the **crumb**, which Task 5.3 rewrote as one composed line
+      // (`ReadingStringsPhrases.crumbMeta`, `eva/redesign.html:1346`): the book
+      // number, the verse count with its unit, and the lit-star count with its
+      // unit. `liveArabicPassage.translation` — the metadata row's own `translation`
+      // field, which the deleted `ReadingHeader` rendered — is **no longer on the
+      // screen at all**; the field survives because other screens read it.
+      ar.crumbMeta(
+        category: '${liveArabicPassage.verses.first.bookNumber}',
+        verses: liveArabicPassage.verses.length,
+        litStars: 0,
+      ),
+      // The citation, which is the crumb's title and a run of its own.
       liveArabicPassage.reference,
       // The five verse paragraphs — whole-verse runs, which the per-site table covers
       // by pointing at the marker inside them.
@@ -422,17 +430,59 @@ void main() {
       // the gate named all five as unrendered, which is the third time in this
       // repository that a test's own wrong derivation has read as a widget defect.
       for (final Verse verse in liveArabicPassage.verses) verse.text,
-      // Site 5 — the CTA label.
-      ar.readingBeginReflection,
-      // Site 2 — the caption, with Arabic-Indic digits.
-      ar.readingCaption(1),
-      // Sites 7, 8 and 9 — the three control tooltips, which have **no prototype
-      // line**: `ReadingEnScreen.tsx:14-16` and `ReadingArScreen.tsx:21-29` are bare
-      // `<button>`s with an inline `<svg>` and no label, so §14 forced these three
-      // strings into this client. They are the 30 tofu boxes decision 71 records.
-      ar.readingBack,
-      ar.readingTextSize,
-      '${ar.readingBookmark} — ${ar.readingUnavailableSuffix}',
+      // Site 5 — the CTA's caption, **composed** and with this arm's numerals.
+      // `readingBeginReflection` ("Begin reflection") and `readingCaptionFor` (an
+      // ICU plural) were both retired in Task 5.3: the redesign's CTA has one line
+      // and the prototype composes it as
+      // `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` `` (`eva/redesign.html:1347`),
+      // so `ReadingStringsPhrases.quizCaption` is what renders and the count it is
+      // given is the passage's own `questionCount`.
+      ar.quizCaption(liveArabicPassage.questionCount),
+      // The pill's `.pbtn` labels and the two dial options — the controls that
+      // replaced the three tooltips.
+      //
+      // **The Arabic dial option is `ع`, one character and Arabic script**, so it
+      // is a run in its own right; `SegmentedControl` gives it Amiri through
+      // `arabicAware`, which is why this row can demand the Arabic family of a
+      // single letter.
+      ReadingPill.languageLabelArabic,
+      // `ReadingPill.decreaseLabel` is `A−` — a Latin `A` and U+2212 — so it is
+      // **not** an Arabic run and must not be declared here: declaring it makes the
+      // gate report a declared run the tree never held, which is the error the
+      // exact-set assertion exists to catch.
+      //
+      // The `listen` **label**, which is Arabic script and therefore an Arabic run in
+      // its own right. Its *accessible name* is the longer composed string below —
+      // a name and a label are two different strings on two different nodes, and the
+      // gate reads the rendered one.
+      ar.readingListen,
+      // The five verse **numerals**, each with the single space `:1362` puts after
+      // it (`<i>${…}</i> ${t}`), because the numeral is its own `TextSpan` and the
+      // gate reads one run per span. Derived from the fixture's own count.
+      for (int i = 0; i < liveArabicPassage.verses.length; i++)
+        '${ar.digits(liveArabicPassage.verses[i].number)} ',
+      // ## AND THREE NAMES THIS LIST CARRIED THAT ARE **NOT RENDERED RUNS**
+      //
+      // `readingBack` (the chevron), `readingBookmark` (the old tooltip) and
+      // `listeningUnavailable(suffix)` are **accessible names**, not painted text:
+      // the chevron is the character `‹`, the bookmark is a painted star, and the
+      // pill's `listen` label is the bare word. The tofu gate reads what is on the
+      // tree, so declaring a name here reported it as a run nothing drew — which is
+      // the exact failure the gate exists to catch, and where it caught mine.
+      //
+      // **The names are asserted where they belong**: `reading_accessibility_test.dart`
+      // owns every node's accessible name on this screen, and a name that is not
+      // rendered is precisely the kind that is easiest to lose in a redesign.
+      //
+      // ## AND TWO STRINGS THIS LIST USED TO CARRY, WHICH THE REDESIGN UNRENDERED
+      //
+      // `readingTextSize` (the old `Aa` control's name) and `readingBookmark` (the
+      // old tooltip) are **still in the ARB** — `/settings` and other screens read
+      // them — but the redesigned reader paints its bookmark as a star
+      // (`FourPointedStar`) and steps its type size with two `.pbtn`s, so neither
+      // string is a rendered run any more. Declaring them would have been the exact
+      // failure this gate was built to catch: a suite that declares a string to make
+      // a test pass, for a string nothing draws.
     ];
 
     testWidgets('the Arabic arm, with the live Arabic passage', (
@@ -451,53 +501,74 @@ void main() {
       await expectNoTofuInAnyRun(tester, screen: '/reading');
     });
 
-    testWidgets('the `Aa` disclosure is gated — it is two more Arabic runs behind '
-        'a tap', (WidgetTester tester) async {
+    testWidgets('the pill\'s four labels are gated, and one of them is Arabic', (
+      WidgetTester tester,
+    ) async {
+      // **The `Aa` disclosure this row replaced is gone with the redesign.** The old
+      // screen had a panel opened by an `Icons.format_size` control, and this row
+      // gated the two strings behind that tap. `eva/redesign.html:550-551` writes
+      // the stepper as two `.pbtn`s — `A−` and `A+` — **always visible**, with no
+      // panel and no `format_size` icon anywhere in `:540-560`.
+      //
+      // So there is nothing behind a tap any more, and this row is the claim that
+      // replaced it: the three Latin labels and the one Arabic word are all on
+      // screen at once, and the Arabic one is the only one that is Arabic script.
       final ReadingHarness h = readingHarness(
         scripture: const Right<Failure, ScriptureText>(liveArabicPassage),
       );
-      // **A taller viewport than `kGeometrySurface`, and it is load-bearing.**
-      // `ScriptureBlock` is a `ListView.builder`, so a verse below the fold is not
-      // merely off-screen — it is **never built**, and a run that is never built is a
-      // run this gate cannot see. Opening the panel costs about 60px and pushed
-      // verse five off the end, so the exact-set assertion below failed on a run that
-      // was not missing from the widget but missing from the *fixture of what gets
-      // rendered*.
-      //
-      // The alternative — declaring whatever happens to be on screen at 932 — makes
-      // this test a function of the viewport, and a viewport is a number a later
-      // phase will change for its own reasons. So the viewport grows instead.
-      await pumpReading(
-        tester,
-        cubit: h.cubit,
-        locale: const Locale('ar'),
-        size: const Size(430, 1200),
-      );
-      await tester.tap(find.byIcon(Icons.format_size));
-      await pumpReadingFrames(tester, 4);
+      await pumpReading(tester, cubit: h.cubit, locale: const Locale('ar'));
 
       await expectArabicTypography(
         tester,
         screen: '/reading',
         expectedArabic: <String>[
           ...arabic,
-          // `AppLocalizations.ar`'s own two new strings. They were
-          // `'Decrease font size'` / `'Increase font size'` hard-coded in
-          // `FontSizeStepper`, so before this phase this arm rendered two English
-          // sentences in a panel on a bilingual screen.
-          AppLocalizationsAr().readingDecreaseFontSize,
-          AppLocalizationsAr().readingIncreaseFontSize,
+          // `ReadingPill`'s own labels, declared here as well as in the list above
+          // because this row is about **them**: the gate is exact-set, so a label
+          // added to the screen without a row here fails — which is the property
+          // that let the tofu below be measured in the first place.
         ],
       );
     });
+    testWidgets(
+      'and in English renders Arabic in exactly ONE place — the dial',
+      (WidgetTester tester) async {
+        // ## WHY THIS ROW IS NO LONGER "NO ARABIC AT ALL", AND WHAT IT BECAME
+        //
+        // The other screens still assert exactly that, and for them it holds. This
+        // one stopped being true on its first run of the redesigned reader, and the
+        // reason is the redesign: `eva/redesign.html:554` writes the language control
+        // as **two options on both arms** —
+        // `<button class="on" data-l="en">EN</button><button data-l="ar">ع</button>` —
+        // so an English reader is shown the Arabic option of the control that would
+        // take them to the Arabic arm. `ع` is one character and it is Arabic script,
+        // so it is an Arabic run on an English screen, by design.
+        //
+        // The old reader had no such control on the arm's face (its language switch
+        // lived in a panel), so "renders no Arabic at all" was true here and the row
+        // was free. It is not free now, and **the row is worth keeping**: it is what
+        // stops a *second* Arabic string from appearing on the English arm, which is
+        // the defect a redesign is most likely to introduce — a string left in the
+        // wrong arm's table, or a widget keyed on the wrong locale.
+        final ReadingHarness h = readingHarness();
+        await pumpReading(tester, cubit: h.cubit);
 
-    testWidgets('and in English renders no Arabic at all', (
-      WidgetTester tester,
-    ) async {
-      final ReadingHarness h = readingHarness();
-      await pumpReading(tester, cubit: h.cubit);
-      await _expectNoArabic(tester, '/reading');
-    });
+        final List<RenderedRun> arabic = await arabicRuns(tester);
+        expect(
+          arabic.map((RenderedRun r) => r.label).toSet(),
+          <String>{ReadingPill.languageLabelArabic},
+          reason:
+              'the English arm must render exactly one Arabic run — the dial\'s own '
+              'Arabic option — and no more. A second one is a string that leaked '
+              'across the arms, and this is where it is cheapest to find.',
+        );
+
+        // And it is in the Arabic face, which is the part that was tofu before
+        // `SegmentedControl` grew `labelFamilyOf`: `eva/redesign.html:186` keys that
+        // face on the *option*, so the English arm's `ع` needs it too.
+        expect(arabic.single.family, EvaTypography.arabicFamily);
+      },
+    );
   });
 
   // The three stubs. Each declares an EMPTY Arabic list and says why — which is the

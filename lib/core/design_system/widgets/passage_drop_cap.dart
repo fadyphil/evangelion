@@ -108,6 +108,7 @@ class PassageDropCap extends StatelessWidget {
     this.direction = TextDirection.ltr,
     this.lines = 3,
     this.color,
+    this.fontSize,
     super.key,
   });
 
@@ -138,6 +139,42 @@ class PassageDropCap extends StatelessWidget {
   /// `emberInk` writes, a 56px letter is text, and the light palette measures
   /// `#D4891A` at 2.0:1 against the pale surfaces around it.
   final Color? color;
+
+  /// The glyph's own em size, when the prototype states one. `null` means the
+  /// [lines]-line ratio of [fontSizeFor].
+  ///
+  /// ## WHY THE REDESIGN NEEDS IT, AND WHY IT IS NOT THE SAME THING AS `lines`
+  ///
+  /// `redesign.html:172` writes the cap as a CSS **first-letter**:
+  /// `font-size: 56px; float: left; line-height: .82` — a fixed 56px letter
+  /// floated at the head of the first paragraph. The ratio in [fontSizeFor] is
+  /// the *other* shape: an N-line cap whose size follows the body. **No integer
+  /// `lines` reaches 56 at this screen's 20px body**, and the two nearest
+  /// answers are far enough apart that either one is a visible miss:
+  ///
+  /// | `lines` | `fontSizeFor(20)` | against the prototype's 56 |
+  /// | --- | --- | --- |
+  /// | 1 | **51.43** | −4.57 (−8 %) |
+  /// | 2 | **102.86** | +46.86 (+84 %) |
+  ///
+  /// So a caller that transcribes the prototype passes `fontSize: 56` and the
+  /// ratio does not run at all. The default stays the ratio: the callers that
+  /// predate the redesign — `/`'s preview and the old `/reading` block — were
+  /// built against a prototype whose cap was **82px against a 19px body**, which
+  /// the ratio reaches at `lines: 3` to within a percent, and
+  /// `passage_drop_cap_test.dart` pins that arithmetic. Both answers are right
+  /// for their own prototype; this parameter is what lets one widget carry both.
+  ///
+  /// **What it does not fix**, and the reason the caption is transcribed rather
+  /// than the layout: CSS's `float: left` wraps text around a box; a
+  /// [WidgetSpan] hangs from the first baseline with no float. `height: 1` in
+  /// [capStyle] means the span's box is one em tall — 56px against a 34px line
+  /// (`20 × 1.7`, `:161`), so the cap covers the first line and about two thirds
+  /// of the second, where the prototype's `.82` line box over a 56px font gives
+  /// 45.92px, or one line and 35 % of the second. **The sizes are transcribed;
+  /// the wrap is Flutter's**, and a reader comparing the two sees a cap of the
+  /// right size sitting slightly lower than the browser's.
+  final double? fontSize;
 
   /// `redesign.html:172`'s halo — `text-shadow: 0 0 26px rgba(232,176,75,.6)`.
   ///
@@ -201,7 +238,9 @@ class PassageDropCap extends StatelessWidget {
   /// The style the glyph renders in.
   TextStyle capStyle(TextStyle bodyStyle) => bodyStyle.copyWith(
     fontFamily: EvaTypography.scriptureFamily,
-    fontSize: fontSizeFor(bodyStyle.fontSize ?? 16),
+    // `fontSize` wins when the prototype states one — see its doc for why the
+    // ratio cannot produce `:172`'s 56 at any integer `lines`.
+    fontSize: fontSize ?? fontSizeFor(bodyStyle.fontSize ?? 16),
     fontWeight: FontWeight.w400,
     color: color,
     // `redesign.html:172` — the only thing this file takes from that rule. See

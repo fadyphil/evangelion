@@ -100,18 +100,22 @@ def strip_comments(text: str) -> str:
 # `text_contrast_gate_test.dart` applies to `knownSubstandard`: the list cannot
 # grow silently.
 ALLOWLIST: dict[str, str] = {
-    "WitnessSky": (
-        "Phase 3 Task 3.3 shipped the widget; Phase 5 places it. It is the "
-        "full-bleed `#sky` layer (eva/redesign.html:116) and its three consumers "
-        "are Phase 5's screens — `/reading` lights verses as they scroll into "
-        "view (eva/redesign.html:1208-1221), `/quiz` fires the flares "
-        "(`:1428`) and `/journey` counts the sky (`:1186-1189`). Placing it "
-        "here would mean inventing the reader's scroll observer, a router entry "
-        "and a settings row — all three of which the dispatch for this task "
-        "explicitly withholds. The entry is STALE the moment any page "
-        "constructs it, and the gate reports that, so it cannot outlive its "
-        "reason."
-    ),
+    # ## `WitnessSky` LEFT THIS LIST IN TASK 5.3, AND THIS COMMENT IS THE RECEIPT
+    #
+    # The entry read "Phase 3 Task 3.3 shipped the widget; Phase 5 places it …
+    # Placing it here would mean inventing the reader's scroll observer, a router
+    # entry and a settings row — all three of which the dispatch for this task
+    # explicitly withholds", and its last line promised "the gate reports that, so
+    # it cannot outlive its reason."
+    #
+    # `reading_page.dart` now does exactly that: the observer of
+    # `eva/redesign.html:1211-1219` — threshold `.6`, one-shot per verse — is what
+    # places the sky, with `lib/app/sky_scope.dart`'s handle carrying the lit set
+    # across the feature boundary `/reading` may not cross (AGENT_CONTEXT §3). The
+    # gate reported the entry stale; an allowlist row that has stopped being true
+    # is a false green, not a harmless leftover, so the row is gone and this
+    # paragraph is what remains of it.
+
     "SealMonogram": (
         "Phase 5.1 rebuilt `/login` against eva/redesign.html:503-511, whose "
         "brand block is a wordmark and a tagline — the seal is one of the "
@@ -120,6 +124,20 @@ ALLOWLIST: dict[str, str] = {
         "(eva/redesign.html:392-395) and `/journey` draws that orb in Task 5.6; "
         "between those two tasks it is genuinely unplaced. Same mechanism as "
         "WitnessSky's entry: STALE the moment any page constructs it."
+    ),
+    "HairlineDivider": (
+        "Task 5.3 made this one real. Its last two call sites were "
+        "`reading_header.dart` and `reading_controls.dart`, both of which the "
+        "redesigned `/reading` deleted (`eva/redesign.html:540-560` has no "
+        "header block and no settings row), so between Task 5.3 and the two "
+        "tasks below it is genuinely unplaced. The prototype's own rules name "
+        "both consumers: `eva/redesign.html:314` — `.brow{...border-bottom:1px "
+        "solid rgba(255,255,255,.05)}` is the journey's book row (Task 5.6), and "
+        "`:419`/`:439` — `.srow` and `.sact`, each with a `border-bottom:1px`, "
+        "are the settings rows and the sheet actions (Task 5.7). Deleting the "
+        "widget now would mean re-deriving it in two tasks with a second "
+        "spelling. Same mechanism as the entries above: STALE the moment any "
+        "page constructs it."
     ),
     "TextLink": (
         "Phase 5.2 rebuilt `/` against eva/redesign.html:513-538, and the "

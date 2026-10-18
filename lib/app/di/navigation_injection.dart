@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/settings_handle.dart';
+import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -259,6 +260,20 @@ void configureNavigation() {
   // star that is not there.
   final SkyCubit skyCubit = SkyCubit(repository: getIt<SkyRepository>());
 
+  // **The sky's seam, built from `SkyCubit` two lines below and for the same reason
+  // `settings_handle.dart` gives**: `/reading` lights a star per verse it scrolls
+  // past (`eva/redesign.html:1211-1219`), and it may not name `features/sky/` —
+  // AGENT_CONTEXT §3, Gate 2. `SkyHandle` holds the two closures and knows no
+  // feature, so this is the whole of the wiring.
+  //
+  // **And it is a singleton for the same reader-visible reason as the settings
+  // handle**: a second instance would be a second sky, so the star a reader lit on
+  // `/reading` would vanish the moment another screen resolved a different handle.
+  final SkyHandle skyHandle = SkyHandle(
+    entriesReader: () => skyCubit.state.entries,
+    recordEntry: skyCubit.record,
+  );
+
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
     // built, and a lazy singleton whose factory re-ran would hand out a *second*
@@ -272,6 +287,7 @@ void configureNavigation() {
     ..registerSingleton<QuizBloc>(quizBloc)
     ..registerSingleton<SettingsCubit>(settingsCubit)
     ..registerSingleton<SkyCubit>(skyCubit)
+    ..registerSingleton<SkyHandle>(skyHandle)
     ..registerSingleton<SettingsHandle>(settingsHandle)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(

@@ -99,6 +99,7 @@ export 'package:evangelion/core/design_system/widgets/eva_text_field.dart';
 export 'package:evangelion/core/design_system/widgets/eva_toggle.dart';
 export 'package:evangelion/core/design_system/widgets/focus_ring.dart';
 export 'package:evangelion/core/design_system/widgets/font_size_stepper.dart';
+export 'package:evangelion/core/design_system/widgets/four_pointed_star.dart';
 export 'package:evangelion/core/design_system/widgets/glass_surface.dart';
 export 'package:evangelion/core/design_system/widgets/hairline_divider.dart';
 export 'package:evangelion/core/design_system/widgets/icon_action_button.dart';

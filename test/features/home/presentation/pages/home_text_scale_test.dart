@@ -221,23 +221,34 @@ void main() {
       // single drawn shape in a 44px circle with no padding, so the only way it
       // overflows is if the shape's own advance exceeds the box. Asserted as a
       // size comparison rather than a string, because the mechanism is the width —
-      // and the shape is PAINTED (`_FourPointedStar`), not typed, which is the
-      // measured correction `SelahCard.glyph`'s doc records: U+2726 is in no
-      // bundled family, so the typed version was the tofu this suite's own
-      // no-overflow check could not see.
+      // and the shape is PAINTED (`FourPointedStar`, the shared
+      // design-system widget), not typed, which is the measured correction
+      // `SelahCard.glyph`'s doc records: U+2726 is in no bundled family, so the
+      // typed version was the tofu this suite's own no-overflow check could not
+      // see.
+      //
+      // **And the box is read off the rendered size**, which is the point of this
+      // row. The finder used to be `w is CustomPaint && w.size ==
+      // const Size.square(11.0)`, which matched the painter's *declaration* — so
+      // the width assertion below was half a constant comparing itself, at the one
+      // place where a scaling failure would show up. A painted shape does not move
+      // under `TextScaler` at all, and that is the property witnessed here: 11
+      // stays 11 while the text around it grows.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc, textScale: scale);
 
       final Finder star = find
           .descendant(
             of: find.byType(SelahCard),
-            matching: find.byWidgetPredicate(
-              (Widget w) =>
-                  w is CustomPaint && w.size == const Size.square(11.0),
-            ),
+            matching: find.byType(FourPointedStar),
           )
           .first;
       final Size glyph = tester.getSize(star);
+      expect(
+        glyph,
+        const Size.square(11.0),
+        reason: '`:269` — `font-size: 11px`, and paint does not scale',
+      );
       expect(
         glyph.width,
         lessThan(SelahCard.diameter),

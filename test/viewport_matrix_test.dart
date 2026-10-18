@@ -1,5 +1,4 @@
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
@@ -14,7 +13,8 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/reading/presentation/widgets/scripture_block.dart';
+import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
+import 'package:evangelion/features/reading/presentation/widgets/verse_line.dart';
 import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
@@ -214,7 +214,9 @@ void main() {
           cubit: readingHarness().cubit,
           size: _currentSurface,
         ),
-        landmark: find.byType(ScriptureBlock),
+        // The verses are `VerseLine`s now — `ScriptureBlock` died with the
+        // redesigned reader (`eva/redesign.html:540-560` renders `.vline`s).
+        landmark: find.byType(VerseLine),
       ),
       (
         state: 'ready, Arabic — taller script and a longer caption',
@@ -226,7 +228,9 @@ void main() {
           locale: const Locale('ar'),
           size: _currentSurface,
         ),
-        landmark: find.byType(ScriptureBlock),
+        // The verses are `VerseLine`s now — `ScriptureBlock` died with the
+        // redesigned reader (`eva/redesign.html:540-560` renders `.vline`s).
+        landmark: find.byType(VerseLine),
       ),
       (
         state: 'the failed state, whose message is a sentence',
@@ -240,17 +244,20 @@ void main() {
         landmark: find.byType(ReadingPage),
       ),
       (
-        state: 'the `Aa` panel OPEN — a row of controls over the CTA',
-        pump: (WidgetTester tester) async {
-          await pumpReading(
-            tester,
-            cubit: readingHarness().cubit,
-            size: _currentSurface,
-          );
-          await tester.tap(find.byIcon(Icons.format_size));
-          await pumpReadingFrames(tester, 4);
-        },
-        landmark: find.byType(FontSizeStepper),
+        // **The `Aa` panel this row used to open is gone with the redesign.**
+        // `eva/redesign.html:550-551` writes the stepper as two `.pbtn`s — `A−`
+        // and `A+` — **always visible** in the pill, with no disclosure and no
+        // `format_size` icon anywhere in `:540-560`. So the state this row mounts
+        // is the pill at rest, which is the state the old row was a *preparation
+        // for*: the steppers, the dial and the inert `listen`, laid out across
+        // three viewports.
+        state: 'the pill at rest — two steppers, the dial, an inert listen',
+        pump: (WidgetTester tester) => pumpReading(
+          tester,
+          cubit: readingHarness().cubit,
+          size: _currentSurface,
+        ),
+        landmark: find.byType(ReadingPill),
       ),
     ]);
 
