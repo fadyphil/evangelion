@@ -37,10 +37,13 @@ import 'package:flutter/widgets.dart';
 /// to equal the English one (a defensible edit to `homeStreakLabel`, say).
 ///
 /// The locale is also the *better* source. `HomeStrings.isArabic` existed for
-/// exactly one caller — `TodayReadingPanel.retryFamilyFor`, whose **failed** state
-/// has no reading to read an arm from — and its own doc called the strings "the
-/// weaker source". The locale is not weaker; it is the fact the question actually
-/// asks.
+/// exactly one caller — the deleted `TodayReadingPanel.retryFamilyFor`, whose
+/// **failed** state had no reading to read an arm from — and its own doc called
+/// the strings "the weaker source". The locale is not weaker; it is the fact the
+/// question actually asks. Phase 5.2 deleted the panel and the caller is now
+/// `HomeStringsPhrases.retryLabelFamily` (`features/home/presentation/
+/// home_l10n.dart`), whose failed state has the same shape: a `Failure.message`
+/// carries no arm of its own.
 ///
 /// ## AND WHY THIS IS NOT `arabicAware`
 ///

@@ -2,62 +2,64 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/home_l10n.dart';
-import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
-import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/greeting_block.dart';
+import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
 import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
-import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/streak_chip.dart';
+import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// `/` — greeting, streak flame, today's-reading panel. `HomeScreen.tsx:11-79`
-/// minus the cut library.
+/// `/`, the sanctuary's threshold: a greeting, the day's verse, the last light, a
+/// minute of silence and the scrolls.
 ///
-/// ## THREE THINGS THE PROTOTYPE SHOWS THAT ARE **NOT** DATA, AND WHAT REPLACES THEM
+/// `redesign.html:513-538`. **Task 5.2 rebuilt this screen against that range**, and
+/// every number on it is a `redesign.html` line rather than the React prototype's
+/// `HomeScreen.tsx` the previous version transcribed.
 ///
-/// | prototype | shipped | why |
+/// ## THE PADDING IS FIVE NUMBERS AND FOUR GAPS, AND CSS'S MARGIN COLLAPSE IS WHY
+///
+/// The prototype's home is two elements: a `.greet` (`:514-517`) and a `.scroll`
+/// (`:518-537`) that owns the rest. Their paddings do not agree — `.greet` is
+/// `54px 20px 6px`, `.scroll` is `6px 14px 118px`, and every card inside the scroll
+/// carries its own `margin: … 14px …` — so the visible edges are **20** for the
+/// greeting and **28** for the cards, which is `14 + 14`.
+///
+/// The four gaps are the other half. CSS collapses adjacent vertical margins, and
+/// Flutter has no such rule, so the collapsed values are written here rather than
+/// summed:
+///
+/// | between | the two margins | collapsed |
 /// | --- | --- | --- |
-/// | `Miriam` at `HomeScreen.tsx:27` | `AuthSession.displayName` through the `AuthRepository` port | there is no user endpoint and the profile screen is cut, so the literal is the only "who is this" the prototype has |
-/// | `MK` at `ds.tsx:525` | `AuthSession.initials`, same route | same |
-/// | `12` at `ds.tsx:516` | `StreakSummary.currentStreak` | the live value is `0` |
+/// | greeting and the day's card | `.greet`'s 6 + `.scroll`'s 6 + `.hcard`'s 14 | **[kGreetToCardGap]** = 26 |
+/// | the two cards | `.hcard`'s 8 and the next `.hcard`'s 14 | **[kCardGap]** = 14 |
+/// | the last card and the selah card | 8 and 8 | **[kSelahGap]** = 8 |
+/// | the selah card and the label | `.selah`'s 8 and `.car-label`'s 20 | **[kLabelGap]** = 20 |
+/// | the label and the strip | `.car-label`'s 10 and `.carousel`'s 4 | **[kStripGap]** = 10 |
+/// | the strip and the bottom | `.carousel`'s 12 + `.scroll`'s 118 | **[kBottomClearance]** = 130 |
 ///
-/// None of the three may be a constant in this feature, and there are now **two**
-/// gates for it rather than one: `home_page_test.dart` asserts the **rendered** tree
-/// (`find.text('Miriam')` and `find.text('MK')` are `findsNothing`), and
-/// `home_strings_test.dart` walks `lib/features/home/` line by line refusing the two
-/// literals in **any** executable line.
+/// `home_geometry_test.dart` reads these back off the rendered tree and compares
+/// them against the CSS numbers it parses, which is what keeps the table above from
+/// being a table of intentions.
 ///
-/// **The second one exists because the first was not enough, and this paragraph
-/// used to claim the first was.** It said "none of the three may be a constant in
-/// this feature … assert that in the failing direction", which is true of the
-/// *rendered* value and silent about the *constant*: adding
-/// `const String kUnusedReaderName = 'Miriam';` to this file passed every test in the
-/// phase. A **private** unused constant is caught incidentally, by the analyzer's
-/// `unused_element`; a **public** one is caught by nothing, and one edit makes it
-/// live.
+/// ## AND THE DOCK IS **NOT** HERE YET
 ///
-/// ## THE VARIANT IS [NeuralVariant.home], UNCONDITIONALLY
-///
-/// `HomeScreen.tsx:15` is `<NeuralBackground variant={1} />` and there is one
-/// `HomeScreen.tsx` in `eva/src`. So the orbs are chosen by the route and the
-/// language chooses only text and direction — the same reading
-/// `LoginPage`'s doc gives for `/login`, and `NeuralScaffold`'s D2 note warns
-/// against re-deriving the variant from anything but the variant.
-///
-/// ## AND NOTHING HERE NAVIGATES ON ITS OWN ACCOUNT
-///
-/// The panel's two controls are handed `context.router.pushPath(AppRoutes.reading)`
-/// and `AppRoutes.quiz` from [HomePage], and `_HomeBody` supplies nothing else. The
-/// reading route is reachable from two controls, exactly as the prototype has two
-/// (`HomeScreen.tsx:39`'s panel `onClick` and `:71`'s primary button), and the quiz
-/// from one. §2's route table carries **no `:passageId`**, so there is no passage to
-/// name and `/reading` is always today's.
+/// `redesign.html:702-708` is a five-tab dock and it is Phase 6's, and this screen's
+/// own chrome in the meantime is [SealFab] — the same interim holder `/login`'s
+/// footer used in Task 5.1. It stays because its two destinations
+/// (`/settings`, `/leaderboard`) have no other entry point until Phase 6 builds the
+/// dock and Phase 5.6 builds the journey screen that the redesign reaches settings
+/// through. **The redesign draws no seal on `/` and this is the divergence**, recorded
+/// here rather than left for a reader to find by looking for a float that is not in
+/// the HTML.
 @RoutePage()
 class HomePage extends StatelessWidget {
   /// The home screen.
@@ -67,8 +69,8 @@ class HomePage extends StatelessWidget {
   ///
   /// `null` means "resolve [HomeBloc] from the locator", which is the production
   /// path — and the reason this page is not a `BlocProvider` of its own: the bloc
-  /// holds two repository results a retry has to be able to replace, so a page that
-  /// created one per mount would lose them on every rebuild.
+  /// holds five repository results a retry has to be able to replace, so a page
+  /// that created one per mount would lose them on every rebuild.
   ///
   /// A parameter rather than only a lookup because a widget test cannot reach the
   /// locator without configuring the whole graph. Same arrangement as `LoginPage`'s
@@ -76,37 +78,68 @@ class HomePage extends StatelessWidget {
   ///
   /// **Substitution, not initialisation.** A passed-in bloc is loaded exactly as the
   /// locator's is — `_HomeBody` dispatches `HomeStarted` unconditionally — so a test
-  /// does not have to remember an event before its first assertion. See `_HomeBody`'s
-  /// doc.
+  /// does not have to remember an event before its first assertion.
   final HomeBloc? bloc;
 
-  /// `NeuralScaffold`'s default gutter, restated because this screen is the one
-  /// that has to match `ds.tsx:504`'s `padding: '20px 20px 0'` and `HomeScreen.tsx`'s
-  /// own `'20px 20px 0'` top bar.
-  static const EdgeInsets scaffoldPadding = EdgeInsets.symmetric(
-    horizontal: EvaSpacing.screenHorizontal,
-  );
+  /// `.greet`'s horizontal padding. `redesign.html:235` — `padding: 54px 20px 6px`.
+  static const double kGreetGutter = 20;
 
-  /// The gap between the bar and the greeting. `HomeScreen.tsx:27`'s
-  /// `marginBottom: 24` is the **greeting block's** own gap; the prototype's top bar
-  /// carries `padding: '20px 20px 0'` and nothing below it, so the gap under it is
-  /// this screen's decision and it is the same 24.
-  static const double topGap = EvaSpacing.xxl;
+  /// `.greet`'s top padding. `redesign.html:235` — `54px`, and it is measured from
+  /// the top of the screen: the prototype's frame is a bare `.screen` with no
+  /// status bar, so `NeuralScaffold`'s `SafeArea` is where a real device's inset
+  /// belongs and the 54 sits inside it.
+  static const double kGreetTop = 54;
 
-  /// The gap between the greeting block and the panel. `HomeScreen.tsx:63` gives the
-  /// panel `marginBottom: 28`; nothing states the gap above it, so it is the
-  /// scale's own `xxxl + xs` step rather than a transcribed number.
-  static const double panelGap = EvaSpacing.xxl + EvaSpacing.xs;
+  /// `.greet`'s bottom padding. `redesign.html:235` — `6px`. See
+  /// [kGreetToCardGap] for what it adds up to.
+  static const double kGreetBottom = 6;
 
-  /// The clearance below the panel.
+  /// `.scroll`'s horizontal padding. `redesign.html:157` — `6px 14px 118px`.
+  static const double kScrollGutter = 14;
+
+  /// `.scroll`'s top padding. `redesign.html:157` — `6px`.
+  static const double kScrollTop = 6;
+
+  /// The gap between the greeting and the day's card. See the class doc's table.
+  static const double kGreetToCardGap = kGreetBottom + kScrollTop + 14;
+
+  /// **The horizontal** half of `.hcard`'s and `.selah`'s own `margin … 14px`.
   ///
-  /// `HomeScreen.tsx:83` gives the root `paddingBottom: 100`, which is the
-  /// prototype's clearance for its `SealFAB` — and **`SealFAB` is cut** with the
-  /// profile screen (§2, decision 1). So 100 is not transcribed; the value is one
-  /// `EvaSpacing.huge`, which §5.3 defines as "above a page's first element, and
-  /// between major sections", and which is also the amount that keeps the last
-  /// control clear of the home indicator on a short screen.
-  static const double bottomSpacer = EvaSpacing.huge;
+  /// A separate constant from [kCardGap] because the same `14` appears twice in the
+  /// prototype's CSS and means two different things: vertically it is a margin that
+  /// collapses against its neighbour, horizontally it is an inset with nothing to
+  /// collapse against. `redesign.html:249` and `:261` both write `14px` in the
+  /// horizontal slot, and the visible consequence is that the cards sit at **28**
+  /// from the screen edge while the greeting sits at 20.
+  ///
+  /// **This was missing in the first version of the page**, which put every card at
+  /// the scroll's own 14 and made the whole block 14px wider than the prototype.
+  /// `home_geometry_test.dart` is the row that caught it: it reads the greeting at
+  /// 20 and the card at 28 and one of them was wrong.
+  static const double kCardGutter = 14;
+
+  /// The gap between the two cards, and between a card and the selah card's own
+  /// `14px` top margin. See the class doc's table.
+  static const double kCardGap = 14;
+
+  /// The gap between the last-light card and the selah card. See the class doc.
+  static const double kSelahGap = 8;
+
+  /// The gap between the selah card and the carousel's label row. See the class
+  /// doc.
+  static const double kLabelGap = 20;
+
+  /// The gap between the label row and the strip of cards. See the class doc.
+  static const double kStripGap = 10;
+
+  /// What is under the strip: `.carousel`'s own `12px` (`:273`) and `.scroll`'s
+  /// `118px` (`:157`), which is the prototype's clearance for its dock — a dock this
+  /// client does not have yet.
+  ///
+  /// **Kept whole rather than re-derived for a dock that does not exist.** Phase 6
+  /// replaces it with the dock's own height, and a number that is already in the
+  /// design is cheaper to swap than to justify now.
+  static const double kBottomClearance = 130;
 
   @override
   Widget build(BuildContext context) {
@@ -118,15 +151,17 @@ class HomePage extends StatelessWidget {
 
     return NeuralScaffold(
       variant: NeuralVariant.home,
-      // `HomeScreen.tsx:14` — `overflowY: 'auto'` on the **root**. The three screens
-      // that do not scroll own their own scrollables; this is not one of them.
+      // `redesign.html:518` — `.scroll{overflow-y: auto}` on the whole section.
       scrollable: true,
-      padding: scaffoldPadding,
-      // `ds.tsx:100` puts `SealFAB` on this screen and nowhere else, in the scaffold's
-      // own overlay layer so it does not scroll with the passage. Its menu is Settings,
-      // Language and **Leaderboard** — the prototype's Profile slot, which was cut for
-      // want of an endpoint and is asserted absent by `seal_fab_test.dart` so it cannot
-      // creep back as a duplicate of another control's job.
+      // **`EdgeInsets.zero`, and this is the load-bearing decision on this screen.**
+      // The redesign's home has no single gutter: the greeting is at 20 and the
+      // cards at 28 (`:235` against `:157` + `:249`), so a scaffold padding would be
+      // a number one of them disagrees with. The two paddings are therefore applied
+      // where the prototype writes them — [kGreetGutter] on the greeting and
+      // [kScrollGutter] on the column below it.
+      padding: EdgeInsets.zero,
+      // Interim chrome — see the class doc. Settings and the board have no other
+      // entry point until Phase 6's dock.
       overlay: SealFab(
         items: <SealFabItem>[
           SealFabItem(
@@ -134,11 +169,10 @@ class HomePage extends StatelessWidget {
             onTap: () => context.router.pushPath(AppRoutes.settings),
           ),
           SealFabItem(
-            // **Why this item exists at all.** The dial's other two destinations were
-            // already one tap away — Settings is the avatar's job and Language is a row
-            // inside `/settings`. Leaderboard is the only one of the four that had no
-            // other entry point on `/`, and without it this control is two duplicates
-            // and one dead route, which is why it was cut in the first place.
+            // **Why this item exists at all.** The dial's other destination — Settings
+            // — has no other entry point either, and Phase 5.5 renames the board to
+            // `/communion`. Kept until then, with `seal_fab_test.dart` asserting
+            // Profile stays absent so a dead route cannot creep back.
             label: context.l10n.sealFabLeaderboard,
             onTap: () => context.router.pushPath(AppRoutes.leaderboard),
           ),
@@ -152,11 +186,11 @@ class HomePage extends StatelessWidget {
   }
 }
 
-/// Everything below the scaffold: the bar, the greeting, and the panel.
+/// Everything below the scaffold: the greeting and the four sections of the scroll.
 ///
 /// A [StatefulWidget] rather than a [StatelessWidget] for one reason: `HomeStarted`
 /// must fire **once**, on entry. `HomePage.build` runs on every rebuild, and a
-/// `getIt<HomeBloc>()..add(HomeStarted(...))` there would re-issue both requests
+/// `getIt<HomeBloc>()..add(HomeStarted(...))` there would re-issue all five requests
 /// each time the state changed, which is to say on every answer.
 ///
 /// ## AND IT FIRES FOR A **PASSED-IN** BLOC TOO
@@ -168,7 +202,7 @@ class HomePage extends StatelessWidget {
 /// reasons:
 ///
 /// * a widget test then has to dispatch the event itself before every assertion,
-///   which is a suite that can forget. This one did: the first run of
+///   which is a suite that can forget — and this one did: the first run of
 ///   `home_page_test.dart` found nothing on screen in **eight** tests, because
 ///   `pumpHome` passed a bloc and no event was ever sent;
 /// * the page then behaves **differently** depending on where its bloc came from,
@@ -180,20 +214,20 @@ class HomePage extends StatelessWidget {
 /// ## AND IT RE-LOADS ON **RE-ENTRY**, WHICH IS NOT A REBUILD
 ///
 /// The first version carried `bool _started`, set once per `State` and never reset.
-/// Measured with the real router — land on `/`, tap Continue → `/reading`, `pop` →
-/// back on `/` — nothing re-fetched: `readings=1 streaks=1` on entry *and* after
-/// returning. `HomePage`'s element is retained under the pushed route, so
+/// Measured with the real router — land on `/`, open a reading → `/reading`, `pop` →
+/// back on `/` — nothing re-fetched: the readings were fetched once on entry *and*
+/// once after returning. `HomePage`'s element is retained under the pushed route, so
 /// `_HomeBodyState` survives the push and comes back unchanged.
 ///
 /// Two consequences, both real:
 ///
-/// * the reader finishes a reflection on `/quiz`, comes back, and the flame and the
-///   panel still show first-landing values. There is no pull-to-refresh and no other
+/// * the reader finishes a reflection on `/quiz`, comes back, and the chip and the
+///   cards still show first-landing values. There is no pull-to-refresh and no other
 ///   invalidation on `/`, so this was the whole refresh story;
 /// * `_onStarted` opens with `emit(state.withGreetingPeriod(…))`, which copies
-///   `readerName`, `readerInitials`, `reading` and `streak` verbatim — so on any
-///   second `HomeStarted` the first frames rendered the **previous** session's name
-///   and reading while the new request was in flight.
+///   every section verbatim — so on any second `HomeStarted` the first frames
+///   rendered the **previous** session's name and the previous day's reading while
+///   the new request was in flight.
 ///
 /// The trigger is [AutoRouteAware]'s [didPopNext], and the wiring it needed was
 /// **missing from the router**: `RootStackRouter.config()`'s default
@@ -217,7 +251,7 @@ class HomePage extends StatelessWidget {
 /// ### AND `_requested`, NOT `_started`
 ///
 /// The flag was a `bool`, and a `bool` cannot say *which* arm of the corpus was
-/// asked for. `didChangeDependencies` also fires on a **locale** change — Phase 9
+/// asked for. `didChangeDependencies` also fires on a **locale** change — Phase 7
 /// owns the real switch, and with a `bool` a locale change would leave `/` showing
 /// the other arm's scripture with nothing re-fetched. Comparing the language rather
 /// than a boolean fixes the second trigger in the same place, and
@@ -264,7 +298,7 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   /// and a language change are one branch, and an uncovered route is the other.
   ///
   /// Guarded on [_requested] and not on a `bool` for the reason its own doc gives:
-  /// `didChangeDependencies` may run many times, and re-issuing both requests on
+  /// `didChangeDependencies` may run many times, and re-issuing all five requests on
   /// every `MediaQuery` change would be the same defect as dispatching from `build`.
   @override
   void didChangeDependencies() {
@@ -335,9 +369,9 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   //
   // | callback | what it means | why it is empty here |
   // | --- | --- | --- |
-  // | `didPush` / `didPushNext` | `/` arrived, then was covered | arriving is `didChangeDependencies`' job and covering is not an event this screen reacts to |
+  // | `didPush` / `didPushNext` | `/` arrived, then was covered | arriving is `didChangeDependencies`'s job and covering is not an event this screen reacts to |
   // | `didPop` | *this* route was popped off | the page is going away; [dispose] runs and the subscription is dropped |
-  // | `didInitTabRoute` / `didChangeTabRoute` | a tab router changed tab | there is no `AutoTabsRouter` in the six routes |
+  // | `didInitTabRoute` / `didChangeTabRoute` | a tab router changed tab | there is no `AutoTabsRouter` in the seven routes |
   //
   // Written out rather than left unimplemented, because an unimplemented one is a
   // compile error today and a silent no-op the moment auto_route gives it a body —
@@ -363,242 +397,98 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
 
-    // §3 keeps `core/domain/` Flutter-free, so the `Locale` → `ReadingLanguage`
-    // conversion happens **here**, at the one edge where a `Locale` exists — see
-    // `_language` above and `reading_language.dart` for why the enum and not the
-    // `Locale`. It rides on the events rather than the bloc, because a bloc
-    // registered once for the process would freeze the language at launch.
-    final ReadingLanguage language = _language;
-
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (BuildContext context, HomeState state) {
+        final HomeBloc bloc = context.read<HomeBloc>();
+        final ReadingLanguage language = _language;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            AppTopBar(
-              wordmark: strings.homeWordmark,
-              streakDays: state.streak?.currentStreak,
-              streakSemanticLabel: strings.homeStreakLabel,
-              streakFailureMessage: state.streakFailure?.message,
-              onRetryStreak: () =>
-                  context.read<HomeBloc>().add(HomeRetried(language)),
-              initials: state.readerInitials ?? '',
-              avatarSemanticLabel: state.readerName ?? strings.homeAvatarLabel,
-              avatarUnavailableReason: strings.homeUnavailableSuffix,
-              // **Live since Phase 9.** It was `null` for four phases, with
-              // [AppTopBar.onAvatarTap]'s doc saying "When a profile route exists the
-              // fix is one argument here and nothing else changes" — and Phase 9 is
-              // what made a destination exist, `/settings`, without re-litigating
-              // decision 1's cut of the profile screen.
-              //
-              // So the avatar is the **only** entry point to `/settings` on `/`, which
-              // is why `app_top_bar_test.dart`'s header had to be rewritten: it said
-              // "`/` passes `onAvatarTap: null` and so can only ever render the
-              // **disabled** avatar", which was true when written and is false now.
-              onAvatarTap: () => context.router.pushPath(AppRoutes.settings),
-            ),
-            const SizedBox(height: HomePage.topGap),
             if (state.greetingPeriod case final GreetingPeriod period)
-              _Greeting(
-                period: period,
-                name: state.readerName,
-                strings: strings,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  HomePage.kGreetGutter,
+                  HomePage.kGreetTop,
+                  HomePage.kGreetGutter,
+                  HomePage.kGreetBottom,
+                ),
+                child: GreetingBlock(
+                  period: period,
+                  name: state.readerName,
+                  chip: StreakChip(
+                    days: state.streak?.currentStreak,
+                    semanticLabel: strings.homeStreakLabel,
+                    daysLabel: strings.homeDays,
+                    failureMessage: state.streakFailure?.message,
+                    onRetry: () => bloc.add(HomeRetried(language)),
+                  ),
+                ),
               ),
-            _StreakSubtitle(streak: state.streak, strings: strings),
-            const SizedBox(height: HomePage.panelGap),
-            TodayReadingPanel(
-              reading: state.reading,
-              failure: state.readingFailure?.message,
-              strings: strings,
-              onRetry: () =>
-                  context.read<HomeBloc>().add(HomeRetried(language)),
-              onOpenReading: () => context.router.pushPath(AppRoutes.reading),
-              onStartReflection: () => context.router.pushPath(AppRoutes.quiz),
+            // `.scroll` — `:518`. Its own top padding, and its own horizontal
+            // gutter, which is 14 rather than the greeting's 20.
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: HomePage.kScrollGutter,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const SizedBox(height: HomePage.kScrollTop),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: HomePage.kCardGutter,
+                    ),
+                    child: VerseOfTheDayCard(
+                      reading: state.reading,
+                      failureMessage: state.readingFailure?.message,
+                      retryLabel: strings.homeRetry,
+                      onRetry: () => bloc.add(HomeRetried(language)),
+                      onOpen: () => context.router.pushPath(AppRoutes.reading),
+                    ),
+                  ),
+                  const SizedBox(height: HomePage.kCardGap),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: HomePage.kCardGutter,
+                    ),
+                    child: LastLightCard(
+                      entry: state.lastLight,
+                      failureMessage: state.lastLightFailure?.message,
+                      retryLabel: strings.homeRetry,
+                      onRetry: () => bloc.add(HomeRetried(language)),
+                      onOpen: () => context.router.pushPath(AppRoutes.reading),
+                    ),
+                  ),
+                  const SizedBox(height: HomePage.kSelahGap),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: HomePage.kCardGutter,
+                    ),
+                    child: SelahCard(
+                      seconds: SelahCard.defaultSeconds,
+                      unavailableReason: strings.homeUnavailableSuffix,
+                    ),
+                  ),
+                  const SizedBox(height: HomePage.kLabelGap),
+                  // The label row carries `.car-label`'s own `10px` bottom margin
+                  // inside it (`LibraryCarousel.labelBottomGap`), so the strip
+                  // follows it directly and [kStripGap] is the strip's own `4px`
+                  // plus that 10 — collapsed, per the class doc's table.
+                  LibraryCarousel(
+                    books: state.catalogue ?? const <LibraryBook>[],
+                    unavailableReason: strings.homeUnavailableSuffix,
+                    failureMessage: state.catalogueFailure?.message,
+                    retryLabel: strings.homeRetry,
+                    onRetry: () => bloc.add(HomeRetried(language)),
+                  ),
+                  const SizedBox(height: HomePage.kBottomClearance),
+                ],
+              ),
             ),
-            const SizedBox(height: HomePage.panelGap),
-            // ## AND THIS WAS MISSING FOR A WHOLE PHASE
-            //
-            // `LeaderboardCard` shipped in `5f53eb5` with its own suite, its own
-            // overflow matrix and a DI seam — and **nothing rendered it**. `HomeBloc`
-            // fetched the preview, `HomeState.leaderboard` held it, and the screen
-            // dropped it. Every gate was green: a widget no page instantiates is
-            // tested perfectly well by tests that instantiate it directly.
-            //
-            // Placed **below** the reading rather than above it, and that is a product
-            // decision rather than a layout one: today's reading is what the reader
-            // came to do, and a rank is a reward glance you take afterwards. Above, it
-            // would push the reading panel toward the fold on a 320×568 screen — the
-            // smallest surface this app supports.
-            //
-            // `panelGap` is the gap the panel already has above it, reused rather than
-            // inventing a second number for the same visual relationship.
-            LeaderboardCard(
-              status: state.leaderboardStatus,
-              board: state.leaderboard,
-              failure: state.leaderboardFailure,
-              onOpen: () => context.router.pushPath(AppRoutes.leaderboard),
-              onRetry: () =>
-                  context.read<HomeBloc>().add(HomeRetried(language)),
-            ),
-            const SizedBox(height: HomePage.bottomSpacer),
           ],
         );
       },
-    );
-  }
-}
-
-/// `Good evening, ` + the name in ember, and the streak sentence under it.
-///
-/// `HomeScreen.tsx:25-31`. The greeting is two spans — `T.ink` for the lead-in and
-/// `ember` with a `0 0 24px` glow for the name — so it is one `Text.rich` with two
-/// `TextSpan`s rather than two widgets, because two widgets would wrap
-/// independently and put the name on its own line at 320px.
-class _Greeting extends StatelessWidget {
-  const _Greeting({
-    required this.period,
-    required this.name,
-    required this.strings,
-  });
-
-  final GreetingPeriod period;
-  final String? name;
-  final AppLocalizations strings;
-
-  @override
-  Widget build(BuildContext context) {
-    final EvaColors colors = context.colors;
-    final String? reader = name;
-    final String lead = strings.greetingLead(period, hasName: reader != null);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text.rich(
-          TextSpan(
-            children: <InlineSpan>[
-              TextSpan(
-                text: lead,
-                style: TextStyle(color: colors.ink),
-              ),
-              if (reader != null)
-                TextSpan(
-                  text: reader,
-                  style: TextStyle(
-                    // `emberInk`, not `ember` — decision 153. This is the
-                    // reader's own name, and light `ember` measures 2.05:1 here.
-                    color: colors.emberInk,
-                    // `HomeScreen.tsx:27` —
-                    // `textShadow: 0 0 24px rgba(ember, 0.5)`.
-                    shadows: <Shadow>[
-                      Shadow(
-                        color: colors.ember.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          // `HomeScreen.tsx:26` — `F.display 30 / 600 / lineHeight 1.1`.
-          // `headlineMedium` is 28sp and is what `EmptyState.titleStyle` already
-          // chose for this design system against the same requirement; see that
-          // method's doc for the 1.22×/320px arithmetic.
-          //
-          // **Swapped for the ambient arm at the ROOT, not on the two spans.** The
-          // lead-in and the name carry `TextStyle(color: …)` and nothing else, so the
-          // engine resolves their family by *merging* them over this span's style —
-          // wrapping this one line fixes both runs and cannot leave one of them out.
-          // Done per span instead it would have been two `arabicAware` calls whose
-          // outputs must agree, and the third instance in this repository of two
-          // copies of one rule is what recorded decision 69 is about.
-          style:
-              arabicAware(
-                Theme.of(context).textTheme.headlineMedium!,
-                Directionality.of(context),
-              ).copyWith(
-                fontWeight: FontWeight.w600,
-                height: 1.1,
-                letterSpacing: -0.01,
-              ),
-        ),
-        const SizedBox(height: EvaSpacing.sm + 2),
-      ],
-    );
-  }
-}
-
-/// `HomeScreen.tsx:30` — "Your streak is glowing. Keep it alive."
-///
-/// **Conditional on the streak's *text*, and never conditional on its existence**,
-/// and the distinction is the whole of this widget. The condition is the measured
-/// one: the live payload has `streak/summary.current_streak == 0`, so the
-/// prototype's unconditional literal would tell a reader their streak is glowing
-/// while the flame beside it reads `0`. See `AppLocalizations.homeStreakResting` for the
-/// alternative that was rejected.
-///
-/// ## WHY THE ROW IS RESERVED WHEN THERE IS NO STREAK
-///
-/// The first version gated the whole row on `if (state.streak case …)`, so the
-/// subtitle **vanished** while the streak was loading and again when the streak
-/// failed — and `EvaSpacing.xxl` of the greeting's own gap went with it, so the
-/// panel jumped up by a line mid-screen. That is precisely what
-/// `TodayReadingPanel`'s `_FailedOrLoading.placeholderHeight` exists to prevent,
-/// declared 140 lines away: "a panel that grows from one line to nine is the layout
-/// moving."
-///
-/// The fix is **an empty [Text] in the same style, not a `SizedBox`**. Measured
-/// rather than reasoned about, because the whole question is whether an empty
-/// paragraph reserves its line: `Text('')` at `bodyMedium` is **20.0 tall and 0.0
-/// wide** — exactly one line — while `Text('Resting')` is also 20.0. So one
-/// `Text` covers all three states and the geometry cannot drift from the text's.
-///
-/// **A `SizedBox` would have been wrong in a way that shows up late**: its height
-/// would be a second copy of `fontSize × height`, and it would not move when the
-/// reader's text scale did. The empty `Text` moves because it is the text.
-///
-/// ## NOT A MESSAGE, AND WHY
-///
-/// The failed arm renders nothing rather than "streak unavailable". A sentence here
-/// would be invented copy for a state the prototype never designed — the same
-/// refusal as `_Beads`'s `noQuestionsToday` earns by *having* a string, and the
-/// same refusal as `StreakFlameRow`'s three arms, where the streak's own failure is
-/// an icon control named by `Failure.message` because a sentence does not belong in
-/// a top bar. The gap is covered; the silence is not.
-class _StreakSubtitle extends StatelessWidget {
-  const _StreakSubtitle({required this.streak, required this.strings});
-
-  /// The streak, or `null` while it is loading or failed.
-  final StreakSummary? streak;
-
-  final AppLocalizations strings;
-
-  @override
-  Widget build(BuildContext context) {
-    final StreakSummary? summary = streak;
-
-    return Padding(
-      // The greeting block's own gap is `marginBottom: 24` on the *block*, so the
-      // subtitle sits inside it and this row is separated from the panel by
-      // `HomePage.panelGap` instead. See `HomePage`'s gap constants.
-      padding: const EdgeInsets.only(bottom: EvaSpacing.xxl),
-      child: Text(
-        // Empty, not absent — see the class doc's measurement.
-        summary == null
-            ? ''
-            : summary.currentStreak > 0
-            ? strings.homeStreakGlowing
-            : strings.homeStreakResting,
-        // `HomeScreen.tsx:30` — `F.ui 14 / 400 / ink2 / marginTop 6`.
-        //
-        // Swapped for the ambient arm: on the Arabic arm this run is
-        // `ابدأ سلسلة اليوم. يكفي قراءة واحدة.` and `bodyMedium` is DM Sans, which
-        // carries no Arabic glyph at all.
-        style: arabicAware(
-          Theme.of(context).textTheme.bodyMedium!,
-          Directionality.of(context),
-        ).copyWith(color: context.colors.ink2),
-      ),
     );
   }
 }

@@ -26,9 +26,13 @@ import '../../features/auth/data/datasources/auth_local_data_source.dart'
 import '../../features/auth/domain/usecases/get_current_session.dart' as _i606;
 import '../../features/auth/domain/usecases/sign_in.dart' as _i920;
 import '../../features/auth/domain/usecases/sign_out.dart' as _i568;
+import '../../features/home/data/datasources/library_catalogue_local_data_source.dart'
+    as _i76;
+import '../../features/home/domain/library_catalogue_repository.dart' as _i56;
 import '../../features/home/domain/usecases/get_reader_session.dart' as _i806;
-import '../../features/home/domain/usecases/load_leaderboard_preview.dart'
-    as _i611;
+import '../../features/home/domain/usecases/load_last_light.dart' as _i257;
+import '../../features/home/domain/usecases/load_library_catalogue.dart'
+    as _i151;
 import '../../features/home/domain/usecases/load_streak_summary.dart' as _i605;
 import '../../features/home/domain/usecases/load_today_reading.dart' as _i1067;
 import '../../features/leaderboard/domain/usecases/load_leaderboard.dart'
@@ -41,6 +45,8 @@ import '../../features/reading/data/datasources/reading_remote_data_source.dart'
     as _i48;
 import '../../features/reading/data/datasources/streak_remote_data_source.dart'
     as _i692;
+import '../../features/reading/data/mappers/streak_history_mapper.dart'
+    as _i301;
 import '../../features/reading/data/mappers/streak_summary_mapper.dart'
     as _i460;
 import '../../features/reading/data/mappers/submit_result_mapper.dart' as _i840;
@@ -93,6 +99,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i460.StreakSummaryMapper>(
       () => homeModule.streakSummaryMapper,
     );
+    gh.lazySingleton<_i301.StreakHistoryMapper>(
+      () => homeModule.streakHistoryMapper,
+    );
     gh.lazySingleton<_i840.SubmitResultMapper>(
       () => homeModule.submitResultMapper,
     );
@@ -100,11 +109,21 @@ extension GetItInjectableX on _i174.GetIt {
       () => homeModule.readingRepository,
     );
     gh.lazySingleton<_i682.StreakRepository>(() => homeModule.streakRepository);
+    gh.lazySingleton<_i76.LibraryCatalogueLocalDataSource>(
+      () => homeModule.libraryCatalogueLocalDataSource,
+    );
+    gh.lazySingleton<_i56.LibraryCatalogueRepository>(
+      () => homeModule.libraryCatalogueRepository,
+    );
     gh.lazySingleton<_i1067.LoadTodayReading>(
       () => homeModule.loadTodayReading,
     );
     gh.lazySingleton<_i605.LoadStreakSummary>(
       () => homeModule.loadStreakSummary,
+    );
+    gh.lazySingleton<_i257.LoadLastLight>(() => homeModule.loadLastLight);
+    gh.lazySingleton<_i151.LoadLibraryCatalogue>(
+      () => homeModule.loadLibraryCatalogue,
     );
     gh.lazySingleton<_i806.GetReaderSession>(() => homeModule.getReaderSession);
     gh.lazySingleton<_i307.LeaderboardRepository>(
@@ -112,9 +131,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i964.LoadLeaderboard>(
       () => leaderboardModule.loadLeaderboard,
-    );
-    gh.lazySingleton<_i611.LoadLeaderboardPreview>(
-      () => leaderboardModule.loadLeaderboardPreview,
     );
     gh.lazySingleton<_i521.StartSession>(() => quizModule.startSession);
     gh.lazySingleton<_i788.RefreshSessionQuestions>(

@@ -1,54 +1,77 @@
-/// `/`'s state, and the three questions it asks.
+/// `/`'s state, and the five questions it asks.
 ///
-/// ## WHY TWO SECTION STATUSES AND NOT ONE
+/// ## WHY FOUR SECTION STATUSES AND NOT ONE
 ///
-/// `/` asks three things: who is signed in, what is today's reading, and how long
-/// is the streak. The last two come from **two endpoints that disagree with each
-/// other** — AGENT_CONTEXT §5's measured inconsistency, where
-/// `streak/summary.current_streak` is `0` while `readings/today/*.current_streak`
-/// is `4`, and `today_completed` is `false` while `is_fully_completed` is `true`.
+/// `/` asks four things: what is today's reading, how long is the streak, where
+/// the light last was, and what the library holds. Three of those come from **three
+/// endpoints that fail independently** — AGENT_CONTEXT §5's measured
+/// inconsistency, where `streak/summary.current_streak` is `0` while
+/// `readings/today/*.current_streak` is `4`, and `today_completed` is `false`
+/// while `is_fully_completed` is `true` — and ADR-0022's fiction table makes the
+/// fourth a local list with no endpoint at all.
 ///
-/// A single `isLoading` would have to collapse those two into one word, and any
-/// word it picked would be a reconciliation — the answer §9's `StreakSummary` doc
-/// rules out. So [readingStatus] and [streakStatus] are independent, and a failure
-/// in one leaves the other's data on screen. That is not a nicety: it is the
-/// requirement Phase 6 names — "a failed **reading** fetch renders `ErrorView`
-/// with a working retry **while the streak flame still renders** — not a blank
-/// panel, and not a whole-screen error."
+/// A single `isLoading` would have to collapse those into one word, and any word it
+/// picked would be a reconciliation — the answer §9's `StreakSummary` doc rules
+/// out. So [readingStatus], [streakStatus], [lastLightStatus] and
+/// [catalogueStatus] are independent, and a failure in one leaves the others on
+/// screen. That is not a nicety: it is the requirement Phase 6 names — "a failed
+/// **reading** fetch renders `ErrorView` with a working retry **while the streak
+/// chip still renders** — not a blank panel, and not a whole-screen error."
+///
+/// ## AND WHY THE STREAK IS **TWO** SECTIONS
+///
+/// Because `/streak/summary` and `/streak` are two requests
+/// (`streak.routes.ts:1-9` and `:163-172`) with different costs — the second runs
+/// a subquery per scheduled day — and a chip that shows a number must not wait for
+/// thirty rows to fail. The class doc above used to say "the flame"; the redesign
+/// moved that number into the streak chip (`redesign.html:516`) and gave the
+/// screen a **last-light card** (`:524`) that the same port's `history[0]` feeds
+/// (`ADR-0022`, fiction table). Two endpoints, two statuses, and the two are
+/// allowed to disagree — which is the same rule as ever, with one more subject.
 ///
 /// ## WHY THE SESSION IS A STATUS WITH NO ERROR SURFACE
 ///
-/// It is a third status because it is a third answer, and it is `ready` on both
+/// It is a fifth status because it is a fifth answer, and it is `ready` on both
 /// arms. `AuthRepository.getCurrentSession` answering `Failure` is **unreachable
 /// in production**: `/` is behind `AuthGuard`, which reads `AuthStatus`, which
 /// reads `AuthBloc.state` — the same repository. So the failure arm produces **no
 /// name** and no message, and the greeting falls back to the prototype's
-/// `…evening.` split. `AuthBloc._onSignedOut` takes the same position on the same
-/// reasoning.
+/// `peace,` line without a name. `AuthBloc._onSignedOut` takes the same position
+/// on the same reasoning.
 ///
 /// The status still exists, because the branch is real code and a reader with no
 /// session deserves the same greeting layout as a reader with one — just without a
 /// name. `readerName` being `null` is what the widget reads.
+///
+/// ## AND WHY THE LIBRARY'S FAILURE ARM IS ALSO UNREACHABLE, AND ALSO KEPT
+///
+/// `LibraryCatalogueRepositoryImpl` returns a literal list, so `catalogueFailed`
+/// cannot happen in production either — decision 26's shape exactly, and the same
+/// answer: the branch is real code the port promises (`Result.left` is how a
+/// books endpoint will report an outage), so it is written, tested from a fake,
+/// and labelled rather than inferred.
 ///
 /// ## NOTHING IS NULLABLE-THEN-CLEARED
 ///
 /// [AuthState]'s doc records the hazard this shape avoids: a `String? = null`
 /// parameter cannot express "clear it", so a field that must be cleared is written
 /// by exactly one writer that builds the whole state. Every transition here goes
-/// through one of the five writers on [HomeState], each of which rebuilds the
+/// through one of the six writers on [HomeState], each of which rebuilds the
 /// entire state, so no nullable field is ever "left alone" by accident.
 library;
 
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
-import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
+import 'package:evangelion/features/home/domain/usecases/load_last_light.dart';
+import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -66,11 +89,11 @@ enum HomeSectionStatus {
   /// The request is open. Nothing is on screen for this section.
   loading,
 
-  /// An answer is in hand. [HomeState.reading] / [HomeState.streak] is non-null.
+  /// An answer is in hand. The section's data field is non-null.
   ready,
 
-  /// The request failed. [HomeState.readingFailure] / [HomeState.streakFailure]
-  /// is non-null and the retry control is live.
+  /// The request failed. The section's `…Failure` field is non-null and the retry
+  /// control is live.
   failed,
 }
 
@@ -106,9 +129,10 @@ sealed class HomeEvent with _$HomeEvent {
 ///
 /// **The memory half of the re-entry work.** `HomeBloc` is a process-wide
 /// `registerSingleton` (`navigation_injection.dart`), so between sign-out and
-/// process death it holds `readerName`, `readerInitials`, `reading` and `streak`
-/// for a reader who no longer has a session — and nothing cleared them, because
-/// `AuthBloc._onSignedOut` touches only `AuthBloc` and **may not** name this event:
+/// process death it holds `readerName`, `readerInitials`, `reading`, `streak`,
+/// `lastLight` and `catalogue` for a reader who no longer has a session — and
+/// nothing cleared them, because `AuthBloc._onSignedOut` touches only `AuthBloc`
+/// and **may not** name this event:
 /// `AuthBloc` lives in `features/auth` and importing `features/home` from there is
 /// Gate 2. So the dispatcher is `configureNavigation()`, which already builds both
 /// blocs and is the one place allowed to know about both.
@@ -126,8 +150,9 @@ final class HomeCleared extends HomeEvent with _$HomeCleared {
 
 /// The screen is opening. Dispatched once, from `_HomeBody`'s `initState`.
 ///
-/// Loads the greeting, the reader, the reading and the streak — in that order of
-/// *emission*, with all three requests in flight at once.
+/// Loads the greeting, the reader, the reading, the streak, the last light and the
+/// library — in that order of *emission*, with all five requests in flight at
+/// once.
 @freezed
 final class HomeStarted extends HomeEvent with _$HomeStarted {
   /// Creates the start-up request for [language].
@@ -188,14 +213,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc({
     required LoadTodayReading loadTodayReading,
     required LoadStreakSummary loadStreakSummary,
+    required LoadLastLight loadLastLight,
+    required LoadLibraryCatalogue loadLibraryCatalogue,
     required GetReaderSession getReaderSession,
-    required LoadLeaderboardPreview loadLeaderboardPreview,
     DateTime Function()? now,
   }) : this._(
          loadTodayReading,
          loadStreakSummary,
+         loadLastLight,
+         loadLibraryCatalogue,
          getReaderSession,
-         loadLeaderboardPreview,
          now ?? DateTime.now,
        );
 
@@ -203,8 +230,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   HomeBloc._(
     this._loadTodayReading,
     this._loadStreakSummary,
+    this._loadLastLight,
+    this._loadLibraryCatalogue,
     this._getReaderSession,
-    this._loadLeaderboardPreview,
     this._now,
   ) : super(const HomeState()) {
     on<HomeStarted>(_onStarted);
@@ -214,16 +242,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   final LoadTodayReading _loadTodayReading;
   final LoadStreakSummary _loadStreakSummary;
+  final LoadLastLight _loadLastLight;
+  final LoadLibraryCatalogue _loadLibraryCatalogue;
   final GetReaderSession _getReaderSession;
-  final LoadLeaderboardPreview _loadLeaderboardPreview;
   final DateTime Function() _now;
 
   /// Loads everything, and emits each answer as it lands.
   ///
-  /// ## THE THREE REQUESTS ARE **IN FLIGHT TOGETHER**
+  /// ## THE FIVE REQUESTS ARE **IN FLIGHT TOGETHER**
   ///
   /// The first version awaited them in sequence, which made the flame wait for
-  /// the reading's round trip. Starting all three first and then awaiting in a
+  /// the reading's round trip. Starting all five first and then awaiting in a
   /// fixed order gets both properties: no request waits for another to be
   /// *started*, and the emission order is deterministic — which is what lets
   /// `bloc_test`'s `expect:` be a list rather than a set.
@@ -249,17 +278,19 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       event.language,
     );
     final Future<Result<StreakSummary>> streak = _loadStreakSummary();
-    // The card's request, started alongside the other three rather than after them.
-    // All four are launched before the first `await` so the emission order below is a
-    // property of this method and not of which future happens to resolve first — the
-    // same reason `home_bloc_test.dart` can assert a frame count.
-    final Future<Result<LeaderboardBoard>> leaderboard =
-        _loadLeaderboardPreview();
+    // The last-light card's request. `GET /streak`, not `GET /streak/summary` —
+    // ADR-0022's fiction table names `history[0]` and the two endpoints are two
+    // sections; see the class doc.
+    final Future<Result<StreakHistoryEntry?>> lastLight = _loadLastLight();
+    // The carousel's. A literal list behind a port, so it resolves on the next
+    // microtask — in flight with the rest and not special-cased.
+    final Future<Result<List<LibraryBook>>> catalogue = _loadLibraryCatalogue();
 
     _emitReader(await reader, emit);
     _emitReading(await reading, emit);
     _emitStreak(await streak, emit);
-    _emitLeaderboard(await leaderboard, emit);
+    _emitLastLight(await lastLight, emit);
+    _emitCatalogue(await catalogue, emit);
   }
 
   /// Re-runs only the failed sections, and **emits nothing** when none failed.
@@ -270,22 +301,27 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Future<void> _onRetried(HomeRetried event, Emitter<HomeState> emit) async {
     final bool retryReading = state.readingStatus == HomeSectionStatus.failed;
     final bool retryStreak = state.streakStatus == HomeSectionStatus.failed;
-    // A fourth section with the same rule. It is here rather than folded into
-    // `withSection` because that method re-derives only the reading and streak
-    // failures; widening it would make a name that says "section" mean three of four.
-    final bool retryLeaderboard =
-        state.leaderboardStatus == HomeSectionStatus.failed;
-    if (!retryReading && !retryStreak && !retryLeaderboard) {
+    final bool retryLastLight =
+        state.lastLightStatus == HomeSectionStatus.failed;
+    // The catalogue's fourth arm, for the reason the streak's second section has
+    // its own: the rule is per section and it is here rather than folded into
+    // `withSection` because that method moves the three *network* sections.
+    final bool retryCatalogue =
+        state.catalogueStatus == HomeSectionStatus.failed;
+    if (!retryReading && !retryStreak && !retryLastLight && !retryCatalogue) {
       return;
     }
 
-    // Both go back to `loading` in one emit, so a two-section failure is one
-    // intermediate frame rather than two, and the failure is cleared as it is
-    // left: the `ErrorView` cannot offer a retry for a request that is open.
+    // All the retrying sections go back to `loading` in one emit, so a four-section
+    // failure is one intermediate frame rather than four, and each failure is
+    // cleared as it is left: an `ErrorView` cannot offer a retry for a request that
+    // is open.
     emit(
       state.withSection(
         readingStatus: retryReading ? HomeSectionStatus.loading : null,
         streakStatus: retryStreak ? HomeSectionStatus.loading : null,
+        lastLightStatus: retryLastLight ? HomeSectionStatus.loading : null,
+        catalogueStatus: retryCatalogue ? HomeSectionStatus.loading : null,
       ),
     );
 
@@ -295,8 +331,11 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     if (retryStreak) {
       _emitStreak(await _loadStreakSummary(), emit);
     }
-    if (retryLeaderboard) {
-      _emitLeaderboard(await _loadLeaderboardPreview(), emit);
+    if (retryLastLight) {
+      _emitLastLight(await _loadLastLight(), emit);
+    }
+    if (retryCatalogue) {
+      _emitCatalogue(await _loadLibraryCatalogue(), emit);
     }
   }
 
@@ -321,26 +360,55 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
-  /// Emits the card's section.
+  /// Emits the last-light card's section.
   ///
-  /// The two arms are the same shape as [\_emitReading] and [\_emitStreak], and the
-  /// failure arm **clears** the board rather than keeping stale rows under an error —
-  /// a card showing last week's ranking beside this week's failure is worse than an
-  /// empty card, because it looks like data.
-  void _emitLeaderboard(
-    Result<LeaderboardBoard> result,
+  /// The failure arm **clears** the pointer rather than keeping a stale reference
+  /// under an error — a card naming last Tuesday's reading beside today's failure
+  /// is worse than an empty card, because it looks like data.
+  ///
+  /// `null` on the success arm is not a failure: it is the prototype's empty state
+  /// (`redesign.html:1192-1197`), which `LoadLastLight`'s doc explains — the
+  /// cohort has no scheduled reading on file, and the card says so in words.
+  void _emitLastLight(
+    Result<StreakHistoryEntry?> result,
     Emitter<HomeState> emit,
   ) {
     emit(
       result.fold<HomeState>(
-        (Failure failure) => state.withLeaderboard(
+        (Failure failure) => state.withLastLight(
           status: HomeSectionStatus.failed,
-          board: null,
+          entry: null,
           failure: failure,
         ),
-        (LeaderboardBoard board) => state.withLeaderboard(
+        (StreakHistoryEntry? entry) => state.withLastLight(
           status: HomeSectionStatus.ready,
-          board: board,
+          entry: entry,
+          failure: null,
+        ),
+      ),
+    );
+  }
+
+  /// Emits the library section.
+  ///
+  /// **Its failure arm is unreachable in production** while the adapter is the
+  /// literal catalogue — the class doc and decision 26 are the reason it is
+  /// written rather than skipped, and `home_bloc_test.dart` reaches it from a
+  /// fake so that swapping in a network catalogue needs no change above here.
+  void _emitCatalogue(
+    Result<List<LibraryBook>> result,
+    Emitter<HomeState> emit,
+  ) {
+    emit(
+      result.fold<HomeState>(
+        (Failure failure) => state.withCatalogue(
+          status: HomeSectionStatus.failed,
+          books: null,
+          failure: failure,
+        ),
+        (List<LibraryBook> books) => state.withCatalogue(
+          status: HomeSectionStatus.ready,
+          books: books,
           failure: null,
         ),
       ),
@@ -390,14 +458,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   /// is why there is no second constructor to invent.
   ///
   /// The greeting period is cleared with everything else, so a signed-out process
-  /// retains no `readerName`, no `readerInitials`, no `reading` and no `streak` —
-  /// the four fields §5's live payloads carry a person in.
+  /// retains no `readerName`, no `readerInitials`, no `reading`, no `streak`, no
+  /// `lastLight` and no `catalogue` — the six fields that carry a person in.
   void _onCleared(HomeCleared event, Emitter<HomeState> emit) {
     emit(const HomeState());
   }
 }
 
-/// `/`'s state: two independently-loaded sections, a greeting, and a name.
+/// `/`'s state: four independently-loaded sections, a greeting, and a name.
 ///
 /// ## NO GENERATED `copyWith`, AND THAT IS THE POINT
 ///
@@ -407,22 +475,22 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 /// that cannot get it wrong. freezed's generated `copyWith` is a sentinel-based
 /// *partial* writer — it can set [reading] without setting [readingStatus], and
 /// can clear [streakFailure] on its own — which is precisely the second spelling
-/// of the five writers this file already has, and the one this file's design
+/// of the six writers this file already has, and the one this file's design
 /// refuses.
 ///
 /// **`==`, `hashCode` and `toString` are generated**, and `toString` is declared
-/// here so freezed does not generate one. The generated `==` covers all ten
+/// here so freezed does not generate one. The generated `==` covers all fourteen
 /// fields, which is the claim `home_bloc_test.dart`'s `HomeCleared` group asserts
-/// in its `reason:` string — see that test, whose wording moved from `props` to
-/// "all ten fields".
+/// in its `reason:` string.
 @Freezed(copyWith: false)
 final class HomeState with _$HomeState {
   /// The state a cold launch starts in: everything loading, nothing known.
   const HomeState({
     this.readingStatus = HomeSectionStatus.loading,
     this.streakStatus = HomeSectionStatus.loading,
+    this.lastLightStatus = HomeSectionStatus.loading,
+    this.catalogueStatus = HomeSectionStatus.loading,
     this.readerStatus = HomeSectionStatus.loading,
-    this.leaderboardStatus = HomeSectionStatus.loading,
     this.greetingPeriod,
     this.readerName,
     this.readerInitials,
@@ -430,40 +498,40 @@ final class HomeState with _$HomeState {
     this.readingFailure,
     this.streak,
     this.streakFailure,
-    this.leaderboard,
-    this.leaderboardFailure,
+    this.lastLight,
+    this.lastLightFailure,
+    this.catalogue,
+    this.catalogueFailure,
   });
 
   /// Where today's-reading panel is.
   final HomeSectionStatus readingStatus;
 
-  /// Where the top bar's streak flame is.
+  /// Where the streak chip's number is.
   final HomeSectionStatus streakStatus;
+
+  /// Where the last-light card's pointer is.
+  ///
+  /// **Its own status rather than a share of [streakStatus]**, because it is a
+  /// different request: `streak.routes.ts:1-9` is `/streak` and `:163-172` is
+  /// `/streak/summary`, and one of them can fail while the other answers. A chip
+  /// that went blank because the card's thirty rows failed would be a lie about a
+  /// request that succeeded.
+  final HomeSectionStatus lastLightStatus;
+
+  /// Where the carousel's books are.
+  final HomeSectionStatus catalogueStatus;
 
   /// Where the greeting's name is. **`ready` on both arms** — see the class doc.
   final HomeSectionStatus readerStatus;
 
-  /// Where the leaderboard card is.
-  ///
-  /// A fourth independent status rather than a share of [readingStatus], for the reason
-  /// the class doc gives for the first three: the backend's four sections fail
-  /// independently, and a card stuck spinning because *today's reading* failed would be
-  /// a lie about a request that succeeded.
-  final HomeSectionStatus leaderboardStatus;
-
-  /// The weekly ranking for the card, or `null` while loading and after a failure.
-  final LeaderboardBoard? leaderboard;
-
-  /// Why the card's request failed, or `null`.
-  final Failure? leaderboardFailure;
-
   /// The time of day, or `null` before the clock has been read.
   ///
-  /// **Null rather than a default.** The prototype's word is `Good evening`
-  /// (`HomeScreen.tsx:26`) and a non-nullable default would paint that word on the
-  /// first frame, before `HomeStarted` has run — a hard-coded value for exactly as
-  /// long as it takes to reach the first emit. `home_page_test.dart` asserts the
-  /// first frame has no greeting at all.
+  /// **Null rather than a default.** The redesign's word is `good evening`
+  /// (`redesign.html:988` — `tr(hourKey())`) and a non-nullable default would paint
+  /// that word on the first frame, before `HomeStarted` has run — a hard-coded
+  /// value for exactly as long as it takes to reach the first emit.
+  /// `home_page_test.dart` asserts the first frame has no greeting at all.
   final GreetingPeriod? greetingPeriod;
 
   /// The reader's name from the session, or `null` when there is none.
@@ -471,7 +539,14 @@ final class HomeState with _$HomeState {
   /// **`null` is a real state, not "not yet loaded"**: `readerStatus` says which.
   final String? readerName;
 
-  /// The avatar monogram from the session, or `null`.
+  /// The initials from the session, or `null`.
+  ///
+  /// **No avatar reads them on this screen any more.** The redesign's home has no
+  /// avatar (`:514-517` is the whole greeting) and the phase plan's 5.2 does not
+  /// draw one, but the session's `initials` is still carried because `/journey`
+  /// (Task 5.6) names the reader with it and rebuilding the state a phase earlier
+  /// than the field has a reader would be the §5 forward reference this file
+  /// already warns about — see the removed `hasStreak` note below.
   final String? readerInitials;
 
   /// Today's reading, when [readingStatus] is [HomeSectionStatus.ready].
@@ -486,26 +561,47 @@ final class HomeState with _$HomeState {
   /// Why the streak summary could not be read, when it could not.
   final Failure? streakFailure;
 
+  /// The most recent scheduled day, when [lastLightStatus] is
+  /// [HomeSectionStatus.ready].
+  ///
+  /// **Null while `ready` is a real state**, not a hole: it is the cohort having
+  /// no scheduled reading on file, which `LoadLastLight` and the card both render
+  /// in words (`redesign.html:1194`, "no light received yet").
+  final StreakHistoryEntry? lastLight;
+
+  /// Why the last light could not be read, when it could not.
+  final Failure? lastLightFailure;
+
+  /// The carousel's books, when [catalogueStatus] is [HomeSectionStatus.ready].
+  final List<LibraryBook>? catalogue;
+
+  /// Why the catalogue could not be read, when it could not.
+  ///
+  /// Unreachable while the adapter is a literal list; see the class doc.
+  final Failure? catalogueFailure;
+
   // `hasStreak` and `hasReading` were removed in Phase 6's coverage pass: nothing
   // read them, not the page and not a test. `home_page.dart` asks
-  // `state.streak?.currentStreak` and hands `state.reading` straight to the panel,
+  // `state.streak?.currentStreak` and hands `state.reading` straight to the card,
   // so a getter that only restates `!= null` over a nullable field is a second
   // spelling of the same question and one more thing to keep in step.
 
-  // --- the five writers ------------------------------------------------------
+  // --- the six writers ------------------------------------------------------
   //
   // Each builds the **whole** state, for the reason [AuthState] gives: a
   // `String? = null` parameter cannot express "clear it", so a nullable field that
-  // must be cleared is written by a method that cannot get it wrong. These five
+  // must be cleared is written by a method that cannot get it wrong. These six
   // are the only writers, every one of them is total, and `@Freezed(copyWith:
   // false)` is what keeps that sentence true — a generated `copyWith` would be a
-  // sixth, partial, silent writer.
+  // seventh, partial, silent writer.
 
   /// [next] with [period] as the greeting's time of day.
   HomeState withGreetingPeriod(GreetingPeriod period) => HomeState(
     greetingPeriod: period,
     readingStatus: readingStatus,
     streakStatus: streakStatus,
+    lastLightStatus: lastLightStatus,
+    catalogueStatus: catalogueStatus,
     readerStatus: readerStatus,
     readerName: readerName,
     readerInitials: readerInitials,
@@ -513,9 +609,10 @@ final class HomeState with _$HomeState {
     readingFailure: readingFailure,
     streak: streak,
     streakFailure: streakFailure,
-    leaderboardStatus: leaderboardStatus,
-    leaderboard: leaderboard,
-    leaderboardFailure: leaderboardFailure,
+    lastLight: lastLight,
+    lastLightFailure: lastLightFailure,
+    catalogue: catalogue,
+    catalogueFailure: catalogueFailure,
   );
 
   /// [next] with the reader resolved to [name] and [initials], or to neither.
@@ -530,16 +627,19 @@ final class HomeState with _$HomeState {
     greetingPeriod: greetingPeriod,
     readingStatus: readingStatus,
     streakStatus: streakStatus,
+    lastLightStatus: lastLightStatus,
+    catalogueStatus: catalogueStatus,
     reading: reading,
     readingFailure: readingFailure,
     streak: streak,
     streakFailure: streakFailure,
-    leaderboardStatus: leaderboardStatus,
-    leaderboard: leaderboard,
-    leaderboardFailure: leaderboardFailure,
+    lastLight: lastLight,
+    lastLightFailure: lastLightFailure,
+    catalogue: catalogue,
+    catalogueFailure: catalogueFailure,
   );
 
-  /// [next] with today's-reading panel in [status], carrying [reading] or
+  /// [next] with today's-reading card in [status], carrying [reading] or
   /// [failure] — exactly one of which is non-null.
   HomeState withReading({
     required HomeSectionStatus status,
@@ -551,50 +651,20 @@ final class HomeState with _$HomeState {
     readingFailure: failure,
     greetingPeriod: greetingPeriod,
     streakStatus: streakStatus,
+    lastLightStatus: lastLightStatus,
+    catalogueStatus: catalogueStatus,
     readerStatus: readerStatus,
     readerName: readerName,
     readerInitials: readerInitials,
     streak: streak,
     streakFailure: streakFailure,
-    leaderboardStatus: leaderboardStatus,
-    leaderboard: leaderboard,
-    leaderboardFailure: leaderboardFailure,
+    lastLight: lastLight,
+    lastLightFailure: lastLightFailure,
+    catalogue: catalogue,
+    catalogueFailure: catalogueFailure,
   );
 
-  /// [next] with the leaderboard card in [status], carrying [board] or [failure] —
-  /// exactly one of which is non-null.
-  ///
-  /// ## WHY IT IS A SEPARATE WRITER AND NOT A PARAMETER ON `withSection`
-  ///
-  /// `withSection` exists to move the reading and streak sections between `loading`
-  /// and `failed` **together** when a retry is dispatched, and it re-derives exactly
-  /// those two failures. Widening it to also carry the leaderboard would give a method
-  /// named "section" that handles three of four, and a reader could not tell from the
-  /// name which sections a call site can move. So the card gets its own writer and its
-  /// own status, and `HomeState` grows a fourth independent one — which the class doc
-  /// already argued for on the strength of the backend's four independently-failing
-  /// endpoints.
-  HomeState withLeaderboard({
-    required HomeSectionStatus status,
-    required LeaderboardBoard? board,
-    required Failure? failure,
-  }) => HomeState(
-    leaderboardStatus: status,
-    leaderboard: board,
-    leaderboardFailure: failure,
-    readingStatus: readingStatus,
-    reading: reading,
-    readingFailure: readingFailure,
-    streakStatus: streakStatus,
-    streak: streak,
-    streakFailure: streakFailure,
-    readerStatus: readerStatus,
-    readerName: readerName,
-    readerInitials: readerInitials,
-    greetingPeriod: greetingPeriod,
-  );
-
-  /// [next] with the streak flame in [status], carrying [streak] or [failure] —
+  /// [next] with the streak chip in [status], carrying [streak] or [failure] —
   /// exactly one of which is non-null.
   HomeState withStreak({
     required HomeSectionStatus status,
@@ -606,27 +676,98 @@ final class HomeState with _$HomeState {
     streakFailure: failure,
     greetingPeriod: greetingPeriod,
     readingStatus: readingStatus,
+    lastLightStatus: lastLightStatus,
+    catalogueStatus: catalogueStatus,
     readerStatus: readerStatus,
     readerName: readerName,
     readerInitials: readerInitials,
     reading: reading,
     readingFailure: readingFailure,
+    lastLight: lastLight,
+    lastLightFailure: lastLightFailure,
+    catalogue: catalogue,
+    catalogueFailure: catalogueFailure,
   );
 
-  /// [next] with the two **section** statuses set, clearing whichever failure
+  /// [next] with the last-light card in [status], carrying [entry] or [failure] —
+  /// at most one of which is non-null.
+  HomeState withLastLight({
+    required HomeSectionStatus status,
+    required StreakHistoryEntry? entry,
+    required Failure? failure,
+  }) => HomeState(
+    lastLightStatus: status,
+    lastLight: entry,
+    lastLightFailure: failure,
+    greetingPeriod: greetingPeriod,
+    readingStatus: readingStatus,
+    streakStatus: streakStatus,
+    catalogueStatus: catalogueStatus,
+    readerStatus: readerStatus,
+    readerName: readerName,
+    readerInitials: readerInitials,
+    reading: reading,
+    readingFailure: readingFailure,
+    streak: streak,
+    streakFailure: streakFailure,
+    catalogue: catalogue,
+    catalogueFailure: catalogueFailure,
+  );
+
+  /// [next] with the carousel in [status], carrying [books] or [failure] — exactly
+  /// one of which is non-null.
+  HomeState withCatalogue({
+    required HomeSectionStatus status,
+    required List<LibraryBook>? books,
+    required Failure? failure,
+  }) => HomeState(
+    catalogueStatus: status,
+    catalogue: books,
+    catalogueFailure: failure,
+    greetingPeriod: greetingPeriod,
+    readingStatus: readingStatus,
+    streakStatus: streakStatus,
+    lastLightStatus: lastLightStatus,
+    readerStatus: readerStatus,
+    readerName: readerName,
+    readerInitials: readerInitials,
+    reading: reading,
+    readingFailure: readingFailure,
+    streak: streak,
+    streakFailure: streakFailure,
+    lastLight: lastLight,
+    lastLightFailure: lastLightFailure,
+  );
+
+  /// [next] with the **section** statuses set, clearing whichever failure
   /// belongs to a status being left.
   ///
-  /// [readingStatus] and [streakStatus] are nullable *parameters* here, which is
-  /// the §4-legal exception: `null` unambiguously means "leave this section alone",
-  /// because a section's status is an enum and never null. The failures are cleared
-  /// by the same rule — a section going back to `loading` cannot keep the
-  /// `Failure` that put it there.
+  /// The four statuses are nullable *parameters* here, which is the §4-legal
+  /// exception: `null` unambiguously means "leave this section alone", because a
+  /// section's status is an enum and never null. The failures are cleared by the
+  /// same rule — a section going back to `loading` cannot keep the `Failure` that
+  /// put it there, and a section going to `ready` cannot keep one either.
+  ///
+  /// ## AND WHY THE CATALOGUE IS IN HERE NOW
+  ///
+  /// It used to be a fourth section with a **private writer of its own**, because
+  /// the board card that shared this method's name would have made `withSection` a
+  /// method that moved three of five sections. All five are the same rule now —
+  /// one failed section is a retry and four are four retries — so one method says
+  /// it, and the alternative is five methods that differ only in which field they
+  /// copy.
   HomeState withSection({
     HomeSectionStatus? readingStatus,
     HomeSectionStatus? streakStatus,
+    HomeSectionStatus? lastLightStatus,
+    HomeSectionStatus? catalogueStatus,
   }) {
     final HomeSectionStatus nextReading = readingStatus ?? this.readingStatus;
     final HomeSectionStatus nextStreak = streakStatus ?? this.streakStatus;
+    final HomeSectionStatus nextLastLight =
+        lastLightStatus ?? this.lastLightStatus;
+    final HomeSectionStatus nextCatalogue =
+        catalogueStatus ?? this.catalogueStatus;
     return HomeState(
       greetingPeriod: greetingPeriod,
       readerStatus: readerStatus,
@@ -642,25 +783,36 @@ final class HomeState with _$HomeState {
       streakFailure: nextStreak == HomeSectionStatus.failed
           ? streakFailure
           : null,
+      lastLightStatus: nextLastLight,
+      lastLight: nextLastLight == HomeSectionStatus.ready ? lastLight : null,
+      lastLightFailure: nextLastLight == HomeSectionStatus.failed
+          ? lastLightFailure
+          : null,
+      catalogueStatus: nextCatalogue,
+      catalogue: nextCatalogue == HomeSectionStatus.ready ? catalogue : null,
+      catalogueFailure: nextCatalogue == HomeSectionStatus.failed
+          ? catalogueFailure
+          : null,
     );
   }
 
   @override
-  /// ## WHY `board` IS COUNTED AND NOT PRINTED
+  /// ## WHY `catalogue` IS COUNTED AND NOT PRINTED
   ///
-  /// `leaderboard` is a whole entity — a window, a group, a list and a standing — and
-  /// a failure message that renders all of it stops being readable. `leaderboardStatus`
-  /// plus the row count is enough to tell "the card is ready and empty" from "the card
-  /// is ready with twelve rows", which is the only question a failing assertion is
-  /// asking of it.
+  /// The catalogue is a list of six `LibraryBook`s — each carrying a name per arm,
+  /// a category, a wash and a count — and a failure message that renders all of it
+  /// stops being readable. `catalogueStatus` plus the row count is enough to tell
+  /// "the carousel is ready and empty" from "the carousel is ready with six
+  /// scrolls", which is the only question a failing assertion is asking of it.
   ///
-  /// Phase 1 added the fourth pair. Two earlier frames in `home_bloc_test.dart` were
-  /// indistinguishable in a failure message until this did, which is the cost of a
-  /// hand-written `toString` that has to be *remembered* — as against the generated
-  /// one freezed would write, which would print all twelve fields and be unreadable.
+  /// The last light is printed as **its arm**, not its two, for the reason
+  /// `toString` is hand-written at all: a generated one would print all fourteen
+  /// fields, including the Arabic book names, and be unreadable.
   String toString() =>
       'HomeState(reading: ${readingStatus.name}, streak: ${streakStatus.name}, '
+      'lastLight: ${lastLightStatus.name} '
+      '${lastLight?.referenceEn ?? (lastLight == null ? '-' : 'empty')}, '
+      'catalogue: ${catalogueStatus.name} ${catalogue?.length ?? '-'}, '
       'reader: ${readerStatus.name} ${readerName ?? '-'}, '
-      'board: ${leaderboardStatus.name} ${leaderboard?.rows.length ?? '-'}, '
       'period: ${greetingPeriod?.name ?? '-'})';
 }

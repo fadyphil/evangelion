@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/leaderboard/data/datasources/leaderboard_remote_data_source.dart';
 import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.dart';
 import 'package:evangelion/features/leaderboard/data/repositories/dio_leaderboard_repository.dart';
@@ -41,10 +40,9 @@ abstract class LeaderboardModule {
   /// **The real endpoint by default.** `DioLeaderboardRepository` is the production
   /// path and the stub is unreachable unless a build names the flag above.
   ///
-  /// Registered against the **port**, so neither `LoadLeaderboard` nor
-  /// `LoadLeaderboardPreview` names either class — the same rule `home_module.dart`
-  /// follows for `DioReadingRepository`, and the reason a page or cubit never says
-  /// `Stub`.
+  /// Registered against the **port**, so `LoadLeaderboard` names neither class —
+  /// the same rule `home_module.dart` follows for `DioReadingRepository`, and the
+  /// reason a page or cubit never says `Stub`.
   @lazySingleton
   LeaderboardRepository get leaderboardRepository => useStubLeaderboard
       ? const StubLeaderboardRepository()
@@ -55,14 +53,17 @@ abstract class LeaderboardModule {
         );
 
   /// The full ranking for a chosen window.
+  ///
+  /// **Phase 5.2 removed the module's third registration.** `LoadLeaderboardPreview`
+  /// was `/`'s weekly-top-three card, and the redesign's home (`:513-538`) has no
+  /// board card at all — the board is its own screen from Task 5.5
+  /// (`/communion`, `redesign.html:612-636`). The port stays, the endpoint stays,
+  /// and `LoadLeaderboard` is now the only reader of either; the two windows'
+  /// `?window=` parameter (`leaderboard.routes.ts:17`) is what 5.5 turns into the
+  /// redesign's week / month / all control.
   @lazySingleton
   LoadLeaderboard get loadLeaderboard =>
       LoadLeaderboard(getIt<LeaderboardRepository>());
-
-  /// The weekly top rows for `/`'s card.
-  @lazySingleton
-  LoadLeaderboardPreview get loadLeaderboardPreview =>
-      LoadLeaderboardPreview(getIt<LeaderboardRepository>());
 }
 
 /// The value of the `--dart-define=USE_STUB_LEADERBOARD` flag.

@@ -60,6 +60,7 @@ import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../../support/css_reference.dart';
 import '../../../../support/login_harness.dart';
 
 /// The prototype this harness reads.
@@ -80,71 +81,32 @@ const List<String> loginSectionMarkers = <String>[
 
 /// Reads the prototype and returns the declarations inside `selector`'s rule.
 ///
-/// The regex walks the file's `<style>` text for `\selector… { … }` and splits
-/// the body on `;`. A missing rule **throws** — with `StateError`, not
-/// `expect`, because this helper also runs at group-construction time, outside
-/// any test body, where `expect` is illegal (`OutsideTestException`, measured).
-/// The claims group below re-asserts the same conditions inside real tests.
-Map<String, String> rule(String selector) {
-  final File source = File(prototype);
-  if (!source.existsSync()) {
-    throw StateError(
-      '$prototype is missing. This harness cannot read the prototype, so it '
-      'does not pass — a missing reference is reported, never assumed '
-      'unchanged.',
-    );
-  }
-  final RegExpMatch? match = RegExp(
-    // **Anchored to a line start**, because the stylesheet's selectors nest:
-    // `.screen[data-mode=light] .field input` (`:85`) contains `.field input`
-    // as a substring, and an unanchored search would read the light-mode
-    // override — two declarations, no radius, no margin — as if it were the
-    // rule. Every selector the claims table names starts its own line.
-    '(^|\\n)${RegExp.escape(selector)}\\s*\\{([^}]*)\\}',
-  ).firstMatch(source.readAsStringSync());
-  if (match == null) {
-    throw StateError(
-      '$selector is not in $prototype any more. Either the prototype changed '
-      'shape — in which case this harness and the page it guards both need '
-      're-reading — or the selector was mistyped here.',
-    );
-  }
-  return <String, String>{
-    // `group(2)`, not 1: the line-start anchor added `(^|\n)` as the first
-    // capture group, and reading group 1 would split a newline on `;` — the
-    // empty map that failed the selector test below.
-    for (final String declaration in match.group(2)!.split(';'))
-      if (declaration.contains(':'))
-        declaration.split(':').first.trim(): declaration
-            .split(':')
-            .skip(1)
-            .join(':')
-            .trim(),
-  };
-}
-
-/// The numeric value of `property` in `declarations`, in logical pixels.
+/// **A one-line delegation to [cssRule], and it was a body until Phase 5.2.**
+/// The parser moved to `css_reference.dart` because `/`'s geometry harness needed
+/// the same one, and the two copies had already drifted in their doc comments —
+/// this one said `\selector… { … }` while the implementation anchored at a line
+/// start, which is the one thing a reader copying it needed to know. One
+/// implementation, two short names: this suite reads `rule` and `px`, `/`'s reads
+/// the same two, and the reasoning is written once.
 ///
-/// CSS lengths here are `Npx`; anything else (a bare `0`, a percentage, an `em`)
-/// is a shape the caller converts deliberately, because the conversion is the
-/// claim — see `kWordmarkTracking`'s row, whose value is `.3em` **of 26px** and
-/// whose conversion is the whole content of the constant. Throws, for the same
-/// out-of-test reason [rule] does.
-double px(Map<String, String> declarations, String property) {
-  final String? raw = declarations[property];
-  if (raw == null) {
-    throw StateError('$property is not declared where the harness looked.');
-  }
-  final RegExpMatch? match = RegExp(r'(-?\d+(?:\.\d+)?)px?').firstMatch(raw);
-  if (match == null) {
-    throw StateError(
-      '$property is "$raw", which is not a pixel length this parser reads. If '
-      'the prototype changed units, the conversion is a claim and belongs in a '
-      'constant with its reasoning — not in this helper.',
-    );
-  }
-  return double.parse(match.group(1)!);
-}
+/// The anchor, the `group(2)` and the `StateError`-not-`expect` rule all live on
+/// [cssRule]; the claims group below still re-asserts every selector inside a real
+/// test, so a miss surfaces twice and neither time as a number.
+Map<String, String> rule(String selector) => cssRule(File(prototype), selector);
+
+/// The numeric value of [property] in [declarations], in logical pixels — [cssPx]
+/// under this suite's shorter name.
+///
+/// A value that is not `Npx` throws, and `kWordmarkTracking`'s row is why the
+/// conversion happens at its call site rather than here: its value is `.3em` **of
+/// 26px**, and the conversion is the whole content of the constant.
+double px(Map<String, String> declarations, String property) =>
+    cssPx(declarations, property);
+
+/// Every length [property] declares, in CSS order — [cssPxList] under this
+/// suite's shorter name, for the shorthand rows that need the **second** value.
+List<double> pxAll(Map<String, String> declarations, String property) =>
+    cssPxList(declarations, property);
 
 void main() {
   group('the prototype file, as this harness reads it', () {
@@ -196,9 +158,17 @@ void main() {
 
     test('kRootGutter is `.login`\'s horizontal padding', () {
       // `padding: 0 34px` — the vertical half is 0 and the horizontal half is
-      // the gutter. The parser reads the pair; the page passes the horizontal
-      // one to `NeuralScaffold`.
-      expect(px(login, 'padding'), LoginPage.kRootGutter);
+      // the gutter, so the row reads **the second** of the pair.
+      //
+      // And a measured finding the shared parser surfaced: this row used to
+      // pass with a plain `px(...)`, because that parser's regex —
+      // `(-?\d+(?:\.\d+)?)px?` — required a `p`, so the unitless `0` was
+      // invisible to it and the *second* number was what `firstMatch` found.
+      // The accidental skip produced the right answer for the wrong reason,
+      // and `cssPxList`'s honest regex made the row fail with `0`. Reading
+      // `[1]` is the transcription; the old behaviour is recorded because it
+      // is the exact kind of green a harness exists to distrust.
+      expect(pxAll(login, 'padding')[1], LoginPage.kRootGutter);
     });
 
     test('kWordmarkSize is `.lmark`\'s font-size', () {

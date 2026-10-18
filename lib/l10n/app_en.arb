@@ -8,21 +8,96 @@
   "authEmailInvalid": "email looks incomplete",
   "authPasswordTooShort": "password too short",
   "authUnavailableSuffix": "unavailable in this build",
-  "homeWordmark": "Evangelion",
-  "homeGreetingMorning": "Good morning",
-  "homeGreetingAfternoon": "Good afternoon",
-  "homeGreetingEvening": "Good evening",
+  "homeGreetingMorning": "good morning",
+  "homeGreetingAfternoon": "good afternoon",
+  "homeGreetingEvening": "good evening",
   "homeGreetingSeparator": ", ",
-  "homeStreakGlowing": "Your streak is glowing. Keep it alive.",
-  "homeStreakResting": "Start a streak today. One reading is all it takes.",
   "homeStreakLabel": "Streak",
-  "homeAvatarLabel": "Account",
   "homeUnavailableSuffix": "unavailable in this build",
-  "homeTodayReading": "Today's reading",
-  "homeContinueReading": "Continue reading",
-  "homeReadingComplete": "Reading complete",
-  "homeReflectionProgress": "Reflections answered",
-  "homeNoQuestionsToday": "No reflection questions today",
+  "homeGreetingVigil": "night vigil",
+  "@homeGreetingVigil": {
+    "description": "00:00–04:59. Transcribed: `redesign.html:926` — `vigil:[\"night vigil\",\"سهر الليل\"]`, the fourth arm of the prototype's `hourKey()` (`:983-984`, which returns `vigil` for every hour before five).\n\n**A fourth key where the three before it were this client's decision.** The redesign's own clock has four buckets, and the last one is not the prototype's English `evening` word but a different word with a different meaning — so the boundaries are now the prototype's and `greeting_period.dart` says so."
+  },
+  "homePeace": "peace",
+  "@homePeace": {
+    "description": "The greeting's second line, `redesign.html:993` — `el('hiName').textContent = lang==='ar' ? 'سلم، مريم' : 'peace, Mariam'`.\n\n**Half of the prototype's string, deliberately.** `hiName` is one literal with the reader's name inside it, and a name is not translatable — it is `AuthSession.displayName`. So the word and the comma live in this table and the page composes `homePeace` + `homeGreetingSeparator` + the name, which reproduces the prototype's sentence exactly on both arms. The Arabic is the prototype's own two-letter word for peace, not the four-letter greeting of a letter."
+  },
+  "homeDays": "days",
+  "@homeDays": {
+    "description": "The unit painted beside the streak number. Transcribed: `redesign.html:925` — `days:[\"days\",\"أيام\"]`, written into the chip's `.sl` span at `:516`.\n\n**Separate from `homeStreakLabel`, which is the announcement's prefix** and a plural noun in Arabic; see that key's description for why it stays a prefix rather than becoming a phrase."
+  },
+  "homeVerseOfTheDay": "verse of the day",
+  "@homeVerseOfTheDay": {
+    "description": "The day's card eyebrow, and the card's accessible name. Transcribed: `redesign.html:927` — `votd:[\"verse of the day\",\"آية اليوم\"]`, written into `#votdCard` at `:521`.\n\n**It replaces `homeTodayReading`** (“Today's reading”), which described the panel this card replaces and named no string the redesign draws."
+  },
+  "homeLastLight": "last light",
+  "@homeLastLight": {
+    "description": "The last-light card's eyebrow, and the card's accessible name. Transcribed: `redesign.html:928` — `lastW:[\"last light\",\"آخر نور\"]`, written into `#lastCard` at `:525`."
+  },
+  "homeNoLightRef": "—",
+  "@homeNoLightRef": {
+    "description": "The reference the same card shows when there is no light: an em dash. Transcribed: `redesign.html:1193` — `el('lastRef').textContent = '—'`.\n\n**The one key in this table whose two values are identical**, and the reason is that it is punctuation: no translation of a dash exists, and an Arabic-specific dash would be a reader-facing change nobody asked for. It replaced `homeWordmark` in `app_localizations_test.dart`'s `mustBeIdentical` set, so the “every other key must differ” rule still has a live exception rather than an empty list."
+  },
+  "homeNoLight": "no light received yet — open a book below",
+  "@homeNoLight": {
+    "description": "The last-light card's body when `GET /streak`'s `history` is empty. Transcribed: `redesign.html:929` — `noLight:[...]`, set by `updateLastWidget` at `:1194`.\n\nThe state is real: `history` is the cohort's last thirty scheduled readings (`streak.service.ts:88-96`) and a cohort with none has a reader who has not opened a book. The sentence points at the carousel below it instead of apologising, which is the prototype's own choice and the reason the Arabic names the books rather than the failure."
+  },
+  "homeResumeHint": "resume where the light left you ›",
+  "@homeResumeHint": {
+    "description": "The last-light card's hint, shown only when there is a light to resume from. Transcribed: `redesign.html:928` — `resumeHint:[...]`, hidden by `updateLastWidget` when `lastRead` is null (`:1195`).\n\n**The `›` is part of the string and not a drawn glyph.** The prototype writes it into the text (`:528`), so it travels with the sentence and uppercases under LTR with the rest of the `.mono` run; a separate `Icon` would sit outside the run and stay lowercase beside an uppercase sentence."
+  },
+  "homeSelah": "Selah",
+  "@homeSelah": {
+    "description": "The selah card's title. Transcribed: `redesign.html:970` — `selah:[\"Selah\",\"سِلاه\"]`.\n\n**The Arabic keeps its tashkeel** (`سِلاه`, a kasra under the seen), because the prototype's own Arabic carries it and a bare `سلاه` is a different spelling of the word. The English is Latin on the Arabic arm's screen too, which is the prototype's arrangement and not an oversight here."
+  },
+  "homeSecondsOfSilence": "seconds of silence",
+  "@homeSecondsOfSilence": {
+    "description": "The selah card's second line, **without the number**. Transcribed: `redesign.html:966` — `secs:[\"seconds of silence\",\"ثانية من الصمت\"]`.\n\nThe prototype composes it: `el('selahSub').textContent = \\`${N(selahDur)} ${tr('secs')}\\`` (`:990`). Composing here rather than through a `{seconds}` placeholder is what keeps the Arabic value free of the ASCII placeholder name — `app_localizations_test.dart` fails any non-plural Arabic value holding Latin script, and see `readingCaptionFor`'s description for why the plural keys are the only ones exempt."
+  },
+  "homeTheLibrary": "the library",
+  "@homeTheLibrary": {
+    "description": "The carousel's left-hand label. Transcribed: `redesign.html:930` — `lib:[\"the library\",\"المكتبة\"]`, written into `.car-label` at `:535`."
+  },
+  "homeScrolls": "scrolls",
+  "@homeScrolls": {
+    "description": "The carousel's first count's unit. Transcribed from `redesign.html:930`'s `libCount` — `\"6 scrolls · 4 open\"`.\n\n**Split in two because the prototype's string has the numbers baked into it and this client's do not.** The catalogue is `LibraryCatalogueRepository.books()` and its length is not a constant, so a single key would have needed an ARB placeholder; a non-plural key with a placeholder puts the ASCII placeholder name in the Arabic value. The page composes `{digits} {homeScrolls} · {digits} {homeOpenBooks}`, which is character-for-character the prototype's literal for the shipped catalogue."
+  },
+  "homeOpenBooks": "open",
+  "@homeOpenBooks": {
+    "description": "The carousel's second count's unit, and it agrees with `homeScrolls`. Transcribed from `redesign.html:930`'s `libCount` — see `homeScrolls` for why the pair exists.\n\n**Feminine plural in Arabic** (`مفتوحة`), because `دروج` is feminine and an Arabic adjective has to agree with its noun; `مفتوح` is the masculine form and reads as a separate word with no subject."
+  },
+  "homeVerses": "verses",
+  "@homeVerses": {
+    "description": "The unit in an open book card's caption. Transcribed: `redesign.html:966` — `verses:[\"verses\",\"آيات\"]`, composed at `:1313` as `${N(b.en.length)} ${tr('verses')}`.\n\n**Carried on open cards only.** `:1317` writes the category alone for a sealed one, because `SEALED` holds no verse array — see `LibraryBook.verseCount` for the null that distinguishes them."
+  },
+  "homeSealed": "sealed",
+  "@homeSealed": {
+    "description": "The badge on a locked book card. Transcribed: `redesign.html:972` — `sealed:[\"sealed\",\"مختوم\"]`, rendered by `buildHome` into `.bcard .lock` at `:1317` and styled by `.bcard.sealed .lock` at `:287-288`."
+  },
+  "homeCategoryPoetry": "poetry",
+  "@homeCategoryPoetry": {
+    "description": "A book card's caption category. Transcribed: `redesign.html:1036` — `CATS = {poetry:[\"poetry\",\"شعر\"], ...}`.\n\n**A key and not a field on `LibraryBook`**, because the category's *name* is a translation decision while the book's name is catalogue data; the enum (`LibraryCategory`) is closed at six, so a seventh category is a compile error rather than a missing translation discovered on the Arabic arm."
+  },
+  "homeCategoryGospel": "gospel",
+  "@homeCategoryGospel": {
+    "description": "A book card's caption category. Transcribed: `redesign.html:1036` — `CATS.gospel`. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
+  },
+  "homeCategoryTorah": "torah",
+  "@homeCategoryTorah": {
+    "description": "A book card's caption category. Transcribed: `redesign.html:1036` — `CATS.torah`. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
+  },
+  "homeCategoryProphets": "prophets",
+  "@homeCategoryProphets": {
+    "description": "A book card's caption category. Transcribed: `redesign.html:1036` — `CATS.prophets`. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
+  },
+  "homeCategoryHistory": "history",
+  "@homeCategoryHistory": {
+    "description": "A book card's caption category, and only a **sealed** book carries it. Transcribed: `redesign.html:1036` — `CATS.history`, which in `SEALED` (`:1033`) belongs to Acts alone. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
+  },
+  "homeCategoryApocalypse": "apocalypse",
+  "@homeCategoryApocalypse": {
+    "description": "A book card's caption category, and only a **sealed** book carries it. Transcribed: `redesign.html:1036` — `CATS.apocalypse`, which in `SEALED` (`:1034`) belongs to Revelation alone. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
+  },
   "leaderboardTitle": "Cohort standings",
   "leaderboardWindowWeekly": "Week",
   "leaderboardWindowMonthly": "Month",
@@ -33,7 +108,6 @@
   "leaderboardUnranked": "Not ranked yet",
   "leaderboardScoreLabel": "points",
   "leaderboardOpenFull": "See all",
-  "leaderboardCardTitle": "This week",
   "leaderboardRowSemantics": "{count, plural, zero{no points} one{1 point} other{{digits} points}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}",
   "@leaderboardRowSemantics": {
     "description": "The screen-reader sentence for one ranked row.\n\nA REAL ICU PLURAL, and the reason this key exists rather than four separate strings. A row is four numbers and a monogram; a screen reader announcing \"3, PG, 80, points\" gives a reader four fragments and no sentence, so this composes one. The plural is over `count` with the digits interpolated separately, which is the same shape `readingCaptionFor` uses.\n\n`isReader` is a `select`, not a second plural: \"that is you\" is a clause, not a quantity, and folding it into the plural would multiply the arms for no gain.\n\nNEVER A NAME. `initials` is the monogram and nothing else can reach this string, which is the accessibility half of `LeaderboardRow` having no `fullName` — a voice-over user must not be able to hear a name the screen cannot show.\n\n`rank` and `digits` are **String** while `count` is **int**, and that split is load-bearing rather than fussy: `count` is what the plural selects on, and `digits` is what the reader sees. Passing the numeral twice means the shape does not have to change when a locale's digits are not ASCII — the Arabic arm renders U+0660…U+0669, and `intl`'s formatting would otherwise be a second source of truth about numerals. `readingCaptionFor` does the same thing.",
@@ -90,11 +164,6 @@
   "@leaderboardOpenFull": {
     "description": "Link from Home's compact card to `/leaderboard`.\n\nPhrased as an action rather than a count, because the card cannot honestly say how many there are — `cohortSize` is `null` whenever the request's `limit` bound. 'See all' stays true whether there are four children or four hundred."
   },
-  "@leaderboardCardTitle": {
-    "description": "Title on Home's compact card.\n\nFIXED TO THE WEEK on purpose. The card always requests `LeaderboardWindow.weekly` — `LoadLeaderboardPreview` takes no window — so a title that varied with the data would be claiming a precision the request does not have."
-  },
-  "homeContinueLabel": "Continue",
-  "homeStartReflection": "Start reflection",
   "homeRetry": "Try again",
   "quizExit": "Close",
   "quizProgress": "Question",
@@ -180,56 +249,23 @@
   "@authUnavailableSuffix": {
     "description": "Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.\n\nNAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.\n\nAPPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render \"unavailable in this build - unavailable in this build\"."
   },
-  "@homeWordmark": {
-    "description": "The product's name, in the top bar. Transcribed: ds.tsx:508.\n\nDELIBERATELY LATIN ON THE ARABIC ARM, for `authWordmark`'s reason — it is a brand mark, not a sentence. `app_top_bar.dart` records a measurement here: replacing this with the Arabic transliteration was tried and reverted.\n\nNAMESPACED `home*` because `authWordmark` is a different control drawing the same mark."
-  },
   "@homeGreetingMorning": {
-    "description": "05:00-11:59. `HomeScreen.tsx:26` writes `Good evening, `; the three words are `greeting_period.dart`'s decision and that file says so.\n\nThe split into three keys rather than one key plus a period is because the prototype's own string is a single lead-in (`…evening, `) and the client's greeting is period-dependent from a live clock."
+    "description": "05:00–11:59. Transcribed: `redesign.html:926` — `morn:[\"good morning\",\"صباح النور\"]`, set by `applyLang` (`:988`).\n\n**The Arabic arm changed with the screen.** It was `صباح الخير` — “good morning” in the ordinary sense — because the old greeting was a status line. The redesign's own word is `صباح النور` (“morning of light”), which is a different sentence, and transcribing it is the point of the phase.\n\nThe English value keeps its capital: the run is a `.mono` and `[dir=rtl] .mono` at `redesign.html:136` removes the transform only on the Arabic arm, so under LTR both spellings paint as `GOOD MORNING`."
   },
   "@homeGreetingAfternoon": {
-    "description": "12:00-17:59. See `homeGreetingMorning` — the prototype writes no afternoon arm at all."
+    "description": "12:00–17:59. Transcribed: `redesign.html:926` — `noon:[\"good afternoon\",\"نهارك نور\"]`. See `homeGreetingMorning` for why the Arabic arm changed, and note the prototype's own grammar: `نهارك نور` is second-person (`your day is light`) where the English is an adjective phrase. Transcribed as written."
   },
   "@homeGreetingEvening": {
-    "description": "18:00-04:59. The prototype's own word: `HomeScreen.tsx:26`."
+    "description": "18:00–23:59. Transcribed: `redesign.html:926` — `eve:[\"good evening\",\"مساء النور\"]`. See `homeGreetingMorning` for why the Arabic arm changed.\n\n**The bucket's end is the redesign's**: `hourKey()` (`:983-984`) returns `eve` for every hour of the evening and sends 00:00–04:59 to `vigil`, where the old three-bucket clock sent them to evening."
   },
   "@homeGreetingSeparator": {
-    "description": "What follows the greeting word when a name comes after it.\n\nA KEY AND NOT A CHARACTER IN CODE, because it is the one place the two arms genuinely differ and it is the difference a translator would otherwise have to find by reading the greeting code. English takes `, `; Arabic takes `، ` — U+060C ARABIC COMMA, a DIFFERENT codepoint from U+002C which renders at a different height. Substituting one for the other produces text that is right and looks wrong, which is the failure mode a bilingual string table exists to prevent."
-  },
-  "@homeStreakGlowing": {
-    "description": "Under the greeting, when the streak is alive. Transcribed VERBATIM: HomeScreen.tsx:30.\n\nCONDITIONAL where the prototype's was not — see `homeStreakResting`."
-  },
-  "@homeStreakResting": {
-    "description": "Under the greeting, when the streak is at zero.\n\nNOT IN THE PROTOTYPE, AND NOT OPTIONAL. HomeScreen.tsx:30 is an unconditional literal, so on the live payload — `streak/summary.current_streak` is `0` — the app would tell a reader their streak is glowing while drawing a flame beside the number `0`. That is the same class of defect as the hard-coded greeting name Phase 7 removed: a prototype string that contradicts live data.\n\nREJECTED: shipping `homeStreakGlowing` unconditionally and recording the lie. Rejected because the number is on screen two inches away."
+    "description": "What follows `homePeace` when a name comes after it.\n\n**Its subject is the greeting's second line now**, where it used to be the old lead-in's: `redesign.html:993` writes `'سلام، مريم'` / `'peace, Mariam'`, and the comma is this key.\n\nA KEY AND NOT A CHARACTER IN CODE, because it is the one place the two arms genuinely differ and it is the difference a translator would otherwise have to find by reading the greeting code. English takes `, `; Arabic takes `، ` — U+060C ARABIC COMMA, a DIFFERENT codepoint from U+002C which renders at a different height. Substituting one for the other produces text that is right and looks wrong, which is the failure mode a bilingual string table exists to prevent."
   },
   "@homeStreakLabel": {
-    "description": "The streak count's accessible name, as a PREFIX. `StreakFlame.semanticLabel`.\n\nA PREFIX AND NOT A PLURALISED PHRASE, and the reason is recorded rather than assumed: the announcement is composed by the row as `$streakLabel: $count`. Converting this to an ICU plural would change the announcement's SHAPE from \"Streak: 5\" to \"5-day streak\", which is a UX change and not a localization one. The Arabic value is already a PLURAL NOUN (`أيام متتالية`, \"consecutive days\"), so a count beside it is grammatically sound. See `readingCaptionFor` for a count that IS genuinely plural-dependent."
-  },
-  "@homeAvatarLabel": {
-    "description": "The avatar's accessible name when the session has no name to read.\n\nds.tsx:525 renders the monogram `MK` inside a `<button>` with NO LABEL AT ALL — §14's first row, and defect #11. So the button is named, and when there is a session the name is better than a noun: `HomePage` passes the display name and falls back to this."
+    "description": "The streak count's accessible name, as a PREFIX. `StreakChip.semanticLabel`.\n\nA PREFIX AND NOT A PLURALISED PHRASE, and the reason is recorded rather than assumed: the announcement is composed by the chip as `$semanticLabel: $days $daysLabel`. Converting this to an ICU plural would change the announcement's SHAPE from “Streak: 5 days” to “5-day streak”, which is a UX change and not a localization one. The Arabic value is already a PLURAL NOUN (`أيام متتالية`, “consecutive days”), so a count beside it is grammatically sound; the painted unit beside the number is `homeDays`. See `readingCaptionFor` for a count that IS genuinely plural-dependent."
   },
   "@homeUnavailableSuffix": {
-    "description": "Appended to the avatar's name while the control is inert.\n\nThe same wording, and the same reasoning, as `authUnavailableSuffix`: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because four features carry this field name and /quiz's differs."
-  },
-  "@homeTodayReading": {
-    "description": "The panel's accessible name. `GlassSurface.semanticLabel`."
-  },
-  "@homeContinueReading": {
-    "description": "The panel's eyebrow. Transcribed: HomeScreen.tsx:44.\n\nCONDITIONAL, because the live reading is finished (`is_fully_completed: true`) and the prototype's literal would then be false. See `homeReadingComplete`; this is the STATUS line the panel's `isFullyCompleted` drives."
-  },
-  "@homeReadingComplete": {
-    "description": "The eyebrow when `is_fully_completed` is true. NOT in the prototype — the prototype has no data layer and so no completed state."
-  },
-  "@homeReflectionProgress": {
-    "description": "`ProgressBeads.semanticLabel`'s prefix.\n\nThe prototype's beads described PASSAGE progress across a cut grid (HomeScreen.tsx:65 — `total={5} completed={2} current={2}`); these count REFLECTION QUESTIONS, which is what the live payload carries. `ProgressBeads` appends \"N of M complete\" itself.\n\nKNOWN GAP, OUT OF SCOPE HERE, RECORDED: that \"of N M complete\" tail is a hard-coded English literal inside `core/design_system/widgets/progress_beads.dart:146`, so it reaches a screen reader in English on the Arabic arm. Fixing it means changing a design-system widget's signature, which is a different task from ARB migration. Not fixed, not hidden."
-  },
-  "@homeNoQuestionsToday": {
-    "description": "In place of the bead row when a reading carries no questions.\n\nA DECISION, RECORDED RATHER THAN LEFT TO AN ACCIDENT. `ProgressBeads` clamps `total` to `0` and returns `SizedBox.shrink()`, so a reading with no questions would render NOTHING between the reference and the buttons — a gap that looks like a rendering bug and reads as \"there is nothing here\" with no way to tell that from a layout failure. This line says which it is."
-  },
-  "@homeContinueLabel": {
-    "description": "The primary CTA. Transcribed: HomeScreen.tsx:71 — `ButtonPrimary`.\n\nKEPT AS THE PROTOTYPE'S, DELIBERATELY: it names an ACTION (open today's reading) and that action is available whether or not the reading is finished. The state-dependent string is the eyebrow above, which is what actually changes."
-  },
-  "@homeStartReflection": {
-    "description": "The secondary CTA. Transcribed: HomeScreen.tsx:72 — `ButtonText`."
+    "description": "Appended to a control's accessible name while the control is inert — the library's book cards and the selah circle.\n\n**Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because four features carry this field name and `/quiz`'s differs."
   },
   "@homeRetry": {
     "description": "`ErrorView.retryLabel`. There is NO prototype error state at all — `eva/src` has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES (\"Try again\") rather than \"Retry\".\n\nNAMESPACED `home*`: three features carry this field name (`homeRetry`, `quizRetry`, `readingRetry`).\n\n`ErrorView` is the precedent for all three: a hard-coded English string inside `core/` is the half-translated UI this app exists not to ship, so the wording lives with the caller and the widget takes it."

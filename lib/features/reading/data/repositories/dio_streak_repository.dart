@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
 import 'package:evangelion/features/reading/data/datasources/streak_remote_data_source.dart';
+import 'package:evangelion/features/reading/data/mappers/streak_history_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.dart';
 
 /// The live [StreakRepository].
@@ -36,11 +38,12 @@ import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.d
 /// `dio_repositories_test.dart` sweeps both over the same nine observed statuses
 /// for exactly that reason.
 final class DioStreakRepository implements StreakRepository {
-  /// A repository over [dataSource], projecting with [mapper] and translating
-  /// faults with [errors].
+  /// A repository over [dataSource], projecting with [mapper] and [historyMapper],
+  /// and translating faults with [errors].
   const DioStreakRepository({
     required this.dataSource,
     required this.mapper,
+    required this.historyMapper,
     required this.errors,
   });
 
@@ -48,8 +51,14 @@ final class DioStreakRepository implements StreakRepository {
   /// `DioReadingRepository`'s reasons — and the endpoint path has exactly one home.
   final StreakRemoteDataSource dataSource;
 
-  /// Body → entity. `const`, and shared by every `DioStreakRepository`.
+  /// Body → `StreakSummary`. `const`, and shared by every `DioStreakRepository`.
   final StreakSummaryMapper mapper;
+
+  /// Body → `List<StreakHistoryEntry>`.
+  ///
+  /// A second mapper rather than a second method on the first, for
+  /// `StreakHistoryMapper`'s own doc: two responses, two reasons to change.
+  final StreakHistoryMapper historyMapper;
 
   /// Exception → [Failure]. `const`, and the one place a status becomes a kind.
   final ApiErrorMapper errors;
@@ -61,6 +70,18 @@ final class DioStreakRepository implements StreakRepository {
       return mapper.map(body);
     } on DioException catch (error) {
       return Result<StreakSummary>.left(errors.fromDioException(error));
+    }
+  }
+
+  @override
+  Future<Result<List<StreakHistoryEntry>>> history() async {
+    try {
+      final Object? body = await dataSource.history();
+      return historyMapper.map(body);
+    } on DioException catch (error) {
+      return Result<List<StreakHistoryEntry>>.left(
+        errors.fromDioException(error),
+      );
     }
   }
 }

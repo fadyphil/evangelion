@@ -7,6 +7,7 @@ import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
@@ -15,6 +16,7 @@ import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
@@ -370,6 +372,77 @@ void main() {
           // and equality genuinely differ.
           (field: 'litAt', value: _skyEntry(litAt: _laterInstant())),
         ],
+      );
+    });
+
+    test('`StreakHistoryEntry`', () {
+      // Phase 5.2's one. Twelve fields, every one a scalar, and the equality
+      // that matters is the whole row: the last-light card's body is built
+      // from four of these fields and the journey's rings (Task 5.6) from the
+      // rest, so a partial comparison would let a row that changed its counts
+      // read as the same day.
+      _equalAndDistinct('StreakHistoryEntry', _historyRow(), _historyRow());
+      _differsInEveryField(
+        'StreakHistoryEntry',
+        _historyRow(),
+        fields: 12,
+        variants: <({String field, StreakHistoryEntry value})>[
+          (field: 'readingId', value: _historyRow(readingId: _otherUserId())),
+          (
+            field: 'scheduledDate',
+            value: _historyRow(scheduledDate: '2026-10-04'),
+          ),
+          (field: 'bookNumber', value: _historyRow(bookNumber: 19)),
+          (field: 'bookNameEn', value: _historyRow(bookNameEn: 'Psalms')),
+          (field: 'bookNameAr', value: _historyRow(bookNameAr: 'المزامير')),
+          (field: 'referenceEn', value: _historyRow(referenceEn: 'Ps 23:1')),
+          (
+            field: 'referenceAr',
+            value: _historyRow(referenceAr: 'المزامير 23: 1'),
+          ),
+          (field: 'totalQuestions', value: _historyRow(totalQuestions: 6)),
+          (
+            field: 'answeredQuestions',
+            value: _historyRow(answeredQuestions: 2),
+          ),
+          (field: 'correctAnswers', value: _historyRow(correctAnswers: 1)),
+          (field: 'pointsEarned', value: _historyRow(pointsEarned: 10)),
+          (field: 'isCompleted', value: _historyRow(isCompleted: true)),
+        ],
+      );
+    });
+
+    test('`LibraryBook`', () {
+      // Phase 5.2's other one, and it is ADR-0022's fiction made data: the
+      // equality that matters is the card's identity (id, names, category,
+      // sealed) plus the wash (`bloomArgb`) the carousel paints. The nullable
+      // `verseCount` gets BOTH variants — present and absent — because the
+      // sealed books carry no count, and a freezed `==` that treated an absent
+      // field as equal to a present one would let a book that gained a count
+      // read as the same card.
+      _equalAndDistinct('LibraryBook', _libraryBook(), _libraryBook());
+      _differsInEveryField(
+        'LibraryBook',
+        _libraryBook(),
+        fields: 7,
+        variants: <({String field, LibraryBook value})>[
+          (field: 'id', value: _libraryBook(id: 'john')),
+          (field: 'nameEn', value: _libraryBook(nameEn: 'john')),
+          (field: 'nameAr', value: _libraryBook(nameAr: 'يوحنا')),
+          (
+            field: 'category',
+            value: _libraryBook(category: LibraryCategory.gospel),
+          ),
+          (field: 'sealed', value: _libraryBook(sealed: true)),
+          (field: 'bloomArgb', value: _libraryBook(bloomArgb: 0x80F4E3B2)),
+          (field: 'verseCount', value: _libraryBook(verseCount: null)),
+        ],
+        // `verseCount: null` is the *absent* variant against a base that has
+        // one; every other type in this file uses `null` only where the field
+        // itself is nullable, and this is the second of those.
+        note:
+            'the nullable `verseCount` is varied to null, which is the sealed '
+            'books\' real state (`redesign.html:1032-1035` holds no verse array)',
       );
     });
 
@@ -845,15 +918,19 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(43),
+        hasLength(45),
         reason:
             'the converted set moved. 25 classes, 14 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
             '`UserSettings` and `SettingsState`, Phase 1 added '
             '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard`, '
             '`LeaderboardQuery` and `LeaderboardState`, Phase 3 added '
-            '`SkyEntry` and `SkyState`. If this number moved, the migration or '
-            'the phase moved and this file has to be told',
+            '`SkyEntry` and `SkyState`, and Phase 5.2 added `StreakHistoryEntry` '
+            'and `LibraryBook` — the last of which is the first freezed type '
+            'under `features/` whose equality is a *fiction\'s* equality, '
+            'because the catalogue is ADR-0022\'s invented data behind a port. '
+            'If this number moved, the migration or the phase moved and this '
+            'file has to be told',
       );
       for (final String name in _assertedTypeNames) {
         expect(
@@ -991,6 +1068,9 @@ const Set<String> _assertedTypeNames = <String>{
   'StreakSummary',
   // Phase 3's one: the witness sky's lit verse, read by three features.
   'SkyEntry',
+  // Phase 5.2's two: `/`'s last-light row and the catalogue's card.
+  'StreakHistoryEntry',
+  'LibraryBook',
   // Phase 3's other one: the witness sky's state, held by `SkyCubit`. The second
   // type in the app with a `List` field, so its `==` is asserted over list
   // *contents* — a cubit that emitted a fresh list with the same stars must not
@@ -1280,6 +1360,52 @@ SubmitAnswerParams _params({
   readingId: _text(readingId),
   questionId: _text(questionId),
   answer: _text(answer),
+);
+
+StreakHistoryEntry _historyRow({
+  String readingId = 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+  String scheduledDate = '2026-10-03',
+  int bookNumber = 43,
+  String bookNameEn = 'John',
+  String bookNameAr = 'يوحنا',
+  String referenceEn = 'John 3:1-5',
+  String referenceAr = 'يوحنا 3: 1-5',
+  int totalQuestions = 5,
+  int answeredQuestions = 5,
+  int correctAnswers = 4,
+  int pointsEarned = 40,
+  bool isCompleted = false,
+}) => StreakHistoryEntry(
+  readingId: _text(readingId),
+  scheduledDate: _text(scheduledDate),
+  bookNumber: _int(bookNumber),
+  bookNameEn: _text(bookNameEn),
+  bookNameAr: _text(bookNameAr),
+  referenceEn: _text(referenceEn),
+  referenceAr: _text(referenceAr),
+  totalQuestions: _int(totalQuestions),
+  answeredQuestions: _int(answeredQuestions),
+  correctAnswers: _int(correctAnswers),
+  pointsEarned: _int(pointsEarned),
+  isCompleted: _bool(isCompleted),
+);
+
+LibraryBook _libraryBook({
+  String id = 'psalms',
+  String nameEn = 'psalms',
+  String nameAr = 'المزامير',
+  LibraryCategory category = LibraryCategory.poetry,
+  bool sealed = false,
+  int bloomArgb = 0x8CE457D6,
+  int? verseCount = 6,
+}) => LibraryBook(
+  id: _text(id),
+  nameEn: _text(nameEn),
+  nameAr: _text(nameAr),
+  category: category,
+  sealed: _bool(sealed),
+  bloomArgb: _int(bloomArgb),
+  verseCount: verseCount == null ? null : _int(verseCount),
 );
 
 SkyEntry _skyEntry({

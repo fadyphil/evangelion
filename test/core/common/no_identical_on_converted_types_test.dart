@@ -89,13 +89,14 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(43),
+        hasLength(45),
         reason:
             'the converted set moved, so the table\'s flags are stale. 34 was the '
             'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`, '
             'Phase 1 converted `LeaderboardRow`, `LeaderboardStanding`, '
             '`LeaderboardBoard`, `LeaderboardQuery` and `LeaderboardState`, '
-            'and Phase 3 converted `SkyEntry` and `SkyState`',
+            'Phase 3 converted `SkyEntry` and `SkyState`, and Phase 5.2 converted '
+            '`StreakHistoryEntry` and `LibraryBook`',
       );
     });
   });

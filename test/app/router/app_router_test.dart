@@ -635,8 +635,10 @@ void main() {
 /// Duplicated rather than parameterised for one call site: `routerHost`'s own doc
 /// records that the app's shell is not this suite's to reshape, and a parameter
 /// defaulted to `const []` is a parameter nobody sets — which is the same
-/// argument-as-burden this project has recorded against `TodayReadingPanel`'s named
-/// constructors.
+/// argument-as-burden `GlassSurface.seam`'s doc records against the two sentinel
+/// spellings it refused, and which the deleted `TodayReadingPanel`'s named
+/// constructors recorded before it (Phase 5.2 removed the panel with the preview;
+/// the argument is the project's, not the widget's).
 Widget _hostWithObservers(AppRouter router, List<NavigatorObserver> observers) {
   if (!getIt.isRegistered<AuthBloc>()) {
     registerTestAuthBloc();

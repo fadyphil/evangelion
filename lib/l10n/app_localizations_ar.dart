@@ -34,49 +34,85 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authUnavailableSuffix => 'غير متاح في هذه النسخة';
 
   @override
-  String get homeWordmark => 'Evangelion';
+  String get homeGreetingMorning => 'صباح النور';
 
   @override
-  String get homeGreetingMorning => 'صباح الخير';
+  String get homeGreetingAfternoon => 'نهارك نور';
 
   @override
-  String get homeGreetingAfternoon => 'نهار الخير';
-
-  @override
-  String get homeGreetingEvening => 'مساء الخير';
+  String get homeGreetingEvening => 'مساء النور';
 
   @override
   String get homeGreetingSeparator => '، ';
 
   @override
-  String get homeStreakGlowing => 'سلسلتك متوهجة. حافظ عليها.';
-
-  @override
-  String get homeStreakResting => 'ابدأ سلسلة اليوم. يكفي قراءة واحدة.';
-
-  @override
   String get homeStreakLabel => 'أيام متتالية';
-
-  @override
-  String get homeAvatarLabel => 'الحساب';
 
   @override
   String get homeUnavailableSuffix => 'غير متاح في هذه النسخة';
 
   @override
-  String get homeTodayReading => 'قراءة اليوم';
+  String get homeGreetingVigil => 'سهر الليل';
 
   @override
-  String get homeContinueReading => 'متابعة القراءة';
+  String get homePeace => 'سلام';
 
   @override
-  String get homeReadingComplete => 'اكتملت القراءة';
+  String get homeDays => 'أيام';
 
   @override
-  String get homeReflectionProgress => 'أسئلة التأمل المجابة';
+  String get homeVerseOfTheDay => 'آية اليوم';
 
   @override
-  String get homeNoQuestionsToday => 'لا توجد أسئلة تأمل اليوم';
+  String get homeLastLight => 'آخر نور';
+
+  @override
+  String get homeNoLightRef => '—';
+
+  @override
+  String get homeNoLight => 'لم يُستقبل نور بعد — افتح كتابًا بالأسفل';
+
+  @override
+  String get homeResumeHint => 'عُد إلى حيث تركت النور';
+
+  @override
+  String get homeSelah => 'سِلاه';
+
+  @override
+  String get homeSecondsOfSilence => 'ثانية من الصمت';
+
+  @override
+  String get homeTheLibrary => 'المكتبة';
+
+  @override
+  String get homeScrolls => 'دروج';
+
+  @override
+  String get homeOpenBooks => 'مفتوحة';
+
+  @override
+  String get homeVerses => 'آيات';
+
+  @override
+  String get homeSealed => 'مختوم';
+
+  @override
+  String get homeCategoryPoetry => 'شعر';
+
+  @override
+  String get homeCategoryGospel => 'إنجيل';
+
+  @override
+  String get homeCategoryTorah => 'توراة';
+
+  @override
+  String get homeCategoryProphets => 'أنبياء';
+
+  @override
+  String get homeCategoryHistory => 'تاريخ';
+
+  @override
+  String get homeCategoryApocalypse => 'رؤيا';
 
   @override
   String get leaderboardTitle => 'ترتيب المجموعة';
@@ -110,9 +146,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get leaderboardOpenFull => 'عرض الكل';
 
   @override
-  String get leaderboardCardTitle => 'هذا الأسبوع';
-
-  @override
   String leaderboardRowSemantics(
     int count,
     String digits,
@@ -136,12 +169,6 @@ class AppLocalizationsAr extends AppLocalizations {
     });
     return '$_temp0، $initials، المركز $rank$_temp1';
   }
-
-  @override
-  String get homeContinueLabel => 'متابعة';
-
-  @override
-  String get homeStartReflection => 'ابدأ التأمل';
 
   @override
   String get homeRetry => 'حاول مرة أخرى';

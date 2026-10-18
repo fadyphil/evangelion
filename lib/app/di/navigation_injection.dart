@@ -9,7 +9,8 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
+import 'package:evangelion/features/home/domain/usecases/load_last_light.dart';
+import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -186,8 +187,9 @@ void configureNavigation() {
   final HomeBloc homeBloc = HomeBloc(
     loadTodayReading: getIt<LoadTodayReading>(),
     loadStreakSummary: getIt<LoadStreakSummary>(),
+    loadLastLight: getIt<LoadLastLight>(),
+    loadLibraryCatalogue: getIt<LoadLibraryCatalogue>(),
     getReaderSession: getIt<GetReaderSession>(),
-    loadLeaderboardPreview: getIt<LoadLeaderboardPreview>(),
   );
   // **Built here, not resolved from the locator** — see the `ReadingCubit` section.
   final ReadingCubit readingCubit = ReadingCubit(

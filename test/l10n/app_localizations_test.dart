@@ -73,9 +73,17 @@ void main() {
   /// and touches none of them — so this ARB-level table no longer sees them.
   /// Their Latin-on-the-Arabic-arm correctness is asserted where they are
   /// painted: `arabic_typography_test.dart`'s `/login` group.
-  const Set<String> latinIsCorrect = <String>{
-    'homeWordmark', // the product's mark, drawn by the top bar
-  };
+  ///
+  /// ## AND IT IS **EMPTY** IN PHASE 5.2, WHICH IS A RESULT RATHER THAN A GAP
+  ///
+  /// The one member the redesigned home might have contributed — a wordmark key —
+  /// does not exist: the redesign's `/` has no wordmark, and its two card
+  /// eyebrows, its carousel label and its four category labels are all real
+  /// Arabic on the Arabic arm. Every value the table now holds is prose in its
+  /// own script, so there is nothing to exempt. An empty set here is the
+  /// strongest state it can be in, and a key that arrives holding Latin has to
+  /// argue its way in rather than join a list that already made that argument.
+  const Set<String> latinIsCorrect = <String>{};
 
   /// The keys whose two values are **identical**, and must stay identical.
   ///
@@ -84,7 +92,16 @@ void main() {
   /// left this set in Phase 5.1: the redesign's placeholders are common nouns and
   /// the app localizes them (`authEmailHint` says why), so the two arms now
   /// legitimately differ.
-  const Set<String> mustBeIdentical = <String>{'homeWordmark'};
+  ///
+  /// **One member, and it is a glyph and not a sentence.** `homeWordmark` died
+  /// with the top bar in Phase 5.2 — the redesign's `/` has no wordmark at all
+  /// (`eva/redesign.html:513-538` draws a caption, a greeting and a chip) — and
+  /// `homeNoLightRef` took the slot: `redesign.html:1193` writes
+  /// `el('lastRef').textContent = '—'` in **both** directions, because an em dash
+  /// is a typographic "nothing" rather than a word any language has a translation
+  /// of. That is the only legitimate identity left, and the set is now small
+  /// enough to read as a claim instead of a list.
+  const Set<String> mustBeIdentical = <String>{'homeNoLightRef'};
 
   group('the ARB pair, structurally', () {
     test('the walk finds the keys, so nothing below is vacuous', () {
@@ -94,29 +111,12 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        102,
+        111,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
-            '**93 → 95 in Phase 10**, for `settingsPreferencesUnavailable` and '
-            '`settingsRetry`: the notice `/settings` renders when `SettingsCubit` '
-            'reports `SettingsStatus.failed`, which was a reachable state the app '
-            'reached and displayed nothing about. Neither key is a plural and '
-            'neither holds a placeholder, so the two ICU-plural groups below are '
-            'unaffected — which is why this suite went red on exactly two numbers '
-            'and on nothing else.\n\n'
-            '**95 → 107 in Phase 1**, for the twelve `leaderboard*` keys: the '
-            'cohort ranking\'s title, three window labels, its empty state\'s title '
-            'and body, the reader\'s own row, the unranked sentence, the score unit, '
-            'the link to `/leaderboard`, and Home\'s card title. None is a plural and '
-            'none holds a placeholder — the ranks and scores are rendered as numbers '
-            'beside their labels rather than inside them, precisely so this step did '
-            'not have to touch an ICU group.\n\n'
-            'The three window labels are **not** the wire codes. `all_time` is an '
-            'identifier in `leaderboard_board.dart`, and a reader needs the words '
-            '"All time" instead.\n\n'
             '**107 → 111 for `SealFab`**, the four keys decision 155 brought back: the '
             'trigger\'s two names (`sealFabOpen` / `sealFabClose`, which differ because '
             'a button that toggles must say which way it will go — the defect '
@@ -143,7 +143,28 @@ void main() {
             '(`:508`, `:976`). The wordmark and the tagline left the table for '
             'widget literals: the redesign renders them untranslated in both '
             'directions, and `arabic_typography_test.dart` now asserts that '
-            'instead of this table.',
+            'instead of this table.\n\n'
+            '**102 → 111 in Phase 5.2**, for the redesigned home — '
+            '`eva/redesign.html:513-538`, and ADR-0022 above it: twelve keys died '
+            'with the elements the redesign removed (the wordmark, the avatar\'s '
+            'label, the two streak sentences, today\'s-reading panel and its '
+            'progress lines, the continue/start-reflection pair, the no-questions '
+            'line, and the board card\'s title, whose screen now owns its copy) and '
+            'twenty-one arrived as the redesign\'s own table rows — the four greeting '
+            'words (`:926`), the two card eyebrows and the empty last-light\'s body '
+            '(`:927-929`), the resume hint (`:928`), the em-dash reference '
+            '(`:1193`), the carousel\'s label, its two count units and the four '
+            'category labels (`:930`, `:1036`), the sealed badge (`:972`), the '
+            'selah title and its seconds unit (`:966`, `:970`), the streak\'s label '
+            'prefix and its day unit (`:925`), the verses unit (`:966`), and '
+            '`homePeace` (`:993`). None is a plural and none holds a placeholder — '
+            'the composed sentences are deliberately Dart, and '
+            '`home_l10n_test.dart` asserts the shape this refusal protects.\n\n'
+            '**The numerals are not in these values.** `libCount`\'s `٦` is the '
+            'prototype\'s Arabic arm *rendering*, and this client draws numerals '
+            'through `digits` (`l10n.dart:105`) — so a value holding a digit is a '
+            'hard-coded count, which the bare-number scan in '
+            '`home_l10n_test.dart` refuses.',
       );
       expect(keysOf(ar), isNotEmpty);
     });
@@ -320,12 +341,38 @@ void main() {
         'authEnterTheWord': 'redesign.html:508',
         'authEmailInvalid': 'redesign.html:976',
         'authPasswordTooShort': 'redesign.html:976',
-        'homeWordmark': 'ds.tsx:508',
-        'homeStreakGlowing': 'HomeScreen.tsx:30',
-        'homeContinueReading': 'HomeScreen.tsx:44',
-        'homeContinueLabel': 'HomeScreen.tsx:71',
-        'homeStartReflection': 'HomeScreen.tsx:72',
-        'homeAvatarLabel': 'ds.tsx:525',
+        // Phase 5.2's redesigned home. **Every key the redesign introduced carries
+        // a `redesign.html` line**, and the six that have none are the ones the
+        // fiction invented — the streak prefix (`homeStreakLabel`, whose words the
+        // prototype renders but never as an accessible name), the four category
+        // labels' *grammar* (`homeCategoryHistory` and `homeCategoryApocalypse`
+        // are `CATS` rows, so they cite `:1036`), `homeGreetingSeparator` and
+        // `homeDays`, whose prototype values are baked into literals rather than
+        // rows. Each of those says so in its description instead of a line.
+        'homePeace': 'redesign.html:993',
+        'homeGreetingMorning': 'redesign.html:926',
+        'homeGreetingAfternoon': 'redesign.html:926',
+        'homeGreetingEvening': 'redesign.html:926',
+        'homeGreetingVigil': 'redesign.html:926',
+        'homeVerseOfTheDay': 'redesign.html:927',
+        'homeLastLight': 'redesign.html:928',
+        'homeResumeHint': 'redesign.html:928',
+        'homeNoLight': 'redesign.html:929',
+        'homeNoLightRef': 'redesign.html:1193',
+        'homeTheLibrary': 'redesign.html:930',
+        'homeScrolls': 'redesign.html:930',
+        'homeOpenBooks': 'redesign.html:930',
+        'homeCategoryPoetry': 'redesign.html:1036',
+        'homeCategoryGospel': 'redesign.html:1036',
+        'homeCategoryTorah': 'redesign.html:1036',
+        'homeCategoryProphets': 'redesign.html:1036',
+        'homeCategoryHistory': 'redesign.html:1036',
+        'homeCategoryApocalypse': 'redesign.html:1036',
+        'homeSelah': 'redesign.html:970',
+        'homeSecondsOfSilence': 'redesign.html:966',
+        'homeSealed': 'redesign.html:972',
+        'homeVerses': 'redesign.html:966',
+        'homeDays': 'redesign.html:925',
         // Phase 9, `/settings`. The full citation list, one per transcribed key.
         'settingsTitle': 'SettingsScreen.tsx:43',
         'settingsBack': 'SettingsScreen.tsx:39',
@@ -418,9 +465,11 @@ void main() {
         'authEmailInvalid',
         'authPasswordTooShort',
         'homeGreetingMorning',
-        'homeTodayReading',
+        'homeGreetingVigil',
+        'homeVerseOfTheDay',
+        'homeLastLight',
+        'homeNoLight',
         'homeRetry',
-        'homeContinueLabel',
       ]) {
         expect(
           RegExp('[؀-ۿ]').hasMatch(ar[key]! as String),

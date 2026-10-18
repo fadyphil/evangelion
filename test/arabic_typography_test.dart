@@ -42,11 +42,11 @@
 library;
 
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/arabic_digits.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
@@ -58,6 +58,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
+import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
@@ -67,11 +68,13 @@ import 'package:evangelion/features/settings/presentation/pages/settings_page.da
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
 import 'support/arabic_typography_gate.dart';
+
 import 'support/design_system_harness.dart';
 import 'support/font_coverage.dart';
 import 'support/home_harness.dart' hide CountingReadingRepository;
@@ -82,54 +85,81 @@ import 'support/settings_harness.dart';
 
 void main() {
   group('`/` — the home screen', () {
-    /// The seven Arabic runs `/` renders, measured off the rendered tree.
+    /// The Arabic runs the redesigned `/` renders, measured off the rendered tree.
     ///
-    /// **Five of the seven were wrong before this phase.** `CormorantGaramond` for
-    /// the greeting's lead-in, `DMSans` for the streak subtitle, `SpaceMono` for the
-    /// panel status line, `DMSans` for the reference and `DMSans` for `ابدأ التأمل`.
-    /// Two were already right and are listed so a regression names them: the preview
-    /// (Phase 6's defect C1) and the `Continue` button (Phase 7's decision 66).
+    /// ## BUILT FROM THE TABLES, THE FIXTURES AND THE WIDGETS — **NOT** TYPED OUT
     ///
-    /// ## BUILT FROM THE TABLES AND THE FIXTURES, **NOT** TYPED OUT
+    /// The old suite's lesson stands, and Phase 5.2 added a third source: the two
+    /// cards' eyebrows are `Text.rich` compositions, and the gate reads a rich
+    /// text as **one run per span** (`renderedRuns`' doc says why a lossy join
+    /// would hide a wrong-family span). So each eyebrow contributes TWO entries —
+    /// the label-with-separator and the reference — and both come from the same
+    /// derivation the widget runs: the label from `AppLocalizationsAr()`, the
+    /// reference from the fixture.
     ///
-    /// The first version of this list was Arabic literals, and every one of them is a
-    /// second copy of a string that already lives in `AppLocalizations` or in the live
-    /// payload. Four went wrong on the first run — a missing combining mark is
-    /// invisible in a diff and the failure then reads as "the widget rendered the
-    /// wrong string" rather than "the test typed the wrong string". So the UI strings
-    /// come from `AppLocalizationsAr()` and the payload strings from the fixture, and
-    /// nothing here is transcribed.
-    ///
-    /// The one composed value, the greeting's lead-in, is `greetingLead`'s own
-    /// output for the period the fixture's clock resolves to — which is exactly the
-    /// derivation the panel uses, and is asserted to be a *distinct* string from the
-    /// rest so a change to it cannot silently collapse two runs into one.
+    /// The one composed value the old list carried (`greetingLead`) is gone with
+    /// the sentence greeting: the redesign's greeting is `peaceWith(name)`, whose
+    /// name is the session's **first token** (`home_l10n.dart`'s `firstNameOf`) —
+    /// `سلام، David` on the Arabic arm with this fixture's `David Mina`, which is
+    /// a mixed-script run and is in the list *because* it is what the reader
+    /// actually sees.
     final AppLocalizations ar = AppLocalizationsAr();
-    final List<String> arabic = <String>[
-      ar.greetingLead(GreetingPeriod.morning, hasName: true),
-      ar.homeStreakResting,
-      // **`continueReading`, not `readingComplete`** — and the reason is the
-      // fixture, not a slip: `liveArabicScripture.isFullyCompleted` is **false**,
-      // because `home_harness.dart`'s doc says the Arabic arm must be unfinished so
-      // both branches of the eyebrow are reachable. The completed branch is gated by
-      // its own test below rather than being assumed here.
-      ar.homeContinueReading,
-      liveArabicScripture.verses.first.textClean!,
-      liveArabicScripture.reference,
-      ar.homeContinueLabel,
-      ar.homeStartReflection,
-      // The leaderboard card's five runs, which arrived when the card was placed on
-      // `/`. **Three of them were rendering in Latin-only faces** — the title in
-      // `SpaceMono` (via `monoCaps`) and the unranked line and both empty-state runs
-      // in `DMSans` — so on the Arabic arm this card was four strings of tofu per
-      // state, on the screen every reader lands on first. The gate named them as
-      // `SpaceMono هذا الأسبوع` and `DMSans غير مصنّف بعد` before the widget was
-      // fixed; `arabicAware` on all four runs is the fix.
-      ar.leaderboardCardTitle,
-      ar.leaderboardUnranked,
-      ar.leaderboardOpenFull,
-      ar.leaderboardEmptyTitle,
-      ar.leaderboardEmptyBody,
+
+    /// The runs every arm carries, whatever the reading resolved to.
+    ///
+    /// [reading] is `false` for the failed arm, whose reading section is an
+    /// `ErrorView` — and the parameter, rather than a set-difference at the call
+    /// site, is what the *fixture collision* forces: the day's card's Arabic
+    /// reference and the last light's are the same string (`يوحنا 3: 1-5`), so
+    /// removing "the reference" by value would remove the last light's too. The
+    /// runs are filtered by **section**, never by value.
+    List<String> sharedRuns({required bool reading}) => <String>[
+      // The caption, the greeting and the chip: `home_l10n.dart`'s `greetingWord`
+      // switch, `peaceWith`'s first-token join, and the unit beside the numeral.
+      // The chip's numeral itself is NOT listed here and that is deliberate: `٠`
+      // is in the gate's Arabic range, and it is asserted on its own below with
+      // the family that carries it — see the tofu correction in `streak_chip.dart`.
+      ar.greetingWord(GreetingPeriod.morning),
+      ar.peaceWith(firstNameOf('David Mina')),
+      // **The numeral is its own run, and it is Arabic script.** `٠` (U+0660) is
+      // inside the gate's Arabic range, so the family gate already polices it —
+      // this entry is what makes the *set* honest, and the row below asserts the
+      // family that carries it. The first version of this list omitted it and the
+      // gate answered with a rendered run nothing declared, which is the gate
+      // working.
+      ar.digits(0),
+      ar.homeDays,
+      // The day's card: the eyebrow's label span (` · ` included, exactly as the
+      // widget writes it) and the reference span, then the verse. **Absent from
+      // the failed arm**, whose reading section is an `ErrorView` and renders
+      // none of them.
+      if (reading) '${ar.homeVerseOfTheDay} · ',
+      if (reading) liveArabicScripture.reference,
+      if (reading) liveArabicScripture.verses.first.textClean!,
+      // The last-light card, in its READY arm: the same eyebrow shape, the hint,
+      // and the reference the server composed — read through the widget's own
+      // `referenceFor` so the Arabic arm's spacing (`٢٣: ١-٦`) is the served one.
+      '${ar.homeLastLight} · ',
+      liveStreakHistoryEntry.referenceAr,
+      ar.homeResumeHint,
+      // The selah card and the library row, with their composed counts in this
+      // arm's numerals (`digits`, which is `:988`'s `N`).
+      ar.homeSelah,
+      ar.selahSeconds(SelahCard.defaultSeconds),
+      ar.homeTheLibrary,
+      ar.scrollsOpen(scrolls: 6, open: 4),
+    ];
+
+    /// The two book cards a 320-wide surface builds first (`psalms`, `john`).
+    ///
+    /// **The caption is ONE run, and the first version of this list had it as
+    /// two.** The carousel composes `category · count` into a single `Text`
+    /// (`library_carousel.dart`'s caption), so the gate reads one run per card,
+    /// and splitting it in the expectation fails with four entries the rendered
+    /// tree never held — measured on this suite's first run.
+    List<String> builtBookRuns() => <String>[
+      'المزامير', '${ar.homeCategoryPoetry} · ${ar.verseCount(6)}', // psalms
+      'يوحنا', '${ar.homeCategoryGospel} · ${ar.verseCount(5)}', // john
     ];
 
     testWidgets('the Arabic arm, with the live Arabic payload', (
@@ -140,8 +170,39 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
-      await expectArabicTypography(tester, screen: '/', expectedArabic: arabic);
+      await expectArabicTypography(
+        tester,
+        screen: '/',
+        expectedArabic: <String>[
+          ...sharedRuns(reading: true),
+          ...builtBookRuns(),
+        ],
+      );
       await expectNoTofuInAnyRun(tester, screen: '/');
+    });
+
+    testWidgets('and the chip\'s numeral is in Amiri, not the scripture face', (
+      WidgetTester tester,
+    ) async {
+      // The run the list above deliberately omits, asserted on its own: `٠` is
+      // inside the gate's Arabic range, so the family gate would already refuse
+      // EB Garamond for it — this row exists to name the defect that was here,
+      // because the first version of the chip rendered `digits(count)` in
+      // `scriptureFamily` and the *browser* the prototype runs in falls back
+      // per character while this client does not.
+      final HomeHarness h = harness(
+        reading: const Right<Failure, ScriptureText>(liveArabicScripture),
+      );
+      await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
+
+      expect(
+        familyOfText(tester, ar.digits(0)),
+        EvaTypography.arabicFamily,
+        reason:
+            'Arabic-Indic digits are Arabic script, and EB Garamond has '
+            'zero Arabic glyphs — the prototype only escapes this because a '
+            'browser falls back per character',
+      );
     });
 
     testWidgets('and the same screen in English renders no Arabic at all', (
@@ -152,16 +213,18 @@ void main() {
       await _expectNoArabic(tester, '/');
     });
 
-    testWidgets('the COMPLETED branch of the same status line', (
+    testWidgets('the EMPTY last light replaces its two runs with one sentence', (
       WidgetTester tester,
     ) async {
-      // `liveArabicScripture` is unfinished so the other branch is reachable, which
-      // means a gate that declared only `continueReading` would never see
-      // `readingComplete` — the run most likely to be dropped in a refactor, and the
-      // one the review named.
+      // `redesign.html:1192-1197`: `lastRef` becomes `—` (identical across the
+      // arms, so NOT an Arabic run), the body becomes `noLight`, the hint is
+      // gone with the tap, and the eyebrow\'s reference span disappears — so
+      // this arm has one run fewer than the ready one and the body\'s sentence
+      // is the longest string on the screen.
       final HomeHarness h = harness(
-        reading: Result<ScriptureText>.of(
-          liveArabicScripture.copyWith(isFullyCompleted: true),
+        reading: const Right<Failure, ScriptureText>(liveArabicScripture),
+        history: const Right<Failure, List<StreakHistoryEntry>>(
+          <StreakHistoryEntry>[],
         ),
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
@@ -170,14 +233,15 @@ void main() {
         tester,
         screen: '/',
         expectedArabic: <String>[
-          for (final String run in arabic)
-            if (run != ar.homeContinueReading) run,
-          ar.homeReadingComplete,
+          ...sharedRuns(reading: true)
+              .where((String run) => run != ar.homeResumeHint),
+          ...builtBookRuns(),
+          ar.homeNoLight,
         ],
       );
     });
 
-    testWidgets('the FAILED state is gated on its own list, and its '
+    testWidgets('the FAILED reading is gated on its own list, and its '
         '`Failure.message` renders in the ambient arm', (
       WidgetTester tester,
     ) async {
@@ -187,39 +251,35 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
-      // **Three runs, not seven.** The panel has no reading, so the preview, the
-      // reference and both controls are genuinely absent — and a gate that declared
-      // the content screen's list here would fail for the wrong reason and send the
-      // next reader looking for a layout bug.
+      // The reading section has no payload, so the verse, the reference span and
+      // the two built book cards are NOT declared here — a gate that declared
+      // the ready screen\'s list on the failed one would fail for the wrong
+      // reason and send the next reader looking for a layout bug. The greeting
+      // block, the chip, the last-light card, the selah card and the library
+      // row all render independently of the reading, which is the
+      // four-independent-sections property.
       await expectArabicTypography(
         tester,
         screen: '/',
         expectedArabic: <String>[
-          ar.greetingLead(GreetingPeriod.morning, hasName: true),
-          ar.homeStreakResting,
-          // The retry label — an Arabic run this phase's own first draft of the list
-          // forgot, which the gate caught. That is the gate working.
+          ...sharedRuns(reading: false),
+          ...builtBookRuns(),
+          // The retry label — the one run the reading's failure adds, in the
+          // arm's family like every other app string. **The failure's own
+          // message is deliberately NOT declared**: this fixture's message is
+          // pure Latin (`verses` is absent…), so it is not an Arabic run, and
+          // the family assertion below is about the *rendering rule* the
+          // message is subject to, not about this fixture's characters.
           ar.homeRetry,
-          // The card renders independently of the reading, so its five runs are here
-          // too. The reading's own failure does **not** remove the leaderboard's
-          // state, which is the four-independent-sections property — and the reason
-          // these strings appear on a screen whose reading panel is an `ErrorView`.
-          ar.leaderboardCardTitle,
-          ar.leaderboardUnranked,
-          ar.leaderboardOpenFull,
-          ar.leaderboardEmptyTitle,
-          ar.leaderboardEmptyBody,
         ],
       );
       expect(
         familyOfText(tester, homeReadingFailure.message),
         EvaTypography.arabicFamily,
         reason:
-            '`ErrorView` renders a `Failure.message` in `titleMedium` — DM Sans — '
-            'and DM Sans carries no Arabic at all, so a backend that localised its '
-            'errors would render tofu on the one screen where something has already '
-            'gone wrong. Amiri carries ASCII as well, so the English case is '
-            'unaffected.',
+            'the message is the SERVER\'s string, and the ambient arm decides '
+            'the family it renders in — the same rule `retryLabelFamily` '
+            'records for the retry label',
       );
     });
   });

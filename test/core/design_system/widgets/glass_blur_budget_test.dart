@@ -89,14 +89,24 @@
 /// | directory | `GlassTier.blur` allowance | direct `BackdropFilter` allowance |
 /// | --- | --- | --- |
 /// | `lib/features/` | **1** — Home's today's-reading panel | 0 |
-/// | `lib/core/design_system/widgets/` | 1 — `GlassSurface`'s own tier test | 0 outside `glass_surface.dart` |
+/// | `lib/core/design_system/widgets/`, `glass_surface.dart` **excluded** | **0** | 0 outside `glass_surface.dart` |
 ///
-/// The design-system allowance is 1 and not 0 because `GlassSurface` is the widget
-/// that *owns* the blur: `final Widget body = tier == GlassTier.blur ? …` is the
-/// one line in the whole tree that decides whether a `BackdropFilter` exists. A
-/// primitive cannot spend the budget — it can only pass the tier through — and
-/// pinning that at 1 is what keeps a second `GlassTier.blur` comparison inside
-/// `lib/core/design_system/widgets/` from being possible.
+/// The design-system row **excludes the owner**, and Phase 5.2 is what moved it
+/// from "1, counted" to "0, elsewhere". While `GlassSurface` decided the blur in
+/// exactly one line, a count of 1 for the whole directory was a working proxy for
+/// "no primitive decides". ADR-0022 gave the one budgeted site its wash too —
+/// `redesign.html:250` gives the home card `backdrop-filter: blur(12px)`,
+/// `.bloom` **and** `.hor` together, so `GlassTier.blur` now paints the wash and
+/// the seam as well — and the owner legitimately grew a second internal
+/// comparison (`bloomed = tier == GlassTier.bloom || tier == GlassTier.blur`).
+/// Counting the directory would put that gate at 2 and read as a violation, when
+/// both sites are the same file deciding for itself.
+///
+/// So the rule is now stated in the only form that survives the owner growing:
+/// **no file other than `glass_surface.dart` may mention `GlassTier.blur` at
+/// all** — a primitive cannot spend the budget, and cannot even compare against
+/// it — while the global ceiling drops to match, because the owner's sites are
+/// its own implementation and not budget spenders.
 ///
 /// ## FAIL-CLOSED, DELIBERATELY
 ///
@@ -198,8 +208,17 @@ void main() {
       _dartFilesUnder(_features),
       'GlassTier.blur',
     );
+    // **The owner is excluded, and the rest of the directory is at ZERO.** While
+    // GlassSurface decided the blur in one line, a directory count of 1 was a
+    // proxy for "no primitive decides"; Phase 5.2 gave the budgeted site its wash
+    // too (`redesign.html:250` — blur, `.bloom` and `.hor` together), so the
+    // owner legitimately holds two internal comparisons and the proxy broke.
+    // Excluding `glass_surface.dart` and requiring zero elsewhere is *stronger*
+    // for every primitive than the count it replaces.
     final List<String> widgets = _sitesMentioning(
-      _dartFilesUnder(_widgets),
+      _dartFilesUnder(_widgets)
+          .where((File file) => !file.uri.path.endsWith('glass_surface.dart'))
+          .toList(),
       'GlassTier.blur',
     );
 
@@ -215,23 +234,25 @@ void main() {
     );
     expect(
       widgets,
-      hasLength(lessThanOrEqualTo(1)),
+      isEmpty,
       reason:
-          'a design-system primitive cannot spend the budget: `GlassSurface` owns '
-          'the blur and every primitive passes a `tier` through. One occurrence is '
-          "GlassSurface's own `tier == GlassTier.blur` test; a second means a "
-          'primitive is deciding for itself:\n${widgets.join('\n')}',
+          'a design-system primitive cannot spend the budget OR compare against '
+          'it: `GlassSurface` is the widget that owns the blur, and its own two '
+          'comparisons (the blur decision and, since Phase 5.2, the bloom '
+          'decision) are its implementation rather than spendings. Any OTHER file '
+          'under `lib/core/design_system/widgets/` naming `GlassTier.blur` is a '
+          'primitive deciding for itself:\n${widgets.join('\n')}',
     );
     // The ceiling the rule states, over both directories together. Two separate
-    // per-directory bounds would let a third site through by arithmetic — 1 in
-    // features plus 1 in the design system is 2 — so the global figure is asserted
-    // as well as the two that make it up.
+    // per-directory bounds would let a third site through by arithmetic, so the
+    // global figure is asserted as well as the two that make it up — and it is
+    // 1 + 0 now, because the owner's comparisons are not budget spenders.
     expect(
       features.length + widgets.length,
-      lessThanOrEqualTo(1 + 1),
+      lessThanOrEqualTo(1 + 0),
       reason:
-          '§13.4 budgets ONE screen site. The one design-system occurrence is '
-          "GlassSurface's own decision, not a site, and the two together are the "
+          '§13.4 budgets ONE screen site. The design-system occurrences are '
+          "GlassSurface's own decisions, not sites, and the two together are the "
           'whole of what exists:\n${[...features, ...widgets].join('\n')}',
     );
   });

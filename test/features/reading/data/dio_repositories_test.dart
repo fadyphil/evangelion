@@ -6,6 +6,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
@@ -14,6 +15,7 @@ import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
 import 'package:evangelion/features/reading/data/datasources/reading_remote_data_source.dart';
 import 'package:evangelion/features/reading/data/datasources/streak_remote_data_source.dart';
+import 'package:evangelion/features/reading/data/mappers/streak_history_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/streak_summary_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/submit_result_mapper.dart';
 import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.dart';
@@ -25,6 +27,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../../support/contract_payloads.dart';
 import '../../../support/fake_dio.dart';
+import '../../../support/home_harness.dart';
 import '../../../support/live_payloads.dart';
 
 /// The two Dio repositories, red-first (AGENT_CONTEXT §6 names the mappers and
@@ -77,6 +80,11 @@ void main() {
     streak = DioStreakRepository(
       dataSource: StreakRemoteDataSource(dio),
       mapper: const StreakSummaryMapper(),
+      // **Required since Phase 5.2**, and a *separate* mapper rather than a second
+      // method on `StreakSummaryMapper`: the two responses have two reasons to
+      // change (`streak_history_mapper.dart`'s doc), so the port's history arm has
+      // its own projection and this file constructs it beside its sibling.
+      historyMapper: const StreakHistoryMapper(),
       errors: const ApiErrorMapper(),
     );
   });
@@ -450,6 +458,61 @@ void main() {
     });
   });
 
+  group('StreakRepository.history — the happy path', () {
+    setUp(() {
+      when(() => adapter.fetch(any(), any(), any()))
+          .thenAnswer((Invocation invocation) async {
+            sent.add(invocation.positionalArguments.first as RequestOptions);
+            return jsonBody(kLiveStreakHistoryJson, 200);
+          });
+    });
+
+    test('resolves the live payload\'s history, in the server\'s order', () async {
+      // The whole body is handed to the mapper rather than sliced first —
+      // `streak_remote_data_source.dart`'s `history()` doc explains why picking
+      // `body['history']` there would be a second place claiming to know the
+      // shape — so this asserts the **entity list** the mapper produced, and the
+      // payload's own doc explains why its scalars must be present for that to
+      // be a test of the drop.
+      final Result<List<StreakHistoryEntry>> result = await streak.history();
+
+      expect(result.isRight(), isTrue);
+      final List<StreakHistoryEntry> entries =
+          (result as Right<Failure, List<StreakHistoryEntry>>).value;
+      expect(entries, hasLength(2));
+      expect(
+        entries.map((StreakHistoryEntry e) => e.scheduledDate).toList(),
+        <String>['2026-10-03', '2026-10-02'],
+        reason: '`scheduled_date DESC` (`streak.service.ts:93`), verbatim',
+      );
+      expect(entries.first.referenceEn, 'John 3:1-5');
+      expect(entries.first.referenceAr, 'يوحنا 3: 1-5');
+    });
+
+    test('asks for exactly the one documented URL', () async {
+      await streak.history();
+
+      expect(sent, hasLength(1));
+      expect(sent.single.uri.path, '/api/v1/streak');
+      expect(sent.single.method, 'GET');
+      // **Not `/summary`** — the two endpoints are one path apart and a client
+      // that fetched the summary for its history would pass this suite's
+      // shape assertions and render the same card forever, because the summary
+      // has no `history[]` at all.
+      expect(sent.single.uri.path, isNot(StreakSummaryMapper.summaryEndpoint));
+    });
+
+    test('and sends `X-User-Id`, which this route also requires', () async {
+      // `streak.routes.ts` guards `/streak` exactly as it guards
+      // `/streak/summary` — absent is a 400 and empty is a 401 — so the
+      // interceptor's coverage matters on both, and the summary group above
+      // asserts the same header for the same reason.
+      await streak.history();
+
+      expect(sent.single.headers['x-user-id'], kSeededUserId);
+    });
+  });
+
   group('non-2xx — every observed status, both repositories', () {
     // The eight bodies Phase 5's decision 14 measured against `HEAD = 4a1c834`.
     const List<(int, String, FailureKind)> observed =
@@ -756,4 +819,16 @@ final class _FakeReadingRepository
           daysToMilestone: 3,
         ),
       );
+
+  /// The port's second method, added in Phase 5.2 for the last-light card.
+  ///
+  /// Answered rather than left abstract, for the same reason [summary] is: a
+  /// hand-written substitute has to be substitutable, and the LSP row below
+  /// assigns this fake to a `StreakRepository` variable — which is a compile
+  /// error, not a review finding, while the method is missing.
+  @override
+  Future<Result<List<StreakHistoryEntry>>> history() async =>
+      Result<List<StreakHistoryEntry>>.of(const <StreakHistoryEntry>[
+        liveStreakHistoryEntry,
+      ]);
 }

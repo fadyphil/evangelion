@@ -3,10 +3,14 @@ import 'dart:ui' show Tristate;
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
-import 'package:evangelion/features/home/presentation/widgets/streak_flame_row.dart';
-import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/features/home/presentation/widgets/greeting_block.dart';
+import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
+import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/streak_chip.dart';
+import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,17 +22,27 @@ import '../../../../support/home_harness.dart';
 
 /// §14 for `/`, as the table of `10-quality-gates.md` writes it.
 ///
-/// ## THE SIX ROWS, AND WHICH OF THEM `/` HAS
+/// ## THE SIX ROWS, AND WHICH OF THEM `/` HAS **NOW**
 ///
 /// | §14 row | on `/` |
 /// | --- | --- |
-/// | icon-only buttons have no accessible name | the streak's retry is icon-only |
-/// | mono-caps chips are non-focusable divs | **not applicable** — no chips on `/` |
-/// | Home's today panel is a `div onClick` | the panel, and its focus ring |
+/// | icon-only buttons have no accessible name | the streak's retry, named with the repository's message |
+/// | mono-caps chips are non-focusable divs | **not applicable** — the streak chip is not interactive at all |
+/// | Home's today panel is a `div onClick` | the day's card, its focus ring, and the last-light card beside it |
 /// | the text field has no programmatic label | **not applicable** |
 /// | no focus indicators | every interactive node |
 /// | animations ignore reduced-motion | the ambient background |
-/// | colour-only state | the bead row, which `ProgressBeads` already answers |
+/// | colour-only state | **gone with the panel** — the redesign draws no state by colour |
+///
+/// ## AND WHAT THE REDESIGN ADDED, WHICH §14 HAS NO ROW FOR
+///
+/// Two of this screen's controls are **inert by design**: the selah circle (its
+/// timer is Phase 7's) and every book card (`/reading` has no passage parameter).
+/// §14's table cannot judge them — it is written for controls that *are* live — so
+/// this file holds them to the rule `SocialAuthButton` and the login ghosts follow:
+/// **a disabled button whose name says why**, so a screen-reader user is told the
+/// control exists and that pressing it does nothing. A control that vanished would
+/// satisfy §14 and inform nobody.
 ///
 /// ## AND WHY `ensureSemantics` IS DISPOSED **IN THE BODY**
 ///
@@ -39,20 +53,14 @@ import '../../../../support/home_harness.dart';
 /// runs after that comparison, so the pattern §14 quotes verbatim fails with "A
 /// SemanticsHandle was active at the end of the test".
 ///
-/// Measured on the first run of this file: eight tests, eight of them failing for
-/// exactly that. `login_accessibility_test.dart` records the same finding and
-/// `focus_ring_gate_test.dart` carries the negative control.
-///
-/// ## AND THE THREE PROTOTYPE LITTERALS THIS PHASE REMOVED
-///
-/// `ds.tsx:507` `Evangelion`, `:516` `MK`, `:525` `12` are all values. The first is
-/// this app's name and is a **parameter**; the second and third were data and are
-/// now the session's monogram and the streak endpoint's number. Asserted here in the
-/// failing direction, because a hard-coded value and a passed-in value are identical
-/// in a diff and only one of them can be wrong.
+/// Measured on the first run of the previous version of this file: eight tests, eight
+/// of them failing for exactly that. `login_accessibility_test.dart` records the same
+/// finding and `focus_ring_gate_test.dart` carries the negative control.
 void main() {
+  final AppLocalizationsEn en = AppLocalizationsEn();
+
   group('every interactive node has a name and something a reader can do', () {
-    testWidgets('the panel is a button, named, and offers a tap', (
+    testWidgets("the day's card is a button, named, and offers a tap", (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
@@ -60,141 +68,120 @@ void main() {
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      final List<SemanticsData> tappable = nodesOffering(
-        tester,
-        SemanticsAction.tap,
-      );
-      final Iterable<SemanticsData> panel = tappable.where(
+      final Iterable<SemanticsData>
+      card = nodesOffering(tester, SemanticsAction.tap).where(
+        // **`contains` and `toUpperCase()`, and both halves matter.** The card's
+        // accessible name is the **merged** one — `VerseOfTheDayCard` passes
+        // `semanticLabel: ''` so the node reads the eyebrow, the reference and
+        // the verse (`:521-522`) and nothing else — and a merged label is the
+        // *rendered* text, which `[dir=rtl] .mono{text-transform:none}` (`:136`)
+        // leaves uppercased on the LTR arm. The name is `VERSE OF THE DAY …`
+        // where the table says `verse of the day`.
+        //
+        // Worth stating rather than working around: a suite asserting against
+        // the table's casing would read this card's accessibility as a function
+        // of a CSS text-transform, which is a coupling this file's subject does
+        // not want. `GlassSurface.semanticLabel` says why the empty string is a
+        // statement rather than a sentinel.
         (SemanticsData d) =>
-            d.label.contains(AppLocalizationsEn().homeTodayReading),
+            d.label.contains(en.homeVerseOfTheDay.toUpperCase()),
       );
 
       expect(
-        panel,
+        card,
         hasLength(1),
         reason:
-            '§14 row for this screen: the today panel was a div with an onClick. It '
-            'is now a GlassSurface with onTap, an InkWell inside a Material. So it '
-            'must be a NAMED node with a tap action, not a container.',
+            '§14 row for this screen: `#votdCard` (`:519`) is a `div` with an '
+            "`onclick` and no name at all — the prototype's own line `:1318` binds "
+            '`el(\'votdCard\').onclick` and the element has no text beyond two '
+            'spans. It is now a `GlassSurface` with `onTap`, an `InkWell` inside a '
+            '`Material` and a name.',
+      );
+      expect(
+        card.single.flagsCollection.isEnabled,
+        isNot(Tristate.isFalse),
+        reason: 'and it is enabled, because there is a reading to open',
       );
       handle.dispose();
     });
 
-    testWidgets('the avatar is a button with a name, and it is LIVE', (
+    testWidgets(
+      'the last-light card is the second named tap, and only when lit',
+      (WidgetTester tester) async {
+        final SemanticsHandle handle = tester.ensureSemantics();
+
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc);
+
+        expect(
+          nodesOffering(tester, SemanticsAction.tap).where(
+            (SemanticsData d) =>
+                d.label.contains(en.homeLastLight.toUpperCase()),
+          ),
+          hasLength(1),
+          reason:
+              '`:524` is a `.hcard` with a tap too, so §14 has two of them on this '
+              'screen and both must be named.',
+        );
+        handle.dispose();
+      },
+    );
+
+    testWidgets('an EMPTY last light is not a button at all', (
       WidgetTester tester,
     ) async {
-      // ## THIS ASSERTION FLIPPED IN PHASE 9, AND THE DOC COMMENT ABOVE IT WAS
-      // ## THE THING THAT FLIPPED
-      //
-      // It used to read `hasAction(SemanticsAction.tap), isFalse` and
-      // `flagsCollection.isEnabled, Tristate.isFalse`, with the reason "the prototype
-      // navigates to `profile` and §2 decision 1 cut it". §2 decision 1 still cuts
-      // `/profile`; **`/settings` is a route that exists**, and `08-build-phases.md`'s
-      // Phase-9 scope note says "`AppTopBar`'s avatar tap now opens `/settings`". So
-      // the control is live and the unavailable suffix is gone.
-      //
-      // The three-way assertion below is the point: name, tap action, and **no**
-      // unavailable reason. A bar that stayed inert would fail the second; a bar that
-      // became live while keeping the reason would fail the third, and that is the
-      // combination `AppTopBar.build`'s `enabled ? … : '… — …'` exists to prevent.
+      // `redesign.html:1197` — `cursor: default` when there is no `lastRead`. The
+      // tap is removed, so the node is removed with it; **not** a disabled button,
+      // because there is nothing a reader could be told to do.
       final SemanticsHandle handle = tester.ensureSemantics();
 
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final SemanticsData avatar = semanticsTree(tester).firstWhere(
-        (SemanticsData d) =>
-            d.label.contains(liveSession.displayName) ||
-            d.label.startsWith(AppLocalizationsEn().homeAvatarLabel),
-      );
-
-      // `ds.tsx:516-524` is a `<button>` with **no label at all** — §14's first row.
-      // The name is the session's display name, not a monogram.
-      expect(avatar.label, contains(liveSession.displayName));
-      expect(
-        avatar.hasAction(SemanticsAction.tap),
-        isTrue,
-        reason:
-            'the avatar opens `/settings`. `home_navigation_test.dart` drives the '
-            'route; this is about the node offering the action at all, which is the '
-            'half a navigation test cannot see.',
-      );
-      // **`isNot(Tristate.isFalse)` and not `Tristate.isTrue`.** `Semantics` publishes
-      // `enabled` only when a widget states it, so a control that is simply not disabled
-      // comes back as `Tristate.none` — which is the correct reading of "there is no
-      // `enabled: false` here". Asserting `isTrue` would be asserting an annotation the
-      // widget does not make; the disabled branch below is the discriminating one.
-      expect(avatar.flagsCollection.isEnabled, isNot(Tristate.isFalse));
-      expect(
-        avatar.label,
-        isNot(contains(AppLocalizationsEn().homeUnavailableSuffix)),
-        reason:
-            'and the unavailable reason is NOT appended, because the control is no '
-            'longer inert. `AppTopBar.build` appends it only on the disabled branch, '
-            'so a reader is never told a working button does nothing.',
-      );
-      handle.dispose();
-    });
-
-    testWidgets('with no session the avatar is still named', (
-      WidgetTester tester,
-    ) async {
-      // The fallback is `AppLocalizations.avatarLabel` rather than an empty string — an
-      // unnamed button is the §14 gap this whole screen had to close.
-      final SemanticsHandle handle = tester.ensureSemantics();
-
-      final HomeHarness h = harness(signedIn: false);
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(
-        semanticsTree(tester).where(
-          (SemanticsData d) =>
-              d.label.startsWith(AppLocalizationsEn().homeAvatarLabel),
+      final HomeHarness h = harness(
+        history: const Right<Failure, List<StreakHistoryEntry>>(
+          <StreakHistoryEntry>[],
         ),
-        hasLength(1),
       );
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(
+        nodesOffering(tester, SemanticsAction.tap).where(
+          (SemanticsData d) => d.label.contains(en.homeLastLight.toUpperCase()),
+        ),
+        isEmpty,
+      );
+      // And the sentence that replaces it is real text, so the state is announced
+      // by reading rather than by an absence.
+      expect(find.text(en.homeNoLight), findsOneWidget);
       handle.dispose();
     });
 
-    testWidgets('the streak is ONE node, not two', (WidgetTester tester) async {
-      // `StreakFlame` publishes a node and the count is a sibling `Text`, so a naive
-      // transcription reads "Streak", then "0" — two announcements for one fact, and
-      // on a number a reader is likely to repeat back.
+    testWidgets('the streak is ONE node, not three', (
+      WidgetTester tester,
+    ) async {
+      // `StreakFlame` publishes its own node and the count and the unit are sibling
+      // `Text`s, so a naive transcription reads "Streak", then "0", then "days" —
+      // three announcements for one fact, and on a number a reader is likely to
+      // repeat back.
       final SemanticsHandle handle = tester.ensureSemantics();
 
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
       final List<SemanticsData> streak = semanticsTree(tester)
-          .where((SemanticsData d) => d.label.startsWith('Streak'))
+          .where((SemanticsData d) => d.label.startsWith(en.homeStreakLabel))
           .toList();
 
-      expect(streak, hasLength(1));
       expect(
-        streak.single.label,
-        'Streak: 0',
-        reason: 'the label and the number in one node',
+        streak,
+        hasLength(1),
+        reason:
+            'one node, and it is not a button — nothing on `/` opens a streak '
+            '(`:1320` gives the prototype a haptic and a toast, not a route, and '
+            'the redesign gives this screen no streak screen at all)',
       );
-      handle.dispose();
-    });
-
-    testWidgets('the bead row announces its count, and no other node does', (
-      WidgetTester tester,
-    ) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
-
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final List<SemanticsData> beads = semanticsTree(tester)
-          .where((SemanticsData d) => d.label.contains('Reflections'))
-          .toList();
-
-      // `ProgressBeads` appends "N of M complete" itself, and the prefix is the
-      // feature's string table — so the count a reader hears is the question count,
-      // not the prototype's five.
-      expect(beads, hasLength(1));
-      expect(beads.single.label, contains('1 of 1 complete'));
+      // The label **and** the number and the unit, in that order: the unit is inside
+      // the node because `excludeSemantics` drops the painted `.sl`, and a bare
+      // "Streak: 0" is a number with no unit.
+      expect(streak.single.label, '${en.homeStreakLabel}: 0 ${en.homeDays}');
       handle.dispose();
     });
 
@@ -238,19 +225,19 @@ void main() {
         named,
         hasLength(1),
         reason:
-            'the repository message is the icon button name. It is '
-            'not drawn as text — a sentence does not belong in a top bar.',
+            'the repository message is the icon button\'s name. It is not drawn as '
+            'text — a sentence does not belong in a 33px pill.',
       );
       handle.dispose();
     });
 
     // ## WHY THREE TESTS AND NOT ONE LOOP
     //
-    // The first version looped over the three states in a single `testWidgets`, so
-    // a failure named a *state* in prose and a *line* that was the same for all
-    // three. Which is exactly what happened: one failure, no way to tell whether
-    // the empty node list was the ready state or a failed one. Split, each failure
-    // now names its own state.
+    // The first version looped over the states in a single `testWidgets`, so a
+    // failure named a *state* in prose and a *line* that was the same for all of
+    // them. Which is exactly what happened: one failure, no way to tell whether the
+    // empty node list was the ready state or a failed one. Split, each failure now
+    // names its own state.
     for (final (String, HomeHarness Function()) case_
         in <(String, HomeHarness Function())>[
           ('ready', harness),
@@ -266,11 +253,19 @@ void main() {
               streak: const Left<Failure, StreakSummary>(streakFailure),
             ),
           ),
+          (
+            'an empty last light',
+            () => harness(
+              history: const Right<Failure, List<StreakHistoryEntry>>(
+                <StreakHistoryEntry>[],
+              ),
+            ),
+          ),
         ]) {
       testWidgets('no unlabeled interactive node, ${case_.$1}', (
         WidgetTester tester,
       ) async {
-        // §14's target is "all 6 pages pass a semantics sweep with no unlabeled
+        // §14's target is "all 7 pages pass a semantics sweep with no unlabeled
         // interactive node", and this is the mechanical form for `/`. An error view
         // adds its own button, and an error view is exactly where a label goes
         // missing — so each state is swept.
@@ -295,9 +290,9 @@ void main() {
             node.label.trim(),
             isNotEmpty,
             reason:
-                'an interactive node with no accessible name. §14\'s first row, '
-                'and the one this screen had to close: `ds.tsx:516` is a `<button>` '
-                'around a monogram with no label at all.',
+                "an interactive node with no accessible name. §14's first row, and "
+                'the one this screen has to keep closed: `:519` is a `<div>` with '
+                'an `onclick` and no text of its own beyond two spans.',
           );
         }
         handle.dispose();
@@ -305,19 +300,101 @@ void main() {
     }
   });
 
+  group('the inert controls say why', () {
+    testWidgets('the selah circle is a disabled button, named with the reason', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      final SemanticsData circle = _named(
+        tester,
+        '${en.homeSelah} — ${en.homeUnavailableSuffix}',
+      );
+      expect(circle.flagsCollection.isButton, isTrue);
+      // **Disabled, not absent**: a screen-reader user is told the control exists
+      // and that it is inert. `SocialAuthButton`'s rule, and the login ghosts'.
+      expect(circle.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(
+        circle.hasAction(SemanticsAction.tap),
+        isFalse,
+        reason:
+            'and it offers no tap, because there is nothing behind one until Phase 7 '
+            'brings the timer',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('every book card is a disabled button, named with its caption', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      // The strip builds what fits, so this reads **psalms** and not all six —
+      // `home_page_test.dart` is the suite that counts them, and it drags.
+      final SemanticsData card = _named(
+        tester,
+        'psalms · ${en.homeCategoryPoetry} · 6 ${en.homeVerses} — '
+        '${en.homeUnavailableSuffix}',
+      );
+      expect(card.flagsCollection.isButton, isTrue);
+      expect(card.flagsCollection.isEnabled, Tristate.isFalse);
+      // **The caption is in the name**, because `excludeSemantics` drops the two
+      // painted runs and a reader who cannot see them would hear only the name.
+      expect(card.label, contains('6 ${en.homeVerses}'));
+      handle.dispose();
+    });
+
+    testWidgets(
+      'and a card with no name would fail, so the reason is asserted',
+      (WidgetTester tester) async {
+        // The negative control, and the reason this file has it: a `Semantics(button:
+        // true, enabled: false)` with no `label` publishes a node whose only content
+        // is "button, disabled" — which passes §14's sweep (the node is not empty,
+        // because its flags are not text) and tells a reader nothing. Asserting the
+        // label's *content* is what closes that.
+        final SemanticsHandle handle = tester.ensureSemantics();
+
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc);
+
+        for (final SemanticsData node in semanticsTree(tester).where(
+          (SemanticsData d) => d.flagsCollection.isEnabled == Tristate.isFalse,
+        )) {
+          expect(
+            node.label,
+            contains(en.homeUnavailableSuffix),
+            reason:
+                'every disabled node on this screen carries the reason it is '
+                'disabled. A disabled node without one is the failure mode §14 cannot '
+                'see.',
+          );
+        }
+        handle.dispose();
+      },
+    );
+  });
+
   group('the focus ring', () {
-    testWidgets('the panel is one tab stop', (WidgetTester tester) async {
+    testWidgets("the day's card is one tab stop with a painted ring", (
+      WidgetTester tester,
+    ) async {
       // §14's "no focus indicators" row. `GlassSurface` owns the node through
-      // `EvaFocusRing`, so the panel is reachable by keyboard — which the
+      // `EvaFocusRing`, so the card is reachable by keyboard — which the
       // prototype's `div onClick` was not.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      final Finder panel = find.byType(TodayReadingPanel);
-      await tabUntilFocused(tester, panel);
+      final Finder card = find.byType(VerseOfTheDayCard);
+      await tabUntilFocused(tester, card);
 
       expect(
-        renderedBorders(tester, panel).where(
+        renderedBorders(tester, card).where(
           (Border b) =>
               b ==
               evaFocusRingBorder(EvaThemeDark.theme.extension<EvaColors>()!),
@@ -329,6 +406,15 @@ void main() {
       );
     });
 
+    testWidgets('and the last-light card is a tab stop for the same reason', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      await tabUntilFocused(tester, find.byType(LastLightCard));
+    });
+
     testWidgets('and the streak retry is reachable by keyboard too', (
       WidgetTester tester,
     ) async {
@@ -337,45 +423,57 @@ void main() {
       );
       await pumpHome(tester, bloc: h.bloc);
 
-      final Finder row = find.byType(StreakFlameRow);
-      await tabUntilFocused(tester, row);
+      await tabUntilFocused(tester, find.byType(StreakChip));
     });
 
-    testWidgets('and the avatar IS a tab stop, because it is live again', (
+    testWidgets('and the inert controls are **not** tab stops', (
       WidgetTester tester,
     ) async {
-      // ## THIS ASSERTION FLIPPED TOO, AND IT IS THE ONE THAT MATTERS
-      //
-      // It used to read `expect(stops, 0)` — "the **disabled** avatar is NOT a tab
-      // stop" — on the reasoning that "a disabled control that still takes focus is a
-      // focus trap with a dead end". §14's row is about focus, and it is still right
-      // about an inert control; it stopped being the case about this control in
-      // Phase 9, when it started opening `/settings`.
-      //
-      // The flip matters because the inverse is now the defect: a **live** button that
-      // cannot be reached with a keyboard is a control that exists only for a finger.
-      // And the third case is asserted in `app_top_bar_test.dart`, where a bar with
-      // `onAvatarTap: null` still has to be inert — so both branches are pinned.
+      // §14's rule for a disabled control, and the reason it is asserted here
+      // rather than only implied: "a disabled control that still takes focus is a
+      // focus trap with a dead end". The selah circle and the book cards are both
+      // inert, so neither may appear in the tab order — the inverse of the avatar
+      // case the previous version of this file recorded, and the same rule read
+      // from the other side.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      final Finder avatar = find.byType(AppTopBar);
-      int stops = 0;
-      for (int i = 0; i < 6; i++) {
+      expect(
+        find.byType(SelahCard),
+        findsOneWidget,
+        reason: 'and the card is on screen, so this is not vacuous',
+      );
+      for (int i = 0; i < 8; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
-        if (_focusInside(tester, avatar)) {
-          stops++;
-        }
+        final FocusNode? node = FocusManager.instance.primaryFocus;
+        if (node == null || !node.hasFocus) continue;
+        expect(
+          _focusInside(tester, find.text('✦')),
+          isFalse,
+          reason: 'press $i landed inside the inert circle',
+        );
       }
-      expect(
-        stops,
-        greaterThan(0),
-        reason:
-            'Tab reaches the avatar within six presses. The bar holds three focusable '
-            'children at most — the streak retry is absent on a successful load — so '
-            'six is a bound and not a search limit.',
-      );
+    });
+
+    testWidgets('and the greeting is one focus-free block', (
+      WidgetTester tester,
+    ) async {
+      // The greeting holds no control, so it must not be a stop — asserted because a
+      // `Text` inside an `Expanded` inside a `Row` is a place a stray `Focus` could
+      // hide, and `GreetingBlock` is a public widget now.
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      for (int i = 0; i < 8; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(
+          _focusInside(tester, find.byType(GreetingBlock)),
+          isFalse,
+          reason: 'press $i landed inside the greeting block',
+        );
+      }
     });
   });
 
@@ -394,24 +492,81 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(NeuralBackground), findsOneWidget);
     });
-  });
 
-  group('the CTAs', () {
-    testWidgets('are the prototype own labels, un-derived', (
+    testWidgets('and the carousel\'s strip does not animate on its own', (
       WidgetTester tester,
     ) async {
+      // `.bcard:hover{transform: translateY(-5px)}` (`:283`) and
+      // `.selah .breathing{animation: breatheRing 8s …}` (`:269`) are **CSS
+      // animations this client does not reproduce**: the first is a hover the
+      // design system already owns through `EvaInk`, and the second belongs to
+      // Phase 7's timer. The assertion is that mounting the strip with animations
+      // disabled produces no exception and no ticker, which is the form §14 takes.
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, disableAnimations: true);
+
+      expect(find.byType(LibraryCarousel), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group("the day's card is the prototype's own words", () {
+    testWidgets('and the eyebrow and the reference are one announcement', (
+      WidgetTester tester,
+    ) async {
+      // `:521` writes three children — a `<span>`, a text ` · ` and a `<b>` — inside
+      // one `.mono` div. Three siblings would be three runs; the card joins them
+      // into one `Text.rich`, and a screen reader reads the sentence.
+      final SemanticsHandle handle = tester.ensureSemantics();
+
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      // `HomeScreen.tsx:71,72`. Derived copy for an *action* was rejected. See
-      // `AppLocalizations.continueLabel`.
-      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
+      // **Uppercase, because the merged label is the *rendered* text.** The eyebrow
+      // is a `.mono` run and `[dir=rtl] .mono{text-transform:none}` (`:136`) leaves
+      // LTR uppercasing in force, so the label says `JOHN 3:1-5` where the table says
+      // `John 3:1-5`. Searching for the table's casing finds nothing — which is what
+      // the first version of this row did, and why this comment exists.
+      final Iterable<SemanticsData> naming = semanticsTree(tester)
+          .where((SemanticsData d) => d.label.contains('JOHN 3:1-5'));
       expect(
-        find.text(AppLocalizationsEn().homeStartReflection),
-        findsOneWidget,
+        naming,
+        hasLength(2),
+        reason:
+            "exactly two: the day's card and the last-light card, because both "
+            'name the same reading. One per card would be an assertion about the '
+            'fixture rather than about the widget.',
       );
+      // And **neither announces its own eyebrow twice**, which is what
+      // `semanticLabel: ''` buys: the merged name begins with the rendered eyebrow
+      // rather than carrying the table's lowercase one in front of it.
+      for (final SemanticsData node in naming) {
+        expect(
+          node.label.trimLeft(),
+          anyOf(
+            startsWith(en.homeVerseOfTheDay.toUpperCase()),
+            startsWith(en.homeLastLight.toUpperCase()),
+          ),
+          reason:
+              'a card named twice announces its eyebrow twice. `GlassSurface`\'s '
+              'doc says which gate catches that, and it is this suite.',
+        );
+      }
+      handle.dispose();
     });
   });
+}
+
+/// The one [SemanticsData] whose label is [label].
+///
+/// Read through the shared `semanticsTree` walk rather than `getSemantics`: this
+/// file asserts on a *label*, and `getSemantics` needs a `SemanticsNode` that is
+/// uniquely findable by type.
+SemanticsData _named(WidgetTester tester, String label) {
+  final Iterable<SemanticsData> matches = semanticsTree(tester)
+      .where((SemanticsData data) => data.label == label);
+  expect(matches, hasLength(1), reason: 'exactly one node announces `$label`');
+  return matches.single;
 }
 
 /// Whether the primary focus is inside [finder].

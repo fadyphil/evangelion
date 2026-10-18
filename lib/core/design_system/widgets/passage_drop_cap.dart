@@ -72,9 +72,13 @@ import 'package:flutter/material.dart';
 /// paint.** Two arguments for keeping it, both load-bearing rather than
 /// sentimental:
 ///
-/// - `today_reading_panel.dart` reaches [paragraph] only on the **English** arm
-///   — the Arabic arm renders its preview whole — so `:141` describes a screen
-///   that does not exist in this client yet, exactly like `:172`'s font size.
+/// - The deleted `today_reading_panel.dart` reached [paragraph] only on the
+///   **English** arm — the Arabic arm rendered its preview whole — so `:141`
+///   described a screen that did not exist in this client even then, exactly
+///   like `:172`'s font size. Phase 5.2 deleted the panel with the preview
+///   (`docs/adr/0022…`: the redesigned `/` shows the day's first verse whole),
+///   and the surviving scripture caller is the one `:141` was always written
+///   against.
 /// - Unsetting a drop cap in Arabic is not a restyle, it is a typographic
 ///   decision about a right-to-left scripture tradition that this widget does not
 ///   own and that no document here has taken.
@@ -91,10 +95,11 @@ import 'package:flutter/material.dart';
 /// in luminance (`#845610` against `#D4891A`).
 ///
 /// [color] stays a nullable pass-through rather than gaining a default, because
-/// the widget is handed the ink by the two call sites that own it —
-/// `scripture_block.dart` and `today_reading_panel.dart`, both of which already
-/// pass `colors.emberInk` — and a default here would be a third answer to a
-/// question two callers have already answered. `null` inherits the body style,
+/// the widget is handed the ink by the call site that owns it —
+/// `scripture_block.dart`, which already passes `colors.emberInk` — and a default
+/// here would be a second answer to a question the caller has already answered.
+/// (`today_reading_panel.dart` was the second; Phase 5.2 deleted it with the
+/// preview, which is why "two call sites" reads as one.) `null` inherits the body style,
 /// which is what the tests below pin.
 class PassageDropCap extends StatelessWidget {
   /// A drop cap for the first [letter] of a passage.

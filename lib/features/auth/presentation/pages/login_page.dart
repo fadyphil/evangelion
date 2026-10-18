@@ -483,7 +483,10 @@ class _LoginFormState extends State<_LoginForm>
                           // by the arm's own gate on the first run). The swap
                           // exists for runs whose script varies; this one never
                           // does.
-                          _monoText(LoginPage.kTaglineText, context),
+                          monoCapsText(
+                            LoginPage.kTaglineText,
+                            Directionality.of(context),
+                          ),
                           style: EvaTypography.monoCaps(context.colors)
                               .copyWith(color: context.colors.ink2),
                         ),
@@ -589,16 +592,6 @@ class _LoginFormState extends State<_LoginForm>
     );
   }
 }
-
-/// `.mono`'s text, uppercased under LTR only.
-///
-/// `redesign.html:136` — `[dir=rtl] .mono{text-transform:none}`. The tagline and
-/// the footer are the two `.mono` runs on this screen, and both are literals, so
-/// the transform is applied to the string at the call site: CSS uppercases for
-/// rendering without changing the content, and this is the same contract with the
-/// uppercase applied where a reader can see it happen.
-String _monoText(String text, BuildContext context) =>
-    Directionality.of(context) == TextDirection.ltr ? text.toUpperCase() : text;
 
 /// One inert ghost pill.
 ///
@@ -879,7 +872,7 @@ class _Footer extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.only(bottom: LoginPage.kFooterBottomGap),
       child: Text(
-        _monoText(LoginPage.kFooterText, context),
+        monoCapsText(LoginPage.kFooterText, Directionality.of(context)),
         textAlign: TextAlign.center,
         // The mono face in BOTH directions, for the tagline's reason: the run
         // is Greek-plus-Latin and never varies its script, so the Arabic-aware

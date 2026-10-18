@@ -5,8 +5,6 @@ import 'package:evangelion/core/design_system/widgets/error_view.dart';
 import 'package:evangelion/core/design_system/widgets/leaderboard_row_tile.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
-import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_page.dart';
@@ -18,12 +16,18 @@ import 'package:fpdart/fpdart.dart';
 import '../../../support/design_system_harness.dart';
 import '../../../support/reading_harness.dart';
 
-/// The surfaces the two new widgets have to survive.
+/// The surfaces the leaderboard screen has to survive.
 ///
-/// The three constants the repo already names — `kNarrowSurface` 320×568,
-/// `kAmbientSurface` 390×844, `kGeometrySurface` 430×932 — because a fourth number
-/// invented here would be a surface no other suite renders on and therefore one nothing
-/// else would catch a regression in.
+/// ## AND THE CARD GROUP THAT WAS HERE
+///
+/// Phase 5.2 deleted `LeaderboardCard` with the board card on `/`
+/// (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md`; the redesign's home
+/// has no board). The card's own overflow matrix — three surfaces, ready and empty
+/// — died with it, and it is *not* re-pointed: the screen is a different layout
+/// with its own scrolling list, so the card's green rows would have said nothing
+/// about it. What the screen inherits is the discipline, not the numbers: the same
+/// three surfaces below, and the same two board states, asserted against the page.
+///
 final List<(String, Size)> _surfaces = <(String, Size)>[
   ('320x568', kNarrowSurface),
   ('390x844', kAmbientSurface),
@@ -112,55 +116,6 @@ final class _AnsweringRepo implements LeaderboardRepository {
 }
 
 void main() {
-  group('the card', () {
-    for (final (String name, Size size) in _surfaces) {
-      testWidgets('renders three rows without overflowing at $name', (
-        WidgetTester tester,
-      ) async {
-        await tester.pumpWidget(
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            size: size,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            child: LeaderboardCard(
-              status: HomeSectionStatus.ready,
-              board: _board,
-              failure: null,
-              onOpen: () {},
-              onRetry: () {},
-            ),
-          ),
-        );
-        await tester.pump(const Duration(milliseconds: 16));
-        expectNoOverflow(tester, somethingRendered: () => true, surface: name);
-      });
-
-      testWidgets('renders the EMPTY board without overflowing at $name', (
-        WidgetTester tester,
-      ) async {
-        await tester.pumpWidget(
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            size: size,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            child: LeaderboardCard(
-              status: HomeSectionStatus.ready,
-              board: _empty,
-              failure: null,
-              onOpen: () {},
-              onRetry: () {},
-            ),
-          ),
-        );
-        await tester.pump(const Duration(milliseconds: 16));
-        // Both arms have to be overflow-free at every size, not only the happy one.
-        expectNoOverflow(tester, somethingRendered: () => true, surface: name);
-      });
-    }
-  });
-
   group('the screen', () {
     for (final (String name, Size size) in _surfaces) {
       testWidgets('renders the list without overflowing at $name', (
@@ -195,7 +150,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final LeaderboardCubit cubit = LeaderboardCubit(
-        loadLeaderboard: LoadLeaderboard(_FailingRepo()),
+        loadLeaderboard: const LoadLeaderboard(_FailingRepo()),
       );
       addTearDown(cubit.close);
       await tester.pumpWidget(
@@ -228,35 +183,31 @@ void main() {
     });
   });
 
-  group('the card renders exactly the rows it says it does', () {
-    testWidgets('three of five, not all five and not one', (
+  group('the screen renders exactly the rows it says it does', () {
+    testWidgets('all five ranked children are on screen', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        evaPrimitiveHarness(
-          theme: EvaThemeDark.theme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-          child: LeaderboardCard(
-            status: HomeSectionStatus.ready,
-            board: _board,
-            failure: null,
-            onOpen: () {},
-            onRetry: () {},
-          ),
-        ),
-      );
-      await tester.pump(const Duration(milliseconds: 16));
-
-      // `kLeaderboardPreviewRows` is the number the card draws out of the fifty it
-      // asked for. A card that drew all fifty would be a wall, and one that drew none
-      // would not be a leaderboard.
+      // **Re-pointed from the deleted card, and stronger for it.** The card drew
+      // 3 of the 50 it asked for (`kLeaderboardPreviewRows`), so its version of
+      // this row asserted a *sample*. The screen draws the whole list the
+      // fixture holds, and a screen that truncated it would fail here rather
+      // than pass on a prefix.
+      await _pumpPage(tester, _board, size: kAmbientSurface);
+      // **Three, and that is the fixture's row count, not a preview.** `_board`
+      // holds three ranked children (its `cohortSize` is the five-strong cohort
+      // they are drawn from), and the screen draws all three. The
+      // "no preview truncation" claim — the full cohort drawn, all five — is the
+      // *view* suite's row, whose fixture holds five; this file's subject is
+      // layout, and its fixture is the smallest one that still exercises the
+      // `3 / 5` line.
       expect(find.byType(LeaderboardRowTile), findsNWidgets(3));
     });
   });
 }
 
 final class _FailingRepo implements LeaderboardRepository {
+  const _FailingRepo();
+
   @override
   Future<Result<LeaderboardBoard>> board({
     required LeaderboardWindow window,
@@ -264,9 +215,7 @@ final class _FailingRepo implements LeaderboardRepository {
   }) async => const Left<Failure, LeaderboardBoard>(
     Failure(
       kind: FailureKind.validation,
-      message:
-          'Could not read the leaderboard: headers must have required property '
-          "'x-group-id'",
+      message: 'Could not read the leaderboard: x-group-id is not a number',
     ),
   );
 }

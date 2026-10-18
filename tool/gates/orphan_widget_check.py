@@ -121,6 +121,19 @@ ALLOWLIST: dict[str, str] = {
         "between those two tasks it is genuinely unplaced. Same mechanism as "
         "WitnessSky's entry: STALE the moment any page constructs it."
     ),
+    "TextLink": (
+        "Phase 5.2 rebuilt `/` against eva/redesign.html:513-538, and the "
+        "redesign's home has no link-shaped control: the two cards are whole-box "
+        "taps and the carousel's label row is two spans. The two widgets that "
+        "placed it — `today_reading_panel.dart`'s continue link and "
+        "`leaderboard_card.dart`'s see-all link — are both deleted, so between "
+        "Phase 5.2 and Task 5.5 the widget is genuinely unplaced. It survives "
+        "because `/communion` draws `leaderboardOpenFull` (the 'See all' link, "
+        "Task 5.5) and `TextLink` is the component the design system owns for "
+        "that shape; deleting it now would mean re-deriving it in 5.5 with a "
+        "second spelling. Same mechanism as the two entries above: STALE the "
+        "moment any page constructs it."
+    ),
 }
 
 

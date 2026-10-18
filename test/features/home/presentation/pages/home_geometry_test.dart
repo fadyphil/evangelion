@@ -1,612 +1,1196 @@
 /// **Decision 8's harness, for `/`.** AGENT_CONTEXT §9, decision 8 names "the phase
 /// that first transcribes a screen" as the owner of a prototype-comparison harness,
-/// and says of the five other screens: "Phases 6–9 should add each screen's own
-/// claims rather than assume this generalises."
+/// and says of the other screens: "Phases 6–9 should add each screen's own claims
+/// rather than assume this generalises."
 ///
 /// ## THE THREE HALVES, AND WHAT EACH ONE CANNOT SEE
 ///
-/// 1. **A line map** — every claim names a `HomeScreen.tsx` / `ds.tsx` line, and the
-///    number on that line is parsed at test time. A renumbered prototype turns this
-///    red instead of leaving it confidently checking a line that moved.
-/// 2. **A symbol map** — a `null` line map proves nothing about the widget.
+/// 1. **A rule map** — every claim names an `eva/redesign.html` **selector**, and
+///    the number that selector declares is parsed at test time. A renumbered
+///    prototype turns this red instead of leaving it confidently checking a line
+///    that moved, and a *renamed class* turns it red at the throw rather than
+///    silently parsing nothing.
+/// 2. **A symbol map** — a `null` rule map proves nothing about the widget.
 ///    `login_geometry_test.dart` measured that: changing `LoginPage.kTopSpacer`
-///    from 72 to 71 left all 37 of its tests green. So every claim that has a
+///    from 72 to 71 left all 21 of its tests green. So every claim that has a
 ///    Dart constant names the **symbol**, and the constant is read.
 /// 3. **Rendered geometry** — what `RenderBox` reports, compared against the
 ///    prototype's numbers rather than against the widget's own constants.
 ///
 /// **What it still cannot see, stated here rather than left for Phase 10:** colours,
-/// radii and blur sigmas are tokens, and a *wrong token* is invisible to a geometry
-/// comparison. It can tell 20 from 24 but not `padding: 20` from
-/// `EdgeInsets.all(20)`.
+/// radii-as-tokens and blur sigmas are not geometry. `home_geometry_test.dart` says
+/// so for the third half; this file's *first* half reaches colours only through
+/// `library_catalogue_local_data_source_test.dart`, which reads the CSS's `--bh`
+/// values straight out of `BOOKS`.
 ///
-/// ## AND WHAT IT CANNOT REACH IN THE PROTOTYPE, WHICH THE SUITE ADMITS
+/// ## AND THE **COLLAPSED MARGINS** ARE THIS FILE'S REASON TO EXIST
 ///
-/// Three of `/`'s numbers are **not** in a `key: number` style object, so
-/// `declaredValues` cannot see them at all:
+/// CSS collapses adjacent vertical margins and Flutter has no such rule, so
+/// `/`'s four inter-section gaps are **not** in the prototype as four numbers —
+/// they are `max()` of six, and the six are. `HomePage`'s doc carries the table;
+/// this file recomputes each `max` from the parsed margins and compares it with the
+/// constant, which is the only way a reader can tell the table from an intention.
+/// A harness that asserted `kCardGap == 14` against nothing would pass on any value
+/// someone typed.
 ///
-/// | number | where the prototype writes it |
-/// | --- | --- |
-/// | the flame's `14 × 18` | `ds.tsx:514` — `width="14" height="18"`, JSX **attributes** |
-/// | the avatar's `1.5` rim | `ds.tsx:521` — inside a template literal, `outline: `1.5px solid …`` |
+/// ## THE INLINE STYLES ARE A THIRD KIND OF CLAIM, AND THIS FILE NAMES THEM
 ///
-/// Each is asserted against its **Dart constant** in a named test that says why the
-/// line map cannot back it. The first version of this file claimed `width: 1.5` on
-/// `ds.tsx` and the extraction reported it "is declared nowhere" — the gate working
-/// exactly as intended, and the claim had to be either fixed or admitted.
-///
-/// ## AND WHAT `/` TRANSCRIBES IS **LESS** THAN `/login`'s, WHICH IS THE POINT
-///
-/// The library half of `HomeScreen.tsx` is **cut** (AGENT_CONTEXT §2, decision 1), so
-/// there is no passage grid, no category chips and no `SealFAB` to transcribe. What
-/// is left is the bar, the greeting and one panel — and this file's line map is
-/// correspondingly short, which is the honest shape of the work.
+/// `redesign.html:519` and `:524` write each card's wash as a `style="--bh:…"`
+/// **attribute**, and `:528` writes the last-light hint's `margin-top:8px` the same
+/// way. No CSS rule declares those numbers, so [inlineDeclarationsFor] reads the
+/// attribute and the rows that use it are marked as inline in the table. The first
+/// version of this file looked for them in a rule and got a `StateError` naming a
+/// selector the prototype has never had — which is the throw doing its job.
 library;
 
 import 'dart:io';
 
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
-import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
-import 'package:evangelion/features/home/presentation/widgets/streak_flame_row.dart';
-import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
+import 'package:evangelion/features/home/presentation/widgets/greeting_block.dart';
+import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
+import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/streak_chip.dart';
+import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../../support/css_reference.dart';
 import '../../../../support/home_harness.dart';
 
-/// The prototype files this harness reads. `eva/` is reference material and is never
-/// written to (AGENT_CONTEXT §2, §8); existence is asserted so a moved file is a
-/// failure rather than an empty extraction.
-const String homeScreen = 'eva/src/screens/HomeScreen.tsx';
+/// The prototype this harness reads. `eva/` is reference material and is never
+/// written to (AGENT_CONTEXT §2, §8).
+const String prototype = 'eva/redesign.html';
 
-const String dsComponents = 'eva/src/components/ds.tsx';
+/// The home section's markup, as the file draws it: the section, its five children
+/// and the ids that carry state. `eva/redesign.html:513-537`.
+const List<String> homeSectionMarkers = <String>[
+  'id="rHome"',
+  'class="greet"',
+  'id="dayMono"',
+  'id="hiName"',
+  'id="streakChip"',
+  'id="flameEl"',
+  'id="streakN"',
+  'id="votdCard"',
+  'id="votdRef"',
+  'id="votdText"',
+  'id="lastCard"',
+  'id="lastRef"',
+  'id="lastText"',
+  'id="lastHint"',
+  'id="selahCard"',
+  'id="selahSub"',
+  'id="selahBtn"',
+  'class="car-label"',
+  'id="libCount"',
+  'id="carousel"',
+];
 
 /// The surface the rendered half uses.
 ///
-/// 430×932 and not §14's 320×568: this file measures geometry the panel's own width
-/// depends on, and at 320 the reference and the two CTAs wrap, which changes every
-/// number being compared. §14's requirement is `home_text_scale_test.dart`'s.
+/// 430×932 and not §14's 320×568: this file measures geometry the cards' own width
+/// depends on, and at 320 the greeting's row and a card's caption wrap, which
+/// changes every number being compared. §14's requirement is
+/// `home_text_scale_test.dart`'s, and the two disagree on purpose.
 const Size kGeometrySurface = Size(430, 932);
 
-/// Every `key: N` numeric declaration in [file], keyed by `line:property`.
-///
-/// A single regex, because the point is to notice a number the prototype declares
-/// and this phase **failed** to transcribe — which means the enumeration cannot be
-/// limited to the properties already accounted for. `allMatches` rather than
-/// `firstMatch`, because a React style object puts several declarations on one line.
-Map<String, double> declaredValues(String file) {
-  final File source = File(file);
-  expect(
-    source.existsSync(),
-    isTrue,
-    reason:
-        '$file is missing. This harness cannot read the prototype, so it does not '
-        'pass — a missing reference is reported, never assumed unchanged.',
-  );
-
-  final Map<String, double> found = <String, double>{};
-  final RegExp declaration = RegExp(r'(\w+):\s*(\d+(?:\.\d+)?)\b');
-  final List<String> lines = source.readAsLinesSync();
-  for (int i = 0; i < lines.length; i++) {
-    for (final RegExpMatch match in declaration.allMatches(lines[i])) {
-      final double value = double.parse(match.group(2)!);
-      // A `0` in a style object is a structural `zIndex: 0` or a `lineHeight: 0`
-      // nobody transcribes; the ones that matter are non-zero geometry.
-      if (value == 0) {
-        continue;
-      }
-      // Keyed by **line and property**, not by the property's offset in the line: an
-      // offset key collides between two lines sharing a column and silently drops
-      // one of them. `login_geometry_test.dart` found that by having its
-      // anti-vacuity test correctly refuse to believe the result.
-      found['${i + 1}:${match.group(1)}'] = value;
-    }
-  }
-  return found;
-}
-
-/// One transcription claim: a prototype key, the number on it, and the Dart symbol
-/// that number became — or `null` where there is deliberately no constant.
-typedef PrototypeClaim = ({
-  String label,
-  String file,
-  String key,
-  double expected,
-  String? symbol,
-});
-
-/// The symbol map: every number this phase publishes **from a prototype number**,
-/// by name.
-///
-/// One table, so a claim can name a symbol and the assertion can read it without a
-/// second table drifting in step. `login_geometry_test.dart` keeps the same two
-/// tables for the same reason.
-///
-/// ## THE FOUR CONSTANTS DELIBERATELY **ABSENT** FROM THIS MAP
-///
-/// * `HomePage.bottomSpacer` — the prototype's `paddingBottom: 100` is the
-///   clearance for its `SealFAB`, which is **cut** with the profile screen, so the
-///   shipped value is `EvaSpacing.huge` and no prototype number is transcribed.
-///   `HomePage.bottomSpacer`'s own doc says so.
-/// * `AppTopBar.avatarTapTarget` — **44**, against the prototype's 32. The 32 is
-///   claimed and transcribed; the 44 is the platform tap-target minimum and is
-///   asserted with its reason where that divergence is argued.
-/// * `StreakFlameRow.flameSize` — the prototype's `18` is a JSX **attribute**
-///   (`ds.tsx:514` - `height="18"`), not a `key: number`, so the line map cannot
-///   reach it. Asserted in "the three numbers the line map cannot reach".
-/// * `AppTopBar.avatarRimWidth` — the prototype's `1.5` is inside a template
-///   literal. Same group.
-const Map<String, double> _homeSymbols = <String, double>{
-  'topGap': HomePage.topGap,
-  'panelGap': HomePage.panelGap,
-  'panelRadius': TodayReadingPanel.radius,
-  'eyebrowGap': TodayReadingPanel.eyebrowGap,
-  'previewGap': TodayReadingPanel.previewGap,
-  'referenceGap': TodayReadingPanel.referenceGap,
-  'actionsGap': TodayReadingPanel.actionsGap,
-  'actionsTopGap': TodayReadingPanel.actionsTopGap,
-  'previewFontSize': TodayReadingPanel.previewFontSize,
-  'trailingGap': AppTopBar.trailingGap,
-  'avatarDiameter': AppTopBar.avatarDiameter,
-  'gap': StreakFlameRow.gap,
-};
-
-/// Every number `/` claims to have transcribed from a `key: number` declaration.
-///
-/// `final`, not `const`: a claim reads its symbol by **indexing** `_homeSymbols`,
-/// and an index expression is not a constant expression in Dart. The map itself is
-/// still `const`, so its values are canonical and the table cannot drift.
-final List<PrototypeClaim> _claims = <PrototypeClaim>[
-  // --- HomeScreen.tsx: the greeting block ------------------------------------
-  (
-    label: 'the greeting block gap',
-    file: homeScreen,
-    key: 'marginBottom',
-    expected: 24,
-    symbol: 'topGap',
-  ),
-  // --- HomeScreen.tsx: the panel ---------------------------------------------
-  (
-    label: 'the panel radius',
-    file: homeScreen,
-    key: 'borderRadius',
-    expected: 24,
-    symbol: 'panelRadius',
-  ),
-  (
-    label: 'the panel bottom margin',
-    file: homeScreen,
-    key: 'marginBottom',
-    expected: 28,
-    symbol: 'panelGap',
-  ),
-  (
-    label: 'the eyebrow gap',
-    file: homeScreen,
-    key: 'marginBottom',
-    expected: 12,
-    symbol: 'eyebrowGap',
-  ),
-  (
-    label: 'the preview row gap',
-    file: homeScreen,
-    key: 'marginBottom',
-    expected: 10,
-    symbol: 'previewGap',
-  ),
-  (
-    label: 'the gap below the reference',
-    file: homeScreen,
-    key: 'marginBottom',
-    expected: 14,
-    symbol: 'referenceGap',
-  ),
-  (
-    label: 'the gap above the two controls',
-    file: homeScreen,
-    key: 'marginTop',
-    expected: 16,
-    symbol: 'actionsTopGap',
-  ),
-  (
-    label: 'the gap between the two controls',
-    file: homeScreen,
-    key: 'gap',
-    expected: 10,
-    symbol: 'actionsGap',
-  ),
-  (
-    label: 'the preview body size',
-    file: homeScreen,
-    key: 'fontSize',
-    expected: 17,
-    symbol: 'previewFontSize',
-  ),
-  (
-    label: 'the drop cap size',
-    file: homeScreen,
-    key: 'fontSize',
-    expected: 76,
-    symbol: null,
-  ),
-  (
-    label: 'the reference size',
-    file: homeScreen,
-    key: 'fontSize',
-    expected: 20,
-    symbol: null,
-  ),
-  // --- ds.tsx: the top bar ----------------------------------------------------
-  (
-    label: 'the gap between the streak and the avatar',
-    file: dsComponents,
-    key: 'gap',
-    expected: 14,
-    symbol: 'trailingGap',
-  ),
-  (
-    label: 'the avatar diameter',
-    file: dsComponents,
-    key: 'width',
-    expected: 32,
-    symbol: 'avatarDiameter',
-  ),
-  // `avatarTapTarget` (44) has **no** prototype row and deliberately no symbol in
-  // `_homeSymbols`: the prototype says 32 and this client says 44 because 32 is
-  // below the platform tap-target minimum. Putting a 44 in a table whose subject is
-  // transcription would claim a fidelity the change does not have; the number is
-  // asserted where the divergence is argued instead.
-  (
-    label: 'the avatar height',
-    file: dsComponents,
-    key: 'height',
-    expected: 32,
-    symbol: 'avatarDiameter',
-  ),
-  (
-    label: 'the gap between the flame and the count',
-    file: dsComponents,
-    key: 'gap',
-    expected: 5,
-    symbol: 'gap',
-  ),
+/// Every selector this file's claims name, for the anti-vacuity group.
+const List<String> claimedSelectors = <String>[
+  '.scroll',
+  '.greet',
+  '.greet .hi',
+  '[dir=rtl] .greet .hi',
+  '.streak',
+  '.streak .sn',
+  '.streak .sl',
+  '.flame',
+  '.hcard',
+  '.hcard .tv',
+  '.hcard .tv.small',
+  '[dir=rtl] .hcard .tv',
+  '.selah',
+  '.selah .dt',
+  '.selah .ds',
+  '[dir=rtl] .selah .ds',
+  '.breathing',
+  '.car-label',
+  '.carousel',
+  '.bcard',
+  '.bcard .bn',
+  '.bcard .bc',
+  '[dir=rtl] .bcard .bn',
+  '[dir=rtl] .bcard .bc',
+  '.bcard.sealed',
+  '.bcard.sealed .bloom',
+  '.bcard.sealed .bn',
+  '.bcard.sealed .lock',
 ];
 
+/// Reads the prototype and returns [selector]'s declarations — `cssRule`, under
+/// this suite's shorter name. See `css_reference.dart` for the anchor and for why
+/// a miss throws instead of returning `null`.
+Map<String, String> rule(String selector) => cssRule(File(prototype), selector);
+
+/// The numeric value of [property] in [declarations] — `cssPx` under this suite's
+/// shorter name.
+double px(Map<String, String> declarations, String property) =>
+    cssPx(declarations, property);
+
+/// Every length [property] declares, in CSS order — `cssPxList` under this suite's
+/// shorter name. A shorthand needs this and not [px]: `padding: 22px 20px` reads as
+/// `22` under [px], which is the **vertical** pair.
+List<double> pxAll(Map<String, String> declarations, String property) =>
+    cssPxList(declarations, property);
+
+/// The inline `style="…"` declarations of the element whose id is [id].
+///
+/// **The third source of numbers, after a CSS rule and a Dart constant.** The two
+/// cards declare their wash this way (`--bh`, `:519` and `:524`) and the
+/// last-light hint its `margin-top` (`:528`), so no rule-based reader can reach
+/// them.
+///
+/// ## WHY THE TAG IS FOUND FIRST AND THE ATTRIBUTE SECOND
+///
+/// Because **the attribute order is not fixed in the prototype**, and the first
+/// version of this helper assumed it was: `:528` writes
+/// `<div class="mono" style="…;margin-top:8px" id="lastHint" …>` — `style`
+/// **before** `id` — while `:519` writes `id="votdCard"` **before** its `style`. A
+/// single `id="…"[^>]*?style="…"` therefore reads one of the three and throws on the
+/// other two, and it threw on `lastHint` during the first run of this suite.
+///
+/// So the tag is matched first — `<[^>]*id="…"` — and the `style` is read out of
+/// *that tag's* text. It is 8 lines of regex rather than an HTML parser, and the
+/// assumption it does make — that no tag containing these ids has a `>` inside an
+/// attribute value — is true of every element in this file.
+Map<String, String> inlineDeclarationsFor(String id) {
+  final RegExpMatch? tag = RegExp('<[^>]*id="${RegExp.escape(id)}"[^>]*>')
+      .firstMatch(File(prototype).readAsStringSync());
+  if (tag == null) {
+    throw StateError(
+      '$id is not in $prototype any more. A card that lost its wash, or changed '
+      'its id, is a change this harness must read.',
+    );
+  }
+  final RegExpMatch? style = RegExp('style="([^"]*)"')
+      .firstMatch(tag.group(0)!);
+  if (style == null) {
+    throw StateError(
+      '#$id has no inline style in $prototype any more. A card that moved its '
+      'wash into a rule, or lost it, is a change this harness must read — and one '
+      'it cannot read through a CSS rule at all.',
+    );
+  }
+  return <String, String>{
+    for (final String declaration in style.group(1)!.split(';'))
+      if (declaration.contains(':'))
+        declaration.split(':').first.trim(): declaration
+            .split(':')
+            .skip(1)
+            .join(':')
+            .trim(),
+  };
+}
+
+/// One transcription claim: what the prototype says, and the Dart constant it
+/// became.
+///
+/// [property] is read from the rule [selector] names, or from the element's inline
+/// style when [id] is given. [index] picks a value out of a shorthand — 1 is the
+/// **horizontal** pair under CSS's top/right/bottom/left order.
+typedef PrototypeClaim = ({
+  String label,
+  String? selector,
+  String? id,
+  String property,
+  double expected,
+  double actual,
+});
+
 void main() {
-  group('the prototype still says what the claims say', () {
-    test('every declared value the claims cite is present on its line', () {
-      // The **line map**. `declaredValues` returns a map keyed `line:property`, and a
-      // claim's key is composed from the line the claim resolved — so this asserts
-      // that `HomeScreen.tsx` still declares `borderRadius: 24` somewhere, and a
-      // prototype that stops declaring it fails here.
-      //
-      // Anti-vacuity first: a parser that matched nothing would return an empty map
-      // and every lookup below would be `null`, which is exactly the silent-pass
-      // shape AGENT_CONTEXT §7 warns about.
-      final Map<String, double> screen = declaredValues(homeScreen);
-      final Map<String, double> components = declaredValues(dsComponents);
+  // The claims, as data. Built at group-construction time rather than inside a
+  // test, so a wrong prototype number fails every row rather than one of them.
+  final Map<String, String> greet = rule('.greet');
+  final Map<String, String> scroll = rule('.scroll');
+  final Map<String, String> hcard = rule('.hcard');
+  final Map<String, String> hcardTv = rule('.hcard .tv');
+  final Map<String, String> hcardSmall = rule('.hcard .tv.small');
+  final Map<String, String> hcardTvRtl = rule('[dir=rtl] .hcard .tv');
+  final Map<String, String> streak = rule('.streak');
+  final Map<String, String> streakSn = rule('.streak .sn');
+  final Map<String, String> streakSl = rule('.streak .sl');
+  final Map<String, String> flame = rule('.flame');
+  final Map<String, String> selah = rule('.selah');
+  final Map<String, String> selahDt = rule('.selah .dt');
+  final Map<String, String> selahDs = rule('.selah .ds');
+  final Map<String, String> selahDsRtl = rule('[dir=rtl] .selah .ds');
+  final Map<String, String> breathing = rule('.breathing');
+  final Map<String, String> carLabel = rule('.car-label');
+  final Map<String, String> carousel = rule('.carousel');
+  final Map<String, String> bcard = rule('.bcard');
+  final Map<String, String> bn = rule('.bcard .bn');
+  final Map<String, String> bc = rule('.bcard .bc');
+  final Map<String, String> bnRtl = rule('[dir=rtl] .bcard .bn');
+  final Map<String, String> bcRtl = rule('[dir=rtl] .bcard .bc');
+  final Map<String, String> sealed = rule('.bcard.sealed');
+  final Map<String, String> sealedBloom = rule('.bcard.sealed .bloom');
+  final Map<String, String> sealedBn = rule('.bcard.sealed .bn');
+  final Map<String, String> sealedLock = rule('.bcard.sealed .lock');
 
-      expect(screen, isNotEmpty);
-      expect(components, isNotEmpty);
-      expect(
-        screen.keys.any((String key) => key.endsWith(':borderRadius')),
-        isTrue,
-        reason: 'the extraction must see the panel radius at all',
-      );
-
-      for (final PrototypeClaim claim in _claims) {
-        final Map<String, double> values = claim.file == homeScreen
-            ? screen
-            : components;
+  group('the prototype file, as this harness reads it', () {
+    test('exists, and still contains the home section', () {
+      final String html = File(prototype).readAsStringSync();
+      for (final String marker in homeSectionMarkers) {
         expect(
-          values.values.contains(claim.expected),
+          html.contains(marker),
           isTrue,
           reason:
-              'the extraction found no `${claim.key}: ${claim.expected}` anywhere '
-              'in ${claim.file} (${claim.label}). Either the prototype changed or '
-              'this claim cites a declaration this harness cannot see — in which '
-              'case it belongs in the admitted list in the library doc, not here.',
+              'the home section lost `$marker`. The harness reads the prototype\'s '
+              'own markup; a section that changed shape is a failure here before '
+              'it is a silent drift in the page.',
         );
+      }
+    });
+
+    test('every selector the claims name is still a rule', () {
+      // The anti-vacuity half, and the rows below re-assert it through
+      // [rule]'s throw. This one states it as one failure so a renamed class is
+      // reported once rather than per row.
+      for (final String selector in claimedSelectors) {
         expect(
-          _lineOf(values, claim),
-          greaterThan(0),
-          reason: 'and the claim must resolve to a real line',
+          () => rule(selector),
+          returnsNormally,
+          reason: '$selector is named by a claim below',
         );
       }
     });
 
-    test('and the extraction resolved a distinct line for most claims', () {
-      // The second half of the same claim. A claim list where every row resolved
-      // to line 1 would satisfy the test above, so this requires **spread**: the
-      // claims are not all the same declaration.
-      final Map<String, double> screen = declaredValues(homeScreen);
-      final Set<int> lines = <int>{
-        for (final PrototypeClaim claim in _claims)
-          if (claim.file == homeScreen) _lineOf(screen, claim),
-      };
-      expect(lines.length, greaterThanOrEqualTo(6));
+    test('the extraction reads more numbers than the claims consume', () {
+      // A harness that reads fewer numbers than the prototype declares is
+      // under-testing; one that reads more is at least looking at the whole file.
+      int declared = 0;
+      for (final String selector in claimedSelectors) {
+        declared += rule(selector).length;
+      }
+      expect(
+        declared,
+        greaterThan(claimedSelectors.length * 2),
+        reason:
+            '$declared declarations across ${claimedSelectors.length} '
+            'rules. The claims below read '
+            '${claimedSelectors.length} of them; if this ever approaches the '
+            'declared count, the rules hold nothing the harness has not already '
+            'accounted for and the mapping is stale.',
+      );
     });
   });
 
-  group('the symbol map — a line map alone proves nothing', () {
-    test('every published constant matches the number it transcribes', () {
-      // The measured lesson, restated: `login_geometry_test.dart` changed
-      // `LoginPage.kTopSpacer` from 72 to 71 and all of its tests stayed green. A
-      // claim with no symbol is a claim about a prototype line, not about this code.
-      for (final PrototypeClaim claim in _claims) {
-        final String? symbol = claim.symbol;
-        if (symbol == null) {
-          continue;
-        }
-        expect(_homeSymbols[symbol], claim.expected, reason: claim.label);
-      }
+  group('the symbol map — the CSS is the number and the constant is the claim', () {
+    final List<PrototypeClaim> claims = <PrototypeClaim>[
+      // --- `.greet`, `:235` ----------------------------------------------------
+      (
+        label: "kGreetTop is `.greet`'s padding-top",
+        selector: '.greet',
+        id: null,
+        property: 'padding',
+        expected: pxAll(greet, 'padding')[0],
+        actual: HomePage.kGreetTop,
+      ),
+      (
+        label: "kGreetGutter is `.greet`'s padding **right**",
+        selector: '.greet',
+        id: null,
+        property: 'padding',
+        expected: pxAll(greet, 'padding')[1],
+        actual: HomePage.kGreetGutter,
+      ),
+      (
+        label: "kGreetBottom is `.greet`'s padding-bottom",
+        selector: '.greet',
+        id: null,
+        property: 'padding',
+        expected: pxAll(greet, 'padding')[2],
+        actual: HomePage.kGreetBottom,
+      ),
+      // --- `.scroll`, `:157` ---------------------------------------------------
+      (
+        label: 'kScrollTop is `.scroll`\'s padding-top',
+        selector: '.scroll',
+        id: null,
+        property: 'padding',
+        expected: pxAll(scroll, 'padding')[0],
+        actual: HomePage.kScrollTop,
+      ),
+      (
+        label: "kScrollGutter is `.scroll`'s padding **right**",
+        selector: '.scroll',
+        id: null,
+        property: 'padding',
+        expected: pxAll(scroll, 'padding')[1],
+        actual: HomePage.kScrollGutter,
+      ),
+      // --- `.greet .hi`, `:236-237` --------------------------------------------
+      (
+        label: "nameSize is `.greet .hi`'s font-size",
+        selector: '.greet .hi',
+        id: null,
+        property: 'font-size',
+        expected: px(rule('.greet .hi'), 'font-size'),
+        actual: GreetingBlock.nameSize,
+      ),
+      (
+        label: "nameSizeArabic is `[dir=rtl] .greet .hi`'s font-size",
+        selector: '[dir=rtl] .greet .hi',
+        id: null,
+        property: 'font-size',
+        expected: px(rule('[dir=rtl] .greet .hi'), 'font-size'),
+        actual: GreetingBlock.nameSizeArabic,
+      ),
+      // --- `.streak`, `:238` ---------------------------------------------------
+      (
+        label: "flameSize is `.flame`'s **height**",
+        selector: '.flame',
+        id: null,
+        property: 'height',
+        expected: px(flame, 'height'),
+        actual: StreakChip.flameSize,
+      ),
+      (
+        label: "the chip's gap is `.streak`'s gap",
+        selector: '.streak',
+        id: null,
+        property: 'gap',
+        expected: px(streak, 'gap'),
+        actual: StreakChip.gap,
+      ),
+      (
+        label: "numberSize is `.streak .sn`'s font-size",
+        selector: '.streak .sn',
+        id: null,
+        property: 'font-size',
+        expected: px(streakSn, 'font-size'),
+        actual: StreakChip.numberSize,
+      ),
+      (
+        label: "unitSize is `.streak .sl`'s font-size",
+        selector: '.streak .sl',
+        id: null,
+        property: 'font-size',
+        expected: px(streakSl, 'font-size'),
+        actual: StreakChip.unitSize,
+      ),
+      (
+        label: "unitTracking is `.streak .sl`'s letter-spacing, in `em`",
+        selector: '.streak .sl',
+        id: null,
+        property: 'letter-spacing',
+        expected: _em(streakSl, 'letter-spacing'),
+        actual: StreakChip.unitTracking,
+      ),
+      // --- `.hcard`, `:249-258` ------------------------------------------------
+      (
+        label: "the day's card radius is `.hcard`'s border-radius",
+        selector: '.hcard',
+        id: null,
+        property: 'border-radius',
+        expected: px(hcard, 'border-radius'),
+        actual: VerseOfTheDayCard.radius,
+      ),
+      (
+        label: "and the last-light card's is the same rule",
+        selector: '.hcard',
+        id: null,
+        property: 'border-radius',
+        expected: px(hcard, 'border-radius'),
+        actual: LastLightCard.radius,
+      ),
+      (
+        label: "the day's card vertical padding is `.hcard`'s padding-top",
+        selector: '.hcard',
+        id: null,
+        property: 'padding',
+        expected: pxAll(hcard, 'padding')[0],
+        actual: VerseOfTheDayCard.padding.top,
+      ),
+      (
+        label:
+            "the day's card horizontal padding is `.hcard`'s padding **right**",
+        selector: '.hcard',
+        id: null,
+        property: 'padding',
+        expected: pxAll(hcard, 'padding')[1],
+        actual: VerseOfTheDayCard.padding.left,
+      ),
+      (
+        label: "the last-light card's padding is the same rule",
+        selector: '.hcard',
+        id: null,
+        property: 'padding',
+        expected: pxAll(hcard, 'padding')[0],
+        actual: LastLightCard.padding.top,
+      ),
+      (
+        label: "verseGap is `.hcard .tv`'s margin-top",
+        selector: '.hcard .tv',
+        id: null,
+        property: 'margin',
+        expected: px(hcardTv, 'margin'),
+        actual: VerseOfTheDayCard.verseGap,
+      ),
+      (
+        label: 'the verse size is `.hcard .tv`\'s font-size',
+        selector: '.hcard .tv',
+        id: null,
+        property: 'font-size',
+        expected: px(hcardTv, 'font-size'),
+        actual: VerseOfTheDayCard.verseSize,
+      ),
+      (
+        label: "the verse's Arabic size is `[dir=rtl] .hcard .tv`'s",
+        selector: '[dir=rtl] .hcard .tv',
+        id: null,
+        property: 'font-size',
+        expected: px(hcardTvRtl, 'font-size'),
+        actual: VerseOfTheDayCard.verseSizeArabic,
+      ),
+      (
+        label: "the empty arm's size is `.hcard .tv.small`'s font-size",
+        selector: '.hcard .tv.small',
+        id: null,
+        property: 'font-size',
+        expected: px(hcardSmall, 'font-size'),
+        actual: LastLightCard.emptySize,
+      ),
+      // --- the hint's **inline** margin, `:528` --------------------------------
+      (
+        label: "hintGap is `#lastHint`'s inline margin-top",
+        selector: null,
+        id: 'lastHint',
+        property: 'margin-top',
+        expected: _inlinePx('lastHint', 'margin-top'),
+        actual: LastLightCard.hintGap,
+      ),
+      // --- `.selah`, `:261-266` ------------------------------------------------
+      (
+        label: "the selah card's radius is `.selah`'s border-radius",
+        selector: '.selah',
+        id: null,
+        property: 'border-radius',
+        expected: px(selah, 'border-radius'),
+        actual: SelahCard.radius,
+      ),
+      (
+        label: "the selah card's vertical padding is `.selah`'s padding-top",
+        selector: '.selah',
+        id: null,
+        property: 'padding',
+        expected: pxAll(selah, 'padding')[0],
+        actual: SelahCard.padding.top,
+      ),
+      (
+        label: "the selah card's horizontal padding is `.selah`'s padding **right**",
+        selector: '.selah',
+        id: null,
+        property: 'padding',
+        expected: pxAll(selah, 'padding')[1],
+        actual: SelahCard.padding.left,
+      ),
+      (
+        label: "the selah card's gap is `.selah`'s gap",
+        selector: '.selah',
+        id: null,
+        property: 'gap',
+        expected: px(selah, 'gap'),
+        actual: SelahCard.gap,
+      ),
+      (
+        label: "titleSize is `.selah .dt`'s font-size",
+        selector: '.selah .dt',
+        id: null,
+        property: 'font-size',
+        expected: px(selahDt, 'font-size'),
+        actual: SelahCard.titleSize,
+      ),
+      (
+        label: "subtitleGap is `.selah .ds`'s margin-top",
+        selector: '.selah .ds',
+        id: null,
+        property: 'margin-top',
+        expected: px(selahDs, 'margin-top'),
+        actual: SelahCard.subtitleGap,
+      ),
+      (
+        label: "subtitleSize is `.selah .ds`'s font-size",
+        selector: '.selah .ds',
+        id: null,
+        property: 'font-size',
+        expected: px(selahDs, 'font-size'),
+        actual: SelahCard.subtitleSize,
+      ),
+      (
+        label: "subtitleTracking is `.selah .ds`'s letter-spacing",
+        selector: '.selah .ds',
+        id: null,
+        property: 'letter-spacing',
+        expected: _em(selahDs, 'letter-spacing'),
+        actual: SelahCard.subtitleTracking,
+      ),
+      (
+        label: "subtitleSizeArabic is `[dir=rtl] .selah .ds`'s font-size",
+        selector: '[dir=rtl] .selah .ds',
+        id: null,
+        property: 'font-size',
+        expected: px(selahDsRtl, 'font-size'),
+        actual: SelahCard.subtitleSizeArabic,
+      ),
+      // --- `.breathing`, `:267-269` --------------------------------------------
+      (
+        label: "the circle's diameter is `.breathing`'s width",
+        selector: '.breathing',
+        id: null,
+        property: 'width',
+        expected: px(breathing, 'width'),
+        actual: SelahCard.diameter,
+      ),
+      (
+        label: 'and its height is the same number',
+        selector: '.breathing',
+        id: null,
+        property: 'height',
+        expected: px(breathing, 'height'),
+        actual: SelahCard.diameter,
+      ),
+      (
+        label: "rimWidth is `.breathing`'s border width",
+        selector: '.breathing',
+        id: null,
+        property: 'border',
+        expected: px(breathing, 'border'),
+        actual: SelahCard.rimWidth,
+      ),
+      (
+        label: "glyphSize is `.breathing`'s font-size",
+        selector: '.breathing',
+        id: null,
+        property: 'font-size',
+        expected: px(breathing, 'font-size'),
+        actual: SelahCard.glyphSize,
+      ),
+      // --- `.car-label` and `.carousel`, `:272-273` ---------------------------
+      (
+        label: "labelGap is `.car-label`'s margin-top",
+        selector: '.car-label',
+        id: null,
+        property: 'margin',
+        expected: pxAll(carLabel, 'margin')[0],
+        actual: HomePage.kLabelGap,
+      ),
+      (
+        label: "labelInset is `.car-label`'s margin **right**",
+        selector: '.car-label',
+        id: null,
+        property: 'margin',
+        expected: pxAll(carLabel, 'margin')[1],
+        actual: LibraryCarousel.labelInset,
+      ),
+      (
+        label: "stripGutter is `.carousel`'s padding **right**",
+        selector: '.carousel',
+        id: null,
+        property: 'padding',
+        expected: pxAll(carousel, 'padding')[1],
+        actual: LibraryCarousel.stripGutter,
+      ),
+      (
+        label: "cardGap is `.carousel`'s gap",
+        selector: '.carousel',
+        id: null,
+        property: 'gap',
+        expected: px(carousel, 'gap'),
+        actual: LibraryCarousel.cardGap,
+      ),
+      (
+        label: "cardWidth is `.bcard`'s **third** flex value, the basis",
+        selector: '.bcard',
+        id: null,
+        property: 'flex',
+        // `flex: 0 0 168px` — three numbers, and the basis is the **third**. Reading
+        // the first with `px` returns `0`, which is the value `cssPxList` is for.
+        expected: pxAll(bcard, 'flex')[2],
+        actual: LibraryCarousel.cardWidth,
+      ),
+      (
+        label: "cardHeight is `.bcard`'s height",
+        selector: '.bcard',
+        id: null,
+        property: 'height',
+        expected: px(bcard, 'height'),
+        actual: LibraryCarousel.cardHeight,
+      ),
+      (
+        label: "cardRadius is `.bcard`'s border-radius",
+        selector: '.bcard',
+        id: null,
+        property: 'border-radius',
+        expected: px(bcard, 'border-radius'),
+        actual: LibraryCarousel.cardRadius,
+      ),
+      (
+        label: "cardPadding is `.bcard`'s padding",
+        selector: '.bcard',
+        id: null,
+        property: 'padding',
+        expected: px(bcard, 'padding'),
+        actual: LibraryCarousel.cardPadding.top,
+      ),
+      (
+        label: "titleSize is `.bcard .bn`'s font-size",
+        selector: '.bcard .bn',
+        id: null,
+        property: 'font-size',
+        expected: px(bn, 'font-size'),
+        actual: LibraryCarousel.titleSize,
+      ),
+      (
+        label: "the title's Arabic size is `[dir=rtl] .bcard .bn`'s",
+        selector: '[dir=rtl] .bcard .bn',
+        id: null,
+        property: 'font-size',
+        expected: px(bnRtl, 'font-size'),
+        actual: LibraryCarousel.titleSizeArabic,
+      ),
+      (
+        label: "captionSize is `.bcard .bc`'s font-size",
+        selector: '.bcard .bc',
+        id: null,
+        property: 'font-size',
+        expected: px(bc, 'font-size'),
+        actual: LibraryCarousel.captionSize,
+      ),
+      (
+        label: "captionTracking is `.bcard .bc`'s letter-spacing",
+        selector: '.bcard .bc',
+        id: null,
+        property: 'letter-spacing',
+        expected: _em(bc, 'letter-spacing'),
+        actual: LibraryCarousel.captionTracking,
+      ),
+      (
+        label: "the caption's Arabic size is `[dir=rtl] .bcard .bc`'s",
+        selector: '[dir=rtl] .bcard .bc',
+        id: null,
+        property: 'font-size',
+        expected: px(bcRtl, 'font-size'),
+        actual: LibraryCarousel.captionSizeArabic,
+      ),
+      // --- the sealed card, `:284-288` ----------------------------------------
+      // `.bcard.sealed .bn{color: var(--ink-2)}` declares no length, so it has no
+      // row here; the *ink* is asserted where colours are asserted — the card test's
+      // `ink2` claim in `home_page_test.dart` — and `sealedBn` is read below so a
+      // rename of that selector is still a failure here.
+      (
+        label: "sealedWashFactor is `.bcard.sealed .bloom`'s opacity",
+        selector: '.bcard.sealed .bloom',
+        id: null,
+        property: 'opacity',
+        expected: px(sealedBloom, 'opacity'),
+        actual: LibraryCarousel.sealedWashFactor,
+      ),
+      (
+        label: "the badge's size is `.bcard.sealed .lock`'s font-size",
+        selector: '.bcard.sealed .lock',
+        id: null,
+        property: 'font-size',
+        expected: px(sealedLock, 'font-size'),
+        actual: LibraryCarousel.sealSize,
+      ),
+      (
+        label: "the badge's tracking is `.bcard.sealed .lock`'s letter-spacing",
+        selector: '.bcard.sealed .lock',
+        id: null,
+        property: 'letter-spacing',
+        expected: _em(sealedLock, 'letter-spacing'),
+        actual: LibraryCarousel.sealTracking,
+      ),
+      (
+        label: "the badge's horizontal padding is `.bcard.sealed .lock`'s **right**",
+        selector: '.bcard.sealed .lock',
+        id: null,
+        property: 'padding',
+        expected: pxAll(sealedLock, 'padding')[1],
+        actual: LibraryCarousel.sealPadding.right,
+      ),
+      (
+        label: "the badge's vertical padding is `.bcard.sealed .lock`'s padding-top",
+        selector: '.bcard.sealed .lock',
+        id: null,
+        property: 'padding',
+        expected: pxAll(sealedLock, 'padding')[0],
+        actual: LibraryCarousel.sealPadding.top,
+      ),
+    ];
+
+    for (final PrototypeClaim claim in claims) {
+      test(claim.label, () {
+        expect(
+          claim.actual,
+          claim.expected,
+          reason:
+              '${claim.selector ?? 'the inline style of #${claim.id}'}'
+              ' declares ${claim.property}, and the constant is the claim.',
+        );
+      });
+    }
+
+    test('the card radius is also `EvaRadii.heroPanel`, and that is 24', () {
+      // The join between the CSS and the token §5.3 published "for Home's
+      // today's-reading panel **by name**". If either moves, the other stops being
+      // a transcription and becomes a coincidence.
+      expect(VerseOfTheDayCard.radius, EvaRadii.heroPanel);
+      expect(EvaRadii.heroPanel, px(hcard, 'border-radius'));
     });
 
-    test('every published constant is claimed by at least one row', () {
-      // The other direction. A constant nothing claims is a number with no
-      // prototype behind it — which is how `kSocialButtonGap` survived in
-      // `login_geometry_test.dart` long enough to be certified while nothing read it.
-      final Set<String> claimed = <String>{
-        for (final PrototypeClaim claim in _claims)
-          if (claim.symbol != null) claim.symbol!,
-      };
-      expect(claimed, _homeSymbols.keys.toSet());
-      // And every name a claim uses is one the map actually has — a typo in a claim
-      // would otherwise read as `null` on the line above and pass.
-      for (final PrototypeClaim claim in _claims) {
-        if (claim.symbol != null) {
-          expect(
-            _homeSymbols.containsKey(claim.symbol),
-            isTrue,
-            reason: claim.label,
-          );
-        }
-      }
+    test(
+      "the pill's radius is `EvaRadii.chip`, and the CSS's 99 means the same",
+      () {
+        // `redesign.html:238` writes `border-radius: 99px` and §5.3's token is `999`.
+        // A pill's radius only has to be at least half its longest side, and the chip
+        // is 33 tall, so the two are the same shape — which is why the widget uses the
+        // token rather than a local `99`. Asserted from both sides so the token cannot
+        // be mistaken for the source.
+        expect(_radiusPx(streak, 'border-radius'), 99.0);
+        expect(EvaRadii.chip, greaterThanOrEqualTo(99.0));
+      },
+    );
+  });
+
+  group('the four collapsed gaps, recomputed from the prototype', () {
+    // CSS collapses adjacent vertical margins and Flutter has no such rule, so the
+    // gaps are `max()` of two numbers each and the numbers are in the CSS. Each row
+    // below recomputes the `max` from the parsed margins and compares it with the
+    // constant — which is the only way a reader can tell `HomePage`'s table from an
+    // intention.
+    final double hcardMarginTop = pxAll(hcard, 'margin')[0];
+    final double hcardMarginBottom = pxAll(hcard, 'margin')[2];
+    // `.selah{margin: 8px 14px}` — **two** values, not three: the vertical pair is
+    // the first and the horizontal pair the second, so the bottom is index **0**. The
+    // first version read index 2 and this suite refused to load with a
+    // `RangeError(0..1)`, which is the throw doing its job on a shorthand read the
+    // wrong way round.
+    final double selahMarginTop = pxAll(selah, 'margin')[0];
+    final double selahMarginBottom = pxAll(selah, 'margin')[0];
+    final double labelMarginTop = pxAll(carLabel, 'margin')[0];
+    final double labelMarginBottom = pxAll(carLabel, 'margin')[2];
+    final double carouselPaddingTop = pxAll(carousel, 'padding')[0];
+    final double carouselPaddingBottom = pxAll(carousel, 'padding')[2];
+    final double scrollPaddingTop = pxAll(scroll, 'padding')[0];
+    final double scrollPaddingBottom = pxAll(scroll, 'padding')[2];
+
+    test('the greeting-to-card gap is additive, because a padding blocks a collapse', () {
+      // `.greet`'s padding-bottom, `.scroll`'s padding-top and `.hcard`'s
+      // margin-top: paddings never collapse, so this one is a **sum**, and the
+      // distinction from the four below is the whole content of this group.
+      expect(
+        HomePage.kGreetToCardGap,
+        HomePage.kGreetBottom + scrollPaddingTop + hcardMarginTop,
+      );
+      expect(HomePage.kGreetToCardGap, greaterThan(hcardMarginTop));
     });
 
-    test('and the two `null` symbols are null for stated reasons', () {
-      final List<String> nulls = <String>[
-        for (final PrototypeClaim claim in _claims)
-          if (claim.symbol == null) claim.label,
-      ];
-      expect(nulls, <String>['the drop cap size', 'the reference size']);
-      // **Both are font sizes**, and `eva_typography.dart` records that §5.2 fixes
-      // none: the sizes come from the SDK's Material 3 scale, and a constant here
-      // would be a second copy of it free to drift from the theme.
-      //
-      // The drop cap is the sharper case, and it is a **divergence** rather than a
-      // transcription: the prototype's literal `76` is derived instead, from the body
-      // size and the cap-height ratio. **At `previewFontSize` 17 — which is the number
-      // this file's `nulls` row is about — the derived value is `3 × 1.8 × 17 / 0.7` =
-      // 131.14.** So this file certifies nothing about it: the number lives in
-      // `PassageDropCap.fontSizeFor`, is asserted there and in
-      // `passage_drop_cap_test.dart`, and `reading_geometry_test.dart` is where the
-      // rendered size is compared. Claiming 76 here would be a claim about a value
-      // nothing renders.
-      //
-      // **This comment used to cite `ScriptureBlock._dropCapFor`'s doc for 131.1, and
-      // that doc said `fontSizeFor(19)` = 131.1.** Both were wrong about the value they
-      // were attached to: at 19 the derived size is **146.57**, and 131.14 is the value
-      // at 17 — which is *this* screen's. The same number was quoted for the wrong
-      // screen in four places, and every one of them now names the body size it is
-      // about. See [AGENT_CONTEXT decision 64].
-      //
-      // If either gains a symbol, this list is what notices.
+    test('between the two cards it is `max(8, 14)`', () {
+      expect(HomePage.kCardGap, greaterThanOrEqualTo(hcardMarginBottom));
+      expect(HomePage.kCardGap, greaterThanOrEqualTo(hcardMarginTop));
+      expect(
+        HomePage.kCardGap,
+        hcardMarginBottom > hcardMarginTop ? hcardMarginBottom : hcardMarginTop,
+        reason: 'CSS collapses to the LARGER of the two margins',
+      );
+      // **And not the sum**, which is what a naive port would have written.
+      expect(HomePage.kCardGap, isNot(hcardMarginBottom + hcardMarginTop));
+    });
+
+    test('the selah card follows the last card by `max(8, 8)`', () {
+      expect(
+        HomePage.kSelahGap,
+        selahMarginTop > hcardMarginBottom ? selahMarginTop : hcardMarginBottom,
+      );
+    });
+
+    test('the label follows the selah card by `max(8, 20)`', () {
+      expect(
+        HomePage.kLabelGap,
+        labelMarginTop > selahMarginBottom ? labelMarginTop : selahMarginBottom,
+      );
+      // The label's own top margin is the *winner* here, which is why
+      // `LibraryCarousel.labelGap` and `HomePage.kLabelGap` are the same number in
+      // two files: the strip's 4px padding-top is inside its own box and loses.
+      expect(HomePage.kLabelGap, greaterThan(carouselPaddingTop));
+    });
+
+    test('the strip follows the label by `max(10, 4)`', () {
+      expect(
+        LibraryCarousel.labelBottomGap,
+        labelMarginBottom > carouselPaddingTop
+            ? labelMarginBottom
+            : carouselPaddingTop,
+      );
+      expect(HomePage.kStripGap, LibraryCarousel.labelBottomGap);
+    });
+
+    test(
+      'and the bottom clearance is the carousel\'s padding plus the scroll\'s',
+      () {
+        expect(
+          HomePage.kBottomClearance,
+          carouselPaddingBottom + scrollPaddingBottom,
+        );
+      },
+    );
+
+    test("the sealed title's rule exists even though it declares no length", () {
+      // `:286` — `.bcard.sealed .bn{color: var(--ink-2)}`. Colours are outside this
+      // file's subject (its own library doc says so), and a rule that declares none
+      // still has to be *reachable*, or a rename would move a widget's ink with
+      // nothing here going red.
+      expect(sealedBn['color'], 'var(--ink-2)');
+    });
+
+    test("the sealed card's own `.8` is NOT applied, and this says why", () {
+      // `redesign.html:284` — `.bcard.sealed{opacity:.8}` — and
+      // `LibraryCarousel.sealedCardOpacity` is the recorded number the widget
+      // deliberately does not use. **This row exists so the constant cannot be
+      // deleted as dead code**, which is what a reader would do without it, and
+      // so the divergence stays visible in the harness rather than only in a
+      // widget's doc comment.
+      expect(px(sealed, 'opacity'), LibraryCarousel.sealedCardOpacity);
+      expect(LibraryCarousel.sealedCardOpacity, 0.8);
     });
   });
 
-  group('the three numbers the line map cannot reach', () {
-    testWidgets('the flame is 18 tall and 14 wide', (
+  group('the geometry the rule map cannot reach', () {
+    testWidgets('the flame is 17 tall and 13.6 wide, not 13', (
       WidgetTester tester,
     ) async {
-      // `ds.tsx:514` — `<svg width="14" height="18" viewBox="0 0 16 20">`. JSX
-      // **attributes**, so there is no `key: number` for `declaredValues` to find;
-      // the extraction sees `viewBox`'s contents only if they were a style object,
-      // and they are not.
+      // `:242` declares `width: 13px; height: 17px`. The **height** is adopted
+      // (`StreakChip.flameSize`, asserted above from the same rule) and the width
+      // is this widget's own viewBox ratio: `streak_flame.dart`'s doc records that
+      // the CSS *blob* — `border-radius: 50% 50% 46% 46%/62% 62% 38% 38%` — is not
+      // adopted, and reproducing a 13px width would mean an anisotropic stretch of
+      // the path.
+      //
+      // 0.6px is 4.6% of the width, and the assertion is a **range** rather than a
+      // float equality because the rendered box comes out of a `CustomPaint` whose
+      // size is computed, not measured.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
 
-      final Size flame = tester.getSize(
-        find.descendant(
-          of: find.byType(StreakFlameRow),
-          matching: find.byType(StreakFlame),
-        ),
-      );
-      expect(flame.height, 18, reason: 'ds.tsx:514 height="18"');
-      // `StreakFlame` derives the width from the height and the viewBox's 16:20,
-      // which its own doc argues at length; 0.778 of 18 is 14.0 to within a rounding
-      // step. So the width is asserted against the prototype's number rather than
-      // against `flameSize * aspect`, which would agree with any value at all.
-      expect(flame.width, closeTo(14, 0.5), reason: 'ds.tsx:514 width="14"');
-    });
-
-    test('the avatar tap target is 44, which the prototype does NOT say', () {
-      // `IconActionButton.size` and `iOSTapTargetGuideline` both say 44; the
-      // prototype's `ds.tsx:520` says `width: 32, height: 32`. So this number is
-      // **deliberately absent from `_homeSymbols`**, and asserting it here with its
-      // reason is what keeps that absence from looking like an oversight.
-      expect(AppTopBar.avatarTapTarget, 44);
+      final Size painted = tester.getSize(find.byType(StreakFlame));
+      expect(painted.height, 17.0, reason: "`.flame`'s height, verbatim");
+      expect(painted.width, closeTo(13.6, 0.01), reason: '17 × 16/20');
       expect(
-        AppTopBar.avatarTapTarget,
-        greaterThan(AppTopBar.avatarDiameter),
-        reason: 'the painted circle stays 32 inside a 44 box',
+        px(flame, 'width'),
+        13.0,
+        reason: 'and the CSS says 13, which is the divergence this row records',
       );
     });
 
-    testWidgets('the avatar rim is 1.5', (WidgetTester tester) async {
-      // `ds.tsx:522` writes the rim inside a template literal — `outline: `1.5px
-      // solid …`` — so the key is `outline`, not `width`, and `1.5` is followed by
-      // `px` with no word boundary after the digits. The extraction cannot see it.
-      expect(AppTopBar.avatarRimWidth, 1.5);
-      // The prototype's alpha is 0.4 dark / 0.6 light; the shipped value is 0.35
-      // because `ember` is the only accent in §5.1 and the avatar must not compete
-      // with the flame beside it. `AppTopBar`'s doc gives the substitution.
-      //
-      // **`0.35` and not `lessThan(1)`.** The bound this replaced was satisfied by
-      // `0.99` — a rim effectively as strong as an opaque one, which is the opposite
-      // of "must not compete with the flame beside it", and the sentence above is the
-      // whole reason the number exists. A doc that names a value and an assertion
-      // that accepts any value under 1 are two different claims and only one of them
-      // was being tested.
-      expect(AppTopBar.avatarRimAlpha, 0.35);
-    });
+    testWidgets(
+      "the greeting's row gap is the one number `.greet` does not declare",
+      (WidgetTester tester) async {
+        // `:235` has `display: flex; justify-content: space-between` and **no `gap`**,
+        // so `GreetingBlock.nameToChipGap` is written rather than transcribed — and a
+        // written number needs a rendered assertion, which is this row.
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
 
-    test('and the prototype really does write them the way this says', () {
-      // The one thing this file *can* do for an unreachable number: assert the
-      // prototype's own text, so a rewrite of `ds.tsx:514` or `:522` is red. A regex
-      // over the raw line rather than the numeric extractor, which is the whole
-      // difference between "cannot see it" and "cannot check it".
-      final List<String> components = File(dsComponents).readAsLinesSync();
+        expect(
+          greet.containsKey('gap'),
+          isFalse,
+          reason:
+              'if `.greet` grows a `gap`, the constant becomes a transcription and '
+              'this row becomes a symbol-map row instead',
+        );
+        // **A minimum, not an equality — and the first version asserted an equality
+        // and read 187.** The name block is `Expanded`, so it takes every pixel the
+        // row has left after the pill; the *text* inside it is only as wide as the
+        // greeting, and the visible gap between the text's end and the pill is
+        // whatever the surface has spare. At 430 wide that is 187, and none of it is
+        // `nameToChipGap`.
+        //
+        // What the constant buys is the **worst** case: a long display name on a 320
+        // screen, where the name block is full and the gap is the constant itself.
+        // That case is `home_text_scale_test.dart`'s; what is asserted here is that
+        // the prototype says nothing, the constant is positive, and the two children
+        // never touch.
+        final Rect name = tester.getRect(find.text('peace, David'));
+        final Rect chip = tester.getRect(find.byType(StreakChip));
+        expect(chip.left, greaterThan(name.right));
+        expect(GreetingBlock.nameToChipGap, greaterThan(0));
+        // And the greeting is **one line** even when the name is long: `maxLines: 1`
+        // is what stops it wrapping onto a second line under the chip.
+        expect(name.height, lessThan(40));
+      },
+    );
 
-      expect(
-        components.firstWhere(
-          (String line) => line.contains('height="18"'),
-          orElse: () =>
-              throw StateError('ds.tsx no longer declares height="18"'),
-        ),
-        contains('width="14"'),
-      );
-      // **Both on the same line.** A first-match search for `1.5px` alone finds
-      // `ds.tsx:264`'s `ButtonSecondary` border - `border: 1.5px solid ...` - and
-      // then asserts that it says `outline`, which is a different control's number.
-      // That was the first version's second form of the same mistake.
-      expect(
-        components.firstWhere(
-          (String line) => line.contains('1.5px') && line.contains('outline'),
-          orElse: () => throw StateError(
-            'ds.tsx no longer declares an `outline: 1.5px` rim',
-          ),
-        ),
-        contains('1.5px'),
-      );
-    });
+    testWidgets(
+      'and the chip is vertically centred, which is `align-items: center`',
+      (WidgetTester tester) async {
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+        // **Against the row, not against the name.** The first version compared the
+        // chip's centre with the *greeting text*'s and read 9.0, which is not a
+        // divergence: `align-items: center` centres a child against the row's cross
+        // axis, and the row is 48 tall (a 16px caption, a 2px gap, a 30px name) while
+        // the name occupies only its own 30 of those 48. The chip lands at
+        // 54 + (48 - 33) / 2 = 61.5 and the row's centre is 78.
+        final Rect chip = tester.getRect(find.byType(StreakChip));
+        final Rect row = tester.getRect(find.byType(GreetingBlock));
+        expect(
+          (chip.center.dy - row.center.dy).abs(),
+          lessThan(0.01),
+          reason: '`align-items: center` centres against the row',
+        );
+        expect(
+          row.top,
+          54.0,
+          reason: "and the row starts at `.greet`'s padding-top",
+        );
+      },
+    );
   });
 
   group('the rendered geometry', () {
-    testWidgets('the panel paints at the prototype radius and padding', (
+    testWidgets('the greeting sits at 20 and the cards at 28', (
       WidgetTester tester,
     ) async {
-      // The third half: the prototype's numbers again, but read off what the tree
-      // reports rather than off this project's constants — a constant that is right
-      // and a widget that ignores it are otherwise the same test.
+      // `.greet`'s gutter is 20 (`:235`) and `.scroll`'s is 14 (`:157`) with each
+      // card's own `margin … 14px` (`:249`) inside it, so the visible edges are 20
+      // and **28**. The second number is the one a single scaffold padding cannot
+      // produce, which is why `NeuralScaffold(padding: EdgeInsets.zero)` and the two
+      // per-section paddings.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
 
-      expect(
-        tester.getSize(find.byType(GlassSurface).first).width,
-        kGeometrySurface.width - 2 * EvaSpacing.screenHorizontal,
-        reason:
-            'the panel fills the scaffold gutter, and 430 is the width '
-            '`login_geometry_test.dart` uses for the same reason',
-      );
-
-      final GlassSurface surface = tester.widget<GlassSurface>(
-        find.byType(GlassSurface).first,
-      );
-      expect(surface.radius, 24, reason: 'HomeScreen.tsx:41 borderRadius: 24');
-      expect(
-        surface.padding,
-        const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        reason: 'HomeScreen.tsx:41 padding 20px 20px 16px',
-      );
+      expect(tester.getTopLeft(find.text('GOOD MORNING')).dx, 20.0);
+      expect(tester.getTopLeft(find.byType(VerseOfTheDayCard)).dx, 28.0);
+      expect(tester.getTopLeft(find.byType(LastLightCard)).dx, 28.0);
+      expect(tester.getTopLeft(find.byType(SelahCard)).dx, 28.0);
     });
 
-    testWidgets('the two controls are the prototype apart', (
+    testWidgets('the greeting\'s top padding is 54', (
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
-
-      final Rect button = tester.getRect(find.byType(EvaButton));
-      // **Scoped to the reading panel**, because `/` now has a second `TextLink`: the
-      // leaderboard card's "See all". A bare `find.byType(TextLink)` matched both and
-      // `getRect` refused to guess — which is the failure mode that a type-based
-      // finder acquires the moment a screen grows a second instance of the type, and
-      // the reason this test names the panel rather than the widget class.
-      //
-      // The claim under test is the panel's two halves, so scoping to the panel is
-      // also the more honest statement of it.
-      final Rect link = tester.getRect(
-        find.descendant(
-          of: find.byType(TodayReadingPanel),
-          matching: find.byType(TextLink),
-        ),
-      );
-
-      // **Centre to centre, not edge to edge.** The prototype's second half is
-      // `<div flex: 1, display: flex, alignItems: center, justifyContent: center>`
-      // (`HomeScreen.tsx:68-69`), so the `TextLink` is *centred inside* its half and
-      // its left edge is nowhere near the button's right edge. An edge-to-edge
-      // assertion measured 42.9 against a declared gap of 10, and "fixing" it would
-      // have meant moving the link out of its centred half — which is the design
-      // improvement this project forbids.
-      //
-      // Two `flex: 1` halves plus a gap put the second half's centre exactly one
-      // half-width plus the gap to the right of the button's centre.
-      expect(
-        link.center.dx - button.center.dx,
-        closeTo(button.width + TodayReadingPanel.actionsGap, 0.5),
-        reason: 'two flex:1 halves separated by gap: 10, with the link centred',
-      );
-      expect(
-        link.left,
-        greaterThan(button.right),
-        reason: 'and the gap is real: the halves do not touch',
-      );
+      expect(tester.getTopLeft(find.text('GOOD MORNING')).dy, 54.0);
     });
 
-    testWidgets('the avatar is 32 painted inside a 44 box', (
+    testWidgets("the day's card paints at 22 by 20 inside its own box", (
       WidgetTester tester,
     ) async {
-      // The one deliberate §14 divergence from the prototype, asserted as **both**
-      // numbers so the change is visible rather than only described.
+      // Measured **relative to the card**, not to the screen, so the assertion holds
+      // whatever the scroll offset is.
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
 
-      expect(
-        tester.getSize(find.byType(AppTopBar)).height,
-        AppTopBar.avatarTapTarget,
-        reason:
-            'the row is as tall as its tallest child, and the avatar box is the '
-            '44px tap target. `AppTopBar` records what that cost against the '
-            'prototype own 32.',
+      final Rect card = tester.getRect(find.byType(VerseOfTheDayCard));
+      final Rect eyebrow = tester.getRect(
+        find.textContaining('VERSE OF THE DAY'),
       );
+      expect(eyebrow.left - card.left, 20.0);
+      expect(eyebrow.top - card.top, 22.0);
+    });
 
-      // The painted circle is still 32 — the prototype's number.
-      final Iterable<double> circles = tester
-          .widgetList<Container>(
-            find.descendant(
-              of: find.byType(AppTopBar),
-              matching: find.byType(Container),
+    testWidgets('and the last-light card paints at the same inset', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+      final Rect card = tester.getRect(find.byType(LastLightCard));
+      final Rect eyebrow = tester.getRect(find.textContaining('LAST LIGHT'));
+      expect(eyebrow.left - card.left, 20.0);
+      expect(eyebrow.top - card.top, 22.0);
+    });
+
+    testWidgets('the chip paints at 11 by 7 around the flame', (
+      WidgetTester tester,
+    ) async {
+      // `.streak`'s padding is `7px 14px 7px 11px` (`:238`) — **top/right/bottom/
+      // left**, so the leading pad is 11 and the trailing 14, and a port that read
+      // the shorthand as symmetric would paint the flame 3px right of where the
+      // prototype puts it.
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+      final Offset pill = tester.getTopLeft(find.byType(StreakChip));
+      final Offset flame = tester.getTopLeft(find.byType(StreakFlame));
+      // **12 and 8, not 11 and 7**, because `.streak`'s `border: 1px solid` is
+      // *inside* the pill's box and CSS padding is inside the border too — so the
+      // flame sits one pixel further out than the padding alone would put it. The
+      // first version of this row asserted 11 and 7 and the tree said 12 and 8,
+      // which is the relationship the prototype has and a transcription of the
+      // padding alone would have lost.
+      expect(flame.dx - pill.dx, StreakChip.padding.left + 1.0);
+      expect(flame.dy - pill.dy, StreakChip.padding.top + 1.0);
+    });
+
+    testWidgets('the verse sits the prototype\'s 10 below the eyebrow', (
+      WidgetTester tester,
+    ) async {
+      // `.hcard .tv`'s `margin: 10px 0 0` (`:258`), and **line boxes**: the gap is
+      // measured from the eyebrow's bottom edge to the verse's top edge, which is
+      // the margin plus nothing — a `Text`'s box is its line box and there is no
+      // descender space inside it.
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+      final Rect eyebrow = tester.getRect(
+        find.textContaining('VERSE OF THE DAY'),
+      );
+      final Rect verse = tester.getRect(find.textContaining('Nicodemus'));
+      expect(verse.top - eyebrow.bottom, 10.0);
+    });
+
+    testWidgets('the circle is 44 square', (WidgetTester tester) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+      // **The `Container`, not the glyph**: reading the circle's size off the
+      // glyph asserted that a circle is a glyph. The circle is the 44px box, and
+      // the star inside it is PAINTED (`_FourPointedStar`), not typed — U+2726 is
+      // in no bundled family, which `arabic_typography_test.dart` measured before
+      // this row was written — so the finder is on the painter's box.
+      final Finder star = find
+          .descendant(
+            of: find.byType(SelahCard),
+            matching: find.byWidgetPredicate(
+              (Widget w) =>
+                  w is CustomPaint && w.size == const Size.square(11.0),
             ),
           )
-          .map((Container c) => c.constraints?.maxWidth ?? 0)
-          .where((double width) => width > 0);
-      expect(circles, contains(AppTopBar.avatarDiameter));
+          .first;
+      expect(star, findsOneWidget);
+      final Rect circle = tester.getRect(
+        find.ancestor(of: star, matching: find.byType(Container)).first,
+      );
+      expect(circle.size, const Size(44, 44));
+      expect(
+        tester.getRect(star).height,
+        lessThan(44),
+        reason: 'the glyph is smaller than the button that draws it',
+      );
     });
+
+    testWidgets('a book card is 168 by 132 with a 16 inset', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+      expect(tester.getSize(find.text('psalms')), isNotNull);
+      final Rect card = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('psalms'),
+              matching: find.byType(GlassSurface),
+            )
+            .first,
+      );
+      expect(card.size.width, 168.0);
+      expect(card.size.height, 132.0);
+
+      final Rect title = tester.getRect(find.text('psalms'));
+      expect(title.left - card.left, 16.0);
+      // `.bcard` is `flex-direction: column; justify-content: space-between`, so the
+      // caption is on the **bottom** inset: 132 − 16 − the caption's own height.
+      final Rect caption = tester.getRect(find.text('POETRY · 6 VERSES'));
+      expect(card.bottom - caption.bottom, 16.0);
+    });
+
+    testWidgets(
+      'the strip\'s gap is 12 and the label\'s inset is 18 more than it',
+      (WidgetTester tester) async {
+        // `.carousel`'s `gap: 12px` (`:273`) and `.car-label`'s `margin: 20px 18px
+        // 10px` (`:272`) — the label sits **4px** further in than the cards, because
+        // the scroll's own gutter is 14 and the label's is 18.
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+        // **The card's box, not its title.** The first version compared the label's
+        // text with the card's *text* and read 6, which is a difference between two
+        // things the prototype never compares: the label sits 18 in from the scroll's
+        // gutter and the card 14, so the label is **4** further in than the card's
+        // edge — while the card's own 16px padding puts its title 12 further in than
+        // the label. Both are true and only one of them is `.car-label`'s margin.
+        final Rect label = tester.getRect(find.text('THE LIBRARY'));
+        final Rect card = tester.getRect(
+          find
+              .ancestor(
+                of: find.text('psalms'),
+                matching: find.byType(GlassSurface),
+              )
+              .first,
+        );
+        // The label sits `18` in from the scroll's gutter and a card `14 + 14` in —
+        // 18 and 28 from the screen's edge, so the label is **4** further in.
+        expect(
+          label.left - card.left,
+          LibraryCarousel.labelInset - LibraryCarousel.stripGutter,
+        );
+        expect(label.left - card.left, 4.0);
+        expect(card.left, HomePage.kScrollGutter + LibraryCarousel.stripGutter);
+      },
+    );
+
+    testWidgets(
+      'and the whole strip is the card height, with no vertical padding',
+      (WidgetTester tester) async {
+        // `.carousel`'s `padding: 4px 14px 12px` (`:273`) — the 4px top is the page's
+        // own `labelBottomGap` winner (10 > 4) and the 12px bottom is the page's
+        // `kBottomClearance`, so the strip itself is exactly one card tall.
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc, size: kGeometrySurface);
+
+        final Size strip = tester.getSize(
+          find
+              .descendant(
+                of: find.byType(LibraryCarousel),
+                matching: find.byType(ListView),
+              )
+              .first,
+        );
+        expect(strip.height, LibraryCarousel.cardHeight);
+      },
+    );
   });
 }
 
-/// The prototype line a claim's `key` resolves on.
+/// `letter-spacing: .14em` as a bare multiplier, for the rows that compare it with a
+/// Dart `double`.
 ///
-/// Found by scanning for the **first** occurrence of `key: expected` in the file.
-/// Where the same `key: N` pair appears twice the claim is ambiguous, and this
-/// reports the first rather than guessing silently — the ambiguity is a property of
-/// the prototype, and the assertion above already asks only that the pair exists
-/// somewhere.
-int _lineOf(Map<String, double> values, PrototypeClaim claim) {
-  final List<int> hits = <int>[
-    for (final MapEntry<String, double> entry in values.entries)
-      if (entry.key.endsWith(':${claim.key}') && entry.value == claim.expected)
-        int.parse(entry.key.split(':').first),
-  ];
-  expect(
-    hits,
-    isNotEmpty,
-    reason:
-        '`${claim.key}: ${claim.expected}` is declared nowhere in '
-        '${claim.file} — the prototype changed',
-  );
-  return hits.first;
+/// **A multiplier and not pixels**, because the CSS's unit is the element's own
+/// `font-size` and Flutter's `letterSpacing` is also in logical pixels — so the two
+/// agree only as a ratio. `login_geometry_test.dart`'s wordmark row converts `.3em`
+/// at its call site for the same reason, and this helper is that conversion's other
+/// half: it reads the number and lets the caller decide what it multiplies.
+double _em(Map<String, String> declarations, String property) {
+  final String raw = declarations[property]!;
+  // **A leading dot is a number.** `letter-spacing: .14em` has no digit before the
+  // point, so `(-?\d+(?:\.\d+)?)em` matches the `14` alone and every tracking row
+  // fails by a factor of 100 — which is what the first run of this suite reported,
+  // and why `cssPxList`'s regex has the same alternation.
+  final RegExpMatch match = RegExp(r'(-?(?:\d+(?:\.\d+)?|\.\d+))em')
+      .firstMatch(raw)!;
+  return double.parse(match.group(1)!);
 }
+
+/// `border-radius: 99px` as a double, without the `cssPx` name it would shadow.
+double _radiusPx(Map<String, String> declarations, String property) =>
+    cssPx(declarations, property);
+
+/// One inline declaration, as a double.
+double _inlinePx(String id, String property) =>
+    cssPx(inlineDeclarationsFor(id), property);

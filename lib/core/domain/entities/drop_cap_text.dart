@@ -26,10 +26,18 @@ typedef DropCapText = ({String letter, String rest});
 /// header, the metadata row and both CTAs with it.
 ///
 /// **And the second half of the same bug was a truncation, not an index.** `previewText`
-/// cuts at a budget too, so an emoji anywhere in the first 56 code units of verse one
+/// cut at a budget too, so an emoji anywhere in the first 56 code units of verse one
 /// put a lone surrogate into `/`'s preview — a wider surface than `/reading`'s, which
-/// only fails at index 0. That half is fixed where the cut is
-/// (`features/home/domain/preview_text.dart`); this is the first-rune half.
+/// only fails at index 0.
+///
+/// **That half no longer exists to fix.** Phase 5.2 deleted the panel and the
+/// preview with it (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md`:
+/// the redesign's `/` shows the day's first verse whole and the last light's
+/// reference, not a budgeted excerpt), and `features/home/domain/preview_text.dart`
+/// went with them. The record stays because the *class* of defect — a cut that
+/// assumes one code unit per glyph — is what this widget's first-rune guard is
+/// about, and a reader meeting it for the first time should know the truncation
+/// cousin it once had.
 ///
 /// ## AND `isEmpty` WAS NOT ENOUGH, IN EITHER DIRECTION
 ///

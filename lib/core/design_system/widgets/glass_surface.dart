@@ -89,12 +89,37 @@ enum GlassTier {
   /// The default, because it is right on four of the six screens.
   tint,
 
-  /// A [BackdropFilter] under the same fill, rim and shadow.
+  /// A [BackdropFilter] under the same fill, rim and shadow — **and under the wash
+  /// and the seam [bloom] draws.**
   ///
   /// Reserved for a surface that sits directly over the animated background and
   /// is expected to let it show through — on `/`, that is **Home's today's-reading
   /// panel and nothing else**. See the enum's doc for why the top bar is not a
   /// second one; `ds.tsx:499-530` has no `backdropFilter` in it at all.
+  ///
+  /// ## WHY THIS TIER CARRIES THE WASH, WHICH IS THE ONE PLACE IT IS NOT OBVIOUS
+  ///
+  /// `redesign.html:250` gives `.hcard` three declarations and no one of them is
+  /// separable from the others: `backdrop-filter:blur(12px)`, the `.bloom` child
+  /// at `:253-254` and the `.hor` at `:256-257`. The vote card is a
+  /// `GlassTier.bloom`; the day's own card is the same rule plus a blur. So
+  /// **`blur` is `bloom` plus the one budgeted filter**, and a surface that blurs
+  /// without a wash would be a card the prototype never draws.
+  ///
+  /// The alternative was a `wash:` flag beside [tier] — and it is refused for the
+  /// reason the constructor's `bloomColor` doc gives: two switches for one thing
+  /// can contradict each other, and the contradiction is a surface that blurs with
+  /// no wash because one caller said `bloom` and the other said `wash: false`. The
+  /// third spelling — a caller painting its own wash in [GlassSurface.child] — was
+  /// refused too, because the child sits **inside** `padding` and the wash is
+  /// full-bleed (see [bloom]'s second substitution): it would have meant
+  /// `padding: EdgeInsets.zero` and the card's own padding re-spelled in the
+  /// widget, on the one surface the budget exists for.
+  ///
+  /// **The cost, stated:** `goldens/glass_surface_blur.png` moved when this
+  /// landed. That golden is the honest outcome and it is named here rather than
+  /// re-recorded quietly — the same treatment `glass_surface_bloom_{dark,light}.png`
+  /// got when [EvaColors.bloomOpacity] moved the light-mode dimmer into a token.
   blur,
 
   /// The `.bloom` radial wash **and** the `.hor` seam, over the same fill, rim
@@ -436,6 +461,7 @@ class GlassSurface extends StatelessWidget {
     this.seamAlignment,
     this.seamWidthFactor,
     this.seamTint,
+    this.seam = true,
     this.onTap,
     this.semanticLabel,
     this.bloomColor,
@@ -512,6 +538,34 @@ class GlassSurface extends StatelessWidget {
   /// so only the middle stop is a colour.
   final Color? seamTint;
 
+  /// Whether the `.hor` seam is painted at all. `true` — the default — is the
+  /// `.hcard` treatment every existing caller already draws.
+  ///
+  /// ## WHY PRESENCE IS A PARAMETER AND NOT A FOURTH TIER
+  ///
+  /// Three of the four `.bloom` hosts carry **no** `.hor`: `.bcard`
+  /// (`redesign.html:275-278`) has the wash and no seam, and `.medal` (`:415`)
+  /// and `.podbar` (`:299`) are the same. Only `#votdCard` (`:520`) draws one.
+  /// So the tier cannot answer this: `bloom` is the wash **and** the seam, and a
+  /// host that wants the wash alone has no spelling for it.
+  ///
+  /// The two rejected alternatives, for the record:
+  ///
+  /// * **`seamTint: Colors.transparent`** — no new API, and it *works*: the
+  ///   gradient's middle stop and the glow both derive from the tint. It is
+  ///   refused because a colour is not a boolean. "Transparent" would be a value
+  ///   whose only meaning is "none", which is the same defect
+  ///   [GlassTier.bloom]'s doc names for a hypothetical `sealedBloom` member: an
+  ///   enum whose members are decisions about a surface, not about whether one of
+  ///   its two decorations happens to be switched on.
+  /// * **`seamWidthFactor: 0`** — same object, same refusal.
+  ///
+  /// It is a parameter rather than a tier for the reason the other three seam
+  /// parameters are: the seam is an *element inside* the surface, and the tier is
+  /// a decision about the surface's treatment. A tier that existed only to omit
+  /// a hairline would make the budget's count depend on hairline policy.
+  final bool seam;
+
   /// Makes the surface tappable and announces it as a button.
   ///
   /// A tappable surface is a `Material` + `InkWell`, not a `GestureDetector`:
@@ -526,6 +580,23 @@ class GlassSurface extends StatelessWidget {
   /// an unnamed button is precisely the §14 gap this widget exists to close.
   /// Left null when the surface is not interactive, so a purely decorative panel
   /// does not add a node to the semantics tree at all.
+  ///
+  /// ## AND THE **EMPTY STRING** IS A STATEMENT, NOT A SENTINEL
+  ///
+  /// The assert cannot see what a `child` contributes: `Semantics(label: …)` merges
+  /// its children's labels into its own node, so a surface whose child draws an
+  /// eyebrow, a reference and a paragraph is **already named** by them, and naming
+  /// it again repeats all of it. `/`'s two cards pass `''` for that reason —
+  /// measured in `VerseOfTheDayCard`'s doc, where the same card announced
+  /// `verse of the day` and then `VERSE OF THE DAY · JOHN 3:1-5`.
+  ///
+  /// So the *gate* for "is this button actually named" is not this assert but the
+  /// semantics sweep in `home_accessibility_test.dart`, which reads the merged
+  /// label off the real node. **That is a weaker guarantee than the assert and a
+  /// better one**: the assert proves a string was passed, the sweep proves a name
+  /// exists. Both stay, because the assert still catches the caller that passes
+  /// `null` by mistake and the sweep catches the caller that passes `''` with a
+  /// childless surface.
   final String? semanticLabel;
 
   /// The wash's colour — the prototype's per-host `--bh`, `redesign.html:254`'s
@@ -578,6 +649,8 @@ class GlassSurface extends StatelessWidget {
   /// Ignored on every other tier, deliberately: the wash belongs to
   /// [GlassTier.bloom] and nowhere else, so this parameter alone cannot turn a
   /// tint panel into a blooming one.
+  ///
+  /// **Or [GlassTier.blur]**, which carries the same wash — see that member's doc.
   final Color? bloomColor;
 
   @override
@@ -586,7 +659,12 @@ class GlassSurface extends StatelessWidget {
     final BorderRadius borderRadius = BorderRadius.circular(radius);
     // The tier is the only switch. `bloomColor` on its own paints nothing, so
     // there is no way to reach the wash without asking for it in the diff.
-    final bool bloomed = tier == GlassTier.bloom;
+    //
+    // **Two tiers wash, and that is [GlassTier.blur]'s second reason to exist
+    // as a state**: `redesign.html:250`'s one budgeted blur site is a `.hcard`,
+    // and a `.hcard` carries the wash and the seam with it. `tint` washes
+    // nothing.
+    final bool bloomed = tier == GlassTier.bloom || tier == GlassTier.blur;
 
     final DecoratedBox surface = DecoratedBox(
       decoration: BoxDecoration(
@@ -684,6 +762,7 @@ class GlassSurface extends StatelessWidget {
                 seamAt: seamAlignment ?? kGlassSeamAlignment,
                 seamWidth: seamWidthFactor ?? kGlassSeamWidthFactor,
                 seamHue: seamTint ?? colors.seam,
+                seam: seam,
               ),
             Padding(padding: padding, child: child),
           ],
@@ -794,6 +873,7 @@ class GlassSurface extends StatelessWidget {
     required Alignment seamAt,
     required double seamWidth,
     required Color seamHue,
+    required bool seam,
   }) => <Widget>[
     // `.bloom` — `redesign.html:253-254`.
     Positioned.fill(
@@ -837,55 +917,59 @@ class GlassSurface extends StatelessWidget {
     // `.hor` — `redesign.html:256-257`, and the light override at `:72`.
     // `.opt::after` (`:348-349`) is the other prototype seam and the reason
     // [seamAlignment], [seamWidthFactor] and [seamTint] exist; see each of them.
-    Positioned.fill(
-      child: IgnorePointer(
-        // `Align` and not `Positioned(bottom: …)`: the seam sits at a *fraction*
-        // of the surface (`bottom:20%`) and `Positioned` takes logical px only.
-        // `Align` also loosens the constraints its child receives, which is what
-        // lets `FractionallySizedBox` pin the width at 72% while the height stays
-        // the prototype's 2px — give the same widget a tight height and it would
-        // stretch the bar to the full panel.
-        child: Align(
-          alignment: seamAt,
-          child: FractionallySizedBox(
-            widthFactor: seamWidth,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(kGlassSeamCornerRadius),
-                ),
-                // Left to right, which is the seam's `90deg` and is
-                // `LinearGradient`'s own `centerLeft` → `centerRight` default.
-                // `glass_surface_test.dart` reads both ends back off this gradient
-                // so the direction cannot drift.
-                gradient: LinearGradient(
-                  colors: <Color>[
-                    Colors.transparent,
-                    seamHue,
-                    Colors.transparent,
-                  ],
-                  // Written out rather than left null. `null` is Flutter's
-                  // "even evenly" spelling and would paint identically; being
-                  // explicit is what lets a test read the three stops off the
-                  // gradient the way the prototype's three colour stops are read
-                  // off `:257`.
-                  stops: const <double>[0, 0.5, 1],
-                ),
-                // `box-shadow:0 0 14px rgba(255,255,255,.6)`. A PAINT: one
-                // `BoxShadow` on a `DecoratedBox`, not a `saveLayer`, which is
-                // why the seam is allowed to glow at all under §13.4.
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: colors.seamGlow,
-                    blurRadius: kGlassSeamGlowBlur,
+    //
+    // **`if (seam)`, because three of the four wash hosts have no `.hor`** — see
+    // [GlassSurface.seam], which is why this is a parameter and not a fourth tier.
+    if (seam)
+      Positioned.fill(
+        child: IgnorePointer(
+          // `Align` and not `Positioned(bottom: …)`: the seam sits at a *fraction*
+          // of the surface (`bottom:20%`) and `Positioned` takes logical px only.
+          // `Align` also loosens the constraints its child receives, which is what
+          // lets `FractionallySizedBox` pin the width at 72% while the height stays
+          // the prototype's 2px — give the same widget a tight height and it would
+          // stretch the bar to the full panel.
+          child: Align(
+            alignment: seamAt,
+            child: FractionallySizedBox(
+              widthFactor: seamWidth,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(
+                    Radius.circular(kGlassSeamCornerRadius),
                   ),
-                ],
+                  // Left to right, which is the seam's `90deg` and is
+                  // `LinearGradient`'s own `centerLeft` → `centerRight` default.
+                  // `glass_surface_test.dart` reads both ends back off this gradient
+                  // so the direction cannot drift.
+                  gradient: LinearGradient(
+                    colors: <Color>[
+                      Colors.transparent,
+                      seamHue,
+                      Colors.transparent,
+                    ],
+                    // Written out rather than left null. `null` is Flutter's
+                    // "even evenly" spelling and would paint identically; being
+                    // explicit is what lets a test read the three stops off the
+                    // gradient the way the prototype's three colour stops are read
+                    // off `:257`.
+                    stops: const <double>[0, 0.5, 1],
+                  ),
+                  // `box-shadow:0 0 14px rgba(255,255,255,.6)`. A PAINT: one
+                  // `BoxShadow` on a `DecoratedBox`, not a `saveLayer`, which is
+                  // why the seam is allowed to glow at all under §13.4.
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: colors.seamGlow,
+                      blurRadius: kGlassSeamGlowBlur,
+                    ),
+                  ],
+                ),
+                child: const SizedBox(height: kGlassSeamHeight),
               ),
-              child: const SizedBox(height: kGlassSeamHeight),
             ),
           ),
         ),
       ),
-    ),
   ];
 }

@@ -66,6 +66,12 @@ import '../../../support/project_import_graph.dart';
 ///   §5.1 publishes no white that means "the handle of a control": `surface` is
 ///   white in light and near-black in dark, and `ink` is the opposite again, so a
 ///   knob that followed either would stop reading as a handle on one palette.
+/// - `features/home/presentation/widgets/card_washes.dart` — the two glass
+///   cards' washes (`eva/redesign.html:519`, `:524`, written as inline
+///   `--bh` properties, not rules) and the one `Color(int)` the catalogue's
+///   packed `bloomArgb` values are built through. §5.1 publishes no per-card
+///   wash; `EvaColors.bloom` is the `var(--bh, …)` **fallback**, and the
+///   prototype gives the two cards different values.
 ///
 /// This test is why those bullets are decisions rather than leaks: move a colour
 /// into a painter and this goes red. And the second test below pins what each
@@ -86,10 +92,25 @@ const String _exemptOrbTranscription =
 const String _exemptToggleKnob =
     'lib/core/design_system/widgets/eva_toggle.dart';
 
+/// The Phase-5.2 addition: `/`'s card washes, and the catalogue's through it.
+///
+/// `eva/redesign.html` writes each glass card's wash as an **inline** custom
+/// property, not a rule — `:519` is `style="--bh:rgba(228,87,214,.55)"` on
+/// `#votdCard` and `:524` is `style="--bh:rgba(232,176,75,.35)"` on
+/// `#lastCard` — so the values are per-card identity that no token table
+/// carries, which is the same shape of fact the orbs' table holds. The file
+/// holds the two packed ints and **one** colour construction
+/// (`homeCardWash(int)`) that the carousel routes the catalogue's per-book
+/// washes through, so the whole screen has one line where a colour is built
+/// from a transcription. The second test below pins that count.
+const String _exemptCardWashes =
+    'lib/features/home/presentation/widgets/card_washes.dart';
+
 /// The files exempt from the rule.
 const Set<String> _colourExemptions = <String>{
   _exemptOrbTranscription,
   _exemptToggleKnob,
+  _exemptCardWashes,
 };
 
 /// Where a colour value can *come from*, as syntax.
@@ -286,6 +307,34 @@ void main() {
       'abstract final class EvaToggleKnob'.allMatches(toggle).length,
       1,
       reason: 'the knob colour has one home and one name',
+    );
+
+    // The washes' exemption is pinned the same way the knob's is, because it is
+    // the same shape of licence: a whole file allowed to construct colour, so
+    // the count of constructions has to be exactly the one the doc names.
+    final String washes = File.fromUri(
+      packageRoot.uri.resolve(_exemptCardWashes),
+    ).readAsStringSync();
+    expect(
+      _colourValueMarkers
+          .expand((String marker) => marker.allMatches(washes))
+          .length,
+      1,
+      reason:
+          'exactly one colour construction in card_washes.dart — '
+          '`homeCardWash(int)`, the one line the catalogue\'s packed washes and '
+          'the two cards\' own washes are built through. A second means this '
+          'file has grown a colour nobody transcribed.',
+    );
+    expect(
+      'const int homeVotdWashArgb'.allMatches(washes).length,
+      1,
+      reason: "the day's card's wash, transcribed from `:519`",
+    );
+    expect(
+      'const int homeLastLightWashArgb'.allMatches(washes).length,
+      1,
+      reason: "the last-light card's wash, transcribed from `:524`",
     );
   });
 

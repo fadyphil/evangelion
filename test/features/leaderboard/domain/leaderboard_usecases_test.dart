@@ -2,7 +2,6 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -34,6 +33,34 @@ final class _RecordingRepository implements LeaderboardRepository {
         );
   }
 }
+
+/// **`LoadLeaderboardPreview` was deleted in Phase 5.2, and this file is the
+/// record of where its four tests went.**
+///
+/// The use case died with the board card: ADR-0022's redesign
+/// (`eva/redesign.html:513-538`) draws a home with no board on it, and a use case
+/// whose only call site was that card is a registration for a widget that no
+/// longer exists (`leaderboard_module.dart`'s doc records the removal from the DI
+/// side).
+///
+/// Three of the four tests were never about the preview. The window passes
+/// through unchanged, the limit passes through unchanged, and the repository's
+/// failure is returned unwrapped — those are the properties of a pass-through,
+/// and `LoadLeaderboard`'s group asserts all three. Asserting them twice against
+/// two use cases was the redundancy the pass-through's own doc warns about.
+///
+/// The fourth — "asks for more than it shows, so the cohort size is provable"
+/// (`kLeaderboardPreviewLimit` 50 over `kLeaderboardPreviewRows` 3) — was
+/// genuinely preview-shaped: a card that requested exactly the three rows it
+/// draws gets `rowsReturned == limit`, the ambiguous case, and can render no
+/// total. That decision belongs to whichever surface asks, and `/leaderboard`'s
+/// page asks through `LeaderboardCubit`, whose own suite asserts the request. It
+/// is not lost; it moved with the screen.
+///
+/// There is no "the symbol is gone" assertion here, because a test cannot
+/// reference a symbol that no longer compiles — the **analyzer** is that
+/// assertion, and a reader who re-adds `LoadLeaderboardPreview` will find this
+/// paragraph through it.
 
 void main() {
   const LeaderboardBoard board = LeaderboardBoard(
@@ -81,52 +108,6 @@ void main() {
         await LoadLeaderboard(repository)(
           const LeaderboardQuery(window: LeaderboardWindow.monthly, limit: 50),
         ),
-        const Left<Failure, LeaderboardBoard>(failure),
-      );
-    });
-  });
-
-  group('LoadLeaderboardPreview', () {
-    test('asks for weekly, three rows, and nothing else', () async {
-      final _RecordingRepository repository = _RecordingRepository();
-      await LoadLeaderboardPreview(repository)();
-      expect(repository.calls, hasLength(1));
-      expect(repository.calls.single.window, LeaderboardWindow.weekly);
-      expect(repository.calls.single.limit, kLeaderboardPreviewLimit);
-    });
-
-    test(
-      'and it asks for more than it shows, so the cohort size is provable',
-      () {
-        // `cohortSizeOf` can only prove the size when `limit` did not bind. A card that
-        // asked for exactly the three rows it draws would get `rowsReturned == limit` —
-        // the ambiguous case — and could render no total at all.
-        expect(kLeaderboardPreviewLimit, greaterThan(kLeaderboardPreviewRows));
-        expect(kLeaderboardPreviewLimit, 50);
-        expect(kLeaderboardPreviewRows, 3);
-      },
-    );
-
-    test("returns the repository's board unchanged", () async {
-      final _RecordingRepository repository = _RecordingRepository(
-        const Right<Failure, LeaderboardBoard>(board),
-      );
-      expect(
-        await LoadLeaderboardPreview(repository)(),
-        const Right<Failure, LeaderboardBoard>(board),
-      );
-    });
-
-    test('and its failure unchanged', () async {
-      const Failure failure = Failure(
-        kind: FailureKind.timeout,
-        message: 'The request timed out.',
-      );
-      final _RecordingRepository repository = _RecordingRepository(
-        const Left<Failure, LeaderboardBoard>(failure),
-      );
-      expect(
-        await LoadLeaderboardPreview(repository)(),
         const Left<Failure, LeaderboardBoard>(failure),
       );
     });

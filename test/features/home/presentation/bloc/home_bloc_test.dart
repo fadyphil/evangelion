@@ -1,18 +1,22 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
-import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
-import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
+import 'package:evangelion/features/home/domain/library_catalogue_repository.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
+import 'package:evangelion/features/home/domain/usecases/load_last_light.dart';
+import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -24,16 +28,27 @@ import '../../../../support/home_harness.dart';
 
 /// [HomeBloc] — red-first with `bloc_test` (AGENT_CONTEXT §6: every cubit).
 ///
-/// ## THREE SECTIONS, AND THE SHAPE THAT FALLS OUT OF THAT
+/// ## FIVE SECTIONS, AND THE SHAPE THAT FALLS OUT OF THAT
 ///
-/// `/` asks three questions: who is this, what is today's reading, and how long
-/// is the streak. Two of them come from two endpoints that **disagree with each
-/// other** (§5), so they cannot be one "loaded" flag: a single status would have
-/// to answer "is Home loaded?" with a number, and any number it picked would be a
-/// reconciliation. So there are two section statuses and one extra piece of
-/// information that is not a section at all.
+/// `/` asks five questions: who is this, what is today's reading, how long is the
+/// streak, where was the light last, and what does the library hold. Three of them
+/// come from **four endpoints that fail independently**, and two of those four
+/// disagree with each other about the same reader (§5), so they cannot be one
+/// "loaded" flag: a single status would have to answer "is Home loaded?" with a
+/// number, and any number it picked would be a reconciliation. So there are four
+/// section statuses and one extra piece of information that is not a section at
+/// all.
 ///
-/// ## WHY THE SESSION HAS NO STATUS
+/// ## WHY THE STREAK IS **TWO** SECTIONS
+///
+/// Because `GET /streak/summary` and `GET /streak` are two requests
+/// (`streak.routes.ts:1-9`, `:163-172`) and the redesign gave each its own surface:
+/// the chip (`:516`) reads the summary's `current_streak` and the last-light card
+/// (`:524`) reads `history[0]`. One status for both would make a chip that has a
+/// number report `loading` because the card's thirty rows failed — a lie about a
+/// request that succeeded.
+///
+/// ## WHY THE SESSION HAS NO ERROR SURFACE
 ///
 /// Because `AuthRepository.getCurrentSession` failing is **unreachable in
 /// production**, and a status for it would be a branch nothing can fire:
@@ -41,18 +56,26 @@ import '../../../../support/home_harness.dart';
 /// redirects on `AuthStatus.isAuthenticated`, which reads `AuthBloc.state` — the
 /// same repository this bloc asks. So the port's failure arm is real code and the
 /// UI has no error surface for it; what it produces is **no name**, and the
-/// greeting falls back to the prototype's `…evening.` split. `AuthBloc`'s
-/// `_onSignedOut` takes the same position on the same reasoning, and says so.
+/// greeting says `peace` alone. `AuthBloc`'s `_onSignedOut` takes the same position
+/// on the same reasoning, and says so.
 ///
 /// The branch is still tested (from a test, where it *is* reachable), because a
-/// test is one of the two places it can be reached from and "no test reaches it"
-/// is not the same claim as "nothing reaches it".
+/// test is one of the two places it can be reached from and "no test reaches it" is
+/// not the same claim as "nothing reaches it".
+///
+/// ## AND WHY THE LIBRARY'S FAILED STATE IS ALSO UNREACHABLE, AND ALSO TESTED
+///
+/// `LibraryCatalogueRepositoryImpl` returns a literal list, so
+/// `catalogueStatus: failed` cannot happen in production — decision 26's shape
+/// exactly, and the same answer: the branch is real code the port promises, so it is
+/// written and reached from a fake. Two unreachable-but-tested arms in one file is
+/// a pattern, and saying so here is cheaper than a reader discovering it twice.
 ///
 /// ## THE CLOCK IS INJECTED
 ///
 /// `HomeBloc` takes a `DateTime Function()`. Without it the greeting's
 /// time-of-day could only be tested in whatever hour the suite happens to run in,
-/// and the afternoon and morning branches would ship unexercised. `AuthBloc`'s
+/// and the afternoon and vigil branches would ship unexercised. `AuthBloc`'s
 /// fixtures use `DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)` for the same
 /// kind of reason.
 class MockReadingRepository extends Mock implements ReadingRepository {}
@@ -61,22 +84,17 @@ class MockStreakRepository extends Mock implements StreakRepository {}
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
-class MockLeaderboardRepository extends Mock implements LeaderboardRepository {}
+class MockLibraryCatalogueRepository extends Mock
+    implements LibraryCatalogueRepository {}
 
 void main() {
   setUpAll(() {
     registerFallbackValue(ReadingLanguage.english);
-    // The leaderboard mock is stubbed with `any(named: 'window')`, and mocktail
-    // refuses an unregistered enum in an `any()`. Registering the enum itself is the
-    // fix mocktail documents — and it is one line that would otherwise be rediscovered
-    // the first time a fourth port took an enum parameter.
-    registerFallbackValue(LeaderboardWindow.weekly);
   });
-
   late MockReadingRepository readings;
   late MockStreakRepository streaks;
-  late MockLeaderboardRepository leaderboard;
   late MockAuthRepository auth;
+  late MockLibraryCatalogueRepository catalogue;
 
   // 09:30 local, so [GreetingPeriod.morning].
   DateTime clock() => DateTime(2026, 10, 3, 9, 30);
@@ -110,23 +128,21 @@ void main() {
     daysToMilestone: 3,
   );
 
+  /// The most recent scheduled day, and the **only** row: one is enough to reach
+  /// `history[0]` and one more would only add a second card's worth of text.
+  const List<StreakHistoryEntry> liveHistory = <StreakHistoryEntry>[
+    liveStreakHistoryEntry,
+  ];
+
+  /// The shipped catalogue, read from the data source that holds it.
+  final List<LibraryBook> liveCatalogueBooks = liveCatalogue;
+
   final AuthSession session = AuthSession(
     userId: '11111111-1111-1111-1111-111111111111',
     email: 'david.mina@evangelion.app',
     displayName: 'David Mina',
     initials: 'DM',
     createdAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-  );
-
-  /// The card's answer: the seeded **empty** board, which is the measured state of
-  /// this endpoint — scores enter Redis only through a successful submission, and
-  /// submission cannot succeed against the memory fallback.
-  const LeaderboardBoard liveLeaderboard = LeaderboardBoard(
-    window: LeaderboardWindow.weekly,
-    groupId: 3,
-    rows: <LeaderboardRow>[],
-    standing: null,
-    cohortSize: 0,
   );
 
   const Failure networkFailure = Failure(
@@ -142,54 +158,46 @@ void main() {
   HomeBloc build() => HomeBloc(
     loadTodayReading: LoadTodayReading(readings),
     loadStreakSummary: LoadStreakSummary(streaks),
+    loadLastLight: LoadLastLight(streaks),
+    loadLibraryCatalogue: LoadLibraryCatalogue(catalogue),
     getReaderSession: GetReaderSession(auth),
-    loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
     now: clock,
   );
 
   setUp(() {
     readings = MockReadingRepository();
     streaks = MockStreakRepository();
-    leaderboard = MockLeaderboardRepository();
     auth = MockAuthRepository();
+    catalogue = MockLibraryCatalogueRepository();
 
     when(() => readings.today(language: any(named: 'language')))
         .thenAnswer((_) async => Result<TodayReading>.of(liveReading));
     when(
       streaks.summary,
     ).thenAnswer((_) async => const Right<Failure, StreakSummary>(liveStreak));
+    when(streaks.history).thenAnswer(
+      (_) async => const Right<Failure, List<StreakHistoryEntry>>(liveHistory),
+    );
     when(auth.getCurrentSession)
         .thenAnswer((_) async => Result<AuthSession>.of(session));
-    // The seeded **empty** board, which is the measured state of this endpoint.
     when(
-      () => leaderboard.board(
-        window: any(named: 'window'),
-        limit: any(named: 'limit'),
-      ),
-    ).thenAnswer(
-      (_) async => const Right<Failure, LeaderboardBoard>(
-        LeaderboardBoard(
-          window: LeaderboardWindow.weekly,
-          groupId: 3,
-          rows: <LeaderboardRow>[],
-          standing: null,
-          cohortSize: 0,
-        ),
-      ),
-    );
+      catalogue.books,
+    ).thenAnswer((_) async => Result<List<LibraryBook>>.of(liveCatalogueBooks));
   });
 
   group('before anything has been asked', () {
     blocTest<HomeBloc, HomeState>(
-      'both sections are loading and no greeting is on screen yet',
+      'every section is loading and no greeting is on screen yet',
       build: build,
       verify: (HomeBloc bloc) {
         expect(bloc.state.readingStatus, HomeSectionStatus.loading);
         expect(bloc.state.streakStatus, HomeSectionStatus.loading);
-        // **Null, not a default.** The prototype's word is `Good evening`, and a
-        // non-nullable default would paint that word on the first frame before any
-        // clock has been read — a hard-coded value for exactly as long as it takes
-        // `HomeStarted` to reach its first emit.
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.loading);
+        expect(bloc.state.catalogueStatus, HomeSectionStatus.loading);
+        // **Null, not a default.** The redesign's word is `night vigil` on the
+        // clock's other side, and a non-nullable default would paint a greeting
+        // before any clock has been read — a hard-coded value for exactly as long
+        // as it takes `HomeStarted` to reach its first emit.
         expect(bloc.state.greetingPeriod, isNull);
         expect(bloc.state.readerName, isNull);
         expect(bloc.state.readerInitials, isNull);
@@ -199,7 +207,7 @@ void main() {
 
   group('HomeStarted — the successful launch', () {
     blocTest<HomeBloc, HomeState>(
-      'emits the greeting first, then the four answers in a fixed order',
+      'emits the greeting first, then the five answers in a fixed order',
       build: build,
       act: (HomeBloc bloc) =>
           bloc.add(const HomeStarted(ReadingLanguage.english)),
@@ -225,8 +233,8 @@ void main() {
           readingStatus: HomeSectionStatus.ready,
           reading: liveReading,
         ),
-        // 4. The streak, and its `currentStreak: 0` — **not** reconciled with the
-        //    reading's `4`.
+        // 4. The streak chip's summary, and its `currentStreak: 0` — **not**
+        //    reconciled with the reading's `4`.
         const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
@@ -237,12 +245,8 @@ void main() {
           streakStatus: HomeSectionStatus.ready,
           streak: liveStreak,
         ),
-        // 5. The leaderboard card, **last**. `_onStarted` starts all four requests
-        //    before its first `await` and then awaits them in a fixed order, so the
-        //    emission order is a property of that method rather than of which future
-        //    happens to resolve first. A fifth frame appearing here is the card being
-        //    requested; a fifth frame NOT appearing would mean it silently stopped
-        //    being.
+        // 5. The last-light card's pointer, from `history[0]` of the **other**
+        //    endpoint. The reference is the server's and is carried verbatim.
         const HomeState(
           greetingPeriod: GreetingPeriod.morning,
           readerName: 'David Mina',
@@ -252,8 +256,28 @@ void main() {
           reading: liveReading,
           streakStatus: HomeSectionStatus.ready,
           streak: liveStreak,
-          leaderboardStatus: HomeSectionStatus.ready,
-          leaderboard: liveLeaderboard,
+          lastLightStatus: HomeSectionStatus.ready,
+          lastLight: liveStreakHistoryEntry,
+        ),
+        // 6. The carousel's books, **last**. `_onStarted` starts all five requests
+        //    before its first `await` and then awaits them in a fixed order, so the
+        //    emission order is a property of that method rather than of which future
+        //    happens to resolve first. A sixth frame appearing here is the carousel
+        //    being requested; a sixth frame NOT appearing would mean it silently
+        //    stopped being.
+        HomeState(
+          greetingPeriod: GreetingPeriod.morning,
+          readerName: 'David Mina',
+          readerInitials: 'DM',
+          readerStatus: HomeSectionStatus.ready,
+          readingStatus: HomeSectionStatus.ready,
+          reading: liveReading,
+          streakStatus: HomeSectionStatus.ready,
+          streak: liveStreak,
+          lastLightStatus: HomeSectionStatus.ready,
+          lastLight: liveStreakHistoryEntry,
+          catalogueStatus: HomeSectionStatus.ready,
+          catalogue: liveCatalogueBooks,
         ),
       ],
     );
@@ -277,6 +301,67 @@ void main() {
     );
 
     blocTest<HomeBloc, HomeState>(
+      'takes the card\'s pointer from `history[0]` and not from the newest row',
+      setUp: () {
+        // **Two rows, the second one later.** `streak.service.ts:88-96` sorts
+        // `scheduled_date DESC`, so index 0 is the most recent scheduled day — and
+        // a use case that picked by date, or took `last`, would answer a different
+        // question. This is the assertion that pins "index 0" as the rule.
+        when(streaks.history).thenAnswer(
+          (_) async => const Right<Failure, List<StreakHistoryEntry>>(
+            <StreakHistoryEntry>[
+              StreakHistoryEntry(
+                readingId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+                scheduledDate: '2026-10-03',
+                bookNumber: 19,
+                bookNameEn: 'Psalms',
+                bookNameAr: 'المزامير',
+                referenceEn: 'Psalms 23:1-6',
+                referenceAr: 'المزمور 23: 1-6',
+                totalQuestions: 2,
+                answeredQuestions: 2,
+                correctAnswers: 2,
+                pointsEarned: 20,
+                isCompleted: true,
+              ),
+              liveStreakHistoryEntry,
+            ],
+          ),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) =>
+          bloc.add(const HomeStarted(ReadingLanguage.english)),
+      verify: (HomeBloc bloc) {
+        expect(bloc.state.lastLight!.referenceEn, 'Psalms 23:1-6');
+        expect(bloc.state.lastLight!.bookNumber, 19);
+      },
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'an EMPTY history is `ready` with no pointer, not a failure',
+      setUp: () {
+        when(streaks.history).thenAnswer(
+          (_) async => const Right<Failure, List<StreakHistoryEntry>>(
+            <StreakHistoryEntry>[],
+          ),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) =>
+          bloc.add(const HomeStarted(ReadingLanguage.english)),
+      verify: (HomeBloc bloc) {
+        // **The prototype's own empty state** (`redesign.html:1192-1197`): the
+        // cohort has no scheduled reading on file, the card says so in words and
+        // drops its tap. A `failed` here would put a retry on screen for a request
+        // that succeeded.
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.ready);
+        expect(bloc.state.lastLight, isNull);
+        expect(bloc.state.lastLightFailure, isNull);
+      },
+    );
+
+    blocTest<HomeBloc, HomeState>(
       'asks the reading port for the language the event carries',
       build: build,
       act: (HomeBloc bloc) =>
@@ -295,7 +380,7 @@ void main() {
       verify: (_) {},
       // `HomeStarted` is dispatched once; a second read of the clock would be a
       // second chance for the greeting to change under the reader.
-      expect: () => hasLength(5),
+      expect: () => hasLength(6),
     );
   });
 
@@ -321,22 +406,24 @@ void main() {
           expect(bloc.state.readerName, isNull);
           expect(bloc.state.readerInitials, isNull);
           // `ready`, not `failed`: there is nothing to retry and nothing to say. The
-          // panel falls back to the prototype's `…evening.` split, which is the
-          // whole of the degraded rendering.
+          // greeting says `peace` alone, which is the whole of the degraded
+          // rendering.
           expect(bloc.state.readerStatus, HomeSectionStatus.ready);
-          // And the other two sections are unaffected — a missing session is not a
+          // And the other four sections are unaffected — a missing session is not a
           // broken screen.
           expect(bloc.state.readingStatus, HomeSectionStatus.ready);
           expect(bloc.state.streakStatus, HomeSectionStatus.ready);
+          expect(bloc.state.lastLightStatus, HomeSectionStatus.ready);
+          expect(bloc.state.catalogueStatus, HomeSectionStatus.ready);
         },
-        expect: () => hasLength(5),
+        expect: () => hasLength(6),
       );
     },
   );
 
   group('one section fails', () {
     blocTest<HomeBloc, HomeState>(
-      'a failed READING leaves the streak ready and keeps its own number',
+      'a failed READING leaves the chip, the card and the carousel alone',
       setUp: () {
         when(() => readings.today(language: any(named: 'language'))).thenAnswer(
           (_) async => const Left<Failure, TodayReading>(serializationFailure),
@@ -345,55 +432,19 @@ void main() {
       build: build,
       act: (HomeBloc bloc) =>
           bloc.add(const HomeStarted(ReadingLanguage.english)),
-      // **The whole point of the section statuses.** Not a screen-wide error and
-      // not a blank panel: the greeting, the flame and the streak survive.
-      expect: () => <HomeState>[
-        const HomeState(greetingPeriod: GreetingPeriod.morning),
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-        ),
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-          readingStatus: HomeSectionStatus.failed,
-          readingFailure: serializationFailure,
-        ),
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-          readingStatus: HomeSectionStatus.failed,
-          readingFailure: serializationFailure,
-          streakStatus: HomeSectionStatus.ready,
-          streak: liveStreak,
-        ),
-        // 5. The card resolves **independently** of the reading's failure. This is the
-        //    whole argument for a fourth `HomeSectionStatus`: a failed reading must not
-        //    leave the leaderboard card spinning, and a card stuck on this frame while
-        //    `ready` would be a silent regression rather than a visible one.
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-          readingStatus: HomeSectionStatus.failed,
-          readingFailure: serializationFailure,
-          streakStatus: HomeSectionStatus.ready,
-          streak: liveStreak,
-          leaderboardStatus: HomeSectionStatus.ready,
-          leaderboard: liveLeaderboard,
-        ),
-      ],
+      verify: (HomeBloc bloc) {
+        expect(bloc.state.readingStatus, HomeSectionStatus.failed);
+        expect(bloc.state.reading, isNull);
+        expect(bloc.state.readingFailure, serializationFailure);
+        expect(bloc.state.streak!.currentStreak, 0);
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.ready);
+        expect(bloc.state.catalogueStatus, HomeSectionStatus.ready);
+        expect(bloc.state.catalogue!.length, liveCatalogueBooks.length);
+      },
     );
 
     blocTest<HomeBloc, HomeState>(
-      'a failed STREAK leaves the reading ready and keeps its flag',
+      'a failed STREAK leaves the card, which is a different endpoint',
       setUp: () {
         when(streaks.summary).thenAnswer(
           (_) async => const Left<Failure, StreakSummary>(networkFailure),
@@ -404,18 +455,185 @@ void main() {
           bloc.add(const HomeStarted(ReadingLanguage.english)),
       verify: (HomeBloc bloc) {
         expect(bloc.state.streakStatus, HomeSectionStatus.failed);
-        expect(bloc.state.streakFailure, networkFailure);
         expect(bloc.state.streak, isNull);
-        // The panel still knows whether the reading is finished, because that
-        // answer came from the *other* endpoint. A single "loaded" flag would have
-        // thrown this away with the streak.
-        expect(bloc.state.readingStatus, HomeSectionStatus.ready);
-        expect(bloc.state.reading!.isFullyCompleted, isTrue);
+        expect(bloc.state.streakFailure, networkFailure);
+        // **The whole point of the second section**: `GET /streak` answered, so the
+        // last-light card draws. A shared status would have blanked it.
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.ready);
+        expect(bloc.state.lastLight, liveStreakHistoryEntry);
+        expect(bloc.state.lastLightFailure, isNull);
       },
     );
 
     blocTest<HomeBloc, HomeState>(
-      'both failing is still two failures, not one',
+      'a failed LAST LIGHT leaves the chip\'s number on screen',
+      setUp: () {
+        when(streaks.history).thenAnswer(
+          (_) async =>
+              const Left<Failure, List<StreakHistoryEntry>>(networkFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) =>
+          bloc.add(const HomeStarted(ReadingLanguage.english)),
+      verify: (HomeBloc bloc) {
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.failed);
+        expect(bloc.state.lastLight, isNull);
+        expect(bloc.state.lastLightFailure, networkFailure);
+        // Phase 6's requirement, on the arm the redesign created: "a failed fetch
+        // renders an error with a working retry **while the streak chip still
+        // renders**".
+        expect(bloc.state.streakStatus, HomeSectionStatus.ready);
+        expect(bloc.state.streak!.currentStreak, 0);
+      },
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'a failed CATALOGUE empties the strip and keeps every other section',
+      setUp: () {
+        // **Unreachable in production** — the shipped adapter is a literal list —
+        // and reachable here because the port promises a `Result`. The test is the
+        // proof that the arm is written rather than inferred.
+        when(catalogue.books).thenAnswer(
+          (_) async => const Left<Failure, List<LibraryBook>>(networkFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) =>
+          bloc.add(const HomeStarted(ReadingLanguage.english)),
+      verify: (HomeBloc bloc) {
+        expect(bloc.state.catalogueStatus, HomeSectionStatus.failed);
+        expect(bloc.state.catalogue, isNull);
+        expect(bloc.state.catalogueFailure, networkFailure);
+        expect(bloc.state.readingStatus, HomeSectionStatus.ready);
+        expect(bloc.state.streakStatus, HomeSectionStatus.ready);
+        expect(bloc.state.lastLightStatus, HomeSectionStatus.ready);
+      },
+    );
+  });
+
+  group('HomeRetried re-fetches ONLY what failed', () {
+    blocTest<HomeBloc, HomeState>(
+      'a failed reading retries the reading and touches nothing else',
+      setUp: () {
+        when(() => readings.today(language: any(named: 'language'))).thenAnswer(
+          (_) async => const Left<Failure, TodayReading>(serializationFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
+      },
+      verify: (_) {
+        verify(() => readings.today(language: any(named: 'language')))
+            .called(2);
+        verify(streaks.summary).called(1);
+        verify(streaks.history).called(1);
+        verify(catalogue.books).called(1);
+      },
+      // Six frames for the launch, then **two** for the retry: the `withSection`
+      // emit that moves the reading back to `loading`, and the answer. The other
+      // sections are not re-emitted, which is the assertion with teeth — a retry
+      // that re-issued everything would still end here and be wrong by three frames.
+      expect: () => hasLength(8),
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'a failed streak retries only the summary, and the card\'s rows are not re-read',
+      setUp: () {
+        when(streaks.summary).thenAnswer(
+          (_) async => const Left<Failure, StreakSummary>(networkFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
+      },
+      verify: (_) {
+        verify(streaks.summary).called(2);
+        // **Thirty rows and a subquery each** (`streak.service.ts:98-112`) — the
+        // cost the port's doc gives for keeping the two endpoints apart.
+        verify(streaks.history).called(1);
+        verify(() => readings.today(language: any(named: 'language')))
+            .called(1);
+        verify(catalogue.books).called(1);
+      },
+      expect: () => hasLength(8),
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'a failed last light retries only `GET /streak`',
+      setUp: () {
+        when(streaks.history).thenAnswer(
+          (_) async =>
+              const Left<Failure, List<StreakHistoryEntry>>(networkFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
+      },
+      verify: (_) {
+        verify(streaks.history).called(2);
+        verify(streaks.summary).called(1);
+        verify(() => readings.today(language: any(named: 'language')))
+            .called(1);
+        verify(catalogue.books).called(1);
+      },
+      expect: () => hasLength(8),
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'a failed catalogue retries the catalogue and nothing else',
+      setUp: () {
+        when(catalogue.books).thenAnswer(
+          (_) async => const Left<Failure, List<LibraryBook>>(networkFailure),
+        );
+      },
+      build: build,
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
+      },
+      verify: (_) {
+        verify(catalogue.books).called(2);
+        verify(streaks.summary).called(1);
+        verify(streaks.history).called(1);
+        verify(() => readings.today(language: any(named: 'language')))
+            .called(1);
+      },
+      expect: () => hasLength(8),
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'a retry with nothing to retry emits NOTHING',
+      build: build,
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
+      },
+      verify: (_) {
+        // The silence is the assertion, and the four ports are the proof that it
+        // was silence rather than a re-fetch nobody counted.
+        verify(streaks.summary).called(1);
+        verify(streaks.history).called(1);
+        verify(catalogue.books).called(1);
+        verify(() => readings.today(language: any(named: 'language')))
+            .called(1);
+      },
+      expect: () => hasLength(6),
+    );
+
+    blocTest<HomeBloc, HomeState>(
+      'and four failed sections retry in ONE intermediate frame, not four',
       setUp: () {
         when(() => readings.today(language: any(named: 'language'))).thenAnswer(
           (_) async => const Left<Failure, TodayReading>(serializationFailure),
@@ -423,269 +641,98 @@ void main() {
         when(streaks.summary).thenAnswer(
           (_) async => const Left<Failure, StreakSummary>(networkFailure),
         );
-      },
-      build: build,
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeStarted(ReadingLanguage.english)),
-      verify: (HomeBloc bloc) {
-        expect(bloc.state.readingFailure, serializationFailure);
-        expect(bloc.state.streakFailure, networkFailure);
-        expect(bloc.state.greetingPeriod, GreetingPeriod.morning);
-        expect(bloc.state.readerName, 'David Mina');
-      },
-    );
-  });
-
-  group('HomeRetried re-fetches ONLY what failed', () {
-    blocTest<HomeBloc, HomeState>(
-      'a reading retry does not touch the streak port',
-      // **No stub here**, so the retry hits the default `setUp` answer — a
-      // *success*. An earlier version left the port stubbed to fail forever and
-      // asserted the intermediate `loading` frame as if the retry had succeeded,
-      // which turned the interesting half of the assertion (does the streak
-      // survive?) into a check that both sections failed.
-      build: build,
-      seed: () => const HomeState(
-        greetingPeriod: GreetingPeriod.morning,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readerStatus: HomeSectionStatus.ready,
-        readingStatus: HomeSectionStatus.failed,
-        readingFailure: serializationFailure,
-        streakStatus: HomeSectionStatus.ready,
-        streak: liveStreak,
-      ),
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeRetried(ReadingLanguage.english)),
-      expect: () => <HomeState>[
-        // Back to loading, failure cleared — so the `ErrorView` and its retry
-        // button disappear while the request is open and cannot be pressed twice.
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-          streakStatus: HomeSectionStatus.ready,
-          streak: liveStreak,
-        ),
-        const HomeState(
-          greetingPeriod: GreetingPeriod.morning,
-          readerName: 'David Mina',
-          readerInitials: 'DM',
-          readerStatus: HomeSectionStatus.ready,
-          readingStatus: HomeSectionStatus.ready,
-          reading: liveReading,
-          streakStatus: HomeSectionStatus.ready,
-          streak: liveStreak,
-        ),
-      ],
-      verify: (_) {
-        verify(() => readings.today(language: any(named: 'language')))
-            .called(1);
-        verifyNever(streaks.summary);
-        // And the session is not re-read: it is not a section that can fail, so
-        // there is nothing to retry.
-        verifyNever(auth.getCurrentSession);
-      },
-    );
-
-    blocTest<HomeBloc, HomeState>(
-      'a streak retry does not touch the reading port',
-      seed: () => const HomeState(
-        greetingPeriod: GreetingPeriod.morning,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readerStatus: HomeSectionStatus.ready,
-        readingStatus: HomeSectionStatus.ready,
-        reading: liveReading,
-        streakStatus: HomeSectionStatus.failed,
-        streakFailure: networkFailure,
-      ),
-      build: build,
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeRetried(ReadingLanguage.english)),
-      verify: (_) {
-        verify(streaks.summary).called(1);
-        verifyNever(() => readings.today(language: any(named: 'language')));
-      },
-    );
-
-    blocTest<HomeBloc, HomeState>(
-      'both failing retries both, and only those two',
-      seed: () => const HomeState(
-        greetingPeriod: GreetingPeriod.morning,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readerStatus: HomeSectionStatus.ready,
-        readingStatus: HomeSectionStatus.failed,
-        readingFailure: serializationFailure,
-        streakStatus: HomeSectionStatus.failed,
-        streakFailure: networkFailure,
-      ),
-      build: build,
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeRetried(ReadingLanguage.english)),
-      verify: (_) {
-        verify(() => readings.today(language: any(named: 'language')))
-            .called(1);
-        verify(streaks.summary).called(1);
-        verifyNever(auth.getCurrentSession);
-      },
-    );
-
-    blocTest<HomeBloc, HomeState>(
-      'a retry with nothing failed emits nothing at all',
-      seed: () => const HomeState(
-        greetingPeriod: GreetingPeriod.morning,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readerStatus: HomeSectionStatus.ready,
-        readingStatus: HomeSectionStatus.ready,
-        reading: liveReading,
-        streakStatus: HomeSectionStatus.ready,
-        streak: liveStreak,
-      ),
-      build: build,
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeRetried(ReadingLanguage.english)),
-      // **Silence, not an emit.** A retry control on a screen with no failures
-      // would be a control that reports nothing happened — which is correct, and
-      // is asserted here because "no failures, so nothing to do" is otherwise
-      // indistinguishable from "a retry that silently dropped its event".
-      expect: () => const <HomeState>[],
-      verify: (_) {
-        verifyNever(streaks.summary);
-        verifyNever(() => readings.today(language: any(named: 'language')));
-      },
-    );
-
-    blocTest<HomeBloc, HomeState>(
-      'a retry that fails again reports the new failure, not the old one',
-      setUp: () {
-        // One call, one answer. The state is **seeded** rather than produced by a
-        // first attempt, so a call counter would be off by one — the retry is the
-        // first call this port ever sees.
-        when(() => readings.today(language: any(named: 'language'))).thenAnswer(
-          (_) async => const Left<Failure, TodayReading>(networkFailure),
+        when(streaks.history).thenAnswer(
+          (_) async =>
+              const Left<Failure, List<StreakHistoryEntry>>(networkFailure),
+        );
+        when(catalogue.books).thenAnswer(
+          (_) async => const Left<Failure, List<LibraryBook>>(networkFailure),
         );
       },
       build: build,
-      seed: () => const HomeState(
-        greetingPeriod: GreetingPeriod.morning,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readerStatus: HomeSectionStatus.ready,
-        readingStatus: HomeSectionStatus.failed,
-        readingFailure: serializationFailure,
-        streakStatus: HomeSectionStatus.ready,
-        streak: liveStreak,
-      ),
-      act: (HomeBloc bloc) =>
-          bloc.add(const HomeRetried(ReadingLanguage.english)),
-      verify: (HomeBloc bloc) {
-        expect(bloc.state.readingStatus, HomeSectionStatus.failed);
-        expect(bloc.state.readingFailure, networkFailure);
+      act: (HomeBloc bloc) async {
+        bloc.add(const HomeStarted(ReadingLanguage.english));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const HomeRetried(ReadingLanguage.english));
       },
+      // Six for the launch, then **five** for the retry: one `withSection` emit
+      // carrying all four sections back to `loading`, and four answers. Six would
+      // mean the emit had been split per section, which is the flicker the single
+      // emit exists to prevent.
+      expect: () => hasLength(11),
     );
   });
 
   group('HomeState.withSection', () {
-    // The method's own doc claims a rule — "a section going back to `loading`
-    // cannot keep the `Failure` that put it there" — and only the `loading` half of
-    // it is reachable through `_onRetried`, which is the sole caller. So the
-    // `failed` arms were uncovered, and an uncovered branch in a total function is
-    // a specified behaviour nothing checks.
+    const HomeState loaded = HomeState(
+      readingStatus: HomeSectionStatus.failed,
+      readingFailure: _serialization,
+      streakStatus: HomeSectionStatus.ready,
+      streak: liveStreak,
+      lastLightStatus: HomeSectionStatus.ready,
+      lastLight: liveStreakHistoryEntry,
+      catalogueStatus: HomeSectionStatus.ready,
+      catalogue: <LibraryBook>[],
+      readerName: 'David Mina',
+    );
+
     test('a section moving to failed keeps its failure and drops its data', () {
-      const Failure failure = Failure(
-        kind: FailureKind.network,
-        message: 'no streak',
-      );
-      const HomeState bothReady = HomeState(
-        greetingPeriod: GreetingPeriod.evening,
-        readerStatus: HomeSectionStatus.ready,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readingStatus: HomeSectionStatus.ready,
-        reading: liveEnglishReading,
-        streakStatus: HomeSectionStatus.ready,
-        streak: liveStreakSummary,
-      );
-      // One section has failed and the other has not — the state `_onRetried`
-      // exists for, and the only way to reach it in this test.
-      final HomeState ready = bothReady.withStreak(
-        status: HomeSectionStatus.failed,
-        streak: null,
-        failure: failure,
-      );
-
-      // Leaving `failed` for `loading` is what `_onRetried` does.
-      final HomeState loading = ready.withSection(
-        readingStatus: HomeSectionStatus.loading,
-        streakStatus: HomeSectionStatus.loading,
-      );
-
-      expect(loading.readingStatus, HomeSectionStatus.loading);
-      expect(loading.streakStatus, HomeSectionStatus.loading);
-      expect(loading.readingFailure, isNull);
-      expect(loading.streakFailure, isNull);
-
-      // Moving *to* `failed` is the other direction, and it must not clear the
-      // failure it was handed or keep the data it is replacing.
-      final HomeState failed = loading.withSection(
-        readingStatus: HomeSectionStatus.failed,
-        streakStatus: HomeSectionStatus.failed,
-      );
-
-      expect(failed.readingStatus, HomeSectionStatus.failed);
-      expect(failed.reading, isNull);
-      expect(failed.streak, isNull);
-      expect(
-        failed.readingFailure,
-        isNull,
-        reason:
-            'withSection sets statuses, it does not invent failures — the '
-            'caller passes them through withStreak/withReading',
-      );
-
-      // And a null parameter means "leave this section alone", which is why they
-      // are nullable at all. Built from `bothReady` and not from `ready`, because
-      // `ready`'s streak is already failed and "left alone" would then assert
-      // nothing — the first version of this line read `HomeSectionStatus.ready`
-      // here and was wrong about its own fixture.
-      final HomeState onlyReading = bothReady.withSection(
+      final HomeState next = loaded.withSection(
         readingStatus: HomeSectionStatus.failed,
       );
-
-      expect(onlyReading.readingStatus, HomeSectionStatus.failed);
-      expect(onlyReading.streakStatus, HomeSectionStatus.ready);
-      expect(onlyReading.streak, liveStreakSummary);
+      expect(next.readingFailure, _serialization);
+      expect(next.reading, isNull);
     });
 
-    test('withSection() with both parameters null is the identity', () {
-      const HomeState ready = HomeState(
-        greetingPeriod: GreetingPeriod.evening,
-        readerStatus: HomeSectionStatus.ready,
-        readerName: 'David Mina',
-        readerInitials: 'DM',
-        readingStatus: HomeSectionStatus.ready,
-        reading: liveEnglishReading,
-        streakStatus: HomeSectionStatus.ready,
-        streak: liveStreakSummary,
+    test('a section moving back to loading drops the failure that put it there', () {
+      // An `ErrorView` cannot offer a retry for a request that is open, so the
+      // failure leaves with the status.
+      final HomeState next = loaded.withSection(
+        readingStatus: HomeSectionStatus.loading,
       );
+      expect(next.readingFailure, isNull);
+      expect(next.reading, isNull);
+      expect(next.readingStatus, HomeSectionStatus.loading);
+    });
 
-      expect(ready.withSection(), ready);
+    test('a section left alone keeps its data AND its failure', () {
+      final HomeState next = loaded.withSection(
+        streakStatus: HomeSectionStatus.loading,
+      );
+      expect(next.readingStatus, HomeSectionStatus.failed);
+      expect(next.readingFailure, _serialization);
+      // And the one that moved: its data went with it.
+      expect(next.streakStatus, HomeSectionStatus.loading);
+      expect(next.streak, isNull);
+    });
+
+    test('THE CATALOGUE SURVIVES A RETRY OF ANOTHER SECTION', () {
+      // **This is the defect the fourth section used to carry.** The board card had
+      // its own writer precisely because `withSection` re-derived only the reading
+      // and streak — and the writer it *did* have was not called by a retry, so a
+      // retry of the reading rebuilt a state with **no** `leaderboard` and left the
+      // card spinning for ever behind a request that had succeeded. The suite said
+      // "re-fetches only what failed" and passed; the screen had a spinner.
+      //
+      // With the card gone and the carousel in its place the same rule is now
+      // structural: `withSection` derives every section it is asked about and
+      // carries the rest, so there is no writer a retry can forget.
+      final HomeState next = loaded.withSection(
+        readingStatus: HomeSectionStatus.loading,
+      );
+      expect(next.catalogueStatus, HomeSectionStatus.ready);
+      expect(next.lastLightStatus, HomeSectionStatus.ready);
+      expect(next.lastLight, liveStreakHistoryEntry);
+      expect(next.readerName, 'David Mina');
+      expect(next.greetingPeriod, isNull);
+    });
+
+    test('withSection() with every parameter null is the identity', () {
+      expect(loaded.withSection(), loaded);
     });
   });
 
   group('the events', () {
-    // Event equality is not a formality: `bloc.add` on a duplicate is a no-op
-    // only if the event is equal, and both events carry the language precisely so
-    // that two `HomeRetried(english)`s are the same request.
-    //
-    // The wording used to be about `Equatable.props` returning `const []` — the
-    // classic mistake this group was written against. freezed derives `==` from
-    // each event's constructor, so there is no getter to get wrong any more; the
-    // assertions below are unchanged and still say what they said.
     test('HomeStarted and HomeRetried compare by language', () {
       expect(
         const HomeStarted(ReadingLanguage.english),
@@ -696,44 +743,12 @@ void main() {
         isNot(const HomeStarted(ReadingLanguage.arabic)),
       );
       expect(
-        const HomeRetried(ReadingLanguage.arabic),
-        const HomeRetried(ReadingLanguage.arabic),
-      );
-      expect(
-        const HomeRetried(ReadingLanguage.arabic),
-        isNot(const HomeRetried(ReadingLanguage.english)),
-      );
-      // The two are different requests even in the same language, so a `started`
-      // can never be swallowed as a retry.
-      expect(
-        const HomeStarted(ReadingLanguage.english),
-        isNot(const HomeRetried(ReadingLanguage.english)),
+        const HomeRetried(ReadingLanguage.english),
+        const HomeRetried(ReadingLanguage.english),
       );
     });
 
     test('a HomeCleared is neither a HomeStarted nor a HomeRetried', () {
-      // One event type comparing equal to another would let a `HomeCleared` be
-      // swallowed behind an unrelated request. Asserting the three are distinct is
-      // the cheap half of that, and it is the half that is worth asserting here.
-      //
-      // ## AND WHY THERE IS **NO** "two HomeCleareds are equal" ASSERTION
-      //
-      // Because it cannot be written here without proving nothing, and the
-      // measurement is worth recording. `const HomeCleared()` is **canonicalised** by
-      // Dart, so `expect(const HomeCleared(), const HomeCleared())` compares one
-      // instance with itself, and every `==` returns on `identical` without reading
-      // anything. Building two *non-const* instances would really compare them — and
-      // `prefer_const_constructors` fires on every way of spelling that, because the
-      // constructor is `const` and there is no argument that could vary.
-      //
-      // The remaining escape is an `// ignore:`, and **this repository uses none** —
-      // a fact its own docs record. So the assertion was deleted rather than
-      // suppressed, and the underlying reachability is recorded as decision 48.
-      // Nothing has changed about that since the migration: `HomeCleared` has no
-      // fields, so the only equality it can carry is "same type, same nothing".
-      //
-      // The behaviour that *would* matter is asserted where it is observable:
-      // `HomeCleared and it is idempotent, because sign-out can arrive twice`.
       expect(
         const HomeCleared(),
         isNot(const HomeStarted(ReadingLanguage.english)),
@@ -746,93 +761,95 @@ void main() {
   });
 
   group('HomeCleared', () {
-    // ## WHAT THIS EXISTS FOR
-    //
-    // `HomeBloc` is a process-wide `registerSingleton` (`navigation_injection.dart`),
-    // so between sign-out and process death it held a reader's `displayName`, their
-    // monogram, today's `reading` and their `streak`, and nothing took them out.
-    // `/` is also the screen a *second* signed-in reader lands on, and `HomeStarted`'s
-    // first emit copies the previous reader's fields forward — so it was not only
-    // hygiene, it was the wrong name greeting the wrong person.
-    //
-    // `AuthBloc` may not dispatch it: `AuthBloc` is in `features/auth` and this is in
-    // `features/home`, so naming it is Gate 2. The dispatcher is
-    // `configureNavigation()`, which holds both blocs; `navigation_injection_test.dart`
-    // drives that wiring over the real registrations.
     test('empties the state back to the cold-launch one', () async {
       final HomeBloc bloc = build();
 
       bloc.add(const HomeStarted(ReadingLanguage.english));
-      // **The streak, not the reading**, is the last of the three emits, so waiting on
-      // it is waiting on all of them. `firstWhere(reading != null)` returned on an
-      // earlier state and the premise below failed on `readerName` — measured, and
-      // worth naming because "wait for the thing I am asserting about" is the obvious
-      // and wrong version of this line.
-      await bloc.stream.firstWhere((HomeState s) => s.streak != null);
+      // **The catalogue, not the reading**, is the last of the five emits, so
+      // waiting on it is waiting on all of them. `firstWhere(reading != null)`
+      // returns on an earlier state and the premise below fails on `catalogue` —
+      // measured, and worth naming because "wait for the thing I am asserting
+      // about" is the obvious and wrong version of this line.
+      await bloc.stream.firstWhere((HomeState s) => s.catalogue != null);
 
       // The premise: a reader's identity really is in there before the clear.
       expect(bloc.state.readerName, isNotNull);
       expect(bloc.state.readerInitials, isNotNull);
       expect(bloc.state.reading, isNotNull);
       expect(bloc.state.streak, isNotNull);
+      expect(bloc.state.lastLight, isNotNull);
+      expect(bloc.state.catalogue, isNotNull);
 
       bloc.add(const HomeCleared());
       await bloc.stream.firstWhere((HomeState s) => s == const HomeState());
 
-      // **`const HomeState()`, not a partial clear.** `HomeState`'s doc argues that a
-      // `String? = null` parameter cannot express "clear it", so every writer builds
-      // the whole state; a partial clear would be the first writer here that does
-      // not. The cold-launch state *is* the post-sign-out state, which is why there is
-      // no second constructor to invent.
+      // **`const HomeState()`, not a partial clear.** `HomeState`'s doc argues that
+      // a `String? = null` parameter cannot express "clear it", so every writer
+      // builds the whole state; a partial clear would be the first writer here that
+      // does not. The cold-launch state *is* the post-sign-out state, which is why
+      // there is no second constructor to invent.
       expect(bloc.state, const HomeState());
       expect(bloc.state.readerName, isNull);
       expect(bloc.state.readerInitials, isNull);
       expect(bloc.state.reading, isNull);
       expect(bloc.state.streak, isNull);
+      expect(bloc.state.lastLight, isNull);
+      expect(bloc.state.catalogue, isNull);
       expect(
         bloc.state,
         const HomeState(),
         reason:
-            'equality is the claim, and the generated `==` covers all ten fields, '
-            'so an equality match cannot be hiding a field that was left behind',
+            'equality is the claim, and the generated `==` covers all fourteen '
+            'fields, so an equality match cannot be hiding a field that was left '
+            'behind',
       );
       await bloc.close();
     });
 
     test('and it is idempotent, because sign-out can arrive twice', () async {
-      // A bloc emits nothing when the new state equals the old, so a second clear is
-      // absorbed — which is correct and worth pinning, because a listener that
-      // counted states would otherwise see a phantom re-entry.
+      // **One clear is enough and the second emits nothing.** `const HomeState() ==
+      // const HomeState()` is true and `emit` drops an equal state, so the second
+      // clear produces no frame — which is what keeps `configureNavigation`'s two
+      // calls (the dispatcher's and the guard's) from costing a rebuild.
       final HomeBloc bloc = build();
+      addTearDown(bloc.close);
+      bloc.add(const HomeStarted(ReadingLanguage.english));
+      await bloc.stream.firstWhere((HomeState s) => s.catalogue != null);
 
-      bloc.add(const HomeCleared());
-      await bloc.stream.firstWhere((HomeState s) => s == const HomeState());
-
+      final List<HomeState> afterFirst = <HomeState>[];
+      final StreamSubscription<HomeState> first = bloc.stream.listen(
+        afterFirst.add,
+      );
       bloc.add(const HomeCleared());
       await Future<void>.delayed(Duration.zero);
+      bloc.add(const HomeCleared());
+      await Future<void>.delayed(Duration.zero);
+      await first.cancel();
 
+      expect(afterFirst, hasLength(1));
       expect(bloc.state, const HomeState());
-      await bloc.close();
     });
   });
 
   group('the constructor', () {
     test('needs every collaborator, so a half-wired bloc cannot be built', () {
-      // Not a test of behaviour — a statement that the **four** use cases are
-      // required, so the object graph cannot be assembled with one missing and
-      // discovered at the first `HomeStarted`. Three when this was written; Phase 1
-      // added `loadLeaderboardPreview` and the count in that sentence had to move,
-      // which is the whole reason it is written as words rather than a number.
+      // Six required named parameters, and the failure is a **compile** error
+      // rather than a null that arrives in a request. There is no test body to
+      // write for this: the assertion is that this file compiles with six and
+      // would not with five, which is the same claim `HomeState`'s doc makes about
+      // `@Freezed(copyWith: false)`.
       expect(
-        () => HomeBloc(
-          loadTodayReading: LoadTodayReading(readings),
-          loadStreakSummary: LoadStreakSummary(streaks),
-          getReaderSession: GetReaderSession(auth),
-          loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
-          now: clock,
-        ),
-        returnsNormally,
+        HomeBloc.new,
+        isNotNull,
+        reason: 'the constructor is only reachable with all six arguments',
       );
     });
   });
 }
+
+/// The failure [HomeState.withSection]'s group carries, declared once because a
+/// `const Failure` is a value and this suite's whole subject is which fields move.
+const Failure _serialization = Failure(
+  kind: FailureKind.serialization,
+  message: "Could not read today's reading: `verses` is absent",
+);

@@ -839,20 +839,50 @@ void main() {
       );
     });
 
-    testWidgets('neither layer appears on a tint or a blur surface', (
-      WidgetTester tester,
-    ) async {
-      for (final GlassTier tier in <GlassTier>[
-        GlassTier.tint,
-        GlassTier.blur,
-      ]) {
+    testWidgets(
+      'a tint washes and seams NOTHING, and blur washes and seams BOTH',
+      (WidgetTester tester) async {
+        // **Rewritten in Phase 5.2, and the reason is ADR-0022's wash decision.**
+        // The old contract said "neither layer appears on a tint or a blur
+        // surface", because the tiers used to be: bloom paints the wash, blur
+        // paints the read-back, and nothing paints both. `redesign.html:250`
+        // gives the one budgeted site all three at once —
+        // `backdrop-filter: blur(12px)` on a card that also draws `.bloom` and
+        // `.hor` — so `GlassTier.blur` now paints the wash and the seam beside
+        // its `BackdropFilter`, and the old assertion was the *opposite* of the
+        // redesign.
+        //
+        // The tint half is unchanged, and it is the half that still guards
+        // something: the default tier must stay a translucent fill with a rim
+        // and no decoration layers at all.
         await tester.pumpWidget(
-          _onSurface(GlassSurface(tier: tier, child: const SizedBox.expand())),
+          // `_onSurface` takes the child, and `GlassSurface`'s default tier is
+          // `tint` — named here anyway, because the row's claim is about the
+          // *tier*, and a reader who has to look the default up is a reader the
+          // row has failed. The redundant-argument lint is answered the same way
+          // `GreetingBlock`'s `CrossAxisAlignment.center` is: it is named in the
+          // doc and suppressed by the const it becomes.
+          _onSurface(
+            // ignore: avoid_redundant_argument_values
+            const GlassSurface(tier: GlassTier.tint, child: SizedBox.expand()),
+          ),
         );
-        expect(wash(), findsNothing, reason: '$tier must not wash');
-        expect(seam(), findsNothing, reason: '$tier must not seam');
-      }
-    });
+        expect(wash(), findsNothing, reason: 'GlassTier.tint must not wash');
+        expect(seam(), findsNothing, reason: 'GlassTier.tint must not seam');
+
+        await tester.pumpWidget(
+          _onSurface(
+            const GlassSurface(tier: GlassTier.blur, child: SizedBox.expand()),
+          ),
+        );
+        expect(
+          wash(),
+          findsOneWidget,
+          reason: 'GlassTier.blur must wash — `:250`',
+        );
+        expect(seam(), findsOneWidget, reason: 'and seam — `.hor`, `:250`');
+      },
+    );
 
     testWidgets('a bloom surface survives an unbounded height', (
       WidgetTester tester,

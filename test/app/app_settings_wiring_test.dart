@@ -38,12 +38,13 @@ import '../support/design_system_harness.dart';
 /// ## AND IT ASSERTS THE RENDERED THEME, NOT `MaterialApp.themeMode`
 ///
 /// The naive version of this test reads `MaterialApp.themeMode` and checks it flipped.
-/// That is the mistake `AppTopBar.wordmark`'s doc records at length: "no test asserted
-/// the rendered text was the one passed, so hard-coding `Text('Evangelion')` here and
-/// ignoring the argument passed all 1520 tests. **Requiredness guarantees the parameter
-/// *exists* at the call site. It says nothing about whether `build` *reads* it.**"
-/// `themeMode` differing proves the toggle is wired to *a* value; it proves nothing
-/// about the palette reaching a screen.
+/// That is a mistake this project has already paid for once, on the top bar
+/// `AppTopBar.wordmark` Phase 5.2 deleted: "no test asserted the rendered text was the
+/// one passed, so hard-coding `Text('Evangelion')` here and ignoring the argument
+/// passed all 1520 tests. **Requiredness guarantees the parameter *exists* at the
+/// call site. It says nothing about whether `build` *reads* it.**" The widget is gone
+/// and the lesson is not: `themeMode` differing proves the toggle is wired to *a*
+/// value; it proves nothing about the palette reaching a screen.
 ///
 /// So every assertion here reads `Theme.of(element)!.extension<EvaColors>()` — the
 /// palette **a widget actually resolved** — from inside the tree `LoginPage` is

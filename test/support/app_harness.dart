@@ -12,6 +12,7 @@ import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
@@ -26,11 +27,17 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/home/data/datasources/library_catalogue_local_data_source.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
+import 'package:evangelion/features/home/domain/library_catalogue_repository.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
+import 'package:evangelion/features/home/domain/usecases/load_last_light.dart';
+import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
+import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
@@ -95,6 +102,19 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
   // whole, and only a deliberately partial one is filled in here.
   if (!getIt.isRegistered<SettingsCubit>()) {
     settingsHarness(loadImmediately: false);
+  }
+  // **The sixth registration, and the first one a screen's *interim* chrome made
+  // necessary.** `LeaderboardPage` resolves its `LeaderboardCubit` from the locator
+  // like every other page, and `/` reaches it through `SealFab`'s interim item —
+  // the redesign's dock (Phase 6) is where the board belongs, and until then this is
+  // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
+  // and the sixth cost of the pattern above was paid by a `StateError` out of
+  // `build` rather than by a red assertion.
+  //
+  // Task 5.5 renames the route to `/communion` and rebuilds the screen; this
+  // registration survives it, because the page keeps resolving from the locator.
+  if (!getIt.isRegistered<LeaderboardCubit>()) {
+    registerTestLeaderboardCubit();
   }
   await tester.pumpWidget(EvangelionApp(locale: locale));
   await pumpUntilFound(tester, find.byType(LoginPage));
@@ -206,6 +226,19 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   // holds it" — and only the first survives a restart.
   if (!getIt.isRegistered<SettingsCubit>()) {
     settingsHarness(loadImmediately: false);
+  }
+  // **The sixth registration, and the first one a screen's *interim* chrome made
+  // necessary.** `LeaderboardPage` resolves its `LeaderboardCubit` from the locator
+  // like every other page, and `/` reaches it through `SealFab`'s interim item —
+  // the redesign's dock (Phase 6) is where the board belongs, and until then this is
+  // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
+  // and the sixth cost of the pattern above was paid by a `StateError` out of
+  // `build` rather than by a red assertion.
+  //
+  // Task 5.5 renames the route to `/communion` and rebuilds the screen; this
+  // registration survives it, because the page keeps resolving from the locator.
+  if (!getIt.isRegistered<LeaderboardCubit>()) {
+    registerTestLeaderboardCubit();
   }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
@@ -434,8 +467,9 @@ HomeBloc registerTestHomeBloc() {
     getReaderSession: GetReaderSession(
       FakeAuthRepository(AuthLocalDataSource()),
     ),
-    loadLeaderboardPreview: LoadLeaderboardPreview(
-      _FakeLeaderboardRepository(),
+    loadLastLight: LoadLastLight(_FakeStreakRepository()),
+    loadLibraryCatalogue: LoadLibraryCatalogue(
+      _FakeLibraryCatalogueRepository(),
     ),
   );
   getIt.registerSingleton<HomeBloc>(bloc);
@@ -472,6 +506,23 @@ QuizBloc registerTestQuizBloc() {
   addTearDown(() => getIt.unregister<QuizBloc>());
   addTearDown(bloc.close);
   return bloc;
+}
+
+/// The `LeaderboardCubit` twin, over a fake that fails like its siblings.
+///
+/// The route exists and its cubit resolves from the locator, so a router test that
+/// lands on `/leaderboard` — `home_navigation_test.dart`'s second seal arm — needs
+/// one in the graph. The fake **fails**, like the other three, because a router suite
+/// is about the route and a stubbed board would be a payload the next reader might
+/// mistake for real.
+LeaderboardCubit registerTestLeaderboardCubit() {
+  final LeaderboardCubit cubit = LeaderboardCubit(
+    loadLeaderboard: LoadLeaderboard(_FakeLeaderboardRepository()),
+  );
+  getIt.registerSingleton<LeaderboardCubit>(cubit);
+  addTearDown(() => getIt.unregister<LeaderboardCubit>());
+  addTearDown(cubit.close);
+  return cubit;
 }
 
 ReadingCubit registerTestReadingCubit() {
@@ -537,6 +588,35 @@ final class _FakeStreakRepository implements StreakRepository {
           kind: FailureKind.network,
           message: 'No streak: this harness does not open a socket.',
         ),
+      );
+
+  /// `/streak`, added in Phase 5.2 for the last-light card, and failing like its
+  /// sibling for the same reason: this harness is about routes, and a stubbed
+  /// success would be a payload a reader could mistake for a live answer.
+  @override
+  Future<Result<List<StreakHistoryEntry>>> history() async =>
+      const Left<Failure, List<StreakHistoryEntry>>(
+        Failure(
+          kind: FailureKind.network,
+          message: 'No streak history: this harness does not open a socket.',
+        ),
+      );
+}
+
+/// The [LibraryCatalogueRepository] twin, and the one fake here that **succeeds**.
+///
+/// **A success, and the reason is the fiction.** The catalogue is ADR-0022's
+/// invented data behind a port, and the shipped adapter answers it from a literal —
+/// so a harness that failed it would render an `ErrorView` for a section the
+/// production app never fails, and a suite mounting `/` here would see a screen the
+/// app never shows. The real data source is used rather than a hand-written list, so
+/// the carousel a router suite sees is the one a reader sees.
+final class _FakeLibraryCatalogueRepository
+    implements LibraryCatalogueRepository {
+  @override
+  Future<Result<List<LibraryBook>>> books() async =>
+      Result<List<LibraryBook>>.of(
+        const LibraryCatalogueLocalDataSource().books(),
       );
 }
 

@@ -34,50 +34,85 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authUnavailableSuffix => 'unavailable in this build';
 
   @override
-  String get homeWordmark => 'Evangelion';
+  String get homeGreetingMorning => 'good morning';
 
   @override
-  String get homeGreetingMorning => 'Good morning';
+  String get homeGreetingAfternoon => 'good afternoon';
 
   @override
-  String get homeGreetingAfternoon => 'Good afternoon';
-
-  @override
-  String get homeGreetingEvening => 'Good evening';
+  String get homeGreetingEvening => 'good evening';
 
   @override
   String get homeGreetingSeparator => ', ';
 
   @override
-  String get homeStreakGlowing => 'Your streak is glowing. Keep it alive.';
-
-  @override
-  String get homeStreakResting =>
-      'Start a streak today. One reading is all it takes.';
-
-  @override
   String get homeStreakLabel => 'Streak';
-
-  @override
-  String get homeAvatarLabel => 'Account';
 
   @override
   String get homeUnavailableSuffix => 'unavailable in this build';
 
   @override
-  String get homeTodayReading => 'Today\'s reading';
+  String get homeGreetingVigil => 'night vigil';
 
   @override
-  String get homeContinueReading => 'Continue reading';
+  String get homePeace => 'peace';
 
   @override
-  String get homeReadingComplete => 'Reading complete';
+  String get homeDays => 'days';
 
   @override
-  String get homeReflectionProgress => 'Reflections answered';
+  String get homeVerseOfTheDay => 'verse of the day';
 
   @override
-  String get homeNoQuestionsToday => 'No reflection questions today';
+  String get homeLastLight => 'last light';
+
+  @override
+  String get homeNoLightRef => '—';
+
+  @override
+  String get homeNoLight => 'no light received yet — open a book below';
+
+  @override
+  String get homeResumeHint => 'resume where the light left you ›';
+
+  @override
+  String get homeSelah => 'Selah';
+
+  @override
+  String get homeSecondsOfSilence => 'seconds of silence';
+
+  @override
+  String get homeTheLibrary => 'the library';
+
+  @override
+  String get homeScrolls => 'scrolls';
+
+  @override
+  String get homeOpenBooks => 'open';
+
+  @override
+  String get homeVerses => 'verses';
+
+  @override
+  String get homeSealed => 'sealed';
+
+  @override
+  String get homeCategoryPoetry => 'poetry';
+
+  @override
+  String get homeCategoryGospel => 'gospel';
+
+  @override
+  String get homeCategoryTorah => 'torah';
+
+  @override
+  String get homeCategoryProphets => 'prophets';
+
+  @override
+  String get homeCategoryHistory => 'history';
+
+  @override
+  String get homeCategoryApocalypse => 'apocalypse';
 
   @override
   String get leaderboardTitle => 'Cohort standings';
@@ -111,9 +146,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaderboardOpenFull => 'See all';
 
   @override
-  String get leaderboardCardTitle => 'This week';
-
-  @override
   String leaderboardRowSemantics(
     int count,
     String digits,
@@ -134,12 +166,6 @@ class AppLocalizationsEn extends AppLocalizations {
     });
     return '$_temp0, $initials, rank $rank$_temp1';
   }
-
-  @override
-  String get homeContinueLabel => 'Continue';
-
-  @override
-  String get homeStartReflection => 'Start reflection';
 
   @override
   String get homeRetry => 'Try again';

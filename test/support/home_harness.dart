@@ -2,19 +2,22 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
-import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
-import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
+import 'package:evangelion/features/home/data/datasources/library_catalogue_local_data_source.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
+import 'package:evangelion/features/home/domain/library_catalogue_repository.dart';
 import 'package:evangelion/features/home/domain/usecases/get_reader_session.dart';
-import 'package:evangelion/features/home/domain/usecases/load_leaderboard_preview.dart';
+import 'package:evangelion/features/home/domain/usecases/load_last_light.dart';
+import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.dart';
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -43,22 +46,22 @@ import 'design_system_harness.dart';
 /// hand-written and always answer, and each records **how many times** it was asked
 /// so "one retry re-fetches only what failed" is assertable at the widget level.
 ///
-/// ## AND WHY `pumpHome` DOES NOT SETTLE
+/// ## AND WHY [pumpHome] DOES NOT SETTLE
 ///
-/// `evaPrimitiveHarness` mounts with `animationsEnabled: false`, so the three
-/// shared ambient clocks never tick — `pumpAndSettle` is therefore safe here. The
+/// `evaPrimitiveHarness` mounts with `animationsEnabled: false`, so the shared
+/// ambient clocks never tick — `pumpAndSettle` is therefore safe here. The
 /// prohibition is on the **app root**, where `NeuralMotionScope` runs three
 /// `repeat()`ing controllers; `app_harness.dart`'s `pumpUntilFound` is for that.
 /// [pumpHome] still advances a fixed number of frames rather than settling, because
-/// the panel's own loading spinner is an infinite animation and settling would wait
-/// for it.
+/// the `ErrorView` a failed section renders carries a `CircularProgressIndicator` in
+/// its retry control and settling would wait for it.
 final class HomeHarness {
   /// The fakes, so a test can read their counters or re-stub them.
   const HomeHarness({
     required this.bloc,
     required this.readings,
     required this.streaks,
-    required this.leaderboard,
+    required this.catalogue,
     required this.auth,
   });
 
@@ -68,44 +71,15 @@ final class HomeHarness {
   /// `GET /readings/today/{lang}`.
   final CountingReadingRepository readings;
 
-  /// `GET /streak/summary`.
+  /// `GET /streak/summary` and `GET /streak` — two counters on one fake, because
+  /// they are one port.
   final CountingStreakRepository streaks;
 
-  /// `GET /leaderboard`.
-  final CountingLeaderboardRepository leaderboard;
+  /// The library catalogue, behind [LibraryCatalogueRepository].
+  final CountingLibraryCatalogueRepository catalogue;
 
   /// The session the greeting's name comes from.
   final CountingAuthRepository auth;
-}
-
-/// [LeaderboardRepository] that answers [answer] and counts its calls.
-///
-/// The card is a fourth section on the same footing as the reading and the streak, so
-/// the harness counts its calls too: `home_bloc_test.dart` asserts that `HomeStarted`
-/// issues all four requests, and a card that silently stopped being requested would
-/// leave a spinner on every Home with the suite green.
-final class CountingLeaderboardRepository implements LeaderboardRepository {
-  /// Starts out answering [answer].
-  CountingLeaderboardRepository({required this.answer});
-
-  /// What the next call answers.
-  Result<LeaderboardBoard> answer;
-
-  /// How many times [board] has been called.
-  int calls = 0;
-
-  /// The window and limit of the most recent call, for asserting what was asked for.
-  ({LeaderboardWindow window, int limit})? lastRequest;
-
-  @override
-  Future<Result<LeaderboardBoard>> board({
-    required LeaderboardWindow window,
-    required int limit,
-  }) async {
-    calls++;
-    lastRequest = (window: window, limit: limit);
-    return answer;
-  }
 }
 
 /// [ReadingRepository] that answers [scripture] and counts its calls.
@@ -169,23 +143,84 @@ final class CountingReadingRepository implements ReadingRepository {
   );
 }
 
-/// [StreakRepository] that answers [answer] and counts its calls.
+/// [StreakRepository] over **two** endpoints, counting each separately.
+///
+/// The counters are separate and that is the point: `HomeRetried` re-fetches only
+/// the sections that failed, and "the streak section" is now two requests
+/// (`GET /streak/summary` for the chip, `GET /streak` for the card). A single
+/// `calls` counter could not tell a suite whether a retry re-asked for the summary,
+/// the history or both.
 final class CountingStreakRepository implements StreakRepository {
-  /// Starts out answering [answer].
-  CountingStreakRepository({required this.answer});
+  /// Starts out answering [answer] for the summary and [history] for the rows.
+  CountingStreakRepository({
+    required this.answer,
+    Result<List<StreakHistoryEntry>>? history,
+  }) : historyAnswer =
+           history ??
+           const Right<Failure, List<StreakHistoryEntry>>(<StreakHistoryEntry>[
+             liveStreakHistoryEntry,
+           ]);
 
-  /// What the next call answers.
+  /// What [summary] answers.
   Result<StreakSummary> answer;
 
+  /// What [history] answers.
+  ///
+  /// **Named `historyAnswer` and not `history`**, because the port method is called
+  /// `history` and a fake that cannot hold the answer under the method's own name
+  /// is a fake whose tests read `fake.history()` for the method and
+  /// `fake.history` for the field with a two-letter difference between them.
+  Result<List<StreakHistoryEntry>> historyAnswer;
+
   /// How many times [summary] has been called.
-  int calls = 0;
+  int summaryCalls = 0;
+
+  /// How many times [history] has been called.
+  int historyCalls = 0;
 
   @override
   Future<Result<StreakSummary>> summary() async {
+    summaryCalls++;
+    return answer;
+  }
+
+  @override
+  Future<Result<List<StreakHistoryEntry>>> history() async {
+    historyCalls++;
+    return historyAnswer;
+  }
+}
+
+/// [LibraryCatalogueRepository] that answers [answer] and counts its calls.
+///
+/// **Defaulted to the shipped adapter**, not to a literal: the catalogue *is*
+/// `ADR-0022`'s fiction and a widget test that asserted six cards against its own
+/// hand-written list would be asserting its own list. So the default arm of
+/// [harness] is the real `LibraryCatalogueRepositoryImpl` over the real data
+/// source, and only the **failure** arm needs this fake — which is also why the
+/// catalogue's failed state is unreachable in production and reachable here.
+final class CountingLibraryCatalogueRepository
+    implements LibraryCatalogueRepository {
+  /// Starts out answering [answer].
+  CountingLibraryCatalogueRepository({required this.answer});
+
+  /// What the next call answers.
+  Result<List<LibraryBook>> answer;
+
+  /// How many times [books] has been called.
+  int calls = 0;
+
+  @override
+  Future<Result<List<LibraryBook>>> books() async {
     calls++;
     return answer;
   }
 }
+
+/// The catalogue the shipped adapter returns, for tests that want the entity rather
+/// than the call.
+List<LibraryBook> get liveCatalogue =>
+    const LibraryCatalogueLocalDataSource().books();
 
 /// [AuthRepository] that answers one session, or `null` for "no session".
 final class CountingAuthRepository implements AuthRepository {
@@ -256,8 +291,7 @@ const TodayReading liveEnglishReading = TodayReading(
 );
 
 /// The same reading in Arabic, with the `text_clean` preview the live payload
-/// carries for that arm and an **unfinished** state so both branches of the
-/// eyebrow are exercised by the fakes and not only by the entity test.
+/// carries for that arm.
 const TodayReading liveArabicReading = TodayReading(
   readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   groupId: 3,
@@ -288,6 +322,43 @@ const StreakSummary liveStreakSummary = StreakSummary(
   nextMilestone: 3,
   daysToMilestone: 3,
 );
+
+/// The most recent scheduled day — `/`'s **last light**.
+///
+/// ## IT IS A **TRANSCRIPTION**, AND THE REFERENCE SPELLING IS THE SERVER'S
+///
+/// `streak.service.ts:116-124` builds `reference.en` as
+/// `` `${bookNameEn} ${startChapter}:${startVerse}-${endVerse}` `` and
+/// `reference.ar` with a space after the chapter's colon. The two below are
+/// therefore **not** the same string with a script swapped, and the card picks
+/// between them by direction — see `LastLightCard.referenceFor`.
+///
+/// The counts are the shape the live schema declares (`streak.routes.ts:40-52`):
+/// `total_questions`, `answered_questions`, `correct_answers`, `points_earned`,
+/// `is_completed`. The fixture does not have to satisfy a live server — no dev run
+/// has a submitted reading — so it is a transcription of the *schema*, which is
+/// what `test/support/contract_payloads.dart` says about its own fixtures.
+const StreakHistoryEntry liveStreakHistoryEntry = StreakHistoryEntry(
+  readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  scheduledDate: '2026-10-03',
+  bookNumber: 43,
+  bookNameEn: 'John',
+  bookNameAr: 'يوحنا',
+  referenceEn: 'John 3:1-5',
+  referenceAr: 'يوحنا 3: 1-5',
+  totalQuestions: 1,
+  answeredQuestions: 1,
+  correctAnswers: 1,
+  pointsEarned: 10,
+  isCompleted: true,
+);
+
+/// The history the chip's endpoint and the card's endpoint disagree about: the
+/// summary says the reader is **behind** and the most recent day is **finished**.
+///
+/// `home_bloc_test.dart`'s subject, with the roles the redesign gave the two
+/// sections. Nothing reconciles them, for the reason `streak_summary.dart` records.
+const StreakHistoryEntry completedStreakHistoryEntry = liveStreakHistoryEntry;
 
 /// The seeded session's identity — `auth_local_data_source.dart`'s
 /// `seedAuthSession` values, spelled out.
@@ -430,31 +501,6 @@ ScriptureText withEmptyFirstVerse(ScriptureText base) {
   );
 }
 
-/// [base] with its first verse's text **opened by an emoji** and padded so the
-/// emoji lands inside `previewText`'s 56-code-unit budget rather than at the cut.
-///
-/// ## WHY THE PADDING, AND WHY IT IS NOT COSMETIC
-///
-/// `previewText` cuts at a **code unit**, so the defect needs the emoji's high
-/// surrogate to be the last unit taken: `'x' * 55 + '\u{1F600}'` does exactly that
-/// and is the shortest string that reaches it. A fixture of `'\u{1F600} There was…'`
-/// would put the emoji at index 0, which is the *other* half of the same bug — the
-/// one `/reading`'s drop cap has — and would leave the truncation untested.
-///
-/// So this is the **wider surface** the review measured: an emoji anywhere in the
-/// first 56 code units of verse one, not only at its start.
-ScriptureText withAstralFirstVerse(ScriptureText base) {
-  if (base.verses.isEmpty) return base;
-  return base.copyWith(
-    verses: <Verse>[
-      base.verses.first.copyWith(
-        text: '${'x' * 55}\u{1F600} There was a man of the Pharisees',
-      ),
-      ...base.verses.skip(1),
-    ],
-  );
-}
-
 /// [liveArabicReading] as the wide entity.
 ///
 /// The Arabic verses carry **`text_clean` on every one**, which the English arm has
@@ -468,10 +514,6 @@ const ScriptureText liveArabicScripture = ScriptureText(
   reference: 'يوحنا 3: 1-5',
   translation: 'Smith & Van Dyck (فانديك)',
   verses: liveArabicVerses,
-  // **Three** questions against the payload's one, and one answered. The narrow
-  // fixture says three too, and the mismatch with the wire is deliberate: `/`'s
-  // Arabic arm needs an *unfinished* reading so both branches of the eyebrow are
-  // reachable, and inventing that through the entity would mean inventing verses.
   questions: liveArabicQuestions,
   isFullyCompleted: false,
   pointsEarnedToday: 0,
@@ -491,7 +533,7 @@ const List<Verse> liveArabicVerses = <Verse>[
     bookNumber: 43,
     chapter: 3,
     number: 2,
-    text: 'جَاءَ هَذَا إِلَىٰ يَسُوعَ لَيْلاً وَقَالَ لَهُ يَا مُعَلِّمُ، قَدْ نَعْلَمُ أَنَّكَ قَدْ أَتَيْتَ مِنَ ٱللَّهِ مُعَلِّمًا، لأَنَّهُ لَيْسَ أَحَدٌ يَقْدِرُ أَنْ يَعْمَلَ هَذِهِ ٱلْآيَاتِ ٱلَّتِ أَنْتَ تَعْمَلُ إِلَّا إِنْ كَانَ ٱللَّهُ مَعَهُ.',
+    text: 'جَاءَ هَذَا إِلَىٰ يَسُوعَ لَيْلاً وَقَالَ لَهُ يَا مُعَلِّمُ، قَدْ نَعْلَمُ أَنَّكَ قَدْ أَتَيْتَ مِنَ ٱللَّهِ مُعَلِّمًا، لأَنَّهُ لَيْسَ أَحَدٌ يَقْدِرُ أَن يَعْمَلَ هَذِهِ ٱلْآيَاتِ ٱلَّتِي أَنْتَ تَعْمَلُ إِلَّا إِنْ كَانَ ٱللَّهُ مَعَهُ.',
     textClean:
         'جاء هذا إلى يسوع لياً وقال له يا معلم، نعلم أنك قد أتيت من الله معلماً، '
         'لأنه ليس أحد يقدر أن يعمل هذه الآيات التي أنت تعمل إلا إن كان الله معه',
@@ -500,7 +542,7 @@ const List<Verse> liveArabicVerses = <Verse>[
     bookNumber: 43,
     chapter: 3,
     number: 3,
-    text: 'أَجَابَ يَسُوعُ وَقَالَ لَهُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لا يُولَدُ مِنْ فَوْقُ لَا يَقْدِرُ أَنْ يَرَى مَلَكُوتَ ٱللَّهِ.»',
+    text: 'أَجَابَ يَسُوعُ وَقَالَ لَهُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لَا يُولَدُ مِنْ فَوْقُ لَا يَقْدِرُ أَن يَرَى مَلَكُوتَ ٱللَّهِ.»',
     textClean:
         'أجاب يسوع وقال له: «الحق الحق أقول لك إن كان أحد لا يولد من فوق لا يقدر '
         'أن يرى ملكوت الله.»',
@@ -509,7 +551,7 @@ const List<Verse> liveArabicVerses = <Verse>[
     bookNumber: 43,
     chapter: 3,
     number: 4,
-    text: 'قَالَ لَهُ نِيقُودِيمُوسُ: كَيْفَ يُولَدُ ٱلْإِنْسَانُ وَهُوَ شَيْخٌ؟ أَلَعَلَّهُ يَقْدِرُ أَنْ يَدْخُلَ بَطْنَ أُمِّهِ ثَانِيَةً وَيَلِدُ؟',
+    text: 'قَالَ لَهُ نِيقُودِيمُوسُ: كَيْفَ يُولَدُ ٱلْإِنْسَانُ وَهُوَ شَيْخٌ؟ أَلَعَلَّهُ يَقْدِرُ أَن يَدْخُلَ بَطْنَ أُمِّهِ ثَانِيَةً وَيَلِدُ؟',
     textClean:
         'قال له نيقوديموس: كيف يولد الإنسان وهو شيخ؟ ألاعله يقدر أن يدخل بطن أمه '
         ' ثانية ويولد؟',
@@ -518,20 +560,14 @@ const List<Verse> liveArabicVerses = <Verse>[
     bookNumber: 43,
     chapter: 3,
     number: 5,
-    text: 'أَجَابَ يَسُوعُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لا يُولَدُ مِنْ ٱلْمَاءِ وَٱلرُّوحِ لَا يَقْدِرُ أَنْ يَدْخُلَ مَلَكُوتَ ٱللَّهِ.»',
+    text: 'أَجَابَ يَسُوعُ: «اَلْحَقَّ ٱلْحَقَّ، أَقُولُ لَكَ: إِنْ كَانَ أَحَدٌ لَا يُولَدُ مِنَ ٱلْمَاءِ وَٱلرُّوحِ لَا يَقْدِرُ أَن يَدْخُلَ مَلَكُوتَ ٱللَّهِ.»',
     textClean:
         'أجاب يسوع: «الحق الحق أقول لك إن كان أحد لا يولد من الماء والروح لا يقدر '
         'أن يدخل ملكوت الله.»',
   ),
 ];
 
-/// The Arabic arm's questions: **three**, of which one is answered.
-///
-/// Deliberately three where the payload carries one, and the reason is written on
-/// [liveArabicScripture]: `/`'s Arabic arm must reach both branches of the
-/// eyebrow's status line, and `is_fully_completed: false` with one answered question
-/// out of three is the only fixture that does. The wide entity makes the
-/// inconsistency **visible** where the narrow one hid it behind a count.
+/// The Arabic arm's questions, of which one is answered.
 const List<Question> liveArabicQuestions = <Question>[
   Question(
     id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -549,27 +585,6 @@ const List<Question> liveArabicQuestions = <Question>[
     userAnswer: 'A',
     isCorrect: true,
   ),
-  Question(
-    id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    sortOrder: 2,
-    type: 'mcq',
-    prompt: 'ماذا قال الرب لنيقوديموس؟',
-    options: <String, String>{'A': 'اذهب', 'B': 'تابعني'},
-    pointsValue: 10,
-    alreadyAnswered: false,
-  ),
-  Question(
-    id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    sortOrder: 3,
-    type: 'mcq',
-    prompt: 'ما معنى الولادة الجديدة؟',
-    options: <String, String>{
-      'A': 'من الماء والروح',
-      'B': 'من الماء والروح أيضًا',
-    },
-    pointsValue: 10,
-    alreadyAnswered: false,
-  ),
 ];
 
 /// The streak endpoint's own failure, for the mirror-image fixture.
@@ -582,14 +597,14 @@ const Failure streakFailure = Failure(
 HomeHarness harness({
   Result<ScriptureText>? reading,
   Result<StreakSummary>? streak,
-  Result<LeaderboardBoard>? leaderboardAnswer,
+  Result<List<StreakHistoryEntry>>? history,
+  Result<List<LibraryBook>>? catalogue,
   AuthSession? session,
   // **Not `session: null`.** A nullable parameter with a default cannot tell "the
   // caller passed null" from "the caller passed nothing", and the default here is
   // the seeded session. So "no session" is a separate flag — and the first version
   // of `home_page_test.dart`'s no-session test passed `session: null`, got the
-  // seeded session anyway, and asserted against a greeting that said
-  // `Good morning, David Mina`.
+  // seeded session anyway, and asserted against a greeting that named David Mina.
   bool signedIn = true,
   DateTime? at,
 }) {
@@ -599,43 +614,52 @@ HomeHarness harness({
   );
   final CountingStreakRepository streaks = CountingStreakRepository(
     answer: streak ?? const Right<Failure, StreakSummary>(liveStreakSummary),
+    history:
+        history ??
+        const Right<Failure, List<StreakHistoryEntry>>(<StreakHistoryEntry>[
+          liveStreakHistoryEntry,
+        ]),
   );
   final CountingAuthRepository auth = CountingAuthRepository(
     session: signedIn ? (session ?? liveSession) : null,
   );
-  final CountingLeaderboardRepository leaderboard =
-      CountingLeaderboardRepository(
+  // The **real data source** by default and the suite's own answer when one is
+  // given: the catalogue is ADR-0022's fiction and its data source is the one file
+  // that holds it, so a widget test asserting six cards should be reading that
+  // file's list rather than a second copy of it.
+  final CountingLibraryCatalogueRepository library =
+      CountingLibraryCatalogueRepository(
         answer:
-            leaderboardAnswer ??
-            const Right<Failure, LeaderboardBoard>(
-              LeaderboardBoard(
-                window: LeaderboardWindow.weekly,
-                groupId: 3,
-                rows: <LeaderboardRow>[],
-                standing: null,
-                cohortSize: 0,
-              ),
+            catalogue ??
+            Result<List<LibraryBook>>.of(
+              const LibraryCatalogueLocalDataSource().books(),
             ),
       );
+  final LibraryCatalogueRepository repo = library;
   final HomeBloc bloc = HomeBloc(
     loadTodayReading: LoadTodayReading(readings),
     loadStreakSummary: LoadStreakSummary(streaks),
+    loadLastLight: LoadLastLight(streaks),
+    loadLibraryCatalogue: LoadLibraryCatalogue(repo),
     getReaderSession: GetReaderSession(auth),
-    loadLeaderboardPreview: LoadLeaderboardPreview(leaderboard),
     now: () => at ?? DateTime(2026, 10, 3, 9, 30),
   );
   addTearDown(bloc.close);
   return HomeHarness(
     bloc: bloc,
-    leaderboard: leaderboard,
     readings: readings,
     streaks: streaks,
+    // **The very object the bloc was given**, so `calls` counts the screen's asks.
+    // The first version built a second, identically-seeded fake here and the count
+    // stayed `0` while the carousel rendered — a counter that cannot see the call it
+    // is meant to count is worse than no counter, because it looks like evidence.
+    catalogue: library,
     auth: auth,
   );
 }
 
-/// Mounts [HomePage] over [bloc] at §14's narrow surface, and pumps the four frames
-/// a `HomeStarted` needs.
+/// Mounts [HomePage] over [bloc] at §14's narrow surface, and pumps the frames a
+/// `HomeStarted` needs.
 ///
 /// [frames] is a parameter rather than a constant because the *loading* state is
 /// reached and left inside one frame, while the *failed* state has to be reached and
@@ -679,9 +703,9 @@ Future<void> pumpHome(
 
 /// Advances [tester] by [count] frames.
 ///
-/// Not `pumpAndSettle`: the panel's loading state is a `CircularProgressIndicator`,
-/// an animation that never ends, so settling here is a ten-minute timeout rather
-/// than a green tick. See this file's library doc.
+/// Not `pumpAndSettle`: a failed section's `ErrorView` retry control carries a
+/// `CircularProgressIndicator`, an animation that never ends, so settling here is a
+/// ten-minute timeout rather than a green tick. See this file's library doc.
 Future<void> pumpFrames(WidgetTester tester, int count) async {
   for (int frame = 0; frame < count; frame++) {
     await tester.pump(const Duration(milliseconds: 16));

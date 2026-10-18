@@ -198,6 +198,31 @@ abstract final class EvaTypography {
       textTheme(colors).labelMedium!.copyWith(fontFamily: monoFamily);
 }
 
+/// A `.mono` run's **text**, uppercased under LTR only.
+///
+/// `redesign.html:136` — `[dir=rtl] .mono{text-transform:none}`, with
+/// `[dir=rtl] .mono{letter-spacing:0}` at `:135` for the tracking half.
+///
+/// ## WHY IT IS A STRING FUNCTION AND NOT PART OF `monoCaps`
+///
+/// Because `text-transform` is a **rendering** transform in CSS and a content
+/// transform in every text engine here: Flutter has no `textTransform`, so the
+/// only faithful spelling is `String.toUpperCase()` on the string that is about to
+/// be rendered. Putting it in the style would mean lying about the value — a `Text`
+/// whose `data` is `days` and whose `style` claims otherwise is exactly what
+/// `gen_l10n` emits for a `{count}` placeholder, which
+/// `app_localizations.dart`'s doc warns about at length.
+///
+/// ## AND WHY IT IS HERE AND NOT IN EACH SCREEN
+///
+/// Because `/login` needs it for its tagline and footer (`:369`) and `/` needs it
+/// for every mono caption it draws, and the first version of this helper was a
+/// private `_monoText` inside `login_page.dart`. Two copies of a one-line rule is
+/// §7's "two implementations of one invariant" — and the copy that survives is the
+/// one a designer's change misses.
+String monoCapsText(String text, TextDirection direction) =>
+    direction == TextDirection.ltr ? text.toUpperCase() : text;
+
 /// The family that renders a run of text whose script follows [direction], given
 /// the family [latin] that renders it otherwise.
 ///

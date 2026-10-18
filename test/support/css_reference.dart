@@ -288,3 +288,116 @@ class CssReference {
     return names;
   }
 }
+
+/// Reads [selector]'s declarations out of [source] and returns them as a map.
+///
+/// ## WHY THIS IS A SEPARATE FUNCTION FROM [CssReference]
+///
+/// [CssReference] answers questions about **custom properties**: which value a
+/// token has, in which scope, and whether a `var()` chain resolves. A screen's
+/// geometry is not a token — `redesign.html:249` writes `.hcard`'s `border-radius:
+/// 24px` as a literal — and the two need different parsers: this one splits a rule
+/// body on `;`, that one walks declarations of the form `--name: value`.
+///
+/// ## WHY IT IS ANCHORED TO A LINE START
+///
+/// Because the stylesheet's selectors **nest**: `.screen[data-mode=light] .field
+/// input` (`:85`) contains `.field input` as a substring, and an unanchored search
+/// reads the light-mode override — two declarations, no radius, no margin — as if it
+/// were the rule. Every selector a geometry harness names starts its own line, and
+/// the anchor is what makes that true in general rather than by luck.
+///
+/// ## AND WHY A MISS **THROWS**
+///
+/// With `StateError`, not a null and not an `expect`. Two reasons, both measured:
+/// a geometry harness builds its claim tables **at group-construction time**, which
+/// is outside any test body where `expect` is illegal
+/// (`OutsideTestException`), and a null would make every row read `null == 20` and
+/// fail with a message about arithmetic instead of about a prototype that moved.
+/// The suites that use it re-assert every selector inside a real test, so the
+/// failure surfaces twice and neither time as a number.
+Map<String, String> cssRule(File source, String selector) {
+  if (!source.existsSync()) {
+    throw StateError(
+      '${source.path} is missing. This harness cannot read the prototype, so it '
+      'does not pass — a missing reference is reported, never assumed '
+      'unchanged.',
+    );
+  }
+  final RegExpMatch? match = RegExp(
+    '(^|\\n)${RegExp.escape(selector)}\\s*\\{([^}]*)\\}',
+  ).firstMatch(source.readAsStringSync());
+  if (match == null) {
+    throw StateError(
+      '$selector is not in ${source.path} any more. Either the prototype '
+      'changed shape — in which case this harness and the page it guards both '
+      'need re-reading — or the selector was mistyped here.',
+    );
+  }
+  return <String, String>{
+    // `group(2)`, not 1: the line-start anchor added `(^|\n)` as the first
+    // capture group, and reading group 1 would split a newline on `;` — the empty
+    // map that failed the selector test in the first version of this harness.
+    for (final String declaration in match.group(2)!.split(';'))
+      if (declaration.contains(':'))
+        declaration.split(':').first.trim(): declaration
+            .split(':')
+            .skip(1)
+            .join(':')
+            .trim(),
+  };
+}
+
+/// The numeric value of [property] in [declarations], in logical pixels.
+///
+/// The first of [cssPxList]'s values, which is the right answer for every property
+/// that declares one — a radius, a `gap`, a `margin-top`.
+///
+/// CSS lengths in this stylesheet are `Npx`; anything else — a bare `0`, a
+/// percentage, an `em` — is a shape the caller converts **deliberately**, because
+/// the conversion is the claim. `login_geometry_test.dart`'s wordmark row is the
+/// example: its value is `.3em` **of 26px**, and the conversion is the whole content
+/// of the constant.
+///
+/// Throws, for the same out-of-test reason [cssRule] does.
+double cssPx(Map<String, String> declarations, String property) =>
+    cssPxList(declarations, property).first;
+
+/// Every pixel length [property] declares, in the order the CSS writes them.
+///
+/// **And why a shorthand needs its own reader.** `padding: 22px 20px` is two
+/// numbers and `[cssPx]` returns the first, which is the *vertical* pair under CSS's
+/// top/right/bottom/left order — so a harness asking for a card's horizontal pad
+/// with [cssPx] would read 22 and compare it against 20 and fail with a message
+/// about arithmetic. `/`'s two `.hcard`s and its `.selah` all declare shorthands
+/// (`:250`, `:262`), and `home_geometry_test.dart` reads both values from them.
+///
+/// `letter-spacing: .14em` is **not** read by this and that is deliberate: the unit
+/// is the font size, so a harness wanting the tracking converts at its call site
+/// where the conversion is the claim.
+List<double> cssPxList(Map<String, String> declarations, String property) {
+  final String? raw = declarations[property];
+  if (raw == null) {
+    throw StateError('$property is not declared where the harness looked.');
+  }
+  // **A leading dot is a number** (`.35` is `opacity`, not `35`), **and a bare
+  // number only counts when no unit follows** — so `.16em` matches *nothing* rather
+  // than matching `16` or `0.16`, and `cssPx` throws the "not a pixel length" error
+  // its doc promises. Both halves were measured: the first version of this regex was
+  // `(-?\d+(?:\.\d+)?)px?`, which read `opacity: .35` as `35` and
+  // `letter-spacing: .16em` as nothing at all.
+  final Iterable<RegExpMatch> matches = RegExp(
+    r'(-?(?:\d+(?:\.\d+)?|\.\d+))(?:px)?(?![a-z%])',
+    caseSensitive: false,
+  ).allMatches(raw);
+  if (matches.isEmpty) {
+    throw StateError(
+      '$property is "$raw", which is not a pixel length this parser reads. If '
+      'the prototype changed units, the conversion is a claim and belongs in a '
+      'constant with its reasoning — not in this helper.',
+    );
+  }
+  return <double>[
+    for (final RegExpMatch match in matches) double.parse(match.group(1)!),
+  ];
+}

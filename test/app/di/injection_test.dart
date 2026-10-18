@@ -613,21 +613,48 @@ void main() {
           'lazySingleton<ApiErrorMapper> apiErrorMapper',
           'lazySingleton<TodayReadingMapper> todayReadingMapper',
           'lazySingleton<StreakSummaryMapper> streakSummaryMapper',
+          // **Phase 5.2 added this**, and its position is the evidence: directly
+          // after `streakSummaryMapper`, because it is the `/streak` history arm's
+          // mapper and injectable emits the home module's providers in declaration
+          // order. The generator chose this; this test asserts *which* providers
+          // exist.
+          'lazySingleton<StreakHistoryMapper> streakHistoryMapper',
           'lazySingleton<SubmitResultMapper> submitResultMapper',
           'lazySingleton<ReadingRepository> readingRepository',
           'lazySingleton<StreakRepository> streakRepository',
+          // **Phase 5.2 added two**, and their position is the evidence again:
+          // `LibraryCatalogueRepository`'s port and its local data source land
+          // directly after `streakRepository` — beside the other repository
+          // providers, because that is where injectable puts a provider whose only
+          // dependency is the data source beside it. The generator chose this;
+          // this test asserts *which* providers exist.
+          'lazySingleton<LibraryCatalogueLocalDataSource> libraryCatalogueLocalDataSource',
+          'lazySingleton<LibraryCatalogueRepository> libraryCatalogueRepository',
           'lazySingleton<LoadTodayReading> loadTodayReading',
           'lazySingleton<LoadStreakSummary> loadStreakSummary',
+          // **Phase 5.2 added two more**, and their position is the evidence:
+          // between `loadStreakSummary` and `getReaderSession`, because the home
+          // module declares them after the summary's use case. The two are
+          // `/`'s new sections — the last-light card's use case and the
+          // catalogue's — and `LoadLeaderboardPreview` is GONE from this list:
+          // ADR-0022 removed the board card from `/`, so the preview use case
+          // died with it and the leaderboard module is back to its own one use
+          // case (`leaderboard_module.dart`'s doc records the removal).
+          'lazySingleton<LoadLastLight> loadLastLight',
+          'lazySingleton<LoadLibraryCatalogue> loadLibraryCatalogue',
           'lazySingleton<GetReaderSession> getReaderSession',
           // **Phase 1 added three**, and their position is the evidence again:
           // `leaderboardRepository` lands directly after `getReaderSession` — beside
           // the other two repository providers, because that is where injectable puts
           // a provider whose only dependency is `ApiErrorMapper` plus the injected
-          // `Dio` — and the two leaderboard use cases follow it, newest-last. The
-          // generator chose this; this test asserts *which* providers exist.
+          // `Dio` — and the leaderboard use case follows it. The generator chose
+          // this; this test asserts *which* providers exist. **Phase 5.2 removed
+          // `loadLeaderboardPreview`**, which sat between the two: the board card
+          // left `/`, and a use case whose only call site was that card is not a
+          // string in this list but a registration for a widget that no longer
+          // exists.
           'lazySingleton<LeaderboardRepository> leaderboardRepository',
           'lazySingleton<LoadLeaderboard> loadLeaderboard',
-          'lazySingleton<LoadLeaderboardPreview> loadLeaderboardPreview',
           'lazySingleton<StartSession> startSession',
           'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
           'lazySingleton<SubmitAnswer> submitAnswer',

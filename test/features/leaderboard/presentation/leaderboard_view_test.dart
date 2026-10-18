@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';
@@ -5,8 +7,6 @@ import 'package:evangelion/core/design_system/widgets/error_view.dart';
 import 'package:evangelion/core/design_system/widgets/leaderboard_row_tile.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
-import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/widgets/leaderboard_card.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_page.dart';
@@ -17,8 +17,32 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../support/design_system_harness.dart';
 
-/// The behaviour of the two leaderboard surfaces that the overflow suite does not
-/// reach, and the cubit tests cannot reach at all.
+/// The behaviour of the leaderboard screen that the overflow suite does not reach,
+/// and the cubit tests cannot reach at all.
+///
+/// ## THE CARD GROUPS THAT WERE HERE, AND WHERE THEY WENT
+///
+/// Phase 5.2 deleted `LeaderboardCard` with the board card on `/`
+/// (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md`; the redesign's home
+/// has no board). Five groups named it, and they did not all die the same death:
+///
+/// * **"states the cohort size only when it is provable"** — re-pointed at the
+///   screen's footer, which prints the same line, and the *strongest* of its
+///   assertions (the invented-total absence, and the rankless `null` case) moved
+///   with it because the screen's group had neither.
+/// * **"marks the reader row by RANK"** — re-pointed at the screen, which draws
+///   the whole cohort rather than a preview's three, so the flags list is the
+///   entire ranking and not a sample of it.
+/// * **"reserves its slot while loading"** — re-pointed at the screen, which no
+///   other suite covered; the reservation height died with the card, so the
+///   claim is now "a spinner, and no rows or error".
+/// * **"the card's failure arm"** — not re-pointed because it was already
+///   doubled: the failure's own words are asserted on the screen in the overflow
+///   suite, and retry re-requesting is asserted by this file's window group.
+/// * **"the card opens the full list"** — deleted, not re-pointed: `onOpen` was
+///   home's navigation to this screen, and the screen has no such link of its
+///   own. Task 5.5 renames this route to `/communion` and draws
+///   `leaderboardOpenFull`; when that lands, the link's test belongs there.
 ///
 /// ## WHAT IS BEING ASSERTED, AND WHY IT IS NOT COSMETIC
 ///
@@ -99,31 +123,6 @@ List<String> _shown(WidgetTester tester) => tester
     .map((Text text) => text.data ?? '')
     .toList();
 
-Future<void> _pumpCard(
-  WidgetTester tester, {
-  required HomeSectionStatus status,
-  required LeaderboardBoard? board,
-  Failure? failure,
-  VoidCallback? onOpen,
-  VoidCallback? onRetry,
-}) async {
-  await tester.pumpWidget(
-    evaPrimitiveHarness(
-      theme: EvaThemeDark.theme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-      child: LeaderboardCard(
-        status: status,
-        board: board,
-        failure: failure,
-        onOpen: onOpen ?? () {},
-        onRetry: onRetry ?? () {},
-      ),
-    ),
-  );
-  await tester.pump(const Duration(milliseconds: 16));
-}
-
 Future<LeaderboardCubit> _pumpPage(
   WidgetTester tester,
   LeaderboardRepository repo,
@@ -143,6 +142,22 @@ Future<LeaderboardCubit> _pumpPage(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 16));
   return cubit;
+}
+
+/// A repository that never answers, which is the only way a `Future`-based cubit
+/// can be *held* in its loading arm.
+///
+/// **A second fake for one state**, and the reason is the arm: `_RecordingRepo`
+/// answers on the first microtask drain, so `_pumpPage`'s two pumps always land in
+/// `ready` and no test using it can reach the spinner. The card's suite reached its
+/// loading arm through `status:` — a parameter a page does not take — so the
+/// re-pointed group needed a fake whose answer never arrives instead.
+final class _NeverRepo implements LeaderboardRepository {
+  @override
+  Future<Result<LeaderboardBoard>> board({
+    required LeaderboardWindow window,
+    required int limit,
+  }) => Completer<Result<LeaderboardBoard>>().future;
 }
 
 /// Answers with a fixed board and remembers every window it was asked for.
@@ -181,11 +196,17 @@ final class _RecordingRepo implements LeaderboardRepository {
 }
 
 void main() {
-  group('the card states the cohort size only when it is provable', () {
+  group('the screen states the cohort size only when it is provable', () {
+    // **The card's group re-pointed, with its strongest assertion kept.** The
+    // ZCARD contract (AGENT_CONTEXT decision 136) is a property of whatever
+    // surface prints the reader's line, and the deleted card's version of it was
+    // the first place the "no total is invented" branch was pinned. The screen's
+    // footer prints the same line, so the same three cases — and the rankless
+    // fourth — belong here.
     testWidgets('prints "rank / cohort" when the size is known', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(tester, status: HomeSectionStatus.ready, board: _five);
+      await _pumpPage(tester, _RecordingRepo(_five));
       // The whole point of the `2 / 5` line, so it is asserted exactly.
       expect(_shown(tester), contains('2 / 5'));
     });
@@ -193,11 +214,7 @@ void main() {
     testWidgets('prints a BARE rank when the size is unknown', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: _uncapped,
-      );
+      await _pumpPage(tester, _RecordingRepo(_uncapped));
       final List<String> shown = _shown(tester);
       // "2" alone. Asserted as the absence of the total rather than the presence of
       // the string "2", because "2" also occurs as the rank column and as row scores —
@@ -207,25 +224,26 @@ void main() {
       expect(shown, contains('2'));
     });
 
-    testWidgets('says "not ranked" when standing is null', (
+    testWidgets('an EMPTY cohort shows the empty state, and no footer', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: _unranked,
-      );
-      expect(_shown(tester), contains('Not ranked yet'));
+      // **Where the card differed, and the difference is the point of re-pointing
+      // rather than copying.** The card printed "Not ranked yet" on an empty
+      // board because it always reserved the footer's row; the screen has a
+      // dedicated empty state (`No scores yet`) that replaces the footer, and
+      // asserting the card's behaviour here would be asserting a layout the
+      // screen does not have. The "not ranked" claim itself is two rows down —
+      // for a cohort with rows that the reader is absent from, which is the case
+      // the footer exists for.
+      await _pumpPage(tester, _RecordingRepo(_unranked));
+      expect(_shown(tester), isNot(contains('Not ranked yet')));
+      expect(_shown(tester), contains('No scores yet'));
     });
 
     testWidgets('says "not ranked" when rank is null but standing is not', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: _rankless,
-      );
+      await _pumpPage(tester, _RecordingRepo(_rankless));
       // The literal `null` must never reach the screen: the entity allows
       // `rank: null` and `'${standing.rank}'` would print "null".
       expect(_shown(tester), contains('Not ranked yet'));
@@ -233,78 +251,47 @@ void main() {
     });
   });
 
-  group('the card reserves its slot while loading', () {
+  group('the screen reserves its slot while loading', () {
     testWidgets('shows a spinner, and no rows or error', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(tester, status: HomeSectionStatus.loading, board: null);
+      // **Re-pointed from the deleted card, and it is the same claim about a
+      // different surface.** The card's version died with the card in Phase 5.2
+      // (`eva/redesign.html:513-538` draws a home with no board), but nothing
+      // else covered the *screen's* loading arm — `leaderboard_cubit_test.dart`
+      // asserts the state, and a state is not a spinner. The page's `loading`
+      // arm (`leaderboard_page.dart`'s `switch`) renders a centred indicator
+      // with `strokeWidth: 2` while `board` is null, and that is the only place
+      // the spinner is drawn.
+      await _pumpPage(tester, _NeverRepo());
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byType(LeaderboardRowTile), findsNothing);
       expect(find.byType(ErrorView), findsNothing);
-      // The reserved slot is what stops the surrounding layout jumping when the
-      // answer lands. It is read off the **declaring** widget, because
-      // `evaPrimitiveHarness` hands its child a tight 600pt and a laid-out
-      // measurement would report the harness, not the reservation — which is exactly
-      // what the first version of this assertion did and why it read 600.
-      expect(
-        tester
-            .widgetList<SizedBox>(find.byType(SizedBox))
-            .map((SizedBox box) => box.height)
-            .where((double? height) => height == LeaderboardCard.loadingHeight),
-        isNotEmpty,
-      );
     });
   });
 
-  group("the card's failure arm", () {
-    testWidgets("shows the failure's OWN words, not an invented sentence", (
-      WidgetTester tester,
-    ) async {
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.failed,
-        board: null,
-        failure: const Failure(
-          kind: FailureKind.validation,
-          message:
-              'Could not read the leaderboard: `leaderboard[1].score` is not a '
-              'number',
-        ),
-      );
-      final ErrorView view = tester.widget<ErrorView>(find.byType(ErrorView));
-      expect(view.message, contains('leaderboard[1].score'));
-      // `ErrorView` throws without a family, and Arabic needs a different one.
-      expect(view.retryFamily, isNotNull);
-    });
-
-    testWidgets('retry re-requests the card', (WidgetTester tester) async {
-      int retries = 0;
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.failed,
-        board: null,
-        failure: const Failure(kind: FailureKind.network, message: 'offline'),
-        onRetry: () => retries++,
-      );
-      await tester.tap(find.text('Try again'));
-      await tester.pump(const Duration(milliseconds: 16));
-      expect(retries, 1);
-    });
-  });
-
-  group('the card marks the reader row by RANK, not by identity', () {
+  group('the screen marks the reader row by RANK, not by identity', () {
     testWidgets('the tile whose rank matches standing is the reader', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(tester, status: HomeSectionStatus.ready, board: _five);
+      // **Re-pointed from the deleted card.** The mechanism is the tile's own
+      // `isReader`, which the page computes from `standing.rank` —
+      // `LeaderboardRow` has no `userId` to compare, so rank position is the
+      // whole of the identity the screen has.
+      await _pumpPage(tester, _RecordingRepo(_five));
       final List<LeaderboardRowTile> tiles = tester
           .widgetList<LeaderboardRowTile>(find.byType(LeaderboardRowTile))
           .toList();
-      // Three drawn of the five ranked, per `kLeaderboardPreviewRows`.
-      expect(tiles, hasLength(3));
+      // The screen draws ALL five, which is the assertion the old card group
+      // could not make: the card drew 3 of 50 by `kLeaderboardPreviewRows`, so
+      // its flags list was a *sample* of the ranking and a tile at rank 4 could
+      // never be checked. The screen's is the whole cohort the fixture holds.
+      expect(tiles, hasLength(5));
       expect(tiles.map((LeaderboardRowTile t) => t.isReader).toList(), <bool>[
         false,
         true,
+        false,
+        false,
         false,
       ]);
     });
@@ -312,40 +299,15 @@ void main() {
     testWidgets('no tile is the reader when standing is null', (
       WidgetTester tester,
     ) async {
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: _unranked,
-      );
       // The empty board draws no tiles at all, so the branch that matters is a
       // non-empty cohort the reader is absent from.
-      final LeaderboardBoard elsewhere = _five.copyWith(standing: null);
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: elsewhere,
-      );
+      await _pumpPage(tester, _RecordingRepo(_five.copyWith(standing: null)));
       expect(
         tester
             .widgetList<LeaderboardRowTile>(find.byType(LeaderboardRowTile))
             .every((LeaderboardRowTile tile) => !tile.isReader),
         isTrue,
       );
-    });
-  });
-
-  group('the card opens the full list', () {
-    testWidgets('the link fires onOpen', (WidgetTester tester) async {
-      int opens = 0;
-      await _pumpCard(
-        tester,
-        status: HomeSectionStatus.ready,
-        board: _five,
-        onOpen: () => opens++,
-      );
-      await tester.tap(find.text('See all'));
-      await tester.pump(const Duration(milliseconds: 16));
-      expect(opens, 1);
     });
   });
 

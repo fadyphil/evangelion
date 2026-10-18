@@ -34,10 +34,12 @@
 ///
 /// ## AND IT IS READ OFF THE **RENDERED** TREE
 ///
-/// `today_reading_panel.dart` cited defect #2 as the reason it branched on language
-/// and then built one `TextStyle` for both arms — the Arabic preview rendered in
-/// `EBGaramond` and 1520 tests stayed green, because nothing read a `fontFamily` off
-/// the tree. Reading the rendered style is the whole of the fix.
+/// The deleted `today_reading_panel.dart` (Phase 5.2 removed it with the preview)
+/// cited defect #2 as the reason it branched on language and then built one
+/// `TextStyle` for both arms — the Arabic preview rendered in `EBGaramond` and 1520
+/// tests stayed green, because nothing read a `fontFamily` off the tree. Reading the
+/// rendered style is the whole of the fix, and it is why the gate reads the tree
+/// rather than the widget's own constants.
 ///
 /// ## FOUR THINGS THE FIRST VERSION GOT WRONG, ALL OF THEM THE SAME FAMILY
 ///

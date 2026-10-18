@@ -46,19 +46,23 @@ void main() {
 
     test('and it cannot be fooled by a translation that coincides with English', () {
       // The failure the string-comparison scheme had. Both arms are the *same*
-      // string here, and the answer is still the locale's. The identical string
-      // is `homeWordmark` since Phase 5.1 — the wordmark left the ARB table's
-      // auth keys for a widget literal on the rebuilt login, and the top bar's
-      // copy is the one the ARB still carries.
+      // string here, and the answer is still the locale's.
+      //
+      // **The identical string is `homeNoLightRef`** — it was `homeWordmark`
+      // until Phase 5.2 deleted the wordmark with the top bar, and
+      // `app_localizations_test.dart`'s `mustBeIdentical` is now a set of one
+      // for exactly this reason: `redesign.html:1193` writes the em dash in both
+      // directions, because "no light" is a typographic nothing rather than a
+      // word any language translates.
       expect(en.homeStreakLabel, isNot(ar.homeStreakLabel));
-      expect(en.homeWordmark, ar.homeWordmark);
+      expect(en.homeNoLightRef, ar.homeNoLightRef);
       expect(
         en.isArabicArm,
         isFalse,
         reason:
-            '`homeWordmark` is deliberately identical across the arms — a brand mark '
-            'is not translated — and a comparison-against-a-string scheme would have '
-            'reported this arm as Arabic',
+            '`homeNoLightRef` is deliberately identical across the arms — an em '
+            'dash is not translated — and a comparison-against-a-string scheme '
+            'would have reported this arm as Arabic',
       );
     });
   });

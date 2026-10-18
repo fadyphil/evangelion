@@ -152,6 +152,67 @@ const String kLiveStreakSummaryJson = '''
 }
 ''';
 
+/// The live `GET /api/v1/streak` body, measured against the backend.
+///
+/// `streak.service.ts:120-142` builds each row: the two reference arms are
+/// **server-composed strings** — `٢٣: ١-٦` with a space after the colon in
+/// Arabic, `23:1-6` without in English — and a reading that *spans* chapters
+/// renders `23:1 - 23:6` with spaces around the dash in both arms. The two rows
+/// below carry one of each shape, so the mapper test cannot pass on a single
+/// string template.
+///
+/// The body also carries the summary's scalars (this endpoint is what
+/// `streak.routes.ts:163-172` picks `/streak/summary`'s fields from) and they are
+/// **deliberately present here**: `StreakHistoryMapper` drops them, and a payload
+/// that lacked them would make that drop untestable — a projection that dropped
+/// nothing would pass a test written against a payload that had nothing to drop.
+const String kLiveStreakHistoryJson = '''
+{
+  "user_id": "11111111-1111-1111-1111-111111111111",
+  "group_id": 3,
+  "today_date": "2026-10-03",
+  "current_streak": 0,
+  "longest_streak": 6,
+  "last_completed_date": "2026-09-29",
+  "today_status": "pending",
+  "today_completed": false,
+  "today_scheduled": true,
+  "next_milestone": 3,
+  "days_to_milestone": 3,
+  "history": [
+    {
+      "reading_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "scheduled_date": "2026-10-03",
+      "book_number": 43,
+      "book_name_ar": "يوحنا",
+      "book_name_en": "John",
+      "reference": { "ar": "يوحنا 3: 1-5", "en": "John 3:1-5" },
+      "total_questions": 5,
+      "answered_questions": 5,
+      "correct_answers": 4,
+      "points_earned": 40,
+      "is_completed": true
+    },
+    {
+      "reading_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "scheduled_date": "2026-10-02",
+      "book_number": 19,
+      "book_name_ar": "المزامير",
+      "book_name_en": "Psalms",
+      "reference": {
+        "ar": "المزامير 23: 1 - 23:6",
+        "en": "Psalms 23:1 - 23:6"
+      },
+      "total_questions": 6,
+      "answered_questions": 2,
+      "correct_answers": 1,
+      "points_earned": 10,
+      "is_completed": false
+    }
+  ]
+}
+''';
+
 /// [kLiveReadingEnJson] decoded, as the shape dio hands a mapper.
 Map<String, Object?> liveReadingEn() =>
     jsonDecode(kLiveReadingEnJson) as Map<String, Object?>;
@@ -163,6 +224,10 @@ Map<String, Object?> liveReadingAr() =>
 /// [kLiveStreakSummaryJson] decoded.
 Map<String, Object?> liveStreakSummary() =>
     jsonDecode(kLiveStreakSummaryJson) as Map<String, Object?>;
+
+/// [kLiveStreakHistoryJson] decoded.
+Map<String, Object?> liveStreakHistory() =>
+    jsonDecode(kLiveStreakHistoryJson) as Map<String, Object?>;
 
 /// [body] with one top-level key removed, for the "a required key is missing"
 /// cases. A copy, so a suite that mutates its fixture cannot affect another's.

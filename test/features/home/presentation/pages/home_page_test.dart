@@ -1,38 +1,17 @@
-/// `/` — the phase's own verification, and the contradictions this phase exists to
-/// resolve.
-///
-/// ## WHAT IS ASSERTED HERE AND WHY IT IS NOT ALL IN ONE FILE
-///
-/// | claim | where |
-/// | --- | --- |
-/// | the screen's four sections and their independent states | here |
-/// | the contradictory endpoints are **not** reconciled | here, in the failing direction |
-/// | a failed reading renders `ErrorView` with a working retry while the flame still renders | here |
-/// | one retry re-fetches only what failed | here, by counting the fakes |
-/// | the bead row counts **questions**, and a `0 / 0` row says so | here |
-/// | the drop cap is Latin-only | here |
-/// | §14: no unlabeled interactive node | `home_accessibility_test.dart` |
-/// | §14: 1.22× at 320px does not overflow | `home_text_scale_test.dart` |
-/// | the prototype's numbers | `home_geometry_test.dart` |
-///
-/// The state machine itself is `home_bloc_test.dart`'s; this file asserts what the
-/// **rendered tree** says, which is a different question and the one Phase 6's
-/// verification line is written about ("renders `ErrorView` … not a blank panel").
-library;
+import 'dart:ui' show Tristate;
 
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/question.dart';
-import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
-import 'package:evangelion/features/home/domain/preview_text.dart';
-import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
-import 'package:evangelion/features/home/presentation/pages/home_page.dart';
-import 'package:evangelion/features/home/presentation/widgets/app_top_bar.dart';
-import 'package:evangelion/features/home/presentation/widgets/today_reading_panel.dart';
-import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:evangelion/features/home/domain/library_book.dart';
+import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
+import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/home/presentation/widgets/streak_chip.dart';
+import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
+
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
@@ -41,1132 +20,575 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/home_harness.dart';
-import '../../../../support/utf16.dart';
 
-/// The preview paragraph's [TextSpan] — the one whose first run is a [WidgetSpan].
+/// `/` — the redesigned screen's own verification, and the claims the prototype
+/// makes that only the rendered tree can settle.
 ///
-/// Found by **structure**, not by index, because "the third `RichText` in the tree"
-/// is a number that changes the moment the greeting or a button grows a span. The
-/// search is: the `TextSpan` that has children and whose first child is a
-/// `WidgetSpan`. Only the drop-cap paragraph has that shape.
-TextSpan _previewSpan(WidgetTester tester) {
-  for (final RichText rich in tester.widgetList<RichText>(
-    find.byType(RichText),
-  )) {
-    final InlineSpan span = rich.text;
-    if (span is TextSpan &&
-        span.children != null &&
-        span.children!.first is WidgetSpan) {
-      return span;
-    }
-  }
-  throw StateError(
-    'no RichText carries a WidgetSpan-first paragraph: the English preview is not '
-    'using PassageDropCap.paragraph()',
-  );
-}
-
-/// The [Padding] that holds the streak subtitle — the reserved row.
+/// ## WHAT IS ASSERTED HERE AND WHY IT IS NOT ALL IN ONE FILE
 ///
-/// Found by **the widget's own structure**, not by a text search: in the reserved
-/// state the row's text is `''`, so any finder built on a string would find nothing
-/// in exactly the state this measures. `_StreakSubtitle` builds one `Padding` with
-/// `bottom: EvaSpacing.xxl` and nothing else on the screen does, so that is what is
-/// matched — and the returned height is the **rendered** one, from the element tree,
-/// because the claim is about pixels and not about a style's arithmetic.
-double _subtitleRow(WidgetTester tester) => tester
-    .getSize(
-      find.byWidgetPredicate(
-        (Widget w) => w is Padding && w.padding == subtitleRowPadding,
-      ),
-    )
-    .height;
-
-/// The subtitle row's own padding, from `HomePage`'s documented arrangement: the
-/// greeting block's gap lives on the block, so the row is separated from the panel
-/// by `HomePage.panelGap` instead.
-const EdgeInsets subtitleRowPadding = EdgeInsets.only(bottom: EvaSpacing.xxl);
-
-/// The rendered height of the reserved streak-subtitle row.
+/// | claim | where |
+/// | --- | --- |
+/// | the screen's five sections and their independent states | here |
+/// | the contradictory endpoints are **not** reconciled | here, in the failing direction |
+/// | a failed reading renders `ErrorView` with a working retry **while the streak chip still renders** | here |
+/// | a failed **last light** does the same for the chip — the arm the redesign created | here |
+/// | one retry re-fetches only what failed, by counting the fakes | here |
+/// | the selah circle and the book cards are inert **and say why** | here |
+/// | the empty last-light arm is the prototype's three changes | here |
+/// | §14: no unlabeled interactive node | `home_accessibility_test.dart` |
+/// | §14: 1.22× at 320px does not overflow | `home_text_scale_test.dart` |
+/// | the prototype's numbers | `home_geometry_test.dart` |
 ///
-/// **20.0 for the line plus 24 for the row's own `bottom` padding**, measured: an
-/// empty `Text` at `bodyMedium` is 20.0 tall (14sp × 1.4, rounded by the engine) and
-/// 0.0 wide, and `EvaSpacing.xxl` is 24. Written as arithmetic on the two measured
-/// parts rather than as `44`, so a reader can see which half is which.
-const double reservedRowHeight = 20 + EvaSpacing.xxl;
-
+/// The state machine itself is `home_bloc_test.dart`'s; this file asserts what the
+/// **rendered tree** says, which is a different question and the one Phase 6's
+/// verification list asks for.
+///
+/// ## AND THE GATE ARM IS A SEPARATE FILE, FOR THE SAME REASON IT ALWAYS IS
+///
+/// `arabic_typography_test.dart` reads every painted run's **family** off the
+/// rendered tree and asserts the Arabic arm is in `arabicFamily`. Four of the seven
+/// runs this screen paints are Arabic on that arm, and three of the four were in a
+/// Latin-only face the last time this screen was built. Reading families is that
+/// file's whole subject; listing the runs here would be a second copy that rots.
 void main() {
-  group('the live payload, both languages', () {
+  final AppLocalizationsEn en = AppLocalizationsEn();
+  final AppLocalizationsAr ar = AppLocalizationsAr();
+
+  group('the greeting block', () {
     testWidgets(
-      'the greeting, the wordmark, the flame and the panel all render',
+      'the caption is the clock\'s word and the greeting is the reader\'s',
       (WidgetTester tester) async {
         final HomeHarness h = harness();
         await pumpHome(tester, bloc: h.bloc);
 
-        expect(find.text('Evangelion'), findsOneWidget);
-        expect(find.textContaining('Good morning'), findsOneWidget);
-        expect(find.byType(StreakFlame), findsOneWidget);
-        expect(find.byType(TodayReadingPanel), findsOneWidget);
-        expect(find.text('John 3:1-5'), findsOneWidget);
+        // `.mono` uppercases under LTR (`redesign.html:136`), so the caption paints
+        // `GOOD MORNING` whatever the table says — and the assertion is on what is on
+        // screen, which is the only place the transform exists.
+        expect(find.text('GOOD MORNING'), findsOneWidget);
+        // `redesign.html:993` — `peace, Mariam`. The name is the session's and the
+        // greeting takes its **first** token: `hiName` says `Mariam` where the
+        // journey's `jName` (`:992`) says `Mariam Hanna`.
+        expect(find.text('peace, David'), findsOneWidget);
+        expect(find.textContaining('David Mina'), findsNothing);
       },
     );
 
-    testWidgets('the greeting names the reader from the session', (
+    testWidgets('and nothing on the screen waits for a second frame', (
       WidgetTester tester,
     ) async {
-      // `HomeScreen.tsx:27` renders the literal `Miriam`. `ds.tsx:525` renders `MK`.
-      // Both are gone; the values come from `AuthSession` through the
-      // `AuthRepository` port. Asserted as **the session's own strings** rather than
-      // as literals, so a change to the seed shows up as a change here.
+      // **Every section is on screen on the frame the greeting is**, which is the
+      // claim a widget test can make about the cold state: the harness's fakes
+      // answer in a microtask and `pumpWidget` drains them, so the *loading* arms
+      // are unreachable from here, and `home_bloc_test.dart`'s "before anything has
+      // been asked" is where "no greeting before the clock is read" is asserted.
+      // What this file can hold the screen to is the other direction: one frame,
+      // five sections, nothing pending.
       final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
+      await pumpHome(tester, bloc: h.bloc, frames: 1);
 
-      expect(find.textContaining('Good morning, '), findsOneWidget);
-      expect(find.textContaining(liveSession.displayName), findsOneWidget);
-      expect(find.text('Miriam'), findsNothing);
-      expect(find.text('MK'), findsNothing);
+      expect(find.text('GOOD MORNING'), findsOneWidget);
+      expect(find.byType(StreakChip), findsOneWidget);
+      expect(find.byType(VerseOfTheDayCard), findsOneWidget);
+      expect(find.byType(LastLightCard), findsOneWidget);
+      expect(find.byType(SelahCard), findsOneWidget);
+      expect(find.byType(LibraryCarousel), findsOneWidget);
     });
 
-    testWidgets('and the avatar shows the session\'s monogram', (
+    testWidgets('a reader with no session is greeted with `peace` alone', (
       WidgetTester tester,
     ) async {
-      final HomeHarness h = harness();
+      // The session's failure arm: unreachable in production, reachable here, and
+      // it produces **no name** rather than an error. `home_l10n.dart`'s
+      // `peaceWith` is the function that has to decide it.
+      final HomeHarness h = harness(signedIn: false);
       await pumpHome(tester, bloc: h.bloc);
 
-      expect(find.text(liveSession.initials), findsOneWidget);
-      expect(find.text('12'), findsNothing, reason: '`ds.tsx:516`\'s literal');
-    });
-
-    testWidgets(
-      'with no session the greeting closes instead of naming anyone',
-      (WidgetTester tester) async {
-        // The `…evening, ` / `…evening.` split the prototype has, reachable now
-        // because the name comes from the session and there may not be one.
-        final HomeHarness h = harness(signedIn: false);
-        await pumpHome(tester, bloc: h.bloc);
-
-        expect(find.textContaining('Good morning.'), findsOneWidget);
-        expect(find.textContaining('Good morning, '), findsNothing);
-        // And the avatar has no monogram rather than the prototype's `MK`.
-        expect(find.text('MK'), findsNothing);
-      },
-    );
-
-    testWidgets('the streak flame reads the STREAK endpoint\'s zero', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      // `liveStreakSummary.currentStreak` is `0`, `liveEnglishReading.currentStreak`
-      // is `4`. The flame shows `0`.
-      expect(find.text('0'), findsOneWidget);
-      expect(find.text('4'), findsNothing);
-    });
-
-    testWidgets('the panel reads the READING endpoint\'s completion', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      // `is_fully_completed: true` on the reading, `today_completed: false` on the
-      // summary. The eyebrow comes from the reading.
+      expect(find.text(en.homePeace), findsOneWidget);
+      // **Not** `find.textContaining(',')` — the day's verse carries a comma of its
+      // own. The claim is about the *composed* greeting, which is the one string
+      // that could hold the separator.
       expect(
-        find.text(AppLocalizationsEn().homeReadingComplete),
-        findsOneWidget,
+        find.textContaining('${en.homePeace}${en.homeGreetingSeparator}'),
+        findsNothing,
       );
-      expect(find.text(AppLocalizationsEn().homeContinueReading), findsNothing);
     });
 
-    testWidgets('and neither number is reconciled anywhere on screen', (
+    testWidgets('the late hours get the vigil word the redesign added', (
       WidgetTester tester,
     ) async {
-      // The test the whole resolution exists for. Both fakes carry **deliberately
-      // contradictory** numbers and each surface shows its own: the flame reads
-      // `StreakSummary.currentStreak` (0), the eyebrow reads
-      // `TodayReading.isFullyCompleted` (true). Nothing on this screen sums them,
-      // prefers one, or cross-checks them — so when the backend fixes the
-      // disagreement, no line here changes.
-      final HomeHarness h = harness();
+      // `redesign.html:984`'s `_ => 'vigil'` arm — 00:00–04:59, which the old
+      // three-bucket clock called evening.
+      final HomeHarness h = harness(at: DateTime(2026, 10, 3, 2, 15));
       await pumpHome(tester, bloc: h.bloc);
-
-      final HomeState state = h.bloc.state;
-      // The `!`s here are `stateless_nullable` violations if they can be avoided;
-      // they are assertions that the two sections answered, and `expect` below
-      // would fail with a null anyway — so this is the documented `!` case.
-      expect(state.streak!.currentStreak, 0);
-      expect(state.reading!.currentStreak, 4);
-      expect(state.streak!.todayCompleted, isFalse);
-      expect(state.reading!.isFullyCompleted, isTrue);
-
-      expect(find.text('0'), findsOneWidget, reason: 'the flame');
-      expect(
-        find.text(AppLocalizationsEn().homeReadingComplete),
-        findsOneWidget,
-        reason: 'the panel',
-      );
+      expect(find.text('NIGHT VIGIL'), findsOneWidget);
     });
 
-    testWidgets('an Arabic locale renders the Arabic arm end to end', (
+    testWidgets('and the Arabic arm reads the table, not the English arm', (
       WidgetTester tester,
     ) async {
-      final HomeHarness h = harness();
-      h.readings.scripture = const Right<Failure, ScriptureText>(
-        liveArabicScripture,
-      );
+      // `redesign.html:926` — `morn:["good morning","صباح النور"]`. The Arabic value
+      // changed with the screen, which is why the assertion is against `ar` and not
+      // against the string the English arm happens to hold.
+      final HomeHarness h = harness(at: DateTime(2026, 10, 3, 9, 30));
       await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
 
-      // Asked for the Arabic endpoint, not the English one.
-      expect(h.readings.asked, <ReadingLanguage>[ReadingLanguage.arabic]);
-      expect(find.text(liveArabicReading.reference), findsOneWidget);
-      // Unfinished, so the **other** eyebrow arm.
-      expect(
-        find.text(AppLocalizationsAr().homeContinueReading),
-        findsOneWidget,
-      );
-      expect(find.text(AppLocalizationsAr().homeReadingComplete), findsNothing);
+      expect(find.text(ar.homeGreetingMorning), findsOneWidget);
+      // **Not uppercased**, because `[dir=rtl] .mono{text-transform:none}` — the
+      // prototype's own rule, and the one `_monoText`'s doc cites.
+      expect(find.text('GOOD MORNING'), findsNothing);
+      // The greeting composes the Arabic comma, U+060C, which is a different
+      // codepoint from U+002C: `homeGreetingSeparator`'s whole reason for being a key.
+      expect(find.text('سلام، David'), findsOneWidget);
     });
   });
 
-  group('what the prototype hard-coded and this screen does not', () {
-    testWidgets('no streak number literal appears', (
+  group('the streak chip', () {
+    testWidgets('the flame, the number and the unit are one row', (
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      // `ds.tsx:516` writes `12`; `ds.tsx:508` writes `Evangelion` (which **is**
-      // this app's name and is a parameter, not a constant — asserted through
-      // `AppTopBar`'s required `wordmark`, and `app_top_bar_test.dart` asserts that
-      // parameter is *read*).
-      expect(find.text('12'), findsNothing);
-    });
-
-    testWidgets('no milestone reaches the screen', (WidgetTester tester) async {
-      // `StreakSummary.nextMilestone` and `daysToMilestone` are carried for Phase 8's
-      // `StreakPill` and read by nothing. Asserted here so a future phase cannot find
-      // them already drawn — the same treatment the entities' docs ask for.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      // **Exact, not containing.** `John 3:1-5` contains a `3`, so a substring
-      // finder would fail for a reason that has nothing to do with the milestone —
-      // which is precisely the kind of false failure that gets a test deleted
-      // instead of fixed.
-      expect(find.text('3'), findsNothing);
-      expect(find.textContaining('milestone'), findsNothing);
-      expect(find.textContaining('days to'), findsNothing);
-    });
-
-    testWidgets('no points figure reaches the screen', (
-      WidgetTester tester,
-    ) async {
-      // Same argument as the milestone: `pointsEarnedToday` is `10` on the live
-      // payload and is read by nothing on `/`.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.text('10'), findsNothing);
-    });
-
-    testWidgets('no translation name reaches the screen', (
-      WidgetTester tester,
-    ) async {
-      // `TodayReading.translation` is carried because the payload carries it;
-      // Phase 7's sanctuary is where an edition belongs.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.text(liveEnglishReading.translation), findsNothing);
-      expect(find.textContaining('NKJV'), findsNothing);
-    });
-  });
-
-  group('a failed READING', () {
-    testWidgets('renders ErrorView with the repository\'s own message', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness(
-        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.byType(ErrorView), findsOneWidget);
-      // Verbatim, per `failure.dart`.
-      expect(find.text(homeReadingFailure.message), findsOneWidget);
-      expect(find.byType(TodayReadingPanel), findsOneWidget);
+      expect(find.byType(StreakFlame), findsOneWidget);
+      expect(find.text('0'), findsOneWidget);
+      expect(find.text('DAYS'), findsOneWidget);
     });
 
     testWidgets(
-      'and NOT a whole-screen error — the rest of `/` still renders',
+      'the number is the summary\'s, and the reading\'s own copy is not read',
       (WidgetTester tester) async {
-        // The phase's own wording: "not a blank panel, and not a whole-screen error".
+        // `TodayReading.currentStreak` is `4` and `StreakSummary.currentStreak` is
+        // `0` in the same fixture set. The chip reads the **summary**, so `0` is on
+        // screen and `4` is not — and neither number is reconciled into anything.
+        final HomeHarness h = harness();
+        await pumpHome(tester, bloc: h.bloc);
+        expect(find.text('0'), findsOneWidget);
+        expect(find.text('4'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'a failed streak is a retry control, and the retry asks again',
+      (WidgetTester tester) async {
+        final HomeHarness h = harness(
+          streak: const Left<Failure, StreakSummary>(streakFailure),
+        );
+        await pumpHome(tester, bloc: h.bloc);
+
+        // **The pill is gone**, because a capsule with a dash in it would be a
+        // control whose painted content is not its content; the message is the
+        // button's name instead. `StreakChip`'s doc is the whole argument.
+        expect(find.byType(StreakFlame), findsNothing);
+        expect(find.byType(IconActionButton), findsOneWidget);
+
+        await tester.tap(find.byType(IconActionButton));
+        await pumpFrames(tester, 4);
+        expect(h.streaks.summaryCalls, 2);
+        // And the rest of the screen was not re-requested.
+        expect(h.streaks.historyCalls, 1);
+        expect(h.readings.calls, 1);
+      },
+    );
+  });
+
+  group("the day's card", () {
+    testWidgets('the eyebrow, the reference in gold and the verse', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(find.byType(VerseOfTheDayCard), findsOneWidget);
+      // `.mono b` is gold and weight 600 (`:31`), so the reference is uppercased
+      // **as part of the `.mono` transform** — and painted as one run with the label.
+      expect(find.textContaining('VERSE OF THE DAY'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(VerseOfTheDayCard),
+          matching: find.textContaining('JOHN 3:1-5'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Nicodemus'), findsOneWidget);
+      // **Scoped to the card**, because both cards draw the same reference: the
+      // fixture's history row is the same day's reading, which is what a cohort that
+      // read today's passage actually has. An unscoped `findsOneWidget` here would be
+      // asserting that one of the two cards is missing.
+    });
+
+    // **The loading arm is not tested here, and that is a measurement.** The
+    // harness's fakes answer in a microtask that `pumpWidget` drains, so a widget
+    // test cannot reach the state between `HomeStarted` and the first answer — and
+    // an assertion that tried would be asserting about a fixture that cannot produce
+    // it. The arm's claims are made where it can be reached: the reserved line is
+    // `VerseOfTheDayCard.verseGap` in `home_geometry_test.dart`, and "the greeting is
+    // not on screen before the clock is read" is `home_bloc_test.dart`'s first group.
+
+    testWidgets(
+      'a failed reading renders the repository\'s own message and a retry',
+      (WidgetTester tester) async {
         final HomeHarness h = harness(
           reading: const Left<Failure, ScriptureText>(homeReadingFailure),
         );
-        await pumpHome(tester, bloc: h.bloc);
+        await pumpHome(tester, bloc: h.bloc, frames: 4);
 
         expect(find.byType(ErrorView), findsOneWidget);
-        // The greeting, the wordmark and — the load-bearing half — **the streak
-        // flame**, with its number.
-        expect(find.text('Evangelion'), findsOneWidget);
-        expect(find.textContaining('Good morning'), findsOneWidget);
-        expect(find.byType(StreakFlame), findsOneWidget);
-        expect(find.text('0'), findsOneWidget);
-        // And the streak's own failure never happened, so its subtitle is the
-        // "glowing" arm… no: the streak is 0, so it is the *resting* one.
-        expect(
-          find.text(AppLocalizationsEn().homeStreakResting),
-          findsOneWidget,
-        );
+        expect(find.text(homeReadingFailure.message), findsOneWidget);
+        // `homeRetry`, the one key the panel and the cards share.
+        expect(find.text(en.homeRetry), findsOneWidget);
+
+        // **`ensureVisible` first, and the reason is measured.** The failed card
+        // renders an 80px icon box, a sentence and a button, and at §14's narrow
+        // surface that button sits below the fold; `tester.tap` on an off-screen
+        // finder is a no-op that fails the count assertion four lines later with a
+        // message about requests.
+        await tester.ensureVisible(find.text(en.homeRetry));
+        await pumpFrames(tester, 2);
+        await tester.tap(find.text(en.homeRetry));
+        await pumpFrames(tester, 6);
+        expect(h.readings.calls, 2);
+        // **The four independent sections, measured on the fakes.**
+        expect(h.streaks.summaryCalls, 1);
+        expect(h.streaks.historyCalls, 1);
+        expect(h.catalogue.calls, 1);
       },
     );
 
-    testWidgets('and NOT a blank panel — the panel frame is still there', (
+    testWidgets('and the chip and the carousel keep rendering through it', (
       WidgetTester tester,
     ) async {
+      // Phase 6's requirement, verbatim: a failed reading fetch renders an error
+      // with a working retry **while the streak chip still renders** — not a blank
+      // panel and not a whole-screen error.
       final HomeHarness h = harness(
         reading: const Left<Failure, ScriptureText>(homeReadingFailure),
       );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.byType(GlassSurface), findsWidgets);
-      expect(find.byType(ProgressBeads), findsNothing);
-      // The panel is not a button in this state: there is no reading to open.
-      expect(
-        tester
-            .widgetList<GlassSurface>(find.byType(GlassSurface))
-            .where((GlassSurface s) => s.onTap != null),
-        isEmpty,
-        reason: 'a failed reading has no `/reading` to push',
-      );
-    });
-
-    testWidgets('the retry works and re-fetches ONLY the reading', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness(
-        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(h.readings.calls, 1);
-      expect(h.streaks.calls, 1);
-      expect(h.auth.calls, 1);
-
-      h.readings.scripture = const Right<Failure, ScriptureText>(
-        liveEnglishScripture,
-      );
-      // `ensureVisible` first: at 320x568 the panel is below the fold, and a tap on
-      // an off-screen widget throws a hit-test warning rather than pressing the
-      // button — which reads as "the retry does not work".
-      final Finder retry = find.text(AppLocalizationsEn().homeRetry);
-      await tester.ensureVisible(retry);
-      await pumpFrames(tester, 2);
-      await tester.tap(retry);
-      await pumpFrames(tester, 6);
-
-      expect(find.byType(ErrorView), findsNothing);
-      expect(find.text('John 3:1-5'), findsOneWidget);
-
-      // **Only** the reading went back to the network. This is the assertion the
-      // "not a whole-screen error" claim needs in order to mean anything: a retry
-      // that re-issued the streak request would put the flame back into loading and
-      // blank the number that was working, for no reason.
-      expect(h.readings.calls, 2);
-      expect(h.streaks.calls, 1);
-      expect(h.auth.calls, 1);
-      // And the streak that was **never** re-fetched is still on screen. This is
-      // the mirror of the assertion the streak retry needed and did not have, and
-      // without it "re-fetches ONLY the reading" is satisfied by a retry that
-      // re-fetched the reading *and* blanked the flame.
-      expect(
-        find.text('0'),
-        findsOneWidget,
-        reason: 'the streak was never re-issued, so its number must not move',
-      );
-    });
-
-    testWidgets('a retry that fails again keeps the error up', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness(
-        reading: const Left<Failure, ScriptureText>(homeReadingFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      final Finder retry = find.text(AppLocalizationsEn().homeRetry);
-      await tester.ensureVisible(retry);
-      await pumpFrames(tester, 2);
-      await tester.tap(retry);
-      await pumpFrames(tester, 6);
+      await pumpHome(tester, bloc: h.bloc, frames: 4);
 
       expect(find.byType(ErrorView), findsOneWidget);
-      expect(h.readings.calls, 2);
-    });
-  });
-
-  group('a failed STREAK', () {
-    testWidgets('the panel still renders, and the flame offers a retry', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness(
-        streak: const Left<Failure, StreakSummary>(streakFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.byType(ErrorView), findsNothing);
-      expect(find.text('John 3:1-5'), findsOneWidget);
-      // The flame's failure is an icon control named with the repository's message,
-      // so a screen-reader user gets the reason and a sighted user gets it on hover.
-      expect(find.byIcon(Icons.sync_problem_outlined), findsOneWidget);
-      expect(
-        find.text(streakFailure.message),
-        findsNothing,
-        reason:
-            'a sentence '
-            'does not belong in a top bar — it is the button\'s label, asserted in '
-            '`home_accessibility_test.dart`',
-      );
-    });
-
-    testWidgets('and the panel\'s completion state survives it', (
-      WidgetTester tester,
-    ) async {
-      // The half of the contradiction this file exists for: the streak endpoint
-      // failing must not take the reading's own `is_fully_completed` with it.
-      final HomeHarness h = harness(
-        streak: const Left<Failure, StreakSummary>(streakFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(
-        find.text(AppLocalizationsEn().homeReadingComplete),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the retry re-fetches ONLY the streak', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness(
-        streak: const Left<Failure, StreakSummary>(streakFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      h.streaks.answer = const Right<Failure, StreakSummary>(liveStreakSummary);
-      final Finder flameRetry = find.byIcon(Icons.sync_problem_outlined);
-      await tester.ensureVisible(flameRetry);
-      await pumpFrames(tester, 2);
-      await tester.tap(flameRetry);
-      await pumpFrames(tester, 6);
-
       expect(find.byType(StreakFlame), findsOneWidget);
-      expect(h.streaks.calls, 2);
-      expect(h.readings.calls, 1);
-      // **And the reading is still on screen.** The call count alone does not say
-      // it is: `HomeState.withSection` decides what survives a status change, and
-      // mutating its one line from
-      // `reading: nextReading == ready ? reading : null` to `reading: null`
-      // re-issued no request, changed no counter, and blanked the panel anyway.
-      //
-      // This assertion is the whole of the reading half of §6's "two independent
-      // sections" claim, and until it existed the claim was certified by one
-      // `expect(ready.withSection(), ready)` in `home_bloc_test.dart` — a test named
-      // for a *different* property. Delete that one test and nothing else in the
-      // phase noticed.
-      expect(
-        find.text('John 3:1-5'),
-        findsOneWidget,
-        reason:
-            'a streak retry must not take the reading with it — `withSection` has '
-            'to leave the section it was not asked about exactly as it found it',
-      );
+      expect(find.byType(LibraryCarousel), findsOneWidget);
     });
   });
 
-  group('the beads', () {
-    testWidgets('count the reading\'s QUESTIONS, not the prototype\'s five', (
-      WidgetTester tester,
-    ) async {
-      // `HomeScreen.tsx:65` — `total={5} completed={2} current={2}` — described
-      // passage progress across the cut library grid. The live reading has **one**
-      // question.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final ProgressBeads beads = tester.widget<ProgressBeads>(
-        find.byType(ProgressBeads),
-      );
-      expect(beads.total, liveEnglishReading.questionCount);
-      expect(beads.completed, liveEnglishReading.answeredQuestionCount);
-      expect(beads.total, 1);
-    });
-
-    testWidgets(
-      'and a reading with NO questions says so instead of a blank row',
-      (WidgetTester tester) async {
-        // The deliberate answer to `0 / 0`. `ProgressBeads` clamps `total` to `0` and
-        // returns `SizedBox.shrink()`, so without this line the panel would render a
-        // gap between the reference and the buttons that is indistinguishable from a
-        // layout failure.
-        final HomeHarness h = harness();
-        // Zero questions is an **empty list** on the wide entity, because the
-        // narrow `questionCount` is now `questions.length`. The old spelling,
-        // `liveEnglishReading.copyWith(questionCount: 0)`, narrowed a count that no
-        // longer exists anywhere.
-        h.readings.scripture = const Right<Failure, ScriptureText>(
-          ScriptureText(
-            readingId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-            groupId: 3,
-            scheduledDate: '2026-10-03',
-            language: ReadingLanguage.english,
-            reference: 'John 3:1-5',
-            translation: 'NKJV (New King James Version)',
-            verses: liveEnglishVerses,
-            questions: <Question>[],
-            isFullyCompleted: true,
-            pointsEarnedToday: 10,
-            currentStreak: 4,
-          ),
-        );
-        await pumpHome(tester, bloc: h.bloc);
-
-        expect(find.byType(ProgressBeads), findsNothing);
-        expect(
-          find.text(AppLocalizationsEn().homeNoQuestionsToday),
-          findsOneWidget,
-        );
-      },
-    );
-  });
-
-  group('the preview\'s typeface', () {
-    testWidgets('the ENGLISH arm renders scripture in the Latin face', (
-      WidgetTester tester,
-    ) async {
-      // **The rendered style, not the constant.** `EvaTypography.scriptureLatin` is
-      // a method anyone can call, and asserting that `_Preview` called it would be
-      // asserting the widget's own source through a mirror of itself. What is being
-      // claimed is that the *words a reader sees* carry that family — so the family
-      // is read off the `TextSpan` the engine will lay out.
-      //
-      // The English arm is the `WidgetSpan`-first paragraph (the drop cap), whose
-      // second child is the run holding the words.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final TextSpan paragraph = _previewSpan(tester);
-      final TextSpan rest = paragraph.children![1] as TextSpan;
-
-      expect(rest.style!.fontFamily, EvaTypography.scriptureFamily);
-      expect(rest.style!.fontFamily, 'EBGaramond');
-      expect(
-        rest.style!.fontFamily,
-        isNot(EvaTypography.arabicFamily),
-        reason: 'the Latin arm must not render in the Arabic face either',
-      );
-    });
-
-    testWidgets('and the ARABIC arm renders scripture in the Arabic face', (
-      WidgetTester tester,
-    ) async {
-      // The defect this closes: `_Preview` built **one** `TextStyle` from
-      // `scriptureLatin` for both arms, 200 lines below this widget's own
-      // doc citing defect #2 — "Arabic never uses the mono family" — as the reason it
-      // branches at all. Only the drop cap branched.
-      //
-      // Measured before the fix: the families in the tree on an `ar` screen were
-      // `{CormorantGaramond, SpaceMono, DMSans, EBGaramond}`, `Amiri` absent, and
-      // `EvaTypography.scriptureArabic` named by nothing in `lib/` but its own
-      // definition. Swapping `scriptureLatin` for `scriptureArabic`
-      // unconditionally passed all 1520 tests — so neither direction was watched,
-      // and this pair of tests is what watches both.
-      final HomeHarness h = harness();
-      h.readings.scripture = const Right<Failure, ScriptureText>(
-        liveArabicScripture,
-      );
-      await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
-
-      // The Arabic arm renders the preview whole — a plain `Text`, because there is
-      // no drop cap — so the style is read off that widget directly.
-      final Text whole = tester.widget<Text>(
-        find.text(previewText(liveArabicReading.firstVerseText)),
-      );
-
-      expect(whole.style!.fontFamily, EvaTypography.arabicFamily);
-      expect(whole.style!.fontFamily, 'Amiri');
-      expect(
-        whole.style!.fontFamily,
-        isNot(EvaTypography.scriptureFamily),
-        reason:
-            'this is the direction the mutation nobody caught went: Arabic '
-            'scripture drawn in the Latin face',
-      );
-      // And the same geometry as the Latin arm, which is the reason
-      // `scriptureArabic`'s own doc exists — asserted so "branched" cannot quietly
-      // become "branched, and also made a size difference".
-      expect(whole.style!.fontSize, TodayReadingPanel.previewFontSize);
-    });
-  });
-
-  group('an empty first verse', () {
-    testWidgets('still renders BOTH controls, because it cannot throw', (
-      WidgetTester tester,
-    ) async {
-      // ## THE TOTALITY CLAIM
-      //
-      // `previewText('')` is `''`. The panel used to call `preview.substring(0, 1)` to
-      // build the drop cap, which is a `RangeError` thrown **out of
-      // `TodayReadingPanel.build`** — and the panel's `EvaButton` and `TextLink` are
-      // that same widget's children, so the exception took **`Continue` →
-      // `/reading` and `Start reflection` → `/quiz`** with it. One verse with no text
-      // made the reading route unreachable from `/`, and nothing caught it because no
-      // fixture had ever had an empty one.
-      //
-      // The English arm is the one that throws: it is the only branch that indexes
-      // into the preview. The Arabic arm was already safe, and asserting the Arabic
-      // arm too is what stops a future "simplification" that re-joins them.
-      final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.of(
-        withEmptyFirstVerse(liveEnglishScripture),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      // No exception escaped, and the panel is on screen…
-      expect(tester.takeException(), isNull);
-      expect(find.byType(TodayReadingPanel), findsOneWidget);
-      // …**with both destinations still reachable.** These two are the whole point:
-      // they are the controls that used to vanish.
-      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
-      expect(
-        find.text(AppLocalizationsEn().homeStartReflection),
-        findsOneWidget,
-      );
-      // The rest of the panel is intact too — a heading, a bead row, and the status
-      // line — so "it did not throw" is not satisfied by a blank frame.
-      expect(find.text('John 3:1-5'), findsOneWidget);
-      expect(find.byType(ProgressBeads), findsOneWidget);
-      expect(
-        find.text(AppLocalizationsEn().homeReadingComplete),
-        findsOneWidget,
-      );
-      // And the preview itself is an empty paragraph rather than an absent widget.
-      expect(find.byType(PassageDropCap), findsNothing);
-    });
-
-    testWidgets('and the ARABIC arm with an empty verse is equally safe', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.of(
-        withEmptyFirstVerse(liveArabicScripture),
-      );
-      await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
-
-      expect(tester.takeException(), isNull);
-      expect(find.text(AppLocalizationsAr().homeContinueLabel), findsOneWidget);
-      expect(
-        find.text(AppLocalizationsAr().homeStartReflection),
-        findsOneWidget,
-      );
-    });
-  });
-
-  group('the drop cap', () {
-    testWidgets('the English preview opens with an enlarged letter', (
-      WidgetTester tester,
-    ) async {
-      // Asserted on the **span tree**, not on a widget: `PassageDropCap` is placed by
-      // `paragraph()` as a `WidgetSpan`, so there is no `PassageDropCap` in the
-      // element tree to find. The claim is that the paragraph's first child is a
-      // `WidgetSpan` holding the cap, which is what "splits a letter off the front"
-      // actually is.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final TextSpan paragraph = _previewSpan(tester);
-      expect(paragraph.children, isNotNull);
-      expect(paragraph.children, hasLength(2));
-      expect(
-        paragraph.children!.first,
-        isA<WidgetSpan>(),
-        reason:
-            'the first run is the drop cap, and the prototype\'s Latin split is '
-            'what this preserves',
-      );
-      final InlineSpan rest = paragraph.children![1];
-      expect(rest, isA<TextSpan>());
-      expect(
-        (rest as TextSpan).text,
-        startsWith('here was a man of the Pharisees'),
-        reason:
-            'the rest of the verse, minus its own first letter. The visible '
-            'tail starts  because the preview was cut at a word '
-            'boundary first.',
-      );
-    });
-
-    testWidgets('and the cap\'s letter is the verse\'s own first character', (
+  group('the last-light card', () {
+    testWidgets('the pointer is the reference and the hint is under it', (
       WidgetTester tester,
     ) async {
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      // Read off the `WidgetSpan`'s own child, which is the `Text` the cap paints.
-      // `find.byType(PassageDropCap)` would match **nothing**: `paragraph()` places
-      // the cap as a span, so the widget instance is never in the element tree —
-      // which is also why the test above searches the span tree instead.
-      final WidgetSpan cap = _previewSpan(tester).children!.first as WidgetSpan;
-      final Text child = cap.child as Text;
-      expect(child.data, liveEnglishReading.firstVerseText.substring(0, 1));
-      expect(child.data, 'T');
-    });
-
-    testWidgets('the Arabic preview is rendered WHOLE — no split letter', (
-      WidgetTester tester,
-    ) async {
-      // `HomeScreen.tsx:55-58` splits a literal `I` off `"n the beginning…"`. The
-      // Arabic first verse begins a joined, right-to-left letter, and enlarging it
-      // to 76px breaks its connection to the word it belongs to — a defect rather
-      // than a rendering of the design, and the same class as Phase 7's defect #2
-      // ("Arabic never uses the mono family").
-      final HomeHarness h = harness();
-      h.readings.scripture = const Right<Failure, ScriptureText>(
-        liveArabicScripture,
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      // **Exact, whole.** 49 characters, so `previewText` leaves it alone, and the
-      // whole string being present *is* the claim: nothing was stripped off its head.
-      // A substring assertion would have been satisfied by the whole string too —
-      // which is why the first version's `isNot(contains('ان إنسان'))` was a test
-      // that could not fail.
-      expect(find.text(liveArabicReading.firstVerseText), findsOneWidget);
-    });
-  });
-
-  group('an ASTRAL character inside the preview\'s budget', () {
-    testWidgets('still renders BOTH controls, because it cannot throw', (
-      WidgetTester tester,
-    ) async {
-      // ## THE SAME TOTALITY CLAIM, AND A **WIDER** SURFACE THAN THE EMPTY VERSE
-      //
-      // `previewText` cuts at a **code unit**, so a budget of 56 landing between an
-      // emoji's two units leaves the **high surrogate alone** in the result. That is
-      // not a truncated emoji — it is not a character — and `RenderParagraph` throws
-      // `ArgumentError: string is not well-formed UTF-16` out of
-      // `_RenderScaledInlineWidget.performLayout`.
-      //
-      // **`/` is the wider surface of the two.** The drop cap's identical bug on
-      // `/reading` is reachable only at index 0 of a verse; this one is reachable at
-      // **any** offset inside the first 56 code units, so an emoji anywhere in the
-      // opening of today's reading is enough — not only at its start.
-      //
-      // And because the panel's `EvaButton` and `TextLink` are `_Preview`'s own
-      // children, the exception takes **`Continue` → `/reading` and `Start
-      // reflection` → `/quiz`** with it: the same two routes the empty-verse case
-      // took, for a different reason, discovered the same way.
-      final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.of(
-        withAstralFirstVerse(liveEnglishScripture),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(tester.takeException(), isNull);
-      expect(find.byType(TodayReadingPanel), findsOneWidget);
-      expect(find.text(AppLocalizationsEn().homeContinueLabel), findsOneWidget);
-      expect(
-        find.text(AppLocalizationsEn().homeStartReflection),
-        findsOneWidget,
-      );
-      expect(find.text('John 3:1-5'), findsOneWidget);
-    });
-
-    testWidgets('and the cap is a WHOLE character, not half of one', (
-      WidgetTester tester,
-    ) async {
-      // The other end of the same string: `splitDropCap` cuts on a **rune**, so a
-      // preview opening with an emoji gives the cap the whole emoji. The drop cap is
-      // a `WidgetSpan`, so its letter is read off the plain text — where a `WidgetSpan`
-      // renders as U+FFFC.
-      final HomeHarness h = harness();
-      h.readings.scripture = Result<ScriptureText>.of(
-        withAstralFirstVerse(liveEnglishScripture),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      // …and nothing anywhere on the panel is unpaired. This is the assertion that
-      // says the *result* is renderable, which `RenderParagraph` only reports by
-      // throwing.
-      for (final String rendered in <String>[
-        for (final Text t in tester.widgetList<Text>(find.byType(Text)))
-          if (t.data != null) t.data!,
-      ]) {
-        expect(
-          isWellFormedUtf16(rendered),
-          isTrue,
-          reason: 'unpaired at ${unpairedSurrogates(rendered)}',
-        );
-      }
-    });
-  });
-
-  group('the preview', () {
-    testWidgets('is cut on a word boundary with one real ellipsis', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      // `liveEnglishReading.firstVerseText` is 71 characters, so this always runs.
-      expect(
-        find.textContaining('…', findRichText: true),
-        findsWidgets,
-        reason: 'the preview is truncated with U+2026, not three dots',
-      );
-      expect(find.textContaining('Nicodemus'), findsNothing);
-    });
-  });
-
-  group('the streak subtitle', () {
-    // The live payload answers `0`, so the `resting` copy is the only one `/`
-    // renders and the `glowing` copy was unreachable from any suite that used the
-    // live payload — an untranslated string with nothing asserting it. This row is
-    // also the one place the two sentences are distinguished at all: they are not a
-    // pluralisation of each other, they are different sentences, so a change to
-    // either has to be a deliberate act.
-    testWidgets(
-      'says RESTING for a zero streak — the live payload\'s own value',
-      (WidgetTester tester) async {
-        final HomeHarness h = harness();
-        await pumpHome(tester, bloc: h.bloc);
-
-        expect(
-          find.text(AppLocalizationsEn().homeStreakResting),
-          findsOneWidget,
-        );
-        expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsNothing);
-      },
-    );
-
-    testWidgets('says GLOWING for any streak above zero', (
-      WidgetTester tester,
-    ) async {
-      // A copyWith rather than a hand-built summary, so the entity keeps being
-      // built by the live payload's own mapper and this test cannot drift from it.
-      final HomeHarness h = harness(
-        streak: Result<StreakSummary>.of(
-          liveStreakSummary.copyWith(currentStreak: 4),
-        ),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsOneWidget);
-      expect(find.text(AppLocalizationsEn().homeStreakResting), findsNothing);
-    });
-
-    testWidgets(
-      'and the Arabic pair is a different sentence, not a transliteration',
-      (WidgetTester tester) async {
-        // Named because the assertion is that `streakGlowing` and `streakResting` are
-        // **not** interchangeable: if a translator ever made them one string with the
-        // number substituted, both English tests would still pass and this one would
-        // not.
-        expect(
-          AppLocalizationsAr().homeStreakGlowing,
-          isNot(AppLocalizationsAr().homeStreakResting),
-        );
-        expect(AppLocalizationsAr().homeStreakGlowing, isNotEmpty);
-        expect(AppLocalizationsAr().homeStreakResting, isNotEmpty);
-      },
-    );
-
-    testWidgets('the row is RESERVED when the streak fails, not removed', (
-      WidgetTester tester,
-    ) async {
-      // ## THE CLAIM, AND WHY IT NEEDED A MEASUREMENT
-      //
-      // The row used to be `if (state.streak case …)`, so it vanished while loading
-      // and again on a streak failure, taking `EvaSpacing.xxl` with it and moving the
-      // panel up by a line mid-screen. `TodayReadingPanel`'s
-      // `_FailedOrLoading.placeholderHeight` exists for exactly this class of jump —
-      // "a panel that grows from one line to nine is the layout moving" — 140 lines
-      // away and about a different widget.
-      //
-      // The fix is an **empty `Text` in the same style**, chosen because it was
-      // measured rather than assumed: `Text('')` at `bodyMedium` is 20.0 tall and 0.0
-      // wide, the same 20.0 as a non-empty one, so one widget covers both non-ready
-      // states and the reserved height cannot drift from the text's.
-      //
-      // ## ONE WITNESS FOR BOTH NON-READY STATES, AND WHY
-      //
-      // Loading and failure are the **same** render: `_StreakSubtitle` branches on
-      // `streak == null` and both states are `null`, so they are one branch with one
-      // witness. Two tests would have been one test written twice.
-      //
-      // The loading state is in any case **not reachable from a page-level widget
-      // test** here, and that is a measurement rather than an omission: both fakes
-      // answer in a microtask, and even a bare `tester.pumpWidget` with no
-      // `pumpFrames` drains enough of the queue for `_onStarted` to have emitted all
-      // three answers by the time it returns — `pumpHome(frames: 0)` included. The
-      // only ways to hold the request open are a `Completer` the fake waits on, and
-      // Phase 6's decision 37 is that this **hangs the suite**: `HomeBloc.close()`
-      // awaits the handler, the handler is parked on the gate, and completing the gate
-      // from a teardown schedules the continuation on a fake-async queue nothing pumps
-      // again. Four router suites timed out at five minutes each with no error at all.
-      // So the state is left unwitnessed here and is `home_bloc_test.dart`'s to own.
-      final HomeHarness h = harness(
-        streak: const Left<Failure, StreakSummary>(streakFailure),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      // **The arm really is the failed one**, so the assertion below is about the
-      // reserved row and not about a state that never happened.
-      expect(h.bloc.state.streak, isNull);
-      expect(h.bloc.state.streakStatus, HomeSectionStatus.failed);
-      // Nothing is claimed, so nothing is said…
-      expect(find.text(AppLocalizationsEn().homeStreakResting), findsNothing);
-      expect(find.text(AppLocalizationsEn().homeStreakGlowing), findsNothing);
-      // …but the row still occupies its line.
-      expect(
-        _subtitleRow(tester),
-        reservedRowHeight,
-        reason: 'a failed streak must not move the panel',
-      );
-      // And the panel below it is on screen, so "nothing is said" is not satisfied by
-      // a blank frame.
-      expect(find.byType(TodayReadingPanel), findsOneWidget);
-      expect(find.text('John 3:1-5'), findsOneWidget);
-    });
-
-    testWidgets('and the reserved row grows with the reader\'s text scale', (
-      WidgetTester tester,
-    ) async {
-      // **The assertion that rules out the alternative.** A `SizedBox` of the
-      // measured 20 + 24 would satisfy the test above exactly, and would be wrong:
-      // §14 requires 1.22× at 320px to lay out without overflow, and a hard-coded
-      // reserved height does not move with the reader's preference — so at 1.22× the
-      // row would be reserved short and the sentence would overlap the panel.
-      //
-      // The empty `Text` moves because it *is* the text. `streak: null` — the
-      // **failed** fixture — is the same `null` the loading frame has, so this needs
-      // no gate: one branch, one value, reached by the fixture that does not hang.
-      final HomeHarness loading = harness(
-        streak: const Left<Failure, StreakSummary>(streakFailure),
-      );
-
-      await pumpHome(tester, bloc: loading.bloc);
-      final double atOne = _subtitleRow(tester);
-
-      await pumpHome(tester, bloc: loading.bloc, textScale: 1.22);
-      final double atOneTwentyTwo = _subtitleRow(tester);
-
-      expect(atOneTwentyTwo, greaterThan(atOne));
-      // And it is the *scaled* line, not just a bigger number.
-      //
-      // **This bound moved when the typeface did, and the property did not.** It
-      // read `greaterThan(4)`, calibrated against DM Sans, whose line box grew by
-      // more than four pixels at 1.22×. Inter's grows by exactly 4.0: 44.0 at 1.0×
-      // and 48.0 at 1.22×, because the engine rounds 20 × 1.22 = 24.4 to 24.
-      //
-      // Four pixels IS the line's own leading here — 20.0 becomes 24.0 — so the
-      // assertion is now written as that rather than as a strictly-greater bound
-      // that a rounding accident happened to clear. The claim is "the reserved
-      // height moved with the reader's text scale", and it moved.
-      expect(
-        atOneTwentyTwo - atOne,
-        greaterThanOrEqualTo(4),
-        reason:
-            'measured 44.0 at 1.0x and 48.0 at 1.22x: the line box grows 20.0 -> '
-            '24.0 as the engine rounds 24.4, and the row padding is 24 in both. A '
-            'reserved height that did not move would be the `SizedBox` this '
-            'replaced.',
-      );
-    });
-
-    testWidgets('a TWELVE-DIGIT streak overflows nothing', (
-      WidgetTester tester,
-    ) async {
-      // The other half of W4: `TodayReadingMapper` **passes through** a large
-      // `current_streak` rather than refusing it, and this is the claim that makes
-      // that a decision instead of a hope. The bar puts the wordmark in an `Expanded`
-      // with `TextOverflow.ellipsis`, so an arbitrarily long number is absorbed by
-      // truncating the wordmark.
-      //
-      // At 320px — the narrowest surface §14 names — because a row that absorbs twelve
-      // digits at 390px has not been shown to absorb them at the size that matters.
-      final HomeHarness h = harness(
-        streak: Result<StreakSummary>.of(
-          liveStreakSummary.copyWith(currentStreak: 999999999999),
-        ),
-      );
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.text('999999999999'), findsOneWidget);
-      // The claim is that nothing overflowed, and a `RenderFlex` overflow is
-      // reported through `takeException` rather than as a failed layout.
-      expect(tester.takeException(), isNull);
-      // The wordmark is what gives way, and it gives way by ellipsis rather than by
-      // overflowing — which is the property, so it is the assertion.
-      expect(find.text(AppLocalizationsEn().homeWordmark), findsOneWidget);
-    });
-  });
-
-  group('the blur budget', () {
-    testWidgets('the panel is the ONE GlassTier.blur site on `/`', (
-      WidgetTester tester,
-    ) async {
-      // §13 rule 4's per-screen line used to name "the panel **and the top bar**",
-      // and `ds.tsx:499-530` has no `backdropFilter` at all. One site ships.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      final List<GlassSurface> blur = tester
-          .widgetList<GlassSurface>(find.byType(GlassSurface))
-          .where((GlassSurface s) => s.tier == GlassTier.blur)
-          .toList();
-      expect(blur, hasLength(1));
-      expect(blur.single.radius, EvaRadii.heroPanel);
-    });
-
-    testWidgets('and the top bar draws no glass at all', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(find.byType(AppTopBar), findsOneWidget);
-      // **Scoped to the bar.** A bare `find.byType(BackdropFilter)` finds the
-      // panel's own blur — which is the one site that is supposed to exist — so the
-      // unscoped form would have been asserting the opposite of its own claim.
+      expect(find.byType(LastLightCard), findsOneWidget);
+      expect(find.textContaining('LAST LIGHT'), findsOneWidget);
+      // `streak.service.ts:122` builds `John 3:1-5` and the card shows it as the
+      // payload wrote it — the space and the hyphen are the server's.
       expect(
         find.descendant(
-          of: find.byType(AppTopBar),
-          matching: find.byType(BackdropFilter),
+          of: find.byType(LastLightCard),
+          matching: find.textContaining('JOHN 3:1-5'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('RESUME WHERE THE LIGHT LEFT YOU'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an empty history is the prototype\'s three changes', (
+      WidgetTester tester,
+    ) async {
+      // `redesign.html:1192-1197`: the reference becomes an em dash, the body says
+      // "no light received yet", the hint is hidden and the card stops being a
+      // button. All four, in one fixture.
+      final HomeHarness h = harness(
+        history: const Right<Failure, List<StreakHistoryEntry>>(
+          <StreakHistoryEntry>[],
+        ),
+      );
+      await pumpHome(tester, bloc: h.bloc);
+
+      // The eyebrow is one `Text.rich` — label, separator and value — so the whole
+      // line is asserted rather than the dash alone: the **body** carries an em dash
+      // of its own ("no light received yet — open a book below", `:929`) and a
+      // `textContaining('—')` over the screen finds both.
+      expect(find.text('LAST LIGHT · —'), findsOneWidget);
+      expect(find.text(en.homeNoLight), findsOneWidget);
+      expect(find.textContaining('RESUME'), findsNothing);
+      // Not a button: `GlassSurface.onTap` is null and the widget adds no semantics
+      // of its own, so there is nothing to press.
+      expect(
+        find.descendant(
+          of: find.byType(LastLightCard),
+          matching: find.byType(EvaInk),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('a failed last light leaves the chip\'s number on screen', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness(
+        history: const Left<Failure, List<StreakHistoryEntry>>(streakFailure),
+      );
+      await pumpHome(tester, bloc: h.bloc, frames: 4);
+
+      expect(find.text(streakFailure.message), findsOneWidget);
+      expect(find.byType(StreakFlame), findsOneWidget);
+      expect(find.text('0'), findsOneWidget);
+      // And **not** the empty state: a failed request is not "no light received".
+      expect(find.text(en.homeNoLight), findsNothing);
+    });
+
+    testWidgets('the reference is the Arabic arm\'s on the Arabic arm', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
+      expect(
+        find.descendant(
+          of: find.byType(LastLightCard),
+          matching: find.textContaining('يوحنا 3: 1-5'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(LastLightCard),
+          matching: find.textContaining('JOHN'),
         ),
         findsNothing,
       );
     });
   });
 
-  group('the first frame', () {
-    testWidgets('has no greeting, because no clock has been read yet', (
+  group('the selah card', () {
+    testWidgets('the word, the duration and the inert circle', (
       WidgetTester tester,
     ) async {
-      // `HomeState.greetingPeriod` is null until `HomeStarted` runs, and this pins
-      // what that looks like: a hard-coded `Good evening` on the first frame would be
-      // a prototype literal surviving for however long the first emit takes.
       final HomeHarness h = harness();
-      await tester.pumpWidget(
-        evaPrimitiveHarness(
-          theme: EvaThemeDark.theme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-          child: HomePage(bloc: h.bloc),
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(find.byType(SelahCard), findsOneWidget);
+      expect(find.text(en.homeSelah), findsOneWidget);
+      // `redesign.html:990` composes the numeral and the word, and `N()` is this
+      // app's `digits` — so the painted line is `60 SECONDS OF SILENCE` on the
+      // English arm.
+      expect(find.text('60 SECONDS OF SILENCE'), findsOneWidget);
+      // **The star is PAINTED, not typed** — and that is the measured correction
+      // `SelahCard.glyph`'s doc records: U+2726 is in no bundled family, so the
+      // first build typed the character and `arabic_typography_test.dart`'s tofu
+      // gate failed with `[10022]`. The claim here is that the circle carries a
+      // drawn star of the size the CSS names, asserted on the painter's box
+      // rather than on a `Text`, because there is no text any more.
+      final Finder star = find.descendant(
+        of: find.byType(SelahCard),
+        matching: find.byWidgetPredicate(
+          (Widget w) => w is CustomPaint && w.size == const Size.square(11.0),
         ),
       );
-
-      // `findRichText: true` because the greeting is ONE `Text.rich` with two
-      // `TextSpan`s (`home_page.dart:418`) — without it this finder cannot match
-      // the greeting at all, so the assertion would hold for any code whatsoever.
-      expect(find.textContaining('Good', findRichText: true), findsNothing);
-      expect(find.byType(AppTopBar), findsOneWidget);
-    });
-  });
-
-  group('the page', () {
-    testWidgets('asks the reading endpoint in the resolved locale', (
-      WidgetTester tester,
-    ) async {
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc, locale: const Locale('ar'));
-
-      expect(h.readings.asked, <ReadingLanguage>[ReadingLanguage.arabic]);
+      expect(star, findsOneWidget);
+      // And the character the prototype wrote stays in the widget's *record*,
+      // so the painted star and the record cannot silently disagree.
+      expect(SelahCard.glyph, '✦');
     });
 
-    testWidgets('does not re-issue on a rebuild, which is not a re-entry', (
+    testWidgets('the circle announces that it cannot be pressed, and why', (
       WidgetTester tester,
     ) async {
-      // **Half of the old `loads once, on entry, and not again on rebuild`, and it
-      // is the half that was true.** A dispatch from `build` — which is what
-      // `LoginPage` does, safely, because `AuthStarted` is idempotent against an
-      // in-memory fake — would re-issue both requests on **every answer**.
-      //
-      // What this cannot see is the other half, and that is why the test it
-      // replaced was deleted rather than fixed. "A rebuild" and "a re-entry" are
-      // different events: the old version forced extra `pump()`s, which do not even
-      // rebuild `_HomeBody` — nothing changed — so it certified a `bool _started`
-      // guard while `/` never re-fetched after a real push/pop. The re-entry half
-      // needs a **router**, so it lives in `home_navigation_test.dart` where one
-      // exists, and it asserts the opposite of this line.
+      final SemanticsHandle handle = tester.ensureSemantics();
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      expect(h.readings.calls, 1);
-      expect(h.streaks.calls, 1);
-      expect(h.auth.calls, 1);
-
-      // Force several frames.
-      for (int i = 0; i < 3; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-      expect(h.readings.calls, 1);
-      expect(h.streaks.calls, 1);
-    });
-
-    testWidgets('and DOES re-issue when the locale changes', (
-      WidgetTester tester,
-    ) async {
-      // **The second trigger, in the same branch as the first.** Phase 9 owns the
-      // real language switch; until it lands, `_language` can only be exercised by
-      // rebuilding the page at another locale. With the old `bool _started`, this
-      // was unrepresentable: the flag was true, so the new arm was never asked for
-      // and `/` would render Arabic strings over English scripture — a
-      // half-migrated screen, which is the state `home_navigation_test.dart`'s
-      // Arabic suite already checks the *other* direction of.
-      final HomeHarness h = harness();
-      await pumpHome(tester, bloc: h.bloc);
-
-      expect(h.readings.asked, <ReadingLanguage>[ReadingLanguage.english]);
-
-      await pumpHome(
+      // `flagsCollection` and not the deprecated `hasFlag`: the repo's other
+      // accessibility suites read the collection and compare a `Tristate`, because
+      // `isEnabled` is three-valued and `hasFlag` collapsed it to a bool that
+      // could not tell "explicitly false" from "not a button".
+      final SemanticsData node = _semanticsOf(
         tester,
-        bloc: h.bloc,
-        locale: const Locale('ar'),
-        frames: 0,
+        '${en.homeSelah} — ${en.homeUnavailableSuffix}',
       );
-
-      expect(
-        h.readings.asked,
-        <ReadingLanguage>[ReadingLanguage.english, ReadingLanguage.arabic],
-        reason:
-            'a locale change has to re-ask, or the panel shows one arm\'s text '
-            'under the other arm\'s labels',
-      );
-      // And the streak and session are re-asked with it: one `HomeStarted`, three
-      // requests. Asserted so a fix that re-asks *only* the reading — which would
-      // leave the flame reading the previous arm's numbers — is distinguishable.
-      expect(h.streaks.calls, 2);
-      expect(h.auth.calls, 2);
-    });
-
-    testWidgets('uses the route constants for its own gutter', (
-      WidgetTester tester,
-    ) async {
-      // Named rather than asserted against `HomePage.scaffoldPadding`'s value,
-      // because "the page uses the constant" is the claim and reading the constant
-      // would be the tautology.
-      expect(
-        HomePage.scaffoldPadding,
-        const EdgeInsets.symmetric(horizontal: 20),
-      );
-      expect(
-        HomePage.scaffoldPadding.left,
-        EvaSpacing.screenHorizontal,
-        reason: 'the gutter is the token, not a number the page invented',
-      );
+      expect(node.flagsCollection.isButton, isTrue);
+      // **Disabled, not absent**: a screen-reader user is told the control exists
+      // and that it is inert, which is `SocialAuthButton`'s rule and the login
+      // ghosts' too.
+      expect(node.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(node.actions, isNot(contains(SemanticsAction.tap)));
+      handle.dispose();
     });
   });
+
+  group('the library', () {
+    testWidgets('the label reads the catalogue\'s own two counts', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(find.text('THE LIBRARY'), findsOneWidget);
+      // **Composed, not the prototype's literal** — `redesign.html:930` bakes the
+      // numbers into the string and this client's catalogue could be a different
+      // size. The wording is the table's and the counts are the list's.
+      expect(find.text('6 SCROLLS · 4 OPEN'), findsOneWidget);
+    });
+
+    testWidgets('all six scrolls render, four open and two sealed', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      // **Only what fits is built**, which is the claim with teeth here: a `ListView`
+      // builds its visible items and nothing else, so asking for the sixth card
+      // before the strip has been dragged would be asking about a layout that has
+      // not happened yet. The label above already counted all six.
+      expect(find.text('psalms'), findsOneWidget);
+      expect(find.text('POETRY · 6 VERSES'), findsOneWidget);
+
+      // **On the `ListView`, not on the carousel**: `LibraryCarousel` is a `Column`
+      // whose top child is the label row, and a drag that starts there moves nothing.
+      // And **after `ensureVisible`**, because the strip is the last section on a
+      // 320×568 surface — an off-screen drag hits nothing and the assertion that
+      // follows fails about the card rather than about the scroll.
+      final Finder strip = find.descendant(
+        of: find.byType(LibraryCarousel),
+        matching: find.byType(ListView),
+      );
+      await tester.ensureVisible(strip);
+      await pumpFrames(tester, 2);
+      // **Three times, and the number is arithmetic rather than taste.** §14's
+      // surface is 320 wide and a card is 168 plus a 12 gap, so one 260px drag
+      // reveals about one and a half cards — measured on this surface:
+      //
+      // | drag | the built cards |
+      // | --- | --- |
+      // | none | `psalms`, `john` |
+      // | one | `john`, `genesis` |
+      // | two | `genesis`, `isaiah`, `acts` |
+      // | three | `acts`, `revelation` |
+      //
+      // A single drag finding `revelation` would have been a claim about a wider
+      // surface than this suite runs on.
+      for (int drag = 0; drag < 3; drag++) {
+        await tester.drag(strip, const Offset(-260, 0));
+        await pumpFrames(tester, 4);
+      }
+
+      // The two sealed books carry the badge and no verse count — `:1317` writes the
+      // category alone for a `SEALED` card because `SEALED` holds no verse array.
+      expect(find.text('revelation'), findsOneWidget);
+      expect(find.text('SEALED'), findsNWidgets(2));
+      expect(find.text('APOCALYPSE'), findsOneWidget);
+      //
+      // **Scoped to the sealed card, and the unscoped form was a measured
+      // flake.** The first version asserted `find.textContaining('VERSES'),
+      // findsNothing` across the whole strip — "no open card is on screen any
+      // more" — and that is a claim about *where the drag settled*, which
+      // `ListView` physics decide: after three 260px drags the tree is
+      // deterministic but the scroll offset is not, and a full-suite run left
+      // `isaiah` ("PROPHETS · 4 VERSES") on screen often enough to make this row
+      // flip. The claim with teeth is the sealed card's caption, and the card
+      // that is guaranteed built is `revelation`, so the caption is asserted
+      // inside that card's subtree.
+      final Finder sealedCard = find
+          .ancestor(
+            of: find.text('revelation'),
+            matching: find.byType(GlassSurface),
+          )
+          .first;
+      expect(
+        find.descendant(
+          of: sealedCard,
+          matching: find.textContaining('VERSES'),
+        ),
+        findsNothing,
+        reason: 'a sealed card\'s caption is the category alone (`:1317`)',
+      );
+    });
+
+    testWidgets('a card announces its caption and says it cannot be opened', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      // `/reading` has no passage parameter and always renders today's reading, so
+      // a tap on "psalms" would open John. The card is therefore a disabled button
+      // whose name says why, which is the login ghosts' treatment.
+      final SemanticsData node = _semanticsOf(
+        tester,
+        'psalms · ${en.homeCategoryPoetry} · 6 ${en.homeVerses} — '
+        '${en.homeUnavailableSuffix}',
+      );
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(node.actions, isNot(contains(SemanticsAction.tap)));
+      handle.dispose();
+    });
+
+    testWidgets('the catalogue is fetched once, on entry', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+      expect(h.catalogue.calls, 1);
+    });
+
+    testWidgets('a failed catalogue renders its own error', (
+      WidgetTester tester,
+    ) async {
+      // **Unreachable in production** — the adapter is a literal list — and
+      // reachable here because the port promises a `Result`. The arm is written, so
+      // it is tested.
+      final HomeHarness h = harness(
+        catalogue: const Left<Failure, List<LibraryBook>>(streakFailure),
+      );
+      await pumpHome(tester, bloc: h.bloc, frames: 4);
+
+      // **Zero scrolls, and the reason underneath.** The label is read off the list
+      // the section holds, and a failed section holds none — so it says `0` rather
+      // than keeping the last good count beside an error, which is the same
+      // "stale data beside a failure" rule `_emitReading` follows.
+      expect(find.text('0 SCROLLS · 0 OPEN'), findsOneWidget);
+      expect(find.text(streakFailure.message), findsOneWidget);
+    });
+  });
+
+  group('what the redesign removed', () {
+    testWidgets('no board card, no avatar, no wordmark, and no bead row', (
+      WidgetTester tester,
+    ) async {
+      // `redesign.html:513-538` draws none of the four, and each left a string or a
+      // widget behind in the previous version. The strings are the cheap assertion
+      // here: they are the things a reader would see.
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      expect(find.text('Evangelion'), findsNothing);
+      // The old streak sentence under the greeting — `homeStreakGlowing` — is gone
+      // from the table, so this asserts the *rendered* text the old design would
+      // have painted, which is the shape of the regression.
+      expect(find.textContaining('streak is glowing'), findsNothing);
+      expect(find.byType(ProgressBeads), findsNothing);
+      // The board card's own title is gone from the table, so this is a **compile**
+      // claim rather than a text search: `home_page.dart` does not import the
+      // widget and `en` has no `leaderboardCardTitle` getter at all.
+      expect(find.textContaining('THIS WEEK'), findsNothing);
+    });
+  });
+}
+
+/// The one [SemanticsData] whose label is [label].
+///
+/// Read through the shared `semanticsTree` walk rather than `getSemantics`, for
+/// `home_accessibility_test.dart`'s reason: `hasFlag` is deprecated, `isEnabled` is
+/// a `Tristate` rather than a bool, and `SemanticsNode` cannot answer "does this
+/// node offer a tap" at all.
+SemanticsData _semanticsOf(WidgetTester tester, String label) {
+  final Iterable<SemanticsData> matches = semanticsTree(tester)
+      .where((SemanticsData data) => data.label == label);
+  expect(matches, hasLength(1), reason: 'exactly one node announces `$label`');
+  return matches.single;
 }
