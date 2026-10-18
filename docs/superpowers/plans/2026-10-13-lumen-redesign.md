@@ -1263,6 +1263,28 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > collapsed margins are recomputed from the parsed CSS (`max()` where CSS
 > collapses, `+` where a padding blocks the collapse) rather than typed.
 
+> **5.3** (`9664312`): `/reading` rebuilt against `:540-560`, and the research
+> pass before it changed the shape of the work: `.vline.in` is **not**
+> scroll-driven — it is a timed stagger, `80 + 25n` ms (`:1383`), and the
+> `IntersectionObserver` at threshold `.6` governs **star emission and
+> last-read bookkeeping only** (`:1211-1219`). So the reveal is schedule-
+> driven and the sky is *observer*-driven, and the two live in
+> `reading_focus.dart`, a pure-Dart policy with 37 TDD'd tests. The
+> prototype's `:177` focus flattening is made **inexpressible** by a
+> three-state `VersePaint` enum rather than by a check. The sky is placed
+> (`WitnessSky`'s allowlist entry removed by the gate itself) through
+> `SkyHandle`/`SkyScope`, the two-closure seam `settings_handle.dart`
+> established. **Seven defects the gates caught, not reading:** the
+> sanctuary rendered `displayText` and stripped every verse's diacritics
+> (decision 51); five tofu sites on the Arabic arm — the title and crumb in
+> Inter/mono, the pill's `listen`, the verse numerals, and the dial's `ع`
+> on the *English* arm, which is what made `SegmentedControl` grow
+> `labelFamilyOf` (`:186` keys that face on the option); the ARB's seven new
+> citations were one line high, pinned by a test before the fix; `#crumbMeta`'s
+> styling rule is dead CSS (a descendant selector for a same-element class),
+> so the port adopts the intent and says so; and `ErrorView`'s retry assert
+> caught the rebuilt failure arm shipping unlabelled.
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
