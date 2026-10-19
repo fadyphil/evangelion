@@ -3,6 +3,7 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/settings_handle.dart';
 import 'package:evangelion/app/sky_scope.dart';
+import 'package:evangelion/core/domain/repositories/cheer_repository.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -15,6 +16,7 @@ import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
@@ -201,10 +203,12 @@ void configureNavigation() {
   // `injection.dart`'s import graph and `injection_test.dart` would fail on it.
   //
   // `registerSingleton`, not `registerLazySingleton`: the cubit holds state, so two
-  // instances would be two rankings, and `/leaderboard` re-entering must see the one
+  // instances would be two rankings, and `/communion` re-entering must see the one
   // that is live.
   final LeaderboardCubit leaderboardCubit = LeaderboardCubit(
     loadLeaderboard: getIt<LoadLeaderboard>(),
+    getReaderSession: getIt<GetBoardReaderSession>(),
+    cheerRepository: getIt<CheerRepository>(),
   );
 
   // **Built here, not resolved from the locator** — see the `QuizBloc` section for

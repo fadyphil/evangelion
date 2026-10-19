@@ -555,7 +555,7 @@ void main() {
       );
     });
 
-    test('the thirty-two current registrations are the ones the config names', () {
+    test('the thirty-nine current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -655,6 +655,22 @@ void main() {
           // exists.
           'lazySingleton<LeaderboardRepository> leaderboardRepository',
           'lazySingleton<LoadLeaderboard> loadLeaderboard',
+          // **Task 5.5 added three**, and their position is the evidence: they
+          // land directly after `loadLeaderboard` — inside the leaderboard
+          // module's own block — because that is where injectable puts
+          // providers whose only dependencies are the data source beside it and
+          // the shared `AuthRepository` port. The generator chose this; this
+          // test asserts *which* providers exist.
+          //
+          // **`GetBoardReaderSession` and not `GetReaderSession`**, and the
+          // difference is the reason the name is what it is: home already
+          // registers a `GetReaderSession` (`get_reader_session.dart`), and two
+          // registrations that render identically in this list are two
+          // registrations a reader of the graph cannot tell apart. The use
+          // case's own doc carries the argument.
+          'lazySingleton<CheerLocalDataSource> cheerLocalDataSource',
+          'lazySingleton<CheerRepository> cheerRepository',
+          'lazySingleton<GetBoardReaderSession> getBoardReaderSession',
           'lazySingleton<StartSession> startSession',
           'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
           'lazySingleton<SubmitAnswer> submitAnswer',

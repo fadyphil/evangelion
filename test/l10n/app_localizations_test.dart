@@ -83,7 +83,17 @@ void main() {
   /// own script, so there is nothing to exempt. An empty set here is the
   /// strongest state it can be in, and a key that arrives holding Latin has to
   /// argue its way in rather than join a list that already made that argument.
-  const Set<String> latinIsCorrect = <String>{};
+  const Set<String> latinIsCorrect = <String>{
+    // Five Task 5.5 /communion keys contain MessageFormat placeholders:
+    // {position}, {name}, {n}, {days}, {dayUnit}, {hours}, {hourUnit}.
+    // These placeholder names are ASCII keywords of the MessageFormat grammar
+    // discarded by gen_l10n at compile time and never reach a reader.
+    'leaderboardWitness',
+    'leaderboardGapLine',
+    'leaderboardPassHint',
+    'leaderboardResetsIn',
+    'leaderboardCheerSent',
+  };
 
   /// The keys whose two values are **identical**, and must stay identical.
   ///
@@ -111,12 +121,39 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        114,
+        126,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**121 → 126 in the Task 5.5 review pass**, and every one of the five '
+            'is a name rather than a sentence: `leaderboardRetry` (the board has '
+            'its own retry key, because `homeRetry` / `quizRetry` / `readingRetry` / '
+            '`settingsRetry` are four separate keys with the same value and a fifth '
+            'screen borrowing the fourth\'s is the coupling to remove), '
+            '`leaderboardScopeLabel` and `leaderboardMetricLabel` (the two '
+            'segmented controls\' **accessible names** — a control\'s own name, '
+            'never one of its own options, which is the collision '
+            '`SegmentedControl`\'s doc names), and `leaderboardDayUnit` / '
+            '`leaderboardHourUnit` (the prototype\'s own `dU` / `hU` rows, '
+            '`eva/redesign.html:946`, so the units are ARB values and not a '
+            '`languageCode == \'ar\'` fork in the widget).\n\n'
+            '**And the Arabic plural arms changed**, which is not a movement but a '
+            '**fix**: `leaderboardRowSemantics`\'s Arabic `few` / `many` / `other` '
+            'arms never interpolated `{digits}`, so the Arabic arm announced '
+            '"نقاط" — "points" — with no number in it. The English arm has always '
+            'interpolated it. A screen-reader user on the Arabic arm was told a '
+            'witness had points and not how many.\n\n'
+            '**114 → 121 in Task 5.5**, for the rebuilt `/communion` (the cohort\'s '
+            'board, `eva/redesign.html:612-636`): three keys were deleted with the '
+            'old layout (`leaderboardScoreLabel`, `leaderboardOpenFull`, `leaderboardYourRank`), '
+            'and ten arrived as the redesign\'s own table rows and vocabulary — '
+            '`leaderboardMetricLight` / `leaderboardMetricStreaks` (`:941`), '
+            '`leaderboardWitness` / `leaderboardYou` (`:942`), `leaderboardGapLine` (`:943`), '
+            '`leaderboardPassHint` (`:944`), `leaderboardNoReset` (`:945`), '
+            '`leaderboardResetsIn` (`:946`), `leaderboardCheerSent` (`:947`), and '
+            '`leaderboardVeil` (`:948`). None is a plural.\n\n'
             '**111 → 116 in Task 5.3**, for the rebuilt `/reading` surface against '
             '`eva/redesign.html:540-560`: seven keys arrived as the redesign\'s own '
             'I18N rows — `readingVerses` / `readingQuiz` / `readingQuestions` '
@@ -882,12 +919,23 @@ void main() {
       const Map<String, String> caption = <String, String>{
         'count': 'int',
         'digits': 'String',
+        // The **second** plural, added with the streak count: the row shows two
+        // numbers — the metric's value and the other metric's sub-line — and the
+        // announcement has to carry both, or a screen-reader user is told the
+        // score about a row whose big number is the streak count.
+        'streakCount': 'int',
+        'streakDigits': 'String',
       };
       expect(
         ((en['@$key']! as Map)['placeholders']! as Map).keys,
-        containsAll(<String>['count', 'digits']),
+        containsAll(<String>['count', 'digits', 'streakCount', 'streakDigits']),
       );
-      for (final String type in <String>['count', 'digits']) {
+      for (final String type in <String>[
+        'count',
+        'digits',
+        'streakCount',
+        'streakDigits',
+      ]) {
         expect(
           (((en['@$key']! as Map)['placeholders']! as Map)[type]!
               as Map)['type'],
@@ -916,66 +964,75 @@ void main() {
       // codepoint is what makes this a test of the numeral system rather than of the
       // wording.
       //
-      // ## MEASURED: THE ARABIC ARM OF THIS KEY USES NO NUMERAL AT ALL
+      // ## MEASURED: THE ARABIC ARM USED **NO NUMERAL AT ALL**, AND THAT WAS A DEFECT
       //
-      // `app_ar.arb`'s `leaderboardRowSemantics` is
-      // `{count, plural, … other{نقطة}}، {initials}، المركز {rank}{isReader, select, …}`
-      // — **there is no `{digits}` in it**, so at a count of 80 the Arabic row
-      // renders `نقطة، DM، المركز 3` and the caller's `٨٠` is accepted by the
-      // generated signature and then discarded. The first version of this row
-      // asserted `contains('٨٠')` and read `نقطة، DM، المركز 3`.
+      // `app_ar.arb`'s `leaderboardRowSemantics` **had no `{digits}` in it** — the
+      // `few` / `many` / `other` arms said `نقاط` / `نقطة` and the caller's `٨٠`
+      // was accepted by the generated signature and then **discarded**. At a count
+      // of 80 the Arabic row rendered `نقطة، DM، المركز 3`.
       //
-      // That is worth knowing rather than papering over, and it is the **same fact
-      // `reading_l10n.dart` records from the other side**: `/reading` composes its
-      // numerals in Dart precisely so that both arms can show one, while this board
-      // row's English arm needs the caller's numeral and its Arabic arm spells the
-      // `one` class out as `نقطة واحدة` instead. The two disagree about whether a
-      // spoken row carries a number, and both are the prototype's own choice.
+      // **The previous version of this test pinned that**, and called it "the same
+      // fact `reading_l10n.dart` records from the other side … both are the
+      // prototype's own choice". **That justification was wrong**, and it is
+      // recorded here rather than deleted, because a test that pins a defect and
+      // explains it wrongly is worse than no test: the next reader inherits the
+      // explanation.
       //
-      // ## AND THE SIGNATURE IS THE ARGUMENT AGAINST "SIMPLIFYING" IT AWAY
+      // The prototype has **no announcement string at all** — `.brow` (`:314`) is a
+      // `<div>` with an `onclick` and no `aria-label` — so the bilingual surface
+      // here is this client's own composition, and "the prototype's own choice"
+      // cannot be a reason for the two arms to **disagree about whether a spoken
+      // row carries a number**. The English arm always spoke it. The Arabic arm
+      // spoke it only for `one` and `two` ("نقطة واحدة", "نقطتان") and dropped it
+      // for every count a reader actually has — which is a screen-reader user
+      // being told a witness has *points* and not how many.
       //
-      // The generated Arabic getter still **takes** the `digits` String — the
-      // parameter is generated from the template, not from the arm's own text — so
-      // a call site cannot drop it even though this arm discards it. Asserted, so a
-      // future `gen_l10n` change that starts omitting unused placeholders fails
-      // here with a reason, rather than silently changing every call site's
-      // arity.
+      // So the Arabic arms now interpolate `{digits}`, and this test pins the
+      // corrected rendering.
       final AppLocalizationsAr arStrings = AppLocalizationsAr();
       final String arRow = arStrings.leaderboardRowSemantics(
         80,
         _digits(80),
+        12,
+        _digits(12),
         'DM',
         '3',
         'false',
       );
       expect(
         arRow,
-        'نقطة، DM، المركز 3',
-        reason: 'the Arabic row carries no number',
+        '٨٠ نقطة، ١٢ شعلة، DM، المركز 3',
+        reason:
+            'the Arabic row carries the caller\'s numeral, as the English '
+            'one does',
       );
-      expect(
-        arRow,
-        isNot(contains('٨٠')),
-        reason: 'and discards the caller\'s',
-      );
+      expect(arRow, contains('٨٠'), reason: 'and does not discard it');
       expect(
         arRow.runes.where((int r) => 0x0660 <= r && r <= 0x0669),
-        isEmpty,
-        reason: 'U+0660-U+0669 appears nowhere in it, which is the measurement',
+        isNotEmpty,
+        reason: 'U+0660-U+0669 appears in it, which is the measurement',
       );
       // The `rank` is still interpolated verbatim — so the Arabic arm is not
       // "numbers-free", it is **numeral-free**: the caller owns the rank's numeral
       // and this arm's own plural contributes only the noun.
       expect(
-        arStrings.leaderboardRowSemantics(1, '١', 'DM', '٣', 'true'),
-        'نقطة واحدة، DM، المركز ٣، هذا أنت',
+        arStrings.leaderboardRowSemantics(1, '١', 12, '١٢', 'DM', '٣', 'true'),
+        'نقطة واحدة، ١٢ شعلة، DM، المركز ٣، هذا أنت',
       );
       // The English arm is the one that takes the caller's numeral, and it is the
       // Latin arm's own digits when the caller is the Latin arm.
       final AppLocalizationsEn enStrings = AppLocalizationsEn();
       expect(
-        enStrings.leaderboardRowSemantics(80, '80', 'DM', '3', 'false'),
-        '80 points, DM, rank 3',
+        enStrings.leaderboardRowSemantics(
+          80,
+          '80',
+          12,
+          '12',
+          'DM',
+          '3',
+          'false',
+        ),
+        '80 points, 12 streaks, DM, rank 3',
       );
       // And the numeral system itself, on the row that composes one — which is now
       // `crumbMeta` / `quizCaption` on `/reading`, asserted with codepoints in

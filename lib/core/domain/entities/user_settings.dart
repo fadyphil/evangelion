@@ -36,10 +36,14 @@ const int kDefaultFontStep = 3;
 ///
 /// ## WHY IT IS IN `core/domain/` AND NOT IN `features/settings/`
 ///
-/// Three consumers, which is §3's placement test. `app` installs three of these four
+/// Three consumers, which is §3's placement test. `app` installs three of these
 /// fields app-wide (`app.dart`: theme mode, language, font step), `/settings` writes
-/// all four, and `/reading` **reads and writes** [fontStep] for its `Aa` control. A
-/// copy inside `features/settings/` would make `app` and `reading` import `settings`,
+/// all of them, and `/reading` **reads and writes** [fontStep] for its `Aa` control.
+/// `/communion` reads [veilWitnesses] and [showPodium] from the same record, which is
+/// why those two live here rather than in a board-local cubit: the veil button and the
+/// future settings controls must write the one value both surfaces read.
+///
+/// A copy inside `features/settings/` would make `app` and `reading` import `settings`,
 /// which §3 forbids with no exceptions and `tool/verify_purity.sh` Gate 2 fails on the
 /// line.
 ///
@@ -106,6 +110,8 @@ final class UserSettings with _$UserSettings {
     this.fontStep = kDefaultFontStep,
     this.language,
     this.reducedMotion = false,
+    this.veilWitnesses = false,
+    this.showPodium = true,
   });
 
   /// Which palette the app renders in.
@@ -158,4 +164,34 @@ final class UserSettings with _$UserSettings {
   /// accessibility failure `reading_text_scale.dart` spent a hundred lines arguing
   /// against from the other direction.
   final bool reducedMotion;
+
+  /// Whether `/communion` veils every witness who is not the reader.
+  ///
+  /// ## IT IS A RENDERING CHOICE OVER ROWS THAT ALREADY ARRIVED
+  ///
+  /// The board's names are on the wire (`leaderboard.routes.ts` sends `full_name`), and
+  /// ADR-0022 `:243-245` records that the prototype's veil (`eva/redesign.html:1070`)
+  /// therefore needs **no endpoint** — the rows are the same rows either way. Turning
+  /// this on replaces each non-reader's name with `{witness} {position}` and their
+  /// monogram with a painted hollow star (`:1072`); the reader keeps their own name and
+  /// monogram, because a reader hiding from themselves is not a privacy control.
+  ///
+  /// **Default `false`**, because the prototype's `veilOn` starts false
+  /// (`:1057`) and the header button is opt-in. The accessible name follows the
+  /// rendered one — a voice-over reader must not hear a name the screen is forbidden to
+  /// show.
+  ///
+  /// **Added by Task 5.5 for the board to read; the `/settings` control is 5.7's.**
+  final bool veilWitnesses;
+
+  /// Whether `/communion` draws the top-three podium.
+  ///
+  /// The prototype's `showPodium` is `true` at start (`eva/redesign.html:1065`), and
+  /// `:1084` hides the `.podium` element when it is off. **The list is still
+  /// `slice(3)`** (`:1110`), so positions one to three are absent from the list whether
+  /// or not the podium is visible — a prototype oddity recorded and followed rather
+  /// than repaired.
+  ///
+  /// **Added by Task 5.5 for the board to read; the `/settings` control is 5.7's.**
+  final bool showPodium;
 }

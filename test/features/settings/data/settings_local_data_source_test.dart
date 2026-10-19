@@ -14,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// `test/core/domain/repositories/settings_repository_test.dart` proves the values
 /// survive. This file proves:
 ///
-/// * the four keys are named, namespaced, and match the file that writes them — a
+/// * the six keys are named, namespaced, and match the file that writes them — a
 ///   store's keys are an interface with the device and with a future migration, and
 ///   nothing else in the app can see them;
 /// * `language` is **removed** when it is `null`, not written as an empty string, so the
@@ -43,8 +43,10 @@ void main() {
         kFontStepKey,
         kLanguageKey,
         kReducedMotionKey,
+        kVeilWitnessesKey,
+        kShowPodiumKey,
       ];
-      expect(keys.toSet(), hasLength(4));
+      expect(keys.toSet(), hasLength(6));
       for (final String key in keys) {
         expect(key, startsWith('eva.'), reason: '$key must be namespaced');
       }
@@ -65,13 +67,15 @@ void main() {
       }
     });
 
-    test('and the write puts exactly those four keys in the store', () async {
+    test('and the write puts exactly those six keys in the store', () async {
       await freshStore().write(
         const UserSettings(
           themeMode: AppThemeMode.light,
           fontStep: 4,
           language: ReadingLanguage.arabic,
           reducedMotion: true,
+          veilWitnesses: true,
+          showPodium: false,
         ),
       );
 
@@ -86,12 +90,14 @@ void main() {
       expect(raw.getInt(kFontStepKey), 4);
       expect(raw.getString(kLanguageKey), 'ar');
       expect(raw.getBool(kReducedMotionKey), isTrue);
+      expect(raw.getBool(kVeilWitnessesKey), isTrue);
+      expect(raw.getBool(kShowPodiumKey), isFalse);
       expect(
         raw.getKeys().where((String key) => key.startsWith('eva.')),
-        hasLength(4),
+        hasLength(6),
         reason:
-            'exactly four Eva keys exist — a fifth would be a leaked key nothing reads, '
-            'and a missing one is a setting that silently stops persisting',
+            'exactly six Eva keys exist — a seventh would be a leaked key nothing '
+            'reads, and a missing one is a setting that silently stops persisting',
       );
     });
 
@@ -135,8 +141,13 @@ void main() {
       test('a `bool` key holding an `int` reads as absent', () async {
         SharedPreferences.setMockInitialValues(<String, Object>{
           kReducedMotionKey: 1,
+          kVeilWitnessesKey: 1,
+          kShowPodiumKey: 0,
         });
-        expect((await freshStore().read()).reducedMotion, isFalse);
+        final UserSettings settings = await freshStore().read();
+        expect(settings.reducedMotion, isFalse);
+        expect(settings.veilWitnesses, isFalse);
+        expect(settings.showPodium, isTrue);
       });
 
       test('a `String` key holding a `bool` reads as absent', () async {

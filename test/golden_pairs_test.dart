@@ -55,10 +55,7 @@ import 'support/project_import_graph.dart';
 void main() {
   test('no `*_dark.png` golden is byte-identical to its `*_light.png` sibling', () {
     final List<Directory> roots = <Directory>[
-      for (final String relative in const <String>[
-        'test/core/design_system/widgets/goldens',
-        'test/core/design_system/effects/goldens',
-      ])
+      for (final String relative in kGoldenRoots)
         Directory.fromUri(packageRoot.uri.resolve(relative)),
     ];
 
@@ -168,10 +165,7 @@ void main() {
     // `find test -name '*_dark.png' | wc -l`, which is the only way to tell a
     // gate that is working from one that has stopped looking.
     int darkCount = 0;
-    for (final String relative in const <String>[
-      'test/core/design_system/widgets/goldens',
-      'test/core/design_system/effects/goldens',
-    ]) {
+    for (final String relative in kGoldenRoots) {
       final Directory dir = Directory.fromUri(
         packageRoot.uri.resolve(relative),
       );
@@ -209,3 +203,22 @@ File? _lightSiblingOf(File dark) {
 /// gate that compared anything looser would disagree with the thing it is gating.
 bool _identicalBytes(File a, File b) =>
     a.readAsBytesSync().toString() == b.readAsBytesSync().toString();
+
+/// The goldens directories this gate walks.
+///
+/// ## ONE LIST, BECAUSE TWO LISTS **DRIFT**
+///
+/// This list used to be spelled out twice — once in the walk and once in the
+/// "not vacuous" count — and the two copies had already diverged when Task 5.5
+/// added `test/features/leaderboard/presentation/goldens` to one of them and not
+/// the other. The count still passed, so the drift was invisible; but a gate that
+/// walks one set of directories while counting another is a gate whose coverage
+/// nobody can state.
+///
+/// It is a **constant** so that the two walks cannot disagree, and it is a
+/// **single** list so that a new golden directory is added in one place.
+const List<String> kGoldenRoots = <String>[
+  'test/core/design_system/widgets/goldens',
+  'test/core/design_system/effects/goldens',
+  'test/features/leaderboard/presentation/goldens',
+];

@@ -42,13 +42,19 @@
 library;
 
 import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/arabic_digits.dart';
+import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
@@ -59,6 +65,14 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/leaderboard/data/datasources/cheer_local_data_source.dart';
+import 'package:evangelion/features/leaderboard/data/repositories/local_cheer_repository.dart';
+import 'package:evangelion/features/leaderboard/domain/leaderboard_ranking.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
+import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
+import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart';
+import 'package:evangelion/features/leaderboard/presentation/widgets/communion_countdown_line.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
@@ -71,6 +85,7 @@ import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
@@ -701,6 +716,44 @@ void main() {
       );
     });
 
+    testWidgets('and the EMPTY state is gated too', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS ARM EXISTS, AND IT IS A **GAP** THAT WAS OPEN
+      //
+      // `/quiz` renders the **shared** `EmptyState` when the session has no
+      // questions, and the empty state's two strings are Arabic. Before Task
+      // 5.5, `EmptyState` painted its title in `headlineMedium` (the display
+      // serif, EBGaramond) and its message in `bodyMedium` (the UI sans,
+      // Inter) with **no `arabicAware`** — and **neither family carries a single
+      // Arabic glyph**, so the whole empty screen was a row of tofu boxes, one
+      // per character.
+      //
+      // **This group had no arm for it**, which is how a shared widget's defect
+      // stayed invisible on the screen that had it first: the gate was
+      // installed on `/quiz` and did not look at the empty state. The defect was
+      // found on `/communion`, whose group does have an empty-state arm.
+      //
+      // So the arm is here to close the gap, not because the fix needs it — the
+      // fix landed in `empty_state.dart` and this arm is what keeps it.
+      final QuizBloc bloc = quizBloc(
+        const Right<Failure, ScriptureText>(arabicQuizPassageWithoutQuestions),
+      );
+      await pumpQuiz(tester, bloc: bloc, locale: const Locale('ar'));
+
+      await expectArabicTypography(
+        tester,
+        screen: '/quiz (empty)',
+        // The empty state is the **only** thing on this screen, so the declared
+        // set is the two strings and nothing else — which is what the
+        // exact-set assertion is for.
+        expectedArabic: <String>[
+          ar.quizNoQuestionsTitle,
+          ar.quizNoQuestionsMessage,
+        ],
+      );
+    });
+
     testWidgets('and in English renders no Arabic at all', (
       WidgetTester tester,
     ) async {
@@ -1047,6 +1100,420 @@ void main() {
     });
   });
 
+  group('`/communion` — the cohort\'s board', () {
+    /// ## THE SEVENTH SCREEN, AND THE ONE GATE
+    ///
+    /// `/communion` is the redesigned cohort board (ADR-0022, Task 5.5), and it
+    /// is a **screen**: an app bar, two segmented controls, a podium, a list, a
+    /// you-card, a countdown, an empty state and a failure state. A screen the
+    /// typography gate does not cover is a screen whose Arabic arm nobody has
+    /// looked at — and this repository's own history is a screen whose Arabic
+    /// arm was **entirely tofu** behind a green suite (recorded decision 73).
+    ///
+    /// So this group is the seventh application of the **one** gate: the
+    /// instrument is `test/support/arabic_typography_gate.dart`, and this file
+    /// is where it is applied. A gate with seven copies is seven gates, and
+    /// they drift.
+    ///
+    /// ## THE THREE ARMS, AND THE ENGLISH CONTROL
+    ///
+    /// 1. the **declared set** of Arabic runs, compared for equality in both
+    ///    directions;
+    /// 2. every one of them in Amiri — the token *and* the literal string;
+    /// 3. **every character on screen** carried by the family that renders it.
+    ///
+    /// Plus the English control, for `/`'s reason: with no Arabic on screen
+    /// the Arabic gate is vacuous by construction, so a screen that silently
+    /// stopped honouring the locale would pass every Arabic assertion.
+    ///
+    /// ## AND THE ONE THING ABOUT THIS SCREEN THAT IS NOT OBVIOUS
+    ///
+    /// **A row's name is a run only when it carries Arabic.** `full_name`
+    /// arrives from the wire as one Latin string for both locales — the
+    /// backend has no Arabic name field — so a witness's un-veiled name is
+    /// **pure Latin** and is *not* an Arabic run, and declaring it would trip
+    /// the exact-set assertion with "a declared run the tree never held".
+    ///
+    /// The reader's own row carries the " · أنت" suffix, so **it** is a run
+    /// (Latin and Arabic in one span). A veiled witness's name is "شاهد ٣",
+    /// so **that** is a run too. Three cases, three answers, and the fixture
+    /// below puts all three on one screen.
+    ///
+    /// ## AND THE TWO KINDS OF STRING THAT ARE **NOT** PAINTED
+    ///
+    /// The row's `Semantics` label (`ar.leaderboardRowSemantics`, through
+    /// `leaderboard_l10n.dart`'s `leaderboardRowAnnouncement`) is an
+    /// **accessible name**, never painted — the category error `/quiz`'s
+    /// `quizProgress` records.
+    ///
+    /// **And it was asserted by NOBODY, on either arm.** The English one is
+    /// read by `communion_page_test.dart`'s semantics group; the **Arabic** one
+    /// — the arm this group exists for — had no assertion anywhere, and the
+    /// Arabic arm of that string **dropped the score entirely** (its `few` /
+    /// `many` / `other` arms never interpolated `{digits}`, so a screen-reader
+    /// user was told a witness had "points" and not how many). The ARB is fixed
+    /// and `app_localizations_test.dart` now pins the Arabic rendering; the
+    /// *announcement* itself is asserted by the l10n wrapper's own suite.
+    ///
+    /// **The two tooltips are the opposite case, and this is the trap.** A
+    /// `Tooltip` paints nothing until a gesture, and `renderedRuns` holds each
+    /// one open past `kLongPressTimeout` and reads the tree then — so the veil
+    /// button's name ("حجب الشهود") and the back control's own Arabic label
+    /// ("رجوع", which is `MaterialLocalizations`' Arabic `backButtonTooltip`)
+    /// **are** painted runs, and the declared set has to name both.
+    ///
+    /// And naming them is how the gate found the defect this group is here
+    /// for: `CommunionAppBar`'s `_IconHit` built its `Tooltip` with no
+    /// `textStyle`, so the framework resolved the family to the theme's
+    /// `bodyMedium` — the **Latin** UI face — and the gate reported
+    ///
+    ///     `رجوع` renders Arabic in `Inter`, which carries no Arabic glyph at all
+    ///
+    /// one box per character, for both tooltips. The fix is the one
+    /// `IconActionButton` already had: the family is resolved with
+    /// `arabicAwareFamily(direction, …)` and handed to the `Tooltip` as its
+    /// `textStyle`, and the two tooltips are Amiri on the Arabic arm.
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, on the ready board', (
+      WidgetTester tester,
+    ) async {
+      await _pumpCommunion(tester, _communionBoard, locale: const Locale('ar'));
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion',
+        expectedArabic: _communionRuns(
+          ar,
+          metric: LeaderboardMetric.light,
+          veiled: false,
+          ranked: true,
+          backTooltip: back,
+        ),
+      );
+      // The third arm, and the only one that is language-agnostic: every
+      // character on the screen is carried by the family that renders it.
+      await expectNoTofuInAnyRun(tester, screen: '/communion');
+    });
+
+    testWidgets('and the VEIL replaces every name but the reader\'s', (
+      WidgetTester tester,
+    ) async {
+      // The veil is a **rendering choice over rows that already arrived**
+      // (`UserSettings.veilWitnesses`), so the board is the same board — and
+      // the difference in the declared set is exactly the three witness names
+      // and the witness the gap line names.
+      //
+      // **The reader is never veiled** (`LeaderboardRowTile`'s own doc: the
+      // prototype checks the reader *before* the veil), so the reader's name
+      // is the same "Latin · أنت" run it is on the un-veiled arm.
+      await _pumpCommunion(
+        tester,
+        _communionBoard,
+        locale: const Locale('ar'),
+        veiled: true,
+      );
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (veiled)',
+        expectedArabic: _communionRuns(
+          ar,
+          metric: LeaderboardMetric.light,
+          veiled: true,
+          ranked: true,
+          backTooltip: back,
+        ),
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (veiled)');
+    });
+
+    testWidgets('and the STREAKS metric swaps the two numbers and drops the '
+        'pass hint', (WidgetTester tester) async {
+      // The second metric is a **second answer to the board's question**, not a
+      // relabelling: the podium and the rows print the streak where they
+      // printed the score, and the sub-line prints the score where it printed
+      // the streak (`leaderboard_row_tile.dart`'s switch, which pairs each
+      // number with the *other* metric's name).
+      //
+      // **And the pass hint is gone**, because the ÷15 is the **light**
+      // economy (`eva/redesign.html:755`) and a streak gap is not a number of
+      // verses (D14). The gap line is therefore a shorter string here, and the
+      // declared set is shorter with it.
+      await _pumpCommunion(
+        tester,
+        _communionBoard,
+        locale: const Locale('ar'),
+        metric: LeaderboardMetric.streaks,
+      );
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (streaks)',
+        expectedArabic: _communionRuns(
+          ar,
+          metric: LeaderboardMetric.streaks,
+          veiled: false,
+          ranked: true,
+          backTooltip: back,
+        ),
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (streaks)');
+    });
+
+    testWidgets('and the reader the board does not rank is named, not '
+        'numbered', (WidgetTester tester) async {
+      // The cold state: `my_standing` answers `{"rank": null, "score": 0}` for
+      // a child who has not scored (`LeaderboardStanding`'s own doc). The
+      // card then falls back to the session's name, says **"not ranked yet"**
+      // instead of a place, and prints **no value at all** — a fabricated
+      // number is the one thing D9 forbids.
+      //
+      // **And no row is the reader's**, so no row's name carries the " · أنت"
+      // suffix: every name on this arm is the pure Latin the wire sent.
+      await _pumpCommunion(
+        tester,
+        _communionUnrankedBoard,
+        locale: const Locale('ar'),
+      );
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (unranked)',
+        expectedArabic: _communionRuns(
+          ar,
+          metric: LeaderboardMetric.light,
+          veiled: false,
+          ranked: false,
+          backTooltip: back,
+        ),
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (unranked)');
+    });
+
+    testWidgets('and the CHEER toast is a run of its own', (
+      WidgetTester tester,
+    ) async {
+      // The toast is the success confirmation, and it is **one** run: the
+      // widget paints the message in a single `Text` beside a painted star.
+      //
+      // **Tapped on a witness's row, and the name it carries is the one the
+      // screen is allowed to show** — the veil applies to the toast's name
+      // too, so a voice-over user cannot hear what the screen is forbidden
+      // to show.
+      await _pumpCommunion(tester, _communionBoard, locale: const Locale('ar'));
+      final String back = await arabicBackTooltip();
+
+      // The list's last row is the witness's, and it is the only row that is
+      // not the reader's.
+      await tester.tap(find.text(_communionWitness.fullName));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (cheer toast)',
+        expectedArabic: <String>[
+          ..._communionRuns(
+            ar,
+            metric: LeaderboardMetric.light,
+            veiled: false,
+            ranked: true,
+            backTooltip: back,
+          ),
+          // The toast's own sentence.
+          ar.leaderboardCheerSent(_communionWitness.fullName),
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (cheer toast)');
+    });
+
+    testWidgets(
+      'and the WEEKLY countdown is pinned, which the page cannot do',
+      (WidgetTester tester) async {
+        // ## WHY THIS ARM PUMPS THE WIDGET AND NOT THE PAGE
+        //
+        // The page's countdown is a function of the **wall clock**:
+        // `CommunionCountdownLine` calls `DateTime.now()` when the page builds
+        // it, so its Arabic string is "يُصفّر بعد نحو ٤ي ١٣س" today and a
+        // different string tomorrow. A declared **set** cannot hold a value
+        // that changes, and a test that recomputed it from its own clock would
+        // be red once an hour, for a reason that has nothing to do with the
+        // screen.
+        //
+        // The widget owns the seam that fixes it: `CommunionCountdownLine`'s
+        // `now` parameter exists "for deterministic testing" and the page does
+        // not pass it. So the **string** is pinned here, on the widget that
+        // renders it, with a fixed instant.
+        //
+        // **And the string is the one that matters.** The English
+        // `leaderboardResetsIn` says "resets in ≈ 3d 4h" with a U+2248, and
+        // **Amiri carries no U+2248** — so the Arabic string says "نحو"
+        // ("about") instead, and that is the whole reason this run is in Amiri
+        // at all. A run that needed the glyph would be tofu.
+        await tester.pumpWidget(
+          evaPrimitiveHarness(
+            theme: EvaThemeDark.theme,
+            locale: const Locale('ar'),
+            textDirection: TextDirection.rtl,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+            child: CommunionCountdownLine(
+              window: LeaderboardWindow.weekly,
+              now: DateTime(2026, 1, 7, 10, 30),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await expectArabicTypography(
+          tester,
+          screen: '/communion (weekly countdown)',
+          expectedArabic: <String>[
+            // Wednesday the seventh of January, ten-thirty in the morning: four
+            // days and thirteen hours to the next Monday, in this arm's own
+            // numerals, with the arm's own unit letters.
+            ar.leaderboardResetsIn(ar.digits(4), ar.digits(13), 'ي', 'س'),
+          ],
+        );
+        await expectNoTofuInAnyRun(
+          tester,
+          screen: '/communion (weekly countdown)',
+        );
+      },
+    );
+
+    testWidgets('and the FAILED board is the retry label and nothing else', (
+      WidgetTester tester,
+    ) async {
+      // ## AND THE ONE RUN THE FAILURE STATE ADDS
+      //
+      // The retry control's label, "حاول مرة أخرى" — which the page hands to
+      // `ErrorView` **by hand**, with its own locale comparison:
+      //
+      //     retryFamily: Localizations.localeOf(context).languageCode == 'ar'
+      //         ? EvaTypography.arabicFamily
+      //         : EvaTypography.uiFamily,
+      //
+      // A page that dropped the Arabic half of that switch would render the
+      // one label on the screen where something has already gone wrong in a
+      // face with no Arabic glyphs, and **no other group's gate would see
+      // it**: the `/` group's failed arm renders the same *string* through
+      // the same `ErrorView`, but the **family** is this page's own argument.
+      //
+      // **And the countdown is gone**, because the countdown is gated on the
+      // **response's** board (`communion_page.dart`: the line renders only
+      // `if (state.board case final LeaderboardBoard board)`), and a failed
+      // request has no board. That is a run that is **not** on this arm, and
+      // declaring it would be the other half of the exact-set assertion.
+      //
+      // The failure's own **message** is deliberately not declared: this
+      // fixture's message is the server's English text, so it is not an
+      // Arabic run. The family that renders it is `ErrorView`'s own
+      // `arabicAware`, and the tofu arm below is what checks the glyphs.
+      await _pumpCommunionFailed(tester, locale: const Locale('ar'));
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (failed)',
+        expectedArabic: <String>[
+          // The chrome: the app bar's title, the two tooltips, and the two
+          // segmented controls' five options.
+          ar.leaderboardTitle,
+          back,
+          ar.leaderboardVeil,
+          ar.leaderboardWindowWeekly,
+          ar.leaderboardWindowMonthly,
+          ar.leaderboardWindowAllTime,
+          ar.leaderboardMetricLight,
+          ar.leaderboardMetricStreaks,
+          // The retry control's label, and the only Arabic run this state
+          // adds.
+          ar.readingRetry,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (failed)');
+    });
+
+    testWidgets('and the EMPTY board is two more runs', (
+      WidgetTester tester,
+    ) async {
+      // ## AND THIS ARM WAS **RED** UNTIL THE SHARED `EmptyState` WAS FIXED
+      //
+      // The empty cohort is a real state — the server answers with zero rows
+      // and the page draws the empty state (`communion_page.dart`'s
+      // `board.rows.isEmpty` branch) — and the empty state's two strings are
+      // Arabic, so they are runs.
+      //
+      // **They used to render in faces that carry no Arabic glyph at all.**
+      // The shared design-system `EmptyState` painted its title with
+      // `Theme.of(context).textTheme.headlineMedium` (the display serif) and
+      // its message with `bodyMedium` (the UI sans), and **neither went
+      // through `arabicAware`** — so on the Arabic arm the gate reported
+      //
+      //     `لا توجد نتائج بعد` renders Arabic in `EBGaramond`, which carries no
+      //     Arabic glyph at all
+      //
+      // one tofu box per character, for the whole empty screen. The fix is
+      // the one `StatTile` got in Phase 8: `arabicAware` on both runs.
+      //
+      // **The arm is here to keep it fixed.** A gate that quietly stops
+      // covering a broken state is "a gate that cannot fail" wearing a
+      // nicer hat, and this is the arm that says so.
+      await _pumpCommunion(
+        tester,
+        _communionEmptyBoard,
+        locale: const Locale('ar'),
+      );
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/communion (empty)',
+        expectedArabic: <String>[
+          // The chrome every arm carries.
+          ar.leaderboardTitle,
+          back,
+          ar.leaderboardVeil,
+          ar.leaderboardWindowWeekly,
+          ar.leaderboardWindowMonthly,
+          ar.leaderboardWindowAllTime,
+          ar.leaderboardMetricLight,
+          ar.leaderboardMetricStreaks,
+          ar.leaderboardNoReset,
+          // The empty state's own two strings.
+          ar.leaderboardEmptyTitle,
+          ar.leaderboardEmptyBody,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/communion (empty)');
+    });
+
+    testWidgets('and in English renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      // The control, for `/`'s reason: with no Arabic on screen the Arabic
+      // assertions above are vacuously true, so this row is what catches a
+      // screen that stopped honouring the locale.
+      await _pumpCommunion(tester, _communionBoard);
+      await _expectNoArabic(tester, '/communion');
+
+      // **The third arm on the English side too**, and the gate's own doc says
+      // why: that arm is "language-agnostic on purpose". The English strings
+      // carry the two characters this screen's Arabic strings had to avoid —
+      // the `·` of "no reset · the sky remembers" and the `≈` of "pass with ≈4
+      // verses" — and both are rendered in the **mono** face, which is a
+      // Latin face. So this row is where the English numerals and the `≈`
+      // are checked for the glyph they need.
+      await expectNoTofuInAnyRun(tester, screen: '/communion (en)');
+    });
+  });
+
   group('the ARM ITSELF, and what the two hard-coded states of the rule do', () {
     // The three properties the whole mechanism rests on, tested as a plain function
     // with no widget tree — so they are a unit test rather than a widget test, and a
@@ -1241,6 +1708,471 @@ AuthBloc _authBloc() {
   );
   addTearDown(bloc.close);
   return bloc;
+}
+
+/// The board `/communion` is gated on: five children, and the reader **fourth**.
+///
+/// ## WHY THE READER IS FOURTH
+///
+/// The list is `sorted.skip(3)` — the prototype's own slice, recorded in
+/// `communion_page.dart` — so the first three children are the **podium**'s
+/// and only the fourth and fifth are rows in the list.
+///
+/// Putting the reader fourth means one pump shows **both** of the names this
+/// screen can paint, side by side:
+///
+/// * the reader's own row, whose name carries the " · أنت" suffix and is
+///   therefore an **Arabic run**; and
+/// * the fifth child's row, whose name is the pure Latin the wire sent and is
+///   therefore **not** an Arabic run.
+///
+/// The podium's three names are Latin for the same reason, and the veil arm
+/// below turns all four into "شاهد ٣".
+///
+/// The scores and the streaks are ordered the same way on purpose, so the
+/// `streaks` metric does not reorder the board and the two arms differ only
+/// in the numbers they print.
+const LeaderboardBoard _communionBoard = LeaderboardBoard(
+  window: LeaderboardWindow.allTime,
+  groupId: 3,
+  rows: <LeaderboardRow>[
+    LeaderboardRow(
+      userId: 'u1',
+      fullName: 'Peter George',
+      currentStreak: 12,
+      rank: 1,
+      score: 1280,
+      initials: 'PG',
+    ),
+    LeaderboardRow(
+      userId: 'u2',
+      fullName: 'Ana Silva',
+      currentStreak: 8,
+      rank: 2,
+      score: 940,
+      initials: 'AS',
+    ),
+    LeaderboardRow(
+      userId: 'u3',
+      fullName: 'Mariam Anton',
+      currentStreak: 5,
+      rank: 3,
+      score: 610,
+      initials: 'MA',
+    ),
+    LeaderboardRow(
+      userId: 'u4',
+      fullName: 'David Mina',
+      currentStreak: 2,
+      rank: 4,
+      score: 560,
+      initials: 'DM',
+    ),
+    LeaderboardRow(
+      userId: 'u5',
+      fullName: 'Noor Haddad',
+      currentStreak: 1,
+      rank: 5,
+      score: 300,
+      initials: 'NH',
+    ),
+  ],
+  standing: _communionStanding,
+  cohortSize: 5,
+);
+
+/// The same board with the reader **unranked** — the cold state.
+///
+/// `my_standing` answers `{"rank": null, "score": 0}` for a child who has not
+/// scored (`LeaderboardStanding`'s own doc), and the card then falls back to
+/// the session's name and says "not ranked yet" instead of a place.
+const LeaderboardBoard _communionEmptyBoard = LeaderboardBoard(
+  window: LeaderboardWindow.allTime,
+  groupId: 3,
+  rows: <LeaderboardRow>[],
+  standing: null,
+  cohortSize: 0,
+);
+
+const LeaderboardBoard _communionUnrankedBoard = LeaderboardBoard(
+  window: LeaderboardWindow.allTime,
+  groupId: 3,
+  rows: <LeaderboardRow>[
+    LeaderboardRow(
+      userId: 'u1',
+      fullName: 'Peter George',
+      currentStreak: 12,
+      rank: 1,
+      score: 1280,
+      initials: 'PG',
+    ),
+    LeaderboardRow(
+      userId: 'u2',
+      fullName: 'Ana Silva',
+      currentStreak: 8,
+      rank: 2,
+      score: 940,
+      initials: 'AS',
+    ),
+    LeaderboardRow(
+      userId: 'u3',
+      fullName: 'Mariam Anton',
+      currentStreak: 5,
+      rank: 3,
+      score: 610,
+      initials: 'MA',
+    ),
+    LeaderboardRow(
+      userId: 'u4',
+      fullName: 'David Mina',
+      currentStreak: 2,
+      rank: 4,
+      score: 560,
+      initials: 'DM',
+    ),
+    LeaderboardRow(
+      userId: 'u5',
+      fullName: 'Noor Haddad',
+      currentStreak: 1,
+      rank: 5,
+      score: 300,
+      initials: 'NH',
+    ),
+  ],
+  standing: LeaderboardStanding(rank: null, score: 0),
+  cohortSize: 5,
+);
+
+/// The child **below** the reader, and the one the list's last row shows.
+final LeaderboardRow _communionWitness = _communionBoard.rows[4];
+
+/// The signed-in reader's name, from the session.
+///
+/// The you-card's **fallback**: a reader the payload does not rank is named by
+/// the session's `displayName` rather than by a row.
+const String _communionSessionName = 'David Mina';
+
+/// The runs `/communion` paints, for one board.
+///
+/// [metric] is the metric the board is ordered by, [veiled] whether the
+/// witness veil is on, [ranked] whether the payload ranks the reader at all,
+/// and [backTooltip] the framework's own Arabic label for the back control.
+///
+/// ## THE SCREEN'S OWN ARITHMETIC, NOT A COPY OF IT
+///
+/// The positions come from `leaderboardPositionOf` and the gap from
+/// `leaderboardGapFor` — the same domain functions the widgets call — so a
+/// change to the ranking shows up here as a **mismatch** rather than as two
+/// lists that agree by accident. And the strings come from
+/// `AppLocalizationsAr()`, for `/`'s reason: a hand-typed Arabic list in a
+/// test is a second copy of the corpus.
+List<String> _communionRuns(
+  AppLocalizations ar, {
+  required LeaderboardMetric metric,
+  required bool veiled,
+  required bool ranked,
+  required String backTooltip,
+}) {
+  final List<LeaderboardRow> ordered = leaderboardOrder(
+    _communionBoard.rows,
+    metric,
+  );
+  final List<String> declared = <String>[
+    // The app bar's title.
+    ar.leaderboardTitle,
+    // The back control's tooltip — the framework's own Arabic label.
+    backTooltip,
+    // The veil button's tooltip.
+    ar.leaderboardVeil,
+    // The scope control's three options.
+    ar.leaderboardWindowWeekly,
+    ar.leaderboardWindowMonthly,
+    ar.leaderboardWindowAllTime,
+    // The metric control's two options.
+    ar.leaderboardMetricLight,
+    ar.leaderboardMetricStreaks,
+    // The countdown, on the all-time window.
+    ar.leaderboardNoReset,
+    // The podium's three values — the metric's number for each column.
+    for (final LeaderboardRow row in ordered.take(3))
+      ar.digits(leaderboardValueOf(row, metric)),
+    // ...and the three places its columns print.
+    for (int place = 1; place <= 3; place++) ar.digits(place),
+  ];
+
+  for (int index = 0; index < ordered.length; index++) {
+    final LeaderboardRow row = ordered[index];
+    // The **display** position, which is the index in this metric's order and
+    // not the server's `rank` — they differ under the `streaks` metric, and
+    // the screen prints the display one.
+    final int position = leaderboardPositionOf(ordered, row);
+    final bool isReader = ranked && row.rank == _communionStanding.rank;
+
+    // The name — and **only two of the four names on this screen are Arabic
+    // runs**: the reader's (Latin plus the Arabic " · أنت") and a veiled
+    // witness's ("شاهد ٣"). A witness's un-veiled name is the pure Latin
+    // the wire sent, so it is **not** a run and declaring it would trip the
+    // exact-set assertion with "a declared run the tree never held".
+    final String? name = _communionName(
+      ar,
+      row,
+      position,
+      isReader: isReader,
+      veiled: veiled,
+    );
+    if (name != null) declared.add(name);
+
+    // The list's own three numbers. The podium's are already declared above.
+    if (index >= 3) {
+      declared.addAll(<String>[
+        ar.digits(position),
+        _communionSubline(ar, row, metric),
+        ar.digits(leaderboardValueOf(row, metric)),
+      ]);
+    }
+  }
+
+  if (!ranked) {
+    // The reader the payload does not rank: the session's name, "not ranked
+    // yet", and **no value at all** — a fabricated number is the one thing D9
+    // forbids.
+    declared.add('$_communionSessionName · ${ar.leaderboardYou}');
+    declared.add(ar.leaderboardUnranked);
+    return declared;
+  }
+
+  // The you-card: the reader's own row.
+  final LeaderboardRow reader = leaderboardReaderRow(
+    _communionBoard.rows,
+    standingRank: _communionStanding.rank,
+  )!;
+  final int position = leaderboardPositionOf(ordered, reader);
+  declared.add('${reader.fullName} · ${ar.leaderboardYou}');
+  declared.add(ar.digits(position));
+  declared.add(ar.digits(leaderboardValueOf(reader, metric)));
+
+  final LeaderboardGap? gap = leaderboardGapFor(
+    ordered: ordered,
+    readerPosition: position,
+    metric: metric,
+  );
+  if (gap != null) {
+    // The witness above the reader, veiled or not.
+    final String above = veiled
+        ? ar.leaderboardWitness(ar.digits(gap.abovePosition))
+        : gap.aboveName;
+    final String base = ar.leaderboardGapLine(above, ar.digits(gap.gap));
+    // **One run, not two**: the card composes the base sentence and the pass
+    // hint into a single `Text`. And the pass hint is the **light** metric's
+    // ÷15 economy, so it is absent under `streaks` (D14) and the string is
+    // shorter there.
+    declared.add(
+      gap.verses == null
+          ? base
+          : '$base · ${ar.leaderboardPassHint(ar.digits(gap.verses!))}',
+    );
+  }
+
+  return declared;
+}
+
+/// The name a row carries, or `null` when the name is **not** an Arabic run.
+///
+/// `full_name` arrives from the wire as one Latin string for both locales —
+/// the backend has no Arabic name field — so a witness's un-veiled name is
+/// pure Latin and is not a run at all.
+String? _communionName(
+  AppLocalizations ar,
+  LeaderboardRow row,
+  int position, {
+  required bool isReader,
+  required bool veiled,
+}) {
+  if (veiled && !isReader) return ar.leaderboardWitness(ar.digits(position));
+  if (isReader) return '${row.fullName} · ${ar.leaderboardYou}';
+  return null;
+}
+
+/// The sub-line a row carries under [metric].
+///
+/// The row shows the **other** metric's number beside that metric's own name
+/// (`leaderboard_row_tile.dart`'s switch), so the `light` board's sub-line is
+/// the streak count and the `streaks` board's is the score.
+String _communionSubline(
+  AppLocalizations ar,
+  LeaderboardRow row,
+  LeaderboardMetric metric,
+) => switch (metric) {
+  LeaderboardMetric.light =>
+    '${ar.digits(row.currentStreak)} ${ar.leaderboardMetricStreaks}',
+  LeaderboardMetric.streaks =>
+    '${ar.digits(row.score)} ${ar.leaderboardMetricLight}',
+};
+
+/// The framework's Arabic label for the back control.
+///
+/// `MaterialLocalizations.of(context).backButtonTooltip` is the string
+/// `CommunionAppBar`'s chevron carries, and on the Arabic arm it is **Arabic**
+/// — so it is an Arabic run, and the declared set has to name it.
+///
+/// Read from the framework's own table and never typed, for `/`'s reason: a
+/// hand-typed Arabic string in a test is a second copy of the corpus, and
+/// this one belongs to the framework rather than to the app.
+Future<String> arabicBackTooltip() async =>
+    (await GlobalMaterialLocalizations.delegate.load(const Locale('ar')))
+        .backButtonTooltip;
+
+/// The reader's standing in [_communionBoard].
+const LeaderboardStanding _communionStanding = LeaderboardStanding(
+  rank: 4,
+  score: 560,
+);
+
+/// The session the board's reader falls back to.
+final class _CommunionAuthRepo implements AuthRepository {
+  const _CommunionAuthRepo();
+
+  @override
+  Future<Result<AuthSession>> getCurrentSession() async =>
+      Result<AuthSession>.of(
+        AuthSession(
+          userId: 'u4',
+          displayName: _communionSessionName,
+          email: 'david@example.com',
+          initials: 'DM',
+          createdAt: DateTime.utc(2026),
+        ),
+      );
+
+  @override
+  Future<Result<AuthSession>> signIn({
+    required String email,
+    required String password,
+  }) async => getCurrentSession();
+
+  @override
+  Future<Result<void>> signOut() async => Result<void>.of(null);
+}
+
+/// A board the port refuses to answer.
+///
+/// The failure's **message** is the server's own English text, on the reason
+/// `ErrorView`'s doc gives: the message is whatever the server sent, and the
+/// client renders it in the ambient arm's family.
+final class _CommunionFailingRepo implements LeaderboardRepository {
+  const _CommunionFailingRepo();
+
+  @override
+  Future<Result<LeaderboardBoard>> board({
+    required LeaderboardWindow window,
+    required int limit,
+  }) async => const Left<Failure, LeaderboardBoard>(
+    Failure(
+      kind: FailureKind.validation,
+      message: 'Could not read the leaderboard: x-group-id is not a number',
+    ),
+  );
+}
+
+/// A board the port answers with, whatever the request.
+final class _CommunionRepo implements LeaderboardRepository {
+  const _CommunionRepo(this.answer);
+
+  final LeaderboardBoard answer;
+
+  @override
+  Future<Result<LeaderboardBoard>> board({
+    required LeaderboardWindow window,
+    required int limit,
+  }) async => Result<LeaderboardBoard>.of(answer);
+}
+
+/// Pumps `/communion` over [board] and settles it.
+///
+/// ## WHY THE SCOPE IS NOT OPTIONAL
+///
+/// The page reads the veil and the podium toggle through `SettingsScope.of`,
+/// which falls back to the locator's `SettingsHandle` when no scope is above
+/// the context — and that fallback is **not watched**, so a page pumped bare
+/// would never repaint when the settings arrive. `settingsScope` is the one
+/// place that spelling lives.
+///
+/// ## AND WHY THE FRAMES ARE COUNTED
+///
+/// Not `pumpAndSettle`: the ambient clocks under `NeuralScaffold` never
+/// settle, so settling is a timeout rather than a green tick. The frames are
+/// here for the two futures the screen waits on — the settings load and the
+/// board request — and the veil arm depends on the first one having landed
+/// before the last frame.
+/// Pumps `/communion` over a **failed** request.
+Future<void> _pumpCommunionFailed(
+  WidgetTester tester, {
+  Locale locale = const Locale('en'),
+}) async {
+  settingsHarness(initial: const UserSettings());
+  final LeaderboardCubit cubit = LeaderboardCubit(
+    loadLeaderboard: const LoadLeaderboard(_CommunionFailingRepo()),
+    getReaderSession: const GetBoardReaderSession(_CommunionAuthRepo()),
+    cheerRepository: LocalCheerRepository(CheerLocalDataSource()),
+  );
+  addTearDown(cubit.close);
+
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      locale: locale,
+      textDirection: locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      child: settingsScope(tester, CommunionPage(cubit: cubit)),
+    ),
+  );
+  for (int frame = 0; frame < 8; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+}
+
+Future<void> _pumpCommunion(
+  WidgetTester tester,
+  LeaderboardBoard board, {
+  Locale locale = const Locale('en'),
+  bool veiled = false,
+  LeaderboardMetric metric = LeaderboardMetric.light,
+}) async {
+  settingsHarness(initial: UserSettings(veilWitnesses: veiled));
+  final LeaderboardCubit cubit = LeaderboardCubit(
+    loadLeaderboard: LoadLeaderboard(_CommunionRepo(board)),
+    getReaderSession: const GetBoardReaderSession(_CommunionAuthRepo()),
+    cheerRepository: LocalCheerRepository(CheerLocalDataSource()),
+  );
+  addTearDown(cubit.close);
+  // The metric is a **presentation-only** choice over the board already in
+  // hand (`LeaderboardCubit.selectMetric`'s doc), and the page's own load
+  // preserves it — so it is set before the pump.
+  cubit.selectMetric(metric);
+
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      locale: locale,
+      // Derived from [locale] and **not** left to the default, for
+      // `login_harness.dart`'s recorded reason: the harness wraps its child in
+      // an explicit `Directionality` that overrides the one Material installs
+      // from the locale, so an `ar` locale rendered LTR reads as "the page
+      // ignores RTL".
+      textDirection: locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      child: settingsScope(tester, CommunionPage(cubit: cubit)),
+    ),
+  );
+  for (int frame = 0; frame < 8; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
 }
 
 /// ## WHY THE STUB PUMPER IS GONE

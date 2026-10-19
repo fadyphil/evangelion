@@ -83,8 +83,14 @@ ports and every entity consumed by two or more features. `core/domain/` and ever
 `package:http`. **No feature may import another feature.** If two features need the same
 type, it belongs in `core/domain/`.
 
-The six screens are `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`. The
-Library and Profile screens were **cut** — the backend has no endpoints for them.
+The **seven** screens are `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings` and
+`/communion` (the cohort's board, renamed from `/leaderboard` in Task 5.5).
+
+The Library and Profile screens were **cut** under ADR-0001 and are **coming back**
+under ADR-0022: the library carousel returns to `/` as a surface and Profile becomes
+`/journey`. `/result` retires to a modal in Phase 6. **AGENT_CONTEXT §2's route table
+is the authority on what is registered today** — this paragraph is a summary, and a
+summary that drifts is worse than no summary.
 
 ## Non-negotiables
 

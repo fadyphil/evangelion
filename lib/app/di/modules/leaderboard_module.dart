@@ -1,11 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/core/domain/repositories/cheer_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
+import 'package:evangelion/features/leaderboard/data/datasources/cheer_local_data_source.dart';
 import 'package:evangelion/features/leaderboard/data/datasources/leaderboard_remote_data_source.dart';
 import 'package:evangelion/features/leaderboard/data/mappers/leaderboard_mapper.dart';
 import 'package:evangelion/features/leaderboard/data/repositories/dio_leaderboard_repository.dart';
+import 'package:evangelion/features/leaderboard/data/repositories/local_cheer_repository.dart';
 import 'package:evangelion/features/leaderboard/data/repositories/stub_leaderboard_repository.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:injectable/injectable.dart';
 
@@ -64,6 +69,33 @@ abstract class LeaderboardModule {
   @lazySingleton
   LoadLeaderboard get loadLeaderboard =>
       LoadLeaderboard(getIt<LeaderboardRepository>());
+
+  /// The session's cheered witnesses, shared across the app's lifetime.
+  ///
+  /// A singleton **data source**, because the set is the session
+  /// (`cheer_local_data_source.dart` is `redesign.html:1066` transcribed). The
+  /// repository below is a stateless projection over it; registering the repository
+  /// as the singleton too costs nothing and keeps one construction site.
+  @lazySingleton
+  CheerLocalDataSource get cheerLocalDataSource => CheerLocalDataSource();
+
+  /// The cheer write and read.
+  ///
+  /// Registered against the **port**, so the cubit names no adapter. There is no
+  /// backend route today (ADR-0022 `:58`); when there is, this getter changes and
+  /// nothing above it does.
+  @lazySingleton
+  CheerRepository get cheerRepository =>
+      LocalCheerRepository(getIt<CheerLocalDataSource>());
+
+  /// The reader's own name for the you-card's fallback.
+  ///
+  /// The leaderboard's own copy over the shared [AuthRepository], for the reason
+  /// `features/home/domain/usecases/get_reader_session.dart` records: a feature may
+  /// not import another feature, and the port is the shared kernel's.
+  @lazySingleton
+  GetBoardReaderSession get getBoardReaderSession =>
+      GetBoardReaderSession(getIt<AuthRepository>());
 }
 
 /// The value of the `--dart-define=USE_STUB_LEADERBOARD` flag.

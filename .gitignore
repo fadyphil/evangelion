@@ -57,6 +57,9 @@ app.*.map.json
 # Git worktrees (isolated phase workspaces)
 .worktrees/
 
+# Qoder's local session memory — a tool's scratch, like the entries above
+.qoder/
+
 # Local environment / secrets — never commit
 .env
 .env.*

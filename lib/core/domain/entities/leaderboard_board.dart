@@ -52,36 +52,80 @@ enum LeaderboardWindow {
   };
 }
 
+/// The board's two metrics — the prototype's `metricSeg` options
+/// (`eva/redesign.html:623-625`, labels at `:941`).
+///
+/// ## WHY AN ENUM AND NOT A `String` OR A `bool`
+///
+/// A `bool` would be `isStreakMetric`, which names one arm and leaves the other as
+/// the absence of a name. The prototype writes two named options and the segmented
+/// control renders two labels; an enum is the same shape, and adding a third metric
+/// is a compile error in every exhaustive `switch` rather than a silently-selected
+/// default.
+enum LeaderboardMetric {
+  /// Ranked by the window's [LeaderboardRow.score].
+  light,
+
+  /// Ranked by [LeaderboardRow.currentStreak].
+  streaks,
+}
+
 /// One ranked child, as far as this app is concerned.
 ///
-/// ## WHY THERE IS NO `fullName` FIELD, AND THAT IS THE POINT
+/// ## WHY THESE FIELDS ARE HERE NOW, WHERE PHASE 1 DELIBERATELY OMITTED THEM
 ///
-/// The payload's row carries `full_name` — `'David Mina (Grade 5)'`, `'Peter George
-/// (Grade 6)'`, `'Mark Anton (Grade 5)'` — and the mapper converts it to [initials]
-/// and **drops it**. The requirement was "initials only, never full names", and this
-/// is the difference between honouring it and promising it: a field that is not on
-/// the entity **cannot be rendered**, so no future widget, no debug print, and no
-/// careless `toString()` can leak another child's name into the UI. A convention
-/// would be one forgotten `Text(row.fullName)` away from a privacy bug.
+/// This entity used to carry three fields and three doc sections explaining the
+/// absences: no [fullName], no [currentStreak], no [userId]. Each absence was a
+/// structural privacy or honesty argument, and each is now **superseded** by
+/// `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md`'s full-fidelity
+/// decision. The old reasoning is not deleted — it is recorded here as the position
+/// that was correct for the screen Phase 1 shipped and is wrong for the screen
+/// `eva/redesign.html:612-636` draws.
 ///
-/// ## WHY THERE IS NO `currentStreak` EITHER
+/// ### [fullName] — the requirement was "initials only"; the veil replaces it
 ///
-/// The payload carries it, and it is **wrong**: `users.current_streak` is the stored
-/// value, which the backend's own memory fixture disagrees with — the seeded
-/// `David Mina` row says `current_streak: 4` while a fresh recompute yields 0, and
+/// The old text said: the payload's `full_name` is converted to [initials] and
+/// dropped, because "a field that is not on the entity cannot be rendered" and a
+/// convention would be one forgotten `Text(row.fullName)` away from a privacy bug.
+///
+/// **What changed:** ADR-0022 `:110-113` establishes that a ranked reader *is*
+/// nameable — the board's own design prints names, and `:1070` is the rendering rule
+/// for hiding them. The control is no longer the type system's silence; it is the
+/// **veil** (`:1069-1072`, ADR-0022 `:243-245`), a rendering choice over rows that
+/// already arrived. The entity carries the name because the row must be able to print
+/// it, and `CommunionPage` renders `witness {position}` instead whenever the veil is
+/// on. The mapper still derives [initials] from this same string, so the monogram and
+/// the name cannot disagree about who the row is.
+///
+/// ### [currentStreak] — the disagreement is still real, and the metric switch is real too
+///
+/// The old text said the payload's `current_streak` is "wrong": it is the stored
+/// `users.current_streak`, which the backend's memory fixture disagrees with — the
+/// seeded `David Mina` row says `4` while a fresh recompute yields `0`, and
 /// `last_completed_date` is `'2026-09-29'`, three days before the fixture's "today".
 /// The authoritative copy is `streak/summary.current_streak`, which the top bar's
-/// flame already draws. Mapping a second, disagreeing copy into a *ranking* widget
-/// would put two numbers for one fact on one screen. So it is dropped rather than
-/// mapped-and-ignored.
+/// flame draws.
 ///
-/// ## WHY THERE IS NO `userId`
+/// **What changed:** ADR-0022 `:49` makes the board's second metric real — the
+/// prototype's `streakM` option (`redesign.html:941`) ranks rows by this field. It is
+/// the row's own ranking value, not a second answer to the top bar's question, and the
+/// ranking arithmetic lives in `features/leaderboard/domain/leaderboard_ranking.dart`.
+/// **The disagreement can be visible**: the reader's row may show
+/// `streak/summary`'s number beside the flame while this entity's number ranks the
+/// board, because the two come from different endpoints with different recompute
+/// times. That is recorded rather than smoothed over; inventing agreement in the
+/// client would be a third number.
 ///
-/// Nothing in Phase 1 acts on another child — no tap target, no profile, no
-/// deep link. Holding the UUIDs of every child in the cohort in a value the UI can
-/// reach is data with no reader, and §3's placement test asks what a type is *for*.
-/// If a row ever becomes tappable, the id comes back at the same time as the
-/// behaviour that needs it.
+/// ### [userId] — the tap target arrived, so the id arrives with it
+///
+/// The old text said: nothing acts on another child, so holding the cohort's UUIDs
+/// would be data with no reader; "if a row ever becomes tappable, the id comes back at
+/// the same time as the behaviour that needs it."
+///
+/// **That behaviour is the cheer** (ADR-0022 `:58`, `:126-129`, `:207-215`;
+/// `redesign.html:1119-1124`): a non-reader row is tapped once per session, and the
+/// cheer is keyed by this id in `LeaderboardState.cheered`. The sentence is discharged,
+/// not reversed.
 @freezed
 final class LeaderboardRow with _$LeaderboardRow {
   /// A ranked child.
@@ -89,6 +133,9 @@ final class LeaderboardRow with _$LeaderboardRow {
     required this.rank,
     required this.score,
     required this.initials,
+    required this.userId,
+    required this.fullName,
+    required this.currentStreak,
   });
 
   /// 1-based position. Always present and always equal to the row's index + 1.
@@ -108,7 +155,45 @@ final class LeaderboardRow with _$LeaderboardRow {
   /// so `'David Mina (Grade 5)'` is `DM`, and not `D` from a token that includes the
   /// grade. Never empty: the mapper substitutes a placeholder rather than shipping a
   /// row with no label at all.
+  ///
+  /// ## DIVERGENCE FROM THE PROTOTYPE'S MONOGRAM, AND WHY THIS ONE STANDS
+  ///
+  /// The prototype's monogram is the **first character** of the display name —
+  /// `monogram()` returns `dispName(p,idx).trim()[0] || '✦'`
+  /// (`eva/redesign.html:1072`) — so `'David Mina'` is `D`, not `DM`.
+  ///
+  /// This carries the **mapper's** two-letter rule instead, and the reason is that
+  /// the mapper's rule is the one already in this repository, is tested, and is
+  /// written down: `LeaderboardMapper.initialsOf` strips the grade annotation
+  /// before it takes the letters, and takes the **first and last** token so that
+  /// `'Ana Maria Silva'` reads `AS` rather than `AM`. The prototype's rule would
+  /// make the grade annotation the monogram's second letter for every seeded row.
+  ///
+  /// The alternative — carrying the first character — would mean a second monogram
+  /// rule in the app, and the two surfaces (the row's orb and the podium's orb)
+  /// would have to agree about which one they use. They agree about this one.
   final String initials;
+
+  /// The server's id for this child — the key the cheer is recorded against.
+  ///
+  /// The payload's key is camelCase `userId` in an otherwise snake_case object; see
+  /// `LeaderboardMapper`'s doc. Never rendered. It is what makes "cheered once per
+  /// witness" a set membership test rather than a name comparison, and names are not
+  /// unique.
+  final String userId;
+
+  /// The child's name exactly as the server sent it, grade annotation included.
+  ///
+  /// Rendered as the row's name and as the podium's label, or replaced by
+  /// `witness {position}` while the veil is on. The mapper also derives [initials]
+  /// from this string, so the two surfaces cannot disagree about a row's identity.
+  final String fullName;
+
+  /// The row's ranking value under the `streaks` metric.
+  ///
+  /// The server's stored `users.current_streak`. See the class doc for the measured
+  /// disagreement with `streak/summary`, which is recorded rather than repaired here.
+  final int currentStreak;
 }
 
 /// Where the reader stands, which is a different question from who is above them.

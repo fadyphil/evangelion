@@ -131,6 +131,22 @@ final class SettingsHandle {
   Future<void> setReducedMotion({required bool reduced}) =>
       write((UserSettings current) => current.copyWith(reducedMotion: reduced));
 
+  /// Reports the board's veil state.
+  ///
+  /// The handle is how `/communion` — a feature that may not import
+  /// `features/settings` — writes a preference `app` installs and `/settings` also
+  /// shows. Named `veiled` rather than `value` so a call site reads
+  /// `setVeilWitnesses(veiled: true)` and not a boolean whose meaning is one file away.
+  Future<void> setVeilWitnesses({required bool veiled}) =>
+      write((UserSettings current) => current.copyWith(veilWitnesses: veiled));
+
+  /// Reports the board's podium visibility.
+  ///
+  /// See [setVeilWitnesses] for why this is on the handle rather than reached through
+  /// `features/settings` directly.
+  Future<void> setShowPodium({required bool shown}) =>
+      write((UserSettings current) => current.copyWith(showPodium: shown));
+
   /// Tells every [SettingsScope] descendant that [settings] may have changed.
   ///
   /// ## PUBLIC BECAUSE `ChangeNotifier.notifyListeners` IS **PROTECTED**, AND A

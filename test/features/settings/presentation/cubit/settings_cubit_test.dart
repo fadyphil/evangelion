@@ -407,6 +407,12 @@ void main() {
 
       await handle.setReducedMotion(reduced: true);
       expect(harness.cubit.state.settings.reducedMotion, isTrue);
+
+      await handle.setVeilWitnesses(veiled: true);
+      expect(harness.cubit.state.settings.veilWitnesses, isTrue);
+
+      await handle.setShowPodium(shown: false);
+      expect(harness.cubit.state.settings.showPodium, isFalse);
     });
 
     test(

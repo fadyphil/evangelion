@@ -17,13 +17,13 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
     as _i3;
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart'
-    as _i10;
-import 'package:evangelion/features/home/presentation/pages/home_page.dart'
-    as _i1;
-import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart'
     as _i11;
-import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_page.dart'
+import 'package:evangelion/features/home/presentation/pages/home_page.dart'
     as _i2;
+import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart'
+    as _i10;
+import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart'
+    as _i1;
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart'
     as _i13;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
@@ -41,11 +41,60 @@ import 'package:evangelion/features/settings/presentation/pages/settings_page.da
 import 'package:flutter/material.dart' as _i9;
 
 /// generated route for
-/// [_i1.HomePage]
+/// [_i1.CommunionPage]
+class CommunionRoute extends _i8.PageRouteInfo<CommunionRouteArgs> {
+  CommunionRoute({
+    _i9.Key? key,
+    _i10.LeaderboardCubit? cubit,
+    List<_i8.PageRouteInfo>? children,
+  }) : super(
+         CommunionRoute.name,
+         args: CommunionRouteArgs(key: key, cubit: cubit),
+         initialChildren: children,
+       );
+
+  static const String name = 'CommunionRoute';
+
+  static _i8.PageInfo page = _i8.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<CommunionRouteArgs>(
+        orElse: () => const CommunionRouteArgs(),
+      );
+      return _i1.CommunionPage(key: args.key, cubit: args.cubit);
+    },
+  );
+}
+
+class CommunionRouteArgs {
+  const CommunionRouteArgs({this.key, this.cubit});
+
+  final _i9.Key? key;
+
+  final _i10.LeaderboardCubit? cubit;
+
+  @override
+  String toString() {
+    return 'CommunionRouteArgs{key: $key, cubit: $cubit}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! CommunionRouteArgs) return false;
+    return key == other.key && cubit == other.cubit;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ cubit.hashCode;
+}
+
+/// generated route for
+/// [_i2.HomePage]
 class HomeRoute extends _i8.PageRouteInfo<HomeRouteArgs> {
   HomeRoute({
     _i9.Key? key,
-    _i10.HomeBloc? bloc,
+    _i11.HomeBloc? bloc,
     List<_i8.PageRouteInfo>? children,
   }) : super(
          HomeRoute.name,
@@ -61,7 +110,7 @@ class HomeRoute extends _i8.PageRouteInfo<HomeRouteArgs> {
       final args = data.argsAs<HomeRouteArgs>(
         orElse: () => const HomeRouteArgs(),
       );
-      return _i1.HomePage(key: args.key, bloc: args.bloc);
+      return _i2.HomePage(key: args.key, bloc: args.bloc);
     },
   );
 }
@@ -71,7 +120,7 @@ class HomeRouteArgs {
 
   final _i9.Key? key;
 
-  final _i10.HomeBloc? bloc;
+  final _i11.HomeBloc? bloc;
 
   @override
   String toString() {
@@ -87,55 +136,6 @@ class HomeRouteArgs {
 
   @override
   int get hashCode => key.hashCode ^ bloc.hashCode;
-}
-
-/// generated route for
-/// [_i2.LeaderboardPage]
-class LeaderboardRoute extends _i8.PageRouteInfo<LeaderboardRouteArgs> {
-  LeaderboardRoute({
-    _i9.Key? key,
-    _i11.LeaderboardCubit? cubit,
-    List<_i8.PageRouteInfo>? children,
-  }) : super(
-         LeaderboardRoute.name,
-         args: LeaderboardRouteArgs(key: key, cubit: cubit),
-         initialChildren: children,
-       );
-
-  static const String name = 'LeaderboardRoute';
-
-  static _i8.PageInfo page = _i8.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<LeaderboardRouteArgs>(
-        orElse: () => const LeaderboardRouteArgs(),
-      );
-      return _i2.LeaderboardPage(key: args.key, cubit: args.cubit);
-    },
-  );
-}
-
-class LeaderboardRouteArgs {
-  const LeaderboardRouteArgs({this.key, this.cubit});
-
-  final _i9.Key? key;
-
-  final _i11.LeaderboardCubit? cubit;
-
-  @override
-  String toString() {
-    return 'LeaderboardRouteArgs{key: $key, cubit: $cubit}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! LeaderboardRouteArgs) return false;
-    return key == other.key && cubit == other.cubit;
-  }
-
-  @override
-  int get hashCode => key.hashCode ^ cubit.hashCode;
 }
 
 /// generated route for

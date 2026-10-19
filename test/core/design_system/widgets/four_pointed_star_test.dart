@@ -54,20 +54,23 @@ const double _inkBoxFactor = 4;
 const Key _inkKey = ValueKey<String>('four-pointed-star-ink');
 
 /// The star alone, in a box [_inkBoxFactor] times [size] to measure.
-Widget _measured({required double size, required Color color}) =>
-    evaAmbientHarness(
-      child: Center(
-        child: RepaintBoundary(
-          key: _inkKey,
-          child: SizedBox.square(
-            dimension: size * _inkBoxFactor,
-            child: Center(
-              child: FourPointedStar(size: size, color: color),
-            ),
-          ),
+Widget _measured({
+  required double size,
+  required Color color,
+  bool outline = false,
+}) => evaAmbientHarness(
+  child: Center(
+    child: RepaintBoundary(
+      key: _inkKey,
+      child: SizedBox.square(
+        dimension: size * _inkBoxFactor,
+        child: Center(
+          child: FourPointedStar(size: size, color: color, outline: outline),
         ),
       ),
-    );
+    ),
+  ),
+);
 
 /// The same harness with **no star**, for the negative control.
 ///
@@ -221,6 +224,14 @@ Color _modalOpaqueColour(Uint8List rgba) {
     );
   return Color(ranked.first.key);
 }
+
+/// The alpha byte at `(x, y)` in an RGBA buffer.
+///
+/// The outline assertions turn on one question — "is the middle of this shape
+/// empty?" — and that is a single byte rather than a scan. A helper rather than
+/// an index expression so the buffer's row stride is written once.
+int _alphaAt(Uint8List rgba, int width, int x, int y) =>
+    rgba[((y * width) + x) * 4 + 3];
 
 /// The [CustomPainter] the star's own `CustomPaint` is holding.
 ///
@@ -433,6 +444,122 @@ void main() {
       await tester.pump();
 
       expect(_modalOpaqueColour(await _inkPixels(tester)), _ember);
+    });
+  });
+
+  group('the outline mode draws the same silhouette, hollow', () {
+    // `eva/redesign.html:1072` — `monogram()` returns `'✧'`, U+2727, for a
+    // veiled witness. Same measurement as U+2726: no bundled family carries it,
+    // so it is painted. This group is what keeps the second mode from being an
+    // unasserted flag on the constructor.
+
+    testWidgets('an outline in the same box has ink, and less of it', (
+      WidgetTester tester,
+    ) async {
+      _pinSurface(tester);
+      await tester.pumpWidget(_measured(size: 40, color: _ember));
+      await tester.pump();
+      final Uint8List filled = await _inkPixels(tester);
+      final int filledLit = _litPixels(filled);
+
+      await tester.pumpWidget(
+        _measured(size: 40, color: _ember, outline: true),
+      );
+      await tester.pump();
+      final Uint8List hollow = await _inkPixels(tester);
+
+      expect(
+        _litPixels(hollow),
+        greaterThan(0),
+        reason:
+            'the outline painted nothing, so "it is hollow" would hold over '
+            'an empty canvas',
+      );
+      expect(
+        _litPixels(hollow),
+        lessThan(filledLit),
+        reason: 'a stroke covers less than the fill it traces',
+      );
+    });
+
+    testWidgets('the middle is empty and the fill\'s middle is not', (
+      WidgetTester tester,
+    ) async {
+      _pinSurface(tester);
+      await tester.pumpWidget(_measured(size: 40, color: _ember));
+      await tester.pump();
+      final ({int height, int width}) box = _inkSize(
+        tester,
+        await _inkPixels(tester),
+      );
+      final int centreX = box.width ~/ 2;
+      final int centreY = box.height ~/ 2;
+
+      expect(
+        _alphaAt(await _inkPixels(tester), box.width, centreX, centreY),
+        0xFF,
+        reason: 'the centre of the filled star is the fill',
+      );
+
+      await tester.pumpWidget(
+        _measured(size: 40, color: _ember, outline: true),
+      );
+      await tester.pump();
+      expect(
+        _alphaAt(await _inkPixels(tester), box.width, centreX, centreY),
+        0,
+        reason:
+            'the centre of `✧` is the page, not the ink — a stroke whose '
+            'centre is inked is a fill with a thin edge',
+      );
+    });
+
+    testWidgets('the outline traces the filled silhouette', (
+      WidgetTester tester,
+    ) async {
+      _pinSurface(tester);
+      await tester.pumpWidget(_measured(size: 40, color: _ember));
+      await tester.pump();
+      final Rect filled = _inkBounds(await _inkPixels(tester), 160, 160)!;
+
+      await tester.pumpWidget(
+        _measured(size: 40, color: _ember, outline: true),
+      );
+      await tester.pump();
+      final Rect hollow = _inkBounds(await _inkPixels(tester), 160, 160)!;
+
+      // A stroke is centred on the path, so half of its width lies outside the
+      // fill's bounds: 40 × 0.1 = 4px of stroke, 2px of it outside — plus one
+      // rasterised pixel of coverage slack, measured at 3. Three pixels of
+      // allowance is that half-width and not a tolerance: an outline that grew a
+      // glow or drew a bigger star would exceed it and fail here.
+      expect(hollow.left, greaterThanOrEqualTo(filled.left - 3));
+      expect(hollow.top, greaterThanOrEqualTo(filled.top - 3));
+      expect(hollow.right, lessThanOrEqualTo(filled.right + 3));
+      expect(hollow.bottom, lessThanOrEqualTo(filled.bottom + 3));
+    });
+
+    testWidgets('changing only the mode repaints; keeping it does not', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(_measured(size: 40, color: _ember));
+      final CustomPainter filled = _painterOf(tester);
+
+      await tester.pumpWidget(
+        _measured(size: 40, color: _ember, outline: true),
+      );
+      final CustomPainter hollow = _painterOf(tester);
+
+      expect(
+        hollow.shouldRepaint(filled),
+        isTrue,
+        reason: 'the ink is the same but the shape it draws is not',
+      );
+      expect(
+        hollow.shouldRepaint(_painterOf(tester)),
+        isFalse,
+        reason: 'same ink, same mode, nothing to repaint',
+      );
     });
   });
 

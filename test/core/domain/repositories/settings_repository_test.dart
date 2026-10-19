@@ -118,32 +118,38 @@ void main() {
       expect(unwrap(await loadThroughFreshStore()), const UserSettings());
     });
 
-    test('and the default is DARK, step 3, no language, motion on', () async {
-      // Spelled out rather than compared to `UserSettings()`, because "the default is
-      // the default" is a tautology and this is the claim that matters: the app opens
-      // dark (§5.1's dark-first product decision), at the table's identity, following
-      // the device's language, with animation.
-      const UserSettings defaults = UserSettings();
-      expect(defaults.themeMode, AppThemeMode.dark);
-      expect(defaults.fontStep, kDefaultFontStep);
-      expect(defaults.fontStep, 3);
-      expect(evaScalerFor(defaults.fontStep).scale(1), 1.0);
-      expect(
-        defaults.language,
-        isNull,
-        reason: 'null is "follow the platform"',
-      );
-      expect(defaults.reducedMotion, isFalse);
-    });
+    test(
+      'and the default is DARK, step 3, no language, motion on, unveiled',
+      () async {
+        // Spelled out rather than compared to `UserSettings()`, because "the default is
+        // the default" is a tautology and this is the claim that matters: the app opens
+        // dark (§5.1's dark-first product decision), at the table's identity, following
+        // the device's language, with animation, showing every witness, with the podium
+        // drawn.
+        const UserSettings defaults = UserSettings();
+        expect(defaults.themeMode, AppThemeMode.dark);
+        expect(defaults.fontStep, kDefaultFontStep);
+        expect(defaults.fontStep, 3);
+        expect(evaScalerFor(defaults.fontStep).scale(1), 1.0);
+        expect(
+          defaults.language,
+          isNull,
+          reason: 'null is "follow the platform"',
+        );
+        expect(defaults.reducedMotion, isFalse);
+        expect(defaults.veilWitnesses, isFalse);
+        expect(defaults.showPodium, isTrue);
+      },
+    );
   });
 
   group('a written setting survives a re-read — the plan requirement', () {
     // ## ONE CASE PER FIELD, NOT ONE CASE PER "it round-trips"
     //
     // A single `save(nonDefault)` / `load()` / `expect(equal)` passes with **one** of
-    // the four fields persisting, because the other three round-trip through their
-    // defaults and the comparison is on the whole record. Four fields, four cases, and
-    // the case name names the field — which is what makes a failure readable.
+    // the fields persisting, because the others round-trip through their defaults and
+    // the comparison is on the whole record. One field, one case, and the case name
+    // names the field — which is what makes a failure readable.
     const List<({String field, UserSettings value})> cases =
         <({String field, UserSettings value})>[
           (
@@ -156,6 +162,8 @@ void main() {
             value: UserSettings(language: ReadingLanguage.arabic),
           ),
           (field: 'reducedMotion', value: UserSettings(reducedMotion: true)),
+          (field: 'veilWitnesses', value: UserSettings(veilWitnesses: true)),
+          (field: 'showPodium', value: UserSettings(showPodium: false)),
         ];
 
     for (final ({String field, UserSettings value}) entry in cases) {
@@ -188,6 +196,8 @@ void main() {
         fontStep: 1,
         language: ReadingLanguage.arabic,
         reducedMotion: true,
+        veilWitnesses: true,
+        showPodium: false,
       );
       await SettingsRepositoryImpl(freshStore()).save(everything);
 
@@ -202,6 +212,8 @@ void main() {
           fontStep: 5,
           language: ReadingLanguage.arabic,
           reducedMotion: true,
+          veilWitnesses: true,
+          showPodium: false,
         ),
       );
       await writer.save(const UserSettings(themeMode: AppThemeMode.system));

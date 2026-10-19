@@ -16,11 +16,17 @@ row where they disagreed.
 | --- | --- |
 | **Claim** | `docs/agents/AGENT_CONTEXT.md:126` — "The six routes", with a 6-row table |
 | **Reality** | `lib/app/router/app_router.dart:242-261` declares **7** `AutoRoute`s plus a `RedirectRoute` for `*`. `/leaderboard` is the seventh. `app_routes.dart` declares **9** constants: the 7, plus `/servant` (declared, deliberately not routed) and `*`. |
-| **Fixed?** | Not yet — this is a known open item, tracked in `docs/SEAMS.md`. |
+| **Fixed?** | **Yes — 2026-10-19, Task 5.5.** §2's table now has seven rows and its heading reads "The seven routes"; the seventh is `/communion`, which is the renamed `/leaderboard`. The **count** is what the row was about, and it is now true. |
 
 The table was written before the leaderboard landed. Decisions 143–155 record its
 arrival; §2 was never updated. The same shape as decision 21's lesson: a claim about
 a number that stops being checked the moment it is written.
+
+**And the fix is a second instance of the lesson.** The heading said "six" while
+the table had six rows and the router had seven routes — a claim that was wrong in
+the direction that *reads* as right, because six rows look like six screens. The
+number in the prose and the number in the table were two numbers that agreed with
+each other and not with the code, and nothing was checking either.
 
 ---
 

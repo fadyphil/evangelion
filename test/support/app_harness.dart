@@ -36,6 +36,10 @@ import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/leaderboard/data/datasources/cheer_local_data_source.dart';
+import 'package:evangelion/features/leaderboard/data/repositories/local_cheer_repository.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart'
+    as leaderboard;
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/usecases/refresh_session_questions.dart';
@@ -104,7 +108,7 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
     settingsHarness(loadImmediately: false);
   }
   // **The sixth registration, and the first one a screen's *interim* chrome made
-  // necessary.** `LeaderboardPage` resolves its `LeaderboardCubit` from the locator
+  // necessary.** `CommunionPage` resolves its `LeaderboardCubit` from the locator
   // like every other page, and `/` reaches it through `SealFab`'s interim item —
   // the redesign's dock (Phase 6) is where the board belongs, and until then this is
   // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
@@ -228,7 +232,7 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
     settingsHarness(loadImmediately: false);
   }
   // **The sixth registration, and the first one a screen's *interim* chrome made
-  // necessary.** `LeaderboardPage` resolves its `LeaderboardCubit` from the locator
+  // necessary.** `CommunionPage` resolves its `LeaderboardCubit` from the locator
   // like every other page, and `/` reaches it through `SealFab`'s interim item —
   // the redesign's dock (Phase 6) is where the board belongs, and until then this is
   // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
@@ -511,13 +515,17 @@ QuizBloc registerTestQuizBloc() {
 /// The `LeaderboardCubit` twin, over a fake that fails like its siblings.
 ///
 /// The route exists and its cubit resolves from the locator, so a router test that
-/// lands on `/leaderboard` — `home_navigation_test.dart`'s second seal arm — needs
+/// lands on `/communion` — `home_navigation_test.dart`'s second seal arm — needs
 /// one in the graph. The fake **fails**, like the other three, because a router suite
 /// is about the route and a stubbed board would be a payload the next reader might
 /// mistake for real.
 LeaderboardCubit registerTestLeaderboardCubit() {
   final LeaderboardCubit cubit = LeaderboardCubit(
     loadLeaderboard: LoadLeaderboard(_FakeLeaderboardRepository()),
+    getReaderSession: leaderboard.GetBoardReaderSession(
+      FakeAuthRepository(AuthLocalDataSource()),
+    ),
+    cheerRepository: LocalCheerRepository(CheerLocalDataSource()),
   );
   getIt.registerSingleton<LeaderboardCubit>(cubit);
   addTearDown(() => getIt.unregister<LeaderboardCubit>());

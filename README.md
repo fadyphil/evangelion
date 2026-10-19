@@ -84,7 +84,7 @@ authority document is stale — see [ROADMAP.md § Docs debt](ROADMAP.md#docs-de
 | `/quiz` | Reflection questions with per-answer feedback | **API** |
 | `/result` | Score, streak, stat tiles | **API** — the submit response, held in memory |
 | `/settings` | Appearance, reading, about | Local — `shared_preferences` |
-| `/leaderboard` | Cohort ranking | **API**, or a stub via `--dart-define` |
+| `/communion` | The Communion — the cohort's board | **API**, or a stub via `--dart-define` |
 
 Four of these are deliberately inert and say so in their own accessible names —
 "unavailable in this build" — rather than pretending to work. There is no

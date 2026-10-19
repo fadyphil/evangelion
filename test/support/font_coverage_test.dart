@@ -171,6 +171,54 @@ void main() {
       }
     });
 
+    // ## THE TWO PUNCTUATION CHARACTERS `/communion` PUT ON SCREEN
+    //
+    // `·` (U+00B7) and `≈` (U+2248) are the only two non-ASCII characters this
+    // repository's Arabic or English copy reaches for, and they were both
+    // measured rather than assumed — the measurements are **pinned here** so a
+    // font swap cannot quietly turn either of them into a tofu box.
+    //
+    // The `≈` is the interesting one, and the reason it is pinned is that its
+    // answer is **not uniform**: every family carries it except **Amiri**, the
+    // Arabic UI family. So the English arms of `/communion` may use `≈` and the
+    // Arabic arms may not — and the Arabic ARB says `نحو` ("about") instead.
+    // That substitution is recorded at `app_en.arb`'s `leaderboardPassHint` and
+    // at `communion_countdown_line.dart`.
+    test('and every family carries the middle dot the board\'s copy uses', () {
+      for (final String family in kBundledFontFamilies) {
+        expect(
+          familyCovers(family, <int>[0x00B7]),
+          isTrue,
+          reason:
+              '$family carries U+00B7 (`·`), which `/communion`\'s `noReset` '
+              'string and its row names both use',
+        );
+      }
+    });
+
+    test('and the approximation sign is in every family but the Arabic one', () {
+      // The asymmetry, measured. `≈` is the prototype's own approximation mark
+      // (`eva/redesign.html:944`, `:946`), and it is in four of the five
+      // bundled families.
+      for (final String family in kBundledFontFamilies) {
+        if (family == EvaTypography.arabicFamily) continue;
+        expect(
+          familyCovers(family, <int>[0x2248]),
+          isTrue,
+          reason: '$family carries U+2248 (`≈`)',
+        );
+      }
+      expect(
+        familyCovers(EvaTypography.arabicFamily, <int>[0x2248]),
+        isFalse,
+        reason:
+            'Amiri does **not** carry U+2248 (`≈`), which is why the Arabic arms '
+            'of `/communion` say `نحو` instead of typing the mark. If a future '
+            'font swap gives Amiri the codepoint, this assertion is the one that '
+            'fails and the substitution can be reconsidered.',
+      );
+    });
+
     test('and `Amiri` is the family the design system already names for Arabic', () {
       // The measurement and the token have to agree, or the fix would be right about
       // the assets and wrong about the design system.

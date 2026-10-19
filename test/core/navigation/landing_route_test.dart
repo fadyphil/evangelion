@@ -144,9 +144,9 @@ void main() {
     //
     // COMPLETE, all nine, and asserted complete against the declaration site
     // below. An earlier version named seven of the nine and omitted
-    // `leaderboard` and `fallback`, which made the failure message factually
-    // wrong: a landing on `/leaderboard` would have been reported as "an
-    // undeclared path" when `/leaderboard` is very much declared. An incomplete
+    // `communion` and `fallback`, which made the failure message factually
+    // wrong: a landing on `/communion` would have been reported as "an
+    // undeclared path" when `/communion` is very much declared. An incomplete
     // hand-written mirror of another file is the same second-source-of-truth
     // shape this file's own doc argues against, and a tenth constant would have
     // landed in the gap unnoticed.
@@ -157,7 +157,7 @@ void main() {
       AppRoutes.quiz,
       AppRoutes.result,
       AppRoutes.settings,
-      AppRoutes.leaderboard,
+      AppRoutes.communion,
       AppRoutes.servant,
       AppRoutes.fallback,
     };

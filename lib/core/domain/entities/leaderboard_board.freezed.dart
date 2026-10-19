@@ -27,20 +27,20 @@ $LeaderboardRowCopyWith<LeaderboardRow> get copyWith => _$LeaderboardRowCopyWith
 @override
 bool operator ==(Object other) {
   final _this = this as LeaderboardRow;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardRow&&(identical(other.rank, _this.rank) || other.rank == _this.rank)&&(identical(other.score, _this.score) || other.score == _this.score)&&(identical(other.initials, _this.initials) || other.initials == _this.initials));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardRow&&(identical(other.rank, _this.rank) || other.rank == _this.rank)&&(identical(other.score, _this.score) || other.score == _this.score)&&(identical(other.initials, _this.initials) || other.initials == _this.initials)&&(identical(other.userId, _this.userId) || other.userId == _this.userId)&&(identical(other.fullName, _this.fullName) || other.fullName == _this.fullName)&&(identical(other.currentStreak, _this.currentStreak) || other.currentStreak == _this.currentStreak));
 }
 
 
 @override
 int get hashCode {
   final _this = this as LeaderboardRow;
-  return Object.hash(runtimeType,_this.rank,_this.score,_this.initials);
+  return Object.hash(runtimeType,_this.rank,_this.score,_this.initials,_this.userId,_this.fullName,_this.currentStreak);
 }
 
 @override
 String toString() {
   final _this = this as LeaderboardRow;
-  return 'LeaderboardRow(rank: ${_this.rank}, score: ${_this.score}, initials: ${_this.initials})';
+  return 'LeaderboardRow(rank: ${_this.rank}, score: ${_this.score}, initials: ${_this.initials}, userId: ${_this.userId}, fullName: ${_this.fullName}, currentStreak: ${_this.currentStreak})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $LeaderboardRowCopyWith<$Res>  {
   factory $LeaderboardRowCopyWith(LeaderboardRow value, $Res Function(LeaderboardRow) _then) = _$LeaderboardRowCopyWithImpl;
 @useResult
 $Res call({
- int rank, int score, String initials
+ int rank, int score, String initials, String userId, String fullName, int currentStreak
 });
 
 
@@ -68,12 +68,15 @@ class _$LeaderboardRowCopyWithImpl<$Res>
 
 /// Create a copy of LeaderboardRow
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? rank = null,Object? score = null,Object? initials = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? rank = null,Object? score = null,Object? initials = null,Object? userId = null,Object? fullName = null,Object? currentStreak = null,}) {
   return _then(LeaderboardRow(
 rank: null == rank ? _self.rank : rank // ignore: cast_nullable_to_non_nullable
 as int,score: null == score ? _self.score : score // ignore: cast_nullable_to_non_nullable
 as int,initials: null == initials ? _self.initials : initials // ignore: cast_nullable_to_non_nullable
-as String,
+as String,userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
+as String,fullName: null == fullName ? _self.fullName : fullName // ignore: cast_nullable_to_non_nullable
+as String,currentStreak: null == currentStreak ? _self.currentStreak : currentStreak // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

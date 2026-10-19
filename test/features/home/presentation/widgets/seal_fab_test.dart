@@ -44,9 +44,15 @@ import '../../../../support/home_harness.dart';
 /// suppressed — so this is two items, and the third needs `language_sheet.dart` promoted
 /// into the shared kernel, which is a larger change than placing a dial.
 ///
-/// Leaderboard takes Profile's slot: Profile is cut for want of an endpoint, and
-/// `/leaderboard` is the one prototype destination with no other entry point on `/`.
-const List<String> _items = <String>['Settings', 'Leaderboard'];
+/// The board takes Profile's slot: Profile is cut for want of an endpoint, and the
+/// board is the one prototype destination with no other entry point on `/`.
+///
+/// **The label is "Communion"**, which is the redesign's own word for the board
+/// (`eva/redesign.html:932`'s `dockBoard`, and `:615`'s `boardT`). It was
+/// "Leaderboard" until Task 5.5 renamed the route, and leaving the two arms of
+/// the same key saying different things — "Communion" in Arabic, "Leaderboard" in
+/// English — was the defect the ARB's own description names.
+const List<String> _items = <String>['Settings', 'Communion'];
 
 /// Advances past the entrance animation so the pills are actually present.
 ///

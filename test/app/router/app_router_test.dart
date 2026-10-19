@@ -90,7 +90,7 @@ void main() {
           AppRoutes.quiz,
           AppRoutes.result,
           AppRoutes.settings,
-          AppRoutes.leaderboard,
+          AppRoutes.communion,
           // `*` last, always. Moving it to the front turns every path into `/` —
           // measured at 46 tests when it was tried.
           AppRoutes.fallback,
@@ -119,6 +119,7 @@ void main() {
             QuizRoute.name,
             ResultRoute.name,
             SettingsRoute.name,
+            CommunionRoute.name,
           ),
         ),
         reason: 'the bare asterisk has no page to build; it redirects',
@@ -139,11 +140,10 @@ void main() {
         QuizRoute.name,
         ResultRoute.name,
         SettingsRoute.name,
-        // **Phase 1 added the seventh**, and the `sublist` above is why this line is
-        // the only edit: the count was never written down, precisely so that adding a
-        // screen would not mean renumbering a `take`. The route goes last among the
-        // real ones because `*` must stay after it.
-        LeaderboardRoute.name,
+        // **Phase 5.5 renamed the seventh to CommunionRoute**, and the `sublist`
+        // above is why this line is the only edit: the count was never written down,
+        // precisely so that adding a screen would not mean renumbering a `take`.
+        CommunionRoute.name,
       ], reason: 'the locked screens, in route-table order');
     });
 
@@ -161,7 +161,7 @@ void main() {
         AppRoutes.quiz,
         AppRoutes.result,
         AppRoutes.settings,
-        AppRoutes.leaderboard,
+        AppRoutes.communion,
       ]) {
         expect(guardCounts[guarded], 1, reason: '$guarded is behind the guard');
       }

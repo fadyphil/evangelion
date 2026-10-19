@@ -92,6 +92,7 @@ import 'package:flutter/material.dart';
 /// | --- | --- | --- |
 /// | `/`, the selah circle's centre | `:269` `.breathing{… font-size:11px}` | **shipped** — `SelahCard` passes `11`, which is the CSS's `font-size` |
 /// | `/reading`, the bookmark button | `:544` `#bmBtn` | **incoming** — Task 5.3's rebuild of `/reading` |
+/// | `/communion`, a veiled witness's monogram | `:1072` `monogram()` returns `'✧'` | **incoming** — Task 5.5's rebuild of the board |
 ///
 /// **The size is the glyph's `font-size`, not a box invented here.** `:269` sizes
 /// the circle 44×44 with `font-size: 11px`, and a text glyph's box matches its
@@ -103,6 +104,25 @@ import 'package:flutter/material.dart';
 /// is why the widget takes a `size` and publishes no default for it. A default
 /// would be a second answer to a question the caller has already answered, and
 /// `PassageDropCap`'s doc records that reasoning for the same choice.
+///
+/// ## [outline] — THE SECOND SHAPE, AND WHY IT IS THE SAME WIDGET
+///
+/// `eva/redesign.html:1072` draws a second four-pointed star as a **character**:
+/// `monogram()` returns `'✧'` — U+2727 WHITE FOUR POINTED STAR — for a witness
+/// the veil is hiding. That codepoint is in **no bundled family either**, so it
+/// is the U+2726 measurement repeated: a browser renders it, this client would
+/// type a tofu box. Both shapes are the same path, inked the same way — a filled
+/// star and the same star stroked — so they are one widget with one flag rather
+/// than two files that would have to agree about the path, the `waist` and the
+/// box forever.
+///
+/// **The default is [outline] `false`, which keeps today's paint byte-identical.**
+/// That matters beyond tidiness: `home_page_test.dart`'s selah-circle goldens and
+/// `reading`'s bookmark button were captured against the filled shape, and a
+/// default that changed the paint would move every one of them for a mode none
+/// of them asked for. `four_pointed_star_test.dart` asserts the two modes
+/// separately on pixels, and the filled-mode rows are the ones that existed
+/// before this parameter.
 ///
 /// ## IT IS DECORATIVE, AND THAT IS A CLAIM WITH A WITNESS
 ///
@@ -124,7 +144,16 @@ import 'package:flutter/material.dart';
 /// the meaning lives on the button, not on the ornament.
 class FourPointedStar extends StatelessWidget {
   /// A four-pointed star drawn in a [size] × [size] box, in [color].
-  const FourPointedStar({required this.size, required this.color, super.key});
+  ///
+  /// [outline] draws the shape as a stroke instead of a fill — the `✧` arm of
+  /// `eva/redesign.html:1072`. See the class doc for why it is a flag here and
+  /// why `false` is the default.
+  const FourPointedStar({
+    required this.size,
+    required this.color,
+    this.outline = false,
+    super.key,
+  });
 
   /// The box the shape is drawn in, and its whole geometry — the em box the
   /// `✦` would have occupied at the prototype's `font-size`.
@@ -145,10 +174,17 @@ class FourPointedStar extends StatelessWidget {
   /// makes the same argument for its own `color`.
   final Color color;
 
+  /// Whether the shape is stroked (`✧`, hollow) rather than filled (`✦`).
+  ///
+  /// `eva/redesign.html:1072`'s veiled monogram. The stroke is centred on the
+  /// same path a fill would cover, so the two modes have the same silhouette —
+  /// asserted on pixels by the widget's own test.
+  final bool outline;
+
   @override
   Widget build(BuildContext context) => CustomPaint(
     size: Size.square(size),
-    painter: _StarPainter(color: color),
+    painter: _StarPainter(color: color, outline: outline),
   );
 }
 
@@ -160,9 +196,12 @@ class FourPointedStar extends StatelessWidget {
 /// `waist`, which is the one number this file says is the character at this
 /// scale rather than a rotated square.
 class _StarPainter extends CustomPainter {
-  const _StarPainter({required this.color});
+  const _StarPainter({required this.color, this.outline = false});
 
   final Color color;
+
+  /// Whether the path is stroked rather than filled. See [FourPointedStar.outline].
+  final bool outline;
 
   /// How far the four concave arcs bow toward the centre, as a fraction of the
   /// box.
@@ -171,6 +210,14 @@ class _StarPainter extends CustomPainter {
   /// the proportion the character has: a `✦` is notably slimmer than a rotated
   /// square, and a half would have drawn exactly that.
   static const double waist = 0.25;
+
+  /// The outline's stroke width, as a fraction of the box.
+  ///
+  /// The `✧` character's own bar is roughly a tenth of its em box, so this is a
+  /// measurement of the character rather than a hairline chosen here. Expressed
+  /// as a fraction because the two call sites draw the shape at different sizes
+  /// and a constant would be thick at 11 and invisible at 40.
+  static const double outlineStroke = 0.1;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -191,20 +238,33 @@ class _StarPainter extends CustomPainter {
       ..conicTo(w * (0.5 - waist), h * (0.5 + waist), 0, h / 2, 1)
       ..conicTo(w * (0.5 - waist), h * (0.5 - waist), w / 2, 0, 1)
       ..close();
-    canvas.drawPath(path, Paint()..color = color);
+    // A stroke of `size * outlineStroke` centred on the path, so half of it sits
+    // outside the fill's silhouette — which is why the widget's outline test
+    // allows the half-width of slack and asserts the *bounds* rather than an
+    // exact rect.
+    final Paint paint = Paint()..color = color;
+    if (outline) {
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.shortestSide * outlineStroke
+        ..strokeJoin = StrokeJoin.round;
+    }
+    canvas.drawPath(path, paint);
   }
 
-  /// Repaint only on a **different ink**.
+  /// Repaint only on a **different ink or a different mode**.
   ///
   /// The size is not consulted because it is not stored: it arrives as the
   /// `Size` argument to [paint], and a change to it resizes the render box,
-  /// which repaints whether this says so or not. So the one thing that can make
-  /// this painter's *output* different — the colour — is the one thing that
-  /// returns true, and a rebuild with the colour unchanged repaints nothing.
+  /// which repaints whether this says so or not. So the two things that can make
+  /// this painter's *output* different — the colour and the fill/stroke mode —
+  /// are the two things that return true, and a rebuild with neither changed
+  /// repaints nothing.
   ///
   /// `oldDelegate.color != color` rather than `!identical(...)`: `build` creates
   /// a fresh `_StarPainter` on every call, so identity is always false and
   /// asserting on it would repaint on every frame of every ambient animation.
   @override
-  bool shouldRepaint(_StarPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(_StarPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.outline != outline;
 }

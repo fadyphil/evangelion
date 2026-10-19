@@ -3,11 +3,10 @@
 /// `context.router.pushNamed('/quiz')` is a typo the compiler cannot see and a
 /// renamed route cannot find.
 ///
-/// Six of the paths are locked by AGENT_CONTEXT §2. Two more are declared here
-/// and not by it — [leaderboard] and [servant] — and each carries its own
-/// paragraph saying so, because "the six" was this file's own headline and a
-/// reader who stopped reading there would have believed the seventh and eighth
-/// routes were §2's too.
+/// Seven of the paths are locked by AGENT_CONTEXT §2. One more is declared here
+/// and not by it — [servant] — and carries its own paragraph saying so, because
+/// "the seven" was this file's own headline and a reader who stopped reading there
+/// would have believed the eighth route was §2's too.
 ///
 /// PURE DART. `core/navigation` is not `core/domain`, so a `package:flutter`
 /// import would be permitted here — but it is not needed, and staying
@@ -66,18 +65,18 @@ abstract final class AppRoutes {
   /// `/settings` — appearance, reading, about. Local only, never synced.
   static const String settings = '/settings';
 
-  /// `/leaderboard` — the cohort's standings over a chosen window.
+  /// `/communion` — the cohort's board over a chosen window.
   ///
   /// ## WHY IT IS A **SEVENTH** ROUTE AND NOT A TAB
   ///
   /// It is pushed, not a destination in the bottom bar, because it is reached from
-  /// Home's card and from nowhere else — a tab would promise an equal place in the app
-  /// for a screen two of six screens can reach.
+  /// Home's seal dock / journey and from nowhere else — a tab would promise an equal
+  /// place in the app for a screen two of seven screens can reach.
   ///
   /// Behind `_guards` like every screen after `/login`, so it cannot be entered by a
   /// deep link while signed out. See `auth_guard.dart` for what the guard actually
   /// checks — and for why that is a UX gate and **not** an authorisation one.
-  static const String leaderboard = '/leaderboard';
+  static const String communion = '/communion';
 
   /// `/servant` — where both servant roles land. **Declared, not yet routed.**
   ///
@@ -137,13 +136,14 @@ abstract final class AppRoutes {
   /// `landingRouteFor`, the reader who has not read this paragraph will believe a
   /// servant screen exists.
   ///
-  /// ## WHY IT IS NOT ONE OF THE SIX LOCKED PATHS, AND WHY IT STILL GETS A ROW
+  /// ## WHY IT IS NOT ONE OF THE LOCKED PATHS, AND WHY IT STILL GETS A ROW
   ///
-  /// §2 locks six route paths; this is the eighth declaration and the second one
-  /// whose value §2 does not fix — `/leaderboard` was the first, and it is why
-  /// `app_routes_test.dart` carries a value row for it rather than leaving it to
-  /// arrive silently. The row exists so a reader has one place to look for what
-  /// each declared path is, not because the value is in doubt.
+  /// §2 locks **seven** route paths; this is the eighth declaration and now the
+  /// **only** one whose value §2 does not fix. It was the second until Task 5.5
+  /// moved `/communion` — then `/leaderboard` — into §2's route table, which is
+  /// why `app_routes_test.dart` carries a value row for it rather than leaving it
+  /// to arrive silently. The row exists so a reader has one place to look for
+  /// what each declared path is, not because the value is in doubt.
   ///
   /// ## AND IT IS NOT A PERMISSION
   ///

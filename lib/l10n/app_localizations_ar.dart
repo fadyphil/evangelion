@@ -115,16 +115,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeCategoryApocalypse => 'رؤيا';
 
   @override
-  String get leaderboardTitle => 'ترتيب المجموعة';
+  String get leaderboardTitle => 'الشركة';
 
   @override
-  String get leaderboardWindowWeekly => 'الأسبوع';
+  String get leaderboardWindowWeekly => 'أسبوع';
 
   @override
-  String get leaderboardWindowMonthly => 'الشهر';
+  String get leaderboardWindowMonthly => 'شهر';
 
   @override
-  String get leaderboardWindowAllTime => 'منذ البداية';
+  String get leaderboardWindowAllTime => 'الكل';
 
   @override
   String get leaderboardEmptyTitle => 'لا توجد نتائج بعد';
@@ -134,21 +134,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'عند بدء إجابات المجموعة سيظهر الترتيب هنا.';
 
   @override
-  String get leaderboardYourRank => 'أنت';
-
-  @override
   String get leaderboardUnranked => 'غير مصنّف بعد';
-
-  @override
-  String get leaderboardScoreLabel => 'نقطة';
-
-  @override
-  String get leaderboardOpenFull => 'عرض الكل';
 
   @override
   String leaderboardRowSemantics(
     int count,
     String digits,
+    int streakCount,
+    String streakDigits,
     String initials,
     String rank,
     String isReader,
@@ -156,19 +149,89 @@ class AppLocalizationsAr extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'نقطة',
-      many: 'نقطة',
-      few: 'نقاط',
+      other: '$digits نقطة',
+      many: '$digits نقطة',
+      few: '$digits نقاط',
       two: 'نقطتان',
       one: 'نقطة واحدة',
       zero: 'لا نقاط',
     );
-    String _temp1 = intl.Intl.selectLogic(isReader, {
+    String _temp1 = intl.Intl.pluralLogic(
+      streakCount,
+      locale: localeName,
+      other: '$streakDigits شعلة',
+      many: '$streakDigits شعلة',
+      few: '$streakDigits شعلات',
+      two: 'شعلتان',
+      one: 'شعلة واحدة',
+      zero: 'لا شعلات',
+    );
+    String _temp2 = intl.Intl.selectLogic(isReader, {
       'true': '، هذا أنت',
       'other': '',
     });
-    return '$_temp0، $initials، المركز $rank$_temp1';
+    return '$_temp0، $_temp1، $initials، المركز $rank$_temp2';
   }
+
+  @override
+  String get leaderboardMetricLight => 'نور';
+
+  @override
+  String get leaderboardMetricStreaks => 'شعلات';
+
+  @override
+  String leaderboardWitness(String position) {
+    return 'شاهد $position';
+  }
+
+  @override
+  String get leaderboardYou => 'أنت';
+
+  @override
+  String leaderboardGapLine(String name, String n) {
+    return '$name يحمل $n نورًا أكثر';
+  }
+
+  @override
+  String leaderboardPassHint(String n) {
+    return 'تجاوز بـ نحو $n آيات';
+  }
+
+  @override
+  String get leaderboardNoReset => 'لا تصفير · السماء تذكر';
+
+  @override
+  String leaderboardResetsIn(
+    String days,
+    String hours,
+    String dayUnit,
+    String hourUnit,
+  ) {
+    return 'يُصفّر بعد نحو $days$dayUnit $hours$hourUnit';
+  }
+
+  @override
+  String leaderboardCheerSent(String name) {
+    return 'تحية مُرسلة إلى $name';
+  }
+
+  @override
+  String get leaderboardVeil => 'حجب الشهود';
+
+  @override
+  String get leaderboardRetry => 'حاول مرة أخرى';
+
+  @override
+  String get leaderboardScopeLabel => 'الفترة';
+
+  @override
+  String get leaderboardMetricLabel => 'مقياس الترتيب';
+
+  @override
+  String get leaderboardDayUnit => 'ي';
+
+  @override
+  String get leaderboardHourUnit => 'س';
 
   @override
   String get homeRetry => 'حاول مرة أخرى';
@@ -366,7 +429,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sealFabSettings => 'الإعدادات';
 
   @override
-  String get sealFabLeaderboard => 'الترتيب';
+  String get sealFabLeaderboard => 'الشركة';
 
   @override
   String get readingVerses => 'آيات';

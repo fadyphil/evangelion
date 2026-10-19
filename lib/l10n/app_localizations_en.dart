@@ -115,16 +115,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeCategoryApocalypse => 'apocalypse';
 
   @override
-  String get leaderboardTitle => 'Cohort standings';
+  String get leaderboardTitle => 'The Communion';
 
   @override
-  String get leaderboardWindowWeekly => 'Week';
+  String get leaderboardWindowWeekly => 'week';
 
   @override
-  String get leaderboardWindowMonthly => 'Month';
+  String get leaderboardWindowMonthly => 'month';
 
   @override
-  String get leaderboardWindowAllTime => 'All time';
+  String get leaderboardWindowAllTime => 'all';
 
   @override
   String get leaderboardEmptyTitle => 'No scores yet';
@@ -134,21 +134,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Once the cohort starts answering, the standings appear here.';
 
   @override
-  String get leaderboardYourRank => 'You';
-
-  @override
   String get leaderboardUnranked => 'Not ranked yet';
-
-  @override
-  String get leaderboardScoreLabel => 'points';
-
-  @override
-  String get leaderboardOpenFull => 'See all';
 
   @override
   String leaderboardRowSemantics(
     int count,
     String digits,
+    int streakCount,
+    String streakDigits,
     String initials,
     String rank,
     String isReader,
@@ -160,12 +153,79 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 point',
       zero: 'no points',
     );
-    String _temp1 = intl.Intl.selectLogic(isReader, {
+    String _temp1 = intl.Intl.pluralLogic(
+      streakCount,
+      locale: localeName,
+      other: '$streakDigits streaks',
+      one: '1 streak',
+      zero: 'no streaks',
+    );
+    String _temp2 = intl.Intl.selectLogic(isReader, {
       'true': ', that is you',
       'other': '',
     });
-    return '$_temp0, $initials, rank $rank$_temp1';
+    return '$_temp0, $_temp1, $initials, rank $rank$_temp2';
   }
+
+  @override
+  String get leaderboardMetricLight => 'light';
+
+  @override
+  String get leaderboardMetricStreaks => 'streaks';
+
+  @override
+  String leaderboardWitness(String position) {
+    return 'witness $position';
+  }
+
+  @override
+  String get leaderboardYou => 'you';
+
+  @override
+  String leaderboardGapLine(String name, String n) {
+    return '$name holds $n more light';
+  }
+
+  @override
+  String leaderboardPassHint(String n) {
+    return 'pass with ≈$n verses';
+  }
+
+  @override
+  String get leaderboardNoReset => 'no reset · the sky remembers';
+
+  @override
+  String leaderboardResetsIn(
+    String days,
+    String hours,
+    String dayUnit,
+    String hourUnit,
+  ) {
+    return 'resets in ≈$days$dayUnit $hours$hourUnit';
+  }
+
+  @override
+  String leaderboardCheerSent(String name) {
+    return 'cheer sent to $name';
+  }
+
+  @override
+  String get leaderboardVeil => 'Veil witnesses';
+
+  @override
+  String get leaderboardRetry => 'Try again';
+
+  @override
+  String get leaderboardScopeLabel => 'Period';
+
+  @override
+  String get leaderboardMetricLabel => 'Ranking metric';
+
+  @override
+  String get leaderboardDayUnit => 'd';
+
+  @override
+  String get leaderboardHourUnit => 'h';
 
   @override
   String get homeRetry => 'Try again';
@@ -361,7 +421,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sealFabSettings => 'Settings';
 
   @override
-  String get sealFabLeaderboard => 'Leaderboard';
+  String get sealFabLeaderboard => 'Communion';
 
   @override
   String get readingVerses => 'verses';

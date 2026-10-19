@@ -27,20 +27,20 @@ $UserSettingsCopyWith<UserSettings> get copyWith => _$UserSettingsCopyWithImpl<U
 @override
 bool operator ==(Object other) {
   final _this = this as UserSettings;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserSettings&&(identical(other.themeMode, _this.themeMode) || other.themeMode == _this.themeMode)&&(identical(other.fontStep, _this.fontStep) || other.fontStep == _this.fontStep)&&(identical(other.language, _this.language) || other.language == _this.language)&&(identical(other.reducedMotion, _this.reducedMotion) || other.reducedMotion == _this.reducedMotion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserSettings&&(identical(other.themeMode, _this.themeMode) || other.themeMode == _this.themeMode)&&(identical(other.fontStep, _this.fontStep) || other.fontStep == _this.fontStep)&&(identical(other.language, _this.language) || other.language == _this.language)&&(identical(other.reducedMotion, _this.reducedMotion) || other.reducedMotion == _this.reducedMotion)&&(identical(other.veilWitnesses, _this.veilWitnesses) || other.veilWitnesses == _this.veilWitnesses)&&(identical(other.showPodium, _this.showPodium) || other.showPodium == _this.showPodium));
 }
 
 
 @override
 int get hashCode {
   final _this = this as UserSettings;
-  return Object.hash(runtimeType,_this.themeMode,_this.fontStep,_this.language,_this.reducedMotion);
+  return Object.hash(runtimeType,_this.themeMode,_this.fontStep,_this.language,_this.reducedMotion,_this.veilWitnesses,_this.showPodium);
 }
 
 @override
 String toString() {
   final _this = this as UserSettings;
-  return 'UserSettings(themeMode: ${_this.themeMode}, fontStep: ${_this.fontStep}, language: ${_this.language}, reducedMotion: ${_this.reducedMotion})';
+  return 'UserSettings(themeMode: ${_this.themeMode}, fontStep: ${_this.fontStep}, language: ${_this.language}, reducedMotion: ${_this.reducedMotion}, veilWitnesses: ${_this.veilWitnesses}, showPodium: ${_this.showPodium})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $UserSettingsCopyWith<$Res>  {
   factory $UserSettingsCopyWith(UserSettings value, $Res Function(UserSettings) _then) = _$UserSettingsCopyWithImpl;
 @useResult
 $Res call({
- AppThemeMode themeMode, int fontStep, ReadingLanguage? language, bool reducedMotion
+ AppThemeMode themeMode, int fontStep, ReadingLanguage? language, bool reducedMotion, bool veilWitnesses, bool showPodium
 });
 
 
@@ -68,12 +68,14 @@ class _$UserSettingsCopyWithImpl<$Res>
 
 /// Create a copy of UserSettings
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? themeMode = null,Object? fontStep = null,Object? language = freezed,Object? reducedMotion = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? themeMode = null,Object? fontStep = null,Object? language = freezed,Object? reducedMotion = null,Object? veilWitnesses = null,Object? showPodium = null,}) {
   return _then(UserSettings(
 themeMode: null == themeMode ? _self.themeMode : themeMode // ignore: cast_nullable_to_non_nullable
 as AppThemeMode,fontStep: null == fontStep ? _self.fontStep : fontStep // ignore: cast_nullable_to_non_nullable
 as int,language: freezed == language ? _self.language : language // ignore: cast_nullable_to_non_nullable
 as ReadingLanguage?,reducedMotion: null == reducedMotion ? _self.reducedMotion : reducedMotion // ignore: cast_nullable_to_non_nullable
+as bool,veilWitnesses: null == veilWitnesses ? _self.veilWitnesses : veilWitnesses // ignore: cast_nullable_to_non_nullable
+as bool,showPodium: null == showPodium ? _self.showPodium : showPodium // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }

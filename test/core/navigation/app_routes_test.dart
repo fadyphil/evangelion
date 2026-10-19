@@ -35,7 +35,7 @@ void main() {
   final Map<String, String> inventory = declaredRouteValues(source);
   final List<String> declared = declaredRouteNames(source);
 
-  group('the six locked routes', () {
+  group('the seven locked routes', () {
     test('login is /login', () {
       expect(AppRoutes.login, '/login');
     });
@@ -60,22 +60,18 @@ void main() {
       expect(AppRoutes.settings, '/settings');
     });
 
-    test(
-      'leaderboard is /leaderboard, and is slash-prefixed like the rest',
-      () {
-        // The slash-prefix invariant is structural (`app_routes_test.dart`'s first group),
-        // so this row is only here for the value. The seventh route is the first one
-        // whose path was **not** locked by AGENT_CONTEXT §2 — which is why it needed a
-        // value row at all rather than arriving with the other six.
-        expect(AppRoutes.leaderboard, '/leaderboard');
-      },
-    );
+    test('communion is /communion, and is slash-prefixed like the rest', () {
+      // The slash-prefix invariant is structural (`app_routes_test.dart`'s first group),
+      // so this row is only here for the value.
+      expect(AppRoutes.communion, '/communion');
+    });
 
     test('servant is /servant, and is slash-prefixed like the rest', () {
-      // The eighth declared route and the second whose path §2 does not fix, so it
-      // follows `leaderboard` rather than arriving with the six. Its value row is
+      // The eighth declared route and now the **only** one whose path §2 does
+      // not fix, so it follows `communion` rather than arriving with the seven.
+      // Its value row is
       // here for the same reason as that one's: a reader who opens this file has
-      // just been told there are eight paths, and this is where each one is named.
+      // just been told there are nine paths, and this is where each one is named.
       //
       // `/servant` is **declared but not routed** — no `AutoRoute` in
       // `app_router.dart` names it, so a push to it falls through the `'*'`
@@ -93,9 +89,9 @@ void main() {
     // every `expect` in the group below would be iterating nothing and the
     // suite would pass while asserting nothing. That is the self-comparing
     // tautology the Phase 0b mutation audit removed from `failure_test.dart`, so
-    // the shape of the claim is asserted first, and the eight names are spelled
+    // the shape of the claim is asserted first, and the nine names are spelled
     // out rather than merely counted: a parser that quietly returned the wrong
-    // eight would otherwise sail through.
+    // nine would otherwise sail through.
     test('the parser sees every declaration, including ones it cannot read', () {
       // Anti-vacuity for the whole group below. A declaration whose initialiser
       // is not a plain literal is reported rather than dropped, because an
@@ -118,12 +114,15 @@ void main() {
         'quiz',
         'result',
         'settings',
-        // Phase 1's seventh screen. The count in this test's name and in its docs is
-        // the thing that had to move, which is the cost of spelling the inventory out
-        // rather than comparing against `AppRoutes`' own members — the parser exists so
-        // a **deleted** constant fails, and an inventory cannot be written that avoids
-        // both halves of that trade.
-        'leaderboard',
+        // Phase 1's seventh screen, **renamed in Task 5.5** from `leaderboard` to
+        // `communion` — the redesign calls the board "The Communion"
+        // (`eva/redesign.html:615`'s `data-i18n="boardT"`) and ADR-0022 `:121`
+        // names the rename. The count in this test's name and in its docs is the
+        // thing that had to move, which is the cost of spelling the inventory out
+        // rather than comparing against `AppRoutes`' own members — the parser
+        // exists so a **deleted** constant fails, and an inventory cannot be
+        // written that avoids both halves of that trade.
+        'communion',
         // The role mechanism's eighth, added with `core/navigation/landing_route.dart`
         // and **before** `fallback` so the wildcard stays last. This test is what
         // made that a decision rather than an accident: it failed on the missing
@@ -134,12 +133,12 @@ void main() {
       ]);
       expect(inventory, hasLength(9));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
-      // all eight entries were real strings. It could not fail: `inventory` is a
+      // all nine entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
-      // `whereType<String>()` is the identity — it returned all eight elements
+      // `whereType<String>()` is the identity — it returned all nine elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(9)` above already implies eight strings.
+      // state, and `hasLength(9)` above already implies nine strings.
     });
   });
 

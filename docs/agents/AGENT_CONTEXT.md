@@ -153,7 +153,7 @@ decision 111 and marked here.)*
   `build` methods → `context.l10n`), and `didPopNext` is untouched and still gated —
   decision 106.
 
-### The six routes
+### The seven routes
 
 | Route | Screen | Data source |
 | --- | --- | --- |
@@ -163,12 +163,13 @@ decision 111 and marked here.)*
 | `/quiz` | Quiz with instant per-question feedback | **API** |
 | `/result` | Result — score, streak, stat tiles | **API** (submit response) |
 | `/settings` | Appearance, reading, about | local |
+| `/communion` | The cohort's board | **API** |
 
 Routes carry **no `:passageId` parameter**. There is no library to browse, so the passage
 is always *today's*. The quiz re-fetches to obtain fresh `already_answered` flags, because
 the backend has **no `GET /readings/:id`** endpoint.
 
-**Pending implementation.** The table above is what `lib/app/router/app_router.dart:243-261` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: **`/journey`** (the profile) and **`/communion`** (the board, renamed from the `/leaderboard` the client already ships — `lib/core/navigation/app_routes.dart:80`) arrive in **Phase 5**; **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
+**Pending implementation.** The table above is what `lib/app/router/app_router.dart:244-267` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: **`/journey`** (the profile) arrives in **Phase 5.6**; `/communion` arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
 
 ---
 

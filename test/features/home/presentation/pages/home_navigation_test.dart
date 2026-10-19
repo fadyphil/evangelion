@@ -41,7 +41,7 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
 import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
-import 'package:evangelion/features/leaderboard/presentation/pages/leaderboard_page.dart';
+import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
@@ -151,12 +151,9 @@ void main() {
       expect(find.byType(SettingsPage), findsOneWidget);
     });
 
-    testWidgets("and the seal's board item reaches /leaderboard", (
+    testWidgets("and the seal's board item reaches /communion", (
       WidgetTester tester,
     ) async {
-      // **The route's current name.** Task 5.5 renames it to `/communion`
-      // (`redesign.html:612-636`) and this arm moves with it; asserted today so the
-      // rename cannot land without a navigation suite noticing.
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
@@ -166,9 +163,9 @@ void main() {
         find.text(AppLocalizationsEn().sealFabLeaderboard),
       );
       await tester.tap(find.text(AppLocalizationsEn().sealFabLeaderboard));
-      await pumpUntilFound(tester, find.byType(LeaderboardPage));
+      await pumpUntilFound(tester, find.byType(CommunionPage));
 
-      expect(mounted.router.currentPath, AppRoutes.leaderboard);
+      expect(mounted.router.currentPath, AppRoutes.communion);
     });
 
     testWidgets('and the push leaves `/` behind rather than over it', (

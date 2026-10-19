@@ -371,6 +371,7 @@ These are reported as findings, not as work someone forgot.
 | `docs/SEAMS.md:267` (Seam 7) | `lib/app/app.dart` hard-codes `ThemeMode.dark` | it switches over a persisted setting |
 | `AGENTS.md:127` | 27 design-system widgets | 23 |
 | `lib/app/router/app_router.dart:9`, `:23`, `:214` | six routes, six locked routes, six features | 7 |
+| `README.md` — "Four of these are deliberately inert" | four **screens** | none: `/login`, `/`, `/reading` and `/quiz` were rebuilt in Phase 5.1-5.4. What still says "unavailable in this build" is two **controls** — `/`'s library cards and `/reading`'s pill controls — not four screens. The paragraph's other half ("no passage library and no user profile") is still true and is ADR-0001's, which ADR-0022 reverses in Phase 5.6 |
 | `lib/app/di/navigation_injection.dart:58` | five hand-written registrations | 10 |
 | `lib/core/design_system/tokens/eva_colors.dart:123`, `:213` | light `ember` is 2.05:1 | 2.11:1 |
 | `lib/features/home/presentation/pages/home_page.dart:489` | light `ember` is 2.05:1 | 2.11:1 |

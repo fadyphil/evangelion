@@ -15,6 +15,7 @@ import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 
 import '../../core/domain/repositories/auth_repository.dart' as _i497;
+import '../../core/domain/repositories/cheer_repository.dart' as _i344;
 import '../../core/domain/repositories/leaderboard_repository.dart' as _i307;
 import '../../core/domain/repositories/reading_repository.dart' as _i499;
 import '../../core/domain/repositories/settings_repository.dart' as _i896;
@@ -35,6 +36,10 @@ import '../../features/home/domain/usecases/load_library_catalogue.dart'
     as _i151;
 import '../../features/home/domain/usecases/load_streak_summary.dart' as _i605;
 import '../../features/home/domain/usecases/load_today_reading.dart' as _i1067;
+import '../../features/leaderboard/data/datasources/cheer_local_data_source.dart'
+    as _i875;
+import '../../features/leaderboard/domain/usecases/get_board_reader_session.dart'
+    as _i453;
 import '../../features/leaderboard/domain/usecases/load_leaderboard.dart'
     as _i964;
 import '../../features/quiz/domain/usecases/refresh_session_questions.dart'
@@ -131,6 +136,15 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i964.LoadLeaderboard>(
       () => leaderboardModule.loadLeaderboard,
+    );
+    gh.lazySingleton<_i875.CheerLocalDataSource>(
+      () => leaderboardModule.cheerLocalDataSource,
+    );
+    gh.lazySingleton<_i344.CheerRepository>(
+      () => leaderboardModule.cheerRepository,
+    );
+    gh.lazySingleton<_i453.GetBoardReaderSession>(
+      () => leaderboardModule.getBoardReaderSession,
     );
     gh.lazySingleton<_i521.StartSession>(() => quizModule.startSession);
     gh.lazySingleton<_i788.RefreshSessionQuestions>(

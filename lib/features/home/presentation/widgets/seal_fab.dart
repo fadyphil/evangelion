@@ -17,7 +17,7 @@ import 'package:flutter_animate/flutter_animate.dart' show Effect;
 /// a floating control whose only unique function leads nowhere is worse than no floating
 /// control.
 ///
-/// It came back because **`/leaderboard` became a live route with no other entry point on
+/// It came back because **`/communion` became a live route with no other entry point on
 /// `/`** beyond a link inside the card. Profile's slot took it, so the dial now has three
 /// items that each go somewhere a reader cannot otherwise reach in one tap.
 ///

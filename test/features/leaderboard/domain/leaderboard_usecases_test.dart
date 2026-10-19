@@ -1,10 +1,14 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
+import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
+import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:mocktail/mocktail.dart';
 
 /// Records what it was asked for, so the assertions can be about the *request* rather
 /// than about the return value — which for a pass-through is the only thing it has.
@@ -62,6 +66,13 @@ final class _RecordingRepository implements LeaderboardRepository {
 /// assertion, and a reader who re-adds `LoadLeaderboardPreview` will find this
 /// paragraph through it.
 
+/// A mocked auth port, for the leaderboard's own `GetBoardReaderSession`.
+///
+/// The use case is a `final class` and cannot be implemented from outside its
+/// library; the seam is the shared port, exactly as it is in every other feature's
+/// use-case suite.
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
 void main() {
   const LeaderboardBoard board = LeaderboardBoard(
     window: LeaderboardWindow.monthly,
@@ -109,6 +120,66 @@ void main() {
           const LeaderboardQuery(window: LeaderboardWindow.monthly, limit: 50),
         ),
         const Left<Failure, LeaderboardBoard>(failure),
+      );
+    });
+  });
+
+  group('GetBoardReaderSession', () {
+    late _MockAuthRepository auth;
+
+    setUp(() {
+      auth = _MockAuthRepository();
+      addTearDown(() => auth);
+    });
+
+    final AuthSession session = AuthSession(
+      userId: '11111111-1111-1111-1111-111111111111',
+      email: 'david@example.test',
+      displayName: 'David Mina',
+      initials: 'DM',
+      createdAt: DateTime.utc(2026),
+    );
+
+    test('returns the session the port answered', () async {
+      when(auth.getCurrentSession)
+          .thenAnswer((_) async => Right<Failure, AuthSession>(session));
+
+      expect(
+        await GetBoardReaderSession(auth)(),
+        Right<Failure, AuthSession>(session),
+      );
+    });
+
+    test('and "no session" stays the port\'s failure', () async {
+      // `FakeAuthRepository.getCurrentSession` answers
+      // `FailureKind.unauthorized, 'Not signed in.'` when there is none. The call is
+      // documented not to distinguish "no session" from "the check failed", and the
+      // cubit turns both into no fallback name.
+      const Failure noSession = Failure(
+        kind: FailureKind.unauthorized,
+        message: 'Not signed in.',
+      );
+      when(auth.getCurrentSession)
+          .thenAnswer((_) async => const Left<Failure, AuthSession>(noSession));
+
+      expect(
+        await GetBoardReaderSession(auth)(),
+        const Left<Failure, AuthSession>(noSession),
+      );
+    });
+
+    test('and it asks for the *current* session, not a sign-in', () async {
+      when(auth.getCurrentSession)
+          .thenAnswer((_) async => Right<Failure, AuthSession>(session));
+
+      await GetBoardReaderSession(auth)();
+
+      verify(auth.getCurrentSession).called(1);
+      verifyNever(
+        () => auth.signIn(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
       );
     });
   });

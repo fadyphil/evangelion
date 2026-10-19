@@ -72,6 +72,7 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
+    final TextDirection direction = Directionality.of(context);
     final Widget? control = action;
 
     return Center(
@@ -99,8 +100,20 @@ class EmptyState extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium!
-                    .copyWith(color: colors.ink2),
+                // **`arabicAware`, and not the theme's own family.** `bodyMedium`
+                // is the UI sans (Inter), and **Inter carries no Arabic glyphs** —
+                // so an Arabic message painted in it is a row of tofu boxes.
+                // Under RTL the family becomes Amiri, which carries them.
+                //
+                // This is the same fix `StatTile` got in Phase 8, and it is the
+                // same defect the bilingual-typography gate reports:
+                // `لا توجد نتائج بعد` rendering in `EBGaramond`, "which carries
+                // no Arabic glyph at all".
+                style: arabicAware(
+                  Theme.of(context).textTheme.bodyMedium!
+                      .copyWith(color: colors.ink2),
+                  direction,
+                ),
               ),
               if (control != null) ...<Widget>[
                 const SizedBox(height: EvaSpacing.xl),
@@ -126,7 +139,27 @@ class EmptyState extends StatelessWidget {
   ///
   /// Clamping the theme's display end instead would change every screen that uses
   /// it, which is a Phase-1 decision to undo and not this phase's to take.
-  static TextStyle titleStyle(BuildContext context) =>
-      Theme.of(context).textTheme.headlineMedium!
-          .copyWith(color: context.colors.ink);
+  ///
+  /// ## AND `arabicAware`, WHICH THE SLOT NEEDED AND DID NOT HAVE
+  ///
+  /// `headlineMedium` is the **display serif** (EBGaramond), and EBGaramond
+  /// carries **no Arabic glyph at all** — so an Arabic empty-state title was a
+  /// row of tofu boxes, one per character, for the whole screen. Under RTL the
+  /// family becomes Amiri, which carries them.
+  ///
+  /// The empty state is a **shared** widget, so the defect was on **more than one
+  /// screen** and invisible on all of them: `/quiz` renders the same widget with
+  /// `quizNoQuestionsTitle` / `quizNoQuestionsMessage`, which are Arabic too, and
+  /// its Arabic empty state was tofu before this change.
+  ///
+  /// **The gate named it on `/communion`, not on `/quiz`.** `/communion` is the
+  /// first screen the bilingual-typography gate covered whose empty state is
+  /// Arabic; `/quiz`'s group has no empty-state arm at all, so a regression there
+  /// would still be invisible. The widget is fixed; the missing arm is recorded
+  /// at the gate.
+  static TextStyle titleStyle(BuildContext context) => arabicAware(
+    Theme.of(context).textTheme.headlineMedium!
+        .copyWith(color: context.colors.ink),
+    Directionality.of(context),
+  );
 }

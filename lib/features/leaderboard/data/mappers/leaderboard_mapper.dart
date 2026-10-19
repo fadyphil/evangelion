@@ -21,8 +21,10 @@ import 'package:fpdart/fpdart.dart';
 /// normalising case: a case-folding reader would hide a future rename instead of
 /// failing on it.
 ///
-/// **Two of those five keys are never read**, deliberately: `userId` and
-/// `current_streak`. See [LeaderboardRow] for why each is dropped rather than mapped.
+/// The mapper reads **all five**. Phase 1 read only `rank`, `score` and `full_name`
+/// and dropped the other two; the Communion redesign needs the id to key a cheer and
+/// the streak to draw the other metric, and the veil — not the mapper — is where
+/// identity is withheld at render time. See [LeaderboardRow] for the reversal.
 ///
 /// ## WHAT A BAD ROW DOES HERE, WHICH IS NOT WHAT A BAD VERSE DOES
 ///
@@ -278,11 +280,19 @@ final class LeaderboardMapper {
     final Result<int> rank = _int(entry, 'rank', where: where);
     final Result<int> score = _int(entry, 'score', where: where);
     final Result<String> fullName = _string(entry, 'full_name', where: where);
+    final Result<String> userId = _string(entry, 'userId', where: where);
+    final Result<int> currentStreak = _int(
+      entry,
+      'current_streak',
+      where: where,
+    );
 
     final Result<void> fields = _firstFailure(<Result<Object?>>[
       rank,
       score,
       fullName,
+      userId,
+      currentStreak,
     ]);
     if (fields case Left<Failure, void>(value: final failure)) {
       return Result<LeaderboardRow>.left(failure);
@@ -293,6 +303,9 @@ final class LeaderboardMapper {
         rank: rank.getOrElse((_) => 0),
         score: score.getOrElse((_) => 0),
         initials: initialsOf(fullName.getOrElse((_) => '')),
+        userId: userId.getOrElse((_) => ''),
+        fullName: fullName.getOrElse((_) => ''),
+        currentStreak: currentStreak.getOrElse((_) => 0),
       ),
     );
   }

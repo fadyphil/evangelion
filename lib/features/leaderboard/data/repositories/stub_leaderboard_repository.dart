@@ -75,14 +75,48 @@ final class StubLeaderboardRepository implements LeaderboardRepository {
   /// **third**, because third is the interesting case: it is inside the card's three
   /// rows *and* below them, so a card that slices wrongly and a screen that does not
   /// both look wrong.
-  static const List<({String name, int score})> _standings =
-      <({String name, int score})>[
-        (name: 'Peter George (Grade 6)', score: 80),
-        (name: 'David Mina (Grade 5)', score: 50),
-        (name: 'Mark Anton (Grade 5)', score: 30),
-        (name: 'Mariam Botros (Grade 6)', score: 20),
-        (name: 'Antonios Farid (Grade 5)', score: 10),
-      ];
+  ///
+  /// `id` and `streak` joined the record in Task 5.5 with the fields they feed: the
+  /// cheer needs a stable key, and the metric switch needs a `current_streak` that is
+  /// **not** monotone with the score — otherwise the two orders would be identical and
+  /// a screen that forgot to re-sort would look correct.
+  static const List<({String id, String name, int score, int streak})>
+  _standings = <({String id, String name, int score, int streak})>[
+    (
+      id: '22222222-2222-2222-2222-222222222222',
+      name: 'Peter George (Grade 6)',
+      score: 80,
+      streak: 12,
+    ),
+    (
+      // `kSeedUserId` by value: `features/auth`'s constant lives in another feature,
+      // and §3 forbids the import even for one string. The value is the seeded
+      // identity's, which is what makes the reader's own row the one the you-card
+      // finds.
+      id: '11111111-1111-1111-1111-111111111111',
+      name: 'David Mina (Grade 5)',
+      score: 50,
+      streak: 21,
+    ),
+    (
+      id: '33333333-3333-3333-3333-333333333333',
+      name: 'Mark Anton (Grade 5)',
+      score: 30,
+      streak: 8,
+    ),
+    (
+      id: '44444444-4444-4444-4444-444444444444',
+      name: 'Mariam Botros (Grade 6)',
+      score: 20,
+      streak: 17,
+    ),
+    (
+      id: '55555555-5555-5555-5555-555555555555',
+      name: 'Antonios Farid (Grade 5)',
+      score: 10,
+      streak: 5,
+    ),
+  ];
 
   /// The reader this stub places, matching the seeded identity's display name.
   static const String _readerName = 'David Mina (Grade 5)';
@@ -101,6 +135,9 @@ final class StubLeaderboardRepository implements LeaderboardRepository {
           // implementation of "strip the grade, take first and last" is free to drift,
           // and then the stub would be showing monograms production never produces.
           initials: LeaderboardMapper.initialsOf(_standings[index].name),
+          userId: _standings[index].id,
+          fullName: _standings[index].name,
+          currentStreak: _standings[index].streak,
         ),
     ];
 
@@ -127,10 +164,15 @@ final class StubLeaderboardRepository implements LeaderboardRepository {
   /// "you are not ranked yet" path is reachable by changing one line of this stub
   /// rather than only by the empty board.
   LeaderboardStanding? _standingFor(List<LeaderboardRow> all) {
-    for (final ({int rank, String name, int score}) entry
-        in <({int rank, String name, int score})>[
+    for (final ({int rank, String name, int score, int streak}) entry
+        in <({int rank, String name, int score, int streak})>[
           for (int i = 0; i < _standings.length; i++)
-            (rank: i + 1, name: _standings[i].name, score: _standings[i].score),
+            (
+              rank: i + 1,
+              name: _standings[i].name,
+              score: _standings[i].score,
+              streak: _standings[i].streak,
+            ),
         ]) {
       if (entry.name == _readerName) {
         return LeaderboardStanding(rank: entry.rank, score: entry.score);

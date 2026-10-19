@@ -27,20 +27,20 @@ $LeaderboardStateCopyWith<LeaderboardState> get copyWith => _$LeaderboardStateCo
 @override
 bool operator ==(Object other) {
   final _this = this as LeaderboardState;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.window, _this.window) || other.window == _this.window)&&(identical(other.board, _this.board) || other.board == _this.board)&&(identical(other.failure, _this.failure) || other.failure == _this.failure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LeaderboardState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.window, _this.window) || other.window == _this.window)&&(identical(other.board, _this.board) || other.board == _this.board)&&(identical(other.failure, _this.failure) || other.failure == _this.failure)&&(identical(other.metric, _this.metric) || other.metric == _this.metric)&&const DeepCollectionEquality().equals(other.cheered, _this.cheered)&&(identical(other.readerName, _this.readerName) || other.readerName == _this.readerName));
 }
 
 
 @override
 int get hashCode {
   final _this = this as LeaderboardState;
-  return Object.hash(runtimeType,_this.status,_this.window,_this.board,_this.failure);
+  return Object.hash(runtimeType,_this.status,_this.window,_this.board,_this.failure,_this.metric,const DeepCollectionEquality().hash(_this.cheered),_this.readerName);
 }
 
 @override
 String toString() {
   final _this = this as LeaderboardState;
-  return 'LeaderboardState(status: ${_this.status}, window: ${_this.window}, board: ${_this.board}, failure: ${_this.failure})';
+  return 'LeaderboardState(status: ${_this.status}, window: ${_this.window}, board: ${_this.board}, failure: ${_this.failure}, metric: ${_this.metric}, cheered: ${_this.cheered}, readerName: ${_this.readerName})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $LeaderboardStateCopyWith<$Res>  {
   factory $LeaderboardStateCopyWith(LeaderboardState value, $Res Function(LeaderboardState) _then) = _$LeaderboardStateCopyWithImpl;
 @useResult
 $Res call({
- LeaderboardStatus status, LeaderboardWindow window, LeaderboardBoard? board, Failure? failure
+ LeaderboardStatus status, LeaderboardWindow window, LeaderboardBoard? board, Failure? failure, LeaderboardMetric metric, Set<String> cheered, String? readerName
 });
 
 
@@ -68,13 +68,16 @@ class _$LeaderboardStateCopyWithImpl<$Res>
 
 /// Create a copy of LeaderboardState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? window = null,Object? board = freezed,Object? failure = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? window = null,Object? board = freezed,Object? failure = freezed,Object? metric = null,Object? cheered = null,Object? readerName = freezed,}) {
   return _then(LeaderboardState(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as LeaderboardStatus,window: null == window ? _self.window : window // ignore: cast_nullable_to_non_nullable
 as LeaderboardWindow,board: freezed == board ? _self.board : board // ignore: cast_nullable_to_non_nullable
 as LeaderboardBoard?,failure: freezed == failure ? _self.failure : failure // ignore: cast_nullable_to_non_nullable
-as Failure?,
+as Failure?,metric: null == metric ? _self.metric : metric // ignore: cast_nullable_to_non_nullable
+as LeaderboardMetric,cheered: null == cheered ? _self.cheered : cheered // ignore: cast_nullable_to_non_nullable
+as Set<String>,readerName: freezed == readerName ? _self.readerName : readerName // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

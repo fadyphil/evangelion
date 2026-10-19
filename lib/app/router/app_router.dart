@@ -1,16 +1,16 @@
 import 'package:auto_route/auto_route.dart';
-// The generated `*Route` classes, and the ONLY bridge to the six features.
+// The generated `*Route` classes, and the ONLY bridge to the seven features.
 //
 // auto_route_generator emits `app_router.gr.dart` as a separate library named
 // after this file rather than as a `part` of it, so this one import is what puts
-// `LoginRoute` / `HomeRoute` / … in scope. The router does not import the six
+// `LoginRoute` / `HomeRoute` / … in scope. The router does not import the seven
 // pages themselves: `@RoutePage()` on each page is what produces its route, and
-// the generated library is already the reference to both. Six unused page
+// the generated library is already the reference to both. Seven unused page
 // imports is what the first draft had, and it is the shape a reader would read as
 // "the router knows the widgets".
 //
-// Losing this import is six `undefined_identifier` errors — the cheap way to find
-// out that the router and its routes have come apart.
+// Losing this import is seven `undefined_identifier` errors — the cheap way to
+// find out that the router and its routes have come apart.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
@@ -19,7 +19,7 @@ import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 
-/// The app's six routes plus the catch-all, with the global transition and the
+/// The app's seven routes plus the catch-all, with the global transition and the
 /// auth gate installed.
 ///
 /// ## WHY IT LIVES IN `lib/app/` AND NOT IN `lib/core/navigation/`
@@ -213,7 +213,7 @@ class AppRouter extends RootStackRouter {
     clipBehavior: clipBehavior,
   );
 
-  /// The six locked routes, then the wildcard.
+  /// The seven locked routes, then the wildcard.
   ///
   /// Paths are [AppRoutes] constants, never re-spelled: `'/login'` written here
   /// and `AppRoutes.login` written there are two names for one route, and the
@@ -235,7 +235,7 @@ class AppRouter extends RootStackRouter {
   /// form auto_route documents and because it leaves exactly one declared path
   /// outside the slash-prefixed set, not because `'/*'` is broken.
   ///
-  /// Of the six, `/login` is the only unguarded one: it is the app's entry point,
+  /// Of the seven, `/login` is the only unguarded one: it is the app's entry point,
   /// and a gate in front of it would redirect to itself forever. The wildcard is
   /// unguarded too, which is deliberate — an unknown path redirects to `/`, which
   /// bounces through the guard and lands on the login screen when there is no
@@ -257,8 +257,8 @@ class AppRouter extends RootStackRouter {
       guards: _guards,
     ),
     AutoRoute(
-      path: AppRoutes.leaderboard,
-      page: LeaderboardRoute.page,
+      path: AppRoutes.communion,
+      page: CommunionRoute.page,
       guards: _guards,
     ),
     // `*` stays LAST. auto_route matches in declaration order, so moving the wildcard

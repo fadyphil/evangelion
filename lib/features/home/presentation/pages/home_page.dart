@@ -55,7 +55,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// `redesign.html:702-708` is a five-tab dock and it is Phase 6's, and this screen's
 /// own chrome in the meantime is [SealFab] — the same interim holder `/login`'s
 /// footer used in Task 5.1. It stays because its two destinations
-/// (`/settings`, `/leaderboard`) have no other entry point until Phase 6 builds the
+/// (`/settings`, `/communion`) have no other entry point until Phase 6 builds the
 /// dock and Phase 5.6 builds the journey screen that the redesign reaches settings
 /// through. **The redesign draws no seal on `/` and this is the divergence**, recorded
 /// here rather than left for a reader to find by looking for a float that is not in
@@ -174,7 +174,7 @@ class HomePage extends StatelessWidget {
             // `/communion`. Kept until then, with `seal_fab_test.dart` asserting
             // Profile stays absent so a dead route cannot creep back.
             label: context.l10n.sealFabLeaderboard,
-            onTap: () => context.router.pushPath(AppRoutes.leaderboard),
+            onTap: () => context.router.pushPath(AppRoutes.communion),
           ),
         ],
       ),

@@ -358,10 +358,12 @@ abstract class AppLocalizations {
   /// **'apocalypse'**
   String get homeCategoryApocalypse;
 
-  /// App bar / section title for `/leaderboard`. The cohort's ranking over a chosen window.
+  /// App bar / section title for `/communion`. The cohort's board over a chosen window.
+  ///
+  /// `eva/redesign.html:615` — `<span class="ttl" data-i18n="boardT">The Communion</span>` — and `:939`'s `commG` row, the redesign's own word for it.
   ///
   /// In en, this message translates to:
-  /// **'Cohort standings'**
+  /// **'The Communion'**
   String get leaderboardTitle;
 
   /// Segmented-control option for `LeaderboardWindow.weekly`.
@@ -369,19 +371,19 @@ abstract class AppLocalizations {
   /// NOT the enum's wire code. The wire sends `weekly`, `monthly`, `all_time`; those are identifiers in `leaderboard_board.dart`, not words to put in front of a reader. `all_time` in particular would need a space and a lowercase 't' to read as English.
   ///
   /// In en, this message translates to:
-  /// **'Week'**
+  /// **'week'**
   String get leaderboardWindowWeekly;
 
   /// Segmented-control option for `LeaderboardWindow.monthly`. See `leaderboardWindowWeekly` for why this is not the wire code.
   ///
   /// In en, this message translates to:
-  /// **'Month'**
+  /// **'month'**
   String get leaderboardWindowMonthly;
 
   /// Segmented-control option for `LeaderboardWindow.allTime`. See `leaderboardWindowWeekly` for why this is not the wire code `all_time`.
   ///
   /// In en, this message translates to:
-  /// **'All time'**
+  /// **'all'**
   String get leaderboardWindowAllTime;
 
   /// Shown when the cohort has nobody ranked.
@@ -400,35 +402,15 @@ abstract class AppLocalizations {
   /// **'Once the cohort starts answering, the standings appear here.'**
   String get leaderboardEmptyBody;
 
-  /// Label on the reader's own row. NOT the reader's name and NOT their initials — the top bar already shows both, and repeating the initials next to the flame would be a second copy of the same identity.
+  /// Shown instead of a position when the client cannot place the reader.
   ///
-  /// A reader must find their own row in a list of other children's monograms without their name appearing anywhere, which is the whole point of `LeaderboardRow` having no `fullName`.
-  ///
-  /// In en, this message translates to:
-  /// **'You'**
-  String get leaderboardYourRank;
-
-  /// Shown instead of a position when `LeaderboardStanding.rank` is `null`.
+  /// **TWO SITUATIONS, and they are not the same.** `LeaderboardStanding.rank` is `null` — the server has no ranking for this reader at all. And `rank` is not `null` but the reader's **row is off the page** (the endpoint's `limit` is 50), so under the `streaks` metric — which the server does not rank and the client cannot rank a reader it has no row for — the card says the reader is unranked **on this board**.
   ///
   /// NEVER AN ARITHMETIC RESULT. `rank: null` with `score: 0` is the server's measured answer for a child who has not scored. Rendering it as `0` or `1` would put a fabricated position on someone who has none — the defect `LeaderboardStanding`'s doc is named for.
   ///
   /// In en, this message translates to:
   /// **'Not ranked yet'**
   String get leaderboardUnranked;
-
-  /// Unit caption under a score. Lowercase and plural-invariant because the unit is fixed and the number is not; 'pts' was rejected as too terse to read as a word in Arabic, where a two-letter abbreviation carries no meaning.
-  ///
-  /// In en, this message translates to:
-  /// **'points'**
-  String get leaderboardScoreLabel;
-
-  /// Link from Home's compact card to `/leaderboard`.
-  ///
-  /// Phrased as an action rather than a count, because the card cannot honestly say how many there are — `cohortSize` is `null` whenever the request's `limit` bound. 'See all' stays true whether there are four children or four hundred.
-  ///
-  /// In en, this message translates to:
-  /// **'See all'**
-  String get leaderboardOpenFull;
 
   /// The screen-reader sentence for one ranked row.
   ///
@@ -441,14 +423,133 @@ abstract class AppLocalizations {
   /// `rank` and `digits` are **String** while `count` is **int**, and that split is load-bearing rather than fussy: `count` is what the plural selects on, and `digits` is what the reader sees. Passing the numeral twice means the shape does not have to change when a locale's digits are not ASCII — the Arabic arm renders U+0660…U+0669, and `intl`'s formatting would otherwise be a second source of truth about numerals. `readingCaptionFor` does the same thing.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, zero{no points} one{1 point} other{{digits} points}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}'**
+  /// **'{count, plural, zero{no points} one{1 point} other{{digits} points}}, {streakCount, plural, zero{no streaks} one{1 streak} other{{streakDigits} streaks}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}'**
   String leaderboardRowSemantics(
     int count,
     String digits,
+    int streakCount,
+    String streakDigits,
     String initials,
     String rank,
     String isReader,
   );
+
+  /// Segmented-control option and row sub-line unit for `LeaderboardMetric.light` — the response's own `score` for the selected window.
+  ///
+  /// Transcribed from `eva/redesign.html:941`'s `light` pair and `:1117`'s sub-line, which prints the OTHER metric beside each row's value.
+  ///
+  /// In en, this message translates to:
+  /// **'light'**
+  String get leaderboardMetricLight;
+
+  /// Segmented-control option and row sub-line unit for `LeaderboardMetric.streaks` — the row's `current_streak`.
+  ///
+  /// `eva/redesign.html:941` `streakM`; `:1117` prints this on a light-ranked row and prints `light` on a streak-ranked one.
+  ///
+  /// In en, this message translates to:
+  /// **'streaks'**
+  String get leaderboardMetricStreaks;
+
+  /// A veiled witness's display name: their display position, never their name. `eva/redesign.html:942` `witness`, used by `:1070`'s `dispName` and `:1072`'s monogram.
+  ///
+  /// `{position}` is the row's DISPLAY position under the selected metric, and its digits arrive through `digits()` so the Arabic arm reads `شاهد ٢`.
+  ///
+  /// In en, this message translates to:
+  /// **'witness {position}'**
+  String leaderboardWitness(String position);
+
+  /// The suffix appended to the reader's own row name, rendering as `Mariam Hanna · you`. `eva/redesign.html:942` `you`, appended at `:1115`.
+  ///
+  /// Also the trailing half of `leaderboardTitle`'s alternative reading? No — see `leaderboardYourRank`'s deletion: this replaces it.
+  ///
+  /// In en, this message translates to:
+  /// **'you'**
+  String get leaderboardYou;
+
+  /// The you-card's gap sentence: the witness one display position above the reader, and how much more of the metric's value they hold. `eva/redesign.html:943` `gapLine`, composed at `:1105-1106`.
+  ///
+  /// `{name}` is already veil-resolved by the caller; `{n}` arrives through `digits()`.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} holds {n} more light'**
+  String leaderboardGapLine(String name, String n);
+
+  /// The you-card's advice half, appended after ` · ` and rendered on the LIGHT metric only. `eva/redesign.html:944`; the ÷15 constant is the rail's light economy (`:755`, "15 per verse read + 10 per correct answer").
+  ///
+  /// Under `streaks` it is not rendered at all: a streak gap is not a number of verses.
+  ///
+  /// **The ARABIC arm says نحو and not the prototype's `≈`.** The prototype writes `≈` in both arms (`:944`), and U+2248 is in **no** bundled family that can draw Arabic — Amiri, the Arabic UI family, does not carry it — so the Arabic arm substitutes the word for "about". `test/support/font_coverage_test.dart` pins the measurement: U+2248 is absent from Amiri and present in the other four.
+  ///
+  /// In en, this message translates to:
+  /// **'pass with ≈{n} verses'**
+  String leaderboardPassHint(String n);
+
+  /// The reset line for `all_time`: the sky keeps every score, so there is no boundary to count down to. `eva/redesign.html:945` `noReset`, rendered at `:1081`.
+  ///
+  /// Printed verbatim, including the `·` (U+00B7), which `test/support/font_coverage_test.dart` pins as present in all five bundled families.
+  ///
+  /// In en, this message translates to:
+  /// **'no reset · the sky remembers'**
+  String get leaderboardNoReset;
+
+  /// The approximate reset line for a bounded window. `eva/redesign.html:946` `resets`/`dU`/`hU`, composed at `:1082` against a locally derived boundary rather than a server instant.
+  ///
+  /// `{days}`, `{hours}` and the two units are Strings so `digits()` can convert the numerals while the units stay the locale's own words; the `≈` states that the boundary is local (ADR-0022 `:66-81`, `redis/leaderboard.service.ts:20-36`).
+  ///
+  /// In en, this message translates to:
+  /// **'resets in ≈{days}{dayUnit} {hours}{hourUnit}'**
+  String leaderboardResetsIn(
+    String days,
+    String hours,
+    String dayUnit,
+    String hourUnit,
+  );
+
+  /// The confirmation toast after a witness is cheered. `eva/redesign.html:947` `cheerSent`, shown for 1800 ms by `:1393`.
+  ///
+  /// The prototype writes a leading `✦`; it is PAINTED beside this string rather than typed into it, because U+2726 is in no bundled family.
+  ///
+  /// In en, this message translates to:
+  /// **'cheer sent to {name}'**
+  String leaderboardCheerSent(String name);
+
+  /// The board header's eye button, and the Settings row Task 5.7 will build: replace every other witness's name with `witness {position}` and their monogram with the hollow star. `eva/redesign.html:948` `veilT`; applied at `:1069-1072`.
+  ///
+  /// A rendering choice over rows that already arrived — there is no veil endpoint (ADR-0022 `:243-245`).
+  ///
+  /// In en, this message translates to:
+  /// **'Veil witnesses'**
+  String get leaderboardVeil;
+
+  /// The failure arm's retry label. The board has its OWN key, and not `/reading`'s: `homeRetry`, `quizRetry`, `readingRetry` and `settingsRetry` are four separate keys with identical values, and the repository namespaces `retry` per screen on purpose. A fifth screen borrowing the fourth's key is the coupling this key removes. `eva/redesign.html:627`'s screen has no retry of its own; the `ErrorView` it borrows is the design system's.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get leaderboardRetry;
+
+  /// The ACCESSIBLE NAME of the scope segmented control — the week/month/all picker. It is a control's own name, and it must not be one of its own option labels: `SegmentedControl` puts this string on the track's node, and two activatable nodes with the same name is the failure `segmented_control.dart`'s own doc names. `eva/redesign.html:940`'s `week`/`month`/`all` row supplies the OPTIONS; this supplies the name of the thing that holds them.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get leaderboardScopeLabel;
+
+  /// The ACCESSIBLE NAME of the metric segmented control — the light/streaks picker. Same rule as `leaderboardScopeLabel`: a control's name, never one of its own options. `eva/redesign.html:941`'s `light`/`streakM` row supplies the options; this supplies the name of the thing that holds them.
+  ///
+  /// In en, this message translates to:
+  /// **'Ranking metric'**
+  String get leaderboardMetricLabel;
+
+  /// The day unit in the reset line — `d` in English, `ي` in Arabic. The prototype's own `dU` row (`eva/redesign.html:946`), and it is a KEY rather than a fork in the widget so that a third locale has somewhere to put its own letter instead of silently getting an English one. The Arabic value is `ي`, the prototype's own.
+  ///
+  /// In en, this message translates to:
+  /// **'d'**
+  String get leaderboardDayUnit;
+
+  /// The hour unit in the reset line — `h` in English, `س` in Arabic. The prototype's own `hU` row (`eva/redesign.html:946`), and the same reasoning as `leaderboardDayUnit`.
+  ///
+  /// In en, this message translates to:
+  /// **'h'**
+  String get leaderboardHourUnit;
 
   /// `ErrorView.retryLabel`. There is NO prototype error state at all — `eva/src` has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES ("Try again") rather than "Retry".
   ///
@@ -490,9 +591,9 @@ abstract class AppLocalizations {
 
   /// The CTA while a choice is made and not yet graded.
   ///
-  /// WRITTEN, NOT TRANSCRIBED — and its citation moved. The old description cited the superseded prototype's `{checked ? 'Next question' : 'Check answer'}` switch. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.
+  /// TRANSCRIBED FROM `QuizScreen.tsx:127`, AND THE VALUE IS STILL THE ONE IT WROTE. The superseded prototype's switch was `{checked ? 'Next question' : 'Check answer'}`; this is its unchecked arm, unchanged. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.
   ///
-  /// The value itself is unchanged from the old transcription, which is the honest continuity: the step is the same, only its provenance changed.
+  /// The citation is kept because the value is kept: the step is the same, so the line that named it still does.
   ///
   /// In en, this message translates to:
   /// **'Check answer'**
@@ -938,10 +1039,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get sealFabSettings;
 
-  /// A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`.
+  /// A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and the board is the only prototype destination with no other entry point on `/`.
+  ///
+  /// **The word is "Communion", and it is the redesign's own** — `eva/redesign.html:932`'s `dockBoard` row, the same word as the screen's title (`:615`'s `boardT`). It was "Leaderboard" until Task 5.5 renamed the route, and the Arabic arm had already moved to "الشركة" — so for a while the two arms of this one key named two different things.
   ///
   /// In en, this message translates to:
-  /// **'Leaderboard'**
+  /// **'Communion'**
   String get sealFabLeaderboard;
 
   /// `:966` — `verses:["verses","آيات"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences.

@@ -98,17 +98,132 @@
   "@homeCategoryApocalypse": {
     "description": "A book card's caption category, and only a **sealed** book carries it. Transcribed: `redesign.html:1036` — `CATS.apocalypse`, which in `SEALED` (`:1034`) belongs to Revelation alone. See `homeCategoryPoetry` for why the six categories are ARB keys and not a field."
   },
-  "leaderboardTitle": "Cohort standings",
-  "leaderboardWindowWeekly": "Week",
-  "leaderboardWindowMonthly": "Month",
-  "leaderboardWindowAllTime": "All time",
+  "leaderboardTitle": "The Communion",
+  "@leaderboardTitle": {
+    "description": "App bar / section title for `/communion`. The cohort's board over a chosen window.\n\n`eva/redesign.html:615` — `<span class=\"ttl\" data-i18n=\"boardT\">The Communion</span>` — and `:939`'s `commG` row, the redesign's own word for it."
+  },
+  "leaderboardWindowWeekly": "week",
+  "@leaderboardWindowWeekly": {
+    "description": "Segmented-control option for `LeaderboardWindow.weekly`.\n\nNOT the enum's wire code. The wire sends `weekly`, `monthly`, `all_time`; those are identifiers in `leaderboard_board.dart`, not words to put in front of a reader. `all_time` in particular would need a space and a lowercase 't' to read as English."
+  },
+  "leaderboardWindowMonthly": "month",
+  "@leaderboardWindowMonthly": {
+    "description": "Segmented-control option for `LeaderboardWindow.monthly`. See `leaderboardWindowWeekly` for why this is not the wire code."
+  },
+  "leaderboardWindowAllTime": "all",
+  "@leaderboardWindowAllTime": {
+    "description": "Segmented-control option for `LeaderboardWindow.allTime`. See `leaderboardWindowWeekly` for why this is not the wire code `all_time`."
+  },
   "leaderboardEmptyTitle": "No scores yet",
   "leaderboardEmptyBody": "Once the cohort starts answering, the standings appear here.",
-  "leaderboardYourRank": "You",
   "leaderboardUnranked": "Not ranked yet",
-  "leaderboardScoreLabel": "points",
-  "leaderboardOpenFull": "See all",
-  "leaderboardRowSemantics": "{count, plural, zero{no points} one{1 point} other{{digits} points}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}",
+  "leaderboardRowSemantics": "{count, plural, zero{no points} one{1 point} other{{digits} points}}, {streakCount, plural, zero{no streaks} one{1 streak} other{{streakDigits} streaks}}, {initials}, rank {rank}{isReader, select, true{, that is you} other{}}",
+  "leaderboardMetricLight": "light",
+  "@leaderboardMetricLight": {
+    "description": "Segmented-control option and row sub-line unit for `LeaderboardMetric.light` — the response's own `score` for the selected window.\n\nTranscribed from `eva/redesign.html:941`'s `light` pair and `:1117`'s sub-line, which prints the OTHER metric beside each row's value."
+  },
+  "leaderboardMetricStreaks": "streaks",
+  "@leaderboardMetricStreaks": {
+    "description": "Segmented-control option and row sub-line unit for `LeaderboardMetric.streaks` — the row's `current_streak`.\n\n`eva/redesign.html:941` `streakM`; `:1117` prints this on a light-ranked row and prints `light` on a streak-ranked one."
+  },
+  "leaderboardWitness": "witness {position}",
+  "@leaderboardWitness": {
+    "description": "A veiled witness's display name: their display position, never their name. `eva/redesign.html:942` `witness`, used by `:1070`'s `dispName` and `:1072`'s monogram.\n\n`{position}` is the row's DISPLAY position under the selected metric, and its digits arrive through `digits()` so the Arabic arm reads `شاهد ٢`.",
+    "placeholders": {
+      "position": {
+        "type": "String",
+        "example": "2"
+      }
+    }
+  },
+  "leaderboardYou": "you",
+  "@leaderboardYou": {
+    "description": "The suffix appended to the reader's own row name, rendering as `Mariam Hanna · you`. `eva/redesign.html:942` `you`, appended at `:1115`.\n\nAlso the trailing half of `leaderboardTitle`'s alternative reading? No — see `leaderboardYourRank`'s deletion: this replaces it."
+  },
+  "leaderboardGapLine": "{name} holds {n} more light",
+  "@leaderboardGapLine": {
+    "description": "The you-card's gap sentence: the witness one display position above the reader, and how much more of the metric's value they hold. `eva/redesign.html:943` `gapLine`, composed at `:1105-1106`.\n\n`{name}` is already veil-resolved by the caller; `{n}` arrives through `digits()`.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "witness 2"
+      },
+      "n": {
+        "type": "String",
+        "example": "60"
+      }
+    }
+  },
+  "leaderboardPassHint": "pass with ≈{n} verses",
+  "@leaderboardPassHint": {
+    "description": "The you-card's advice half, appended after ` · ` and rendered on the LIGHT metric only. `eva/redesign.html:944`; the ÷15 constant is the rail's light economy (`:755`, \"15 per verse read + 10 per correct answer\").\n\nUnder `streaks` it is not rendered at all: a streak gap is not a number of verses.\n\n**The ARABIC arm says نحو and not the prototype's `≈`.** The prototype writes `≈` in both arms (`:944`), and U+2248 is in **no** bundled family that can draw Arabic — Amiri, the Arabic UI family, does not carry it — so the Arabic arm substitutes the word for \"about\". `test/support/font_coverage_test.dart` pins the measurement: U+2248 is absent from Amiri and present in the other four.",
+    "placeholders": {
+      "n": {
+        "type": "String",
+        "example": "4"
+      }
+    }
+  },
+  "leaderboardNoReset": "no reset · the sky remembers",
+  "@leaderboardNoReset": {
+    "description": "The reset line for `all_time`: the sky keeps every score, so there is no boundary to count down to. `eva/redesign.html:945` `noReset`, rendered at `:1081`.\n\nPrinted verbatim, including the `·` (U+00B7), which `test/support/font_coverage_test.dart` pins as present in all five bundled families."
+  },
+  "leaderboardResetsIn": "resets in ≈{days}{dayUnit} {hours}{hourUnit}",
+  "@leaderboardResetsIn": {
+    "description": "The approximate reset line for a bounded window. `eva/redesign.html:946` `resets`/`dU`/`hU`, composed at `:1082` against a locally derived boundary rather than a server instant.\n\n`{days}`, `{hours}` and the two units are Strings so `digits()` can convert the numerals while the units stay the locale's own words; the `≈` states that the boundary is local (ADR-0022 `:66-81`, `redis/leaderboard.service.ts:20-36`).",
+    "placeholders": {
+      "days": {
+        "type": "String",
+        "example": "3"
+      },
+      "hours": {
+        "type": "String",
+        "example": "14"
+      },
+      "dayUnit": {
+        "type": "String",
+        "example": "d"
+      },
+      "hourUnit": {
+        "type": "String",
+        "example": "h"
+      }
+    }
+  },
+  "leaderboardCheerSent": "cheer sent to {name}",
+  "@leaderboardCheerSent": {
+    "description": "The confirmation toast after a witness is cheered. `eva/redesign.html:947` `cheerSent`, shown for 1800 ms by `:1393`.\n\nThe prototype writes a leading `✦`; it is PAINTED beside this string rather than typed into it, because U+2726 is in no bundled family.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Peter George (Grade 6)"
+      }
+    }
+  },
+  "leaderboardVeil": "Veil witnesses",
+  "leaderboardRetry": "Try again",
+  "leaderboardScopeLabel": "Period",
+  "leaderboardMetricLabel": "Ranking metric",
+  "leaderboardDayUnit": "d",
+  "leaderboardHourUnit": "h",
+  "@leaderboardRetry": {
+    "description": "The failure arm's retry label. The board has its OWN key, and not `/reading`'s: `homeRetry`, `quizRetry`, `readingRetry` and `settingsRetry` are four separate keys with identical values, and the repository namespaces `retry` per screen on purpose. A fifth screen borrowing the fourth's key is the coupling this key removes. `eva/redesign.html:627`'s screen has no retry of its own; the `ErrorView` it borrows is the design system's."
+  },
+  "@leaderboardScopeLabel": {
+    "description": "The ACCESSIBLE NAME of the scope segmented control — the week/month/all picker. It is a control's own name, and it must not be one of its own option labels: `SegmentedControl` puts this string on the track's node, and two activatable nodes with the same name is the failure `segmented_control.dart`'s own doc names. `eva/redesign.html:940`'s `week`/`month`/`all` row supplies the OPTIONS; this supplies the name of the thing that holds them."
+  },
+  "@leaderboardMetricLabel": {
+    "description": "The ACCESSIBLE NAME of the metric segmented control — the light/streaks picker. Same rule as `leaderboardScopeLabel`: a control's name, never one of its own options. `eva/redesign.html:941`'s `light`/`streakM` row supplies the options; this supplies the name of the thing that holds them."
+  },
+  "@leaderboardDayUnit": {
+    "description": "The day unit in the reset line — `d` in English, `ي` in Arabic. The prototype's own `dU` row (`eva/redesign.html:946`), and it is a KEY rather than a fork in the widget so that a third locale has somewhere to put its own letter instead of silently getting an English one. The Arabic value is `ي`, the prototype's own."
+  },
+  "@leaderboardHourUnit": {
+    "description": "The hour unit in the reset line — `h` in English, `س` in Arabic. The prototype's own `hU` row (`eva/redesign.html:946`), and the same reasoning as `leaderboardDayUnit`."
+  },
+  "@leaderboardVeil": {
+    "description": "The board header's eye button, and the Settings row Task 5.7 will build: replace every other witness's name with `witness {position}` and their monogram with the hollow star. `eva/redesign.html:948` `veilT`; applied at `:1069-1072`.\n\nA rendering choice over rows that already arrived — there is no veil endpoint (ADR-0022 `:243-245`)."
+  },
   "@leaderboardRowSemantics": {
     "description": "The screen-reader sentence for one ranked row.\n\nA REAL ICU PLURAL, and the reason this key exists rather than four separate strings. A row is four numbers and a monogram; a screen reader announcing \"3, PG, 80, points\" gives a reader four fragments and no sentence, so this composes one. The plural is over `count` with the digits interpolated separately, which is the same shape `readingCaptionFor` uses.\n\n`isReader` is a `select`, not a second plural: \"that is you\" is a clause, not a quantity, and folding it into the plural would multiply the arms for no gain.\n\nNEVER A NAME. `initials` is the monogram and nothing else can reach this string, which is the accessibility half of `LeaderboardRow` having no `fullName` — a voice-over user must not be able to hear a name the screen cannot show.\n\n`rank` and `digits` are **String** while `count` is **int**, and that split is load-bearing rather than fussy: `count` is what the plural selects on, and `digits` is what the reader sees. Passing the numeral twice means the shape does not have to change when a locale's digits are not ASCII — the Arabic arm renders U+0660…U+0669, and `intl`'s formatting would otherwise be a second source of truth about numerals. `readingCaptionFor` does the same thing.",
     "placeholders": {
@@ -119,6 +234,14 @@
       "digits": {
         "type": "String",
         "example": "80"
+      },
+      "streakCount": {
+        "type": "int",
+        "example": "12"
+      },
+      "streakDigits": {
+        "type": "String",
+        "example": "12"
       },
       "initials": {
         "type": "String",
@@ -134,35 +257,14 @@
       }
     }
   },
-  "@leaderboardTitle": {
-    "description": "App bar / section title for `/leaderboard`. The cohort's ranking over a chosen window."
-  },
-  "@leaderboardWindowWeekly": {
-    "description": "Segmented-control option for `LeaderboardWindow.weekly`.\n\nNOT the enum's wire code. The wire sends `weekly`, `monthly`, `all_time`; those are identifiers in `leaderboard_board.dart`, not words to put in front of a reader. `all_time` in particular would need a space and a lowercase 't' to read as English."
-  },
-  "@leaderboardWindowMonthly": {
-    "description": "Segmented-control option for `LeaderboardWindow.monthly`. See `leaderboardWindowWeekly` for why this is not the wire code."
-  },
-  "@leaderboardWindowAllTime": {
-    "description": "Segmented-control option for `LeaderboardWindow.allTime`. See `leaderboardWindowWeekly` for why this is not the wire code `all_time`."
-  },
   "@leaderboardEmptyTitle": {
     "description": "Shown when the cohort has nobody ranked.\n\nA REAL STATE, NOT AN ERROR. Measured against the live endpoint: `{\"group_id\":3,\"window\":\"weekly\",\"total_ranked\":0,\"my_standing\":null,\"leaderboard\":[]}`. Scores only enter Redis via `leaderboardService.recordScore`, called from `submissions.service.ts:105` on a *successful* submission, and submission cannot succeed against the memory fallback because the schemas require UUIDs the fallback does not mint. So the empty board is currently the ONLY reachable state in development.\n\nThis is why the copy explains what will fill it instead of apologising for a failure."
   },
   "@leaderboardEmptyBody": {
     "description": "Body under `leaderboardEmptyTitle`. Says what will populate the list, because the reader cannot tell whether the cohort is new or the app is broken."
   },
-  "@leaderboardYourRank": {
-    "description": "Label on the reader's own row. NOT the reader's name and NOT their initials — the top bar already shows both, and repeating the initials next to the flame would be a second copy of the same identity.\n\nA reader must find their own row in a list of other children's monograms without their name appearing anywhere, which is the whole point of `LeaderboardRow` having no `fullName`."
-  },
   "@leaderboardUnranked": {
-    "description": "Shown instead of a position when `LeaderboardStanding.rank` is `null`.\n\nNEVER AN ARITHMETIC RESULT. `rank: null` with `score: 0` is the server's measured answer for a child who has not scored. Rendering it as `0` or `1` would put a fabricated position on someone who has none — the defect `LeaderboardStanding`'s doc is named for."
-  },
-  "@leaderboardScoreLabel": {
-    "description": "Unit caption under a score. Lowercase and plural-invariant because the unit is fixed and the number is not; 'pts' was rejected as too terse to read as a word in Arabic, where a two-letter abbreviation carries no meaning."
-  },
-  "@leaderboardOpenFull": {
-    "description": "Link from Home's compact card to `/leaderboard`.\n\nPhrased as an action rather than a count, because the card cannot honestly say how many there are — `cohortSize` is `null` whenever the request's `limit` bound. 'See all' stays true whether there are four children or four hundred."
+    "description": "Shown instead of a position when the client cannot place the reader.\n\n**TWO SITUATIONS, and they are not the same.** `LeaderboardStanding.rank` is `null` — the server has no ranking for this reader at all. And `rank` is not `null` but the reader's **row is off the page** (the endpoint's `limit` is 50), so under the `streaks` metric — which the server does not rank and the client cannot rank a reader it has no row for — the card says the reader is unranked **on this board**.\n\nNEVER AN ARITHMETIC RESULT. `rank: null` with `score: 0` is the server's measured answer for a child who has not scored. Rendering it as `0` or `1` would put a fabricated position on someone who has none — the defect `LeaderboardStanding`'s doc is named for."
   },
   "homeRetry": "Try again",
   "quizExit": "Back",
@@ -452,9 +554,9 @@
   "@sealFabSettings": {
     "description": "A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away."
   },
-  "sealFabLeaderboard": "Leaderboard",
+  "sealFabLeaderboard": "Communion",
   "@sealFabLeaderboard": {
-    "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
+    "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and the board is the only prototype destination with no other entry point on `/`.\n\n**The word is \"Communion\", and it is the redesign's own** — `eva/redesign.html:932`'s `dockBoard` row, the same word as the screen's title (`:615`'s `boardT`). It was \"Leaderboard\" until Task 5.5 renamed the route, and the Arabic arm had already moved to \"الشركة\" — so for a while the two arms of this one key named two different things."
   },
   "readingVerses": "verses",
   "@readingVerses": {

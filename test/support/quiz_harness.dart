@@ -92,6 +92,33 @@ const ScriptureText liveArabicQuizPassage = ScriptureText(
   currentStreak: 4,
 );
 
+/// The Arabic passage with **no questions at all**.
+///
+/// ## WHY THIS FIXTURE EXISTS
+///
+/// `/quiz` renders the **shared** `EmptyState` when the session has no questions,
+/// and the empty state's two strings are Arabic. The bilingual-typography gate's
+/// `/quiz` group had **no arm for that state**, which is how a shared widget's
+/// Arabic defect stayed invisible on the screen that had it first: `EmptyState`
+/// painted its title in the display serif and its message in the UI sans, and
+/// **neither family carries a single Arabic glyph**.
+///
+/// The defect was found on `/communion`; this fixture is what lets the `/quiz`
+/// group close the gap.
+const ScriptureText arabicQuizPassageWithoutQuestions = ScriptureText(
+  readingId: 'reading-group-3-2026-10-04',
+  groupId: 3,
+  scheduledDate: '2026-10-04',
+  language: ReadingLanguage.arabic,
+  reference: 'يوحنا 3: 1-5',
+  translation: 'Smith & Van Dyck (فانديك)',
+  verses: <Verse>[firstVerse],
+  questions: <Question>[],
+  isFullyCompleted: false,
+  pointsEarnedToday: 0,
+  currentStreak: 4,
+);
+
 /// The English twin of [liveArabicQuizPassage].
 const ScriptureText liveEnglishQuizPassage = ScriptureText(
   readingId: 'reading-group-3-2026-10-04',

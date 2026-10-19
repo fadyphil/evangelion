@@ -143,6 +143,15 @@ void main() {
       expect(parsed.rows.last.score, 50);
     });
 
+    test('reads userId, full_name and current_streak for every row', () {
+      final LeaderboardBoard parsed = expectSuccess(mapped(board()));
+      final LeaderboardRow first = parsed.rows.first;
+      expect(first.userId, '22222222-2222-2222-2222-222222222222');
+      expect(first.fullName, 'Peter George (Grade 6)');
+      expect(first.currentStreak, 7);
+      expect(first.initials, 'PG');
+    });
+
     test('takes the window from the response, not from the request', () {
       // Echoing is the only place the two can be compared; a client that assumed its
       // own request was honoured would label a monthly board "this week".
@@ -260,6 +269,43 @@ void main() {
         mapped(board(rows: <Object?>[row(score: 6.0)])),
       );
       expect(failure.message, contains('an int'));
+    });
+
+    test('a missing userId refuses the row, naming the key', () {
+      final Failure failure = expectFailure(
+        mapped(board(rows: <Object?>[row(userId: null)])),
+      );
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('leaderboard[0].userId'));
+      expect(failure.message, contains('a String'));
+    });
+
+    test('a missing full_name refuses the row, naming the key', () {
+      final Failure failure = expectFailure(
+        mapped(board(rows: <Object?>[row(fullName: null)])),
+      );
+      expect(failure.message, contains('leaderboard[0].full_name'));
+    });
+
+    test('a missing current_streak refuses the row, naming the key', () {
+      final Failure failure = expectFailure(
+        mapped(board(rows: <Object?>[row(currentStreak: null)])),
+      );
+      expect(failure.message, contains('leaderboard[0].current_streak'));
+      expect(failure.message, contains('an int'));
+    });
+
+    test('a wrong-typed userId and current_streak are refused too', () {
+      expect(
+        expectFailure(mapped(board(rows: <Object?>[row(userId: 7)]))).message,
+        contains('a String'),
+      );
+      expect(
+        expectFailure(
+          mapped(board(rows: <Object?>[row(currentStreak: 'seven')])),
+        ).message,
+        contains('an int'),
+      );
     });
   });
 
@@ -461,20 +507,16 @@ void main() {
     });
   });
 
-  group('rows never carry a name, a streak or an id', () {
-    test('a mapped row exposes exactly three members', () {
-      // The privacy requirement is structural, not a convention: `fullName`,
-      // `currentStreak` and `userId` are not on the entity, so no widget can render
-      // them. A field added later breaks this test.
+  group('rows carry the name, the streak and the id the screen now draws', () {
+    test('a mapped row carries all three, and initials still come from the name', () {
+      // The privacy requirement was structural in Phase 1 and is superseded by
+      // ADR-0022 `:110-113`; the veil (`:243-245`) is the rendering-time control.
       final LeaderboardRow row = expectSuccess(mapped(board())).rows.first;
-      expect(
-        row.toString(),
-        allOf(
-          contains('initials'),
-          isNot(contains('Peter')),
-          isNot(contains('Grade')),
-        ),
-      );
+      expect(row.fullName, 'Peter George (Grade 6)');
+      expect(row.currentStreak, 7);
+      expect(row.userId, '22222222-2222-2222-2222-222222222222');
+      // The monogram is derived from the same string, so the two cannot disagree.
+      expect(row.initials, LeaderboardMapper.initialsOf(row.fullName));
     });
   });
 }

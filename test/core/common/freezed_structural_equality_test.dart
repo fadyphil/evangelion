@@ -178,11 +178,14 @@ void main() {
       _differsInEveryField(
         'LeaderboardRow',
         _row(),
-        fields: 3,
+        fields: 6,
         variants: <({String field, LeaderboardRow value})>[
           (field: 'rank', value: _row(rank: 2)),
           (field: 'score', value: _row(score: 120)),
           (field: 'initials', value: _row(initials: 'DM')),
+          (field: 'userId', value: _row(userId: 'someone-else')),
+          (field: 'fullName', value: _row(fullName: 'David Mina (Grade 5)')),
+          (field: 'currentStreak', value: _row(currentStreak: 21)),
         ],
       );
     });
@@ -278,7 +281,7 @@ void main() {
       _differsInEveryField(
         'LeaderboardState',
         _leaderboardState(),
-        fields: 4,
+        fields: 7,
         variants: <({String field, LeaderboardState value})>[
           (
             field: 'status',
@@ -302,6 +305,15 @@ void main() {
               ),
             ),
           ),
+          (
+            field: 'metric',
+            value: _leaderboardState(metric: LeaderboardMetric.streaks),
+          ),
+          (
+            field: 'cheered',
+            value: _leaderboardState(cheered: const <String>{'peter'}),
+          ),
+          (field: 'readerName', value: _leaderboardState(readerName: 'David')),
         ],
       );
     });
@@ -706,7 +718,7 @@ void main() {
       _differsInEveryField(
         'UserSettings',
         _userSettings(),
-        fields: 4,
+        fields: 6,
         variants: <({String field, UserSettings value})>[
           (
             field: 'themeMode',
@@ -718,6 +730,8 @@ void main() {
             value: _userSettings(language: ReadingLanguage.arabic),
           ),
           (field: 'reducedMotion', value: _userSettings(reducedMotion: true)),
+          (field: 'veilWitnesses', value: _userSettings(veilWitnesses: true)),
+          (field: 'showPodium', value: _userSettings(showPodium: false)),
         ],
       );
     });
@@ -1246,12 +1260,21 @@ StreakSummary _streak({
 );
 
 /// A row whose initials come from `'Peter George (Grade 6)'`, the seeded name.
-LeaderboardRow _row({int rank = 1, int score = 80, String initials = 'PG'}) =>
-    LeaderboardRow(
-      rank: _int(rank),
-      score: _int(score),
-      initials: _text(initials),
-    );
+LeaderboardRow _row({
+  int rank = 1,
+  int score = 80,
+  String initials = 'PG',
+  String userId = '22222222-2222-2222-2222-222222222222',
+  String fullName = 'Peter George (Grade 6)',
+  int currentStreak = 12,
+}) => LeaderboardRow(
+  rank: _int(rank),
+  score: _int(score),
+  initials: _text(initials),
+  userId: _text(userId),
+  fullName: _text(fullName),
+  currentStreak: _int(currentStreak),
+);
 
 LeaderboardStanding _standing({int? rank = 2, int score = 50}) =>
     LeaderboardStanding(rank: rank, score: _int(score));
@@ -1275,11 +1298,17 @@ LeaderboardState _leaderboardState({
   LeaderboardWindow window = LeaderboardWindow.weekly,
   LeaderboardBoard? board,
   Failure? failure,
+  LeaderboardMetric metric = LeaderboardMetric.light,
+  Set<String> cheered = const <String>{},
+  String? readerName,
 }) => LeaderboardState(
   status: status,
   window: window,
   board: board,
   failure: failure,
+  metric: metric,
+  cheered: cheered,
+  readerName: readerName,
 );
 
 LeaderboardQuery _query({
@@ -1524,11 +1553,15 @@ UserSettings _userSettings({
   int fontStep = kDefaultFontStep,
   ReadingLanguage? language,
   bool reducedMotion = false,
+  bool veilWitnesses = false,
+  bool showPodium = true,
 }) => UserSettings(
   themeMode: themeMode,
   fontStep: _int(fontStep),
   language: language,
   reducedMotion: _bool(reducedMotion),
+  veilWitnesses: _bool(veilWitnesses),
+  showPodium: _bool(showPodium),
 );
 
 SettingsState _settingsState({

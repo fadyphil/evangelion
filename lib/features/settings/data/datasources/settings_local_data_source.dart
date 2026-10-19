@@ -121,6 +121,8 @@ final class SettingsLocalDataSource {
         _stringAt(preferences, kLanguageKey) ?? '',
       ),
       reducedMotion: _boolAt(preferences, kReducedMotionKey) ?? false,
+      veilWitnesses: _boolAt(preferences, kVeilWitnessesKey) ?? false,
+      showPodium: _boolAt(preferences, kShowPodiumKey) ?? true,
     );
   }
 
@@ -175,6 +177,8 @@ final class SettingsLocalDataSource {
       await preferences.remove(kLanguageKey);
     }
     await preferences.setBool(kReducedMotionKey, settings.reducedMotion);
+    await preferences.setBool(kVeilWitnessesKey, settings.veilWitnesses);
+    await preferences.setBool(kShowPodiumKey, settings.showPodium);
   }
 
   /// The platform store, read once.
@@ -208,3 +212,14 @@ const String kLanguageKey = 'eva.language';
 
 /// The preferences key holding the reduce-motion preference. See [kThemeModeKey].
 const String kReducedMotionKey = 'eva.reduced_motion';
+
+/// The preferences key holding [UserSettings.veilWitnesses].
+///
+/// `eva.communion.…` rather than `eva.veil_witnesses`, and the namespacing is the
+/// point: the field is a **board** preference that `/settings` happens to expose, so a
+/// reader poking at the store can see which screen owns it. See [kThemeModeKey] for
+/// the prefix rule.
+const String kVeilWitnessesKey = 'eva.communion.veil_witnesses';
+
+/// The preferences key holding [UserSettings.showPodium]. See [kVeilWitnessesKey].
+const String kShowPodiumKey = 'eva.communion.show_podium';

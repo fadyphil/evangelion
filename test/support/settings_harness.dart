@@ -90,6 +90,13 @@ SettingsHarness settingsHarness({
       kFontStepKey: initial.fontStep,
       kReducedMotionKey: initial.reducedMotion,
       if (initial.language != null) kLanguageKey: initial.language!.code,
+      // The two `/communion` fields (Task 5.5, D15). Seeded here for the same
+      // reason the other four are: a test that wants "the reader chose the veil"
+      // should be able to say so through `initial`, rather than writing the
+      // setting after the harness is built and asserting on a value it put there
+      // itself.
+      kVeilWitnessesKey: initial.veilWitnesses,
+      kShowPodiumKey: initial.showPodium,
     },
   });
 
