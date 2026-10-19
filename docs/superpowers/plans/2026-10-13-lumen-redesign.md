@@ -1285,6 +1285,49 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > so the port adopts the intent and says so; and `ErrorView`'s retry assert
 > caught the rebuilt failure arm shipping unlabelled.
 
+> **5.4** (`840d37a`): `/quiz` rebuilt against `:562-574` — the bare `‹`, the
+> centred `Refraction · <reference>` crumb and the gold `✦ N` score, the bead
+> row re-homed under the appbar, a centred scripture prompt, four tint-tier
+> options and the `.qnext` ghost pill. The score is `QuizSession.runningScore`,
+> a domain getter: the payload's `total_points_earned_today` seed plus each
+> **correct** submit's `points_earned`, never the client's own guess at a
+> verdict — and the star is painted (`FourPointedStar`) because U+2726 is in no
+> bundled family. The prototype's `.reveal` is deliberately absent: the wire
+> has no correct-letter field, so the client grades only the option the reader
+> submitted and never reveals an unpicked one. `FeedbackBanner` and the mono
+> `Question N of M` line died with the old chrome; the verdict lives on the
+> graded card (colour, glyph, `EvaShake` on wrong, and the `liveRegion` the
+> banner used to own). The terminal rule is the prototype's (`:1431-1432`): the
+> last graded question's one press is `see results ✦` -> `/result`, so
+> `QuizStatus.complete` and `QuizCta.finish` — reachable only by a direct event
+> dispatch — are deleted rather than kept as dead branches.
+>
+> The body is a `SliverFillRemaining(hasScrollBody: false)`, the prototype's
+> centred-when-short/scrollable-when-tall pair: at 320×568 the fourth option is
+> one scroll away, not dropped. `EvaShake` moved out of `/login` into the
+> design system because `.opt.wrong` shares `:360`'s keyframes and `.45s`, and
+> a second private copy is the alternative the move removes. `ReadingPage`'s
+> lost `@RoutePage()` was restored so the next codegen cannot delete
+> `ReadingRoute`. Keys 116 -> 114: `quizRefraction` arrived,
+> `quizOfWord`/`quizVerdictCorrect`/`quizVerdictIncorrect` died with their
+> elements, and `quizExit`/`quizProgress`/`quizNextQuestion`/`quizSeeResults`
+> took the redesign's own copy.
+>
+> **Five defects the gates caught, not reading:** removing `complete` from the
+> CTA guard mechanically let `submitting` through while the answer is still
+> `isAnswerable`, leaving an **enabled** Check button whose handler returns
+> immediately — a one-frame dead control, now held by a negative-controlled
+> bloc test; the first `_Cta` drove its label off `cta` rather than `graded`,
+> so a reader with nothing chosen was told a sentence invented for another
+> state (`quiz_page_test` caught it); `quiz_geometry_test` parsed the
+> three-value `.appbar` shorthand as four and dropped the leading dot from the
+> `.75`/`.18` alphas; `quiz_text_scale_test` asserted the fourth option and
+> graded card were offstage when they are built, and now scrolls to and hits
+> each; and `quiz_accessibility_test` found the back chevron and CTA exposed no
+> activatable semantics action because `excludeSemantics: true` drops the inner
+> ink's — both now carry `onTap` on the `Semantics` node. Gate run: 2883 tests,
+> 98.30% coverage (6083/6188).
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
