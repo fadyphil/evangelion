@@ -277,11 +277,12 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('and the feedback banner is a live region', (
+    testWidgets('and the graded card is a live region', (
       WidgetTester tester,
     ) async {
-      // The banner arrives after the screen has settled, so without
+      // The verdict arrives after the screen has settled, so without
       // `liveRegion` a screen-reader user learns about it only by exploring.
+      // The retired banner carried the flag; the graded card inherited it.
       final SemanticsHandle handle = tester.ensureSemantics();
       await gradeTheAnsweredOption(tester, submission: defaultSubmission);
 

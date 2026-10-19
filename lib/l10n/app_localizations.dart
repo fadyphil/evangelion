@@ -126,7 +126,7 @@ abstract class AppLocalizations {
   /// **'password'**
   String get authPasswordHint;
 
-  /// The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n="enter"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:954` — `enter:["enter the word","ادخل الكلمة"]`). The Arabic is the prototype's own, not a new translation.
+  /// The sign-in CTA. Transcribed: redesign.html:508 — `data-i18n="enter"`, one of the THREE strings on the redesigned login the prototype itself translates (`redesign.html:965` — `enter:["enter the word","ادخل الكلمة"]`). The Arabic is the prototype's own, not a new translation.
   ///
   /// In en, this message translates to:
   /// **'enter the word'**
@@ -276,7 +276,7 @@ abstract class AppLocalizations {
   /// **'Selah'**
   String get homeSelah;
 
-  /// The selah card's second line, **without the number**. Transcribed: `redesign.html:966` — `secs:["seconds of silence","ثانية من الصمت"]`.
+  /// The selah card's second line, **without the number**. Transcribed: `redesign.html:970` — `secs:["seconds of silence","ثانية من الصمت"]`.
   ///
   /// The prototype composes it: `el('selahSub').textContent = \`${N(selahDur)} ${tr('secs')}\`` (`:990`). Composing here rather than through a `{seconds}` placeholder is what keeps the Arabic value free of the ASCII placeholder name — `app_localizations_test.dart` fails any non-plural Arabic value holding Latin script, and see `readingCaptionFor`'s description for why the plural keys are the only ones exempt.
   ///
@@ -460,48 +460,62 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get homeRetry;
 
-  /// The close control's accessible name.
+  /// The back control's accessible name.
   ///
-  /// WRITTEN, NOT TRANSCRIBED: QuizScreen.tsx:46-50 is a `<button>` around a bare inline `<svg>` cross with NO LABEL AT ALL — §14's first row, verbatim. The same obligation that forced `readingBack` forces this.
+  /// REWORDED WITH THE CHROME IT NAMES. The old value ("Close") named a cross icon; the redesign replaces that control with the `.chev` chevron (`redesign.html:564`), whose click returns to the reader (`:1412` — `qBack` is `pop('reader')` then `enterReader()`, a back step and not a dismissal). The client's control is still `context.router.maybePop()`, which is the same move.
+  ///
+  /// Still WRITTEN, NOT TRANSCRIBED: `:564` is a `<button>` around a bare `‹` with NO LABEL AT ALL — §14's first row, verbatim. The same obligation that forced `readingBack` forces this.
   ///
   /// In en, this message translates to:
-  /// **'Close'**
+  /// **'Back'**
   String get quizExit;
 
-  /// `ProgressBeads`' accessible-name prefix. See its own `semanticLabel`.
+  /// `ProgressBeads`' accessible-name prefix for the re-homed dots row.
   ///
-  /// See `homeReflectionProgress`'s description for the recorded English tail this prefix sits on.
+  /// REWORDED WITH ITS JOB. The old value ("Question") was the noun of the composed `Question 2 of 5` line, which the redesign's quiz screen does not have — its only progress surface is the `.dots` row (`redesign.html:568`, CSS `:328-332`). The row is a bare unlabelled `<div>` in the prototype, so this name is WRITTEN, NOT TRANSCRIBED — §14's colour-and-shape row needs the progress announced, and `ProgressBeads`' `Semantics` is where it lands.
+  ///
+  /// Semantics-only, never painted: `ProgressBeads` puts it in `Semantics(label:, excludeSemantics: true)`, so the Arabic-typography gate declines to declare it.
   ///
   /// In en, this message translates to:
-  /// **'Question'**
+  /// **'Quiz progress'**
   String get quizProgress;
 
-  /// The word between the two counts in the quiz progress label.
+  /// The crumb's first half — `Refraction · <reference>`.
   ///
-  /// A KEY AND NOT A CONSTANT, because the two arms genuinely differ — `of` against `من` — and a constant would have had to be a `switch` over a private anchor object to stay `const`, which is more machinery than the string is worth. `reading` had a `_space` constant once because both arms spell the space identically; this is the other case, and the difference is the reason.
-  ///
-  /// KEY NAME: `quizOfWord` rather than `of`, because ARB keys share ONE flat namespace with every other key and `of` is both a Dart keyword and too generic to survive a grep.
+  /// Transcribed from the prototype's I18N row (`redesign.html:967`, `refraction:["Refraction","انعطاف"]`), rendered at `:565` as the appbar's centred `#qCrumb` and filled from the reader's own passage (`:1348` — `` `${tr('refraction')} · ${bookTitle(b)}` ``). The client's second half is the payload's `reference`, carried on `QuizSession` and composed in `quiz_l10n.dart` — an ARB placeholder would fail the Latin/numeral gates, the `home_l10n.dart` precedent.
   ///
   /// In en, this message translates to:
-  /// **'of'**
-  String get quizOfWord;
+  /// **'Refraction'**
+  String get quizRefraction;
 
-  /// The CTA before the answer is graded. Transcribed: QuizScreen.tsx:127.
+  /// The CTA while a choice is made and not yet graded.
+  ///
+  /// WRITTEN, NOT TRANSCRIBED — and its citation moved. The old description cited the superseded prototype's `{checked ? 'Next question' : 'Check answer'}` switch. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.
+  ///
+  /// The value itself is unchanged from the old transcription, which is the honest continuity: the step is the same, only its provenance changed.
   ///
   /// In en, this message translates to:
   /// **'Check answer'**
   String get quizCheckAnswer;
 
-  /// The CTA after the answer is graded, with a question still to come. Transcribed: QuizScreen.tsx:127.
+  /// The CTA after the answer is graded, with a question still to come.
+  ///
+  /// REWORDING, ON A MEASUREMENT. The old value ("Next question") was the superseded prototype's switch label. The redesign's own I18N row is `next:["next ▸","التالي"]` (`redesign.html:967`), and `.qnext` renders it mono, uppercase, tracked (`:364`) — so the rendered form is `NEXT ▸` exactly as the prototype draws it. The `▸` (U+25B8) is safe as TEXT on the English arm only because `.qnext` is mono (`:364`) and JetBrainsMono carries the codepoint — measured against all nineteen bundled TTFs, same instrument as `font_coverage.dart`. The Arabic value carries no arrow, which is the prototype's own pair.
+  ///
+  /// The terminal arm took the redesign's other label — see `quizSeeResults`.
   ///
   /// In en, this message translates to:
-  /// **'Next question'**
+  /// **'next ▸'**
   String get quizNextQuestion;
 
-  /// The CTA on the last question. WRITTEN, NOT TRANSCRIBED: the prototype's CTA is `{checked ? 'Next question' : 'Check answer'}` — there is NO TERMINAL STATE, because the prototype has exactly one hard-coded question.
+  /// The CTA on the last graded question — the terminal arm.
+  ///
+  /// NOW TRANSCRIBED, AND THE VALUE REWORDED TO THE REDESIGN'S OWN. The old description called this key written because the old prototype had no terminal state. The redesign does: its I18N row is `seeRes:["see results ✦","النتائج"]` (`redesign.html:967`), applied at `:1431` (`label = last question ? tr('seeRes') : tr('next')`), and one click opens the results (`:1432`).
+  ///
+  /// THE ✦ IS NEVER TEXT. U+2726 is in NO bundled family — measured against all nineteen TTFs (`four_pointed_star.dart` carries the measurement) — so the star is the painted `FourPointedStar` composed by the CTA on the English arm, and the Arabic arm carries none, which is the prototype's own pair. The value here is therefore the words only.
   ///
   /// In en, this message translates to:
-  /// **'See results'**
+  /// **'see results'**
   String get quizSeeResults;
 
   /// Appended to the correct option's accessible name once it is revealed.
@@ -521,20 +535,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'your answer, incorrect'**
   String get quizIncorrectSuffix;
-
-  /// The feedback banner's text on a correct answer.
-  ///
-  /// WRITTEN, NOT TRANSCRIBED. QuizScreen.tsx:116 reads "Exactly. Light — before anything else.", which describes THE PROTOTYPE'S OWN INVENTED OPTION SET, and this client's question is a different one. Transcribing it would put a claim about the wrong passage on the screen.
-  ///
-  /// In en, this message translates to:
-  /// **'Correct.'**
-  String get quizVerdictCorrect;
-
-  /// The feedback banner's text on a wrong answer. Written, for `quizVerdictCorrect`'s reason.
-  ///
-  /// In en, this message translates to:
-  /// **'Not this time.'**
-  String get quizVerdictIncorrect;
 
   /// Appended to an option's accessible name when the wire says it is answered.
   ///
@@ -944,43 +944,43 @@ abstract class AppLocalizations {
   /// **'Leaderboard'**
   String get sealFabLeaderboard;
 
-  /// `:967` — `verses:["verses","آيات"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences.
+  /// `:966` — `verses:["verses","آيات"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences.
   ///
   /// In en, this message translates to:
   /// **'verses'**
   String get readingVerses;
 
-  /// `:967` — `quiz:["quiz","اختبار"]`. The caption the CTA is built around (`:1347`), not a heading: the prototype writes `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` ``.
+  /// `:966` — `quiz:["quiz","اختبار"]`. The caption the CTA is built around (`:1347`), not a heading: the prototype writes `` `${tr('quiz')} · ${N(qEff)} ${tr('questions')}` ``.
   ///
   /// In en, this message translates to:
   /// **'quiz'**
   String get readingQuiz;
 
-  /// `:967` — `questions:["questions","أسئلة"]`. The unit beside the CTA's numeral. **Not a plural**: the prototype renders one word for every count, exactly as home's `verseCount` and `selahSeconds` do.
+  /// `:966` — `questions:["questions","أسئلة"]`. The unit beside the CTA's numeral. **Not a plural**: the prototype renders one word for every count, exactly as home's `verseCount` and `selahSeconds` do.
   ///
   /// In en, this message translates to:
   /// **'questions'**
   String get readingQuestions;
 
-  /// `:966` — `listen:["listen","استمع"]`. The pill's last button (`#listen`, `:559`).
+  /// `:965` — `listen:["listen","استمع"]`. The pill's last button (`#listen`, `:559`).
   ///
   /// In en, this message translates to:
   /// **'listen'**
   String get readingListen;
 
-  /// `:969` — `sky:["sky","سماء"]`. The crumb's third clause (`` `${tr('sky')} ${N(skyN)}` ``, `:1346`) — the count of lit stars, which is `SkyState.count`.
+  /// `:968` — `sky:["sky","سماء"]`. The crumb's third clause (`` `${tr('sky')} ${N(skyN)}` ``, `:1346`) — the count of lit stars, which is `SkyState.count`.
   ///
   /// In en, this message translates to:
   /// **'sky'**
   String get readingSky;
 
-  /// `:975` — `bmk:["✦ bookmarked","✦ تم الحفظ"]`, and the leading `✦` is **deliberately dropped**: U+2726 is in no bundled family (measured — `arabic_typography_test.dart` failed with `[10022]` on the selah glyph before it became a painted star), so a toast carrying it would ship a tofu box. The glyph is decoration on a transient label; the word is the information. `readingBookmark` keeps the button's own name, which `:544` writes as `title="bookmark"` with no glyph at all.
+  /// `:974` — `bmk:["✦ bookmarked","✦ تم الحفظ"]`, and the leading `✦` is **deliberately dropped**: U+2726 is in no bundled family (measured — `arabic_typography_test.dart` failed with `[10022]` on the selah glyph before it became a painted star), so a toast carrying it would ship a tofu box. The glyph is decoration on a transient label; the word is the information. `readingBookmark` keeps the button's own name, which `:544` writes as `title="bookmark"` with no glyph at all.
   ///
   /// In en, this message translates to:
   /// **'bookmarked'**
   String get readingBookmarkOn;
 
-  /// `:975` — `bmkOff:["bookmark removed","أُزيل الحفظ"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind.
+  /// `:974` — `bmkOff:["bookmark removed","أُزيل الحفظ"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind.
   ///
   /// In en, this message translates to:
   /// **'bookmark removed'**

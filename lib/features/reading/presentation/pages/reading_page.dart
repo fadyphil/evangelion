@@ -43,6 +43,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// which is what makes the pill's translucent fill read as glass even though the
 /// pill does not blur (§13.4's budget; `reading_pill.dart`'s doc carries the
 /// recorded consequence).
+@RoutePage()
 class ReadingPage extends StatelessWidget {
   const ReadingPage({super.key, this.cubit});
 

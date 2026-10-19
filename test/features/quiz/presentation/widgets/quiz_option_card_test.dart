@@ -7,6 +7,7 @@ import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -46,7 +47,6 @@ void main() {
     String letter = 'A',
     String text = 'Nicodemus',
     bool enabled = true,
-    bool dimmed = false,
     VoidCallback? onTap,
     ReadingLanguage language = ReadingLanguage.english,
     String? semanticLabel,
@@ -66,7 +66,6 @@ void main() {
               state: state,
               language: language,
               enabled: enabled,
-              dimmed: dimmed,
               onTap: onTap,
               semanticLabel:
                   semanticLabel ??
@@ -87,12 +86,19 @@ void main() {
       expect(
         QuizOptionCard.accentFor(QuizOptionState.idle, colors),
         isNull,
-        reason: '`ds.tsx:424` — `accent = null` for `default`',
+        reason:
+            '`eva/redesign.html:338` — the resting card is a `--glass-fill` tint '
+            'with no accent at all',
       );
+      // `selected` has no prototype line (the redesign grades on tap) and keeps
+      // the app's accent — see the enum's doc.
       expect(
         QuizOptionCard.accentFor(QuizOptionState.selected, colors),
         colors.ember,
       );
+      // The redesign's verdict hues are gold and ember (`:350`/`:358`); this design
+      // system's quiz/feedback pair is `ok`/`err` (§5.1's own words) and the gold
+      // is substituted, not added — see `QuizOptionState.correct`'s doc.
       expect(
         QuizOptionCard.accentFor(QuizOptionState.correct, colors),
         colors.ok,
@@ -115,38 +121,57 @@ void main() {
       },
     );
 
-    testWidgets('the border and the fill follow the accent', (
-      WidgetTester tester,
-    ) async {
-      // `ds.tsx:425-426`: the fill is the accent at 0.09 and the border **is** the
-      // accent. So a wrong answer has a red rim and a 9%-red wash, and an idle card
-      // has the resting rim and no accent at all.
+    testWidgets('the border and the fill follow the accent, at the redesign\'s '
+        'alphas', (WidgetTester tester) async {
+      // `eva/redesign.html:350` — the correct card is the accent at .75 on the rim
+      // and .10 in the fill; `:358` — the wrong one at .6 and .07. The gold is
+      // `ok`'s hue here (see the accent test above), and the wrong card's ember IS
+      // `err`'s.
       final EvaColors colors = EvaThemeDark.theme.extension<EvaColors>()!;
       await pumpCard(tester, state: QuizOptionState.correct);
       final BoxDecoration correct = tester
           .widgetList<DecoratedBox>(find.byType(DecoratedBox))
           .map((DecoratedBox b) => b.decoration as BoxDecoration)
           .firstWhere((BoxDecoration d) => d.border != null);
-      expect(correct.border!.top.color, colors.ok);
-      expect(correct.color, colors.ok.withValues(alpha: 0.09));
+      expect(correct.border!.top.color, colors.ok.withValues(alpha: 0.75));
+      expect(correct.color, colors.ok.withValues(alpha: 0.10));
 
       await pumpCard(tester, state: QuizOptionState.incorrect);
       final BoxDecoration wrong = tester
           .widgetList<DecoratedBox>(find.byType(DecoratedBox))
           .map((DecoratedBox b) => b.decoration as BoxDecoration)
           .firstWhere((BoxDecoration d) => d.border != null);
-      expect(wrong.border!.top.color, colors.err);
+      expect(wrong.border!.top.color, colors.err.withValues(alpha: 0.6));
+      expect(wrong.color, colors.err.withValues(alpha: 0.07));
     });
 
-    testWidgets('the badge fills only in the two graded states', (
+    testWidgets('and the WRONG card dims to 62%, which is the redesign\'s own '
+        'opacity', (WidgetTester tester) async {
+      // `eva/redesign.html:358` — `opacity: .62` on `.opt.wrong`, the whole card.
+      // The old card's separate `dimmed` flag died with the prototype that wrote
+      // it: the redesign dims nothing but the wrong card itself.
+      await pumpCard(tester, state: QuizOptionState.idle);
+      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1);
+
+      await pumpCard(tester, state: QuizOptionState.incorrect);
+      expect(
+        tester.widget<Opacity>(find.byType(Opacity)).opacity,
+        QuizOptionCard.wrongOpacity,
+      );
+    });
+
+    testWidgets('the badge fills ONLY on the correct card', (
       WidgetTester tester,
     ) async {
-      // `ds.tsx:427` — `badgeFill = (correct || incorrect) ? accent : 'transparent'`.
+      // `eva/redesign.html:352` fills the correct badge with the accent;
+      // `:359` gives the wrong badge an accent RIM and INK and no fill — the two
+      // verdicts are shaped differently as well as coloured differently, which is
+      // the colour-blind reader's second signal.
       for (final (QuizOptionState, bool) row in <(QuizOptionState, bool)>[
         (QuizOptionState.idle, false),
         (QuizOptionState.selected, false),
         (QuizOptionState.correct, true),
-        (QuizOptionState.incorrect, true),
+        (QuizOptionState.incorrect, false),
       ]) {
         await pumpCard(tester, state: row.$1);
         final Iterable<Container> badges = tester.widgetList<Container>(
@@ -167,45 +192,20 @@ void main() {
       }
     });
 
-    testWidgets('the letter is drawn in mono caps at 12', (
+    testWidgets('the letter is drawn in mono at 10, on the card\'s own weight', (
       WidgetTester tester,
     ) async {
-      // `ds.tsx:450` — `F.mono, fontSize 12, fontWeight 700`.
+      // `eva/redesign.html:342` — `font-family: var(--mono); font-size: 10px`,
+      // with no weight of its own — and `:341` declares `font-weight: 500` on the
+      // card the badge sits in, so the badge **inherits** it. The old
+      // transcription drew 12px at 700 from the superseded prototype.
       await pumpCard(tester, state: QuizOptionState.idle, letter: 'C');
       // `find.text`, not `widgetWithText` — the latter needs an ancestor `Widget`
       // argument and the badge is private.
       final Text letter = tester.widget<Text>(find.text('C'));
       expect(letter.style?.fontFamily, EvaTypography.monoFamily);
-      expect(letter.style?.fontSize, 12);
-      expect(letter.style?.fontWeight, FontWeight.w700);
-    });
-  });
-
-  group('`dimmed`', () {
-    testWidgets('is the prototype\'s post-check dimming and nothing else', (
-      WidgetTester tester,
-    ) async {
-      // `ds.tsx:437` — `opacity: dimmed ? 0.48 : 1` — and it is on the **whole card**,
-      // badge included.
-      await pumpCard(tester, state: QuizOptionState.idle);
-      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1);
-
-      await pumpCard(tester, state: QuizOptionState.idle, dimmed: true);
-      expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 0.48);
-    });
-
-    testWidgets('and it is NOT `enabled: false` — two different questions', (
-      WidgetTester tester,
-    ) async {
-      // `dimmed` is visual; `enabled` is §5 trap 3's prevention. A disabled card is
-      // **not** dimmed in the prototype (it has no disabled state), and a dimmed card
-      // is still a card a reader has already answered.
-      await pumpCard(tester, state: QuizOptionState.idle, enabled: false);
-      expect(
-        tester.widget<Opacity>(find.byType(Opacity)).opacity,
-        1,
-        reason: 'a disabled card is not a dimmed one',
-      );
+      expect(letter.style?.fontSize, QuizOptionCard.badgeFontSize);
+      expect(letter.style?.fontWeight, QuizOptionCard.labelWeight);
     });
   });
 
@@ -356,38 +356,30 @@ void main() {
     });
   });
 
-  group('the flecks\' offsets, which are a FUNCTION of the width', () {
-    test('the right pair sits outside the card at both §14 and the prototype width', () {
-      // `QuizScreen.tsx:92-95` writes them as absolute px against one viewport, so
-      // `356` is only "just outside the right edge" at the width the prototype was
-      // drawn at. Copying it puts both flecks in the middle of the card at 430 and off
-      // the end of it at 320 — §14's own surface.
-      for (final double width in <double>[288, 320, 390, 430]) {
-        final List<Offset> offsets = QuizOptionCard.fleckOffsetsFor(width);
-        expect(offsets, hasLength(4), reason: 'four flecks at $width');
-        expect(offsets[0].dx, lessThan(0), reason: 'the left pair is outside');
-        expect(offsets[1].dx, lessThan(0));
-        expect(
-          offsets[2].dx,
-          greaterThanOrEqualTo(width),
-          reason: 'right, outside',
-        );
-        expect(offsets[3].dx, greaterThan(offsets[2].dx));
-      }
+  group('the old prototype\'s ornaments are gone', () {
+    testWidgets('no flecks, and the long-label card still grows instead of '
+        'overflowing', (WidgetTester tester) async {
+      // The old card decorated a correct answer with four positioned flecks whose
+      // offsets were a function of the card's width. The redesign's `.opt`
+      // (`eva/redesign.html:337-362`) paints border, fill and badge and nothing
+      // else — the flecks died with the prototype that drew them, and the sweep
+      // above is what keeps them from coming back.
+      await pumpCard(tester, state: QuizOptionState.correct);
+      expect(find.byType(GoldFlecks), findsNothing);
     });
-
-    test(
-      'and the left pair is the prototype\'s own numbers, untranscribed',
-      () {
-        expect(QuizOptionCard.fleckOffsetsFor(430).take(2), <Offset>[
-          const Offset(-10, 12),
-          const Offset(-15, 36),
-        ]);
-      },
-    );
   });
 
   group('§14\'s surface', () {
+    /// A one-line card's rendered height, measured first — the baseline the
+    /// long-label test grows beyond.
+    double singleLineHeight = 0;
+
+    testWidgets('measure the one-line baseline', (WidgetTester tester) async {
+      await pumpCard(tester, state: QuizOptionState.idle);
+      singleLineHeight = tester.getSize(find.byType(QuizOptionCard)).height;
+      expect(singleLineHeight, greaterThan(0));
+    });
+
     testWidgets('320px at 1.22× overflows nothing, on either arm', (
       WidgetTester tester,
     ) async {
@@ -407,60 +399,60 @@ void main() {
       }
     });
 
-    testWidgets(
-      'a LONG Arabic label grows the card rather than overflowing it',
-      (WidgetTester tester) async {
-        // `ds.tsx:434` is `minHeight: 64` and the first version wrote it as a `SizedBox`
-        // height, which a two-line Arabic label at 1.22× would have overflowed. A
-        // `ConstrainedBox` min is the transcription that holds.
-        await tester.pumpWidget(
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            textScale: 1.22,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            child: const Center(
-              child: SizedBox(
-                width: 320,
-                child: QuizOptionCard(
-                  letter: 'أ',
-                  // **Long enough to exceed the 64px minimum** at 1.22×: measured four
-                  // lines of 52px, which is *under* 64 and would have made this test
-                  // pass with a hard-coded height.
-                  text:
-                      'نيقوديموس الفريسي الذي جاء إلى يسوع ليلاً，并且是当时 '
-                      'الrepresentative — Executable long label that wraps',
-                  state: QuizOptionState.idle,
-                  language: ReadingLanguage.arabic,
-                  semanticLabel: 'x',
-                ),
+    testWidgets('a LONG Arabic label grows the card rather than overflowing it', (
+      WidgetTester tester,
+    ) async {
+      // `ds.tsx:434` is `minHeight: 64` and the first version wrote it as a `SizedBox`
+      // height, which a two-line Arabic label at 1.22× would have overflowed. A
+      // `ConstrainedBox` min is the transcription that holds.
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          theme: EvaThemeDark.theme,
+          textScale: 1.22,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+          child: const Center(
+            child: SizedBox(
+              width: 320,
+              child: QuizOptionCard(
+                letter: 'أ',
+                // **Long enough to exceed the 64px minimum** at 1.22×: measured four
+                // lines of 52px, which is *under* 64 and would have made this test
+                // pass with a hard-coded height.
+                text:
+                    'نيقوديموس الفريسي الذي جاء إلى يسوع ليلاً，并且是当时 '
+                    'الrepresentative — Executable long label that wraps',
+                state: QuizOptionState.idle,
+                language: ReadingLanguage.arabic,
+                semanticLabel: 'x',
               ),
             ),
           ),
-        );
-        await tester.pump();
-        expect(tester.takeException(), isNull);
-        expect(
-          tester.getSize(find.byType(QuizOptionCard)).height,
-          greaterThan(QuizOptionCard.minHeight),
-          reason:
-              'the label runs to five lines at 1.22×, so the card must be **taller** '
-              'than its 64px minimum. The first draft of this test used a shorter '
-              'label, measured three lines at 52px, and the card came out at exactly '
-              '64 — which is the assertion passing for the wrong reason and a '
-              '`SizedBox(height: 64)` passing alongside it.',
-        );
-      },
-    );
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getSize(find.byType(QuizOptionCard)).height,
+        greaterThan(singleLineHeight),
+        reason:
+            'the label runs to five lines at 1.22×, so the card must be **taller** '
+            'than the one-line card above it. The redesign\'s `.opt` carries no '
+            'min-height (the old 64px was the superseded prototype\'s), so the '
+            'assertion is growth, not a floor — and a fixed-height transcription '
+            'would fail here on the first long label.',
+      );
+    });
   });
 
-  group('`QuizHeader`, and the spacer that centres the beads', () {
-    testWidgets('the two ends are the SAME width, or the row is off-centre', (
-      WidgetTester tester,
-    ) async {
-      // `QuizScreen.tsx:45` is `justifyContent: 'space-between'` and `:46`/`:52` are
-      // both 44 — so the **empty** box on the right is what puts the beads in the
-      // middle. With one end 44 and the other 0 they sit 22px off.
+  group('`QuizHeader`, and the chrome the redesign drew', () {
+    testWidgets('the back control is a 44 box around the chevron, and it is '
+        'named', (WidgetTester tester) async {
+      // `eva/redesign.html:564` is a bare `‹` with no label at all (§14's first
+      // row), and `:149` gives it a ~28px box. The client paints the glyph at the
+      // prototype's size inside a 44×44 tap box — recorded decision 31's shape —
+      // and the row is 44 tall because a row is as tall as its tallest child.
+      final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
@@ -468,6 +460,52 @@ void main() {
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
           child: Scaffold(
             body: QuizHeader(
+              crumb: strings.quizCrumb('John 3:1-5'),
+              score: 0,
+              total: 3,
+              completed: 1,
+              current: 1,
+              language: ReadingLanguage.english,
+              strings: strings,
+              onExit: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final SemanticsNode back = tester.getSemantics(
+        find.bySemanticsLabel(strings.quizExit),
+      );
+      expect(back.flagsCollection.isEnabled.toBoolOrNull(), isTrue);
+      final Rect backRect = tester.getRect(
+        find.bySemanticsLabel(strings.quizExit),
+      );
+      expect(
+        backRect.width,
+        moreOrLessEquals(QuizHeader.chevTapSize, epsilon: 0.5),
+      );
+      expect(
+        backRect.height,
+        moreOrLessEquals(QuizHeader.chevTapSize, epsilon: 0.5),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('the crumb renders the composed string, centred and capped', (
+      WidgetTester tester,
+    ) async {
+      // `eva/redesign.html:565` — the `.ttl` slot, `max-width: 52%` of the row,
+      // one line with an ellipsis (`:145`).
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          theme: EvaThemeDark.theme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+          child: Scaffold(
+            body: QuizHeader(
+              crumb: strings.quizCrumb('John 3:1-5'),
+              score: 0,
               total: 3,
               completed: 1,
               current: 1,
@@ -479,28 +517,64 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(IconActionButton), findsOneWidget);
-      expect(
-        tester.getSize(find.byType(IconActionButton)).width,
-        QuizHeader.endWidth,
-      );
-      // **The measured width**, not the widget's field: `SizedBox` keeps its size in
-      // `constraints` at runtime and the first draft read a `width` field that does
-      // not exist. The measurement is also the better claim — it is what `space-between`
-      // consumes.
-      final SizedBox spacer = tester.widget<SizedBox>(
-        find
-            .descendant(
-              of: find.byType(QuizHeader),
-              matching: find.byType(SizedBox),
-            )
-            .last,
+      final Rect headerRect = tester.getRect(find.byType(QuizHeader));
+      final Rect crumbRect = tester.getRect(
+        find.text(strings.quizCrumb('John 3:1-5')),
       );
       expect(
-        tester.getSize(find.byWidget(spacer)).width,
-        QuizHeader.endWidth,
-        reason: '**the spacer is a named constant, not `Expanded`**',
+        crumbRect.width,
+        lessThanOrEqualTo(headerRect.width * QuizHeader.crumbMaxWidthFactor),
+        reason: '`max-width: 52%` on the `.ttl` (`eva/redesign.html:144`)',
       );
+      // Centred in the row, not left-aligned behind the chevron.
+      expect(
+        crumbRect.center.dx,
+        moreOrLessEquals(headerRect.center.dx, epsilon: 1),
+      );
+    });
+
+    testWidgets('the score is the painted star and the arm\'s digits', (
+      WidgetTester tester,
+    ) async {
+      // `eva/redesign.html:566` — `✦ 0` in `.mono` with an inline gold override.
+      // The star is `FourPointedStar` (U+2726 is in no bundled family) and the
+      // ink is `emberInk` — the recorded substitution for the gold. The digits
+      // follow the arm, which is why the style is a per-arm function.
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          theme: EvaThemeDark.theme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+          child: Scaffold(
+            body: QuizHeader(
+              crumb: strings.quizCrumb('John 3:1-5'),
+              score: 40,
+              total: 3,
+              completed: 1,
+              current: 1,
+              language: ReadingLanguage.english,
+              strings: strings,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('40'), findsOneWidget);
+      final Text digits = tester.widget<Text>(find.text('40'));
+      expect(digits.style?.fontFamily, EvaTypography.monoFamily);
+      expect(digits.style?.fontSize, QuizHeader.scoreFontSize);
+      expect(
+        digits.style?.color,
+        EvaThemeDark.theme.extension<EvaColors>()!.emberInk,
+      );
+      // The star, painted: the widget's own box is the glyph's em box
+      // (`FourPointedStar`'s rule), read off the widget rather than a `CustomPaint`
+      // find that could match the focus ring's or the ink's painter first.
+      final FourPointedStar star = tester.widget<FourPointedStar>(
+        find.byType(FourPointedStar),
+      );
+      expect(star.size, QuizHeader.scoreStarSize);
     });
 
     testWidgets('the beads row carries the CALLER\'s prefix, not the default', (
@@ -517,6 +591,8 @@ void main() {
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
           child: Scaffold(
             body: QuizHeader(
+              crumb: AppLocalizationsAr().quizCrumb('يوحنا 3: 1-5'),
+              score: 0,
               total: 3,
               completed: 1,
               current: 1,
@@ -536,9 +612,9 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('and the close control\'s tooltip is the caller\'s too', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('and the back control\'s name is the caller\'s too, in the '
+        'right family', (WidgetTester tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,
@@ -546,6 +622,8 @@ void main() {
           supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
           child: Scaffold(
             body: QuizHeader(
+              crumb: AppLocalizationsAr().quizCrumb('يوحنا 3: 1-5'),
+              score: 0,
               total: 1,
               completed: 0,
               current: 0,
@@ -557,14 +635,17 @@ void main() {
       );
       await tester.pump();
 
-      // `tooltipFamily` is **required** (recorded decision 71): `Tooltip` has no
-      // `textStyle` of its own, so omitting it resolves to `bodyMedium` — measured
-      // DMSans — which is tofu for every Arabic character in `إغلاق`.
-      final IconActionButton close = tester.widget<IconActionButton>(
-        find.byType(IconActionButton),
+      expect(
+        find.bySemanticsLabel(AppLocalizationsAr().quizExit),
+        findsOneWidget,
       );
-      expect(close.tooltip, AppLocalizationsAr().quizExit);
-      expect(close.tooltipFamily, EvaTypography.arabicFamily);
+      // The crumb's Arabic run is chrome — the payload's reference rides whole —
+      // and the family is the Arabic one under RTL.
+      final Text crumb = tester.widget<Text>(
+        find.text(AppLocalizationsAr().quizCrumb('يوحنا 3: 1-5')),
+      );
+      expect(crumb.style?.fontFamily, EvaTypography.arabicFamily);
+      handle.dispose();
     });
   });
 }

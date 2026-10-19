@@ -183,7 +183,12 @@ final class QuizAnswer with _$QuizAnswer {
 final class QuizSession with _$QuizSession {
   /// A session over [answers], submitting against [readingId].
 
-  const QuizSession({required this.readingId, required this.answers});
+  const QuizSession({
+    required this.readingId,
+    required this.reference,
+    required this.pointsEarnedToday,
+    required this.answers,
+  });
 
   /// A fresh session over [questions], each untouched.
   ///
@@ -202,9 +207,13 @@ final class QuizSession with _$QuizSession {
   /// loses the reader's selection.
   factory QuizSession.fromQuestions({
     required String readingId,
+    required String reference,
+    required int pointsEarnedToday,
     required List<Question> questions,
   }) => QuizSession(
     readingId: readingId,
+    reference: reference,
+    pointsEarnedToday: pointsEarnedToday,
     answers: <QuizAnswer>[
       for (final Question question in questions) QuizAnswer(question: question),
     ],
@@ -222,6 +231,44 @@ final class QuizSession with _$QuizSession {
   /// **only** reading this backend serves — recorded decision 15's argument, applied
   /// to a second field.
   final String readingId;
+
+  /// The passage's `reference` — `John 3:1-5` in English,
+  /// `يوحنا 3: 1-5` in Arabic — as the payload carried it.
+  ///
+  /// ## WHY A SESSION CARRIES A STRING IT NEVER SUBMITS
+  ///
+  /// `eva/redesign.html:565` writes the appbar crumb as
+  /// `Refraction · Psalms 1`, and `:1348` fills it from the reader's own
+  /// passage before the quiz opens. The client's honest equivalent of "the reader's
+  /// book title" is the **reference the server sent with the questions** — never a
+  /// book the client derives (the same refusal as `Verse.bookNumber`'s doc), and
+  /// never the prototype's literal.
+  ///
+  /// [withQuestions] replaces it together with [readingId], because the two are the
+  /// same payload's identity: an id that rolled over at midnight arrived with the
+  /// reference of the new day's passage beside it.
+  final String reference;
+
+  /// `total_points_earned_today` — the reader's total when this session was opened.
+  ///
+  /// ## THE SEED OF THE SCORE ROW, AND WHY IT IS **NOT** UPDATED BY THE REBASE
+  ///
+  /// `eva/redesign.html:566` paints `✦ 0` and `:1408` seeds it from zero on every
+  /// open. This client has no reason to start a score at zero when the payload it
+  /// just parsed carries the reader's real total, so the seed is that value.
+  ///
+  /// **`withQuestions` deliberately does not take a fresh one.** The rebase is the
+  /// retry-after-failure path, and a verdict carried across it (recorded decision
+  /// 88) was **already included** in the fresh payload's total — the server counted
+  /// the submit that produced the verdict. Refreshing the seed here would double it
+  /// with [runningScore]'s own sum, and the reachable flow proves it: a correct
+  /// answer, then a failed submit, then a retry — the fresh payload's total contains
+  /// the correct answer's points and the carried verdict adds them again.
+  ///
+  /// The cost, stated: points earned **elsewhere** between session start and a
+  /// rebase do not reach this number until the session is rebuilt. The screen's
+  /// claim is narrower than the server's ledger — see [runningScore].
+  final int pointsEarnedToday;
 
   /// The questions, in the order the server sent them.
   ///
@@ -247,6 +294,39 @@ final class QuizSession with _$QuizSession {
       )
       .length;
 
+  /// The number the `✦ N` score row paints: the seed plus what this session's
+  /// correct submits earned.
+  ///
+  /// ## THE RULE, AND WHY IT IS HERE AND NOT IN A WIDGET
+  ///
+  /// `eva/redesign.html:1428` adds `10` to a local `score` on every correct pick;
+  /// this client's grade is a `POST`, so the honest increment is what the server
+  /// awarded — each verdict's `SubmitResult.pointsEarned` — and the honest seed is
+  /// [pointsEarnedToday], the payload's own `total_points_earned_today`. A wrong
+  /// submit adds nothing, which is both the prototype's rule (`:1429` never touches
+  /// `score`) and the contract's (`points_earned: 0` rides a wrong answer).
+  ///
+  /// **A getter and not page arithmetic**, for §6's reason: the accumulation is
+  /// domain logic, and a widget that sums a list inline is untested logic wearing a
+  /// `build` method. `quiz_session_test.dart` holds the accumulation, the wrong
+  /// answer's zero and the empty-session zero.
+  ///
+  /// **`currentTotalPoints` was weighed and not taken.** It is the server's total
+  /// and always the freshest number, but it is the *server's* — it includes points
+  /// earned outside this session since the payload was read, and a locale switch
+  /// that rebuilds the session would keep displaying a total the rebuilt session's
+  /// questions no longer account for. The screen's number is **the session's running
+  /// total**, and it says so; `/result` is where the server's own
+  /// `current_total_points` is painted.
+  int get runningScore {
+    final int earned = answers.fold<int>(0, (int sum, QuizAnswer answer) {
+      final SubmitResult? verdict = answer.verdict;
+      if (verdict == null || !verdict.isCorrect) return sum;
+      return sum + verdict.pointsEarned;
+    });
+    return pointsEarnedToday + earned;
+  }
+
   /// Whether there is nothing to play against.
   bool get isEmpty => answers.isEmpty;
 
@@ -263,6 +343,8 @@ final class QuizSession with _$QuizSession {
     if (index < 0 || index >= answers.length) return this;
     return QuizSession(
       readingId: readingId,
+      reference: reference,
+      pointsEarnedToday: pointsEarnedToday,
       answers: <QuizAnswer>[
         for (int i = 0; i < answers.length; i++)
           if (i == index) answer else answers[i],
@@ -270,7 +352,8 @@ final class QuizSession with _$QuizSession {
     );
   }
 
-  /// [next] rebuilt from a **fresh** set of [questions] and [readingId].
+  /// [next] rebuilt from a **fresh** set of [questions], [readingId] and
+  /// [reference].
   ///
   /// ## WHY THIS REBASES RATHER THAN REPLACES, AND WHY IT IS NOT `copyWith`
   ///
@@ -351,8 +434,17 @@ final class QuizSession with _$QuizSession {
   /// back shorter. The reader's position is clamped by the caller, which is the
   /// only writer, and clamping a cursor is a smaller failure than an index that
   /// points at nothing.
+  ///
+  /// ## THE TWO IDENTITY FIELDS MOVE TOGETHER, AND THE SEED DOES **NOT**
+  ///
+  /// [readingId] and [reference] are the same payload's identity — an id that
+  /// rolled at midnight arrived with the new day's reference beside it (§5 trap 11)
+  /// — so both are taken fresh. [pointsEarnedToday] is **not**: see its own doc for
+  /// the double-count the carried verdict would produce, and why the seed is the
+  /// ledger the session was opened with.
   QuizSession withQuestions({
     required String readingId,
+    required String reference,
     required List<Question> questions,
   }) {
     final Map<String, QuizAnswer> previous = <String, QuizAnswer>{
@@ -360,6 +452,8 @@ final class QuizSession with _$QuizSession {
     };
     return QuizSession(
       readingId: readingId,
+      reference: reference,
+      pointsEarnedToday: pointsEarnedToday,
       answers: <QuizAnswer>[
         for (final Question question in questions)
           switch (previous[question.id]) {

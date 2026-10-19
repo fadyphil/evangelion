@@ -330,10 +330,12 @@ class _LoginFormState extends State<_LoginForm>
   final List<VoidCallback> _controllerListeners = <VoidCallback>[];
 
   /// The failed-submit shake. `redesign.html:360` — `.cta.err` runs `shake .45s`;
-  /// `:360`'s keyframes are −8 / 8 / −5 / 5 px at 20/40/60/80 %.
+  /// `:360`'s keyframes are −8 / 8 / −5 / 5 px at 20/40/60/80 %. The curve is the
+  /// design system's [EvaShake] — `.opt.wrong` shares the same keyframes, and a
+  /// second private copy would have been exactly that.
   late final AnimationController _shake = AnimationController(
     vsync: this,
-    duration: _Shake.kDuration,
+    duration: EvaShake.duration,
   );
 
   /// The shake's easing, applied to the controller's value in the
@@ -351,7 +353,7 @@ class _LoginFormState extends State<_LoginForm>
   /// button that was actually three pixels off, for exactly one frame, forever.
   /// The curve is therefore applied **directly** — the same one line the tween
   /// would have run, minus the assertion a shake can never satisfy.
-  final _Shake _shakeCurve = const _Shake();
+  final EvaShake _shakeCurve = const EvaShake();
 
   /// WHY LISTENERS RATHER THAN AN `onChanged` PARAMETER
   ///
@@ -882,49 +884,6 @@ class _Footer extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// `.cta.err`'s shake (`redesign.html:360`), as a curve.
-///
-/// ```css
-/// @keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}
-///                  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
-/// ```
-///
-/// Piecewise-linear between the keyframes. CSS interpolates keyframes with
-/// `ease` by default, which on a ±8px pulse is indistinguishable from linear at
-/// any speed a shake is visible at; recorded rather than re-derived, because a
-/// cubic-bezier fit to four waypoints would be a second curve token for a
-/// 450 ms effect. The amplitude is **not** scaled to the button's width — the
-/// prototype shakes a full-width button by fixed pixels too.
-final class _Shake extends Curve {
-  /// `redesign.html:360` — `.45s`.
-  static const Duration kDuration = Duration(milliseconds: 450);
-
-  const _Shake();
-
-  @override
-  double transform(double t) {
-    // Waypoints from `:360`, linearly between. `t == 1` (the clock's end) is
-    // the rest position, so the button always lands where it started.
-    const List<(double, double)> keys = <(double, double)>[
-      (0.0, 0),
-      (0.2, -8),
-      (0.4, 8),
-      (0.6, -5),
-      (0.8, 5),
-      (1.0, 0),
-    ];
-    for (int i = 0; i < keys.length - 1; i++) {
-      final (double t0, double x0) = keys[i];
-      final (double t1, double x1) = keys[i + 1];
-      if (t <= t1) {
-        final double f = (t - t0) / (t1 - t0);
-        return x0 + (x1 - x0) * f;
-      }
-    }
-    return 0;
-  }
 }
 
 /// A callback that does nothing.

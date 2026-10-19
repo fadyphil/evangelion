@@ -127,35 +127,32 @@ void main() {
       );
     });
 
-    test(
-      'turns the wide payload into a session, keeping the reading id',
-      () async {
-        final _CountingRepository repository = _CountingRepository(
-          ok(twoQuestions),
-        );
-        final StartSession useCase = StartSession(repository);
+    test('turns the wide payload into a session, keeping the reading id', () async {
+      final _CountingRepository repository = _CountingRepository(
+        ok(twoQuestions),
+      );
+      final StartSession useCase = StartSession(repository);
 
-        final Result<QuizSession> result = await useCase(
-          ReadingLanguage.english,
-        );
+      final Result<QuizSession> result = await useCase(ReadingLanguage.english);
 
-        expect(result.isRight(), isTrue);
-        final QuizSession session =
-            (result as Right<Failure, QuizSession>).value;
-        expect(session.readingId, 'reading-group-3-2026-10-04');
-        expect(session.questionCount, 2);
-        expect(session.answeredCount, 1, reason: 'the wire flag counts');
-        expect(session.answers.first.question, anOpen);
-        expect(session.answers.first.isChecked, isFalse);
-        expect(session.answers.last.question, anAnswered);
-        expect(
-          session.answers.last.verdict,
-          isNull,
-          reason:
-              'the wire says it was answered; this session did not grade it',
-        );
-      },
-    );
+      expect(result.isRight(), isTrue);
+      final QuizSession session = (result as Right<Failure, QuizSession>).value;
+      expect(session.readingId, 'reading-group-3-2026-10-04');
+      // The crumb's second half and the score row's seed, carried off the same
+      // payload — `eva/redesign.html:565`/:566 — and never re-derived downstream.
+      expect(session.reference, 'John 3:1-5');
+      expect(session.pointsEarnedToday, 0);
+      expect(session.questionCount, 2);
+      expect(session.answeredCount, 1, reason: 'the wire flag counts');
+      expect(session.answers.first.question, anOpen);
+      expect(session.answers.first.isChecked, isFalse);
+      expect(session.answers.last.question, anAnswered);
+      expect(
+        session.answers.last.verdict,
+        isNull,
+        reason: 'the wire says it was answered; this session did not grade it',
+      );
+    });
 
     test('asks the port for the language it was given, in that arm', () async {
       final _CountingRepository repository = _CountingRepository(
@@ -363,18 +360,28 @@ void main() {
       expect((result as Left<Failure, RefreshedQuestions>).value, failure);
     });
 
-    test('`RefreshedQuestions` is two fields and nothing else', () {
+    test('`RefreshedQuestions` is the rebase surface and nothing wider', () {
       // The type exists because the re-fetch is **wider** than "the questions": the
       // backend has no `GET /readings/:id`, so refreshing one question means
       // re-reading the whole payload, and that payload's `reading_id` is part of
       // what has to survive. Naming the pair is what stops a caller re-reading the
       // payload a second time to get the other half — which is the redundancy this
       // type was created to remove.
+      //
+      // **Four fields now**: the rebase needs the fresh `reference` (the crumb's
+      // second half travels with the id) and the fresh
+      // `total_points_earned_today` — which only the failed-start arm reads; see
+      // `RefreshedQuestions.pointsEarnedToday`'s doc for the arm that deliberately
+      // does not.
       const RefreshedQuestions value = RefreshedQuestions(
         readingId: 'r',
+        reference: 'John 3:1-5',
+        pointsEarnedToday: 10,
         questions: <Question>[anOpen],
       );
       expect(value.readingId, 'r');
+      expect(value.reference, 'John 3:1-5');
+      expect(value.pointsEarnedToday, 10);
       expect(value.questions, hasLength(1));
       expect(value.questionCount, 1);
       expect(value, isNot(equals(value.copyWithReadingId('other'))));

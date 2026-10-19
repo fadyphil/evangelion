@@ -219,20 +219,20 @@ $QuizSessionCopyWith<QuizSession> get copyWith => _$QuizSessionCopyWithImpl<Quiz
 @override
 bool operator ==(Object other) {
   final _this = this as QuizSession;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is QuizSession&&(identical(other.readingId, _this.readingId) || other.readingId == _this.readingId)&&const DeepCollectionEquality().equals(other.answers, _this.answers));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is QuizSession&&(identical(other.readingId, _this.readingId) || other.readingId == _this.readingId)&&(identical(other.reference, _this.reference) || other.reference == _this.reference)&&(identical(other.pointsEarnedToday, _this.pointsEarnedToday) || other.pointsEarnedToday == _this.pointsEarnedToday)&&const DeepCollectionEquality().equals(other.answers, _this.answers));
 }
 
 
 @override
 int get hashCode {
   final _this = this as QuizSession;
-  return Object.hash(runtimeType,_this.readingId,const DeepCollectionEquality().hash(_this.answers));
+  return Object.hash(runtimeType,_this.readingId,_this.reference,_this.pointsEarnedToday,const DeepCollectionEquality().hash(_this.answers));
 }
 
 @override
 String toString() {
   final _this = this as QuizSession;
-  return 'QuizSession(readingId: ${_this.readingId}, answers: ${_this.answers})';
+  return 'QuizSession(readingId: ${_this.readingId}, reference: ${_this.reference}, pointsEarnedToday: ${_this.pointsEarnedToday}, answers: ${_this.answers})';
 }
 
 
@@ -243,7 +243,7 @@ abstract mixin class $QuizSessionCopyWith<$Res>  {
   factory $QuizSessionCopyWith(QuizSession value, $Res Function(QuizSession) _then) = _$QuizSessionCopyWithImpl;
 @useResult
 $Res call({
- String readingId, List<QuizAnswer> answers
+ String readingId, String reference, int pointsEarnedToday, List<QuizAnswer> answers
 });
 
 
@@ -260,10 +260,12 @@ class _$QuizSessionCopyWithImpl<$Res>
 
 /// Create a copy of QuizSession
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? readingId = null,Object? answers = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? readingId = null,Object? reference = null,Object? pointsEarnedToday = null,Object? answers = null,}) {
   return _then(QuizSession(
 readingId: null == readingId ? _self.readingId : readingId // ignore: cast_nullable_to_non_nullable
-as String,answers: null == answers ? _self.answers : answers // ignore: cast_nullable_to_non_nullable
+as String,reference: null == reference ? _self.reference : reference // ignore: cast_nullable_to_non_nullable
+as String,pointsEarnedToday: null == pointsEarnedToday ? _self.pointsEarnedToday : pointsEarnedToday // ignore: cast_nullable_to_non_nullable
+as int,answers: null == answers ? _self.answers : answers // ignore: cast_nullable_to_non_nullable
 as List<QuizAnswer>,
   ));
 }

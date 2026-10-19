@@ -1338,17 +1338,25 @@ QuizAnswer _answer({
 
 QuizSession _session_({
   String readingId = 'reading-1',
+  String reference = 'John 3:1-5',
+  int pointsEarnedToday = 0,
   List<QuizAnswer>? answers,
 }) => QuizSession(
   readingId: _text(readingId),
+  reference: _text(reference),
+  pointsEarnedToday: pointsEarnedToday,
   answers: answers ?? <QuizAnswer>[_answer()],
 );
 
 RefreshedQuestions _refreshed({
   String readingId = 'reading-1',
+  String reference = 'John 3:1-5',
+  int pointsEarnedToday = 0,
   List<Question>? questions,
 }) => RefreshedQuestions(
   readingId: _text(readingId),
+  reference: _text(reference),
+  pointsEarnedToday: pointsEarnedToday,
   questions: questions ?? <Question>[_question()],
 );
 

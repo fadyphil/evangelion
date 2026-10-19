@@ -171,34 +171,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeRetry => 'Try again';
 
   @override
-  String get quizExit => 'Close';
+  String get quizExit => 'Back';
 
   @override
-  String get quizProgress => 'Question';
+  String get quizProgress => 'Quiz progress';
 
   @override
-  String get quizOfWord => 'of';
+  String get quizRefraction => 'Refraction';
 
   @override
   String get quizCheckAnswer => 'Check answer';
 
   @override
-  String get quizNextQuestion => 'Next question';
+  String get quizNextQuestion => 'next ▸';
 
   @override
-  String get quizSeeResults => 'See results';
+  String get quizSeeResults => 'see results';
 
   @override
   String get quizCorrectSuffix => 'correct answer';
 
   @override
   String get quizIncorrectSuffix => 'your answer, incorrect';
-
-  @override
-  String get quizVerdictCorrect => 'Correct.';
-
-  @override
-  String get quizVerdictIncorrect => 'Not this time.';
 
   @override
   String get quizAlreadyAnsweredSuffix =>

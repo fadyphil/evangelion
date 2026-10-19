@@ -174,34 +174,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeRetry => 'حاول مرة أخرى';
 
   @override
-  String get quizExit => 'إغلاق';
+  String get quizExit => 'رجوع';
 
   @override
-  String get quizProgress => 'السؤال';
+  String get quizProgress => 'تقدم الاختبار';
 
   @override
-  String get quizOfWord => 'من';
+  String get quizRefraction => 'انعطاف';
 
   @override
   String get quizCheckAnswer => 'تحقق من الإجابة';
 
   @override
-  String get quizNextQuestion => 'السؤال التالي';
+  String get quizNextQuestion => 'التالي';
 
   @override
-  String get quizSeeResults => 'اعرض النتيجة';
+  String get quizSeeResults => 'النتائج';
 
   @override
   String get quizCorrectSuffix => 'الإجابة الصحيحة';
 
   @override
   String get quizIncorrectSuffix => 'إجابتك غير صحيحة';
-
-  @override
-  String get quizVerdictCorrect => 'إجابة صحيحة.';
-
-  @override
-  String get quizVerdictIncorrect => 'ليس هذه المرة.';
 
   @override
   String get quizAlreadyAnsweredSuffix =>

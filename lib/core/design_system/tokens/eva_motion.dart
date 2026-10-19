@@ -471,3 +471,55 @@ abstract final class EvaMotion {
     return Duration(microseconds: micros);
   }
 }
+
+/// `.cta.err`'s and `.opt.wrong`'s shake (`eva/redesign.html:360`), as a curve.
+///
+/// ```css
+/// @keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}
+///                  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+/// ```
+///
+/// Piecewise-linear between the keyframes. CSS interpolates keyframes with
+/// `ease` by default, which on a ±8px pulse is indistinguishable from linear at
+/// any speed a shake is visible at; recorded rather than re-derived, because a
+/// cubic-bezier fit to four waypoints would be a second curve token for a
+/// 450 ms effect. The amplitude is **not** scaled to the element's width — the
+/// prototype shakes a full-width button by fixed pixels too.
+///
+/// ## WHY IT LIVES HERE AND NOT IN ITS FIRST CALLER
+///
+/// The curve was private to `/login`'s form for its whole first life, and the
+/// quiz's `.opt.wrong` shake (`:360`'s other user — same keyframes, same `.45s`)
+/// would have been the second copy of it. A shake that two screens share is
+/// motion the design system owns, which is where every other curve already
+/// lives. Promoted rather than duplicated, and `/login` reads it from here.
+final class EvaShake extends Curve {
+  /// `eva/redesign.html:360` — `.45s`.
+  static const Duration duration = Duration(milliseconds: 450);
+
+  /// Creates the curve.
+  const EvaShake();
+
+  @override
+  double transform(double t) {
+    // Waypoints from `:360`, linearly between. `t == 1` (the clock's end) is
+    // the rest position, so the element always lands where it started.
+    const List<(double, double)> keys = <(double, double)>[
+      (0.0, 0),
+      (0.2, -8),
+      (0.4, 8),
+      (0.6, -5),
+      (0.8, 5),
+      (1.0, 0),
+    ];
+    for (int i = 0; i < keys.length - 1; i++) {
+      final (double t0, double x0) = keys[i];
+      final (double t1, double x1) = keys[i + 1];
+      if (t <= t1) {
+        final double f = (t - t0) / (t1 - t0);
+        return x0 + (x1 - x0) * f;
+      }
+    }
+    return 0;
+  }
+}

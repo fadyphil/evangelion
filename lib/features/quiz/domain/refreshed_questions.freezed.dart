@@ -27,20 +27,20 @@ $RefreshedQuestionsCopyWith<RefreshedQuestions> get copyWith => _$RefreshedQuest
 @override
 bool operator ==(Object other) {
   final _this = this as RefreshedQuestions;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RefreshedQuestions&&(identical(other.readingId, _this.readingId) || other.readingId == _this.readingId)&&const DeepCollectionEquality().equals(other.questions, _this.questions));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RefreshedQuestions&&(identical(other.readingId, _this.readingId) || other.readingId == _this.readingId)&&(identical(other.reference, _this.reference) || other.reference == _this.reference)&&(identical(other.pointsEarnedToday, _this.pointsEarnedToday) || other.pointsEarnedToday == _this.pointsEarnedToday)&&const DeepCollectionEquality().equals(other.questions, _this.questions));
 }
 
 
 @override
 int get hashCode {
   final _this = this as RefreshedQuestions;
-  return Object.hash(runtimeType,_this.readingId,const DeepCollectionEquality().hash(_this.questions));
+  return Object.hash(runtimeType,_this.readingId,_this.reference,_this.pointsEarnedToday,const DeepCollectionEquality().hash(_this.questions));
 }
 
 @override
 String toString() {
   final _this = this as RefreshedQuestions;
-  return 'RefreshedQuestions(readingId: ${_this.readingId}, questions: ${_this.questions})';
+  return 'RefreshedQuestions(readingId: ${_this.readingId}, reference: ${_this.reference}, pointsEarnedToday: ${_this.pointsEarnedToday}, questions: ${_this.questions})';
 }
 
 
@@ -51,7 +51,7 @@ abstract mixin class $RefreshedQuestionsCopyWith<$Res>  {
   factory $RefreshedQuestionsCopyWith(RefreshedQuestions value, $Res Function(RefreshedQuestions) _then) = _$RefreshedQuestionsCopyWithImpl;
 @useResult
 $Res call({
- String readingId, List<Question> questions
+ String readingId, String reference, int pointsEarnedToday, List<Question> questions
 });
 
 
@@ -68,10 +68,12 @@ class _$RefreshedQuestionsCopyWithImpl<$Res>
 
 /// Create a copy of RefreshedQuestions
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? readingId = null,Object? questions = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? readingId = null,Object? reference = null,Object? pointsEarnedToday = null,Object? questions = null,}) {
   return _then(RefreshedQuestions(
 readingId: null == readingId ? _self.readingId : readingId // ignore: cast_nullable_to_non_nullable
-as String,questions: null == questions ? _self.questions : questions // ignore: cast_nullable_to_non_nullable
+as String,reference: null == reference ? _self.reference : reference // ignore: cast_nullable_to_non_nullable
+as String,pointsEarnedToday: null == pointsEarnedToday ? _self.pointsEarnedToday : pointsEarnedToday // ignore: cast_nullable_to_non_nullable
+as int,questions: null == questions ? _self.questions : questions // ignore: cast_nullable_to_non_nullable
 as List<Question>,
   ));
 }

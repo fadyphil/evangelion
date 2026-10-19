@@ -36,10 +36,31 @@ part 'refreshed_questions.freezed.dart';
 @freezed
 final class RefreshedQuestions with _$RefreshedQuestions {
   /// A re-read, narrowed to what a session can take from it.
-  const RefreshedQuestions({required this.readingId, required this.questions});
+  const RefreshedQuestions({
+    required this.readingId,
+    required this.reference,
+    required this.pointsEarnedToday,
+    required this.questions,
+  });
 
   /// The reading the [questions] belong to, as the fresh payload states it.
   final String readingId;
+
+  /// The fresh payload's `reference`, travelling with [readingId] — the two are
+  /// the same payload's identity, and `QuizSession.withQuestions` replaces them
+  /// together.
+  final String reference;
+
+  /// The fresh payload's `total_points_earned_today`.
+  ///
+  /// ## WHY A REBASING SESSION TAKES IT AND STILL DOES **NOT** SHOW IT
+  ///
+  /// `QuizSession.fromQuestions` (the failed-start retry arm) seeds its score from
+  /// this. The **rebase** arm does not hand it to `withQuestions` — see that
+  /// method's doc for the double-count the carried verdict would produce. So this
+  /// field is read on one arm and deliberately not on the other, and both arms are
+  /// named at the call site in `quiz_bloc.dart`.
+  final int pointsEarnedToday;
 
   /// The questions, in the server's order. Not re-sorted; see
   /// `ScriptureText.questions`.
@@ -57,6 +78,10 @@ final class RefreshedQuestions with _$RefreshedQuestions {
   /// is the witness for a property of `props`, and recorded decision 48's lesson is
   /// that a property documented in three places and asserted in one is a property
   /// with one witness.
-  RefreshedQuestions copyWithReadingId(String readingId) =>
-      RefreshedQuestions(readingId: readingId, questions: questions);
+  RefreshedQuestions copyWithReadingId(String readingId) => RefreshedQuestions(
+    readingId: readingId,
+    reference: reference,
+    pointsEarnedToday: pointsEarnedToday,
+    questions: questions,
+  );
 }

@@ -57,16 +57,17 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
-import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
+import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
+import '../../../../support/design_system_harness.dart';
 import '../../../../support/quiz_harness.dart';
 import '../../../../support/reading_harness.dart';
 
@@ -121,20 +122,23 @@ Future<void> mountQuiz(
 }) => pumpQuiz(tester, bloc: bloc, locale: locale);
 
 void main() {
-  group('the screen the prototype described', () {
-    testWidgets('is a Scaffold with NO app bar, and says why', (
+  group('the screen the redesign described', () {
+    // `eva/redesign.html:562-574` is the markup this group pins: an appbar whose
+    // row is a `‹` chevron, the centred crumb and the gold score (`:563-566`), the
+    // `.dots` row beneath (`:568`), the prompt (`:570`), the options (`:571`) and
+    // the `.qnext` pill (`:573`). No `AppBar`, no title, no count sentence.
+    testWidgets('is chrome over the question, and NO app bar', (
       WidgetTester tester,
     ) async {
       // ## THE OPPOSITE OF THE STUB'S FIRST TEST, ASSERTED EXPLICITLY
       //
       // The stub's test asserted `find.byType(AppBar), findsOneWidget` and
       // `find.text(AppRoutes.quiz), findsOneWidget` — it asserted the route constant
-      // was painted as a title. `QuizScreen.tsx` has no `AppBar` and no title: its
-      // top row is a close control, `ProgressBeads` and a spacer, which is
-      // `QuizHeader`, and §13.6's chrome table puts the header there rather than in
-      // an `AppBar`. So both halves are inverted, and saying "no app bar" is stronger
-      // than "some other app bar": a future `AppBar` titled `Quiz` would satisfy the
-      // old test and violate the prototype.
+      // was painted as a title. The redesign has no `AppBar` and no title: its top
+      // row is the chevron, the crumb and the score, which is `QuizHeader`. So both
+      // halves are inverted, and saying "no app bar" is stronger than "some other
+      // app bar": a future `AppBar` titled `Quiz` would satisfy the old test and
+      // violate the prototype.
       final QuizBloc bloc = quizBloc(
         const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
@@ -164,21 +168,33 @@ void main() {
       }
       expect(find.text('Placeholder for /quiz'), findsNothing);
 
-      // And the letters, which the prototype draws as a badge beside each option.
+      // And the letters, which the redesign draws as a 26px badge beside each
+      // option (`eva/redesign.html:342`).
       for (final String letter in liveEnglishQuestion.options.keys) {
         expect(find.text(letter), findsOneWidget, reason: 'letter "$letter"');
       }
     });
 
-    testWidgets('and its progress line counts the questions it has', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the crumb composes the payload reference, and the score is the '
+        'session\'s running total', (WidgetTester tester) async {
+      // `eva/redesign.html:565` is `Refraction · Psalms 1`, filled from the
+      // reader's passage (`:1348`); the client's second half is the payload's
+      // reference, carried on `QuizSession` and composed by `quiz_l10n.dart` —
+      // never an ARB placeholder and never a hard-coded book. The score is
+      // `:566`'s `✦ N`, and N is the **session's running total**: the seed plus
+      // what this session's correct submits earned (`QuizSession.runningScore`).
+      // `liveEnglishQuizPassage` seeds `0`, so the first frame reads `0`.
       final QuizBloc bloc = quizBloc(
         const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
       );
       await mountQuiz(tester, bloc: bloc);
 
-      expect(find.text(en.questionProgress(1, 1)), findsOneWidget);
+      expect(find.text(en.quizCrumb('John 3:1-5')), findsOneWidget);
+      expect(find.text(en.digits(0)), findsOneWidget);
+      // The old mono count sentence is gone with the chrome that drew it —
+      // asserted by its retired literal, because the method that composed it no
+      // longer exists to compose it.
+      expect(find.text('Question 1 of 1'), findsNothing);
     });
   });
 
@@ -214,15 +230,14 @@ void main() {
         expect(states, isNot(contains(QuizOptionState.correct)));
         expect(states, isNot(contains(QuizOptionState.incorrect)));
 
-        // No verdict sentence. [FeedbackBanner] exists but is not on screen.
-        expect(find.byType(FeedbackBanner), findsNothing);
-        expect(find.text(en.quizVerdictCorrect), findsNothing);
-        expect(find.text(en.quizVerdictIncorrect), findsNothing);
+        // No verdict suffix anywhere as TEXT, and the retired verdict sentences
+        // are nowhere either — they died with the banner that spoke them.
         expect(find.text(en.quizCorrectSuffix), findsNothing);
         expect(find.text(en.quizIncorrectSuffix), findsNothing);
 
-        // And no flecks, which are the prototype's reward animation for a correct
-        // answer. Four `GoldFlecks` would be the giveaway even with the colours gone.
+        // And no flecks: the redesign's quiz options carry none
+        // (`eva/redesign.html:337-362` paints borders, fills and a key badge), so
+        // even the OLD prototype's reward animation must be absent.
         expect(find.byType(GoldFlecks), findsNothing);
       },
     );
@@ -323,20 +338,27 @@ void main() {
       expect(correctLetters, <String>{theAnsweredLetter});
     });
 
-    testWidgets('the flecks appear on that one card and nowhere else', (
+    testWidgets('the verdict glyph appears on that one card and nowhere else', (
       WidgetTester tester,
     ) async {
-      // The animation, not the colour. `QuizScreen.tsx:90-97` puts four flecks on the
-      // correct option only, and this is the assertion that catches the offset bug
-      // `quiz_option_card_test.dart` also carries: the pair that was positioned
-      // inside the card instead of outside it was still *present*, so counting them
-      // is what distinguishes "in the right place" from "there".
+      // The shape, not the colour — decision 127's row. The redesign's verdict is
+      // the card's own recolour (`eva/redesign.html:350-352`), and the glyph is
+      // what a reader who cannot separate the two tints is given on top of it.
+      // Counting is what distinguishes "on the right card" from "anywhere": the
+      // first version of the state switch marked all four cards, and a
+      // `findsOneWidget` here is what that mutation fails.
       await gradeTheAnsweredOption(tester);
 
-      expect(find.byType(GoldFlecks), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(QuizOptionCard),
+          matching: find.byIcon(Icons.check_circle_outline),
+        ),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('REDUCED MOTION REACHES BOTH AMBIENT ANIMATIONS, MEASURED AT '
+    testWidgets('REDUCED MOTION REACHES THE AMBIENT ANIMATIONS, MEASURED AT '
         'EACH WIDGET', (WidgetTester tester) async {
       // ## WHY THIS IS HERE, AND WHAT IT DELIBERATELY DOES **NOT** RE-PROVE
       //
@@ -347,11 +369,13 @@ void main() {
       // which nothing reads is indistinguishable from a flag nothing turns.
       //
       // So this test closes the **screen** half of the chain, and the design system
-      // already owns the other half: `gold_flecks_test.dart`'s *"disableAnimations
-      // freezes the flecks at rest"* compares **pixels** and proves the freeze, and
-      // `neural_background`'s tier tests prove the same for the orbs. What neither can
-      // do is show that `pumpQuiz`'s flag arrives at those widgets — that is a wiring
-      // fact about this screen, and it is what this asserts.
+      // already owns the other half: `progress_beads_test.dart`'s reduced-motion row
+      // proves the dot pulse is not painted when the clock is stopped, and
+      // `neural_background`'s tier tests prove the same for the orbs. What neither
+      // can do is show that `pumpQuiz`'s flag arrives at those widgets — that is a
+      // wiring fact about this screen, and it is what this asserts. (The probe used
+      // to be `GoldFlecks`, which died with the old prototype's flecks; the beads
+      // row is the redesign's own ambient animation, and it reads the same flag.)
       //
       // **No freeze assertion here on purpose.** A first draft compared the two
       // `CustomPaint` widgets the two runs produced and asserted they differed. That
@@ -383,22 +407,22 @@ void main() {
         await tester.tap(find.text(en.quizCheckAnswer));
         await pumpQuizFrames(tester, 6);
 
-        // `GoldFlecks` only mounts on a graded-correct card, so this runs on a screen
-        // in that state rather than an idle one — a flag that reached `MediaQuery`
+        // A graded screen, not an idle one: the current bead is `current`, the one
+        // state whose pulse reads the flag, so a flag that reached `MediaQuery`
         // without reaching this widget would pass an idle-screen test.
-        expect(find.byType(GoldFlecks), findsOneWidget);
+        expect(find.byType(ProgressBeads), findsOneWidget);
       }
 
-      /// The flag as `GoldFlecks.build` and `NeuralBackground.build` read it, taken
-      /// off the mounted tree at each widget rather than from a parameter — so a
-      /// harness that stopped passing the flag reads `false` here and fails.
-      ({bool atFlecks, bool atBackground, NeuralTier tier}) probe() {
-        final BuildContext flecks = tester.element(find.byType(GoldFlecks));
+      /// The flag as `ProgressBeads._Bead` and `NeuralBackground.build` read it,
+      /// taken off the mounted tree at each widget rather than from a parameter —
+      /// so a harness that stopped passing the flag reads `false` here and fails.
+      ({bool atBeads, bool atBackground, NeuralTier tier}) probe() {
+        final BuildContext beads = tester.element(find.byType(ProgressBeads));
         final BuildContext background = tester.element(
           find.byType(NeuralBackground),
         );
         return (
-          atFlecks: MediaQuery.maybeDisableAnimationsOf(flecks) ?? false,
+          atBeads: MediaQuery.maybeDisableAnimationsOf(beads) ?? false,
           atBackground:
               MediaQuery.maybeDisableAnimationsOf(background) ?? false,
           // The exact two arguments `NeuralBackground.build` passes, at the position
@@ -417,8 +441,8 @@ void main() {
       }
 
       await runWith(disableAnimations: true);
-      final ({bool atFlecks, bool atBackground, NeuralTier tier}) on = probe();
-      expect(on.atFlecks, isTrue, reason: 'the flag reaches the flecks');
+      final ({bool atBeads, bool atBackground, NeuralTier tier}) on = probe();
+      expect(on.atBeads, isTrue, reason: 'the flag reaches the bead row');
       expect(on.atBackground, isTrue, reason: '…and the background');
       expect(
         on.tier,
@@ -430,8 +454,8 @@ void main() {
       // "the flag arrives" would also be satisfied by a screen where the flag arrives
       // at everything because the harness always set it.
       await runWith(disableAnimations: false);
-      final ({bool atFlecks, bool atBackground, NeuralTier tier}) off = probe();
-      expect(off.atFlecks, isFalse, reason: 'the default call does not set it');
+      final ({bool atBeads, bool atBackground, NeuralTier tier}) off = probe();
+      expect(off.atBeads, isFalse, reason: 'the default call does not set it');
       expect(off.atBackground, isFalse);
       expect(
         off.tier,
@@ -440,14 +464,13 @@ void main() {
       );
     });
 
-    testWidgets('the banner states the verdict, and the CTA moves on', (
+    testWidgets('the graded card is a live region, and the CTA relabels', (
       WidgetTester tester,
     ) async {
       final QuizBloc bloc = await gradeTheAnsweredOption(tester);
 
-      expect(find.byType(FeedbackBanner), findsOneWidget);
       // The verdict the **submission** reported, not one derived from the payload.
-      // `contractSubmitAnswerFixture` says `is_correct: true`, so the banner reads
+      // `contractSubmitAnswerFixture` says `is_correct: true`, so the card reads
       // "correct"; the first version of this file asserted the payload's answer key
       // and would have kept passing if the submit response and the fixture disagreed —
       // which is precisely the case §5 trap 3's dead `question-group-3` makes
@@ -460,13 +483,26 @@ void main() {
             'true. Asserting the payload instead would not notice the two '
             'disagreeing',
       );
-      expect(find.text(en.quizVerdictCorrect), findsOneWidget);
-      expect(find.text(en.quizVerdictIncorrect), findsNothing);
 
-      // `QuizScreen.tsx:127`'s `{checked ? 'Next question' : 'Check answer'}` — the
-      // same button, relabelled. `checkAnswer` must be **gone**, because a screen
-      // showing both is ambiguous about which press does what.
-      expect(find.text(en.quizNextQuestion), findsOneWidget);
+      // The retired banner's live region moved onto the graded card — the wrapper
+      // is a container, so what is announced is the card's own subtree, verdict
+      // suffix included.
+      expect(
+        semanticsTree(tester)
+            .where((SemanticsData node) => node.flagsCollection.isLiveRegion),
+        hasLength(1),
+        reason:
+            'the verdict arrives after the screen has settled; without the flag a '
+            'screen-reader user learns about it only by exploring. '
+            '`FeedbackBanner` used to carry it; the graded card does now',
+      );
+
+      // `eva/redesign.html:1431` — the same pill, relabelled by the graded state,
+      // and the live payload has **one** question: grading it IS the terminal
+      // state, so the label is `seeRes` with the painted star beside it.
+      // `checkAnswer` must be **gone**, because a screen showing both is ambiguous
+      // about which press does what.
+      expect(find.text(en.quizSeeResults), findsOneWidget);
       expect(find.text(en.quizCheckAnswer), findsNothing);
     });
 
@@ -669,16 +705,17 @@ void main() {
       // reachable only from a multi-question payload, which is what
       // `mixedQuizPassage` is for.
       //
-      // ## AND THE LABEL IS `nextQuestion`, WHICH IS THE PROTOTYPE'S OWN WORD
+      // ## AND THE LABEL IS THE REDESIGN'S OWN `next`, WHICH IS THE **TRUE** WORD
       //
-      // `QuizScreen.tsx:127` labels every graded answer `Next question` and
-      // `ds.tsx` disables it on `!checked && !selected`. An already-answered question
-      // is `checked` as far as the server is concerned and `selected` as far as the
-      // reader is concerned — so it is neither, and the label has to come from
-      // somewhere. It comes from `checked`, which is false here, so the button says
-      // `Check answer` and is **disabled**: the honest rendering, because "check
-      // answer" is the only action this control can perform on this screen and there
-      // is nothing to check.
+      // The old screen labelled this frame `Check answer` — the superseded
+      // prototype's `{checked ? 'Next question' : 'Check answer'}` with `checked`
+      // false — which named the one action the control cannot perform: the question
+      // is closed by the wire and will never be checkable in this session. The
+      // redesign's `.qnext` names what the press DOES (`eva/redesign.html:1431`:
+      // `label = last ? seeRes : next`), and here the press advances — so `next ▸`
+      // is the honest label, on a control that is **enabled** because advancing is
+      // possible. The dead end two tests down keeps the written reason, because
+      // there the press can do nothing at all.
       final QuizBloc bloc = quizBloc(
         Result<ScriptureText>.of(mixedQuizPassage),
       );
@@ -689,7 +726,7 @@ void main() {
 
       // And the button is enabled, because advancing is possible — which is the
       // difference between this arm and the dead end two tests down.
-      final Finder cta = find.byType(EvaButton);
+      final Finder cta = find.bySemanticsLabel(en.quizNextQuestion);
       expect(
         tester.getSemantics(cta).flagsCollection.isEnabled.toBoolOrNull(),
         isTrue,
@@ -731,7 +768,7 @@ void main() {
       expect(bloc.state.lastResult, isNull);
 
       // The button is still on screen — §14's disabled row, not a removed control.
-      final Finder cta = find.byType(EvaButton);
+      final Finder cta = find.bySemanticsLabel(en.quizUnavailableSuffix);
       expect(cta, findsOneWidget);
 
       // ## AND ITS **VISIBLE** LABEL NAMES WHAT IS MISSING, NOT AN ACTION THIS
@@ -787,7 +824,7 @@ void main() {
       expect(find.text(en.quizCheckAnswer), findsOneWidget);
       expect(find.text(en.quizUnavailableSuffix), findsNothing);
       expect(
-        tester.getSemantics(find.byType(EvaButton)).label,
+        tester.getSemantics(find.bySemanticsLabel(en.quizCheckAnswer)).label,
         en.quizCheckAnswer,
       );
     });
@@ -814,15 +851,30 @@ void main() {
   // `enabled`. `reason` is therefore now derived from the same value that decides
   // whether the button works, which is the only way the two cannot disagree.
   group('the reason is named only by a DEAD cta', () {
-    /// Drives one open question to graded, and returns the bloc.
+    /// A two-open-question payload — the smallest one whose **first** graded state
+    /// is a live `next` CTA rather than the terminal `seeResults`.
     ///
-    /// The same sequence as `gradeTheAnsweredOption`, reached through this group's own
-    /// copy on purpose: that helper lives inside the group above and is not visible
-    /// here, and duplicating four lines is cheaper than hoisting a fixture whose every
-    /// other use asserts nothing about the frame it leaves behind.
-    Future<QuizBloc> gradeToReadyOnTheLastQuestion(WidgetTester tester) async {
+    /// The live payload's single open question cannot serve: grading it IS the
+    /// terminal state now, and both tests below need a graded question that still
+    /// has a question after it.
+    final ScriptureText twoOpen = englishPassageWith(<Question>[
+      liveEnglishQuestion,
+      liveEnglishQuestion.copyWith(
+        id: 'question-group-4',
+        sortOrder: 2,
+        prompt: 'Where did Nicodemus find Jesus?',
+        options: <String, String>{'A': 'In Galilee', 'B': 'In Jerusalem'},
+      ),
+    ]);
+
+    /// Drives the group's payload to the state the test names: [last] selects the
+    /// terminal frame (both questions graded) or the live `next` frame (one).
+    Future<QuizBloc> gradeOnTwoOpenQuestions(
+      WidgetTester tester, {
+      required bool last,
+    }) async {
       final QuizBloc bloc = quizBloc(
-        const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
+        Result<ScriptureText>.of(twoOpen),
         submission: defaultSubmission,
       );
       await mountQuiz(tester, bloc: bloc);
@@ -830,34 +882,42 @@ void main() {
       await pumpQuizFrames(tester, 2);
       await tester.tap(find.text(en.quizCheckAnswer));
       await pumpQuizFrames(tester, 6);
+      if (last) {
+        await tester.tap(find.text(en.quizNextQuestion));
+        await pumpQuizFrames(tester, 4);
+        await tester.tap(find.text('In Galilee'));
+        await pumpQuizFrames(tester, 2);
+        await tester.tap(find.text(en.quizCheckAnswer));
+        await pumpQuizFrames(tester, 6);
+      }
       return bloc;
     }
 
     /// The CTA's accessible name.
     ///
-    /// Read off the `EvaButton` because that is the node `_Cta`'s `Semantics` labels,
-    /// and `excludeSemantics` folds the button's own caption into it — so this is the
+    /// Read off the node whose label is the CTA's — `_Cta`'s own `Semantics` —
+    /// with `excludeSemantics` folding the pill's caption into it, so this is the
     /// string a screen reader announces, not the caption a sighted reader sees.
-    String ctaAccessibleName(WidgetTester tester) =>
-        tester.getSemantics(find.byType(EvaButton)).label;
+    /// The label is resolved by **name** rather than by type, because the ghost
+    /// pill is not an `EvaButton` and a type find would name a private widget.
+    String ctaAccessibleName(WidgetTester tester, String label) =>
+        tester.getSemantics(find.bySemanticsLabel(label)).label;
 
     testWidgets('a LIVE cta does not claim there is no answer to show', (
       WidgetTester tester,
     ) async {
-      final QuizBloc bloc = await gradeToReadyOnTheLastQuestion(tester);
+      final QuizBloc bloc = await gradeOnTwoOpenQuestions(tester, last: false);
 
-      // The precondition stated as an assertion, because the whole finding is that
-      // the payload predicate and the CTA state disagree **on this frame**: every
-      // question is answered *and* the button is live. If either stopped being true
-      // the reason below would be absent for a reason that is not the one being fixed.
-      expect(
-        bloc.state.session!.answeredCount,
-        bloc.state.session!.questionCount,
-      );
+      // The precondition stated as an assertion: one question graded, one still to
+      // come, and the button **live** on the frame whose label the assertion below
+      // pins. If the CTA stopped being `next` here the label below would be absent
+      // for a reason that is not the one being fixed.
+      expect(bloc.state.session!.answeredCount, 1);
+      expect(bloc.state.session!.questionCount, 2);
       expect(bloc.state.cta, QuizCta.next);
       expect(
         tester
-            .getSemantics(find.byType(EvaButton))
+            .getSemantics(find.bySemanticsLabel(en.quizNextQuestion))
             .flagsCollection
             .isEnabled
             .toBoolOrNull(),
@@ -869,10 +929,10 @@ void main() {
       // `label.contains(suffix)` on a merged node, and none of them was on a live
       // CTA at all.
       expect(
-        ctaAccessibleName(tester),
+        ctaAccessibleName(tester, en.quizNextQuestion),
         en.quizNextQuestion,
         reason:
-            'the label is the prototype\'s own, with nothing appended. '
+            'the label is the redesign\'s own, with nothing appended. '
             '"${en.quizUnavailableSuffix}" is a fact about a DEAD control and this '
             'control opens the graded answer',
       );
@@ -881,20 +941,21 @@ void main() {
     testWidgets('and the TERMINAL cta does not either', (
       WidgetTester tester,
     ) async {
-      final QuizBloc bloc = await gradeToReadyOnTheLastQuestion(tester);
-      await tester.tap(find.text(en.quizNextQuestion));
-      await pumpQuizFrames(tester, 6);
+      final QuizBloc bloc = await gradeOnTwoOpenQuestions(tester, last: true);
 
-      expect(bloc.state.cta, QuizCta.finish);
+      // The redesign's own terminal rule: the last graded question IS the terminal
+      // state (`eva/redesign.html:1431` labels it `seeRes`), and one press opens
+      // `/result` (`:1432`). There is no second "advance" press in between any more.
+      expect(bloc.state.cta, QuizCta.seeResults);
       expect(
         tester
-            .getSemantics(find.byType(EvaButton))
+            .getSemantics(find.bySemanticsLabel(en.quizSeeResults))
             .flagsCollection
             .isEnabled
             .toBoolOrNull(),
         isTrue,
       );
-      expect(ctaAccessibleName(tester), en.quizSeeResults);
+      expect(ctaAccessibleName(tester, en.quizSeeResults), en.quizSeeResults);
     });
   });
 

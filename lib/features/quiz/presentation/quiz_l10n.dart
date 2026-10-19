@@ -1,39 +1,42 @@
 import 'package:evangelion/l10n/app_localizations.dart';
-import 'package:evangelion/l10n/l10n.dart';
 
 /// The `/quiz` strings that are **composed** rather than translated.
 ///
 /// Both were methods on `QuizStrings`.
 ///
-/// ## AND WHY NEITHER IS AN ARB KEY, MEASURED
+/// ## AND WHY THE CRUMB IS AN EXTENSION METHOD AND NOT AN ARB KEY, MEASURED
 ///
-/// * [questionProgress] reads `Question <current> of <total>` — `QuizScreen.tsx:67`.
-///   It is **not** an ICU plural and the reason is that there is no noun agreeing
-///   with either number: English writes `Question 2 of 5` and `Question 1 of 1`
-///   identically, and Arabic writes `السؤال ٢ من ٥` the same way. The `of` is
-///   invariant. A `plural` here would select an `other` branch identical to the
-///   `one` branch, which asserts that two strings are equal — a test that cannot
-///   fail. It also needs the numerals, which a `plural` selector cannot carry (see
-///   [AppLocalizationsArm.digits]).
+/// * [quizCrumb] composes the appbar's centred crumb out of
+///   [AppLocalizations.quizRefraction] and the payload's own `reference`. The
+///   second half is server text — a reading the client does not translate, quote or
+///   reformat — so an ARB placeholder would put it inside a message whose Arabic
+///   arm is checked for Latin script and whose numerals are the arm's own
+///   (decision 102/103). The composition lives here, the `home_l10n.dart`
+///   precedent, and the citation is `eva/redesign.html:1348` —
+///   `` `${tr('refraction')} · ${bookTitle(b)}` `` — the prototype's own composed
+///   string, written in JavaScript and never an I18N row either.
 /// * [optionLabel] is punctuation around caller-supplied text, and its `suffix` is
 ///   `null` before the reader has checked — which is the whole of the spoiler
 ///   boundary as a string.
+///
+/// ## AND WHY THERE IS NO `questionProgress` ANY MORE
+///
+/// The composed `Question <current> of <total>` line was the old chrome's progress
+/// surface, and the redesign's quiz screen has none of it: the screen's markup
+/// (`eva/redesign.html:562-574`) carries the appbar, the `.dots` row, the prompt,
+/// the options and the CTA, and no count sentence. The progress the screen still
+/// shows is the beads row, whose accessible name is [AppLocalizations.quizProgress]
+/// — a semantics-only string, never painted, which is why the Arabic gate declines
+/// to declare it. `quizOfWord` died with the composition.
 extension QuizStringsPhrases on AppLocalizations {
-  /// `Question <current> of <total>` — `QuizScreen.tsx:67`, with the prototype's
-  /// hard-coded `2` and `5` replaced by the session's own numbers.
+  /// The appbar crumb: `Refraction · <reference>`.
   ///
-  /// ## THE **PROTOTYPE'S** NUMBER IS A LIE AND THE ARMS USE DIFFERENT DIGITS
-  ///
-  /// `ReadingEnScreen.tsx:89`'s `5 questions` was the same kind of literal and
-  /// `readingCaptionFor`'s description records what happened to it. So neither number
-  /// is transcribed: `current` and `total` come from the session.
-  ///
-  /// The Arabic arm renders both in **Arabic-Indic** digits, which is what
-  /// [digits] is for, and which is also why this string must be rendered in the
-  /// payload arm's family: U+0660–U+0669 are Arabic-block codepoints and are tofu in
-  /// Space Mono for exactly the reason the scripture is.
-  String questionProgress(int current, int total) =>
-      '$quizProgress ${digits(current)} $quizOfWord ${digits(total)}';
+  /// `eva/redesign.html:565` draws it centred in the `.ttl` slot;
+  /// `:1348` fills it from the reader's passage. The client's second half is
+  /// `QuizSession.reference`'s honest equivalent — the server's `reference`,
+  /// verbatim — and the separator is the prototype's own `·` (U+00B7), on both
+  /// arms, because `:1348` interpolates one literal for both.
+  String quizCrumb(String reference) => '$quizRefraction · $reference';
 
   /// An option's accessible name: the letter, the text, and any verdict.
   ///

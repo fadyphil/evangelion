@@ -165,16 +165,14 @@
     "description": "Link from Home's compact card to `/leaderboard`.\n\nPhrased as an action rather than a count, because the card cannot honestly say how many there are — `cohortSize` is `null` whenever the request's `limit` bound. 'See all' stays true whether there are four children or four hundred."
   },
   "homeRetry": "Try again",
-  "quizExit": "Close",
-  "quizProgress": "Question",
-  "quizOfWord": "of",
+  "quizExit": "Back",
+  "quizProgress": "Quiz progress",
+  "quizRefraction": "Refraction",
   "quizCheckAnswer": "Check answer",
-  "quizNextQuestion": "Next question",
-  "quizSeeResults": "See results",
+  "quizNextQuestion": "next ▸",
+  "quizSeeResults": "see results",
   "quizCorrectSuffix": "correct answer",
   "quizIncorrectSuffix": "your answer, incorrect",
-  "quizVerdictCorrect": "Correct.",
-  "quizVerdictIncorrect": "Not this time.",
   "quizAlreadyAnsweredSuffix": "already answered, so it cannot be submitted again",
   "quizUnavailableSuffix": "there is no answer to show",
   "quizRetry": "Try again",
@@ -269,34 +267,28 @@
     "description": "`ErrorView.retryLabel`. There is NO prototype error state at all — `eva/src` has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES (\"Try again\") rather than \"Retry\".\n\nNAMESPACED `home*`: three features carry this field name (`homeRetry`, `quizRetry`, `readingRetry`).\n\n`ErrorView` is the precedent for all three: a hard-coded English string inside `core/` is the half-translated UI this app exists not to ship, so the wording lives with the caller and the widget takes it."
   },
   "@quizExit": {
-    "description": "The close control's accessible name.\n\nWRITTEN, NOT TRANSCRIBED: QuizScreen.tsx:46-50 is a `<button>` around a bare inline `<svg>` cross with NO LABEL AT ALL — §14's first row, verbatim. The same obligation that forced `readingBack` forces this."
+    "description": "The back control's accessible name.\n\nREWORDED WITH THE CHROME IT NAMES. The old value (\"Close\") named a cross icon; the redesign replaces that control with the `.chev` chevron (`redesign.html:564`), whose click returns to the reader (`:1412` — `qBack` is `pop('reader')` then `enterReader()`, a back step and not a dismissal). The client's control is still `context.router.maybePop()`, which is the same move.\n\nStill WRITTEN, NOT TRANSCRIBED: `:564` is a `<button>` around a bare `‹` with NO LABEL AT ALL — §14's first row, verbatim. The same obligation that forced `readingBack` forces this."
+  },
+  "@quizRefraction": {
+    "description": "The crumb's first half — `Refraction · <reference>`.\n\nTranscribed from the prototype's I18N row (`redesign.html:967`, `refraction:[\"Refraction\",\"انعطاف\"]`), rendered at `:565` as the appbar's centred `#qCrumb` and filled from the reader's own passage (`:1348` — `` `${tr('refraction')} · ${bookTitle(b)}` ``). The client's second half is the payload's `reference`, carried on `QuizSession` and composed in `quiz_l10n.dart` — an ARB placeholder would fail the Latin/numeral gates, the `home_l10n.dart` precedent."
   },
   "@quizProgress": {
-    "description": "`ProgressBeads`' accessible-name prefix. See its own `semanticLabel`.\n\nSee `homeReflectionProgress`'s description for the recorded English tail this prefix sits on."
-  },
-  "@quizOfWord": {
-    "description": "The word between the two counts in the quiz progress label.\n\nA KEY AND NOT A CONSTANT, because the two arms genuinely differ — `of` against `من` — and a constant would have had to be a `switch` over a private anchor object to stay `const`, which is more machinery than the string is worth. `reading` had a `_space` constant once because both arms spell the space identically; this is the other case, and the difference is the reason.\n\nKEY NAME: `quizOfWord` rather than `of`, because ARB keys share ONE flat namespace with every other key and `of` is both a Dart keyword and too generic to survive a grep."
+    "description": "`ProgressBeads`' accessible-name prefix for the re-homed dots row.\n\nREWORDED WITH ITS JOB. The old value (\"Question\") was the noun of the composed `Question 2 of 5` line, which the redesign's quiz screen does not have — its only progress surface is the `.dots` row (`redesign.html:568`, CSS `:328-332`). The row is a bare unlabelled `<div>` in the prototype, so this name is WRITTEN, NOT TRANSCRIBED — §14's colour-and-shape row needs the progress announced, and `ProgressBeads`' `Semantics` is where it lands.\n\nSemantics-only, never painted: `ProgressBeads` puts it in `Semantics(label:, excludeSemantics: true)`, so the Arabic-typography gate declines to declare it."
   },
   "@quizCheckAnswer": {
-    "description": "The CTA before the answer is graded. Transcribed: QuizScreen.tsx:127."
+    "description": "The CTA while a choice is made and not yet graded.\n\nTRANSCRIBED FROM `QuizScreen.tsx:127`, AND THE VALUE IS STILL THE ONE IT WROTE. The superseded prototype's switch was `{checked ? 'Next question' : 'Check answer'}`; this is its unchecked arm, unchanged. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.\n\nThe citation is kept because the value is kept: the step is the same, so the line that named it still does."
   },
   "@quizNextQuestion": {
-    "description": "The CTA after the answer is graded, with a question still to come. Transcribed: QuizScreen.tsx:127."
+    "description": "The CTA after the answer is graded, with a question still to come.\n\nREWORDING, ON A MEASUREMENT. The old value (\"Next question\") was the superseded prototype's switch label. The redesign's own I18N row is `next:[\"next ▸\",\"التالي\"]` (`redesign.html:967`), and `.qnext` renders it mono, uppercase, tracked (`:364`) — so the rendered form is `NEXT ▸` exactly as the prototype draws it. The `▸` (U+25B8) is safe as TEXT on the English arm only because `.qnext` is mono (`:364`) and JetBrainsMono carries the codepoint — measured against all nineteen bundled TTFs, same instrument as `font_coverage.dart`. The Arabic value carries no arrow, which is the prototype's own pair.\n\nThe terminal arm took the redesign's other label — see `quizSeeResults`."
   },
   "@quizSeeResults": {
-    "description": "The CTA on the last question. WRITTEN, NOT TRANSCRIBED: the prototype's CTA is `{checked ? 'Next question' : 'Check answer'}` — there is NO TERMINAL STATE, because the prototype has exactly one hard-coded question."
+    "description": "The CTA on the last graded question — the terminal arm.\n\nNOW TRANSCRIBED, AND THE VALUE REWORDED TO THE REDESIGN'S OWN. The old description called this key written because the old prototype had no terminal state. The redesign does: its I18N row is `seeRes:[\"see results ✦\",\"النتائج\"]` (`redesign.html:967`), applied at `:1431` (`label = last question ? tr('seeRes') : tr('next')`), and one click opens the results (`:1432`).\n\nTHE ✦ IS NEVER TEXT. U+2726 is in NO bundled family — measured against all nineteen TTFs (`four_pointed_star.dart` carries the measurement) — so the star is the painted `FourPointedStar` composed by the CTA on the English arm, and the Arabic arm carries none, which is the prototype's own pair. The value here is therefore the words only."
   },
   "@quizCorrectSuffix": {
     "description": "Appended to the correct option's accessible name once it is revealed.\n\nTHE SPOILER BOUNDARY'S VOCABULARY, AND IT IS BILINGUAL. The boundary itself is `QuizPage`'s; this is the word that makes it visible to a screen reader.\n\nA CITATION THAT USED TO NAME A FILE THAT DID NOT EXIST, AND THE CLAIM IS HELD TWO FILES OVER INSTEAD. An earlier version of this doc said `quiz_accessibility_test.dart` asserts the string is in the semantics tree only after a check. There is no such file and there never was. The claim is nevertheless real and is held by `quiz_page_test.dart`: its \"before the reader commits to an answer\" group asserts no node's label carries this string, and its \"the SEMANTICS tree carries the verdict the card colours carry\" test asserts exactly one does after a check.\n\nNOT CORRECTED BY CREATING THE FILE. A second /quiz test file whose subject is a subset of that spoiler group would give the boundary two homes and make \"nothing leaks before a check\" a claim about whichever file a reader opened."
   },
   "@quizIncorrectSuffix": {
     "description": "Appended to the chosen-but-wrong option's accessible name, once revealed."
-  },
-  "@quizVerdictCorrect": {
-    "description": "The feedback banner's text on a correct answer.\n\nWRITTEN, NOT TRANSCRIBED. QuizScreen.tsx:116 reads \"Exactly. Light — before anything else.\", which describes THE PROTOTYPE'S OWN INVENTED OPTION SET, and this client's question is a different one. Transcribing it would put a claim about the wrong passage on the screen."
-  },
-  "@quizVerdictIncorrect": {
-    "description": "The feedback banner's text on a wrong answer. Written, for `quizVerdictCorrect`'s reason."
   },
   "@quizAlreadyAnsweredSuffix": {
     "description": "Appended to an option's accessible name when the wire says it is answered.\n\n§14's disabled row: a reader has to be told WHY a control cannot be pressed, not only that it cannot. `LoginPage`'s four inert social buttons and `AppTopBar`'s avatar are the precedent, and they are the reason /quiz can ship a dead CTA honestly at all."

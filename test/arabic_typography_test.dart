@@ -61,7 +61,7 @@ import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
-import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/result/presentation/result_l10n.dart';
@@ -75,6 +75,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
 import 'support/arabic_typography_gate.dart';
+import 'support/contract_payloads.dart';
 
 import 'support/design_system_harness.dart';
 import 'support/font_coverage.dart';
@@ -588,8 +589,13 @@ void main() {
     // a hand-typed Arabic list in a test is a second copy of the corpus.
     final AppLocalizations ar = AppLocalizationsAr();
     final List<String> arabic = <String>[
-      // The progress label — `questionProgress` with Arabic-Indic digits.
-      ar.questionProgress(1, 1),
+      // The appbar crumb — the payload's own reference, composed with the arm's
+      // `quizRefraction` (`redesign.html:565`, filled at `:1348`). It replaced the
+      // old `questionProgress` run when the redesign removed the count sentence.
+      ar.quizCrumb(liveArabicQuizPassage.reference),
+      // The score's numeral — `redesign.html:566`'s `✦ N`, with the star painted
+      // and the digits the arm's own.
+      ar.digits(0),
       // The question text — the **payload** arm again, and the one this list was
       // missing when the gate first fired on this screen. The failure named it
       // exactly: `Declared but NOT rendered: {تحقق من الإجابة}`, `Rendered: … ما اسم
@@ -598,12 +604,8 @@ void main() {
       // The four option texts: the **payload** arm, so `QuizOptionCard`'s required
       // `ReadingLanguage` is the only thing that can put them in Amiri.
       ...liveArabicQuestion.options.values,
-      // The close control's tooltip — a bare `<button>` around an `<svg>` cross in
-      // the prototype (`QuizScreen.tsx:46-50`), so §14 forced the string into this
-      // client, exactly as it forced `AppLocalizations.readingBack` on Phase 7.
-      ar.quizExit,
     ];
-    // **`ar.quizProgress` is DELIBERATELY NOT IN THE LIST, and that is a fact about the
+    // **`ar.quizProgress` IS DELIBERATELY NOT IN THE LIST, and that is a fact about the
     // gate rather than an omission.**
     //
     // `QuizHeader` passes `strings.quizProgress` to `ProgressBeads.semanticLabel`, and
@@ -618,7 +620,8 @@ void main() {
     // The label is still asserted, by the gate that covers the right layer:
     // `quiz_page_test.dart`'s semantics group reads `ProgressBeads`' merged node and
     // names it. Two instruments, two layers, and this one declines to claim the
-    // other's coverage.
+    // other's coverage. `ar.quizExit` is the same category: the redesign's bare `‹`
+    // carries a `Semantics` name and paints no string.
 
     testWidgets('the Arabic arm, with the live Arabic question', (
       WidgetTester tester,
@@ -642,12 +645,13 @@ void main() {
       );
     });
 
-    testWidgets('and the FEEDBACK banner is gated too', (
+    testWidgets('and the GRADED card is gated too', (
       WidgetTester tester,
     ) async {
-      // The banner is the one run on this screen that only exists **after** a check,
-      // so its own gate needs its own pump — the same reason `/reading`'s `Aa`
-      // disclosure has one.
+      // The verdict is the one run that exists only **after** a check, and under
+      // the redesign it lives on the card rather than in a banner
+      // (`redesign.html:350-359`). Its own gate needs its own pump — the same
+      // reason `/reading`'s `Aa` disclosure has one.
       // **`quizBlocWith`, not a hand-built bloc**: decision 20's rule is that the bloc
       // is built in the test body, and this suite already imports
       // `home_harness.dart`, whose `CountingReadingRepository` collides with
@@ -662,26 +666,37 @@ void main() {
       // **Read off the fixture, not typed here.** A hand-typed copy of a corpus
       // string is the "second declaration" this gate's own doc warns against: if the
       // fixture's option text is ever corrected, the tap silently misses and the
-      // banner never appears, which fails as *"the banner is absent"* and reads as
+      // card is never graded, which fails as *"the verdict is absent"* and reads as
       // the gate working. `liveArabicQuestion` is the one transcription.
       await tester.tap(find.text(liveArabicQuestion.options['A']!));
       await pumpQuizFrames(tester, 2);
       await tester.tap(find.text(ar.quizCheckAnswer));
       await pumpQuizFrames(tester, 4);
 
-      expect(find.byType(FeedbackBanner), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is QuizOptionCard &&
+              widget.state == QuizOptionState.correct,
+        ),
+        findsOneWidget,
+      );
       await expectArabicTypography(
         tester,
         screen: '/quiz',
-        // Same reasoning as the arm above, and for one more run: the **verdict
-        // sentence** the banner shows once an answer is checked, and the CTA's new
-        // label. `correctSuffix` is *not* here — like `ProgressBeads`' label it is a
-        // semantics-only string, and `quiz_page_test.dart`'s spoiler group is what
-        // reads it.
+        // Same reasoning as the arm above, and for two more runs: the CTA's new
+        // label and the score's new numeral. `correctSuffix` is *not* here — like
+        // `ProgressBeads`' label it is a semantics-only string, and
+        // `quiz_page_test.dart`'s spoiler group is what reads it.
+        //
+        // **The ready arm's `ar.digits(0)` is removed, not left in.** The score moved
+        // to the submit response's `pointsEarned`, so the graded screen paints `١٠`
+        // where it painted `٠`; keeping both would fail the gate's
+        // `Declared but NOT rendered` half, which is the half that caught this.
         expectedArabic: <String>[
-          ...arabic,
-          ar.quizVerdictCorrect,
-          ar.quizNextQuestion,
+          ...arabic.where((String run) => run != ar.digits(0)),
+          ar.digits(contractSubmitAnswerFixture.pointsEarned),
+          ar.quizSeeResults,
         ],
       );
     });
@@ -973,8 +988,8 @@ void main() {
       WidgetTester tester,
     ) async {
       // The sheet is a `showModalBottomSheet` route of its own, so it is a second
-      // screen inside `/settings` and it needs its own pump — the same reason `/quiz`'s
-      // feedback banner and `/reading`'s `Aa` disclosure each have one.
+      // screen inside `/settings` and it needs its own pump — the same reason
+      // `/reading`'s `Aa` disclosure has one.
       //
       // **`settingsLanguageSheetTitle` is the run this catches most:** the sheet is
       // reachable only by tapping the default-language row, so a sheet that opened

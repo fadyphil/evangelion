@@ -111,7 +111,7 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        116,
+        114,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
@@ -184,6 +184,16 @@ void main() {
             '`homePeace` (`:993`). None is a plural and none holds a placeholder — '
             'the composed sentences are deliberately Dart, and '
             '`home_l10n_test.dart` asserts the shape this refusal protects.\n\n'
+            '**116 → 114 in Task 5.4**, for the rebuilt `/quiz` — '
+            '`eva/redesign.html:562-574`: three keys died with the old chrome — '
+            '`quizOfWord` and the two verdict sentences (`quizVerdictCorrect` / '
+            '`quizVerdictIncorrect`), whose banner the redesign does not draw — and '
+            'one arrived as the crumb\'s own prefix, `quizRefraction` (`:565`). The '
+            'verdict vocabulary that replaced the sentences (`quizCorrectSuffix` / '
+            '`quizIncorrectSuffix`) already existed for the accessible name, so this '
+            'is a surface leaving the table rather than a translation going missing. '
+            'None of the four is a plural and none holds a placeholder, which is why '
+            'both ICU groups below are untouched.\n\n'
             '**The numerals are not in these values.** `libCount`\'s `٦` is the '
             'prototype\'s Arabic arm *rendering*, and this client draws numerals '
             'through `digits` (`l10n.dart:105`) — so a value holding a digit is a '
@@ -412,7 +422,12 @@ void main() {
         'settingsAbout': 'SettingsScreen.tsx:107',
         'settingsVersion': 'SettingsScreen.tsx:115',
         'quizCheckAnswer': 'QuizScreen.tsx:127',
-        'quizNextQuestion': 'QuizScreen.tsx:127',
+        // **`quizNextQuestion` left this map in Task 5.4, and the departure is the
+        // claim.** Its value is no longer the superseded prototype's
+        // `{checked ? 'Next question' : …}`; it is the redesign's own
+        // `next:["next ▸","التالي"]` row (`redesign.html:967`), and the description
+        // cites that row instead. Keeping the old citation would say the value was
+        // transcribed from a line that no longer produced it.
         // Task 5.3's rebuilt `/reading`. **Seven rows, and every value here is the
         // prototype's own I18N pair** — `verses` / `quiz` / `questions` share one
         // line, `bmk` / `bmkOff` share another.

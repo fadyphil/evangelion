@@ -207,6 +207,8 @@ void main() {
   group('`QuizSession`', () {
     const QuizSession aSession = QuizSession(
       readingId: 'reading-group-3-2026-10-04',
+      reference: 'John 3:1-5',
+      pointsEarnedToday: 10,
       answers: <QuizAnswer>[
         QuizAnswer(question: anOpenQuestion),
         QuizAnswer(question: anAnsweredQuestion),
@@ -221,11 +223,23 @@ void main() {
       expect(aSession.answeredCount, 1);
     });
 
+    test('carries the payload identity the crumb and the score row read', () {
+      // `eva/redesign.html:565` composes the crumb from the reader's passage and
+      // `:566` paints the score from a number this client must not invent — the
+      // payload's own `total_points_earned_today`. Both travel on the session,
+      // because `StartSession` parses the payload once and nothing downstream
+      // re-reads it.
+      expect(aSession.reference, 'John 3:1-5');
+      expect(aSession.pointsEarnedToday, 10);
+    });
+
     test(
       'an empty session has no answers and reports zero for both counts',
       () {
         const QuizSession empty = QuizSession(
           readingId: 'reading-group-3-2026-10-04',
+          reference: 'John 3:1-5',
+          pointsEarnedToday: 0,
           answers: <QuizAnswer>[],
         );
         expect(empty.questionCount, 0);
@@ -234,6 +248,78 @@ void main() {
         expect(aSession.isEmpty, isFalse);
       },
     );
+
+    group('`runningScore` — the number the ✦ row paints', () {
+      // `eva/redesign.html:1428` adds 10 to a local score per correct pick;
+      // this client's increment is what the server awarded, and its seed is the
+      // payload's own total. The three rows below are the whole rule.
+      const QuizSession fresh = QuizSession(
+        readingId: 'reading-group-3-2026-10-04',
+        reference: 'John 3:1-5',
+        pointsEarnedToday: 10,
+        answers: <QuizAnswer>[QuizAnswer(question: anOpenQuestion)],
+      );
+
+      test('starts at the seed the payload carried', () {
+        expect(fresh.runningScore, 10);
+      });
+
+      test('and a CORRECT verdict adds what the server awarded', () {
+        final QuizSession graded = fresh.withAnswerAt(
+          0,
+          fresh.answers.first.withSelection('A').withVerdict(aVerdict),
+        );
+        // `aVerdict` is `points_earned: 10`, so 10 + 10.
+        expect(graded.runningScore, 20);
+      });
+
+      test('and a WRONG verdict adds nothing', () {
+        const SubmitResult wrong = SubmitResult(
+          questionId: 'question-group-3',
+          isCorrect: false,
+          pointsEarned: 0,
+          currentTotalPoints: 10,
+          currentStreak: 4,
+          longestStreak: 6,
+          readingCompleted: false,
+        );
+        final QuizSession graded = fresh.withAnswerAt(
+          0,
+          fresh.answers.first.withSelection('B').withVerdict(wrong),
+        );
+        expect(
+          graded.runningScore,
+          10,
+          reason: 'wrong earns 0 — :1429 never touches the score',
+        );
+      });
+
+      test('and two correct verdicts accumulate', () {
+        // `aSession` carries two answers, so the second verdict has a question to
+        // land on.
+        final QuizSession one = aSession.withAnswerAt(
+          0,
+          aSession.answers.first.withSelection('A').withVerdict(aVerdict),
+        );
+        final QuizSession two = one.withAnswerAt(
+          1,
+          one.answers[1]
+              .withSelection('A')
+              .withVerdict(
+                const SubmitResult(
+                  questionId: 'question-group-4',
+                  isCorrect: true,
+                  pointsEarned: 10,
+                  currentTotalPoints: 30,
+                  currentStreak: 4,
+                  longestStreak: 6,
+                  readingCompleted: false,
+                ),
+              ),
+        );
+        expect(two.runningScore, 30);
+      });
+    });
 
     test('the answer at an index, or `null` past the end', () {
       expect(aSession.answerAt(0)?.question, anOpenQuestion);
@@ -285,6 +371,7 @@ void main() {
       // question this session no longer holds).
       final QuizSession rebased = aSession.withQuestions(
         readingId: 'reading-group-3-2026-10-05',
+        reference: 'John 3:1-5',
         questions: <Question>[anOpenQuestion, aSecondQuestion],
       );
       expect(rebased.readingId, 'reading-group-3-2026-10-05');
@@ -293,6 +380,33 @@ void main() {
       // flag won, which is the entire purpose of the re-fetch.
       expect(rebased.answers.last.question.alreadyAnswered, isFalse);
       expect(rebased.answers.last.verdict, isNull);
+    });
+
+    test('`withQuestions` takes the fresh reference and KEEPS the score seed', () {
+      // The two identity fields move together — an id that rolled at midnight
+      // arrived with the new day's reference beside it (§5 trap 11) — so both are
+      // taken fresh. The seed is NOT: a carried verdict's points are already
+      // inside the fresh payload's total, and refreshing the seed would count them
+      // twice. `QuizSession.pointsEarnedToday`'s doc carries the reachable flow
+      // (correct answer → failed submit → retry).
+      final QuizSession graded = aSession.withAnswerAt(
+        0,
+        aSession.answers.first.withSelection('A').withVerdict(aVerdict),
+      );
+      final QuizSession rebased = graded.withQuestions(
+        readingId: 'reading-group-3-2026-10-05',
+        reference: 'Nehemiah 8:1-3',
+        questions: <Question>[anOpenQuestion, aSecondQuestion],
+      );
+      expect(rebased.reference, 'Nehemiah 8:1-3');
+      expect(
+        rebased.pointsEarnedToday,
+        graded.pointsEarnedToday,
+        reason: 'the ledger the session was opened with, not the fresh total',
+      );
+      // And the running score stays the carried verdict's sum over the old seed —
+      // 10 + 10, not the fresh total plus the carried verdict again.
+      expect(rebased.runningScore, 20);
     });
 
     test('`withQuestions` keeps a selection the reader made on an identical '
@@ -306,6 +420,7 @@ void main() {
       );
       final QuizSession rebased = withSelection.withQuestions(
         readingId: withSelection.readingId,
+        reference: 'John 3:1-5',
         questions: <Question>[anOpenQuestion, anAnsweredQuestion],
       );
       expect(rebased.answers.first.selectedLetter, 'C');
@@ -332,6 +447,7 @@ void main() {
       // the pre-submit payload is not a defect the client can detect.
       final QuizSession rebased = graded.withQuestions(
         readingId: graded.readingId,
+        reference: 'John 3:1-5',
         questions: <Question>[anOpenQuestion, aSecondQuestion],
       );
 
@@ -362,6 +478,7 @@ void main() {
       );
       final QuizSession rebased = graded.withQuestions(
         readingId: graded.readingId,
+        reference: 'John 3:1-5',
         questions: <Question>[anOpenQuestion, aSecondQuestion],
       );
 
@@ -377,6 +494,7 @@ void main() {
           equals(
             aSession.withQuestions(
               readingId: 'other',
+              reference: 'John 3:1-5',
               questions: <Question>[anOpenQuestion, anAnsweredQuestion],
             ),
           ),
@@ -388,6 +506,7 @@ void main() {
           equals(
             aSession.withQuestions(
               readingId: aSession.readingId,
+              reference: 'John 3:1-5',
               questions: <Question>[anOpenQuestion],
             ),
           ),

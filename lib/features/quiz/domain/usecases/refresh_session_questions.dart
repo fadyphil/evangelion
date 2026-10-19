@@ -46,6 +46,8 @@ final class RefreshSessionQuestions
     return reading.map(
       (ScriptureText scripture) => RefreshedQuestions(
         readingId: scripture.readingId,
+        reference: scripture.reference,
+        pointsEarnedToday: scripture.pointsEarnedToday,
         questions: scripture.questions,
       ),
     );

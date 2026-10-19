@@ -2,59 +2,69 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:flutter/material.dart';
 
-/// How one quiz option is drawn. `ds.tsx:416` — `QuizState`.
+/// How one quiz option is drawn. `eva/redesign.html:337-343` — the `.opt` rules.
 enum QuizOptionState {
-  /// `default` — `ds.tsx:424`'s `accent = null`.
-  ///
-  /// **No accent means no border colour from the accent ramp**, so the card takes
-  /// the resting rim: `rgba(#fff | #000, 0.1)` in `ds.tsx:426`.
+  /// `default` — the resting card: a 1px `--glass-line` rim on a `--glass-fill`
+  /// tint. `eva/redesign.html:338-339`.
   idle,
 
-  /// `selected` — ember. `ds.tsx:424` — `state === 'selected' ? hex.ember`.
+  /// The reader's choice, before it is graded.
+  ///
+  /// ## WRITTEN, AND THE REDESIGN HAS NO SUCH STATE
+  ///
+  /// `eva/redesign.html:1423` grades the instant a card is chosen, so the
+  /// prototype never shows a picked-but-ungraded card. This client's grade is a
+  /// `POST` (§5 trap 10 — no request may be fired on a mis-tap), so choosing and
+  /// grading are two presses and the first one needs a face. The treatment is the
+  /// app's accent — the same `ember` accent the old prototype's `selected` state
+  /// wore — and that is a written state, recorded here rather than smuggled in.
   selected,
 
-  /// `correct` — `hex.ok`. `ds.tsx:424`.
+  /// `.opt.correct` — `eva/redesign.html:350-352`: a gold-tinted rim and fill,
+  /// the key badge filled with the accent and its letter inked dark.
+  ///
+  /// ## THE HUE IS A SUBSTITUTION, RECORDED
+  ///
+  /// The prototype's correct treatment is `--gold` (`rgba(232,176,75,…)`) at two
+  /// alphas. This design system publishes no gold token, and the orchestrator's
+  /// locked decision for this task is that none is created; §5.1's own words
+  /// assign `ok`/`err` to "the quiz/feedback semantic pair", so the correct
+  /// verdict paints with `ok` and the wrong one with `err`. The alphas below are
+  /// the prototype's.
   correct,
 
-  /// `incorrect` — `hex.err`. `ds.tsx:424`.
+  /// `.opt.wrong` — `eva/redesign.html:358-360`: an ember-tinted rim and fill,
+  /// the whole card dimmed to 62%, and the shake.
   incorrect,
 }
 
-/// One answer option. `ds.tsx:418-457`, the `QuizOption` component.
+/// One answer option — `eva/redesign.html:337-362`, the `.opt` rules.
 ///
 /// ## THE FOUR STATES AND WHO DECIDES THEM
 ///
-/// `QuizScreen.tsx:78-85` computes the state in the **screen**, not the component:
+/// The page computes the state, not the component: `QuizPage._optionStateFor` is
+/// the only function that can produce [QuizOptionState.correct] or
+/// `.incorrect`, it takes the answer's `isChecked` as its gate, and it reads
+/// **only** `QuizAnswer.verdict` — never `QuizAnswer.question.isCorrect`. That
+/// split is the whole of the spoiler boundary's structure, and
+/// `quiz_page_test.dart` plants a leak that renders `is_correct` before the check
+/// to prove the boundary holds.
 ///
-/// ```js
-/// let state = 'default'
-/// if (checked) {
-///   if (opt.letter === CORRECT) state = 'correct'
-///   else if (opt.letter === selected && selected !== CORRECT) state = 'incorrect'
-/// } else if (selected === opt.letter) state = 'selected'
-/// const dimmed = checked && opt.letter !== CORRECT && opt.letter !== selected
-/// ```
+/// ## AND `enabled` IS A **SEPARATE FLAG** FROM THE VERDICT'S DIMMING
 ///
-/// So the widget takes a state and the page derives it. That split is the whole of
-/// the spoiler boundary's structure: **the page can only produce `correct` or
-/// `incorrect` when `checked` is true**, and `quiz_page_test.dart` plants a leak
-/// that renders `is_correct` before the check to prove the boundary holds.
-///
-/// ## AND `enabled` IS A **SEPARATE FLAG** FROM `dimmed`
-///
-/// `dimmed` is the prototype's `checked && …` — visual only, a 48% opacity on an
-/// option the reader no longer has to choose.
-///
-/// `enabled` is this client's own, and it is §5 trap 3: a question whose wire
-/// `already_answered` is `true` must be **disabled**, so the reader is never walked
-/// into a `409`. The prototype has no such state — its question is hard-coded and
-/// unanswered — so this flag has no prototype line and is recorded here as written.
+/// The redesign dims the wrong card to 62% (`:358`'s `opacity: .62`) — that is
+/// [QuizOptionState.incorrect]'s own treatment, driven by the state. `enabled` is
+/// this client's own, and it is §5 trap 3: a question whose wire
+/// `already_answered` is `true` must be **disabled**, so the reader is never
+/// walked into a `409`. The prototype has no such state — its question is
+/// hard-coded and unanswered — so this flag has no prototype line and is recorded
+/// here as written.
 ///
 /// *Rejected: expressing "disabled" as `onTap: null` alone.* That is a *behaviour*
 /// and not a *statement*: §14's disabled row wants `Semantics(enabled: false)` with
 /// the tap action genuinely absent **and the reason in the accessible name**, and
 /// `SocialAuthButton`'s doc is the precedent for all three at once.
-class QuizOptionCard extends StatelessWidget {
+class QuizOptionCard extends StatefulWidget {
   /// An option showing [letter] and [text] in [state].
   const QuizOptionCard({
     required this.letter,
@@ -64,18 +74,18 @@ class QuizOptionCard extends StatelessWidget {
     required this.language,
     this.onTap,
     this.enabled = true,
-    this.dimmed = false,
     super.key,
   });
 
   /// The option's key in `Question.options` — `A`…`D` on the live payload.
   ///
-  /// `ds.tsx:451` renders it in `F.mono, 12, 700`. §5 trap 10 records that the ids
-  /// in this payload are fabricated, and the letters come from the same JSON, so the
-  /// badge is drawn **verbatim** — no substitution to a canonical alphabet.
+  /// §5 trap 10 records that the ids in this payload are fabricated, and the
+  /// letters come from the same JSON, so the badge is drawn **verbatim** — no
+  /// substitution to a canonical alphabet.
   final String letter;
 
-  /// The option's label. `ds.tsx:454-456` — `F.ui, 15, 400, lineHeight 1.4`.
+  /// The option's label. `eva/redesign.html:344` renders it in the card's own
+  /// 15px/500 with `overflow-wrap: anywhere`.
   final String text;
 
   /// Which of the four treatments to draw.
@@ -104,10 +114,10 @@ class QuizOptionCard extends StatelessWidget {
   /// point of decision 75's seam: the option text is the server's scripture, fetched
   /// in the language the session was opened in, so its arm comes from the payload
   /// and **not** from `Directionality.of(context)`. A widget reading the direction
-  /// here would render Arabic options in DM Sans on the Arabic arm — which is what
-  /// `reading_glyph_test.dart` measures on `/reading`, and the reason a screen that
-  /// is rebuilt under Phase 9's language switch cannot desynchronise its scripture
-  /// from its chrome.
+  /// here would render Arabic options in the Latin UI face on the Arabic arm —
+  /// which is what `reading_glyph_test.dart` measures on `/reading`, and the reason
+  /// a screen that is rebuilt under Phase 9's language switch cannot desynchronise
+  /// its scripture from its chrome.
   ///
   /// It is required for the same reason `EvaButton.labelFamily` and
   /// `IconActionButton.tooltipFamily` are (decisions 66 and 71): a caller that omits
@@ -120,41 +130,86 @@ class QuizOptionCard extends StatelessWidget {
 
   /// Whether the reader may still choose this.
   ///
-  /// See the class doc: this is the §5 trap 3 prevention, and it is **not** the same
-  /// thing as [dimmed].
+  /// See the class doc: this is the §5 trap 3 prevention, and it is **not** the
+  /// same thing as a verdict's dimming.
   final bool enabled;
 
-  /// The prototype's post-check dimming. `ds.tsx:437` — `opacity: dimmed ? .48 : 1`.
-  final bool dimmed;
+  /// The card's own box: `eva/redesign.html:339` — `padding: 16px 18px`.
+  ///
+  /// **No `min-height` any more.** The old card carried `minHeight: 64` from the
+  /// superseded prototype (`ds.tsx:434`); the redesign's `.opt` has none, and its
+  /// height is the padding plus the text's line box — 53px for one line, which is
+  /// above the 44px touch floor, so the floor is met by the card's own content.
+  static const EdgeInsets padding = EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 16,
+  );
 
-  /// `ds.tsx:434` — `minHeight: 64`.
-  static const double minHeight = 64;
-
-  /// `ds.tsx:434` — `padding: '0 16px'`.
-  static const EdgeInsets padding = EdgeInsets.symmetric(horizontal: 16);
-
-  /// `ds.tsx:433` — `borderRadius: 18`. A token: [EvaRadii.card].
+  /// `eva/redesign.html:339` — `border-radius: 18`. A token: [EvaRadii.card].
   static const double radius = EvaRadii.card;
 
-  /// `ds.tsx:434` — `gap: 14`.
+  /// `eva/redesign.html:338` — `gap: 14`.
   static const double gap = 14;
 
-  /// The letter badge. `ds.tsx:444` — `width: 30, height: 30, borderRadius: '50%'`.
-  static const double badgeSize = 30;
+  /// The letter badge. `eva/redesign.html:342` — 26×26, radius 50%, 1px
+  /// `--glass-line` rim.
+  static const double badgeSize = 26;
 
-  /// `ds.tsx:445` — `border: '1.5px solid …'`.
-  static const double badgeBorderWidth = 1.5;
+  /// `eva/redesign.html:342` — `border: 1px solid var(--glass-line)` — and the
+  /// card's own rim is `1px` on `:338` as well, where the old prototype drew both
+  /// at 1.5px.
+  static const double borderWidth = 1;
 
-  /// `ds.tsx:435` — `border: '1.5px solid …'`.
-  static const double rimBorderWidth = 1.5;
+  /// The badge letter's size. `eva/redesign.html:342` — `font-size: 10px`, with no
+  /// weight declaration, so the family's regular weight.
+  static const double badgeFontSize = 10;
+
+  /// The label's size. `eva/redesign.html:341` — `font-size: 15px`,
+  /// `font-weight: 500`.
+  static const double labelFontSize = 15;
+
+  /// `eva/redesign.html:341` — `font-weight: 500` — **raised from the old
+  /// transcription's 400**, which read the superseded prototype's `ds.tsx:455`.
+  static const FontWeight labelWeight = FontWeight.w500;
+
+  /// `.opt.wrong`'s dimming. `eva/redesign.html:358` — `opacity: .62`, on the
+  /// whole card.
+  static const double wrongOpacity = 0.62;
+
+  /// The correct card's alphas. `eva/redesign.html:350` — border
+  /// `rgba(232,176,75,.75)`, background `rgba(232,176,75,.10)` — with `ok`
+  /// substituted for the gold, per [QuizOptionState.correct]'s doc.
+  static const double correctBorderAlpha = 0.75;
+  static const double correctFillAlpha = 0.10;
+
+  /// The wrong card's alphas. `eva/redesign.html:358` — border
+  /// `rgba(255,90,72,.6)`, background `rgba(255,90,72,.07)` — and these are
+  /// `--ember`'s own numbers, which `err` already is.
+  static const double wrongBorderAlpha = 0.6;
+  static const double wrongFillAlpha = 0.07;
+
+  /// The selected card's fill alpha — the app's own state, carried over from the
+  /// old card's `accentFillAlpha` so a selection does not invent a new treatment
+  /// decision.
+  static const double selectedFillAlpha = 0.09;
+
+  /// The verdict glyph's size.
+  ///
+  /// `EvaSpacing.xxl` (24) — beside the text, at the row's scale. **No prototype
+  /// number**: the prototype's verdict shape is the *key badge* recolouring, and
+  /// this glyph is decision 127's — §14's "pair the colour with an icon" row, which
+  /// the badge's colour change alone does not satisfy for the two non-verdict
+  /// cards beside it. The card's own box is governed by its padding, so the glyph
+  /// cannot grow the row beyond the text's line box.
+  static const double verdictGlyphSize = EvaSpacing.xxl;
 
   /// The glyph for a graded verdict, or `null` — see the call site.
   ///
   /// **A method rather than two constants inline**, for `reading_geometry_test.dart`'s
-  /// argument: `ds.tsx` has no icon here to transcribe — `ds.tsx:437` and `:440` carry
-  /// only the border, the fill and the glow — so both glyphs are **written**, and
-  /// written as *shapes* rather than as colours for the reason in the call site's
-  /// comment. A method also keeps this widget's vocabulary of verdicts in one
+  /// argument: the redesign carries no icon here to transcribe — `:350-360` paint
+  /// only the border, the fill, the dimming and the shake — so both glyphs are
+  /// **written**, and written as *shapes* rather than as colours for the reason in
+  /// the call site's comment. A method also keeps this widget's vocabulary of verdicts in one
   /// exhaustive `switch` over the enum, so a fifth state is a compile error here
   /// rather than a missing glyph at runtime.
   ///
@@ -166,120 +221,38 @@ class QuizOptionCard extends StatelessWidget {
     QuizOptionState.idle || QuizOptionState.selected => null,
   };
 
-  /// The verdict glyph's size.
+  /// The accent for [state], or `null` for [QuizOptionState.idle].
   ///
-  /// `EvaSpacing.xxl` (24) — the letter badge's `30` is that badge's own box, and this
-  /// glyph sits beside it rather than inside it. **No prototype number**, and the card
-  /// keeps its 64px minimum height, so the glyph cannot grow it: 24 against a 64 row
-  /// leaves the option text's own line box dominant.
-  static const double verdictGlyphSize = EvaSpacing.xxl;
-
-  /// The letter's size. `ds.tsx:450` — `fontSize: 12`.
-  static const double letterFontSize = 12;
-
-  /// The label's size. `ds.tsx:455` — `fontSize: 15`.
-  static const double labelFontSize = 15;
-
-  /// `ds.tsx:455` — `lineHeight: 1.4`.
-  static const double labelLineHeight = 1.4;
-
-  /// `ds.tsx:438` — `transition: 'all 250ms cubic-bezier(0.16,1,0.3,1)'`.
-  ///
-  /// **Carried as a constant and not used.** The design system's §13.2 rule is that
-  /// the ambient clock drives every animation, and a per-widget `AnimatedContainer`
-  /// would be a fourth controller — the exact thing `GoldFlecks`'s doc refuses. So
-  /// the state change is instant here, and the only motion on a correct answer is
-  /// the flecks'. Recorded rather than deleted, because "the prototype transitions"
-  /// is a claim a reader will otherwise make and find false.
-  static const int transitionMillis = 250;
-
-  /// `ds.tsx:437` — `opacity: 0.48` when dimmed.
-  static const double dimmedOpacity = 0.48;
-
-  /// `ds.tsx:425` — the accent fill is the accent at **0.09**.
-  static const double accentFillAlpha = 0.09;
-
-  /// `ds.tsx:426` — the resting border is `#fff | #000` at **0.1**, which is
-  /// [EvaColors.glassBorder] on both palettes (`#14FFFFFF` dark, and light's is
-  /// measured off `glassBorder` too — `eva_colors.dart` is the authority and this
-  /// is not a new token).
-  ///
-  /// ## AND `ds.tsx:428`'s BADGE BORDER IS **0.18**, WHICH IS **NOT** A TOKEN
-  ///
-  /// Named here because a reader comparing against `ds.tsx` will look for a
-  /// `glassBorder * 1.8` and there is none: the two alphas are separate decisions
-  /// in the prototype and this client keeps them separate.
-  static const double badgeBorderAlpha = 0.18;
-
-  /// `ds.tsx:440` — `0 0 22px rgba(accent, .22)`.
-  static const double accentGlowBlur = 22;
-  static const double accentGlowAlpha = 0.22;
-
-  /// `ds.tsx:440` — the inset highlight, `rgba(#ffffff, .06)` with an accent and
-  /// `rgba(#ffffff, .04)` without.
-  static const double insetHighlightAlpha = 0.06;
-  static const double restingInsetHighlightAlpha = 0.04;
-
-  /// `ds.tsx:450` — the letter goes `#ffffff` in the two graded states and
-  /// `T.ink` otherwise. `#ffffff` is `EvaColors.canvas` on the dark palette and
-  /// **not** on the light one, so the graded letter is [onAccent] rather than a
-  /// literal.
-  static const double gradedLetterAlpha = 1;
-
-  /// The four flecks' offsets, in logical px from the card's **top-left**.
-  ///
-  /// ## WHY THIS IS A FUNCTION OF THE WIDTH, AND THE HONEST PART OF THAT
-  ///
-  /// `QuizScreen.tsx:92-95` writes them as absolute px against one viewport:
-  /// `(-10, 12)`, `(-15, 36)`, `(356, 8)`, `(362, 30)`. The left pair is relative to
-  /// the card's left edge and transcribes as it stands. **The right pair is not**:
-  /// 356 is only "just outside the right edge" at the width the prototype was drawn
-  /// at, so copying it puts both flecks in the middle of the card at 430px and off
-  /// the end of it at 320px — which is §14's own surface.
-  ///
-  /// So the right pair is expressed as [width] minus the prototype's own overhang
-  /// (`6` for the inner one, `12` for the outer). The **relationship** is
-  /// transcribed; the literal is not, and this is the same "a number is a claim
-  /// about a specific thing" correction `reading_geometry_test.dart` makes about the
-  /// drop cap.
-  ///
-  /// A pure function rather than four fields, so `quiz_geometry_test.dart` can
-  /// assert the right pair sits outside the card at **both** 320 and 430 without
-  /// pumping a widget.
-  static List<Offset> fleckOffsetsFor(double width) => <Offset>[
-    const Offset(-10, 12),
-    const Offset(-15, 36),
-    // `width + 6` and `width + 12`, **not** `width - 6`. The doc above this method
-    // says the right pair hangs *outside* the card — `QuizScreen.tsx:94-95` puts two
-    // "just outside the right edge" — and the first draft wrote `width - 6` for the
-    // inner one, which put it *inside*.
-    //
-    // `quiz_option_card_test.dart`'s `the right pair sits outside the card at both
-    // §14 and the prototype width` is the assertion that caught it, and it is written
-    // as `>= width` rather than `== width` so a future `width - 6` cannot come back.
-    Offset(width + 6, 8),
-    Offset(width + 12, 30),
-  ];
-
-  /// The accent for [state], or `null` for [QuizOptionState.idle]. `ds.tsx:424`.
+  /// `eva/redesign.html:350/358` name two accent hues — gold for correct, ember
+  /// for wrong — and `ok`/`err` are the tokens this design system publishes for
+  /// that pair ([QuizOptionState.correct]'s doc carries the substitution). The
+  /// **selected** state has no prototype line at all and keeps the app's accent.
   static Color? accentFor(QuizOptionState state, EvaColors colors) =>
       switch (state) {
         QuizOptionState.idle => null,
-        QuizOptionState.selected => colors.emberInk,
-        QuizOptionState.correct => colors.okInk,
-        QuizOptionState.incorrect => colors.errInk,
+        QuizOptionState.selected => colors.ember,
+        QuizOptionState.correct => colors.ok,
+        QuizOptionState.incorrect => colors.err,
       };
 
-  /// The ink the letter is drawn in. `ds.tsx:450`.
+  /// The ink the badge letter is drawn in.
+  ///
+  /// `eva/redesign.html:342` — `--ink-2` at rest; `:352` — `#1c1608` on the
+  /// correct badge's fill; `:359` — `var(--ember)` on the wrong one. `#1c1608` is
+  /// not a token this app publishes, and the pairing it names is "a dark ink on
+  /// the accent fill", which is [onGradedAccent]'s job — the same pairing the old
+  /// card recorded, with the same measured cost.
   static Color letterInkFor(
     QuizOptionState state,
     EvaColors colors,
     Brightness brightness,
-  ) => accentFor(state, colors) == null
-      ? colors.ink
-      : onGradedAccent(colors, brightness);
+  ) => switch (state) {
+    QuizOptionState.correct ||
+    QuizOptionState.incorrect => onGradedAccent(colors, brightness),
+    QuizOptionState.idle || QuizOptionState.selected => colors.ink2,
+  };
 
-  /// The letter's ink **on** an accent — `ds.tsx:450`'s `#ffffff`.
+  /// The letter's ink **on** a graded accent.
   ///
   /// `colors.canvas` on the dark palette and `colors.onEmber` on the light one,
   /// because `#ffffff` is not a token this app publishes on either palette
@@ -289,30 +262,107 @@ class QuizOptionCard extends StatelessWidget {
   /// say the contrast was measured against a background it is not on.
   ///
   /// Measured against the shipped palettes: `onEmber` on `ok` is **3.36:1** and on
-  /// `err` is **3.49:1** — below AA for 12px text, which is decision 6's shape. The
+  /// `err` is **3.49:1** — below AA for 10px text, which is decision 6's shape. The
   /// letter is **decorative**: the option's accessible name already carries the
-  /// verdict ([semanticLabel]), and `GoldFlecks` is `ExcludeSemantics`d. So the
-  /// sub-AA pairing is recorded here rather than fixed, because fixing it would
-  /// mean a 13th colour token in a phase that does not own the palette — the same
-  /// trade `eva_colors_test.dart` records for seven other pairs, and the same
-  /// reason the answer is not "make the letter bigger".
+  /// verdict ([semanticLabel]), and §14's shape row is met by the verdict glyph
+  /// beside the text. So the sub-AA pairing is recorded here rather than fixed,
+  /// because fixing it would mean a 13th colour token in a phase that does not own
+  /// the palette — the same trade `eva_colors_test.dart` records for seven other
+  /// pairs.
   static Color onGradedAccent(EvaColors colors, Brightness brightness) =>
       brightness == Brightness.dark ? colors.canvas : colors.onEmber;
 
   /// Whether [state] is one of the two **graded** states.
   ///
-  /// `ds.tsx:427` — `badgeFill = (state === 'correct' || state === 'incorrect')
-  /// ? accent : 'transparent'`, and `:450` puts the letter's ink on the same
-  /// condition. Two prototype conditions that are one question here, which is
-  /// `switch` expression territory per §4.
+  /// `eva/redesign.html:350-359` — the two treatments the reader can tell apart
+  /// from the resting card. Two prototype conditions that are one question here,
+  /// which is `switch` expression territory per §4.
   static bool isGraded(QuizOptionState state) =>
       state == QuizOptionState.correct || state == QuizOptionState.incorrect;
 
   @override
+  State<QuizOptionCard> createState() => _QuizOptionCardState();
+
+  /// The option label's [TextStyle] for the arm [language].
+  ///
+  /// A method on the widget rather than an inline `copyWith`, because
+  /// `reading_geometry_test.dart` pins `ScriptureBlock.fontSizeFor` and
+  /// `reading_glyph_test.dart` pins its output against the prototype line, and this
+  /// is the quiz's equivalent of both — with the **same rule**: a single number in
+  /// the prototype belongs to one screen and is never shared.
+  static TextStyle optionStyleFor(
+    BuildContext context,
+    ReadingLanguage language,
+  ) {
+    final TextStyle base = Theme.of(context).textTheme.bodyLarge!.copyWith(
+      fontSize: QuizOptionCard.labelFontSize,
+      fontWeight: QuizOptionCard.labelWeight,
+      color: context.colors.ink,
+    );
+    return base.copyWith(
+      fontFamily: switch (language) {
+        ReadingLanguage.english => EvaTypography.uiFamily,
+        ReadingLanguage.arabic => EvaTypography.arabicFamily,
+      },
+    );
+  }
+}
+
+/// The card's state, and the one reason it exists: the shake.
+///
+/// ## WHY THE SHAKE LIVES HERE AND NOT ON THE PAGE
+///
+/// `.opt.wrong` runs `shake .45s` (`eva/redesign.html:360`) on the card that was
+/// just graded wrong. The transition happens **to this widget's [QuizOptionCard.state]**,
+/// so the trigger is `didUpdateWidget` — the same arrangement `/login`'s form uses
+/// for its `.cta.err` shake, which is where the curve came from. One controller per
+/// card, and three of the four never run it: a ticker with no animation costs
+/// nothing.
+class _QuizOptionCardState extends State<QuizOptionCard>
+    with SingleTickerProviderStateMixin {
+  /// The shake's clock, and why it is `late final`.
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: EvaShake.duration,
+  );
+
+  /// The promoted curve — the design system's own, shared with `/login`'s
+  /// `.cta.err`.
+  final EvaShake _shakeCurve = const EvaShake();
+
+  @override
+  void didUpdateWidget(QuizOptionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final bool wasWrong = oldWidget.state == QuizOptionState.incorrect;
+    final bool isWrong = widget.state == QuizOptionState.incorrect;
+    if (isWrong && !wasWrong) _playShake();
+    if (!isWrong && _shake.isAnimating) _shake.stop();
+  }
+
+  /// `.opt.wrong`'s shake, §14-aware.
+  ///
+  /// "When disabled, jump straight to the end state" — and the end state of a
+  /// shake **is** its rest position (`transform(1.0) == 0`), so under reduced
+  /// motion the card simply never leaves it. The reset before replay is what makes
+  /// a second wrong grade shake again instead of continuing a finished clock.
+  void _playShake() {
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _shake
+      ..reset()
+      ..forward();
+  }
+
+  @override
+  void dispose() {
+    _shake.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
-    final Color? accent = accentFor(state, colors);
-    final bool interactive = enabled && onTap != null;
+    final Color? accent = QuizOptionCard.accentFor(widget.state, colors);
+    final bool interactive = widget.enabled && widget.onTap != null;
 
     // ## THE `Semantics` IS **ABOVE** `EvaFocusRing`, AND IT WAS NOT
     //
@@ -321,8 +371,8 @@ class QuizOptionCard extends StatelessWidget {
     // was **two tappable nodes per card**, one of them unnamed:
     //
     // ```text
-    // lbl="A. Nicodemus"  acts=[tap]              ← the Semantics
-    // lbl=""              acts=[tap, focus]        ← the InkWell, and it has no name
+    // lbl="A. Nicodemus"  acts=[tap]              <- the Semantics
+    // lbl=""              acts=[tap, focus]        <- the InkWell, and it has no name
     // ```
     //
     // `excludeSemantics: true` drops a node's **descendants**, never its ancestors, so
@@ -340,104 +390,113 @@ class QuizOptionCard extends StatelessWidget {
     // while `EvaInk`'s **focus** node is untouched, because focus and semantics are
     // separate mechanisms and `focus_ring_gate_test.dart` still sees its Tab stop.
     final Widget surface = Opacity(
-      // `ds.tsx:437` — the dimming is on the whole card, including its badge.
-      opacity: dimmed ? dimmedOpacity : 1,
+      // `eva/redesign.html:358` — the wrong card dims to .62. The two
+      // non-wrong states render at full opacity: the redesign dims nothing
+      // else, and the old card's separate `dimmed` flag died with the
+      // prototype that wrote it.
+      opacity: widget.state == QuizOptionState.incorrect
+          ? QuizOptionCard.wrongOpacity
+          : 1,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          // `ds.tsx:425` — accent at 0.09, else the resting tint.
-          color: accent == null
-              ? colors.glassFill
-              : accent.withValues(alpha: accentFillAlpha),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            // `ds.tsx:426` — the accent, else the resting rim.
-            color: accent ?? colors.glassBorder,
-            width: rimBorderWidth,
-          ),
-          boxShadow: <BoxShadow>[
-            // `ds.tsx:440` — the accent glow plus an inset highlight. The
-            // resting card has the weaker inset only, so the two are the same
-            // expression with a different second term rather than two branches.
-            if (accent != null)
-              BoxShadow(
-                color: accent.withValues(alpha: accentGlowAlpha),
-                blurRadius: accentGlowBlur,
-              ),
-            BoxShadow(
-              color: colors.canvas.withValues(
-                alpha: accent == null
-                    ? restingInsetHighlightAlpha
-                    : insetHighlightAlpha,
-              ),
-              offset: const Offset(0, 1),
+          // `eva/redesign.html:338-350-358` — a `--glass-fill` tint at rest;
+          // the accent's own alpha when graded.
+          color: switch (widget.state) {
+            QuizOptionState.idle => colors.glassFill,
+            QuizOptionState.selected => accent!.withValues(
+              alpha: QuizOptionCard.selectedFillAlpha,
             ),
-          ],
+            QuizOptionState.correct => accent!.withValues(
+              alpha: QuizOptionCard.correctFillAlpha,
+            ),
+            QuizOptionState.incorrect => accent!.withValues(
+              alpha: QuizOptionCard.wrongFillAlpha,
+            ),
+          },
+          borderRadius: BorderRadius.circular(QuizOptionCard.radius),
+          border: Border.all(
+            // `eva/redesign.html:338` — `--glass-line` at rest; `:350` the
+            // accent at .75 when correct; `:358` the accent at .6 when wrong.
+            // The selected state keeps the full accent, which is the old
+            // card's written treatment for a written state.
+            color: switch (widget.state) {
+              QuizOptionState.idle => colors.glassBorder,
+              QuizOptionState.selected => accent!,
+              QuizOptionState.correct => accent!.withValues(
+                alpha: QuizOptionCard.correctBorderAlpha,
+              ),
+              QuizOptionState.incorrect => accent!.withValues(
+                alpha: QuizOptionCard.wrongBorderAlpha,
+              ),
+            },
+          ),
         ),
         child: Padding(
-          padding: padding,
-          child: ConstrainedBox(
-            // `ds.tsx:434` — `minHeight: 64`. A constraint and not a `SizedBox`,
-            // so a two-line Arabic label at 1.22× grows the card instead of
-            // overflowing it — §14's requirement, and the reason this is not
-            // transcribed as a fixed height.
-            constraints: const BoxConstraints(minHeight: minHeight),
-            child: Row(
-              children: <Widget>[
-                _Badge(
-                  letter: letter,
-                  state: state,
-                  accent: accent,
-                  colors: colors,
-                  brightness: Theme.of(context).brightness,
-                ),
-                const SizedBox(width: gap),
-                Expanded(
-                  child: Text(
-                    text,
-                    // `ds.tsx:455` — `F.ui, 15, 400, lineHeight 1.4`.
-                    //
-                    // **The family is the PAYLOAD arm, not the ambient one.** The
-                    // option text is the server's scripture, fetched in the
-                    // language the session was opened in, and decision 75's table
-                    // says a payload run's arm comes from the payload. So this
-                    // takes [language] rather than reading
-                    // `Directionality.of(context)` — which is what
-                    // `SocialAuthButton`'s `arabicAware` does, correctly, for a
-                    // chrome label with no payload behind it.
-                    style: optionStyleFor(context, language),
+          padding: QuizOptionCard.padding,
+          child: Row(
+            children: <Widget>[
+              _Badge(
+                letter: widget.letter,
+                state: widget.state,
+                accent: accent,
+                colors: colors,
+                brightness: Theme.of(context).brightness,
+              ),
+              const SizedBox(width: QuizOptionCard.gap),
+              Expanded(
+                child: Text(
+                  widget.text,
+                  // `eva/redesign.html:341` — 15px, weight 500, `--ink-0`,
+                  // `overflow-wrap: anywhere`.
+                  //
+                  // **The family is the PAYLOAD arm, not the ambient one.** The
+                  // option text is the server's scripture, fetched in the
+                  // language the session was opened in, and decision 75's table
+                  // says a payload run's arm comes from the payload. So this
+                  // takes `widget.language` rather than reading
+                  // `Directionality.of(context)`.
+                  style: QuizOptionCard.optionStyleFor(
+                    context,
+                    widget.language,
                   ),
                 ),
-                // ## §14'S "PAIR THE COLOUR WITH AN ICON", WHICH WAS THE HALF
-                // ## `/quiz` NEVER HAD
-                //
-                // §14's last row reads: *"Colour-only state (quiz correct/incorrect) —
-                // pair the colour with an icon and a semantics label."* The
-                // **semantics label** half has been here since Phase 7
-                // (`quizCorrectSuffix` / `quizIncorrectSuffix`, composed by
-                // `AppLocalizations.optionLabel`), and `quiz_option_card_test.dart`
-                // holds it. The **icon** half did not exist: the card drew the accent
-                // border, the accent fill and the accent glow, and nothing with a
-                // shape. A reader who cannot separate `ok` from `err` — a
-                // colour-blind reader, or one on a greyscale panel — was told nothing,
-                // and §14's row is about exactly that reader.
-                //
-                // **Derived from [state], which is what makes it spoiler-safe.**
-                // `state` is this widget's own field and nothing else, so the glyph
-                // can appear only where the accent already appears; and
-                // `quiz_page_test.dart`'s "the widget tree carries nothing that says
-                // which option is right" asserts every card is `idle` from that one
-                // field, so a leak would have to change `state` first and would be
-                // caught there before it could reach an icon.
-                if (verdictGlyphFor(state)
-                    case final IconData glyph) ...<Widget>[
-                  const SizedBox(width: gap),
-                  Icon(glyph, size: verdictGlyphSize, color: accent),
-                ],
+              ),
+              // ## §14'S "PAIR THE COLOUR WITH AN ICON", WHICH DECISION 127 SHIPPED
+              //
+              // The **semantics label** half lives in the accessible name
+              // (`quizCorrectSuffix` / `quizIncorrectSuffix`, composed by
+              // `AppLocalizations.optionLabel`), and `quiz_page_test.dart` holds
+              // it. The **icon** half is this: derived from [QuizOptionCard.state],
+              // which is what makes it spoiler-safe — `state` is this widget's own
+              // field and nothing else, so the glyph can appear only where the
+              // accent already appears; and `quiz_page_test.dart`'s "the widget
+              // tree carries nothing that says which option is right" asserts
+              // every card is `idle` from that one field, so a leak would have to
+              // change `state` first and would be caught there before it could
+              // reach an icon.
+              if (QuizOptionCard.verdictGlyphFor(widget.state)
+                  case final IconData glyph) ...<Widget>[
+                const SizedBox(width: QuizOptionCard.gap),
+                Icon(
+                  glyph,
+                  size: QuizOptionCard.verdictGlyphSize,
+                  color: accent,
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ),
+    );
+
+    final Widget shaken = AnimatedBuilder(
+      animation: _shake,
+      builder: (BuildContext context, Widget? child) => Transform.translate(
+        // The curve's value IS an x offset in logical px — see `EvaShake`'s doc.
+        offset: Offset(_shakeCurve.transform(_shake.value), 0),
+        child: child,
+      ),
+      child: surface,
     );
 
     // ## THE TAP HANDLER IS HERE AND IT WAS **MISSING** ON THE FIRST RUN
@@ -448,12 +507,6 @@ class QuizOptionCard extends StatelessWidget {
     // all. `quiz_page_test.dart` found it by tapping an option and finding the bloc's
     // `selectedLetter` still `null`.
     //
-    // `SocialAuthButton` has the same shape and gets away with it because its
-    // `onPressed` is `null` in **every** shipping call site — it ships inert, so no
-    // test ever pressed it. That is the interesting half: a widget can be correct
-    // about semantics and wrong about touch for a whole phase, because the two are
-    // separate mechanisms and only one of them was ever exercised.
-    //
     // `EvaInk` inside `EvaFocusRing` for `IconActionButton`'s reason: §14 requires
     // every interactive node to be keyboard-activatable, and `FocusRing`'s idle rim
     // is `null` because this card's **resting** border is already painted by the
@@ -461,62 +514,36 @@ class QuizOptionCard extends StatelessWidget {
     // records in its own comment.
     final Widget pressable = interactive
         ? EvaFocusRing(
+            radius: QuizOptionCard.radius,
             // `enabled` and `idleBorder` are both left at their defaults: `true`
             // and `null`. `null` because this card's **resting** border is already
-            // painted by the `DecoratedBox` above — drawing it twice would be the
-            // same defect `GlassSurface` records in its own comment.
-            radius: radius,
+            // painted by the `DecoratedBox` above.
             child: EvaInk(
-              onPressed: onTap,
-              borderRadius: BorderRadius.circular(radius),
-              child: surface,
+              onPressed: widget.onTap,
+              borderRadius: BorderRadius.circular(QuizOptionCard.radius),
+              child: shaken,
             ),
           )
-        : surface;
+        : shaken;
 
     return Semantics(
       // §14's disabled row, `SocialAuthButton`'s shape: `enabled` is stated,
       // `onTap` is **absent** rather than present-and-flagged, and the name
       // carries the reason (built by `AppLocalizations.optionLabel`).
       button: true,
-      enabled: enabled,
-      label: semanticLabel,
+      enabled: widget.enabled,
+      label: widget.semanticLabel,
       // The whole point of the hoist: this drops the card's **entire** subtree — the
       // badge, the option text, and the ring's and the ink's own nodes — so the one
       // node that survives is the one with the name on it.
       excludeSemantics: true,
-      onTap: interactive ? onTap : null,
+      onTap: interactive ? widget.onTap : null,
       child: pressable,
-    );
-  }
-
-  /// The option label's [TextStyle] for the arm [language].
-  ///
-  /// A method on the widget rather than an inline `copyWith`, because
-  /// `reading_geometry_test.dart` pins `ScriptureBlock.fontSizeFor` and
-  /// `reading_glyph_test.dart` pins its output against the prototype line, and this
-  /// is the quiz's equivalent of both — with the **same rule**: a single number in
-  /// `ds.tsx` belongs to one screen and is never shared.
-  static TextStyle optionStyleFor(
-    BuildContext context,
-    ReadingLanguage language,
-  ) {
-    final TextStyle base = Theme.of(context).textTheme.bodyLarge!.copyWith(
-      fontSize: labelFontSize,
-      height: labelLineHeight,
-      fontWeight: FontWeight.w400,
-      color: context.colors.ink,
-    );
-    return base.copyWith(
-      fontFamily: switch (language) {
-        ReadingLanguage.english => EvaTypography.uiFamily,
-        ReadingLanguage.arabic => EvaTypography.arabicFamily,
-      },
     );
   }
 }
 
-/// The letter badge. `ds.tsx:443-453`.
+/// The letter badge. `eva/redesign.html:342-343` and its two verdict overrides.
 class _Badge extends StatelessWidget {
   const _Badge({
     required this.letter,
@@ -534,41 +561,35 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool graded = QuizOptionCard.isGraded(state);
+    final bool filled = state == QuizOptionState.correct;
     return Container(
       width: QuizOptionCard.badgeSize,
       height: QuizOptionCard.badgeSize,
       decoration: BoxDecoration(
-        // `ds.tsx:427` — the badge fills only in the two graded states.
-        color: graded ? accent : Colors.transparent,
+        // `eva/redesign.html:352` — the badge fills **only** on the correct card
+        // (`background: var(--gold)`); the wrong card's badge keeps its resting
+        // face and takes an accent rim and ink instead (`:359`), and the resting
+        // badge declares no background at all (`:342`). `ok` stands in for the
+        // gold, per `QuizOptionState.correct`'s doc.
+        color: filled ? accent! : Colors.transparent,
         shape: BoxShape.circle,
-        // `ds.tsx:428` — the accent, else `#fff | #000` at 0.18. A **named
-        // constant** rather than `glassBorder * 1.8`: the two alphas are separate
-        // decisions in `ds.tsx` and this client keeps them separate.
         border: Border.all(
-          color:
-              accent ??
-              colors.ink.withValues(alpha: QuizOptionCard.badgeBorderAlpha),
-          width: QuizOptionCard.badgeBorderWidth,
+          color: switch (state) {
+            QuizOptionState.idle ||
+            QuizOptionState.selected => colors.glassBorder,
+            // `:359` — `border-color: var(--ember)` on the wrong badge.
+            QuizOptionState.incorrect => accent!,
+            // `:352` — `border-color: var(--gold)` on the filled badge.
+            QuizOptionState.correct => accent!,
+          },
         ),
-        // `ds.tsx:447` — `0 0 12px rgba(accent, .55)`, and **only** in the graded
-        // states, which is the whole of the condition on that line.
-        boxShadow: graded
-            ? <BoxShadow>[
-                BoxShadow(
-                  color: accent!.withValues(alpha: 0.55),
-                  blurRadius: 12,
-                ),
-              ]
-            : const <BoxShadow>[],
       ),
       child: Center(
         child: Text(
           letter,
-          // `ds.tsx:450` — `F.mono, 12, 700`.
+          // `eva/redesign.html:342` — mono, 10px, `--ink-2` at rest.
           style: EvaTypography.monoCaps(colors).copyWith(
-            fontSize: QuizOptionCard.letterFontSize,
-            fontWeight: FontWeight.w700,
+            fontSize: QuizOptionCard.badgeFontSize,
             color: QuizOptionCard.letterInkFor(state, colors, brightness),
           ),
         ),

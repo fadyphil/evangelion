@@ -13,7 +13,9 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 /// Both call [ReadingRepository.todayScripture] with the same argument. What
 /// differs is what comes back: `LoadScripture` hands `/reading` the whole
 /// [ScriptureText], and this hands `QuizBloc` a [QuizSession] — the reading's
-/// `reading_id` plus one [QuizAnswer] per question, each carrying the reader's
+/// `reading_id`, its `reference` (the appbar crumb's second half,
+/// `eva/redesign.html:565`) and its `total_points_earned_today` (the score row's
+/// seed, `:566`), plus one [QuizAnswer] per question carrying the reader's
 /// progress (nothing, a selection, a verdict).
 ///
 /// **Two use cases over one port method is the ISP answer**, and it is the same
@@ -53,6 +55,8 @@ final class StartSession implements UseCase<ReadingLanguage, QuizSession> {
     return reading.map(
       (ScriptureText scripture) => QuizSession.fromQuestions(
         readingId: scripture.readingId,
+        reference: scripture.reference,
+        pointsEarnedToday: scripture.pointsEarnedToday,
         questions: scripture.questions,
       ),
     );

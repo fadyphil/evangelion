@@ -9,6 +9,14 @@
 /// six without one — which means §14's standing clause was, for these two screens, a
 /// claim in a doc comment and nothing else.
 ///
+/// ## AND THE VERDICT SURFACE MOVED WITH THE REDESIGN
+///
+/// The old screen added a `FeedbackBanner` after a check; `eva/redesign.html:562-574`
+/// has no banner. The verdict is the **card's own state** (`:350-359`), so the
+/// graded layout below scrolls a `QuizOptionState.correct` card into view instead.
+/// The claim is the same one — the tallest addition is reachable, not dropped — and
+/// the instrument moved with the widget that carries it.
+///
 /// That is the same defect class as the four doc comments this phase pointed at
 /// geometry suites that did not exist: a reader follows the pointer and finds a gap.
 ///
@@ -21,27 +29,32 @@
 /// ## AND EVERY STATE IS MOUNTED, BECAUSE A LAYOUT IS NOT ONE THING
 ///
 /// `/quiz` has several layouts that are not each other's mirror: the **ready** screen
-/// (progress label, prompt, four options, CTA), the screen **after a check**, which
-/// adds the feedback banner, the **dead end**, whose button label is a whole sentence
-/// after decision 91, and the **empty** session. Arabic is separate again — script
-/// height and the `٤٠`-style numerals are not the LTR arm's metrics.
+/// (progress label, prompt, four options, CTA), the screen **after a check**, whose
+/// verdict is the graded card's own state, the **dead end**, whose button label is a
+/// whole sentence after decision 91, and the **empty** session. Arabic is separate
+/// again — script height and the `٤٠`-style numerals are not the LTR arm's metrics.
 ///
-/// ## AND THE ANSWER AT THIS SURFACE IS **SCROLLING**, WHICH IS THE POINT
+/// ## AND THE FOURTH OPTION IS BUILT, ONE DRAG FROM BEING TAPPABLE
 ///
-/// The question label and the question body live in an `Expanded(child: ListView(…))`
-/// (`quiz_page.dart:308`, with the reason written there: at 320×568 with 1.22× text a
-/// five-verse day's question plus its options does not fit, and §13 rule 5 forbids a
-/// `Column` over unbounded content). So at this surface **the fourth option and the
-/// feedback banner are below the fold** — measured: `find.byType(QuizOptionCard)`
-/// finds **three** cards, and the fourth is absent from the onstage tree while
-/// `skipOffstage: false` finds it. That is not a dropped child and not an overflow; it
-/// is a lazy `ListView` that has not built the row yet.
+/// The question and its options live in an `Expanded(child: CustomScrollView(…))`
+/// (`quiz_page.dart`'s `SliverFillRemaining`, with the reason written there: at
+/// 320×568 with 1.22× text a five-verse day's question plus its options does not fit,
+/// and §13 rule 5 forbids a `Column` over unbounded content). The **measured**
+/// result at this fixture is that the fourth option is **built** on the first frame
+/// — it is part of the sliver's single `Column`, not a lazily-built list child, so
+/// `find.text` sees it — but its centre sits below the viewport and it is not
+/// hit-testable until the body scrolls. The test below asserts exactly that pair:
+/// built (nothing dropped), then `ensureVisible` (a finger can reach it).
+///
+/// The graded card is onstage **and** hit-testable with no scroll, so its test
+/// asserts that directly and then drags to prove the verdict is not conditional on
+/// a settled viewport.
 ///
 /// **Which makes "no exception" a weak assertion on its own**, so each graded case
-/// below also **scrolls the banner into view and asserts it is there**. A gate that
-/// only checked for exceptions would pass on a screen that silently lost its feedback
-/// row — and the review's own manual check, which looked for throws, would have passed
-/// on exactly that.
+/// below also names the graded card and asserts it is reachable. A gate that only
+/// checked for exceptions would pass on a screen that silently lost its verdict — and
+/// the review's own manual check, which looked for throws, would have passed on
+/// exactly that.
 library;
 
 import 'package:evangelion/core/common/failure.dart';
@@ -51,7 +64,6 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
-import 'package:evangelion/features/quiz/presentation/widgets/feedback_banner.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
@@ -100,13 +112,13 @@ void main() {
       _expectNoOverflow(tester, screen: 'ready (ar)');
     });
 
-    testWidgets('and the FOURTH option is one scroll away, not dropped', (
+    testWidgets('and the fourth option is built and one scroll away', (
       WidgetTester tester,
     ) async {
-      // The falsifying shape for the library doc's claim: at this surface the `D` card
-      // is offstage, so a test that asserted "four cards" without scrolling would fail
-      // — and a test that asserted "no exception" would pass without ever noticing.
-      // This asserts both halves: **not** onstage now, onstage after a drag.
+      // The falsifying shape for the library doc's claim: the `D` card is **built**
+      // from the first frame, so a lazy-list regression that dropped it would fail
+      // here — and it is not reachable by a finger until the body scrolls, which a
+      // test that only counted `QuizOptionCard`s would never notice.
       await pumpQuiz(
         tester,
         bloc: quizBloc(
@@ -117,26 +129,27 @@ void main() {
       );
 
       final Finder fourth = find.text('Lazarus');
-      expect(fourth, findsNothing, reason: 'below the fold at this surface');
+      expect(fourth, findsOneWidget, reason: 'built, so nothing was dropped');
 
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.ensureVisible(fourth);
       await pumpQuizFrames(tester, 4);
 
       expect(
-        fourth,
+        fourth.hitTestable(),
         findsOneWidget,
-        reason: 'the fourth option is reachable by scrolling, so nothing was dropped',
+        reason: 'the fourth option is reachable by a finger once scrolled into view',
       );
       _expectNoOverflow(tester, screen: 'ready (en), scrolled');
     });
 
-    testWidgets('after a CHECK the banner is reachable, not dropped', (
+    testWidgets('after a CHECK the graded card is reachable, not dropped', (
       WidgetTester tester,
     ) async {
-      // **Events, not taps.** At 320x568 the CTA sits below the fold inside the
-      // scrolling body, so `tester.tap` on it misses. This file is about **layout**,
-      // and driving the bloc is what lets the graded layout be measured at all; the
-      // tap path is `quiz_page_test.dart`'s subject at the default surface.
+      // **Events, not taps.** At 320x568 the content scrolls and a tap on the CTA can
+      // miss, depending on where the pointer's hit test lands. This file is about
+      // **layout**, and driving the bloc is what lets the graded layout be measured
+      // at all; the tap path is `quiz_page_test.dart`'s subject at the default
+      // surface.
       final QuizBloc bloc = quizBloc(
         const Right<Failure, ScriptureText>(liveEnglishQuizPassage),
         submission: defaultSubmission,
@@ -148,19 +161,34 @@ void main() {
       bloc.add(const QuizAnswerChecked());
       await pumpQuizFrames(tester, 6);
 
-      // Built but offstage — the row that a "no exception" gate would never see.
-      expect(find.byType(FeedbackBanner, skipOffstage: false), findsOneWidget);
+      /// The card that carries the check's verdict.
+      Finder gradedCard() => find.byWidgetPredicate(
+        (Widget widget) =>
+            widget is QuizOptionCard && widget.state == QuizOptionState.correct,
+      );
 
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      // The verdict is the screen's tallest single addition and it is painted on the
+      // graded frame, not deferred until a scroll.
+      expect(
+        gradedCard(),
+        findsOneWidget,
+        reason: 'the graded card is onstage',
+      );
+      expect(
+        gradedCard().hitTestable(),
+        findsOneWidget,
+        reason: 'the verdict is reachable by a finger, not merely built',
+      );
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
       await pumpQuizFrames(tester, 4);
 
       expect(
-        find.byType(FeedbackBanner),
+        gradedCard(),
         findsOneWidget,
         reason:
-            'the verdict row is the tallest addition on this screen and it is one '
-            'scroll away. A gate that only checked for exceptions would pass on a '
-            'screen that had quietly lost it',
+            'the verdict survives a scroll. A gate that only checked for exceptions '
+            'would pass on a screen that had quietly lost it',
       );
       _expectNoOverflow(tester, screen: 'graded (en)');
     });
@@ -182,10 +210,17 @@ void main() {
       await pumpQuizFrames(tester, 2);
       bloc.add(const QuizAnswerChecked());
       await pumpQuizFrames(tester, 6);
-      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
       await pumpQuizFrames(tester, 4);
 
-      expect(find.byType(FeedbackBanner), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is QuizOptionCard &&
+              widget.state == QuizOptionState.correct,
+        ),
+        findsOneWidget,
+      );
       _expectNoOverflow(tester, screen: 'graded (ar)');
     });
 

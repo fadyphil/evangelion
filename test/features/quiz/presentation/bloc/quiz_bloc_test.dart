@@ -23,18 +23,20 @@ import '../../../../support/reading_harness.dart';
 /// were asked and — for the submit — record the whole triple, because "the body sent
 /// was the contract's" is a claim a count cannot make.
 ///
-/// ## THE FIVE STATES, AND WHY "SUBMITTING" IS NOT A `bool`
+/// ## THE FOUR STATES, AND WHY "SUBMITTING" IS NOT A `bool`
 ///
-/// `QuizStatus` distinguishes loading / ready / submitting / failed / complete
-/// because the reader can tell those five apart. The interesting pair is
+/// `QuizStatus` distinguishes loading / ready / submitting / failed because the
+/// reader can tell those four apart. The interesting pair is
 /// **submitting** and **ready**: a single `isLoading` would have to collapse them,
 /// and any word it picked would be a claim the reader cannot verify — the CTA has to
 /// go dead for the round trip and come back either graded or failed, and a flag that
 /// said "busy" would leave the *failure* indistinguishable from still-busy.
 ///
-/// **`complete` is a state and not a derived getter** because the plan asks for it
-/// and because it is observable: the CTA's label and its enabled-ness both change
-/// when it is reached, so a widget test can see it without re-deriving the rule.
+/// **`complete` is GONE.** The terminal press is `QuizCta.seeResults` — one press
+/// from the last graded question straight to `/result` (`eva/redesign.html:1432`) —
+/// so there is no state past the end to advance into, and the old `complete` was
+/// the state only a direct event dispatch could reach: this repository's recorded
+/// dead-branch defect, removed rather than kept tested.
 void main() {
   /// Two questions: the first open, the second already answered on the wire.
   const ScriptureText twoQuestions = ScriptureText(
@@ -139,6 +141,8 @@ void main() {
   /// The session `twoQuestions` becomes, with nothing touched.
   const QuizSession aFreshSession = QuizSession(
     readingId: 'reading-group-3-2026-10-04',
+    reference: 'John 3:1-5',
+    pointsEarnedToday: 0,
     answers: <QuizAnswer>[
       QuizAnswer(question: openQuestion),
       QuizAnswer(question: answeredQuestion),
@@ -230,10 +234,9 @@ void main() {
       bloc.add(const QuizOptionSelected('A'));
       bloc.add(const QuizAnswerChecked());
       await settle();
-      bloc.add(const QuizAdvanced());
-      await settle();
-      expect(bloc.state.status, QuizStatus.complete);
-      expect(bloc.state.cta, QuizCta.finish, reason: 'the terminal state');
+      // The THIRD question is the last: its graded state IS the terminal state.
+      expect(bloc.state.status, QuizStatus.ready);
+      expect(bloc.state.cta, QuizCta.seeResults, reason: 'the terminal state');
 
       // **The locale switch**, while the reader is looking at a live "See results"
       // button. Same event, same bloc, no reader action — exactly what
@@ -265,7 +268,7 @@ void main() {
       // That is recorded rather than fixed, and the reason is scope: making
       // `QuizStarted` rebase instead of rebuild is `_onRetried`'s two arms, and it
       // changes what a *first* start means. `QuizState.cta`'s own table is the other
-      // half of the answer — it says the terminal CTA is `finish` only when
+      // half of the answer — it says the terminal CTA is `seeResults` only when
       // `lastResult` is in hand, so with the field dropped there was **no** press
       // that could ever open `/result` again, and now there is one.
       expect(
@@ -363,7 +366,7 @@ void main() {
     );
   });
 
-  group('SELECT → CHECK → NEXT → COMPLETE, the plan\'s own sequence', () {
+  group('SELECT → CHECK → NEXT → SEE RESULTS, the plan\'s own sequence', () {
     blocTest<QuizBloc, QuizState>(
       'the whole path, on a three-question reading',
       build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
@@ -386,26 +389,28 @@ void main() {
         await settle();
         bloc.add(const QuizAdvanced());
         await settle();
-        // select, check, next on question three — and there is no fourth, so this
-        // is the **complete**.
+        // select, check on question three — and there is no fourth, so this is
+        // the **terminal state**: one press from `/result`, no advance in between
+        // (`eva/redesign.html:1431-1432`).
         bloc.add(const QuizOptionSelected('A'));
         await settle();
         bloc.add(const QuizAnswerChecked());
         await settle();
-        bloc.add(const QuizAdvanced());
-        await settle();
       },
       verify: (QuizBloc bloc) {
         final QuizState state = bloc.state;
-        expect(state.status, QuizStatus.complete);
+        expect(state.status, QuizStatus.ready);
         expect(state.session?.answeredCount, 3);
         // Three submits, and the **last** one is what `/result` is handed.
         expect(state.lastResult, contractSubmitAnswerFixture);
         // The reader is left looking at the last question, whose verdict is on
-        // screen — `complete` does not blank the session.
+        // screen — the terminal state does not blank the session.
         expect(state.currentIndex, 2);
         expect(state.currentAnswer?.isCorrect, isTrue);
-        expect(state.cta, QuizCta.finish);
+        expect(state.cta, QuizCta.seeResults);
+        // The score row's number: the payload's seed plus what this session's
+        // correct submits earned — three answers at 10 points each.
+        expect(state.session?.runningScore, 30);
       },
     );
 
@@ -524,6 +529,43 @@ void main() {
         expect(bloc.state.cta, QuizCta.next);
       },
     );
+
+    // ## THE ROUND TRIP'S CTA, WHICH THE FIRST VERSION LEFT ALIVE
+    //
+    // Removing `QuizStatus.complete` from the guard mechanically turned
+    // `submitting` into an allowed status, and the open answer is still
+    // `isAnswerable` during the request — so the screen kept an **enabled**
+    // "Check answer" button whose handler returns immediately because the status
+    // is no longer `ready`. A control that accepts a press and does nothing is
+    // §14's defect, one frame long. The guard is `ready` only, and this is the
+    // assertion that keeps it there.
+    test('the CTA is dead while the submit is in flight', () async {
+      final QuizBloc bloc = blocOver(
+        const Right<Failure, ScriptureText>(threeOpen),
+      );
+      bloc.add(const QuizStarted(ReadingLanguage.english));
+      await settle();
+      bloc.add(const QuizOptionSelected('A'));
+      await settle();
+
+      final List<QuizState> states = await watch(bloc);
+      bloc.add(const QuizAnswerChecked());
+      await settle();
+
+      final QuizState submitting = states.singleWhere(
+        (QuizState state) => state.status == QuizStatus.submitting,
+      );
+      expect(
+        submitting.cta,
+        QuizCta.none,
+        reason: 'the round trip must not leave an enabled check button behind',
+      );
+      expect(
+        submitting.isSessionFinished,
+        isFalse,
+        reason: 'the in-flight frame is not the dead end',
+      );
+    });
 
     // ## AND THIS IS THE **ONLY** PLACE THE TRIPLE IS ASSERTED, BECAUSE THE BLOC IS
     // ## THE ONLY THING THAT CAN GET IT WRONG
@@ -890,28 +932,34 @@ void main() {
         bloc.add(const QuizAdvanced());
       },
       verify: (QuizBloc bloc) {
-        expect(bloc.state.status, QuizStatus.complete);
-        expect(
-          bloc.state.currentIndex,
-          0,
-          reason: 'clamped to the only question',
-        );
+        // **Refused, and `complete` is gone with it.** The old handler clamped the
+        // index and emitted a past-the-end status; the terminal affordance is now
+        // the `seeResults` press, so there is nothing past the last question to
+        // advance into and the handler leaves the cursor alone. The dead end is
+        // exactly where it was — `none`, because no `SubmitResult` exists.
+        expect(bloc.state.status, QuizStatus.ready);
+        expect(bloc.state.currentIndex, 0);
         expect(bloc.state.lastResult, isNull);
         expect(
           bloc.state.cta,
           QuizCta.none,
           reason:
-              '**not** `finish`. `finish` means "press to open `/result`", and '
-              '`ResultPage` requires a `SubmitResult` — so a `finish` with no '
-              '[QuizState.lastResult] would be a control the page cannot honour. '
-              'The dead end is in the state, which is what makes it assertable.',
+              '**not** `seeResults`. The terminal arm means "press to open '
+              '`/result`", and `ResultPage` requires a `SubmitResult` — so a '
+              '`seeResults` with no [QuizState.lastResult] would be a control the '
+              'page cannot honour. The dead end is in the state, which is what '
+              'makes it assertable.',
         );
         expect(bloc.state.session?.answeredCount, 1);
       },
     );
 
     blocTest<QuizBloc, QuizState>(
-      'off the end it emits `complete` and **keeps the index on the last question**',
+      'the LAST graded question is the terminal state, and the cursor stays on it',
+      // `eva/redesign.html:1431-1432` — the last graded question labels the CTA
+      // `seeRes` and its one click opens the results. There is no state past the
+      // end, so there is no clamping to assert any more; what is asserted is the
+      // arm and the cursor.
       build: () => blocOver(const Right<Failure, ScriptureText>(threeOpen)),
       act: (QuizBloc bloc) async {
         bloc.add(const QuizStarted(ReadingLanguage.english));
@@ -929,45 +977,43 @@ void main() {
         bloc.add(const QuizOptionSelected('A'));
         bloc.add(const QuizAnswerChecked());
         await settle();
-        bloc.add(const QuizAdvanced()); // → complete
       },
       verify: (QuizBloc bloc) {
-        expect(bloc.state.status, QuizStatus.complete);
-        // **Not 3.** An index past the end has no answer to render, and
-        // `ScriptureBlock`-style rendering would throw on it. Clamping is the whole
-        // of what this assertion holds.
+        expect(bloc.state.status, QuizStatus.ready);
         expect(bloc.state.currentIndex, 2);
+        expect(bloc.state.cta, QuizCta.seeResults);
       },
     );
 
-    test('`complete` is idempotent — a second `next` emits nothing', () async {
+    test('an ADVANCE off the end is refused — the terminal press is `seeResults`', () async {
       final QuizBloc bloc = blocOver(
         const Right<Failure, ScriptureText>(threeOpen),
       );
       bloc.add(const QuizStarted(ReadingLanguage.english));
       await settle();
+      for (int i = 0; i < 2; i++) {
+        bloc.add(const QuizOptionSelected('A'));
+        bloc.add(const QuizAnswerChecked());
+        await settle();
+        bloc.add(const QuizAdvanced());
+        await settle();
+      }
       bloc.add(const QuizOptionSelected('A'));
       bloc.add(const QuizAnswerChecked());
       await settle();
-      bloc.add(const QuizAdvanced()); // → 1
-      await settle();
-      bloc.add(const QuizOptionSelected('A'));
-      bloc.add(const QuizAnswerChecked());
-      await settle();
-      bloc.add(const QuizAdvanced()); // → 2
-      await settle();
-      bloc.add(const QuizOptionSelected('A'));
-      bloc.add(const QuizAnswerChecked());
-      await settle();
-      bloc.add(const QuizAdvanced()); // → complete
-      await settle();
-      expect(bloc.state.status, QuizStatus.complete);
+      expect(bloc.state.cta, QuizCta.seeResults);
 
       final List<QuizState> states = await watch(bloc);
       bloc.add(const QuizAdvanced());
       await settle();
 
-      expect(states, hasLength(1));
+      expect(
+        states,
+        hasLength(1),
+        reason:
+            'no state past the end exists, so an advance there is a refusal — '
+            'the same silent refusal the `isOpen` guards make',
+      );
       expect(bloc.state.currentIndex, 2);
     });
 
@@ -987,12 +1033,10 @@ void main() {
         bloc.add(const QuizOptionSelected('A'));
         bloc.add(const QuizAnswerChecked());
         await settle();
-        bloc.add(const QuizAdvanced()); // → 2
+        bloc.add(const QuizAdvanced()); // → 2, the last
         await settle();
         bloc.add(const QuizOptionSelected('A'));
         bloc.add(const QuizAnswerChecked());
-        await settle();
-        bloc.add(const QuizAdvanced()); // → complete
         await settle();
 
         final List<QuizState> states = await watch(bloc);
@@ -1284,8 +1328,37 @@ void main() {
           QuizCta.none,
           reason: 'question two, nothing chosen',
         );
+        // ## AND THE TABLE'S LAST ROW
+        //
+        // Grade question two, advance to question three — the last — and grade it.
+        // The terminal arm is the redesign's own rule
+        // (`eva/redesign.html:1431`: `label = last ? seeRes : next`), and it is
+        // `seeResults` with **no advance in between**.
+        bloc.add(const QuizOptionSelected('A'));
+        bloc.add(const QuizAnswerChecked());
+        await settle();
+        expect(
+          bloc.state.cta,
+          QuizCta.next,
+          reason: 'a question still follows',
+        );
+        bloc.add(const QuizAdvanced());
+        await settle();
+        expect(
+          bloc.state.cta,
+          QuizCta.none,
+          reason: 'the last, nothing chosen',
+        );
+        bloc.add(const QuizOptionSelected('A'));
+        bloc.add(const QuizAnswerChecked());
+        await settle();
+        expect(
+          bloc.state.cta,
+          QuizCta.seeResults,
+          reason: 'the last graded question — one press from `/result`',
+        );
       },
-      verify: (QuizBloc bloc) => expect(bloc.state.cta, QuizCta.none),
+      verify: (QuizBloc bloc) => expect(bloc.state.cta, QuizCta.seeResults),
     );
 
     test('and it is `none` while a submit is in flight', () async {

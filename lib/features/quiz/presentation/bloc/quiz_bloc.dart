@@ -45,20 +45,19 @@ enum QuizStatus {
   /// The last operation failed. [QuizState.session] says whether there is still a
   /// screen underneath.
   failed,
-
-  /// Every question has been closed and the reader is past the last one.
-  complete,
 }
 
 /// What the quiz's one button offers.
 ///
 /// ## WHY IT IS AN **ENUM ON THE STATE** AND NOT A `bool get canSubmit`
 ///
-/// Because there are **five** distinct answers and a reader can tell them apart.
-/// `QuizScreen.tsx:124-127` is the whole of the prototype's rule:
-/// `disabled={!checked && !selected}` with `{checked ? 'Next question' : 'Check
-/// answer'}`, and this is that plus the two states the prototype has no state for —
-/// the last question, and a session with nothing to submit at all.
+/// Because there are **four** distinct answers and a reader can tell them apart.
+/// `eva/redesign.html:1430` is the whole of the prototype's terminal rule — the
+/// graded answer always shows the button, and the *label* is
+/// `last question ? seeRes : next` (`:1431`) — and this is that, plus the two
+/// states the prototype has no state for: the **check** step (this client's grade
+/// is a `POST`, so choosing and grading are two presses, not the prototype's
+/// one-tap `pick`) and a session with nothing to submit at all.
 ///
 /// A `bool` plus a separate `String` label is the shape that gets the two out of
 /// step, and the whole of §14 is about a control that says one thing and does
@@ -73,8 +72,21 @@ enum QuizCta {
   /// Move to the next question.
   next,
 
-  /// Go to `/result`.
-  finish,
+  /// Open `/result` with the graded answer in hand — the redesign's
+  /// `see results ✦` (`:967`, applied at `:1431`).
+  ///
+  /// ## ONE PRESS, AND WHY THE OLD `complete` → `finish` PAIR IS GONE
+  ///
+  /// This arm replaces both rows of the old table that separated "advance off the
+  /// end" from "open the results": the last graded question now goes **straight**
+  /// to `/result`, like the prototype's `qi++ → qi>=qEff → showResults()` does in
+  /// one click (`:1432`). `QuizStatus.complete` existed to be the state that press
+  /// landed on and `QuizCta.finish` the arm that opened the route from it; with the
+  /// intermediate advance gone, both are unreachable from the UI, and a state only
+  /// a direct event dispatch can reach is this repository's recorded dead-branch
+  /// defect (decisions 15 and 48). Removing them is the change keeping them would
+  /// have been four steps later.
+  seeResults,
 }
 
 /// Everything `/quiz` can be asked. Sealed, so an unhandled event is a compile error.
@@ -141,13 +153,13 @@ final class QuizRetried extends QuizEvent with _$QuizRetried {
 
 /// The reader chose [letter] on the current question.
 ///
-/// ## IT REPLACES, AND THAT IS THE PROTOTYPE'S RULE
+/// ## IT REPLACES, AND THE PROTOTYPE'S RULE IS `pick`'s ONE-SHOT GUARD
 ///
-/// `QuizScreen.tsx:89` is `onClick={() => !checked && setSelected(opt.letter)}` —
-/// `selected` is one letter or `null`, never a set. So choosing `B` after `A` moves
-/// the selection rather than adding to it, and `QuizOptionCard`'s `selected` state is
-/// on **at most one** card at a time. A `Set<String>` would let a reader select two
-/// options and then have to guess which one the submit sends.
+/// `eva/redesign.html:1423` opens the grader with `if(answered)return;
+/// answered=true` — a choice is a **single** slot, never a set. So choosing `B`
+/// after `A` moves the selection rather than adding to it, and `QuizOptionCard`'s
+/// `selected` state is on **at most one** card at a time. A `Set<String>` would let
+/// a reader select two options and then have to guess which one the submit sends.
 @freezed
 final class QuizOptionSelected extends QuizEvent with _$QuizOptionSelected {
   /// Creates the selection.
@@ -270,53 +282,51 @@ final class QuizState with _$QuizState {
   /// ## THE RULES, IN THE ORDER A READER MEETS THEM
   ///
   /// ```
-  /// loading / submitting / failed / empty            → none
-  /// a chosen letter on an open question              → check
-  /// closed, and a question remains after it          → next
-  /// closed, on the last, not yet finished            → next  (the press finishes)
-  /// past the end, with a graded answer in hand       → finish
-  /// closed, on the last, and nothing was submitted   → none   (see the dead end)
+  /// loading / submitting / failed / empty             → none
+  /// a chosen letter on an open question                → check
+  /// closed, and a question remains after it            → next
+  /// closed, on the last, with a graded answer in hand → seeResults (one press)
+  /// closed, on the last, and nothing was submitted     → none   (see the dead end)
   /// ```
   ///
-  /// The fourth row is the interesting one, and it is the live payload's own shape:
-  /// §5's 2026-10-03 capture has one question with `already_answered: true`, so a
-  /// reader arriving today lands on a closed question with no selection and no way to
-  /// submit. The button says "next" — the only action that exists — and on the last
-  /// such question it is `none` with the reason in the accessible name, because
-  /// there is no `SubmitResult` for `/result` to be handed. **That dead end is real
-  /// and is stated in `QuizPage`'s doc rather than papered over.**
+  /// The fourth row is the redesign's own terminal rule: `eva/redesign.html:1431`
+  /// labels the last graded question `seeRes` and its one click opens the results
+  /// (`:1432`). `/result` is still a route (until Phase 6.2) and [lastResult] is
+  /// what the page pushes, so decision 81's required-parameter mechanism is
+  /// unchanged — only the number of presses changed.
+  ///
+  /// The dead end is real and is stated in `QuizPage`'s doc rather than papered
+  /// over: §5's 2026-10-03 capture has one question with `already_answered: true`,
+  /// so a reader arriving today lands on a closed question with no selection and no
+  /// way to submit. On the last such question the button is `none` with the reason
+  /// in the accessible name, because there is no `SubmitResult` for `/result` to be
+  /// handed. **That dead end is real and is stated rather than smoothed over.**
   QuizCta get cta {
-    if (status != QuizStatus.ready && status != QuizStatus.complete) {
-      return QuizCta.none;
-    }
+    if (status != QuizStatus.ready) return QuizCta.none;
     final QuizAnswer? answer = currentAnswer;
     if (answer == null) return QuizCta.none;
     if (answer.isAnswerable) return QuizCta.check;
     if (answer.isOpen) return QuizCta.none;
     if (!isLastQuestion) return QuizCta.next;
-    // ## THE LAST TWO ARMS, AND THEY ARE **NOT** THE SAME QUESTION
+    // ## THE LAST QUESTION, AND WHY `lastResult` IS STILL CHECKED **FIRST**
     //
-    // Both are "the reader is on the last question and it is closed". What differs
-    // is whether the reader has **acknowledged the end**:
+    // Both arms are "the reader is on the last question and it is closed". What
+    // differs is whether there is a graded answer for `/result` to be handed:
     //
-    // | status | lastResult | cta | why |
-    // | --- | --- | --- | --- |
-    // | `ready` | non-null | **`next`** | there is still a press to make. `QuizScreen.tsx:127` labels *every* graded answer `Next question` and its press is `onFinish`, so advancing off the end **is** how the quiz finishes. |
-    // | `complete` | non-null | `finish` | past the end. `/result` can be opened. |
-    // | `ready` | `null` | `none` | nothing was submitted, so there is no `SubmitResult` for `ResultPage`'s **required** parameter. This is the live payload's shape — see the class doc's dead-end note. |
+    // | lastResult | cta | why |
+    // | --- | --- | --- |
+    // | non-null | **`seeResults`** | one press opens `/result` — `eva/redesign.html:1431`'s `seeRes` arm. |
+    // | `null` | `none` | nothing was submitted, so there is no `SubmitResult` for `ResultPage`'s **required** parameter. This is the live payload's shape. |
     //
-    // **The first version returned `finish` for the second row too**, and the page
-    // then labelled that button `Next question` while its action navigated — a §14
-    // control that says one thing and does another, which is the whole reason
-    // `QuizCta` is an enum on the state rather than a `bool` beside a `String`.
-    // `quiz_page_test.dart` is what caught it: the button said "Next question", the
-    // press did nothing, and `QuizStatus.complete` was **unreachable from the UI**.
-    // **`lastResult` first, and the order is the point.** `complete` is reachable
-    // from a session where nothing was submitted — a reading whose only question
-    // arrives `already_answered` is `complete` after one press — so testing
-    // `complete` first would hand out a `finish` the page cannot honour.
-    if (lastResult == null) return QuizCta.none;
-    return status == QuizStatus.complete ? QuizCta.finish : QuizCta.next;
+    // The first guard has already returned `none` for `submitting`, and that is what
+    // keeps the last question's own in-flight submit from handing out a `seeResults`
+    // whose press navigates before there is a result to navigate with. (Treating
+    // `submitting` as actionable here was measured: the answer is still `isAnswerable`
+    // and the CTA came back as an **enabled** `check` for the round trip, so the
+    // reader could press a button whose handler refuses because the status is no
+    // longer `ready`.) The null check below is what keeps the *dead end* from
+    // becoming a `seeResults` the page cannot honour.
+    return lastResult == null ? QuizCta.none : QuizCta.seeResults;
   }
 
   /// Whether the CTA is dead because the session is **finished**, not because the
@@ -449,8 +459,8 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     // `QuizState.cta`'s `isOpen` arm still wins. A reader who switches language is
     // therefore still on `QuizCta.none` — but with the field in hand there is a press
     // that reaches `/result` again, and `QuizState.cta`'s table says the terminal CTA
-    // is `finish` *only* when `lastResult` is there. Without it, no press could ever
-    // open the results for the rest of the session.
+    // is `seeResults` *only* when `lastResult` is there. Without it, no press could
+    // ever open the results for the rest of the session.
     //
     // **Rejected: making `QuizStarted` rebase instead of rebuild.** That is
     // `_onRetried`'s two arms with a different trigger, and it would change what a
@@ -511,13 +521,22 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
             // `quiz_bloc_test.dart` asserts the session is back, in the failing
             // direction, because "the retry happened" is not the claim — "the retry
             // produced a session" is.
+            //
+            // **The fresh arm takes the fresh seed and the rebase does not** —
+            // `withQuestions` takes no `pointsEarnedToday` on purpose (the carried
+            // verdict's points are already inside the fresh payload's total; see
+            // `QuizSession.pointsEarnedToday`), while a session built fresh here has
+            // no ledger of its own yet and seeds from the payload.
             session: before == null
                 ? QuizSession.fromQuestions(
                     readingId: value.readingId,
+                    reference: value.reference,
+                    pointsEarnedToday: value.pointsEarnedToday,
                     questions: value.questions,
                   )
                 : before.withQuestions(
                     readingId: value.readingId,
+                    reference: value.reference,
                     questions: value.questions,
                   ),
             // **Clamped.** A re-read can come back **shorter** than the session:
@@ -541,10 +560,11 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
 
   /// Records the reader's letter, and issues **no** request.
   ///
-  /// Selecting is local (`QuizScreen.tsx:89`'s `setSelected`); only `check` reaches
-  /// the network. The `isOpen` guard is the same one `check` uses — a closed
-  /// question has no selectable options, so this only ever fires if an event arrives
-  /// from somewhere the card's `enabled` does not govern.
+  /// Selecting is local (`eva/redesign.html:1423`'s one-shot guard, minus this
+  /// client's two-step check); only `check` reaches the network. The `isOpen` guard
+  /// is the same one `check` uses — a closed question has no selectable options, so
+  /// this only ever fires if an event arrives from somewhere the card's `enabled`
+  /// does not govern.
   void _onSelected(QuizOptionSelected event, Emitter<QuizState> emit) {
     final QuizAnswer? answer = state.currentAnswer;
     if (state.status != QuizStatus.ready || answer == null) return;
@@ -656,14 +676,18 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
   /// arrives answered, so a reader who cannot move past it is stuck on a screen with
   /// no working control at all.
   ///
-  /// Off the end it emits [QuizStatus.complete] and **clamps the index to the last
-  /// answer** — an index past the end has no `QuizAnswer` to render, and the
-  /// alternative is a screen that throws on its own state.
+  /// ## AND THE LAST QUESTION IS **NOT ADVANCEABLE ANY MORE, ON PURPOSE**
+  ///
+  /// This handler used to advance off the end and emit `QuizStatus.complete`,
+  /// because the terminal press landed there and `QuizCta.finish` opened `/result`
+  /// from it. The terminal press is now `QuizCta.seeResults` — one press, straight
+  /// to `/result`, `eva/redesign.html:1432` — so there is no state past the end to
+  /// advance into and [QuizStatus.complete] is gone. A `QuizAdvanced` arriving on
+  /// the last question is refused, and the refusal is silent in the same sense the
+  /// other guards are: the CTA that could have dispatched it is `seeResults` there,
+  /// so the page never sends one.
   void _onAdvanced(QuizAdvanced event, Emitter<QuizState> emit) {
-    if (state.status != QuizStatus.ready &&
-        state.status != QuizStatus.complete) {
-      return;
-    }
+    if (state.status != QuizStatus.ready) return;
     final QuizAnswer? answer = state.currentAnswer;
     if (answer == null) return;
     if (answer.isOpen) return;
@@ -672,14 +696,15 @@ class QuizBloc extends Bloc<QuizEvent, QuizState> {
     if (session == null) return;
 
     final int next = state.currentIndex + 1;
-    final int clamped = _clamp(next, session.questionCount);
-    final bool past = next >= session.questionCount;
+    // The last question's exit is the `seeResults` press, not an advance — see the
+    // method doc. Refusing here keeps the cursor inside the answer list it renders.
+    if (next >= session.questionCount) return;
 
     emit(
       QuizState(
-        status: past ? QuizStatus.complete : QuizStatus.ready,
+        status: QuizStatus.ready,
         session: session,
-        currentIndex: clamped,
+        currentIndex: next,
         lastResult: state.lastResult,
       ),
     );
