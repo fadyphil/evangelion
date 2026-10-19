@@ -161,5 +161,26 @@
   "readingBookmarkOff": "أُزيل الحفظ",
   "@readingBookmarkOff": {
     "description": "`:974` — `bmkOff:[\"bookmark removed\",\"أُزيل الحفظ\"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind."
-  }
+  },
+  "journeyTitle": "الرحلة",
+  "journeyScribe": "كاتبة · المستوى ٧",
+  "journeyStreakSub": "أيام متتالية · أبقِ الشعلة",
+  "journeyRingVerses": "آيات",
+  "journeyRingQuizzes": "اختبارات",
+  "journeyRingAccuracy": "دقة",
+  "journeySky": "سماء",
+  "journeyStarsLit": "نجوم مضاءة",
+  "journeyConstellations": "أبراج",
+  "journeyMedals": "الأوسمة",
+  "journeyMedalFirstLight": "أول نور",
+  "journeyMedalPsalmist": "مرنّمة",
+  "journeyMedalStreakSeven": "٧ أيام",
+  "journeyMedalJohn": "يوحنا",
+  "journeyAccount": "الحساب",
+  "journeyRowBoard": "الشركة",
+  "journeyRowSettings": "الإعدادات",
+  "journeyRowShare": "مشاركة التقدم",
+  "journeyRowPlans": "خطط القراءة",
+  "journeyUnavailableSuffix": "غير متاح في هذه النسخة",
+  "journeyRetry": "حاول مرة أخرى"
 }

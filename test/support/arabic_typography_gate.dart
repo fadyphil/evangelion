@@ -1,4 +1,4 @@
-/// The bilingual-typography gate, shared by all six screens.
+/// The bilingual-typography gate, shared by all eight screens.
 ///
 /// ## WHY THIS IS A HARNESS AND NOT SIX COPIES
 ///
@@ -85,6 +85,7 @@
 library;
 
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -507,9 +508,25 @@ Future<List<({String message, RenderedRun run})>> _tooltipRuns(
     );
     // The tooltip's own `showDuration`/`enterDuration` are what this waits out. A
     // fixed 12 pumps was tried first and is a second number to get wrong.
+    //
+    // **And the gesture is held past `kLongPressTimeout` before it is released,
+    // whatever the message looks like.** The loop used to break as soon as the
+    // message was painted, and that is wrong whenever the same string is painted
+    // somewhere else on the screen: the journey's app bar puts the **rows'**
+    // strings on its **tooltips** — "The Communion" is the trophy's tooltip
+    // *and* the first account row's title — so the check was satisfied by the
+    // row on the very first frame, the gesture was released at 50ms, and **the
+    // button's own tap fired**. A tap is a navigation, and a typography probe
+    // that navigates is measuring the wrong screen.
+    //
+    // The long press is what shows a tooltip at all, so the hold is not a
+    // formality: past `kLongPressTimeout` the long press has won the gesture
+    // arena, the tooltip is up, and the release cannot become a tap.
     for (int frame = 0; frame < 20; frame++) {
       await tester.pump(const Duration(milliseconds: 50));
-      if (_isPainted(tester, messages[index])) break;
+      final bool longPressWon =
+          (frame + 1) * 50 >= kLongPressTimeout.inMilliseconds;
+      if (longPressWon && _isPainted(tester, messages[index])) break;
     }
     for (final RenderedRun run in _paintedRuns(tester, fallback)) {
       if (run.label == messages[index]) {

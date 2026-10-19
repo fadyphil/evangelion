@@ -16,7 +16,7 @@ row where they disagreed.
 | --- | --- |
 | **Claim** | `docs/agents/AGENT_CONTEXT.md:126` — "The six routes", with a 6-row table |
 | **Reality** | `lib/app/router/app_router.dart:242-261` declares **7** `AutoRoute`s plus a `RedirectRoute` for `*`. `/leaderboard` is the seventh. `app_routes.dart` declares **9** constants: the 7, plus `/servant` (declared, deliberately not routed) and `*`. |
-| **Fixed?** | **Yes — 2026-10-19, Task 5.5.** §2's table now has seven rows and its heading reads "The seven routes"; the seventh is `/communion`, which is the renamed `/leaderboard`. The **count** is what the row was about, and it is now true. |
+| **Fixed?** | **Yes — 2026-10-19, Task 5.5.** §2's table gained the `/leaderboard` row and its heading stopped saying "six". The **count** is what the row was about, and it became true again. **And it moved once more in Task 5.6**, which added `/journey` — the eighth row and the eighth heading — so the number this row was about is **still** the number §2's table has to carry, and a reader who trusts the heading over the table will be wrong the next time a screen lands. |
 
 The table was written before the leaderboard landed. Decisions 143–155 record its
 arrival; §2 was never updated. The same shape as decision 21's lesson: a claim about

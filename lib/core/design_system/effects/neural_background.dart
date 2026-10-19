@@ -31,6 +31,15 @@ enum NeuralVariant {
 
   /// `/settings`.
   settings,
+
+  /// `/journey` — the profile, which ADR-0001 cut and ADR-0022 restored.
+  ///
+  /// **It takes the orb group the profile always had** (`ds.tsx:104-107`),
+  /// which sat in the design system cut-and-kept-for-index-alignment since
+  /// Phase 2. The redesign's journey *is* the profile (`eva/redesign.html:576`),
+  /// and every other screen kept the group its predecessor had, so this is the
+  /// one that was always going to be needed.
+  journey,
 }
 
 /// How much of the background a device can afford.
@@ -307,6 +316,10 @@ OrbGroup orbGroupFor(NeuralVariant variant) => switch (variant) {
   NeuralVariant.result => OrbGroup.result,
   // `ORB_CONFIGS[7]` — NOT `[6]`. Index 6 is Profile.
   NeuralVariant.settings => OrbGroup.settings,
+  // `ORB_CONFIGS[6]` — the profile's own group, and the journey **is** the
+  // profile. It sat here cut-and-kept since Phase 2, waiting for the screen
+  // ADR-0022 restored.
+  NeuralVariant.journey => OrbGroup.profile,
 };
 
 /// [variant]'s orbs, in paint order.

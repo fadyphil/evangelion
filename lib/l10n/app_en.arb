@@ -345,7 +345,7 @@
     "description": "The password field's error line. Transcribed: redesign.html:976 — `pwErr:[\"password too short\",\"كلمة المرور قصيرة\"]`, announced by `redesign.html:1306`'s one length test. Rendered by presence, as `authEmailInvalid` says."
   },
   "@authUnavailableSuffix": {
-    "description": "Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.\n\nNAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.\n\nAPPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render \"unavailable in this build - unavailable in this build\"."
+    "description": "Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.\n\nNAMESPACED `auth*` because **FIVE** features carry a field of this name and they are NOT all the same string: `/quiz`'s says there is no answer to show, and the other four say the same thing. See `quizUnavailableSuffix`.\n\nAPPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render \"unavailable in this build - unavailable in this build\"."
   },
   "@homeGreetingMorning": {
     "description": "05:00–11:59. Transcribed: `redesign.html:926` — `morn:[\"good morning\",\"صباح النور\"]`, set by `applyLang` (`:988`).\n\n**The Arabic arm changed with the screen.** It was `صباح الخير` — “good morning” in the ordinary sense — because the old greeting was a status line. The redesign's own word is `صباح النور` (“morning of light”), which is a different sentence, and transcribing it is the point of the phase.\n\nThe English value keeps its capital: the run is a `.mono` and `[dir=rtl] .mono` at `redesign.html:136` removes the transform only on the Arabic arm, so under LTR both spellings paint as `GOOD MORNING`."
@@ -363,7 +363,7 @@
     "description": "The streak count's accessible name, as a PREFIX. `StreakChip.semanticLabel`.\n\nA PREFIX AND NOT A PLURALISED PHRASE, and the reason is recorded rather than assumed: the announcement is composed by the chip as `$semanticLabel: $days $daysLabel`. Converting this to an ICU plural would change the announcement's SHAPE from “Streak: 5 days” to “5-day streak”, which is a UX change and not a localization one. The Arabic value is already a PLURAL NOUN (`أيام متتالية`, “consecutive days”), so a count beside it is grammatically sound; the painted unit beside the number is `homeDays`. See `readingCaptionFor` for a count that IS genuinely plural-dependent."
   },
   "@homeUnavailableSuffix": {
-    "description": "Appended to a control's accessible name while the control is inert — the library's book cards and the selah circle.\n\n**Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because four features carry this field name and `/quiz`'s differs."
+    "description": "Appended to a control's accessible name while the control is inert — the library's book cards and the selah circle.\n\n**Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because **five** features carry this field name and `/quiz`'s differs."
   },
   "@homeRetry": {
     "description": "`ErrorView.retryLabel`. There is NO prototype error state at all — `eva/src` has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES (\"Try again\") rather than \"Retry\".\n\nNAMESPACED `home*`: three features carry this field name (`homeRetry`, `quizRetry`, `readingRetry`).\n\n`ErrorView` is the precedent for all three: a hard-coded English string inside `core/` is the half-translated UI this app exists not to ship, so the wording lives with the caller and the widget takes it."
@@ -396,7 +396,7 @@
     "description": "Appended to an option's accessible name when the wire says it is answered.\n\n§14's disabled row: a reader has to be told WHY a control cannot be pressed, not only that it cannot. `LoginPage`'s four inert social buttons and `AppTopBar`'s avatar are the precedent, and they are the reason /quiz can ship a dead CTA honestly at all."
   },
   "@quizUnavailableSuffix": {
-    "description": "Appended to the CTA's accessible name when there is nothing to submit.\n\nNAMESPACED `quiz*` BECAUSE THIS IS NOT THE SAME STRING AS THE OTHER THREE. `authUnavailableSuffix`, `homeUnavailableSuffix` and `readingUnavailableSuffix` all say \"unavailable in this build\"; this one says why *this* control is unavailable, which is §14's actual requirement and a different fact."
+    "description": "Appended to the CTA's accessible name when there is nothing to submit.\n\nNAMESPACED `quiz*` BECAUSE THIS IS NOT THE SAME STRING AS THE OTHER FOUR. `authUnavailableSuffix`, `homeUnavailableSuffix`, `readingUnavailableSuffix` and `journeyUnavailableSuffix` all say \"unavailable in this build\"; this one says why *this* control is unavailable, which is §14's actual requirement and a different fact."
   },
   "@quizRetry": {
     "description": "`ErrorView.retryLabel`. Written — the prototype has no data layer, so it has no error state and nothing to transcribe. NAMESPACED `quiz*`; see `homeRetry` for the three-way collision."
@@ -426,7 +426,7 @@
     "description": "The bookmark control's accessible name, BEFORE any suffix. The bookmark has no endpoint and no port — ReadingEnScreen.tsx:19-21 draws one with no handler — so it ships INERT and says so via `readingUnavailableSuffix`."
   },
   "@readingUnavailableSuffix": {
-    "description": "Appended to a control's name while that control is inert.\n\nThe same wording, and the same reasoning, as `authUnavailableSuffix` and `homeUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; /quiz's is a different string."
+    "description": "Appended to a control's name while that control is inert.\n\nThe same wording, and the same reasoning, as `authUnavailableSuffix`, `homeUnavailableSuffix` and `journeyUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; `/quiz`'s is a different string, and `/journey`'s is the same as this one."
   },
   "@readingPassage": {
     "description": "The name `ScriptureBlock` gives its merged semantics node, so a screen-reader user arriving at the reading body hears WHAT they have entered rather than a bare collection of verses.\n\nTranscribed from `ScriptureBlock.semanticLabel`. Note the noun is `passage` and not `reading`: `reading` is this app's name for a whole day's session, which `/reading` is, and using it here would make the block's name and the screen's name the same word for two different things."
@@ -585,5 +585,89 @@
   "readingBookmarkOff": "bookmark removed",
   "@readingBookmarkOff": {
     "description": "`:974` — `bmkOff:[\"bookmark removed\",\"أُزيل الحفظ\"]`. The toggle's off label; a bookmark that reports only the on state cannot be turned off blind."
+  },
+  "journeyTitle": "Journey",
+  "journeyScribe": "scribe · level 7",
+  "journeyStreakSub": "day streak · keep the flame",
+  "journeyRingVerses": "verses",
+  "journeyRingQuizzes": "quizzes",
+  "journeyRingAccuracy": "accuracy",
+  "journeySky": "sky",
+  "journeyStarsLit": "stars lit",
+  "journeyConstellations": "constellations",
+  "journeyMedals": "medals",
+  "journeyMedalFirstLight": "first light",
+  "journeyMedalPsalmist": "psalmist",
+  "journeyMedalStreakSeven": "streak ×7",
+  "journeyMedalJohn": "john",
+  "journeyAccount": "account",
+  "journeyRowBoard": "The Communion",
+  "journeyRowSettings": "Settings",
+  "journeyRowShare": "Share progress",
+  "journeyRowPlans": "Reading plans",
+  "journeyUnavailableSuffix": "unavailable in this build",
+  "@journeyTitle": {
+    "description": "`eva/redesign.html:933` — the i18n row `journey`, rendered by `:579`'s `.ttl`.\n\nThe screen's own name, and it is the redesign's name for the **profile**: ADR-0022 restored the profile ADR-0001 cut, and the redesign calls it \"Journey\". The route is `/journey` for the same reason."
+  },
+  "@journeyScribe": {
+    "description": "`eva/redesign.html:933` — the i18n row `scribe`, rendered by `:588`'s `.jrole`.\n\n**The level is an unconditioned literal and there is no levels endpoint.** The backend ships fourteen routes and none of them is a level, a rank or a title; the prototype writes `scribe · level 7` and never changes it. So the whole line is transcribed copy, and the \"7\" is **not** derived from anything — recorded as a divergence at the widget.\n\n**The Arabic arm embeds the Arabic-Indic `٧` in the source string** (the prototype's own row, `:933`), so it is a literal in the ARB rather than a `digits()` call at the call site."
+  },
+  "@journeyStreakSub": {
+    "description": "`eva/redesign.html:934` — the i18n row `streakSub`, rendered by `:590`.\n\nThe line under the hero number. The hero number above it is the reader's **real** `current_streak` (`GET /streak/summary`); this line is the prototype's own copy."
+  },
+  "@journeyRingVerses": {
+    "description": "`eva/redesign.html:935` — the i18n row `rlVerses`, rendered by `:592`.\n\n**The label is the prototype's, and the quantity behind it is not.** The backend counts **questions**, not verses (`streak.service.ts:5-17` carries `total_questions` / `answered_questions` / `correct_answers` and no verse count at all), so the ring under this label is a **scheduled-day completion ratio**. The divergence is recorded at the derivation, and it is the same shape as recorded decision 27's \"beads count questions\"."
+  },
+  "@journeyRingQuizzes": {
+    "description": "`eva/redesign.html:935` — the i18n row `rlQuizzes`, rendered by `:593`.\n\n**This ring is a count, and it is the only one that is.** The prototype writes `data-v=\"86\"` with **no** percent sign where its two neighbours write `83%` and `92%` — an inconsistency in the prototype's own markup, resolved **deliberately** rather than transcribed: the quantity is the number of questions answered, so a percent sign on it would be a unit the number does not have."
+  },
+  "@journeyRingAccuracy": {
+    "description": "`eva/redesign.html:935` — the i18n row `rlAcc`, rendered by `:594`.\n\nCorrect answers over answered questions, across the thirty-day history the endpoint returns."
+  },
+  "@journeySky": {
+    "description": "`eva/redesign.html:968` — the i18n row `sky`, rendered by `:596`."
+  },
+  "@journeyStarsLit": {
+    "description": "`eva/redesign.html:968` — the i18n row `stars`, rendered by `:596`.\n\n**Real.** `SkyRepository.count()` — the port's own doc already names `journey` as the consumer of it, and the prototype's `jSkyN` (`:596`) is written by `updateSkyWidget` (`:1186-1187`) from the same live star set."
+  },
+  "@journeyConstellations": {
+    "description": "`eva/redesign.html:968` — the i18n row `consts`, rendered by `:596`.\n\n**The prototype's own meaning is \"books whose final verse was lit\"** (`constDone`, `:1132`, set at `:1156-1157`). This client has no book-completion record, so the count is a **proxy** — the distinct books among the completed scheduled days — and the proxy is recorded at the derivation with what it gives up."
+  },
+  "@journeyMedals": {
+    "description": "`eva/redesign.html:936` — the i18n row `medals`, rendered by `:597`'s `.car-label`."
+  },
+  "@journeyMedalFirstLight": {
+    "description": "`eva/redesign.html:937` — the i18n row `m1`, rendered by `:599`'s `.mn`.\n\n**One of four medals the prototype draws as static markup.** The four medals, their glyphs and their count are ADR-0022's fiction: \"No screen may render a hard-coded … medal …; the fiction lives in data sources\". The **names** are copy and live here; **which** medals exist, and how many of the twelve are earned, come from the medals port."
+  },
+  "@journeyMedalPsalmist": {
+    "description": "`eva/redesign.html:937` — the i18n row `m2`, rendered by `:600`'s `.mn`.\n\nThe only one of the four whose emblem is a **typographic** glyph — `❧` (U+2767), which the `cmap` measurement puts in **EBGaramond only**. It is therefore drawn in the scripture family, pinned, on both arms."
+  },
+  "@journeyMedalStreakSeven": {
+    "description": "`eva/redesign.html:937` — the i18n row `m3`, rendered by `:601`'s `.mn`.\n\nThe `×` is U+00D7, which is in all five bundled families. The `7` is Latin in the prototype's own string; the Arabic arm is the prototype's `٧ أيام`."
+  },
+  "@journeyMedalJohn": {
+    "description": "`eva/redesign.html:937` — the i18n row `m4`, rendered by `:602`'s `.mn`."
+  },
+  "@journeyAccount": {
+    "description": "`eva/redesign.html:938` — the i18n row `account`, rendered by `:604`'s `.car-label`."
+  },
+  "@journeyRowBoard": {
+    "description": "`eva/redesign.html:939` — the i18n row `rowBoard`, rendered by `:605`'s `.srow`.\n\nThe board's own title — the same word the screen it navigates to uses (`leaderboardTitle`, `eva/redesign.html:939`'s `commG` row)."
+  },
+  "@journeyRowSettings": {
+    "description": "`eva/redesign.html:938` — the i18n row `rowSet`, rendered by `:606`'s `.srow`.\n\n**The app bar's gear button names the same destination**, so the tooltip and the row share this one string rather than two that can drift."
+  },
+  "@journeyRowShare": {
+    "description": "`eva/redesign.html:938` — the i18n row `rowShare`, rendered by `:607`'s `.srow`.\n\n**The prototype has no handler for this row either** — `el('rowShare')` appears nowhere in the prototype's script, so the button is rendered-and-inert there too. Here it is rendered-**and-disabled**, with the reason in its accessible name, because §14 asks a reader to be told *why* a control cannot be pressed."
+  },
+  "@journeyRowPlans": {
+    "description": "`eva/redesign.html:938` — the i18n row `rowPlans`, rendered by `:608`'s `.srow`.\n\n**No handler in the prototype, and no endpoint in the backend** — the fourteen routes include nothing for reading plans. Same treatment as `journeyRowShare`: rendered-and-disabled, with the reason in the accessible name."
+  },
+  "@journeyUnavailableSuffix": {
+    "description": "Appended to a control's accessible name when the control is **inert** — and the\nreason is that the feature is not built in this client.\n\n§14's disabled row: a reader has to be told WHY a control cannot be pressed, not only that it cannot. `LoginPage`'s four inert social buttons and `/`'s avatar are the precedent, and they are the reason /quiz can ship a dead CTA honestly at all.\n\n**The fifth of the `*UnavailableSuffix` keys**, and it reads like the four that say the same thing — `authUnavailableSuffix`, `homeUnavailableSuffix`, `readingUnavailableSuffix` and this one all read \"unavailable in this build\" — because the reason is the same: the feature is not built in this client. `quizUnavailableSuffix` reads differently because its control is dead for a different reason."
+  },
+  "journeyRetry": "Try again",
+  "@journeyRetry": {
+    "description": "`eva/redesign.html` has no retry on the journey — the prototype's screen has no\ndata layer to fail — so this is the **fifth** of the per-screen `*Retry` keys\nand it reads like the other four.\n\n**The repository namespaces `retry` per screen on purpose**, and this key is the\nsixth instance of that rule rather than an exception to it: `homeRetry`,\n`quizRetry`, `readingRetry`, `settingsRetry` and `leaderboardRetry` are five\nseparate keys with the same value, and the journey's screen borrowing the\nboard's would have been the first screen to take another screen's copy.\n\nSee `app_localizations_test.dart` for the assertion that keeps the family\nhonest — it asserts the *shape* (six of them, five of which say the same\nthing) rather than that they are all equal, because a test that demanded\nthey differ would be satisfied by a translator harmonising them and would\nbe wrong."
   }
 }

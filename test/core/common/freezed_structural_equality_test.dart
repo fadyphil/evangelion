@@ -18,6 +18,10 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/journey/domain/journey_rings.dart';
+import 'package:evangelion/features/journey/domain/medal.dart';
+import 'package:evangelion/features/journey/domain/medal_repository.dart';
+import 'package:evangelion/features/journey/presentation/bloc/journey_cubit.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/quiz/domain/refreshed_questions.dart';
@@ -506,6 +510,104 @@ void main() {
       );
     });
 
+    test('`JourneyState`', () {
+      _equalAndDistinct('JourneyState', _journeyState(), _journeyState());
+      _differsInEveryField(
+        'JourneyState',
+        _journeyState(),
+        fields: 8,
+        variants: <({String field, JourneyState value})>[
+          (
+            field: 'status',
+            value: _journeyState(
+              status: JourneyStatus.failed,
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(),
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'session',
+            value: _journeyState(
+              session: _session(displayName: 'Another Reader'),
+              summary: _streak(),
+              rings: _rings(),
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'summary',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(currentStreak: 9),
+              rings: _rings(),
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'rings',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(completion: 0.5),
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'constellations',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(),
+              constellations: 3,
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'starsLit',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(),
+              starsLit: 11,
+              shelf: _shelf(),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'shelf',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(),
+              shelf: _shelf(total: 24),
+              failure: _failure(),
+            ),
+          ),
+          (
+            field: 'failure',
+            value: _journeyState(
+              session: _session(),
+              summary: _streak(),
+              rings: _rings(),
+              shelf: _shelf(),
+              failure: Failure(
+                kind: FailureKind.network,
+                message: _text('boom'),
+                statusCode: _int(500),
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+
     test('`RefreshedQuestions`', () {
       _equalAndDistinct('RefreshedQuestions', _refreshed(), _refreshed());
       _differsInEveryField(
@@ -932,7 +1034,7 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(45),
+        hasLength(46),
         reason:
             'the converted set moved. 25 classes, 14 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
@@ -1074,6 +1176,8 @@ String _onlyFieldOf(Object event) {
 /// the two disagree in either direction. The alternative — discovering the types
 /// here too — would mean discovering the *assertions*, which a scanner cannot do.
 const Set<String> _assertedTypeNames = <String>{
+  // The journey's own state — added in Task 5.6 with `/journey`.
+  'JourneyState',
   // The 17 classes with fields of their own.
   'Verse',
   'ScriptureText',
@@ -1376,6 +1480,51 @@ QuizSession _session_({
   pointsEarnedToday: pointsEarnedToday,
   answers: answers ?? <QuizAnswer>[_answer()],
 );
+
+/// A `JourneyState` with **every** field set, so the equality gate can vary one
+/// field at a time and no variant is a no-op.
+///
+/// **Every field is non-null in the base, and every variant changes it to a
+/// different non-null value** — a variant that set a field to `null` would have to
+/// be told apart from a base that already held `null`, and a base holding `null`
+/// would make that variant *equal* to the base. The nullable fields are therefore
+/// varied by value and never by absence.
+JourneyState _journeyState({
+  JourneyStatus status = JourneyStatus.ready,
+  AuthSession? session,
+  StreakSummary? summary,
+  JourneyRings? rings,
+  int constellations = 0,
+  int starsLit = 0,
+  MedalShelf? shelf,
+  Failure? failure,
+}) => JourneyState(
+  status: status,
+  session: session ?? _session(),
+  summary: summary ?? _streak(),
+  rings: rings ?? _rings(),
+  constellations: constellations,
+  starsLit: starsLit,
+  shelf: shelf ?? _shelf(),
+  failure: failure ?? _failure(),
+);
+
+/// The journey's three ring quantities, for the equality gate.
+JourneyRings _rings({
+  double completion = 0.25,
+  int answered = 12,
+  double accuracy = 0.75,
+  double answeredShare = 0.5,
+}) => JourneyRings(
+  completion: completion,
+  answered: answered,
+  accuracy: accuracy,
+  answeredShare: answeredShare,
+);
+
+/// The reader's medal shelf, for the equality gate.
+MedalShelf _shelf({int total = 12}) =>
+    MedalShelf(earned: <Medal>[Medal.firstLight], total: total);
 
 RefreshedQuestions _refreshed({
   String readingId = 'reading-1',

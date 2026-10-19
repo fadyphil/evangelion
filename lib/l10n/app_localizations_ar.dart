@@ -451,4 +451,67 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get readingBookmarkOff => 'أُزيل الحفظ';
+
+  @override
+  String get journeyTitle => 'الرحلة';
+
+  @override
+  String get journeyScribe => 'كاتبة · المستوى ٧';
+
+  @override
+  String get journeyStreakSub => 'أيام متتالية · أبقِ الشعلة';
+
+  @override
+  String get journeyRingVerses => 'آيات';
+
+  @override
+  String get journeyRingQuizzes => 'اختبارات';
+
+  @override
+  String get journeyRingAccuracy => 'دقة';
+
+  @override
+  String get journeySky => 'سماء';
+
+  @override
+  String get journeyStarsLit => 'نجوم مضاءة';
+
+  @override
+  String get journeyConstellations => 'أبراج';
+
+  @override
+  String get journeyMedals => 'الأوسمة';
+
+  @override
+  String get journeyMedalFirstLight => 'أول نور';
+
+  @override
+  String get journeyMedalPsalmist => 'مرنّمة';
+
+  @override
+  String get journeyMedalStreakSeven => '٧ أيام';
+
+  @override
+  String get journeyMedalJohn => 'يوحنا';
+
+  @override
+  String get journeyAccount => 'الحساب';
+
+  @override
+  String get journeyRowBoard => 'الشركة';
+
+  @override
+  String get journeyRowSettings => 'الإعدادات';
+
+  @override
+  String get journeyRowShare => 'مشاركة التقدم';
+
+  @override
+  String get journeyRowPlans => 'خطط القراءة';
+
+  @override
+  String get journeyUnavailableSuffix => 'غير متاح في هذه النسخة';
+
+  @override
+  String get journeyRetry => 'أعد المحاولة';
 }

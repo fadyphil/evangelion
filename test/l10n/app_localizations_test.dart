@@ -121,12 +121,43 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        126,
+        147,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**146 → 147 in the Task 5.6 review pass**, for the journey\'s **own** '
+            'retry key. The screen was borrowing `leaderboardRetry`, and the '
+            'repository namespaces `retry` per screen on purpose — '
+            '`homeRetry`, `quizRetry`, `readingRetry`, `settingsRetry` and '
+            '`leaderboardRetry` are five separate keys with the same value. A '
+            'sixth screen taking another screen\'s copy is the coupling the rule '
+            'exists to remove, and the review caught it on the first read of the '
+            'page.\n\n'
+            '**126 → 146 in Task 5.6**, for the new `/journey` screen (the profile '
+            'ADR-0022 restored, which the redesign calls "Journey" — '
+            '`eva/redesign.html:933`): **twenty** keys, and every one of them is a '
+            'transcription of a prototype i18n row with its citation in the ARB '
+            'description. The screen\'s own (`journeyTitle`, `journeyScribe`, '
+            '`journeyStreakSub`), the three ring labels (`journeyRingVerses`, '
+            '`journeyRingQuizzes`, `journeyRingAccuracy`), the sky line\'s three '
+            '(`journeySky`, `journeyStarsLit`, `journeyConstellations`), the two '
+            'section labels (`journeyMedals`, `journeyAccount`), the four medal '
+            'names (`journeyMedalFirstLight`, `journeyMedalPsalmist`, '
+            '`journeyMedalStreakSeven`, `journeyMedalJohn`), the four account rows '
+            '(`journeyRowBoard`, `journeyRowSettings`, `journeyRowShare`, '
+            '`journeyRowPlans`), and the fifth `*UnavailableSuffix` key.\n\n'
+            '**The medals\' names are copy and live here, and the medals\' '
+            '*existence* is the fiction** — which is ADR-0022\'s rule and the '
+            '`LibraryBook` entity\'s: a translated string does not arrive as data, '
+            'so the enum holds the identity and the ARB holds the label.\n\n'
+            '**126 → 146 is the second movement in two tasks, and the first was '
+            'also a fix**: `journeyUnavailableSuffix` is the fifth member of the '
+            '`*UnavailableSuffix` family, and it reads like the three that say the '
+            'same thing because the reason is the same — the feature is not built '
+            'in this client. `quizUnavailableSuffix` still reads differently, '
+            'because its control is dead for a different reason.\n\n'
             '**121 → 126 in the Task 5.5 review pass**, and every one of the five '
             'is a name rather than a sentence: `leaderboardRetry` (the board has '
             'its own retry key, because `homeRetry` / `quizRetry` / `readingRetry` / '
@@ -637,22 +668,25 @@ void main() {
       expect(arabicInEnglish, isEmpty);
     });
 
-    test('the four `*UnavailableSuffix` keys are FOUR distinct strings', () {
-      // The four-way name collision, asserted where cross-key identity can be seen.
+    test('the five `*UnavailableSuffix` keys are FIVE, and four say the same', () {
+      // The name collision, asserted where cross-key identity can be seen.
       //
-      // `authUnavailableSuffix`, `homeUnavailableSuffix` and `readingUnavailableSuffix`
-      // all read "unavailable in this build" — one string, three owners, which is
-      // §14's obligation that a screen reader is told WHY. `quizUnavailableSuffix`
-      // reads "there is no answer to show", because that is why *that* control is
-      // dead and "unavailable in this build" would be a non-answer.
+      // `authUnavailableSuffix`, `homeUnavailableSuffix`,
+      // `readingUnavailableSuffix` and — since Task 5.6 — `journeyUnavailableSuffix`
+      // all read "unavailable in this build" — one string, four owners, which is
+      // §14's obligation that a screen reader is told WHY.
+      // `quizUnavailableSuffix` reads "there is no answer to show", because that
+      // is why *that* control is dead and "unavailable in this build" would be a
+      // non-answer.
       //
-      // So three of the four are the same and the fourth is not, and this asserts
-      // exactly that shape rather than "all four differ" — which would be satisfied
-      // by a translator harmonising them and would be *wrong*.
+      // So four of the five are the same and the fifth is not, and this asserts
+      // exactly that shape rather than "all five differ" — which would be
+      // satisfied by a translator harmonising them and would be *wrong*.
       const List<String> keys = <String>[
         'authUnavailableSuffix',
         'homeUnavailableSuffix',
         'readingUnavailableSuffix',
+        'journeyUnavailableSuffix',
         'quizUnavailableSuffix',
       ];
       for (final String key in keys) {
@@ -661,13 +695,21 @@ void main() {
       expect(en['authUnavailableSuffix'], en['homeUnavailableSuffix']);
       expect(en['homeUnavailableSuffix'], en['readingUnavailableSuffix']);
       expect(
+        en['readingUnavailableSuffix'],
+        en['journeyUnavailableSuffix'],
+        reason:
+            'the journey\'s two dead rows are dead for the same reason the login '
+            'and home controls are: the feature is not built in this client. A '
+            'different string here would be a *true* string and a *useless* one.',
+      );
+      expect(
         en['quizUnavailableSuffix'],
         isNot(en['authUnavailableSuffix']),
         reason:
-            'the four-way collision resolved to three identical suffixes and one '
-            'different one. If the /quiz one said "unavailable in this build" it '
-            'would be true and useless — §14 asks for the reason, and the reason '
-            'there is that there is no answer to submit.',
+            'the collision resolved to four identical suffixes and one different '
+            'one. If the /quiz one said "unavailable in this build" it would be '
+            'true and useless — §14 asks for the reason, and the reason there is '
+            'that there is no answer to submit.',
       );
     });
 

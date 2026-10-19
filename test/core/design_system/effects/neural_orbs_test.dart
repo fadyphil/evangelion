@@ -318,13 +318,31 @@ void main() {
         orbGroups[OrbGroup.profile]!.first.hueDirection,
         OrbHueDirection.reverse,
       );
+      // **And the journey is the one screen that inherits it.** The profile was
+      // cut by ADR-0001 and restored as `/journey` by ADR-0022, and the journey
+      // takes the profile's own orb group — so for the first time since the
+      // cut, a **variant** opens backwards.
+      //
+      // That is the rule, and it is now an exception rather than a
+      // universal: every variant opens forward **except the journey**, which
+      // opens reverse because the group it takes is the reverse one. The
+      // exception is named here so a reader who sees a backwards-cycling orb on
+      // `/journey` knows it is the profile's, and not a defect.
       for (final NeuralVariant variant in NeuralVariant.values) {
+        if (variant == NeuralVariant.journey) continue;
         expect(
           orbsFor(variant).first.hueDirection,
           OrbHueDirection.forward,
           reason: '${variant.name} opens forward in the prototype',
         );
       }
+      expect(
+        orbsFor(NeuralVariant.journey).first.hueDirection,
+        OrbHueDirection.reverse,
+        reason:
+            'the journey takes the profile\'s group, and the profile\'s first orb '
+            'is the one backwards cycle in the prototype (ds.tsx:106)',
+      );
     });
 
     test('hueDelay is preserved as a phase offset, not as a timer', () {
@@ -504,25 +522,23 @@ void main() {
       ]);
     });
 
-    test('and all seven sequences are named here, so none can be dropped', () {
+    test('and all eight sequences are named here, so none can be dropped', () {
       // The count, not the values: a sixth assertion added and a seventh deleted
       // would leave every other test in this file green. `length` on the map of
-      // variant → group is the machine-checkable form of "all seven".
-      const Map<NeuralVariant, List<String>> named =
-          <NeuralVariant, List<String>>{
-            NeuralVariant.login: <String>['6C3FE8', '3B5BDB', 'C026D3'],
-            NeuralVariant.home: <String>[
-              '3B5BDB',
-              '14B8A6',
-              '6C3FE8',
-              'F59E0B',
-            ],
-            NeuralVariant.readingEn: <String>['3B5BDB', '14B8A6'],
-            NeuralVariant.readingAr: <String>['6C3FE8', '06B6D4'],
-            NeuralVariant.quiz: <String>['C026D3', '3B5BDB', '14B8A6'],
-            NeuralVariant.result: <String>['F59E0B', 'F43F5E', '6C3FE8'],
-            NeuralVariant.settings: <String>['6C3FE8', '06B6D4'],
-          };
+      // variant → group is the machine-checkable form of "all eight".
+      const Map<NeuralVariant, List<String>>
+      named = <NeuralVariant, List<String>>{
+        NeuralVariant.login: <String>['6C3FE8', '3B5BDB', 'C026D3'],
+        NeuralVariant.home: <String>['3B5BDB', '14B8A6', '6C3FE8', 'F59E0B'],
+        NeuralVariant.readingEn: <String>['3B5BDB', '14B8A6'],
+        NeuralVariant.readingAr: <String>['6C3FE8', '06B6D4'],
+        NeuralVariant.quiz: <String>['C026D3', '3B5BDB', '14B8A6'],
+        NeuralVariant.result: <String>['F59E0B', 'F43F5E', '6C3FE8'],
+        NeuralVariant.settings: <String>['6C3FE8', '06B6D4'],
+        // The profile's own group — the journey IS the profile, and it is the
+        // one group whose first orb cycles backwards (ds.tsx:104-107).
+        NeuralVariant.journey: <String>['14B8A6', '3B5BDB'],
+      };
       expect(named, hasLength(NeuralVariant.values.length));
       for (final MapEntry<NeuralVariant, List<String>> entry in named.entries) {
         expect(

@@ -20,9 +20,15 @@
 /// naming a *different* day would open *today's* passage, and that is why
 /// `LibraryCarousel`'s cards are inert rather than mis-wired.
 ///
-/// The third exit is the interim chrome this screen still carries: `SealFab`'s two
-/// items, `/settings` and `/leaderboard`, which exist because Phase 6's dock does
-/// not yet. Phase 6 deletes the fab and this suite's arms with it.
+/// The third exit is the interim chrome this screen still carries: `SealFab`'s
+/// three items — `/settings`, `/communion` and `/journey` — which exist because
+/// Phase 6's dock does not yet. Phase 6 deletes the fab and this suite's arms
+/// with it.
+///
+/// **`/journey` joined them in Task 5.6**, and the reason is the same as the other
+/// two: the redesign's real home for the profile is the **dock**
+/// (`eva/redesign.html:702-708`, the journey tab at `:707`), and the redesign's
+/// `/` has no app bar and no avatar to reach it from.
 library;
 
 import 'package:auto_route/auto_route.dart';
@@ -41,6 +47,7 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
 import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
+import 'package:evangelion/features/journey/presentation/pages/journey_page.dart';
 import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
@@ -52,6 +59,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../support/app_harness.dart';
 import '../../../../support/home_harness.dart';
+import '../../../journey/journey_harness.dart';
 
 void main() {
   setUp(resetServiceLocator);
@@ -166,6 +174,59 @@ void main() {
       await pumpUntilFound(tester, find.byType(CommunionPage));
 
       expect(mounted.router.currentPath, AppRoutes.communion);
+    });
+
+    testWidgets("and the seal's journey item reaches /journey", (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THE DIAL IS THE JOURNEY'S ENTRY
+      //
+      // The redesign's real home for the profile is the **dock**
+      // (`eva/redesign.html:702-708`, the journey tab at `:707`), and the
+      // redesign's `/` has no app bar and no avatar to reach it from — so the
+      // dial is the interim holder of the destinations `/` cannot otherwise
+      // reach, exactly as it is for the board (`:706`) and for Settings.
+      //
+      // **The cubit comes from the locator**, because the dial pushes the
+      // **path** (`pushPath(AppRoutes.journey)`) and a path carries no
+      // arguments — so `JourneyPage` falls back to `getIt<JourneyCubit>()`, and
+      // the locator is where that has to be. The fixture is the journey
+      // feature's own harness, so the screen under test is the shipped one.
+      final JourneyHarness journey = journeyHarness();
+      registerJourneyCubit(journey.cubit);
+
+      final ({AppRouter router, HomeHarness harness}) mounted =
+          await mountHomeWithAReading(tester);
+
+      // **The dial, then the pill.** The fab is a shutter: its items are not in
+      // the tree until `SealFabTrigger` is pressed.
+      await tester.tap(find.byType(SealFabTrigger));
+      await pumpUntilFound(
+        tester,
+        find.text(AppLocalizationsEn().journeyTitle),
+      );
+
+      // **The label is "Journey", not "Profile".** ADR-0001 cut the profile for
+      // want of an endpoint and ADR-0022 restored it, and the redesign gives
+      // the screen a new name — so the *name the cut screen had* is still
+      // absent, and a future change that put a "Profile" pill back would be a
+      // screen with no route behind it.
+      expect(find.text('Profile'), findsNothing);
+
+      await tester.tap(find.text(AppLocalizationsEn().journeyTitle));
+      await pumpUntilFound(tester, find.byType(JourneyPage));
+
+      // **The stack, not `currentPath` alone.** `currentPath` is auto_route's
+      // URL state, and for a pushed page over a route whose args are optional
+      // the URL is the *root* path until the delegate adopts the pushed
+      // configuration — the settings arm's `reason:` is the full argument.
+      expect(
+        mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        contains('JourneyRoute'),
+        reason: 'the journey is on the stack, above `/`',
+      );
+      expect(mounted.router.stack.last.name, 'JourneyRoute');
+      expect(find.byType(JourneyPage), findsOneWidget);
     });
 
     testWidgets('and the push leaves `/` behind rather than over it', (

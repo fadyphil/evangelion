@@ -443,4 +443,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readingBookmarkOff => 'bookmark removed';
+
+  @override
+  String get journeyTitle => 'Journey';
+
+  @override
+  String get journeyScribe => 'scribe · level 7';
+
+  @override
+  String get journeyStreakSub => 'day streak · keep the flame';
+
+  @override
+  String get journeyRingVerses => 'verses';
+
+  @override
+  String get journeyRingQuizzes => 'quizzes';
+
+  @override
+  String get journeyRingAccuracy => 'accuracy';
+
+  @override
+  String get journeySky => 'sky';
+
+  @override
+  String get journeyStarsLit => 'stars lit';
+
+  @override
+  String get journeyConstellations => 'constellations';
+
+  @override
+  String get journeyMedals => 'medals';
+
+  @override
+  String get journeyMedalFirstLight => 'first light';
+
+  @override
+  String get journeyMedalPsalmist => 'psalmist';
+
+  @override
+  String get journeyMedalStreakSeven => 'streak ×7';
+
+  @override
+  String get journeyMedalJohn => 'john';
+
+  @override
+  String get journeyAccount => 'account';
+
+  @override
+  String get journeyRowBoard => 'The Communion';
+
+  @override
+  String get journeyRowSettings => 'Settings';
+
+  @override
+  String get journeyRowShare => 'Share progress';
+
+  @override
+  String get journeyRowPlans => 'Reading plans';
+
+  @override
+  String get journeyUnavailableSuffix => 'unavailable in this build';
+
+  @override
+  String get journeyRetry => 'retry';
 }

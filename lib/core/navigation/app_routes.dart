@@ -3,10 +3,10 @@
 /// `context.router.pushNamed('/quiz')` is a typo the compiler cannot see and a
 /// renamed route cannot find.
 ///
-/// Seven of the paths are locked by AGENT_CONTEXT §2. One more is declared here
+/// Eight of the paths are locked by AGENT_CONTEXT §2. One more is declared here
 /// and not by it — [servant] — and carries its own paragraph saying so, because
-/// "the seven" was this file's own headline and a reader who stopped reading there
-/// would have believed the eighth route was §2's too.
+/// "the eight" was this file's own headline and a reader who stopped reading there
+/// would have believed the ninth route was §2's too.
 ///
 /// PURE DART. `core/navigation` is not `core/domain`, so a `package:flutter`
 /// import would be permitted here — but it is not needed, and staying
@@ -70,13 +70,41 @@ abstract final class AppRoutes {
   /// ## WHY IT IS A **SEVENTH** ROUTE AND NOT A TAB
   ///
   /// It is pushed, not a destination in the bottom bar, because it is reached from
-  /// Home's seal dock / journey and from nowhere else — a tab would promise an equal
-  /// place in the app for a screen two of seven screens can reach.
+  /// Home's seal dock and from the journey's own trophy button, and from nowhere
+  /// else — a tab would promise an equal place in the app for a screen two of the
+  /// eight screens can reach.
   ///
   /// Behind `_guards` like every screen after `/login`, so it cannot be entered by a
   /// deep link while signed out. See `auth_guard.dart` for what the guard actually
   /// checks — and for why that is a UX gate and **not** an authorisation one.
   static const String communion = '/communion';
+
+  /// `/journey` — the reader's own journey: the orb, the streak, the rings, the
+  /// medals and the account rows.
+  ///
+  /// ## WHY IT IS AN **EIGHTH** LOCKED ROUTE, AND WHY IT IS **PUSHED**
+  ///
+  /// **Locked:** AGENT_CONTEXT §2's table names it, because ADR-0022 restored the
+  /// profile ADR-0001 cut and the redesign calls it "Journey"
+  /// (`eva/redesign.html:933`).
+  ///
+  /// **Pushed, not a tab:** the redesign's own entry is the five-tab dock
+  /// (`eva/redesign.html:702-708`, and the journey tab at `:707`), and the dock is
+  /// Phase 6's. Until then the `SealFab` on `/` is the interim holder of the
+  /// destinations Home cannot otherwise reach, and the journey is one of them —
+  /// beside the board, which is the prototype's other dock tab (`:706`).
+  ///
+  /// **And it is pushed, which is why it has a back chevron the prototype's
+  /// journey does not have.** The prototype's journey is only ever a tab
+  /// (`eva/redesign.html:576-583` — no chevron, a 68px spacer instead), so it
+  /// never needed a way back. This client pushes it, and a pushed screen on
+  /// desktop has no system back button, so the chevron is the way out. The
+  /// prototype's own board is also a dock tab and it **does** have a chevron
+  /// (`:614`) for the same reason.
+  ///
+  /// Behind `_guards` like every screen after `/login`, so it cannot be entered by
+  /// a deep link while signed out.
+  static const String journey = '/journey';
 
   /// `/servant` — where both servant roles land. **Declared, not yet routed.**
   ///
@@ -109,8 +137,8 @@ abstract final class AppRoutes {
   ///     paragraph is a retroactive justification for the gap either way.
   ///
   /// **The honest consequence, which a reader will otherwise have to discover by
-  /// pushing it:** `AppRouter`'s table declares seven routes and then `'*'`, and
-  /// none of the seven names this path — so a navigation to `/servant` matches
+  /// pushing it:** `AppRouter`'s table declares eight routes and then `'*'`, and
+  /// none of the eight names this path — so a navigation to `/servant` matches
   /// nothing and the wildcard redirects it to [home]. A servant therefore lands
   /// on `/` today. That is the *correct outcome* for a role with nothing extra to
   /// see, and it is a **coincidence rather than a design**: it is what the
@@ -138,7 +166,7 @@ abstract final class AppRoutes {
   ///
   /// ## WHY IT IS NOT ONE OF THE LOCKED PATHS, AND WHY IT STILL GETS A ROW
   ///
-  /// §2 locks **seven** route paths; this is the eighth declaration and now the
+  /// §2 locks **eight** route paths; this is the ninth declaration and now the
   /// **only** one whose value §2 does not fix. It was the second until Task 5.5
   /// moved `/communion` — then `/leaderboard` — into §2's route table, which is
   /// why `app_routes_test.dart` carries a value row for it rather than leaving it

@@ -116,15 +116,27 @@ ALLOWLIST: dict[str, str] = {
     # is a false green, not a harmless leftover, so the row is gone and this
     # paragraph is what remains of it.
 
-    "SealMonogram": (
-        "Phase 5.1 rebuilt `/login` against eva/redesign.html:503-511, whose "
-        "brand block is a wordmark and a tagline — the seal is one of the "
-        "elements the redesign deleted from that screen. The widget survives "
-        "because Task 4.2 re-rolled its treatment to `.jorb` "
-        "(eva/redesign.html:392-395) and `/journey` draws that orb in Task 5.6; "
-        "between those two tasks it is genuinely unplaced. Same mechanism as "
-        "WitnessSky's entry: STALE the moment any page constructs it."
-    ),
+    # ## `SealMonogram` LEFT THIS LIST IN TASK 5.6, AND THIS COMMENT IS THE
+    # RECEIPT
+    #
+    # The entry read "Phase 5.1 rebuilt `/login` against
+    # `eva/redesign.html:503-511`, whose brand block is a wordmark and a tagline
+    # — the seal is one of the elements the redesign deleted from that screen.
+    # The widget survives because Task 4.2 re-rolled its treatment to `.jorb`
+    # (`eva/redesign.html:392-395`) and `/journey` draws that orb in Task 5.6;
+    # between those two tasks it is genuinely unplaced."
+    #
+    # **Task 5.6 is that task.** `journey_page.dart` now constructs the orb
+    # through `JourneyOrb` — the seal at 74px, the prototype's own number
+    # (`eva/redesign.html:392`), with the reader's own monogram in it and not
+    # the prototype's literal `M` (`:586`).
+    #
+    # The gate reported the entry stale, which is what the entry's own last
+    # sentence promised: "Same mechanism as WitnessSky's entry: STALE the
+    # moment any page constructs it." An allowlist row that has stopped being
+    # true is a false green, not a harmless leftover — so the row is gone and
+    # this paragraph is what remains of it, exactly as `WitnessSky`'s did.
+
     "HairlineDivider": (
         "Task 5.3 made this one real. Its last two call sites were "
         "`reading_header.dart` and `reading_controls.dart`, both of which the "

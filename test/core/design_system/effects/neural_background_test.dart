@@ -552,11 +552,16 @@ void main() {
     });
   });
 
-  group('§13.1 — the seven goldens per theme', () {
-    // 7 variants x 2 themes = 14. `NeuralTier.high` is passed explicitly so the
+  group('§13.1 — the eight goldens per theme', () {
+    // 8 variants x 2 themes = 16. `NeuralTier.high` is passed explicitly so the
     // goldens do not silently change shape if the size thresholds are ever
     // retuned: a golden that captures "mid" today and "low" tomorrow is a
     // re-recorded image with no diff anyone reads.
+    //
+    // **The journey's two are new**, and they are the **profile's** orbs: the
+    // profile was cut by ADR-0001 and restored as `/journey` by ADR-0022, so the
+    // group the prototype always gave the profile is on screen again for the
+    // first time.
     for (final (String label, ThemeData theme) in <(String, ThemeData)>[
       ('dark', EvaThemeDark.theme),
       ('light', EvaThemeLight.theme),

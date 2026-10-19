@@ -35,7 +35,7 @@ void main() {
   final Map<String, String> inventory = declaredRouteValues(source);
   final List<String> declared = declaredRouteNames(source);
 
-  group('the seven locked routes', () {
+  group('the eight locked routes', () {
     test('login is /login', () {
       expect(AppRoutes.login, '/login');
     });
@@ -106,7 +106,7 @@ void main() {
       );
     });
 
-    test('the inventory is exactly the nine declared route names', () {
+    test('the inventory is exactly the ten declared route names', () {
       expect(declared, <String>[
         'login',
         'home',
@@ -123,7 +123,12 @@ void main() {
         // exists so a **deleted** constant fails, and an inventory cannot be
         // written that avoids both halves of that trade.
         'communion',
-        // The role mechanism's eighth, added with `core/navigation/landing_route.dart`
+        // Task 5.6's eighth locked screen: the profile ADR-0001 cut and ADR-0022
+        // restored, which the redesign calls "Journey" (`eva/redesign.html:933`).
+        // It is pushed rather than tabbed because the redesign's dock — the real
+        // home of the journey tab (`:707`) — is Phase 6's.
+        'journey',
+        // The role mechanism's ninth, added with `core/navigation/landing_route.dart`
         // and **before** `fallback` so the wildcard stays last. This test is what
         // made that a decision rather than an accident: it failed on the missing
         // name before anything else in the suite did, which is the whole reason the
@@ -131,14 +136,14 @@ void main() {
         'servant',
         'fallback',
       ]);
-      expect(inventory, hasLength(9));
+      expect(inventory, hasLength(10));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
-      // all nine entries were real strings. It could not fail: `inventory` is a
+      // all ten entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
-      // `whereType<String>()` is the identity — it returned all nine elements
+      // `whereType<String>()` is the identity — it returned all ten elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(9)` above already implies nine strings.
+      // state, and `hasLength(10)` above already implies ten strings.
     });
   });
 

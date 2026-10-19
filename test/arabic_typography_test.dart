@@ -1,4 +1,4 @@
-/// **Defect #2 on all six screens, from one harness.**
+/// **Defect #2 on all eight screens, from one harness.**
 ///
 /// ## WHAT THIS FILE IS
 ///
@@ -9,15 +9,22 @@
 /// `test/support/arabic_typography_gate.dart` does the work, and this file runs it
 /// over **every** screen, which is the whole deliverable.
 ///
-/// ## SIX SCREENS, NO EXEMPTIONS
+/// ## EIGHT SCREENS, NO EXEMPTIONS
 ///
-/// AGENT_CONTEXT §2's route table names six routes. **Three of them are stubs** —
-/// `/quiz`, `/result` and `/settings` render `Placeholder for /quiz` and nothing
-/// else — and the brief named only two. All three are here, and each declares an
-/// **empty** Arabic list with a `vacuousBecause`, which is the difference between a
-/// gate that is installed and honest and one that is silently doing nothing
-/// (§7: "A gate whose target directory does not exist yet reports **vacuous** and says
-/// so — report that honestly rather than calling it a pass").
+/// AGENT_CONTEXT §2's route table names **eight** routes, and this file has a group
+/// for every one of them: `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`,
+/// `/communion` and — since Task 5.6 — `/journey`.
+///
+/// **The three former stubs are built now, and this header used to say they were
+/// not.** It said that `/quiz`, `/result` and `/settings` render
+/// `Placeholder for /quiz` and nothing else, and that each of them declared an
+/// **empty** Arabic list with a `vacuousBecause` — which was decision 79's honest
+/// report at the time (Phase 8 lifted `/quiz` and `/result`, Phase 9 lifted
+/// `/settings`) and stopped being true long before the eighth screen landed.
+/// Every one of the eight groups now declares a **non-empty** list, and
+/// `expectArabicTypography` *refuses* a `vacuousBecause` on a screen that has
+/// Arabic runs — so a group that went back to declaring nothing would be red
+/// rather than quiet.
 ///
 /// Their capability is not asserted in the abstract; it is proved by the per-screen
 /// mutation in the review, which plants a wrong-family Arabic run on each of them.
@@ -26,8 +33,9 @@
 ///
 /// 1. the **declared set** of Arabic runs, compared for equality in both directions;
 /// 2. every one of them in Amiri — the token *and* the literal string;
-/// 3. **every character on screen** carried by the family that renders it, which is
-///    the only one of the three that does real work on the three stub screens.
+/// 3. **every character on screen** carried by the family that renders it — the
+///    arm that catches a run the app's own strings do not cover: a
+///    `Failure.message`, the framework's own Arabic label, a `·` or a `×`.
 ///
 /// Plus an English control per screen: with no Arabic on screen, the Arabic gate is
 /// vacuous *by construction*, so a screen that silently stopped honouring the locale
@@ -41,6 +49,11 @@
 /// `return style`, and forced to never swap.
 library;
 
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:auto_route/auto_route.dart';
+import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -49,12 +62,16 @@ import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/sky_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
+import 'package:evangelion/core/domain/repositories/sky_repository.dart';
+import 'package:evangelion/core/domain/repositories/streak_repository.dart';
+import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
@@ -65,6 +82,18 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
+import 'package:evangelion/features/journey/data/datasources/medal_local_data_source.dart';
+import 'package:evangelion/features/journey/data/repositories/medal_repository_impl.dart';
+import 'package:evangelion/features/journey/domain/journey_rings.dart';
+import 'package:evangelion/features/journey/domain/medal.dart';
+import 'package:evangelion/features/journey/domain/usecases/get_journey_reader_session.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_sky_count.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_streak_history.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_streak_summary.dart';
+import 'package:evangelion/features/journey/presentation/bloc/journey_cubit.dart';
+import 'package:evangelion/features/journey/presentation/journey_l10n.dart';
+import 'package:evangelion/features/journey/presentation/pages/journey_page.dart';
+import 'package:evangelion/features/journey/presentation/widgets/journey_account_rows.dart';
 import 'package:evangelion/features/leaderboard/data/datasources/cheer_local_data_source.dart';
 import 'package:evangelion/features/leaderboard/data/repositories/local_cheer_repository.dart';
 import 'package:evangelion/features/leaderboard/domain/leaderboard_ranking.dart';
@@ -83,8 +112,10 @@ import 'package:evangelion/features/settings/presentation/pages/settings_page.da
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -1514,6 +1545,573 @@ void main() {
     });
   });
 
+  group('`/journey` — the reader\'s journey', () {
+    /// ## THE EIGHTH SCREEN, AND THE ONLY RIGHT-TO-LEFT ONE IN THIS FILE
+    ///
+    /// `/journey` is the redesigned profile (ADR-0022, Task 5.6): an app bar, an
+    /// orb, the reader's name, the transcribed role line, the hero streak, three
+    /// rings, the sky line, a medals strip and four account rows.
+    ///
+    /// It is also the screen whose Arabic arm carries **Arabic-Indic digits in
+    /// nine separate places** — the hero, the three rings, the sky line's two
+    /// counts, the medals' own count, and the two ARB rows that **bake a digit
+    /// into their text**: `journeyScribe`'s "كاتبة · المستوى ٧" and
+    /// `journeyMedalStreakSeven`'s "٧ أيام". The prototype bakes them into its
+    /// own i18n table the same way (`:933` and `:937`), and the prototype's row
+    /// at `:933` is read by the client as a **run with a digit in it** — not as a
+    /// number composed at the call site.
+    ///
+    /// **U+0660–U+0669 is inside the block this gate's predicate is a range
+    /// over**, so every one of those nine is an Arabic run to the gate and to a
+    /// reader — and every one of them has to be in a face that carries the
+    /// glyph. `JetBrainsMono` carries none of them, which is why every mono run
+    /// on this screen goes through `arabicAware`.
+    ///
+    /// ## AND THE FIVE THINGS THIS GROUP PROVES THAT THE OTHER SEVEN DO NOT
+    ///
+    /// 1. **The percent sign.** The rings' values on the Arabic arm end in `٪`
+    ///    (U+066A) and not in `%` (U+0025) — the prototype's own `N()` (`:981`)
+    ///    maps one to the other, and this client's `journeyPercent` does the
+    ///    same. **U+0025 is in all five bundled families and U+066A is in
+    ///    Amiri**, so a ring that said `%` on the Arabic arm would not tofu — it
+    ///    would be *wrong*, and no glyph check would catch it. That is why the
+    ///    group asserts the sign and not merely the presence of a sign.
+    /// 2. **The fleuron's pin.** `❧` (U+2767) is in **EB Garamond alone** and
+    ///    it is **not Arabic content**, so the Arabic arm has to keep it on the
+    ///    scripture face. An `arabicAware` swap would put it in Amiri, which
+    ///    does not carry it — and the no-tofu arm is what catches that.
+    /// 3. **The four marks that cannot be typed at all.** `✦` (U+2726),
+    ///    `✠` (U+2720), `☩` (U+2629) and `⚙` (U+2699) are in **no** bundled
+    ///    family, so three of them are painted (`FourPointedStar`) and the
+    ///    fourth is the framework's (`Icons.settings`). The group asserts that
+    ///    **no run on the screen carries any of the four**.
+    /// 4. **The direction.** The rows' `›` mirrors under RTL and the app bar's
+    ///    `.iconbtn` pill does **not** — Task 5.5's lesson, and both halves of
+    ///    it.
+    /// 5. **The order.** The three rings and the four medals keep the
+    ///    prototype's order, and the row reverses under RTL exactly as the
+    ///    prototype's flexbox does.
+    ///
+    /// ## AND THE ONE STRING ON THIS SCREEN THAT IS **NOT** AN ARABIC RUN
+    ///
+    /// The reader's own name. The prototype's is a literal — `Mariam Hanna` at
+    /// `:587`, written again by JavaScript at `:992` as `مريم حنا` on the Arabic
+    /// arm — and **this client's is the session's**, which the backend sends as
+    /// one Latin string for both locales. So the name under the orb is pure
+    /// Latin, and declaring it would trip the exact-set assertion with "a
+    /// declared run the tree never held". The monogram in the orb is the
+    /// session's `initials` for the same reason.
+    ///
+    /// **And the reason it is not an Arabic run is not "it is Latin".** It is a
+    /// run in **Amiri** under RTL — `arabicAware` swapped it — and Amiri carries
+    /// the Latin too, so the no-tofu arm covers it even though the Arabic arm
+    /// does not.
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, on the ready screen', (
+      WidgetTester tester,
+    ) async {
+      await _pumpJourney(tester, locale: const Locale('ar'));
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/journey',
+        expectedArabic: _journeyReadyRuns(ar, backTooltip: back),
+      );
+      // The third arm, and the only one that is language-agnostic: every
+      // character on the screen is carried by the family that renders it.
+      await expectNoTofuInAnyRun(tester, screen: '/journey');
+    });
+
+    testWidgets('and the FAILED screen is the app bar and the retry label', (
+      WidgetTester tester,
+    ) async {
+      // ## THE ONE RUN THE FAILURE STATE ADDS
+      //
+      // The retry control's label, "أعد المحاولة" — which the page hands to
+      // `ErrorView` **by hand**, with its own arm switch:
+      //
+      //     retryFamily: context.l10n.isArabicArm
+      //         ? EvaTypography.arabicFamily
+      //         : EvaTypography.uiFamily,
+      //
+      // A page that dropped the Arabic half of that switch would render the
+      // one label on the screen where something has already gone wrong in a
+      // face with no Arabic glyphs, and **no other group's gate would see
+      // it**: the `/communion` group's failed arm renders the **board's** copy
+      // of the same label through the same `ErrorView`, and the two are two
+      // separate ARB keys now — so the *family*, which is this page's own
+      // argument, is the only thing either arm can check.
+      //
+      // **And the failure's own message is deliberately not declared.** It is
+      // the server's English text, so it is not an Arabic run; the family that
+      // renders it is `ErrorView`'s own `arabicAware`, and the tofu arm below
+      // is what checks the glyphs.
+      await _pumpJourney(tester, locale: const Locale('ar'), failed: true);
+      final String back = await arabicBackTooltip();
+
+      await expectArabicTypography(
+        tester,
+        screen: '/journey (failed)',
+        expectedArabic: <String>[
+          // The chrome: the app bar's title and its three tooltips.
+          ar.journeyTitle,
+          back,
+          ar.journeyRowBoard,
+          ar.journeyRowSettings,
+          // The retry control's label, and the only Arabic run this state adds.
+          ar.journeyRetry,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/journey (failed)');
+    });
+
+    testWidgets('and in English renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      // The control, for `/`'s reason: with no Arabic on screen the Arabic
+      // assertions above are vacuously true, so this row is what catches a
+      // screen that stopped honouring the locale.
+      await _pumpJourney(tester);
+      await _expectNoArabic(tester, '/journey');
+
+      // **The third arm on the English side too**, and this screen is where it
+      // has the most to check: the English arm's runs carry the `·` of the role
+      // line and the sky line, the `×` of the "streak ×7" medal, the `/` of
+      // the medals' own count and the `%` of the two rings — and all of them
+      // are rendered in the **mono** face, which is a Latin face.
+      await expectNoTofuInAnyRun(tester, screen: '/journey (en)');
+    });
+
+    group('the typeface rule, and why the mono face cannot be left alone', () {
+      test('and the mono face carries neither an Arabic glyph nor a digit', () {
+        // **The reason the whole rule exists, stated as arithmetic.**
+        //
+        // `JetBrainsMono` is one of the five bundled families and it is the
+        // face this screen's `.mono` runs are written in — the role line, the
+        // hero's sub-line, the sky line, the rings' values and labels, the
+        // medals' labels and count, and the two section labels. It carries
+        // **no** Arabic glyph and **no** Arabic-Indic digit, so a run that
+        // stayed in it on the Arabic arm would be a row of tofu boxes.
+        expect(
+          familyCovers(EvaTypography.monoFamily, <int>[0x0628, 0x0644]),
+          isFalse,
+          reason:
+              'JetBrains Mono carries no Arabic glyph at all, so every Arabic run '
+              'this screen paints has to have been swapped out of it',
+        );
+        expect(
+          familyCovers(EvaTypography.monoFamily, <int>[0x0667]),
+          isFalse,
+          reason:
+              'and no Arabic-Indic digit either — which is what makes the '
+              'digit-bearing runs (the hero, the three rings, the sky line\'s two '
+              'counts and the medals\' count) the sharpest case',
+        );
+      });
+
+      testWidgets('and every mono run on this screen is on a face that has them', (
+        WidgetTester tester,
+      ) async {
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        final List<RenderedRun> runs = await arabicRuns(tester);
+        final Map<String, String> families = <String, String>{
+          for (final RenderedRun run in runs) run.label: run.family,
+        };
+
+        // **The mono runs, named.** Every one of them is written in the
+        // `.mono` face in the prototype — `:30`'s rule, and `:135`, `:136`,
+        // `:409` and `:418`'s four RTL overrides — so every one of them is a
+        // run that would be tofu if `arabicAware` had not been applied to it.
+        for (final String label in _journeyMonoRuns(ar)) {
+          expect(
+            families[label],
+            EvaTypography.arabicFamily,
+            reason:
+                '`$label` is one of the screen\'s mono runs, and the mono face '
+                'carries neither the Arabic letters nor the Arabic-Indic digits '
+                'it needs. The family is what `arabicAware` resolved it to.',
+          );
+        }
+
+        // **And the nine digit-bearing runs, which is where the mono face would
+        // have failed hardest.** Two of them are not mono at all — the hero's
+        // number is the display face, and the medals' count is — and both are
+        // still digit-bearing, so both are still in the same boat.
+        for (final String label in _journeyDigitRuns(ar)) {
+          expect(
+            families[label],
+            EvaTypography.arabicFamily,
+            reason:
+                '`$label` carries an Arabic-Indic digit, and no bundled Latin '
+                'face carries one. The family is what `arabicAware` resolved it '
+                'to.',
+          );
+        }
+
+        // **And the whole Arabic arm is in one face** — the gate's own
+        // third-arm rule, restated here for the runs this screen owns.
+        expect(
+          <String>{for (final RenderedRun run in runs) run.family},
+          <String>{EvaTypography.arabicFamily},
+        );
+      });
+    });
+
+    group('the glyphs, and the four that cannot be typed at all', () {
+      test('the four missing marks are in no bundled family', () {
+        // **Measured, not assumed** — `journey_glyph_test.dart` reads the same
+        // `cmap`s, and this row is the typography gate's own copy of the
+        // measurement, because the gate is what enforces it.
+        for (final int codepoint in <int>[0x2726, 0x2720, 0x2629, 0x2699]) {
+          for (final String family in kBundledFontFamilies) {
+            expect(
+              codepointsForFamily(family).contains(codepoint),
+              isFalse,
+              reason:
+                  'U+${codepoint.toRadixString(16).toUpperCase()} is in $family — '
+                  'so the painted substitutes this screen ships are not the only '
+                  'way it could have been drawn, and the decision needs '
+                  're-reading',
+            );
+          }
+        }
+      });
+
+      test('the fleuron is in EB Garamond alone', () {
+        for (final String family in kBundledFontFamilies) {
+          expect(
+            codepointsForFamily(family).contains(0x2767),
+            family == 'EBGaramond',
+            reason:
+                'U+2767 is in $family — the fleuron is drawn as text in the '
+                'scripture family, and that only holds while EB Garamond is the '
+                'one family that carries it',
+          );
+        }
+      });
+
+      test('and the percent sign the Arabic arm uses is in Amiri', () {
+        // **U+0025 is in all five families and U+066A is in Amiri** — so the
+        // *wrong* sign on the Arabic arm would not tofu. It would be a
+        // translation defect, and the next row is what catches it.
+        expect(
+          familyCovers(EvaTypography.arabicFamily, <int>[0x066A]),
+          isTrue,
+          reason:
+              'U+066A is missing from Amiri, so the Arabic arm\'s percentage '
+              'would be a tofu box',
+        );
+        for (final String family in kBundledFontFamilies) {
+          expect(
+            codepointsForFamily(family).contains(0x0025),
+            isTrue,
+            reason:
+                'U+0025 is missing from $family — and that is exactly why the '
+                'Arabic arm cannot carry the Latin sign: it would render, and '
+                'nobody would notice',
+          );
+        }
+      });
+
+      testWidgets('and none of the four is typed anywhere on the screen', (
+        WidgetTester tester,
+      ) async {
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        // **Every painted run, read off the tree.** A mark that is in no family
+        // and is *typed* is a tofu box, and the run is the only place a typed
+        // character shows up.
+        final List<RenderedRun> runs = await renderedRuns(tester);
+        for (final RenderedRun run in runs) {
+          for (final int codepoint in <int>[0x2726, 0x2720, 0x2629, 0x2699]) {
+            expect(
+              run.label.runes,
+              isNot(contains(codepoint)),
+              reason:
+                  '`${run.label}` carries U+${codepoint.toRadixString(16).toUpperCase()}, '
+                  'which is in no bundled family — it would be a tofu box on '
+                  '/journey',
+            );
+          }
+        }
+
+        // **And the two substitutions are the ones the prototype's own roles
+        // ask for.** The star is painted, the crosses unify on it, and the gear
+        // is the framework's icon.
+        expect(find.byType(FourPointedStar), findsNWidgets(3));
+        expect(find.byIcon(Icons.settings), findsOneWidget);
+        expect(find.byIcon(Icons.emoji_events), findsOneWidget);
+        expect(find.text('❧'), findsOneWidget);
+      });
+
+      testWidgets('and the fleuron is pinned to the scripture face on the '
+          'Arabic arm too', (WidgetTester tester) async {
+        // ## THE PIN, AND WHY IT IS NOT `arabicAware`
+        //
+        // `❧` is in EB Garamond **alone**. Under RTL the house's rule swaps
+        // every Arabic run into Amiri — and Amiri does not carry U+2767, so an
+        // `arabicAware` fleuron is a tofu box in the middle of an Arabic
+        // screen. The tile therefore **pins** the family, and this row is what
+        // holds the pin.
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        final Text fleuron = tester.widget<Text>(find.text('❧'));
+        expect(
+          fleuron.style?.fontFamily,
+          EvaTypography.scriptureFamily,
+          reason:
+              'the fleuron is not Arabic content, so it stays on the scripture '
+              'face on both arms — the pin is what keeps the Arabic arm from '
+              'tofu-ing it',
+        );
+      });
+
+      testWidgets('and the Arabic arm writes `٪` where the Latin arm writes `%`', (
+        WidgetTester tester,
+      ) async {
+        // ## THE PROTOTYPE'S OWN TRANSFORM
+        //
+        // `:981` is `const N=s=>lang==='ar'?String(s).replace(/\d/g,…).replace(/%/g,'٪'):String(s)`
+        // — the digits first and the sign second — and `:987` writes every
+        // `.rv[data-v]` through it, so the prototype's rings read `٨٣٪` and
+        // `٩٢٪` on the Arabic arm.
+        //
+        // **And the screen's own values are the ones the gate reads.** The two
+        // ratios go through `journeyPercent`, and the count ring carries **no**
+        // sign at all — the prototype's `:593` writes `data-v="86"` where its
+        // neighbours write `83%` and `92%`, and this client resolved that
+        // deliberately: a percent sign is a unit, and a count of answered
+        // questions does not have one.
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        final List<RenderedRun> runs = await arabicRuns(tester);
+        final List<String> values = <String>[
+          for (final RenderedRun run in runs)
+            if (run.label.endsWith('٪') || run.label.endsWith('%')) run.label,
+        ];
+
+        expect(
+          values,
+          hasLength(2),
+          reason:
+              'the two ratio rings carry a sign and the count ring carries none — '
+              'the values on screen were $values',
+        );
+        for (final String value in values) {
+          expect(
+            value,
+            endsWith('٪'),
+            reason:
+                'the Arabic arm writes U+066A and not U+0025. Both are in the '
+                'bundled fonts, so the Latin sign would render and nobody would '
+                'notice: `$value` is the defect this row exists to catch',
+          );
+          expect(value, isNot(contains('%')));
+        }
+        // And the sign is the Arabic one, not a lookalike.
+        expect(values.first.codeUnitAt(values.first.length - 1), 0x066A);
+      });
+    });
+
+    group('the direction, and the two rules the prototype states', () {
+      testWidgets('the rows\' chevron mirrors under RTL', (
+        WidgetTester tester,
+      ) async {
+        // ## `:138` — `[dir=rtl] .srow .ar{display:inline-block;transform:scaleX(-1)}`
+        //
+        // The trailing `›` on every account row is U+203A, which is a
+        // **`Bidi_Mirrored`** character, so the text engine paints the mirrored
+        // form in a right-to-left paragraph. The row does **not** transform it
+        // on top of that — the widget's own doc says so, and the reason is
+        // that a `scaleX(-1)` over an already-mirrored glyph flips it *back*.
+        //
+        // **The pixels, and not the paragraph's direction.** The paragraph being
+        // RTL is the *mechanism*; whether the glyph came out pointing the other
+        // way is the *claim*, and the claim is what a reader sees.
+        //
+        // **And the comparison is between the row's own chevron on the two
+        // arms** — the same widget, the same face, the same size — so what is
+        // left is the one thing the direction changed.
+        final List<String> ltr = await _chevronMask(tester, TextDirection.ltr);
+        final List<String> rtl = await _chevronMask(tester, TextDirection.rtl);
+
+        expect(
+          ltr.length,
+          rtl.length,
+          reason:
+              'the two arms drew the chevron at the same height, so the '
+              'comparison below is between two shapes and not two windows',
+        );
+        expect(
+          _pixelDifferences(rtl, ltr.map(_reverseRow).toList()),
+          lessThanOrEqualTo(1),
+          reason:
+              'the RTL chevron is the LTR chevron mirrored — the same shape, '
+              'pointing the other way. The one pixel of slack is the '
+              'antialiasing of the point, which lands on a different side of '
+              'the pixel grid on the two arms.',
+        );
+        expect(
+          rtl,
+          isNot(ltr),
+          reason: 'and it is therefore not the same glyph as the LTR chevron',
+        );
+      });
+
+      testWidgets('and the app bar\'s chevron flips while its pill does not', (
+        WidgetTester tester,
+      ) async {
+        // ## THE OTHER HALF OF TASK 5.5'S LESSON
+        //
+        // `:139` is `[dir=rtl] .chev{transform:scaleX(-1)}` — the prototype
+        // mirrors the **bare glyph** control. And **no `[dir=rtl]` rule mentions
+        // `.iconbtn` at all**, so the **pill** — the 30px glass circle the
+        // trophy and the gear sit in — is **not** mirrored.
+        //
+        // **Measured in the tree, not in the prototype.** Flutter's `Icon`
+        // wraps a `matchTextDirection: true` icon in a `Transform` that scales
+        // x by −1 under RTL, and leaves every other icon alone. So the two
+        // halves are two different answers to the same question, and this row
+        // asks both.
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        expect(
+          _isFlipped(tester, find.byIcon(Icons.arrow_back_ios_new)),
+          isTrue,
+          reason:
+              'the back control is the prototype\'s `.chev` (`:149`), and `:139` '
+              'mirrors it under RTL',
+        );
+        expect(
+          _isFlipped(tester, find.byIcon(Icons.emoji_events)),
+          isFalse,
+          reason:
+              'the trophy is the prototype\'s `.iconbtn` (`:151`), and no '
+              '`[dir=rtl]` rule mentions `.iconbtn` — a pill does not mirror',
+        );
+        expect(
+          _isFlipped(tester, find.byIcon(Icons.settings)),
+          isFalse,
+          reason: 'and neither does the gear beside it',
+        );
+      });
+
+      testWidgets('and the rings and the medals keep the prototype\'s order', (
+        WidgetTester tester,
+      ) async {
+        // ## WHAT IS ACTUALLY TRUE, MEASURED
+        //
+        // The brief's question was "does an RTL screen still show the first
+        // ring on the left?", and the answer is **no** — on either arm the
+        // order is the prototype's, and the *visual* order reverses under RTL
+        // on both.
+        //
+        // **The prototype.** `:401` is `.rings{display:flex;justify-content:
+        // center;gap:26px}` — a flex row — and `:1400` sets the root's
+        // `dir="rtl"` on the Arabic arm. A flex row's main axis follows
+        // `direction`, so the prototype's first ring is at the **right** under
+        // RTL, and `:410`'s `.medals` is the same shape.
+        //
+        // **The client.** `JourneyRingsRow` builds a `Row`, and Flutter's
+        // `RenderFlex` flips the main axis under `TextDirection.rtl` — the
+        // first child is laid out at the **right**. The medals strip is a
+        // horizontal `ListView`, whose axis direction follows the ambient
+        // direction the same way.
+        //
+        // So the two agree, and the order the reader reads is verses, quizzes,
+        // accuracy either way — right to left on the Arabic arm.
+        //
+        // **And the two arms are two pumps in two tests, not one test with two
+        // pumps.** The page's body is a `const` widget, so a second
+        // `pumpWidget` over the same tree **reuses** its `State` — and that
+        // state's `_loaded` flag is already set, so the new cubit is never asked
+        // to load and the screen stays on its spinner. One pump per arm is the
+        // shape that works.
+        final JourneyRings rings = deriveJourneyRings(_journeyHistory);
+        final AppLocalizations en = AppLocalizationsEn();
+
+        await _pumpJourney(tester);
+
+        // LTR: the prototype's order, left to right.
+        expect(
+          _leftOf(
+            tester,
+            journeyPercent(en, rings.completion),
+            en.digits(rings.answered),
+          ),
+          isTrue,
+          reason: 'the verses ring is left of the quizzes ring under LTR',
+        );
+        expect(
+          _leftOf(
+            tester,
+            en.digits(rings.answered),
+            journeyPercent(en, rings.accuracy),
+          ),
+          isTrue,
+          reason: 'and the quizzes ring is left of the accuracy ring',
+        );
+
+        // And the medals strip, which is the same shape.
+        expect(
+          _leftOf(
+            tester,
+            monoCapsText(Medal.firstLight.label(en), TextDirection.ltr),
+            monoCapsText(Medal.psalmist.label(en), TextDirection.ltr),
+          ),
+          isTrue,
+          reason: 'the first medal is leftmost under LTR',
+        );
+      });
+
+      testWidgets('and they reverse under RTL, exactly as the prototype does', (
+        WidgetTester tester,
+      ) async {
+        final JourneyRings rings = deriveJourneyRings(_journeyHistory);
+
+        await _pumpJourney(tester, locale: const Locale('ar'));
+
+        // RTL: the same order, read right to left.
+        expect(
+          _leftOf(
+            tester,
+            journeyPercent(ar, rings.accuracy),
+            ar.digits(rings.answered),
+          ),
+          isTrue,
+          reason:
+              'under RTL the accuracy ring is the leftmost one, because the row '
+              'reverses exactly as the prototype\'s flex row does',
+        );
+        expect(
+          _leftOf(
+            tester,
+            ar.digits(rings.answered),
+            journeyPercent(ar, rings.completion),
+          ),
+          isTrue,
+          reason: 'and the verses ring is the rightmost one',
+        );
+
+        // And the medals strip, which is the same shape.
+        expect(
+          _leftOf(
+            tester,
+            Medal.streakSeven.label(ar),
+            Medal.firstLight.label(ar),
+          ),
+          isTrue,
+          reason:
+              'under RTL the third medal is left of the first, which is the '
+              'strip reversing the way `.medals` does (`:410`, `display:flex`)',
+        );
+      });
+    });
+  });
+
   group('the ARM ITSELF, and what the two hard-coded states of the rule do', () {
     // The three properties the whole mechanism rests on, tested as a plain function
     // with no widget tree — so they are a unit test rather than a widget test, and a
@@ -2204,3 +2802,643 @@ Future<void> _expectNoArabic(WidgetTester tester, String screen) async {
         'page.',
   );
 }
+
+// ---------------------------------------------------------------------------
+// `/journey`'s own fixtures and helpers.
+//
+// The `/communion` group's helpers are above; these are the same shape, for
+// the eighth screen.
+// ---------------------------------------------------------------------------
+
+/// The four scheduled days `/journey`'s three rings are derived from.
+///
+/// **Four days, three of them completed, over two books** — chosen so the
+/// three derived numbers are all different and none of them is a copy of the
+/// prototype's `.83` / `.86` / `.92` decoration:
+///
+/// | the derived number | the arithmetic | the value on the Arabic arm |
+/// | --- | --- | --- |
+/// | the completion ratio | 3 completed of 4 days | `٧٥٪` |
+/// | the answered count | 10 + 10 + 0 + 6 | `٢٦` |
+/// | the accuracy ratio | 20 correct of 26 answered | `٧٧٪` |
+/// | the constellations | the distinct completed books — 43 and 19 | `٢` |
+///
+/// **The book names are the payload's own**, in both arms, and neither reaches
+/// the screen: the journey draws no book name at all. They are here because the
+/// entity carries them.
+const List<StreakHistoryEntry> _journeyHistory = <StreakHistoryEntry>[
+  StreakHistoryEntry(
+    readingId: 'r1',
+    scheduledDate: '2026-01-04',
+    bookNumber: 43,
+    bookNameEn: 'John',
+    bookNameAr: 'يوحنا',
+    referenceEn: 'John 3:1-5',
+    referenceAr: 'يوحنا ٣: ١-٥',
+    totalQuestions: 10,
+    answeredQuestions: 10,
+    correctAnswers: 8,
+    pointsEarned: 8,
+    isCompleted: true,
+  ),
+  StreakHistoryEntry(
+    readingId: 'r2',
+    scheduledDate: '2026-01-03',
+    bookNumber: 43,
+    bookNameEn: 'John',
+    bookNameAr: 'يوحنا',
+    referenceEn: 'John 3:6-10',
+    referenceAr: 'يوحنا ٣: ٦-١٠',
+    totalQuestions: 10,
+    answeredQuestions: 10,
+    correctAnswers: 8,
+    pointsEarned: 8,
+    isCompleted: true,
+  ),
+  StreakHistoryEntry(
+    readingId: 'r3',
+    scheduledDate: '2026-01-02',
+    bookNumber: 19,
+    bookNameEn: 'Psalms',
+    bookNameAr: 'المزامير',
+    referenceEn: 'Psalms 23:1-6',
+    referenceAr: 'المزمور ٢٣: ١-٦',
+    totalQuestions: 8,
+    answeredQuestions: 0,
+    correctAnswers: 0,
+    pointsEarned: 0,
+    isCompleted: false,
+  ),
+  StreakHistoryEntry(
+    readingId: 'r4',
+    scheduledDate: '2026-01-01',
+    bookNumber: 19,
+    bookNameEn: 'Psalms',
+    bookNameAr: 'المزامير',
+    referenceEn: 'Psalms 23:7-12',
+    referenceAr: 'المزمور ٢٣: ٧-١٢',
+    totalQuestions: 6,
+    answeredQuestions: 6,
+    correctAnswers: 4,
+    pointsEarned: 4,
+    isCompleted: true,
+  ),
+];
+
+/// The streak the hero number shows.
+///
+/// `eva/redesign.html:589`'s is the literal `12`, written by JavaScript at
+/// `:989`; this one is the endpoint's own `current_streak`.
+const StreakSummary _journeySummary = StreakSummary(
+  currentStreak: 12,
+  longestStreak: 6,
+  lastCompletedDate: '2026-01-04',
+  todayStatus: StreakTodayStatus.completed,
+  todayCompleted: true,
+  todayScheduled: true,
+  nextMilestone: 3,
+  daysToMilestone: 3,
+);
+
+/// How many stars the sky line counts.
+///
+/// The sky is a **real** port read (`SkyRepository.count()`), and the number
+/// here is the fixture's, not the prototype's `0` at `:596`.
+const int _journeyStarsLit = 7;
+
+/// The medals the shelf holds, in the prototype's draw order (`:599-602`).
+const List<Medal> _journeyEarnedMedals = Medal.values;
+
+/// How many medals there are in all — the prototype's "4 / 12" (`:597`).
+const int _journeyTotalMedals = 12;
+
+/// The failure the failed arm reports.
+///
+/// **The server's own wording**, which is English — so it is not an Arabic run
+/// and the declared set does not name it. The family that renders it is
+/// `ErrorView`'s own `arabicAware`.
+const Failure _journeyFailure = Failure(
+  kind: FailureKind.network,
+  message: 'Could not read the streak: the request timed out',
+);
+
+/// The Arabic runs `/journey` paints on its **ready** arm.
+///
+/// ## BUILT FROM THE SCREEN'S OWN ARITHMETIC, NOT A COPY OF IT
+///
+/// The three ring values come from `deriveJourneyRings` and
+/// `countCompletedBooks` — the same domain functions the page calls — and the
+/// percentages come from `journeyPercent`, the page's own transform. So a
+/// change to the derivation shows up here as a **mismatch** rather than as two
+/// lists that agree by accident.
+///
+/// ## AND THE TWENTY-ONE `journey*` KEYS ARE NINETEEN RUNS HERE
+///
+/// Nineteen of the twenty-one are painted **on the ready arm**, and two of
+/// them (`journeyRowBoard` and `journeyRowSettings`) are painted **twice** —
+/// once as the app bar's tooltip and once as the account row's title — so the
+/// ready screen draws **twenty-nine** Arabic runs over **twenty-seven**
+/// distinct labels: the nineteen keys, the framework's own Arabic label for
+/// the back control, and the seven runs the screen **composes out of
+/// numerals**.
+///
+/// The two that are not on the ready arm:
+///
+/// * `journeyUnavailableSuffix` is **not painted at all** — it is the reason
+///   a dead row carries in its **accessible name**
+///   (`journey_account_rows.dart`'s `Semantics(label: …)`), and an accessible
+///   name never reaches a glyph buffer. Declaring it would be the exact
+///   failure the gate exists to catch — the same category error `/quiz`'s
+///   `quizProgress` records — and the reason it is asserted is
+///   `journey_page_test.dart`'s accessibility group, which reads the
+///   semantics tree.
+/// * `journeyRetry` is painted on the **failed** arm only, and the failed
+///   arm's declared set names it.
+List<String> _journeyReadyRuns(
+  AppLocalizations ar, {
+  required String backTooltip,
+}) {
+  final JourneyRings rings = deriveJourneyRings(_journeyHistory);
+  final int constellations = countCompletedBooks(_journeyHistory);
+
+  return <String>[
+    // The app bar: the title, the back control's own Arabic label from the
+    // framework, and the two buttons' tooltips.
+    ar.journeyTitle,
+    backTooltip,
+    ar.journeyRowBoard,
+    ar.journeyRowSettings,
+    // The identity block: the role line — with its **baked-in** `٧` — the
+    // hero's number and the hero's sub-line.
+    ar.journeyScribe,
+    ar.digits(_journeySummary.currentStreak),
+    ar.journeyStreakSub,
+    // The three rings, in the prototype's order: a value and a label each.
+    journeyPercent(ar, rings.completion),
+    ar.journeyRingVerses,
+    ar.digits(rings.answered),
+    ar.journeyRingQuizzes,
+    journeyPercent(ar, rings.accuracy),
+    ar.journeyRingAccuracy,
+    // The sky line: three words and two counts, in five spans — the `·`
+    // separators are the widget's own and carry no Arabic.
+    ar.journeySky,
+    ar.digits(_journeyStarsLit),
+    ar.journeyStarsLit,
+    ar.digits(constellations),
+    ar.journeyConstellations,
+    // The medals: the section label, the count and the four names.
+    ar.journeyMedals,
+    '${ar.digits(_journeyEarnedMedals.length)} / ${ar.digits(_journeyTotalMedals)}',
+    for (final Medal medal in _journeyEarnedMedals) medal.label(ar),
+    // The account block: the section label, the two live rows' titles (already
+    // declared above as the app bar's tooltips) and the two dead rows'.
+    ar.journeyAccount,
+    ar.journeyRowShare,
+    ar.journeyRowPlans,
+  ];
+}
+
+/// The screen's **mono** runs, named.
+///
+/// Every one of them is written in the `.mono` face in the prototype — `:30`'s
+/// rule, and `:135`, `:136`, `:409` and `:418`'s four RTL overrides — so every
+/// one of them is a run that would be tofu if `arabicAware` had not been
+/// applied to it.
+List<String> _journeyMonoRuns(AppLocalizations ar) {
+  final JourneyRings rings = deriveJourneyRings(_journeyHistory);
+
+  return <String>[
+    // The role line and the hero's sub-line.
+    ar.journeyScribe,
+    ar.journeyStreakSub,
+    // The sky line: three words.
+    ar.journeySky,
+    ar.journeyStarsLit,
+    ar.journeyConstellations,
+    // The three rings: a value and a label each.
+    journeyPercent(ar, rings.completion),
+    ar.journeyRingVerses,
+    ar.digits(rings.answered),
+    ar.journeyRingQuizzes,
+    journeyPercent(ar, rings.accuracy),
+    ar.journeyRingAccuracy,
+    // The medals: four names and the count.
+    '${ar.digits(_journeyEarnedMedals.length)} / ${ar.digits(_journeyTotalMedals)}',
+    for (final Medal medal in _journeyEarnedMedals) medal.label(ar),
+    // The two section labels.
+    ar.journeyMedals,
+    ar.journeyAccount,
+  ];
+}
+
+/// The screen's **digit-bearing** runs, named.
+///
+/// **Nine of them**, and they are the sharpest case in this group: every one
+/// carries an Arabic-Indic digit, and `JetBrainsMono` — the face the screen's
+/// mono runs are written in — carries none.
+List<String> _journeyDigitRuns(AppLocalizations ar) {
+  final JourneyRings rings = deriveJourneyRings(_journeyHistory);
+
+  return <String>[
+    // The hero's number — the one digit run that is **not** mono: the hero is
+    // `displayLarge` on the scripture face (`:399-400`).
+    ar.digits(_journeySummary.currentStreak),
+    // The two ratio rings and the count ring.
+    journeyPercent(ar, rings.completion),
+    ar.digits(rings.answered),
+    journeyPercent(ar, rings.accuracy),
+    // The sky line's two counts.
+    ar.digits(_journeyStarsLit),
+    ar.digits(countCompletedBooks(_journeyHistory)),
+    // The medals' own count.
+    '${ar.digits(_journeyEarnedMedals.length)} / ${ar.digits(_journeyTotalMedals)}',
+    // And the two ARB rows that **bake** a digit into their text — the
+    // prototype's own i18n table does the same (`:933` and `:937`).
+    ar.journeyScribe,
+    ar.journeyMedalStreakSeven,
+  ];
+}
+
+/// Pumps `/journey` and settles it.
+///
+/// **The frames are counted, not settled.** The ambient clocks under
+/// `NeuralScaffold` never settle, so `pumpAndSettle` is a timeout rather than
+/// a green tick. The frames are here for the five futures the screen waits on
+/// and for the rings' own entrance.
+///
+/// ## AND THE SURFACE IS **WIDE**, AND THAT IS A MEASUREMENT
+///
+/// `:410` is `.medals{display:flex;gap:12px;overflow-x:auto}`, and the four
+/// medals are 4 × 104 + 3 × 12 = **452** wide — so on a 390px phone the strip
+/// **scrolls**, and the fourth medal is not in the tree at all. The gate
+/// declares the **screen's** runs rather than the viewport's, so the surface
+/// here is wide enough for all four: 452 + the strip's own 18px of padding on
+/// each side, plus the page's 14px gutter on each side, is 516.
+///
+/// A declared set that changed with the viewport would be a gate measuring the
+/// window rather than the screen.
+Future<void> _pumpJourney(
+  WidgetTester tester, {
+  Locale locale = const Locale('en'),
+  bool failed = false,
+}) async {
+  tester.view.physicalSize = const Size(800, 844);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  final JourneyCubit cubit = JourneyCubit(
+    getReaderSession: const GetJourneyReaderSession(_JourneyAuthRepo()),
+    loadStreakSummary: LoadJourneyStreakSummary(
+      _JourneyStreakRepo(fails: failed),
+    ),
+    loadStreakHistory: LoadJourneyStreakHistory(
+      _JourneyStreakRepo(fails: failed),
+    ),
+    loadSkyCount: const LoadJourneySkyCount(_JourneySkyRepo()),
+    // **The shipped stub, not a fixture.** The medals are ADR-0022's fiction
+    // behind a port, and the fiction lives in the data source — so the gate
+    // reads the same four names the app ships.
+    medalRepository: MedalRepositoryImpl(MedalLocalDataSource()),
+  );
+  addTearDown(cubit.close);
+
+  final _JourneyRouter router = _JourneyRouter();
+  addTearDown(router.dispose);
+
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      locale: locale,
+      // Derived from [locale] and **not** left to the default, for
+      // `login_harness.dart`'s recorded reason: the harness wraps its child in
+      // an explicit `Directionality` that overrides the one Material installs
+      // from the locale, so an `ar` locale rendered LTR reads as "the page
+      // ignores RTL".
+      textDirection: locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      // The router, and why the screen needs one — see [_JourneyRouter].
+      child: StackRouterScope(
+        controller: router,
+        stateHash: 0,
+        child: JourneyPage(cubit: cubit),
+      ),
+    ),
+  );
+  for (int frame = 0; frame < 8; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+}
+
+/// A router whose navigation goes nowhere.
+///
+/// ## WHY THE GATE NEEDS ONE, AND IT IS NOT COSMETIC
+///
+/// The shared instrument's tooltip probe long-presses every `Tooltip` on the
+/// screen and then **releases the gesture**. `/journey`'s app bar puts its
+/// **rows'** strings on its **tooltips** — `journeyRowBoard` and
+/// `journeyRowSettings`, one string in two places on purpose, so a tooltip
+/// and its row cannot drift — and the probe's "is this message painted?" check
+/// is therefore satisfied by the **account row's title** rather than by the
+/// tooltip. The gesture is released before the long press can win the arena,
+/// and the **button's own tap fires**.
+///
+/// On `/communion` the same probe releases the same way, but its tooltips carry
+/// strings nothing else paints, so the long press wins and no tap happens.
+/// Here the tap is real, and without a router above the page it throws
+/// `AutoRouter operation requested with a context that does not include an
+/// AutoRouter` — the **harness** talking, not the screen.
+///
+/// So the screen is given a router whose navigation is a no-op, and the tap has
+/// nothing to do. The gate still reads the **painted** tree, and the declared
+/// set is still the screen's.
+///
+/// ## AND IT IS THE APP'S OWN ROUTER, SUBCLASSED
+///
+/// `StackRouter` cannot be implemented outside `auto_route`'s own library — it
+/// has a private member — so the only concrete `StackRouter` this test can
+/// reach is the app's [AppRouter]. Subclassing it and answering "nothing
+/// happened" to the two calls the app bar makes is the smallest way to give
+/// the screen a router without mounting the whole app.
+final class _JourneyRouter extends AppRouter {
+  _JourneyRouter() : super(const _JourneyAuthStatus(), _JourneyAuthChanges());
+
+  @override
+  Future<T?> pushPath<T extends Object?>(
+    String path, {
+    bool includePrefixMatches = false,
+    OnNavigationFailure? onFailure,
+  }) async => null;
+
+  @override
+  Future<bool> maybePop<T extends Object?>([T? result]) async => false;
+}
+
+/// The session the router's guard reads.
+///
+/// **Signed in**, because the app bar's buttons are the ones the probe taps
+/// and the screen is behind the auth guard.
+final class _JourneyAuthStatus implements AuthStatus {
+  const _JourneyAuthStatus();
+
+  @override
+  bool get isAuthenticated => true;
+}
+
+/// The router's re-evaluation signal.
+///
+/// **A notifier nobody notifies.** The app's own is a `ChangeNotifier` fed by
+/// the auth bloc, and this gate has no session to change.
+final class _JourneyAuthChanges extends ReevaluateListenable {}
+
+/// The session `/journey` names the reader by.
+///
+/// **Latin, and that is the point.** The backend has no Arabic name field —
+/// the same fact `/communion`'s group records — so the reader's own name and
+/// monogram are pure Latin and are **not** Arabic runs.
+final class _JourneyAuthRepo implements AuthRepository {
+  const _JourneyAuthRepo();
+
+  @override
+  Future<Result<AuthSession>> getCurrentSession() async =>
+      Result<AuthSession>.of(
+        AuthSession(
+          userId: 'u4',
+          displayName: 'David Mina',
+          email: 'david@example.com',
+          initials: 'DM',
+          createdAt: DateTime.utc(2026),
+        ),
+      );
+
+  @override
+  Future<Result<AuthSession>> signIn({
+    required String email,
+    required String password,
+  }) => getCurrentSession();
+
+  @override
+  Future<Result<void>> signOut() async => Result<void>.of(null);
+}
+
+/// The streak the screen's hero and its rings are derived from.
+final class _JourneyStreakRepo implements StreakRepository {
+  const _JourneyStreakRepo({required this.fails});
+
+  /// Whether the read fails, which is what puts the screen in its failed arm.
+  final bool fails;
+
+  @override
+  Future<Result<StreakSummary>> summary() async => fails
+      ? const Left<Failure, StreakSummary>(_journeyFailure)
+      : Result<StreakSummary>.of(_journeySummary);
+
+  @override
+  Future<Result<List<StreakHistoryEntry>>> history() async => fails
+      ? const Left<Failure, List<StreakHistoryEntry>>(_journeyFailure)
+      : Result<List<StreakHistoryEntry>>.of(_journeyHistory);
+}
+
+/// The lit stars the sky line counts.
+final class _JourneySkyRepo implements SkyRepository {
+  const _JourneySkyRepo();
+
+  @override
+  Future<Result<SkyEntry>> record(SkyEntry entry) async =>
+      Result<SkyEntry>.of(entry);
+
+  @override
+  Future<Result<List<SkyEntry>>> entries() async =>
+      Result<List<SkyEntry>>.of(const <SkyEntry>[]);
+
+  @override
+  Future<Result<int>> count() async => Result<int>.of(_journeyStarsLit);
+
+  @override
+  Future<Result<void>> clear() async => Result<void>.of(null);
+}
+
+/// Whether the icon under [finder] is flipped horizontally.
+///
+/// **The sign of the x-scale, and not the presence of a `Transform`.** The
+/// design system's own transforms are translations — `SettingsTile`'s hover
+/// slide is `Matrix4.translationValues(4, 0, 0)` — so "there is a `Transform`
+/// near it" is true of almost everything and answers nothing.
+///
+/// Flutter's `Icon` wraps its `RichText` in a `Transform` that scales x by
+/// −1 under RTL **when the icon declares `matchTextDirection`**, and the
+/// x-scale's sign is what says "mirrored".
+///
+/// **And the `Transform` is *inside* the icon, not above it** — `Icon.build`
+/// returns the `Transform` as the icon's own child — so the walk is a
+/// *descendant* search and not an ancestor one.
+bool _isFlipped(WidgetTester tester, Finder finder) {
+  final Finder flips = find.descendant(
+    of: finder,
+    matching: find.byType(Transform),
+  );
+  for (final Element element in flips.evaluate()) {
+    final Transform flip = element.widget as Transform;
+    if (flip.transform.entry(0, 0) < 0) return true;
+  }
+  return false;
+}
+
+/// Whether the run [left] is painted to the left of the run [right].
+bool _leftOf(WidgetTester tester, String left, String right) =>
+    tester.getRect(find.text(left)).left <
+    tester.getRect(find.text(right)).left;
+
+/// The painted ink of the account rows' trailing chevron, as a binary mask.
+///
+/// **One row of `'0'`/`'1'` per pixel row, cropped to the ink.** The crop
+/// removes the one difference between the two arms that is not the mirroring —
+/// under RTL the paragraph puts the glyph at the other end of its own box — so
+/// what is left is the glyph's *shape*, and the shape is what "mirrored" is
+/// about.
+Future<List<String>> _chevronMask(
+  WidgetTester tester,
+  TextDirection direction, {
+  int threshold = _chevronInkThreshold,
+}) async {
+  _pinSurface(tester);
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      // **The English arm on both pumps.** The row's *title* is not what this
+      // probe is about, and holding it still keeps the two captures
+      // comparable. The harness's own default locale is `en`, so saying it
+      // again would be the redundant argument the linter refuses.
+      textDirection: direction,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      child: const RepaintBoundary(
+        key: _journeyChevronKey,
+        child: JourneyAccountRows(
+          onOpenBoard: _noopJourney,
+          onOpenSettings: _noopJourney,
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+
+  final RenderRepaintBoundary boundary = tester
+      .renderObject<RenderRepaintBoundary>(find.byKey(_journeyChevronKey));
+  final (Uint8List, int)? captured = await tester.runAsync<(Uint8List, int)>(
+    () async {
+      final ui.Image image = boundary.toImageSync();
+      final ByteData? data = await image.toByteData();
+      final int width = image.width;
+      image.dispose();
+      if (data == null) throw StateError('the chevron produced no pixels');
+      return (data.buffer.asUint8List(), width);
+    },
+  );
+  if (captured == null) throw StateError('runAsync returned no pixels');
+  final (Uint8List bytes, int stride) = captured;
+
+  final Rect chevron = tester.getRect(find.text('›').first);
+  final Rect box = tester.getRect(find.byKey(_journeyChevronKey));
+  final int left = (chevron.left - box.left).round();
+  final int top = (chevron.top - box.top).round();
+  final int width = chevron.width.round();
+  final int height = chevron.height.round();
+
+  final List<String> mask = <String>[];
+  for (int y = 0; y < height; y++) {
+    final StringBuffer row = StringBuffer();
+    for (int x = 0; x < width; x++) {
+      final int offset = (((top + y) * stride) + (left + x)) * 4;
+      row.write(bytes[offset + 3] > threshold ? '1' : '0');
+    }
+    mask.add(row.toString());
+  }
+  return _cropToInk(mask);
+}
+
+/// Pins the surface the pixel probes are captured on.
+///
+/// **Logical pixels and physical ones have to be the same scale.** The crop is
+/// measured in logical pixels and the capture is in physical ones, and the
+/// default test surface is 800×600 at **3×** — so an unpinned probe reads a
+/// third-scale corner of the glyph it meant to read.
+void _pinSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 844);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+/// The alpha above which a pixel counts as inked.
+///
+/// **64 of 255 — a quarter of full coverage.** Measured over the eight
+/// thresholds, and this is the one at which the two arms' chevrons are the
+/// **same shape**: at 0 and 40 the antialiasing of the point lands on a
+/// different pixel of the grid on the two arms, and at 16 and 200 the two arms
+/// do not even agree on how wide the glyph is. At 64 the shape is three pixels
+/// across and five tall, and the RTL one is the LTR one reversed — **with no
+/// slack at all**.
+///
+/// The slack the assertion allows is one pixel in the whole mask, which is the
+/// one place a different rasteriser could put the point's antialiasing.
+const int _chevronInkThreshold = 64;
+
+/// The mask cropped to its own ink.
+///
+/// **And the ink's own box, so the two arms' masks are the glyph** rather than
+/// a window onto it. A mask with no ink comes back unchanged, so a chevron
+/// that was not painted fails the comparison rather than passing it.
+List<String> _cropToInk(List<String> mask) {
+  int top = mask.length;
+  int bottom = -1;
+  int left = 1 << 30;
+  int right = -1;
+  for (int y = 0; y < mask.length; y++) {
+    final String row = mask[y];
+    for (int x = 0; x < row.length; x++) {
+      if (row[x] != '1') continue;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (x < left) left = x;
+      if (x > right) right = x;
+    }
+  }
+  if (bottom < 0) return mask;
+  return <String>[
+    for (int y = top; y <= bottom; y++) mask[y].substring(left, right + 1),
+  ];
+}
+
+/// A row of a mask, reversed.
+String _reverseRow(String row) => row.split('').reversed.join();
+
+/// How many pixels two masks of the same shape differ in.
+///
+/// **And the shorter of the two is padded with blanks**, so a mask that lost a
+/// column counts the loss rather than hiding it.
+int _pixelDifferences(List<String> a, List<String> b) {
+  final int rows = a.length < b.length ? a.length : b.length;
+  int differing = 0;
+  for (int y = 0; y < rows; y++) {
+    final String left = a[y];
+    final String right = b[y];
+    final int width = left.length < right.length ? left.length : right.length;
+    for (int x = 0; x < width; x++) {
+      if (left[x] != right[x]) differing++;
+    }
+    differing += (left.length - width) + (right.length - width);
+  }
+  differing += (a.length - rows) + (b.length - rows);
+  return differing;
+}
+
+/// A control that does nothing, for the rows the probe renders.
+void _noopJourney() {}
+
+/// The key for the chevron's capture.
+const Key _journeyChevronKey = ValueKey<String>('journey-chevron-boundary');

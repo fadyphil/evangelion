@@ -33,8 +33,14 @@ enum OrbGroup {
   /// `ORB_CONFIGS[5]` — Result. `ds.tsx:98-102`. The only warm group.
   result,
 
-  /// `ORB_CONFIGS[6]` — Profile. `ds.tsx:104-107`. **Cut**; kept for index
-  /// alignment. See the enum doc.
+  /// `ORB_CONFIGS[6]` — Profile. `ds.tsx:104-107`.
+  ///
+  /// **Cut in Phase 2 and placed again in Task 5.6.** The profile screen was
+  /// cut by ADR-0001 for want of an endpoint, and the group was kept anyway so
+  /// the other seven would keep their indices — which is how it was still here,
+  /// unused, when ADR-0022 restored the profile as `/journey`. The redesign's
+  /// journey is that screen, and every other screen kept the group its
+  /// predecessor had, so this is the one that was always going to be needed.
   profile,
 
   /// `ORB_CONFIGS[7]` — Settings. `ds.tsx:109-112`.

@@ -153,7 +153,7 @@ decision 111 and marked here.)*
   `build` methods → `context.l10n`), and `didPopNext` is untouched and still gated —
   decision 106.
 
-### The seven routes
+### The eight routes
 
 | Route | Screen | Data source |
 | --- | --- | --- |
@@ -164,12 +164,25 @@ decision 111 and marked here.)*
 | `/result` | Result — score, streak, stat tiles | **API** (submit response) |
 | `/settings` | Appearance, reading, about | local |
 | `/communion` | The cohort's board | **API** |
+| `/journey` | The reader's journey — orb, streak, rings, medals, account | **API** (streak) · local (medals stub) |
 
 Routes carry **no `:passageId` parameter**. There is no library to browse, so the passage
 is always *today's*. The quiz re-fetches to obtain fresh `already_answered` flags, because
 the backend has **no `GET /readings/:id`** endpoint.
 
-**Pending implementation.** The table above is what `lib/app/router/app_router.dart:244-267` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: **`/journey`** (the profile) arrives in **Phase 5.6**; `/communion` arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
+**Pending implementation.** The table above is what `lib/app/router/app_router.dart:244-268` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: `/communion` arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/journey`** (the profile) arrives in **Phase 5.6**; **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
+
+**`/journey` IS PUSHED, NOT A TAB, AND THAT IS A RECORDED DIFFERENCE.** The
+redesign's own entry for the journey is the five-tab dock (`eva/redesign.html:702-708`,
+the journey tab at `:707`), and the dock is Phase 6's. Until then the `SealFab` on
+`/` is the interim holder of the destinations Home cannot otherwise reach, and the
+journey is one of them — beside the board, which is the prototype's other dock tab
+(`:706`). The consequence is that a **pushed** journey needs a back chevron the
+prototype's journey does not have: the prototype's is only ever a tab
+(`eva/redesign.html:576-583` — no chevron, a 68px spacer instead) and never needed
+a way back, while a pushed screen on desktop has no system back button. The
+prototype's own board is also a dock tab and it **does** have a chevron (`:614`) for
+the same reason.
 
 ---
 
@@ -1181,6 +1194,21 @@ with a numeral or a bracket, which §5's live payload does — verse 3 opens
 budget (56, the prototype's own preview length), a boundary (back up to the last
 space in the final fifth) and one character (`…`, U+2026 — the prototype's own glyph,
 and §5's payloads contain real ones inside quoted scripture).
+
+**AMENDED IN TASK 5.6: THE AVATAR THIS DECISION IS ABOUT NO LONGER EXISTS.**
+`AppTopBar` — the widget that carried the avatar, and the only reason this
+decision's "one argument at one call site" had a call site — was **deleted in
+Task 5.2**, when `/` was rebuilt against the redesign: the redesign's home
+(`eva/redesign.html:513-538`) has **no app bar and no avatar**, and the greeting
+block replaced both. The paragraphs below are therefore a record of a decision
+about a widget this client no longer ships, kept because the **rule** they
+established still governs anything drawn at a 44px target — and because
+decision 155's reasoning was written against the same avatar, and 5.6 amends
+that decision with the fact.
+
+**The parameters named below — `streakSemanticLabel`, `avatarSemanticLabel` and
+`avatarUnavailableReason` — do not exist in the tree.** A reader who goes
+looking for them will not find them, and that is the drift this note is for.
 
 **31. THE AVATAR IS 32 PAINTED INSIDE A 44 BOX, AND THAT IS THE ONE DELIBERATE §14
 DIVERGENCE FROM THE PROTOTYPE.** `ds.tsx:517` is `width: 32, height: 32`. The painted
@@ -4008,13 +4036,45 @@ accent run — the chip label, the segment label, and a 13×12 chevron.
 asserting that no sub-AA pair had gone unrecorded. The hand-read found the first defect;
 the mechanical check found the next three.
 
-**155. `SealFab` COMES BACK TO `/` WITH TWO ITEMS, AND FOUR GATES ARGUED ABOUT IT.**
+**155. `SealFab` COMES BACK TO `/` — TWO ITEMS, THEN THREE, AND FOUR GATES ARGUED
+ABOUT IT.**
 
 `ds.tsx:533-573` defines a 56×56 glass circle carrying the display-serif `E`, outlined in
 ember, expanding into pill destinations. `ds.tsx:541` places it `bottom: 28, right: 20`, on
 `HomeScreen.tsx:100` and **nowhere else**. It was cut, and the reason was sound: its menu
 was Profile, Settings and Language, and by then Profile had no endpoint, Settings was
 already the avatar's job on `/`, and Language was already a row inside `/settings`.
+
+**AMENDED IN TASK 5.6: THE DIAL HAS THREE ITEMS, AND THIS DECISION NAMED THE WAY.**
+This decision names two ways to get a third item back — further down: "promote
+`language_sheet.dart` into the shared kernel … or give `/` another live route" — and
+says neither is taken, so **the second one was taken**. Task 5.6 gives `/` another live
+route: `/journey`, the profile ADR-0001 cut and ADR-0022 restored. The redesign makes
+that screen a **dock tab** (`eva/redesign.html:707`), and the dock is Phase 6's, so the
+dial is the interim holder of the destinations Home cannot otherwise reach — which is
+what the dial already was, and it already held the **board**, the prototype's other
+dock tab (`:706`).
+
+**The label is "Journey", not "Profile".** The redesign renamed the screen
+(`eva/redesign.html:933`), so the dial offers the journey and the "Profile stays
+absent" assertion in `seal_fab_test.dart` still holds: the *name* the cut screen had
+is still absent, and the screen itself is here under the name the redesign gives it.
+The assertion was **updated, not deleted**, and it now also asserts that the journey
+item is present and navigates.
+
+**LANGUAGE IS STILL ABSENT, and the first of the two ways was not taken.**
+`showLanguageSheet` is still in `features/settings/`, and there is still deliberately
+no `sealFabLanguage` key — a getter with no call site is a string in the bilingual
+surface no reader can reach.
+
+**AND THE PREMISE THIS DECISION WAS WRITTEN ON HAS ROTTED, WHICH IS WHY THE AMENDMENT
+IS HERE AND NOT A QUIET EDIT.** The paragraph above says "Settings was already the
+avatar's job on `/`" — and the avatar **no longer exists**: Phase 5.2 rebuilt `/`
+against the redesign, and the redesign's `/` (`eva/redesign.html:513-538`) has **no
+app bar and no avatar** at all. The `AppTopBar` this decision's reasoning was written
+against is gone from `lib/`, and the dial is now the only way Home reaches Settings
+and the board. A decision that names a screen's chrome has to be re-read when that
+screen's chrome is rebuilt, and this one had not been.
 
 **TWO ITEMS, NOT THREE, AND GATE 2 IS WHY.** The third destination would be Language, and
 `showLanguageSheet` lives in `features/settings/` — so the import was written, and

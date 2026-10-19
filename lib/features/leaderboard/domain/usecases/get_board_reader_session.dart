@@ -46,7 +46,9 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 /// The reworked you-card (`eva/redesign.html:629`) shows the reader's own name. The
 /// prototype hard-codes `Mariam Hanna` (`:1055-1064`), and ADR-0022's fiction table
 /// names that as a stub replaced by a future `/me`
-/// (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md:113-117`). There is no
+/// (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md:56` — "Your own name
+/// `:587` | **stub** | a real `/me` endpoint"), and says so in prose at `:106`:
+/// "There is no `/me`." There is no
 /// `/me` today, but `AuthSession` already carries `displayName` from the seeded
 /// session, so the real value exists and this is the legal way for a feature that
 /// may not import `auth` to reach it. A ranked reader's **row** carries `full_name`

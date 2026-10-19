@@ -18,8 +18,20 @@ import 'package:flutter_animate/flutter_animate.dart' show Effect;
 /// control.
 ///
 /// It came back because **`/communion` became a live route with no other entry point on
-/// `/`** beyond a link inside the card. Profile's slot took it, so the dial now has three
-/// items that each go somewhere a reader cannot otherwise reach in one tap.
+/// `/`** beyond a link inside the card. Profile's slot took it.
+///
+/// **And the dial has three items again, since Task 5.6 — for a different reason,
+/// and the paragraph above is the receipt for the first time it had two.** The
+/// **journey** took the profile's *other* half: ADR-0022 restored the profile and
+/// the redesign makes it a **dock tab** (`eva/redesign.html:707`), so its real
+/// entry is Phase 6's dock, and until then the dial is the interim holder of the
+/// destinations `/` cannot otherwise reach. It already held the board — the
+/// prototype's other dock tab (`:706`) — and Settings, which the redesign's `/`
+/// has no other way to reach either.
+///
+/// **Three items, and each goes somewhere a reader cannot otherwise reach in one
+/// tap.** The count is the prototype's (`ds.tsx:537-541` — Profile, Settings,
+/// Language) with Language out and the two live dock destinations in.
 ///
 /// ## WHY IT LIVES IN `NeuralScaffold.overlay`
 ///

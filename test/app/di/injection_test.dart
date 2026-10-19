@@ -555,7 +555,7 @@ void main() {
       );
     });
 
-    test('the thirty-nine current registrations are the ones the config names', () {
+    test('the forty-five current registrations are the ones the config names', () {
       // Spelled out rather than counted, for the reason
       // `app_routes_test.dart` gives: a parser that quietly returned entries of the
       // wrong shape would sail through a length check.
@@ -643,6 +643,31 @@ void main() {
           'lazySingleton<LoadLastLight> loadLastLight',
           'lazySingleton<LoadLibraryCatalogue> loadLibraryCatalogue',
           'lazySingleton<GetReaderSession> getReaderSession',
+          // **Task 5.6 added six**, and their position is the evidence again: they
+          // land in their own block, between the home module's and the
+          // leaderboard's, because that is where injectable puts a module's
+          // providers — the journey's module is a **feature** module, and
+          // `journey_module.dart` is its own file for the reason
+          // `leaderboard_module.dart` is.
+          //
+          // **The four use cases first, then the port, then the stub.** The use
+          // cases take the *shared* ports (`AuthRepository`, `StreakRepository`,
+          // `SkyRepository`), so they have no dependency inside this module; the
+          // medal port takes the stub, so the stub has to exist first — and
+          // injectable emits in reverse-dependency order, which puts the
+          // dependent above its dependency.
+          //
+          // **`MedalRepository` and not `MedalShelf`**: the shelf is the port's
+          // *return type*, and a return type is not a registration. The port is
+          // registered so the cubit can name it, and the cubit is hand-registered
+          // beside `AuthBloc` — the group below refuses it by name, for
+          // `LeaderboardCubit`'s reason.
+          'lazySingleton<GetJourneyReaderSession> getJourneyReaderSession',
+          'lazySingleton<LoadJourneyStreakSummary> loadJourneyStreakSummary',
+          'lazySingleton<LoadJourneyStreakHistory> loadJourneyStreakHistory',
+          'lazySingleton<LoadJourneySkyCount> loadJourneySkyCount',
+          'lazySingleton<MedalRepository> medalRepository',
+          'lazySingleton<MedalLocalDataSource> medalLocalDataSource',
           // **Phase 1 added three**, and their position is the evidence again:
           // `leaderboardRepository` lands directly after `getReaderSession` — beside
           // the other two repository providers, because that is where injectable puts

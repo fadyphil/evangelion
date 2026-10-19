@@ -76,9 +76,12 @@ final class StreakHistoryEntry with _$StreakHistoryEntry {
   /// **A `String` and not a `DateTime`, for the reason `TodayReading.scheduledDate`
   /// records**: the payload carries a date with no zone and no time, and
   /// `DateTime.parse` would produce a *local* midnight — a different instant on
-  /// every device. Journey's calendar (Task 5.6) is the first consumer that wants
-  /// to compare two of these, and it compares them as the strings the server
-  /// sorted them by.
+  /// every device. **No consumer compares them yet.** `/journey` derives its three
+  /// rings from this history and **does not read the date** — the rings are
+  /// ratios and a count, and a ratio over a window the server already ordered
+  /// needs no comparison. The forward reference that named a calendar here was
+  /// written for a screen that has no calendar, and it is withdrawn rather than
+  /// left for a reader to go looking for the comparison.
   final String scheduledDate;
 
   /// `book_number` — 1 to 66, the Bible's canonical order.
@@ -132,7 +135,7 @@ final class StreakHistoryEntry with _$StreakHistoryEntry {
 
   /// `is_completed` — the server's own verdict for this day.
   ///
-  /// `streak.service.ts:113` computes it as `totalQ > 0 && answeredQ >= totalQ`, so
+  /// `streak.service.ts:112` computes it as `totalQ > 0 && answeredQ >= totalQ`, so
   /// a scheduled day with **no** questions is never completed. That is the
   /// endpoint's rule and it is carried rather than re-derived: the same arithmetic
   /// lives in `streak.service.ts:153-169` for `current_streak`, and a client that

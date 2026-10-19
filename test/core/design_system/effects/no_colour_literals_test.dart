@@ -106,11 +106,33 @@ const String _exemptToggleKnob =
 const String _exemptCardWashes =
     'lib/features/home/presentation/widgets/card_washes.dart';
 
+/// The Task-5.6 addition: `/journey`'s own colour table.
+///
+/// `eva/redesign.html` writes the three ring strokes and the four medal washes as
+/// **inline** colours on the elements themselves — `:592`'s `stroke:#3EC9B0`,
+/// `:594`'s `stroke:#4F74FF`, and `:599-602`'s four `--bh:rgba(…, .5)` — so the
+/// values are per-element identity that no token table carries, which is the same
+/// shape of fact the orbs' table and the card washes' table hold.
+///
+/// **The one colour that IS a token is not here.** The prototype's magenta
+/// (`#E457D6`, `:593` and `:600`) is `EvaColors.bloom`'s exact hue, and the
+/// journey's table resolves those two lines through the token rather than
+/// transcribing them — so the transcription is four lines, not six, and the
+/// alpha difference (the token's 55% against the prototype's 50%) is recorded
+/// there.
+///
+/// The file holds the packed ints and **one** colour construction, so the whole
+/// screen has one line where a colour is built from a transcription. The second
+/// test below pins that count.
+const String _exemptJourneyColours =
+    'lib/features/journey/presentation/journey_colours.dart';
+
 /// The files exempt from the rule.
 const Set<String> _colourExemptions = <String>{
   _exemptOrbTranscription,
   _exemptToggleKnob,
   _exemptCardWashes,
+  _exemptJourneyColours,
 };
 
 /// Where a colour value can *come from*, as syntax.
@@ -336,6 +358,68 @@ void main() {
       1,
       reason: "the last-light card's wash, transcribed from `:524`",
     );
+
+    // And the journey's, pinned the same way — a whole file allowed to construct
+    // colour, so the count of constructions has to be exactly the one the
+    // exemption's doc names.
+    final String journey = File.fromUri(
+      packageRoot.uri.resolve(_exemptJourneyColours),
+    ).readAsStringSync();
+    // **Stripped first, and the two licences above are not.** Their files
+    // happen not to mention a colour construction in prose; this one does — it
+    // quotes the prototype's own `stroke:#3EC9B0` and the packed ints it
+    // transcribes — and a doc comment that *says* `Color(0x…)` is not a
+    // construction. Counting the raw text would count the documentation, and a
+    // gate that counts documentation is a gate that fails the moment somebody
+    // explains the table properly.
+    final String journeyCode = _withoutComments(journey);
+    expect(
+      _colourValueMarkers
+          .expand((String marker) => marker.allMatches(journeyCode))
+          .length,
+      1,
+      reason:
+          'exactly one colour construction in journey_colours.dart — '
+          '`_journeyColour(int, double)`, the one line the four transcribed '
+          'values are built through. A second means this file has grown a colour '
+          'nobody transcribed.',
+    );
+    expect(
+      'Color _journeyColour(int argb, double alpha)'
+          .allMatches(journeyCode)
+          .length,
+      1,
+      reason: 'the construction has one home and one name',
+    );
+    // **And the number of TRANSCRIBED COLOURS, which the construction count
+    // does not catch.** A fifth colour added as a packed int and a getter
+    // through the same `_journeyColour` would leave the construction count at
+    // one and the file still exempt — so the count that matters is the number
+    // of packed ints, and it is pinned here. The card washes' precedent pins
+    // its two ints **by name**; this pins both the count and the names.
+    expect(
+      'const int journey'.allMatches(journeyCode).length,
+      4,
+      reason:
+          'exactly four transcribed colours in journey_colours.dart — the teal, '
+          'the blue, the cream and the amber. The magenta is NOT here: it is '
+          '`EvaColors.bloom`, the prototype\'s hue exactly, so it resolves '
+          'through the token. A fifth packed int is a colour nobody transcribed.',
+    );
+    for (final String name in <String>[
+      'journeyTealArgb',
+      'journeyBlueArgb',
+      'journeyCreamArgb',
+      'journeyAmberArgb',
+    ]) {
+      expect(
+        'const int $name'.allMatches(journeyCode).length,
+        1,
+        reason:
+            '`$name` is transcribed once, from its own prototype line. A rename '
+            'or a removal is caught here rather than by a reader.',
+      );
+    }
   });
 
   test('the resolution list itself is not a hole', () {

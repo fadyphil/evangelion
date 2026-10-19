@@ -117,8 +117,14 @@ abstract final class EvaMotion {
   //
   // | prototype site | curve | Flutter equivalent |
   // | --- | --- | --- |
-  // | `ds.tsx:438` `QuizOption` — the most-tapped element in the app | `all 250ms cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] |
-  // | `ds.tsx:207` orb mouse-parallax | `transform 0.9s cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] |
+  // | `ds.tsx:438` `QuizOption` — the most-tapped element in the app | `all 250ms cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
+  // | `ds.tsx:207` orb mouse-parallax | `transform 0.9s cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
+  //
+  // **The word "approximation" is the point**, and it was added after a
+  // review found the table asserting an identity that was not there:
+  // [interactiveCurve] is `Cubic(0.19, 1.0, 0.22, 1.0)` and the prototype's
+  // bezier is `Cubic(0.16, 1, 0.3, 1)`. They are close, and the distance is
+  // measured — see [interactiveCurve] for the number.
   //
   // So `QuizOption` — the answer a child presses to answer a question — was never
   // on a plain `easeOut` in the design this app was transcribed from. "No bounce,
@@ -150,10 +156,30 @@ abstract final class EvaMotion {
 
   /// `cubic-bezier(0.16, 1, 0.3, 1)` — the prototype's own interactive curve.
   ///
-  /// [Curves.easeOutExpo] is that bezier. It leaves the gate faster than any other
-  /// curve here and then spends a long tail settling, which is why it reads as
-  /// "responsive" rather than "abrupt" — and why a 250ms `QuizOption` press felt
-  /// deliberate in the prototype.
+  /// ## IT IS AN **APPROXIMATION** OF THAT BEZIER, AND NOT THE SAME CURVE
+  ///
+  /// [Curves.easeOutExpo] is `Cubic(0.19, 1.0, 0.22, 1.0)`, and the
+  /// prototype's `--e-light` is `Cubic(0.16, 1, 0.3, 1)`. **They are not the
+  /// same curve** — this doc once said they were, and a review found the
+  /// claim false.
+  ///
+  /// The approximation is close, and the distance is **measured**: over the
+  /// whole curve the two differ by at most **2.53%** of the progress, and the
+  /// worst of it is at x ≈ 0.054, where the prototype's curve is ahead by
+  /// 0.025. A screen that draws a one-second animation from it cannot tell
+  /// the two apart; a screen that transcribes the prototype's rule for its
+  /// own sake can, and does.
+  ///
+  /// **AND A SCREEN THAT NEEDS THE PROTOTYPE'S OWN CURVE TRANSCRIBES IT.**
+  /// `/journey`'s rings are the case: `journey_rings_row.dart`'s `drawCurve`
+  /// is `Cubic(0.16, 1, 0.3, 1)`, transcribed from `eva/redesign.html:18`,
+  /// and the divergence from this token is recorded **at the site** — which is
+  /// the shape this file asks of every approximation it makes.
+  ///
+  /// It leaves the gate faster than any other curve here and then spends a
+  /// long tail settling, which is why it reads as "responsive" rather than
+  /// "abrupt" — and why a 250ms `QuizOption` press felt deliberate in the
+  /// prototype.
   ///
   /// **No overshoot.** It is monotone. Anything that overshoots belongs to
   /// [achievementSpring], and that is the whole reason the two are separate.

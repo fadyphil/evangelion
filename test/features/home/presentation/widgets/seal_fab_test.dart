@@ -41,8 +41,8 @@ import '../../../../support/home_harness.dart';
 /// **Language is absent, and Gate 2 is why.** `showLanguageSheet` lives in
 /// `features/settings/`, and `injection_test.dart` forbids one feature importing
 /// another. The import was written, the gate named it, and it was removed rather than
-/// suppressed — so this is two items, and the third needs `language_sheet.dart` promoted
-/// into the shared kernel, which is a larger change than placing a dial.
+/// suppressed — so this is three items, and a fourth needs `language_sheet.dart`
+/// promoted into the shared kernel, which is a larger change than placing a dial.
 ///
 /// The board takes Profile's slot: Profile is cut for want of an endpoint, and the
 /// board is the one prototype destination with no other entry point on `/`.
@@ -52,7 +52,19 @@ import '../../../../support/home_harness.dart';
 /// "Leaderboard" until Task 5.5 renamed the route, and leaving the two arms of
 /// the same key saying different things — "Communion" in Arabic, "Leaderboard" in
 /// English — was the defect the ARB's own description names.
-const List<String> _items = <String>['Settings', 'Communion'];
+///
+/// **And the third item is the journey**, added by Task 5.6. **The profile is
+/// BACK** — ADR-0001 cut it for want of an endpoint and ADR-0022 restored it, and
+/// the redesign names it "Journey" (`eva/redesign.html:933`) and makes it a
+/// **dock tab** (`:707`). The redesign's real entry is the five-tab dock, which is
+/// Phase 6's; until then the dial is the interim holder of the destinations `/`
+/// cannot otherwise reach, and it already held the board — the prototype's other
+/// dock tab (`:706`).
+///
+/// **So the label is "Journey", not "Profile"** — the redesign renamed the screen,
+/// and the "Profile stays absent" assertion below still holds: the profile is here,
+/// under the name the redesign gives it.
+const List<String> _items = <String>['Settings', 'Communion', 'Journey'];
 
 /// Advances past the entrance animation so the pills are actually present.
 ///
@@ -165,11 +177,20 @@ void main() {
       // Profile would either navigate nowhere or, worse, be "fixed" later by pointing
       // Profile at some other screen — which is the product decision decision 32
       // refused to make and recorded as visible debt.
+      //
+      // **The profile is BACK since Task 5.6, and it is still not called
+      // "Profile".** ADR-0022 restored the screen and the redesign renamed it
+      // "Journey" (`eva/redesign.html:933`), so the dial offers the journey and
+      // this assertion still holds — the *name* the cut screen had is still absent,
+      // and a future change that put a "Profile" pill back would be a screen with
+      // no route behind it.
       expect(find.text('Profile'), findsNothing);
-      // And nothing slipped in beside the two — in particular **not Language**, which
-      // Gate 2 puts out of this feature's reach. Asserting its absence here means a
-      // future change that does promote the sheet has to come and delete this line.
-      expect(find.byType(SealFabPill), findsNWidgets(2));
+      expect(find.text('Journey'), findsOneWidget);
+      // And nothing slipped in beside the three — in particular **not Language**,
+      // which Gate 2 puts out of this feature's reach. Asserting its absence here
+      // means a future change that does promote the sheet has to come and delete
+      // this line.
+      expect(find.byType(SealFabPill), findsNWidgets(3));
       expect(find.text('Language'), findsNothing);
     });
     testWidgets('tapping the trigger again closes it', (
@@ -179,7 +200,8 @@ void main() {
       await tester.tap(find.byType(SealFabTrigger));
       await tester.pump();
       await tester.pump(EvaMotion.base);
-      expect(find.byType(SealFabPill), findsNWidgets(2));
+      // **Three, since Task 5.6** — the journey joined the board and Settings.
+      expect(find.byType(SealFabPill), findsNWidgets(3));
       await tester.tap(find.byType(SealFabTrigger));
       await tester.pump();
       await tester.pump(EvaMotion.base);

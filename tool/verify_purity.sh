@@ -323,7 +323,7 @@ echo
 # ---------------------------------------------------------------------------
 # Gate 4 — the route inventory is readable.
 #
-# The six route paths are locked by AGENT_CONTEXT §2, and the structural
+# The route paths are locked by AGENT_CONTEXT §2, and the structural
 # invariants over them (no collisions, no stray whitespace, no uppercase, one
 # root, one wildcard) are asserted in `test/core/navigation/app_routes_test.dart`
 # over an inventory read from the declaration site. Dart has no reflection, so

@@ -217,8 +217,23 @@ bool _identicalBytes(File a, File b) =>
 ///
 /// It is a **constant** so that the two walks cannot disagree, and it is a
 /// **single** list so that a new golden directory is added in one place.
+///
+/// ## AND WHY A NEW DIRECTORY IS **ADDED HERE** AND NOT LEFT OUT
+///
+/// Task 5.6's `/journey` goldens land in `test/features/journey/goldens`, and
+/// the list is where a directory becomes **walked**. A directory the gate does
+/// not walk is a directory whose pairs are never compared — so its two themes
+/// could be byte-identical and nothing would say so, which is the exact
+/// failure this gate exists for.
+///
+/// The two journeys' directories are at different depths
+/// (`test/features/leaderboard/presentation/goldens` and
+/// `test/features/journey/goldens`), and the walk resolves each entry against
+/// the package root, so the depth is part of the path and not a convention
+/// this gate has to know about.
 const List<String> kGoldenRoots = <String>[
   'test/core/design_system/widgets/goldens',
   'test/core/design_system/effects/goldens',
   'test/features/leaderboard/presentation/goldens',
+  'test/features/journey/goldens',
 ];

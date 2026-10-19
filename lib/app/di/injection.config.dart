@@ -36,6 +36,17 @@ import '../../features/home/domain/usecases/load_library_catalogue.dart'
     as _i151;
 import '../../features/home/domain/usecases/load_streak_summary.dart' as _i605;
 import '../../features/home/domain/usecases/load_today_reading.dart' as _i1067;
+import '../../features/journey/data/datasources/medal_local_data_source.dart'
+    as _i136;
+import '../../features/journey/domain/medal_repository.dart' as _i988;
+import '../../features/journey/domain/usecases/get_journey_reader_session.dart'
+    as _i900;
+import '../../features/journey/domain/usecases/load_journey_sky_count.dart'
+    as _i592;
+import '../../features/journey/domain/usecases/load_journey_streak_history.dart'
+    as _i915;
+import '../../features/journey/domain/usecases/load_journey_streak_summary.dart'
+    as _i702;
 import '../../features/leaderboard/data/datasources/cheer_local_data_source.dart'
     as _i875;
 import '../../features/leaderboard/domain/usecases/get_board_reader_session.dart'
@@ -66,6 +77,7 @@ import '../../features/sky/data/datasources/sky_local_data_source.dart'
 import 'modules/auth_module.dart' as _i4;
 import 'modules/core_module.dart' as _i134;
 import 'modules/home_module.dart' as _i443;
+import 'modules/journey_module.dart' as _i491;
 import 'modules/leaderboard_module.dart' as _i820;
 import 'modules/quiz_module.dart' as _i697;
 import 'modules/reading_module.dart' as _i768;
@@ -82,6 +94,7 @@ extension GetItInjectableX on _i174.GetIt {
     final authModule = _$AuthModule();
     final coreModule = _$CoreModule();
     final homeModule = _$HomeModule();
+    final journeyModule = _$JourneyModule();
     final leaderboardModule = _$LeaderboardModule();
     final quizModule = _$QuizModule();
     final readingModule = _$ReadingModule();
@@ -131,6 +144,24 @@ extension GetItInjectableX on _i174.GetIt {
       () => homeModule.loadLibraryCatalogue,
     );
     gh.lazySingleton<_i806.GetReaderSession>(() => homeModule.getReaderSession);
+    gh.lazySingleton<_i900.GetJourneyReaderSession>(
+      () => journeyModule.getJourneyReaderSession,
+    );
+    gh.lazySingleton<_i702.LoadJourneyStreakSummary>(
+      () => journeyModule.loadJourneyStreakSummary,
+    );
+    gh.lazySingleton<_i915.LoadJourneyStreakHistory>(
+      () => journeyModule.loadJourneyStreakHistory,
+    );
+    gh.lazySingleton<_i592.LoadJourneySkyCount>(
+      () => journeyModule.loadJourneySkyCount,
+    );
+    gh.lazySingleton<_i988.MedalRepository>(
+      () => journeyModule.medalRepository,
+    );
+    gh.lazySingleton<_i136.MedalLocalDataSource>(
+      () => journeyModule.medalLocalDataSource,
+    );
     gh.lazySingleton<_i307.LeaderboardRepository>(
       () => leaderboardModule.leaderboardRepository,
     );
@@ -186,6 +217,8 @@ class _$AuthModule extends _i4.AuthModule {}
 class _$CoreModule extends _i134.CoreModule {}
 
 class _$HomeModule extends _i443.HomeModule {}
+
+class _$JourneyModule extends _i491.JourneyModule {}
 
 class _$LeaderboardModule extends _i820.LeaderboardModule {}
 

@@ -91,6 +91,8 @@ void main() {
           AppRoutes.result,
           AppRoutes.settings,
           AppRoutes.communion,
+          // **Task 5.6's eighth screen** — the profile ADR-0022 restored.
+          AppRoutes.journey,
           // `*` last, always. Moving it to the front turns every path into `/` —
           // measured at 46 tests when it was tried.
           AppRoutes.fallback,
@@ -111,8 +113,14 @@ void main() {
       // internals that could change without anything here breaking.
       expect(
         fallback.page.name,
+        // **`isIn` and not `anyOf`.** `anyOf` takes a fixed number of
+        // positional arguments — seven — so the eighth screen did not fit and
+        // the file would have had to drop one route from the check to
+        // compile. A list matcher has no such ceiling, and the shape of the
+        // claim is unchanged: the wildcard's page is not any of the real
+        // screens'.
         isNot(
-          anyOf(
+          isIn(<String>[
             LoginRoute.name,
             HomeRoute.name,
             ReadingRoute.name,
@@ -120,7 +128,9 @@ void main() {
             ResultRoute.name,
             SettingsRoute.name,
             CommunionRoute.name,
-          ),
+            // **Task 5.6 added the eighth.**
+            JourneyRoute.name,
+          ]),
         ),
         reason: 'the bare asterisk has no page to build; it redirects',
       );
@@ -144,6 +154,9 @@ void main() {
         // above is why this line is the only edit: the count was never written down,
         // precisely so that adding a screen would not mean renumbering a `take`.
         CommunionRoute.name,
+        // **Task 5.6's eighth screen** — the profile ADR-0022 restored, and
+        // the redesign's third dock tab (`eva/redesign.html:707`).
+        JourneyRoute.name,
       ], reason: 'the locked screens, in route-table order');
     });
 

@@ -202,9 +202,16 @@ bloc builds it **in the test body**, with `addTearDown(…close)`.
 
 `lib/app/router/app_router.dart` · `auth_guard.dart`
 
-**8 entries in `AppRouter.routes`**: 7 `AutoRoute`s (`/login`, `/`, `/reading`, `/quiz`,
-`/result`, `/settings`, `/leaderboard`) and a `RedirectRoute` for `*`. **9 constants**
-exist in `app_routes.dart`; `/servant` is declared deliberately unrouted.
+**9 entries in `AppRouter.routes`**: 8 `AutoRoute`s (`/login`, `/`, `/reading`, `/quiz`,
+`/result`, `/settings`, `/communion`, `/journey`) and a `RedirectRoute` for `*`.
+**10 constants** exist in `app_routes.dart`; `/servant` is declared deliberately
+unrouted.
+
+**The counts are three tasks old.** `/leaderboard` was renamed `/communion` in Task
+5.5 and `/journey` was added in Task 5.6, and this paragraph kept the old numbers —
+which is the drift `docs/DRIFT.md` catalogues, and the reason the **route inventory
+test** spells its list out instead of counting: a count in a paragraph is a claim
+about a number that nobody checks, while a count in a test is a claim that fails.
 
 **The guard.** `AuthGuard` depends on `AuthStatus` — one member, `bool get
 isAuthenticated` — not on `AuthBloc`, which did not exist when it was designed.

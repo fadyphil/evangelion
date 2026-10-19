@@ -178,16 +178,25 @@ passing vacuously. Seven `vacuousBecause: null` call sites stand behind that
 list, and every one of them is currently null — which means the gate is not
 vacuous on any screen it covers.
 
-### Two screens have no prototype harness at all
+### One screen has no prototype harness at all — and it is the one being deleted
 
-`/login`, `/`, `/quiz`, `/reading`, and `/result` each have a geometry harness
-that parses the prototype **at test time**. `/settings` and `/leaderboard` have
-none.
+**Seven of the eight screens have a test that reads the prototype at test time**
+— `/login`, `/`, `/reading`, `/quiz`, `/settings`, `/communion` and `/journey` —
+and **the one that does not is `/result`**, the modal Phase 6 retires.
 
-That is the part worth pausing on. Those two screens are verified against
-**no** prototype today, and they will stay that way unless the overhaul adds a
-harness for them. A reader skimming a green gate run would reasonably assume
-every screen is prototype-checked; on this repository, two of seven are not.
+**The narrow claim this paragraph used to make is gone, and it stopped being true
+as the redesign landed.** It said `/settings` and `/leaderboard` had **none**;
+the board's golden suite and the settings' own suite now read `eva/redesign.html`
+when they run, and the journey's medals test reads the prototype's own i18n
+table to check the four medal names it transcribes. What remains of the worry is
+smaller: the **geometry harnesses that parse the prototype's stylesheet** are
+still fewer than the screens, because a screen whose numbers a human transcribed
+can be pinned by those numbers while a screen whose numbers are *derived* from
+the stylesheet has to parse it.
+
+A reader skimming a green gate run would reasonably assume every screen is
+prototype-checked; on this repository, **one of eight** is not — and it is the
+one the redesign is deleting.
 
 ## Blocked on the backend
 
@@ -371,7 +380,7 @@ These are reported as findings, not as work someone forgot.
 | `docs/SEAMS.md:267` (Seam 7) | `lib/app/app.dart` hard-codes `ThemeMode.dark` | it switches over a persisted setting |
 | `AGENTS.md:127` | 27 design-system widgets | 23 |
 | `lib/app/router/app_router.dart:9`, `:23`, `:214` | six routes, six locked routes, six features | 7 |
-| `README.md` — "Four of these are deliberately inert" | four **screens** | none: `/login`, `/`, `/reading` and `/quiz` were rebuilt in Phase 5.1-5.4. What still says "unavailable in this build" is two **controls** — `/`'s library cards and `/reading`'s pill controls — not four screens. The paragraph's other half ("no passage library and no user profile") is still true and is ADR-0001's, which ADR-0022 reverses in Phase 5.6 |
+| `README.md` — "Four of these are deliberately inert" | four **screens** | none: `/login`, `/`, `/reading` and `/quiz` were rebuilt in Phase 5.1-5.4. What still says "unavailable in this build" is two **controls** — `/`'s library cards and `/reading`'s pill controls — not four screens. The paragraph's other half ("no passage library and no user profile") was true until Task 5.6, which landed the profile as `/journey` and left the passage library cut |
 | `lib/app/di/navigation_injection.dart:58` | five hand-written registrations | 10 |
 | `lib/core/design_system/tokens/eva_colors.dart:123`, `:213` | light `ember` is 2.05:1 | 2.11:1 |
 | `lib/features/home/presentation/pages/home_page.dart:489` | light `ember` is 2.05:1 | 2.11:1 |

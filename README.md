@@ -57,10 +57,15 @@ corpus to show is the server's — the client reads the `language` field the
 response carried and follows it. Typography, pluralization and layout all branch
 on that.
 
-**Four of the seven screens read live data; three do not.** Reading, quiz,
-result and the leaderboard come from a REST API. Login is UI-only against a
-fake repository because the backend has no auth endpoint. Settings are local to
-the device with no server sync.
+**Five of the eight screens read live data; three do not.** Reading, quiz,
+result, the leaderboard and the journey come from a REST API. Login is UI-only
+against a fake repository because the backend has no auth endpoint. Settings are
+local to the device with no server sync.
+
+The journey is the **mixed** one: its streak, its rings and its constellations
+come from `GET /streak`, its lit stars from the device's own sky, and its
+**medals from a stub** — the backend has no achievements endpoint, so the four
+medals and their "4 / 12" are ADR-0022's fiction behind a repository port.
 
 **The verification regime is unusual and deliberate.** `dart analyze` runs with
 `--fatal-infos --fatal-warnings`, there are **no** `// ignore:` comments in
@@ -73,7 +78,7 @@ it is the most distinctive engineering decision in the repository.
 
 ## Screens
 
-Seven screens, seven routes, and a catch-all redirect. The screen count in the
+Eight screens, eight routes, and a catch-all redirect. The screen count in the
 authority document is stale — see [ROADMAP.md § Docs debt](ROADMAP.md#docs-debt-findings-from-re-measurement).
 
 | Route | Screen | Data source |
@@ -85,11 +90,14 @@ authority document is stale — see [ROADMAP.md § Docs debt](ROADMAP.md#docs-de
 | `/result` | Score, streak, stat tiles | **API** — the submit response, held in memory |
 | `/settings` | Appearance, reading, about | Local — `shared_preferences` |
 | `/communion` | The Communion — the cohort's board | **API**, or a stub via `--dart-define` |
+| `/journey` | The Journey — the reader's own profile | **API** (streak) · local (stars) · a stub (medals) |
 
 Four of these are deliberately inert and say so in their own accessible names —
 "unavailable in this build" — rather than pretending to work. There is no
-passage library and no user profile, because the backend has no endpoints for
-either. See [ADR-0001](docs/adr/0001-six-screens-library-and-profile-cut.md).
+passage library, because the backend has no endpoint for one; the **profile is
+back**, as `/journey`, with the parts the backend cannot answer stubbed behind
+ports. See [ADR-0001](docs/adr/0001-six-screens-library-and-profile-cut.md) and
+[ADR-0022](docs/adr/0022-full-fidelity-redesign-supersedes-0001.md).
 
 `/result` is **not deep-linkable**, and that is deliberate rather than a bug: the
 submit response exists only as the reply to a `POST`, so `ResultPage` takes it as
@@ -112,7 +120,7 @@ flutter run -d linux
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
-Four of the seven screens need a running backend. See
+Five of the eight screens need a running backend. See
 [Running the backend](#running-the-backend) — there are two environment traps
 there that each cost an afternoon if you meet them cold.
 

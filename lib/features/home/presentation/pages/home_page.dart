@@ -160,8 +160,8 @@ class HomePage extends StatelessWidget {
       // where the prototype writes them — [kGreetGutter] on the greeting and
       // [kScrollGutter] on the column below it.
       padding: EdgeInsets.zero,
-      // Interim chrome — see the class doc. Settings and the board have no other
-      // entry point until Phase 6's dock.
+      // Interim chrome — see the class doc. Settings, the board and the journey
+      // have no other entry point until Phase 6's dock.
       overlay: SealFab(
         items: <SealFabItem>[
           SealFabItem(
@@ -175,6 +175,25 @@ class HomePage extends StatelessWidget {
             // Profile stays absent so a dead route cannot creep back.
             label: context.l10n.sealFabLeaderboard,
             onTap: () => context.router.pushPath(AppRoutes.communion),
+          ),
+          SealFabItem(
+            // **The journey, and this is the item that discharges a piece of
+            // recorded debt.** ADR-0001 cut the profile for want of an endpoint and
+            // ADR-0022 restored it; the redesign calls it "Journey"
+            // (`eva/redesign.html:933`) and makes it a **dock tab** (`:707`), so its
+            // real entry is Phase 6's dock.
+            //
+            // **The dial is the interim holder of exactly that kind of destination**
+            // — it already holds the board, the prototype's other dock tab (`:706`),
+            // and Settings, which the redesign's `/` has no other way to reach
+            // either. So the journey goes here rather than nowhere.
+            //
+            // **And the label is "Journey", not "Profile".** The redesign renamed
+            // the screen, and `seal_fab_test.dart`'s "Profile stays absent"
+            // assertion still holds: the profile is here, under the name the
+            // redesign gives it.
+            label: context.l10n.journeyTitle,
+            onTap: () => context.router.pushPath(AppRoutes.journey),
           ),
         ],
       ),

@@ -16,6 +16,12 @@ import 'package:evangelion/features/home/domain/usecases/load_library_catalogue.
 import 'package:evangelion/features/home/domain/usecases/load_streak_summary.dart';
 import 'package:evangelion/features/home/domain/usecases/load_today_reading.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
+import 'package:evangelion/features/journey/domain/medal_repository.dart';
+import 'package:evangelion/features/journey/domain/usecases/get_journey_reader_session.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_sky_count.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_streak_history.dart';
+import 'package:evangelion/features/journey/domain/usecases/load_journey_streak_summary.dart';
+import 'package:evangelion/features/journey/presentation/bloc/journey_cubit.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/load_leaderboard.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
@@ -210,6 +216,21 @@ void configureNavigation() {
     getReaderSession: getIt<GetBoardReaderSession>(),
     cheerRepository: getIt<CheerRepository>(),
   );
+  // Hand-registered for the same reason `LeaderboardCubit` is: `flutter_bloc`
+  // re-exports the widget layer, so a `@module` naming a cubit would drag
+  // `package:flutter` into `injection.dart`'s import graph and
+  // `injection_test.dart` would fail on it.
+  //
+  // `registerSingleton`, not `registerLazySingleton`: the cubit holds state, so
+  // two instances would be two journeys, and `/journey` re-entering must see the
+  // one that is live.
+  final JourneyCubit journeyCubit = JourneyCubit(
+    getReaderSession: getIt<GetJourneyReaderSession>(),
+    loadStreakSummary: getIt<LoadJourneyStreakSummary>(),
+    loadStreakHistory: getIt<LoadJourneyStreakHistory>(),
+    loadSkyCount: getIt<LoadJourneySkyCount>(),
+    medalRepository: getIt<MedalRepository>(),
+  );
 
   // **Built here, not resolved from the locator** — see the `QuizBloc` section for
   // the mechanism and for why `lastResult` makes the singleton load-bearing.
@@ -288,6 +309,7 @@ void configureNavigation() {
     ..registerSingleton<HomeBloc>(homeBloc)
     ..registerSingleton<ReadingCubit>(readingCubit)
     ..registerSingleton<LeaderboardCubit>(leaderboardCubit)
+    ..registerSingleton<JourneyCubit>(journeyCubit)
     ..registerSingleton<QuizBloc>(quizBloc)
     ..registerSingleton<SettingsCubit>(settingsCubit)
     ..registerSingleton<SkyCubit>(skyCubit)

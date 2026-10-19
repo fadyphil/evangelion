@@ -158,6 +158,10 @@ void main() {
       AppRoutes.result,
       AppRoutes.settings,
       AppRoutes.communion,
+      // **Task 5.6 added the journey**, and the comment above's point is
+      // the one it proves: a constant nobody mirrored here would have
+      // landed in the gap unnoticed.
+      AppRoutes.journey,
       AppRoutes.servant,
       AppRoutes.fallback,
     };

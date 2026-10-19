@@ -148,7 +148,7 @@ abstract class AppLocalizations {
 
   /// Appended to a permanently-disabled control's name, so a screen reader announces WHY it cannot be pressed instead of only that it cannot.
   ///
-  /// NAMESPACED `auth*` because FOUR features carry a field of this name and they are NOT the same string: /quiz's says there is no answer to show. See `quizUnavailableSuffix`.
+  /// NAMESPACED `auth*` because **FIVE** features carry a field of this name and they are NOT all the same string: `/quiz`'s says there is no answer to show, and the other four say the same thing. See `quizUnavailableSuffix`.
   ///
   /// APPENDED BY THE CALL SITE, NEVER BAKED IN — the two inert ghost pills on `/login` share labels, and a suffix inside the label would render "unavailable in this build - unavailable in this build".
   ///
@@ -200,7 +200,7 @@ abstract class AppLocalizations {
 
   /// Appended to a control's accessible name while the control is inert — the library's book cards and the selah circle.
   ///
-  /// **Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because four features carry this field name and `/quiz`'s differs.
+  /// **Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because **five** features carry this field name and `/quiz`'s differs.
   ///
   /// In en, this message translates to:
   /// **'unavailable in this build'**
@@ -647,7 +647,7 @@ abstract class AppLocalizations {
 
   /// Appended to the CTA's accessible name when there is nothing to submit.
   ///
-  /// NAMESPACED `quiz*` BECAUSE THIS IS NOT THE SAME STRING AS THE OTHER THREE. `authUnavailableSuffix`, `homeUnavailableSuffix` and `readingUnavailableSuffix` all say "unavailable in this build"; this one says why *this* control is unavailable, which is §14's actual requirement and a different fact.
+  /// NAMESPACED `quiz*` BECAUSE THIS IS NOT THE SAME STRING AS THE OTHER FOUR. `authUnavailableSuffix`, `homeUnavailableSuffix`, `readingUnavailableSuffix` and `journeyUnavailableSuffix` all say "unavailable in this build"; this one says why *this* control is unavailable, which is §14's actual requirement and a different fact.
   ///
   /// In en, this message translates to:
   /// **'there is no answer to show'**
@@ -721,7 +721,7 @@ abstract class AppLocalizations {
 
   /// Appended to a control's name while that control is inert.
   ///
-  /// The same wording, and the same reasoning, as `authUnavailableSuffix` and `homeUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; /quiz's is a different string.
+  /// The same wording, and the same reasoning, as `authUnavailableSuffix`, `homeUnavailableSuffix` and `journeyUnavailableSuffix`: a reader should be told WHY a control cannot be pressed, not only that it cannot. NAMESPACED `reading*`; `/quiz`'s is a different string, and `/journey`'s is the same as this one.
   ///
   /// In en, this message translates to:
   /// **'unavailable in this build'**
@@ -1088,6 +1088,183 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'bookmark removed'**
   String get readingBookmarkOff;
+
+  /// `eva/redesign.html:933` — the i18n row `journey`, rendered by `:579`'s `.ttl`.
+  ///
+  /// The screen's own name, and it is the redesign's name for the **profile**: ADR-0022 restored the profile ADR-0001 cut, and the redesign calls it "Journey". The route is `/journey` for the same reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Journey'**
+  String get journeyTitle;
+
+  /// `eva/redesign.html:933` — the i18n row `scribe`, rendered by `:588`'s `.jrole`.
+  ///
+  /// **The level is an unconditioned literal and there is no levels endpoint.** The backend ships fourteen routes and none of them is a level, a rank or a title; the prototype writes `scribe · level 7` and never changes it. So the whole line is transcribed copy, and the "7" is **not** derived from anything — recorded as a divergence at the widget.
+  ///
+  /// **The Arabic arm embeds the Arabic-Indic `٧` in the source string** (the prototype's own row, `:933`), so it is a literal in the ARB rather than a `digits()` call at the call site.
+  ///
+  /// In en, this message translates to:
+  /// **'scribe · level 7'**
+  String get journeyScribe;
+
+  /// `eva/redesign.html:934` — the i18n row `streakSub`, rendered by `:590`.
+  ///
+  /// The line under the hero number. The hero number above it is the reader's **real** `current_streak` (`GET /streak/summary`); this line is the prototype's own copy.
+  ///
+  /// In en, this message translates to:
+  /// **'day streak · keep the flame'**
+  String get journeyStreakSub;
+
+  /// `eva/redesign.html:935` — the i18n row `rlVerses`, rendered by `:592`.
+  ///
+  /// **The label is the prototype's, and the quantity behind it is not.** The backend counts **questions**, not verses (`streak.service.ts:5-17` carries `total_questions` / `answered_questions` / `correct_answers` and no verse count at all), so the ring under this label is a **scheduled-day completion ratio**. The divergence is recorded at the derivation, and it is the same shape as recorded decision 27's "beads count questions".
+  ///
+  /// In en, this message translates to:
+  /// **'verses'**
+  String get journeyRingVerses;
+
+  /// `eva/redesign.html:935` — the i18n row `rlQuizzes`, rendered by `:593`.
+  ///
+  /// **This ring is a count, and it is the only one that is.** The prototype writes `data-v="86"` with **no** percent sign where its two neighbours write `83%` and `92%` — an inconsistency in the prototype's own markup, resolved **deliberately** rather than transcribed: the quantity is the number of questions answered, so a percent sign on it would be a unit the number does not have.
+  ///
+  /// In en, this message translates to:
+  /// **'quizzes'**
+  String get journeyRingQuizzes;
+
+  /// `eva/redesign.html:935` — the i18n row `rlAcc`, rendered by `:594`.
+  ///
+  /// Correct answers over answered questions, across the thirty-day history the endpoint returns.
+  ///
+  /// In en, this message translates to:
+  /// **'accuracy'**
+  String get journeyRingAccuracy;
+
+  /// `eva/redesign.html:968` — the i18n row `sky`, rendered by `:596`.
+  ///
+  /// In en, this message translates to:
+  /// **'sky'**
+  String get journeySky;
+
+  /// `eva/redesign.html:968` — the i18n row `stars`, rendered by `:596`.
+  ///
+  /// **Real.** `SkyRepository.count()` — the port's own doc already names `journey` as the consumer of it, and the prototype's `jSkyN` (`:596`) is written by `updateSkyWidget` (`:1186-1187`) from the same live star set.
+  ///
+  /// In en, this message translates to:
+  /// **'stars lit'**
+  String get journeyStarsLit;
+
+  /// `eva/redesign.html:968` — the i18n row `consts`, rendered by `:596`.
+  ///
+  /// **The prototype's own meaning is "books whose final verse was lit"** (`constDone`, `:1132`, set at `:1156-1157`). This client has no book-completion record, so the count is a **proxy** — the distinct books among the completed scheduled days — and the proxy is recorded at the derivation with what it gives up.
+  ///
+  /// In en, this message translates to:
+  /// **'constellations'**
+  String get journeyConstellations;
+
+  /// `eva/redesign.html:936` — the i18n row `medals`, rendered by `:597`'s `.car-label`.
+  ///
+  /// In en, this message translates to:
+  /// **'medals'**
+  String get journeyMedals;
+
+  /// `eva/redesign.html:937` — the i18n row `m1`, rendered by `:599`'s `.mn`.
+  ///
+  /// **One of four medals the prototype draws as static markup.** The four medals, their glyphs and their count are ADR-0022's fiction: "No screen may render a hard-coded … medal …; the fiction lives in data sources". The **names** are copy and live here; **which** medals exist, and how many of the twelve are earned, come from the medals port.
+  ///
+  /// In en, this message translates to:
+  /// **'first light'**
+  String get journeyMedalFirstLight;
+
+  /// `eva/redesign.html:937` — the i18n row `m2`, rendered by `:600`'s `.mn`.
+  ///
+  /// The only one of the four whose emblem is a **typographic** glyph — `❧` (U+2767), which the `cmap` measurement puts in **EBGaramond only**. It is therefore drawn in the scripture family, pinned, on both arms.
+  ///
+  /// In en, this message translates to:
+  /// **'psalmist'**
+  String get journeyMedalPsalmist;
+
+  /// `eva/redesign.html:937` — the i18n row `m3`, rendered by `:601`'s `.mn`.
+  ///
+  /// The `×` is U+00D7, which is in all five bundled families. The `7` is Latin in the prototype's own string; the Arabic arm is the prototype's `٧ أيام`.
+  ///
+  /// In en, this message translates to:
+  /// **'streak ×7'**
+  String get journeyMedalStreakSeven;
+
+  /// `eva/redesign.html:937` — the i18n row `m4`, rendered by `:602`'s `.mn`.
+  ///
+  /// In en, this message translates to:
+  /// **'john'**
+  String get journeyMedalJohn;
+
+  /// `eva/redesign.html:938` — the i18n row `account`, rendered by `:604`'s `.car-label`.
+  ///
+  /// In en, this message translates to:
+  /// **'account'**
+  String get journeyAccount;
+
+  /// `eva/redesign.html:939` — the i18n row `rowBoard`, rendered by `:605`'s `.srow`.
+  ///
+  /// The board's own title — the same word the screen it navigates to uses (`leaderboardTitle`, `eva/redesign.html:939`'s `commG` row).
+  ///
+  /// In en, this message translates to:
+  /// **'The Communion'**
+  String get journeyRowBoard;
+
+  /// `eva/redesign.html:938` — the i18n row `rowSet`, rendered by `:606`'s `.srow`.
+  ///
+  /// **The app bar's gear button names the same destination**, so the tooltip and the row share this one string rather than two that can drift.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get journeyRowSettings;
+
+  /// `eva/redesign.html:938` — the i18n row `rowShare`, rendered by `:607`'s `.srow`.
+  ///
+  /// **The prototype has no handler for this row either** — `el('rowShare')` appears nowhere in the prototype's script, so the button is rendered-and-inert there too. Here it is rendered-**and-disabled**, with the reason in its accessible name, because §14 asks a reader to be told *why* a control cannot be pressed.
+  ///
+  /// In en, this message translates to:
+  /// **'Share progress'**
+  String get journeyRowShare;
+
+  /// `eva/redesign.html:938` — the i18n row `rowPlans`, rendered by `:608`'s `.srow`.
+  ///
+  /// **No handler in the prototype, and no endpoint in the backend** — the fourteen routes include nothing for reading plans. Same treatment as `journeyRowShare`: rendered-and-disabled, with the reason in the accessible name.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading plans'**
+  String get journeyRowPlans;
+
+  /// Appended to a control's accessible name when the control is **inert** — and the
+  /// reason is that the feature is not built in this client.
+  ///
+  /// §14's disabled row: a reader has to be told WHY a control cannot be pressed, not only that it cannot. `LoginPage`'s four inert social buttons and `/`'s avatar are the precedent, and they are the reason /quiz can ship a dead CTA honestly at all.
+  ///
+  /// **The fifth of the `*UnavailableSuffix` keys**, and it reads like the four that say the same thing — `authUnavailableSuffix`, `homeUnavailableSuffix`, `readingUnavailableSuffix` and this one all read "unavailable in this build" — because the reason is the same: the feature is not built in this client. `quizUnavailableSuffix` reads differently because its control is dead for a different reason.
+  ///
+  /// In en, this message translates to:
+  /// **'unavailable in this build'**
+  String get journeyUnavailableSuffix;
+
+  /// `eva/redesign.html` has no retry on the journey — the prototype's screen has no
+  /// data layer to fail — so this is the **fifth** of the per-screen `*Retry` keys
+  /// and it reads like the other four.
+  ///
+  /// **The repository namespaces `retry` per screen on purpose**, and this key is the
+  /// sixth instance of that rule rather than an exception to it: `homeRetry`,
+  /// `quizRetry`, `readingRetry`, `settingsRetry` and `leaderboardRetry` are five
+  /// separate keys with the same value, and the journey's screen borrowing the
+  /// board's would have been the first screen to take another screen's copy.
+  ///
+  /// See `app_localizations_test.dart` for the assertion that keeps the family
+  /// honest — it asserts the *shape* (six of them, five of which say the same
+  /// thing) rather than that they are all equal, because a test that demanded
+  /// they differ would be satisfied by a translator harmonising them and would
+  /// be wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'retry'**
+  String get journeyRetry;
 }
 
 class _AppLocalizationsDelegate

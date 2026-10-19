@@ -10,43 +10,47 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:auto_route/auto_route.dart' as _i8;
-import 'package:evangelion/core/domain/entities/submit_result.dart' as _i15;
+import 'package:auto_route/auto_route.dart' as _i9;
+import 'package:evangelion/core/domain/entities/submit_result.dart' as _i17;
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
-    as _i12;
+    as _i14;
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
-    as _i3;
+    as _i4;
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart'
-    as _i11;
+    as _i12;
 import 'package:evangelion/features/home/presentation/pages/home_page.dart'
     as _i2;
+import 'package:evangelion/features/journey/presentation/bloc/journey_cubit.dart'
+    as _i13;
+import 'package:evangelion/features/journey/presentation/pages/journey_page.dart'
+    as _i3;
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart'
-    as _i10;
+    as _i11;
 import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart'
     as _i1;
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart'
-    as _i13;
+    as _i15;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
-    as _i4;
-import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart'
-    as _i14;
-import 'package:evangelion/features/reading/presentation/pages/reading_page.dart'
     as _i5;
-import 'package:evangelion/features/result/presentation/pages/result_page.dart'
-    as _i6;
-import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart'
+import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart'
     as _i16;
-import 'package:evangelion/features/settings/presentation/pages/settings_page.dart'
+import 'package:evangelion/features/reading/presentation/pages/reading_page.dart'
+    as _i6;
+import 'package:evangelion/features/result/presentation/pages/result_page.dart'
     as _i7;
-import 'package:flutter/material.dart' as _i9;
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart'
+    as _i18;
+import 'package:evangelion/features/settings/presentation/pages/settings_page.dart'
+    as _i8;
+import 'package:flutter/material.dart' as _i10;
 
 /// generated route for
 /// [_i1.CommunionPage]
-class CommunionRoute extends _i8.PageRouteInfo<CommunionRouteArgs> {
+class CommunionRoute extends _i9.PageRouteInfo<CommunionRouteArgs> {
   CommunionRoute({
-    _i9.Key? key,
-    _i10.LeaderboardCubit? cubit,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i11.LeaderboardCubit? cubit,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          CommunionRoute.name,
          args: CommunionRouteArgs(key: key, cubit: cubit),
@@ -55,7 +59,7 @@ class CommunionRoute extends _i8.PageRouteInfo<CommunionRouteArgs> {
 
   static const String name = 'CommunionRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<CommunionRouteArgs>(
@@ -69,9 +73,9 @@ class CommunionRoute extends _i8.PageRouteInfo<CommunionRouteArgs> {
 class CommunionRouteArgs {
   const CommunionRouteArgs({this.key, this.cubit});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i10.LeaderboardCubit? cubit;
+  final _i11.LeaderboardCubit? cubit;
 
   @override
   String toString() {
@@ -91,11 +95,11 @@ class CommunionRouteArgs {
 
 /// generated route for
 /// [_i2.HomePage]
-class HomeRoute extends _i8.PageRouteInfo<HomeRouteArgs> {
+class HomeRoute extends _i9.PageRouteInfo<HomeRouteArgs> {
   HomeRoute({
-    _i9.Key? key,
-    _i11.HomeBloc? bloc,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i12.HomeBloc? bloc,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          HomeRoute.name,
          args: HomeRouteArgs(key: key, bloc: bloc),
@@ -104,7 +108,7 @@ class HomeRoute extends _i8.PageRouteInfo<HomeRouteArgs> {
 
   static const String name = 'HomeRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<HomeRouteArgs>(
@@ -118,9 +122,9 @@ class HomeRoute extends _i8.PageRouteInfo<HomeRouteArgs> {
 class HomeRouteArgs {
   const HomeRouteArgs({this.key, this.bloc});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i11.HomeBloc? bloc;
+  final _i12.HomeBloc? bloc;
 
   @override
   String toString() {
@@ -139,13 +143,62 @@ class HomeRouteArgs {
 }
 
 /// generated route for
-/// [_i3.LoginPage]
-class LoginRoute extends _i8.PageRouteInfo<LoginRouteArgs> {
+/// [_i3.JourneyPage]
+class JourneyRoute extends _i9.PageRouteInfo<JourneyRouteArgs> {
+  JourneyRoute({
+    _i10.Key? key,
+    _i13.JourneyCubit? cubit,
+    List<_i9.PageRouteInfo>? children,
+  }) : super(
+         JourneyRoute.name,
+         args: JourneyRouteArgs(key: key, cubit: cubit),
+         initialChildren: children,
+       );
+
+  static const String name = 'JourneyRoute';
+
+  static _i9.PageInfo page = _i9.PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<JourneyRouteArgs>(
+        orElse: () => const JourneyRouteArgs(),
+      );
+      return _i3.JourneyPage(key: args.key, cubit: args.cubit);
+    },
+  );
+}
+
+class JourneyRouteArgs {
+  const JourneyRouteArgs({this.key, this.cubit});
+
+  final _i10.Key? key;
+
+  final _i13.JourneyCubit? cubit;
+
+  @override
+  String toString() {
+    return 'JourneyRouteArgs{key: $key, cubit: $cubit}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! JourneyRouteArgs) return false;
+    return key == other.key && cubit == other.cubit;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ cubit.hashCode;
+}
+
+/// generated route for
+/// [_i4.LoginPage]
+class LoginRoute extends _i9.PageRouteInfo<LoginRouteArgs> {
   LoginRoute({
-    _i9.Key? key,
-    _i3.LoginResultCallback? onResult,
-    _i12.AuthBloc? bloc,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i4.LoginResultCallback? onResult,
+    _i14.AuthBloc? bloc,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          LoginRoute.name,
          args: LoginRouteArgs(key: key, onResult: onResult, bloc: bloc),
@@ -154,13 +207,13 @@ class LoginRoute extends _i8.PageRouteInfo<LoginRouteArgs> {
 
   static const String name = 'LoginRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<LoginRouteArgs>(
         orElse: () => const LoginRouteArgs(),
       );
-      return _i3.LoginPage(
+      return _i4.LoginPage(
         key: args.key,
         onResult: args.onResult,
         bloc: args.bloc,
@@ -172,11 +225,11 @@ class LoginRoute extends _i8.PageRouteInfo<LoginRouteArgs> {
 class LoginRouteArgs {
   const LoginRouteArgs({this.key, this.onResult, this.bloc});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i3.LoginResultCallback? onResult;
+  final _i4.LoginResultCallback? onResult;
 
-  final _i12.AuthBloc? bloc;
+  final _i14.AuthBloc? bloc;
 
   @override
   String toString() {
@@ -195,12 +248,12 @@ class LoginRouteArgs {
 }
 
 /// generated route for
-/// [_i4.QuizPage]
-class QuizRoute extends _i8.PageRouteInfo<QuizRouteArgs> {
+/// [_i5.QuizPage]
+class QuizRoute extends _i9.PageRouteInfo<QuizRouteArgs> {
   QuizRoute({
-    _i9.Key? key,
-    _i13.QuizBloc? bloc,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i15.QuizBloc? bloc,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          QuizRoute.name,
          args: QuizRouteArgs(key: key, bloc: bloc),
@@ -209,13 +262,13 @@ class QuizRoute extends _i8.PageRouteInfo<QuizRouteArgs> {
 
   static const String name = 'QuizRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<QuizRouteArgs>(
         orElse: () => const QuizRouteArgs(),
       );
-      return _i4.QuizPage(key: args.key, bloc: args.bloc);
+      return _i5.QuizPage(key: args.key, bloc: args.bloc);
     },
   );
 }
@@ -223,9 +276,9 @@ class QuizRoute extends _i8.PageRouteInfo<QuizRouteArgs> {
 class QuizRouteArgs {
   const QuizRouteArgs({this.key, this.bloc});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i13.QuizBloc? bloc;
+  final _i15.QuizBloc? bloc;
 
   @override
   String toString() {
@@ -244,12 +297,12 @@ class QuizRouteArgs {
 }
 
 /// generated route for
-/// [_i5.ReadingPage]
-class ReadingRoute extends _i8.PageRouteInfo<ReadingRouteArgs> {
+/// [_i6.ReadingPage]
+class ReadingRoute extends _i9.PageRouteInfo<ReadingRouteArgs> {
   ReadingRoute({
-    _i9.Key? key,
-    _i14.ReadingCubit? cubit,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i16.ReadingCubit? cubit,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          ReadingRoute.name,
          args: ReadingRouteArgs(key: key, cubit: cubit),
@@ -258,13 +311,13 @@ class ReadingRoute extends _i8.PageRouteInfo<ReadingRouteArgs> {
 
   static const String name = 'ReadingRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ReadingRouteArgs>(
         orElse: () => const ReadingRouteArgs(),
       );
-      return _i5.ReadingPage(key: args.key, cubit: args.cubit);
+      return _i6.ReadingPage(key: args.key, cubit: args.cubit);
     },
   );
 }
@@ -272,9 +325,9 @@ class ReadingRoute extends _i8.PageRouteInfo<ReadingRouteArgs> {
 class ReadingRouteArgs {
   const ReadingRouteArgs({this.key, this.cubit});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i14.ReadingCubit? cubit;
+  final _i16.ReadingCubit? cubit;
 
   @override
   String toString() {
@@ -293,12 +346,12 @@ class ReadingRouteArgs {
 }
 
 /// generated route for
-/// [_i6.ResultPage]
-class ResultRoute extends _i8.PageRouteInfo<ResultRouteArgs> {
+/// [_i7.ResultPage]
+class ResultRoute extends _i9.PageRouteInfo<ResultRouteArgs> {
   ResultRoute({
-    required _i15.SubmitResult result,
-    _i9.Key? key,
-    List<_i8.PageRouteInfo>? children,
+    required _i17.SubmitResult result,
+    _i10.Key? key,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          ResultRoute.name,
          args: ResultRouteArgs(result: result, key: key),
@@ -307,11 +360,11 @@ class ResultRoute extends _i8.PageRouteInfo<ResultRouteArgs> {
 
   static const String name = 'ResultRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ResultRouteArgs>();
-      return _i6.ResultPage(result: args.result, key: args.key);
+      return _i7.ResultPage(result: args.result, key: args.key);
     },
   );
 }
@@ -319,9 +372,9 @@ class ResultRoute extends _i8.PageRouteInfo<ResultRouteArgs> {
 class ResultRouteArgs {
   const ResultRouteArgs({required this.result, this.key});
 
-  final _i15.SubmitResult result;
+  final _i17.SubmitResult result;
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
   @override
   String toString() {
@@ -340,12 +393,12 @@ class ResultRouteArgs {
 }
 
 /// generated route for
-/// [_i7.SettingsPage]
-class SettingsRoute extends _i8.PageRouteInfo<SettingsRouteArgs> {
+/// [_i8.SettingsPage]
+class SettingsRoute extends _i9.PageRouteInfo<SettingsRouteArgs> {
   SettingsRoute({
-    _i9.Key? key,
-    _i16.SettingsCubit? cubit,
-    List<_i8.PageRouteInfo>? children,
+    _i10.Key? key,
+    _i18.SettingsCubit? cubit,
+    List<_i9.PageRouteInfo>? children,
   }) : super(
          SettingsRoute.name,
          args: SettingsRouteArgs(key: key, cubit: cubit),
@@ -354,13 +407,13 @@ class SettingsRoute extends _i8.PageRouteInfo<SettingsRouteArgs> {
 
   static const String name = 'SettingsRoute';
 
-  static _i8.PageInfo page = _i8.PageInfo(
+  static _i9.PageInfo page = _i9.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<SettingsRouteArgs>(
         orElse: () => const SettingsRouteArgs(),
       );
-      return _i7.SettingsPage(key: args.key, cubit: args.cubit);
+      return _i8.SettingsPage(key: args.key, cubit: args.cubit);
     },
   );
 }
@@ -368,9 +421,9 @@ class SettingsRoute extends _i8.PageRouteInfo<SettingsRouteArgs> {
 class SettingsRouteArgs {
   const SettingsRouteArgs({this.key, this.cubit});
 
-  final _i9.Key? key;
+  final _i10.Key? key;
 
-  final _i16.SettingsCubit? cubit;
+  final _i18.SettingsCubit? cubit;
 
   @override
   String toString() {

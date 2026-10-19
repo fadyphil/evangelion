@@ -89,7 +89,7 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(45),
+        hasLength(46),
         reason:
             'the converted set moved, so the table\'s flags are stale. 34 was the '
             'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`, '

@@ -332,7 +332,7 @@ blank frame — left green.
 
 Navigation is `auto_route`, and `AppRouter` declares **8 entries**: seven
 `AutoRoute`s (`/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`,
-`/communion`) and a `RedirectRoute` for `*`, at `app_router.dart:244-267`.
+`/communion`, `/journey`) and a `RedirectRoute` for `*`, at `app_router.dart:244-272`.
 `app_routes.dart` declares **9** route constants — the seven, plus `/servant`,
 which is deliberately declared but not routed, plus the `*` fallback. Gate 4
 verifies all nine are plain string literals, which is what makes the invariants
