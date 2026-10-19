@@ -1421,6 +1421,215 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > uncheerable — was planted back and watched go red, and the cubit's generation guard
 > was removed and watched go red. Gate run: 2988 tests, 98.63% coverage (6713/6806).
 
+> **5.6** (`8034e5b`): `/journey` rebuilt against `:575-610` — **the profile ADR-0001 cut
+> and ADR-0022 restored**, which the redesign names "Journey" (`:933`) and makes its
+> **third dock tab** (`:707`). The eighth route, and AGENT_CONTEXT §2's table grew a
+> row with it.
+>
+> The screen is a **column of figures**, and the question each figure answers decides
+> where it comes from. The **hero number** is `GET /streak/summary`'s `current_streak`
+> (the prototype's `12` is a literal written by JavaScript at `:989`); the **name** is
+> the reader's own session (`:587`'s "Mariam Hanna" is a literal too); the **lit stars**
+> are `SkyRepository.count()` — the port whose own doc already named `journey` as the
+> consumer of `count()` before this screen existed; the **three rings** are derived
+> from `GET /streak`'s thirty-day history; and the **medals** are ADR-0022's fiction
+> behind a **feature-local** port, because §3's placement test is two or more consumers
+> and this has one — the same argument `library_catalogue_repository.dart` makes for
+> the book catalogue.
+>
+> The **rings** are a pure function, `features/journey/domain/journey_rings.dart`, and
+> each of the three carries a divergence that is recorded at the derivation. Ring 1
+> wears the prototype's label — "verses" — over a **scheduled-day completion ratio**,
+> because the backend counts *questions* and has no verse count at all
+> (`streak.service.ts:5-17`); the same shape as recorded decision 27's "beads count
+> questions", and the number is honest while the label is the prototype's. Ring 2 is a
+> **bare count**, which resolves the prototype's own inconsistency deliberately rather
+> than transcribing it: `:593` writes `data-v="86"` with no percent sign where its
+> neighbours write `83%` and `92%`, and a percent sign on a count is a unit the number
+> does not have. Ring 3 is correct over answered. **And the count ring's arc measures
+> something the count does not**: a ring is an arc and an arc is a fraction, and a bare
+> count has no denominator of its own — so the arc is the **share of the scheduled
+> questions that were answered**, a ratio the payload does contain, and the difference
+> between the number and the arc is recorded where they are drawn. **That fourth
+> quantity is the one the brief's fixed API contract did not have**, and the contract
+> moved for it: the arcs of two rings that agree on every other field now differ, which
+> is exactly what the first version of the class's `==` did not notice.
+>
+> The **constellations** count is a **proxy**, and says so: the prototype counts books
+> whose *final verse* was lit (`constDone`, `:1132`), and this client has no
+> book-completion record — the sky keeps keys, a flare flag and a stamp, and the
+> 44-star cap evicts. So the count is the distinct books among the **completed**
+> scheduled days, and the derivation says exactly what that gives up.
+>
+> **The colours were the hardest decision, and it was made by measurement rather than
+> by taste.** Decision 63's policy is "substitute with a token that exists on both
+> themes and record the divergence" — and **there is no token** for the prototype's
+> teal `#3EC9B0`, its blue `#4F74FF`, its cream `#F4E3B2` or its amber `#D98E32`. The
+> nearest vocabulary, the sticker palette, is not close enough to be a transcription.
+> Worse, the **contrast is measured and it fails in the light theme**: the prototype's
+> teal is 1.80:1 and its magenta 2.77:1 against the light canvas, and the prototype
+> has no light override for the strokes (only the track, at `:79`) — **and every
+> candidate token fails too** (sticker teal 1.76, sky 1.67, lavender 2.04, pink 1.91),
+> so substitution does not fix it and a cited transcription of the real colour is both
+> more faithful *and* no worse. The one colour that **is** a token is the magenta:
+> `EvaColors.bloom` is `0x8CE457D6`, so `withValues(alpha: 1)` is `#E457D6` exactly.
+> The four transcribed values live in one feature-local table with a cite per line, and
+> the colour gate's exemption for it **pins the number of colour constructions in that
+> file** — a second one means the table has grown a colour nobody transcribed.
+>
+> **The glyphs were measured, not typed.** U+2726 (`✦`), U+2720 (`✠`), U+2629 (`☩`)
+> and U+2699 (`⚙`) are in **none** of the five bundled families, so none of them is
+> ever typed: the star is **painted**, the gear is `Icons.settings`, the trophy is
+> `Icons.emoji_events`, and the two crosses **unify on the painted star** because no
+> painted cross exists — and the unification is recorded at the site. U+2767 (`❧`) is
+> in **EBGaramond only**, so it is drawn as text in the scripture family, **pinned on
+> both arms**, because it is not Arabic content and the Arabic face has no `❧`. And
+> the percent sign: the prototype's `N()` (`:981`) maps `%` to `٪`,
+> `AppLocalizations.digits` is an int helper with no place for a sign, and a
+> percentage with a Latin sign on an Arabic arm is a translation defect — so the
+> journey has a **feature-local** percent transform and the digits come from the
+> shared one.
+>
+> **The entry point is a correction, and the correction is recorded.** The research
+> said to wire `AppTopBar.onAvatarTap` — and **`AppTopBar` no longer exists**: Phase
+> 5.2 rebuilt `/` against the redesign, and the redesign's `/` (`:513-538`) has no app
+> bar and no avatar at all. Decision 32's "the fix is one argument at one call site"
+> had no call site left. So the **dial** takes the journey — the interim holder of the
+> destinations Home cannot otherwise reach, which already held the **board**, the
+> prototype's other dock tab — and the label is **"Journey"**, the redesign's own word,
+> so `seal_fab_test.dart`'s "Profile stays absent" assertion still holds and was
+> **updated, not deleted**. Decision 155 named two ways to get a third item back and
+> said neither was taken; **the second one was taken**, and the decision is amended
+> rather than quietly contradicted.
+>
+> And because the journey is **pushed** — the redesign's dock is Phase 6's — it carries
+> a **back chevron the prototype's journey does not have**, because a pushed screen on
+> desktop has no system back button. The prototype's own board is also a dock tab and
+> it **does** have a chevron (`:614`), for the same reason.
+>
+> **The orbs were waiting for this screen.** `OrbGroup.profile` has sat in the design
+> system since Phase 2 — cut-and-kept-for-index-alignment, because the profile was cut
+> then — and the journey **is** the profile, so `NeuralVariant.journey` takes the
+> profile's own group. It is the **one group whose first orb cycles backwards**
+> (`ds.tsx:106`), so the orb test's "every variant opens forward" became an exception
+> with a named reason rather than a rule that quietly stopped being true.
+>
+> Keys 126 -> 146, and then **146 -> 147 in the review pass**: the journey's **own**
+> `journeyRetry`, because the screen was borrowing the **board's** retry string, and
+> the repository namespaces `retry` per screen on purpose — `homeRetry`, `quizRetry`,
+> `readingRetry`, `settingsRetry` and `leaderboardRetry` are five separate keys with
+> the same value, and a sixth screen taking another screen's copy is the coupling the
+> rule exists to remove. The medals' *names* are copy and live in the ARB; the medals'
+> *existence* and their "4 / 12" are the fiction and live in the stub — the same split
+> `LibraryBook` draws between a book's name and a book's catalogue. And the
+> `*UnavailableSuffix` family is now **five** keys, four of which say the same thing,
+> and the test asserts that shape rather than "all five differ" — a test that would be
+> satisfied by a translator harmonising them, and would be *wrong*.
+>
+> **Twenty new keys, and one of them was wrong on arrival.** The ARB's Arabic medal
+> name read "بوحنا" where the prototype's `m4` row writes "يوحنا" (`:937`) — a ب for a
+> ي. The medals agent caught it by reading the prototype's own i18n table back out of
+> `eva/redesign.html` at test time, which is why the stub's test reads the prototype
+> rather than a fixture.
+>
+> **And the review found the defects the gates could not.** The **letter-tracking** was
+> the big one: every tracking value on the screen was the prototype's `em` number
+> written straight into Flutter's **logical-pixel** field, so it was 8×–12× too small
+> — and the design system already states the rule and applies it, **including to the
+> very same prototype declaration** (`:408`'s `.14em` is `1.19px` in `StatTile` and
+> `0.14px` on `/journey`). The same prototype rule was being rendered two ways in one
+> app, and the widget's doc claimed a fidelity the code did not deliver. Seven sites,
+> each now carrying the **resolved** value and saying so — the house's wording is
+> "transcribed as the resolved value and not as `em`". The review also caught the
+> draw **curve**: the widget asserted that `--e-light` **is**
+> `EvaMotion.interactiveCurve`, and it is not — the prototype's is
+> `cubic-bezier(.16,1,.3,1)` (`:18`) and the token is `Curves.easeOutExpo` — so the
+> curve is now the prototype's own `Cubic(0.16, 1, 0.3, 1)`, cited, with the token's
+> 1.7%-of-progress difference recorded, and the design system's own doc — which made
+> the same false identity — corrected to say it is an approximation. And it caught the
+> **equality**: `JourneyRings`' `==` and `hashCode` omitted the new `answeredShare`,
+> so two rings whose arcs differed compared **equal** — a defect that could only be
+> found by reading, because neither the freezed suite nor the derivation's own tests
+> varied the field.
+>
+> **The goldens are the coupling, and they were re-recorded and re-checked.** Twenty-two
+> new files — eleven subjects in two themes — and the pairs gate now **walks** the
+> journey's golden directory, because a directory nobody walks is a directory nobody
+> gates. The medals strip is captured at its own content width (488), not at 390,
+> because at 390 the fourth medal is scrolled out and the golden would have pinned
+> three of the four washes and not the blue-versus-amber distinction the prototype
+> draws. And the strip's golden is what shows the **unification** honestly: four
+> washes, and two emblems.
+>
+> **Twenty-nine defects the gates, the reviews and the agents caught, not
+> reading.** **The gates found eight**, and every one of them was an inventory that
+> names a number: the DI's registration list stopped at thirty-nine when the
+> journey added six; the router's route list and its wildcard-last list were both
+> a screen behind; the landing route's "the declared set is COMPLETE" mirror was
+> missing `/journey`; the route inventory was nine names for ten constants; the
+> freezed suite's converted-type set grew by `JourneyState` and the type needed an
+> equality case of its own; **the orphan gate's `SealMonogram` allowlist row went
+> stale** the moment the page placed the seal — a false green, and the gate said
+> so; the colour gate's exemption **pinned the wrong thing**, counting colour
+> *construction sites* while its own failure message claimed it bounded colour
+> *count* — so a fifth transcribed colour could have been added with the gate
+> still green; and the router's `anyOf` matcher takes **seven** positional
+> arguments, so the eighth screen did not fit and the file would not compile.
+>
+> **The reviews found fourteen**, and three of them are the kind of defect a
+> reader would have taken on faith. The **letter-tracking** was the prototype's
+> `em` number written straight into Flutter's **logical-pixel** field — 8×–12×
+> too small at seven sites, while the design system already resolved the **very
+> same** prototype rule correctly in `StatTile` (1.19px against 0.14px), so one
+> declaration was being rendered two ways in one app and the widget's doc claimed
+> a fidelity it did not deliver. The **draw curve**: the widget asserted that
+> `--e-light` **is** `EvaMotion.interactiveCurve`, and it is not — the prototype's
+> is `cubic-bezier(.16,1,.3,1)` and the token is `Curves.easeOutExpo` — so the
+> curve is now the prototype's own, cited, with the measured divergence (at most
+> 1.79% of the draw's progress) recorded, and the design system's own doc — which
+> made the same false identity — corrected to say it is an approximation. And
+> **`JourneyRings` compared by value but omitted one of its four numbers**, so a
+> count ring whose arc had moved compared **equal** to the old one and the cubit
+> never rebuilt. The rest: three vertical-spacing declarations transcribed
+> nowhere and recorded nowhere; a bare `130` where `/` has a named constant; the
+> failure arm borrowing **another screen's** retry string against the rule that
+> namespaces `retry` per screen; three `!`s with no adjacent "provably non-null
+> because…" comment; **nine prototype citations** pointing at lines that say
+> something else; three stale route counts; a decision attributed with the
+> **opposite** of what it says; the medal port's own port count; the ARB's
+> `*UnavailableSuffix` family described as four when it was five; the
+> reduced-motion behaviour presented as a transcription when the prototype's `.rm`
+> does not touch a `transition` at all; and a **two-file import cycle** with a
+> generated third consumer, which made one of the DI file's imports dead in
+> exactly the way nothing can see.
+>
+> **And the agents found seven in each other's work**, which is the argument for
+> running them in parallel and reading each other's output: the **Arabic medal
+> name** read "بوحنا" where the prototype's own i18n table writes "يوحنا" — caught
+> by a test that reads `eva/redesign.html` at test time rather than a fixture; the
+> medals strip's content width given as 460px when it is 452, and a "320"
+> requirement attributed to a CSS-variables line that does not mention it; an
+> `animateRings()` range two lines wide; a misspelled heading; the screen suite
+> making the same 460px mistake; the shared **tooltip probe** releasing its
+> gesture before the long press could win the arena, so a screen whose tooltip
+> repeats a string painted elsewhere had the **button's own tap fire** — a
+> navigation inside a typography probe — and the re-entry reload, which the
+> screen suite caught as a failure and the Arabic gate caught independently.
+>
+> **And one review finding was wrong, and checking it was worth as much as the
+> fixes.** The code-quality review reported the profile orb group's two hue
+> directions transposed against `ds.tsx:104-107` and recommended swapping them.
+> The code does hold `[reverse, forward]` — and so does the prototype:
+> `ds.tsx:106` is the profile's **first** orb and its `hueDir` is
+> `hue-cycle-rev`. The review had read the values and miscounted the lines.
+> Applying the recommendation would have introduced a real bug, and the doc would
+> then have said the opposite of the truth. **A finding is a claim, and this
+> repository's rule is that a claim about a specific thing is checked against the
+> specific thing** — which cuts both ways: it is why fourteen findings were real
+> and why the fifteenth was not.
+>
+> Gate run: 3148 tests, 98.60% coverage (7271/7374).
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
