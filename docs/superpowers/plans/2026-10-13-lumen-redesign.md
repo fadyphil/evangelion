@@ -1328,6 +1328,99 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > ink's — both now carry `onTap` on the `Semantics` node. Gate run: 2883 tests,
 > 98.30% coverage (6083/6188).
 
+> **5.5** (`d8b8484`): `/communion` rebuilt against `:612-636` — and **renamed from
+> `/leaderboard`**: the route, the constant, the page class and the generated route all
+> moved, because the board is "The Communion" / "الشركة" (`eva/redesign.html:615`'s
+> `data-i18n="boardT"`) and ADR-0022 `:121` names the rename. The seventh screen, and
+> AGENT_CONTEXT §2's table grew a row with it.
+>
+> The chrome is the prototype's: a centred app-bar title with a back chevron and a
+> **veil** toggle (`:612-617`), an approximate reset countdown (`:618`), the scope and
+> metric segmented controls (`:620-625`), the **podium** in its 2nd/1st/3rd order with
+> 84/112/64px bars and 40/46/36px orbs (`:1085`), the **you-card** (`:629-633`), and
+> the list — which is `sorted.slice(3)` (`:1110`), **always**, whether or not the podium
+> is drawn. That last is the prototype's own oddity and it is recorded rather than
+> repaired: hiding the podium leaves the top three off the list, because the prototype
+> slices by position and never consults the toggle.
+>
+> The ranking is a **pure function** over the payload, in
+> `features/leaderboard/domain/leaderboard_ranking.dart`: under `light` the wire order
+> is the server's order and is not re-sorted, and under `streaks` — which the server
+> never ranked — the sort is the client's, with the server's `rank` as the tie-break so
+> the same payload cannot render two different boards. The window switch is a request;
+> the **metric** switch is not, because both numbers are already on every row. The
+> prototype's invented month and all-time figures (`×4.35`, `×38.6`, `:1067`) are not
+> ported: ADR-0022 `:97-104` names that as fiction, and nothing here scales.
+>
+> The veil is a **rendering choice over rows that already arrived** — `full_name` is on
+> the wire (`leaderboard.routes.ts:59`) — so it needs no endpoint. A veiled witness
+> becomes `witness {n}` with a painted hollow star (`:1070`, `:1072`); the reader is
+> never veiled, because the prototype checks `p.id==='you'` **before** the veil
+> (`:1069`), and the accessible name follows the rendered one, so a voice-over user
+> cannot hear what the screen is forbidden to show.
+>
+> The cheer is a **port with no route** (`core/domain/repositories/cheer_repository.dart`)
+> over a session-scoped `Set` (`:1066`), so a witness is cheered once per session. Its
+> three effects are the prototype's — the orb pulse (`@keyframes rp`, `:362`), a star
+> flare, and a toast (`:947`, 1800ms) — with two divergences recorded at their sites:
+> the **flare is row-local and transient** rather than a sky entry, because `SkyEntry`
+> is verse-keyed and a board has no verse; and there is **no haptic** and no aurora
+> spike, because this app ships none. The toast is anchored to the **screen root** and
+> is `pointer-events: none` (`:466`), so it is a notice and never a control.
+>
+> Keys 114 -> 121, and then 121 -> 126 in the review pass: three died with the old
+> layout (`leaderboardScoreLabel`, `leaderboardOpenFull`, `leaderboardYourRank`) and
+> ten arrived as the redesign's own table rows (`:941-948`); the review added the
+> board's own `leaderboardRetry`, the two controls' accessible names, and the
+> prototype's own `dU` / `hU` unit letters. The **Arabic plural arms changed** too,
+> which is not a movement but a fix: `leaderboardRowSemantics`'s Arabic arms never
+> interpolated `{digits}`, so the Arabic arm announced "نقاط" — "points" — with no
+> number in it.
+>
+> **Twenty-one defects the gates and the reviews caught, not reading.** The gates found
+> eleven: the cheer toast was anchored to the **scrolling content**, so it swallowed
+> the last row's taps — a reader could not cheer the last witness at all — and could
+> sit below the fold entirely; the cheer flare **stuck** on a row rebuilt
+> already-cheered, because the board empties on a window change while the marks
+> survive it, and the effect was gated on the state rather than on the transition;
+> `EmptyState` painted Arabic in EBGaramond and Inter, **tofu for the whole empty
+> screen**; the app bar's two tooltips had no family, so the Arabic back label and the
+> veil name were tofu; the row's `Semantics` node said "button" with **no action**, so
+> a screen-reader user could not cheer at all; the route inventory still said
+> `leaderboard`; **two same-named `GetReaderSession` types** sat in one injector graph,
+> which the DI inventory could not tell apart; the countdown counted down to the
+> *requested* window rather than the response's, which is the one mismatch
+> `LeaderboardBoard.window` exists to catch; the toast re-announced a cheer that
+> **never happened** on a second tap; the rank numerals were Latin on the Arabic arm
+> and every mono run could tofu, because JetBrainsMono carries no Arabic and no
+> Arabic-Indic digits; and the podium hid itself below three rows, where the prototype
+> skips a missing position instead (`:1087`).
+>
+> **And the review found ten more that no gate could see:** the app bar's two controls
+> had **no accessible name, no `button` flag, and were not keyboard-reachable** — on
+> desktop the back chevron is the only way out of `/communion`, so a keyboard-only
+> reader could land on the screen and never leave it — and the file justified its own
+> bespoke hit-target on a **false** reading of `IconActionButton`, which was the reason
+> the ring and the name were missing; the **Arabic row announcement dropped the score
+> entirely**, so a screen-reader user was told a witness had "points" and not how many;
+> the **cubit had no request-generation guard**, so two window switches in flight could
+> land the older response under the newer heading; the **overflow matrix was measuring
+> an empty list**, because a three-row board with `slice(3)` lays out no rows at all;
+> the **metric control was named "light"**, the same word as its own first option; the
+> **you-card said "Not ranked yet"** about a reader the server had ranked 51st; the
+> **English dock word was still "Leaderboard"** while its Arabic arm had already
+> moved, so the two arms of one key named two different things; the **podium's bloom
+> was one wash behind the columns** where the prototype's is per bar, and its three
+> bars grew for 480/400/**320**ms where the prototype's grow for 600 each; the **row
+> had no entrance at all**, where the prototype fades and rises each row on an
+> `80 + k·45` ms stagger; and the **you-card's monogram rule disagreed with the
+> mapper's** while its own doc claimed it did not.
+>
+> Every one of them is **pinned**, and the two that could pass vacuously are
+> **negative-controlled**: the toast's placement — the defect that made the last row
+> uncheerable — was planted back and watched go red, and the cubit's generation guard
+> was removed and watched go red. Gate run: 2988 tests, 98.63% coverage (6713/6806).
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
