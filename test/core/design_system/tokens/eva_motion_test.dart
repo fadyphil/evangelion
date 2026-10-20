@@ -650,6 +650,97 @@ void main() {
     });
   });
 
+  group('the shake curve', () {
+    // ## WHY THIS GROUP EXISTS AT ALL: `EvaShake` HAD NO TEST OF ITS OWN
+    //
+    // It is the design system's own curve — `redesign.html:360`'s
+    // `@keyframes shake` — and it is used by two screens: `/login`'s
+    // `.cta.err` and the quiz's `.opt.wrong`. It was covered only
+    // **incidentally**, by whichever test happened to build one of those two
+    // screens and run the animation, and that is not a test: nothing asserted
+    // a single number about it.
+    //
+    // ## AND THE INCIDENTAL COVERAGE WAS NOT EVEN REPRODUCIBLE
+    //
+    // `EvaShake` is a `const` class, so `const EvaShake()` **materialises** a
+    // canonical instance, and a materialisation is a **per-isolate** event —
+    // not a program counter, which the VM shares between the isolates of a
+    // group. `flutter test --coverage` collects from **one isolate per group**
+    // (`package:coverage`'s `coveredIsolateGroups`), so the line that records
+    // the materialisation is reported as covered or **not** depending on which
+    // isolate the collector happened to sample.
+    //
+    // **Measured, 2026-10-20, on one tree:** `eva_motion.dart:1046` read `4`
+    // on a 16-core machine, `2` at `--concurrency=2`, and **`0` on the CI
+    // runner** — which is the whole of the one-line difference between the
+    // runner's 98.84% and the local 98.86%, and the reason a coverage floor
+    // compared with zero tolerance is a coin flip on this repository.
+    //
+    // **This group is the fix, and it is a fix that is a test.** It asserts
+    // the curve's actual numbers, so the curve is covered by a test that
+    // *means* something rather than by a screen that happened to be built. The
+    // materialisation it performs is the same one the screens perform.
+    const Curve shake = EvaShake();
+
+    test(
+      'is pinned to the prototype\'s four waypoints — `redesign.html:360`',
+      () {
+        // `@keyframes shake{20%{translateX(-8px)}40%{translateX(8px)}
+        // 60%{translateX(-5px)}80%{translateX(5px)}}` — four offsets, and the
+        // signs are the point: the curve starts by pulling the button **away**
+        // from where it was, not towards the reader.
+        expect(shake.transform(0.2), closeTo(-8.0, 1e-12));
+        expect(shake.transform(0.4), closeTo(8.0, 1e-12));
+        expect(shake.transform(0.6), closeTo(-5.0, 1e-12));
+        expect(shake.transform(0.8), closeTo(5.0, 1e-12));
+      },
+    );
+
+    test('returns to rest at BOTH ends, which is what a shake is', () {
+      // **AND THIS IS THE ONE PROPERTY THAT MAKES IT NOT A `Curve` LIKE THE
+      // OTHERS.** `expectProperEndpoints` above asserts `transform(1) == 1` for
+      // every other curve, and the shake **cannot** satisfy it: it ends where
+      // it began, `transform(1.0) == 0`, and a curve that ended at 1 would
+      // leave the button 5 logical pixels off its resting position forever.
+      //
+      // That is also why `login_page.dart` applies the curve **directly**
+      // rather than through a `CurveTween` — `CurveTween.transform` asserts
+      // its curve is the identity at both ends, and a shake is not. See the
+      // note on `_shakeCurve` there.
+      expect(shake.transform(0.0), 0.0);
+      expect(shake.transform(1.0), 0.0);
+    });
+
+    test('is piecewise-linear BETWEEN the waypoints, not a spline', () {
+      // Halfway from 0% to 20% is half of -8, and halfway from 20% to 40% is
+      // zero — the two offsets cancel. A spline through the same four points
+      // would round the corners and land somewhere else, and a shake that
+      // overshoots its own keyframes is a different animation.
+      expect(shake.transform(0.1), closeTo(-4.0, 1e-12));
+      expect(shake.transform(0.3), closeTo(0.0, 1e-12));
+      expect(shake.transform(0.5), closeTo(1.5, 1e-12));
+      expect(shake.transform(0.7), closeTo(0.0, 1e-12));
+      expect(shake.transform(0.9), closeTo(2.5, 1e-12));
+    });
+
+    test('runs for 450ms — `redesign.html:360`\'s `.45s`', () {
+      expect(EvaShake.duration, const Duration(milliseconds: 450));
+    });
+
+    test('never leaves the +/-8px band the prototype draws', () {
+      // The amplitude is **not** scaled to the element's width — the prototype
+      // shakes a full-width button by fixed pixels too — so the band is fixed
+      // at the prototype's own numbers.
+      for (double t = 0.0; t <= 1.0; t += 0.01) {
+        expect(
+          shake.transform(t),
+          inInclusiveRange(-8.0, 8.0),
+          reason: 'the shake at t=$t',
+        );
+      }
+    });
+  });
+
   group('the achievement spring', () {
     // ## WHY THESE ARE MEASURED RATHER THAN READ OFF THE TOKENS
     //
