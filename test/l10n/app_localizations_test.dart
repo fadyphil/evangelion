@@ -137,6 +137,322 @@ void main() {
   /// enough to read as a claim instead of a list.
   const Set<String> mustBeIdentical = <String>{'homeNoLightRef'};
 
+  /// Every row of the prototype's `I18N` table that this table does not carry
+  /// **verbatim**, and where each one went.
+  ///
+  /// ## WHY THIS MAP IS **THE RECORD** AND NOT A NOTE
+  ///
+  /// `eva/redesign.html:924-977` is **128 rows** of the prototype's own table,
+  /// and the group below measures this one against it: **103** rows are carried
+  /// **verbatim**, and the other **25** are here. Every one of the 25 is a
+  /// decision, and a decision nobody wrote down is a decision nobody can audit
+  /// — which is what `docs/DRIFT.md` is a catalogue of.
+  ///
+  /// **AND THE MAP IS CHECKED, NOT TRUSTED.** The group below asserts that the
+  /// keys of this map are **exactly** the prototype's rows this table does not
+  /// carry verbatim — so a row that is ported properly makes this map stale
+  /// and fails, and a row that is dropped from the prototype makes it fail the
+  /// other way. And it asserts that every reason here carries the
+  /// prototype's **own line**, so a row that moves in the file cannot leave a
+  /// citation pointing at the wrong line: the defect
+  /// `reading_l10n_test.dart` pins for the seven `/reading` rows, where every
+  /// citation sat one line above the row it named and no gate could see it.
+  ///
+  /// ## THE THREE SHAPES, AND WHY THE SECOND ONE IS NOT THE THIRD
+  ///
+  /// * **carried** — the row's content is here under another name. The value
+  ///   may differ (a dropped glyph, a split bilingual label, a reworded
+  ///   sentence) and the reason says which.
+  /// * **composedInDart** — the row is drawn and **no ARB row carries it**,
+  ///   because what the row says is a count and the count is the domain
+  ///   function's (`digits`). A key for it would be a key nobody reads.
+  /// * **notDrawn** — the client does not draw the row. The reason names the
+  ///   surface that does not exist, or the live source that replaced the
+  ///   prototype's hard-coded number.
+  ///
+  /// ## AND WHY **NO** OF THEM IS A NEW KEY
+  ///
+  /// A row that the client does not draw gets **no key**, and that is a rule
+  /// rather than an omission: "A key nobody reads is a key a translator will
+  /// translate for a screen that does not exist" is the reason
+  /// `settingsMotionOn` / `settingsMotionOff` were deleted and
+  /// `sealFabLanguage` was never written. So the count above did not move, and
+  /// this map is where the twenty-five went instead.
+  const Map<String, _I18nOutcome> i18nRowsAccountedFor = <String, _I18nOutcome>{
+    // ## THE HOME'S THREE, AND TWO OF THEM ARE **LIVE DATA**
+    'votdRef': _I18nOutcome.notDrawn(
+      'The prototype\'s reference is a hard-coded fiction: '
+      '`redesign.html:927` writes `votdRef:["psalm 23:1","المزمور ٢٣:١"]` '
+      'and `:991` writes it into the card. This client draws the '
+      '**server\'s** reference instead — `TodayReading.reference` from '
+      '`GET /readings/today`, painted by `verse_of_the_day_card.dart` — and '
+      'ADR-0022\'s fiction table rates "Verse of the day :519" **real**. '
+      'So the fiction is excluded and the live source is named. The only '
+      'reference the table does carry is `homeNoLightRef`, the em dash for '
+      'a card with no reading on it.',
+    ),
+    'libCount': _I18nOutcome.composedInDart(
+      '`redesign.html:930` writes `libCount:["6 scrolls · 4 open","٦ دروج '
+      '· ٤ مفتوحة"]` — one literal with both numbers baked in, and the '
+      'prototype never even translates it (`:535` gives it an `id` and no '
+      '`data-i18n`). The client has no such literal: the catalogue\'s '
+      'length is `LibraryCatalogueRepository.books().length` and the open '
+      'count is the cards\' `sealed` flags, so the row was **split into '
+      'two ARB keys** (`homeScrolls`, `homeOpenBooks`) and **composed** by '
+      '`HomeStringsPhrases.scrollsOpen` in `home_l10n.dart`, with the '
+      'numerals from `digits`. A single key would have needed an ARB '
+      'placeholder, and a non-plural Arabic value holding a Latin '
+      'placeholder name fails this file\'s own Latin gate.',
+    ),
+    'medalsCount': _I18nOutcome.composedInDart(
+      '`redesign.html:936` writes `medalsCount:["4 / 12","٤ / ١٢"]`, the '
+      'medals label\'s count at `:597`. The count is the medals port\'s '
+      '`earned` of `total` — ADR-0022\'s fiction table rates "Medals :597" '
+      'a **stub** — and it is composed in Dart by `JourneyMedalsLabel` in '
+      '`journey_section_labels.dart` as `digits(earned) / digits(total)`. '
+      '**No ARB row carries it**, and that is stated in that widget\'s own '
+      'doc: a count of two numbers and a slash has nothing translatable in '
+      'it, and a key for it would be a key nobody reads.',
+    ),
+    // ## THE BOARD'S THREE, ALL **RENAMED** AND TWO OF THEM **REWORDED**
+    'witness': _I18nOutcome.carried(
+      '`redesign.html:942` writes `witness:["witness","شاهد"]`, used at '
+      '`:1070` as the row\'s own word followed by the display position. The '
+      'client carries it as '
+      '`leaderboardWitness` — "witness {position}" — because a veiled '
+      'witness is named by their **display position** and the numeral '
+      'arrives through `digits`; the bare word alone would be a name with '
+      'no position, and the position is what the board ranks.',
+      <String>['leaderboardWitness'],
+    ),
+    'resets': _I18nOutcome.carried(
+      '`redesign.html:946` writes `resets:["resets in","يُصفّر بعد"]`, '
+      'composed at `:1082` with the two unit rows `dU` and `hU`. The client '
+      'carries it as `leaderboardResetsIn` — "resets in '
+      '≈{days}{dayUnit} {hours}{hourUnit}" — because the boundary is '
+      '**local** (ADR-0022: the response carries no reset instant) and the '
+      'count, the hours and the two units are all arguments, with the '
+      'numerals from `digits`. The units are the prototype\'s own rows, as '
+      '`leaderboardDayUnit` and `leaderboardHourUnit`.',
+      <String>[
+        'leaderboardResetsIn',
+        'leaderboardDayUnit',
+        'leaderboardHourUnit',
+      ],
+    ),
+    'cheerSent': _I18nOutcome.carried(
+      '`redesign.html:947` writes `cheerSent:["✦ cheer sent to {name}","✦ '
+      'تحية مُرسلة إلى {name}"]`, raised at `:1122`. The client carries it '
+      'as `leaderboardCheerSent` with the **leading ✦ dropped**: U+2726 is '
+      'in no bundled family, so the star is painted beside the string '
+      'rather than typed into it — the same correction '
+      '`readingBookmarkOn` records. The `{name}` placeholder is the '
+      'prototype\'s own, and the key is in this file\'s `latinIsCorrect` '
+      'set with that reason.',
+      <String>['leaderboardCheerSent'],
+    ),
+    // ## THE WORKSHOP\'S ONE, AND IT IS THE ONLY **BILINGUAL** ROW
+    'wsLang': _I18nOutcome.carried(
+      '`redesign.html:949` writes '
+      '`wsLang:["language · اللغة","اللغة · language"]` — a **bilingual** '
+      'label, each arm naming the thing in the reader\'s script and then in '
+      'the other one. The client carries it as `settingsWsLang`, one script '
+      'per arm ("language" and "اللغة"), because the English arm may hold '
+      'no Arabic script and the Arabic arm may hold no Latin one — and the '
+      'divergence is recorded in that key\'s own description and in this '
+      'file\'s `latinIsCorrect` note.',
+      <String>['settingsWsLang'],
+    ),
+    // ## THE RESULT CARD\'S THREE, AND **TWO** OF THEM ARE THE CLIENT\'S
+    // ## OWN WORDS FOR THE SAME TWO SLOTS
+    'complete': _I18nOutcome.notDrawn(
+      '`redesign.html:963` writes `complete:["chapter complete","اكتمل '
+      'الإصحاح"]`, the result card\'s eyebrow at `:720`. This client draws '
+      '**no eyebrow** on its result card: the card is the redesign\'s '
+      '`.rcard` (`:718-727`) with the eyebrow, the ring and the recap all '
+      'replaced, and `result_sheet.dart` records the missing ring as the '
+      'largest divergence on that surface. The completion claim itself is '
+      '`resultCompleteMessage` — and the word "chapter" names a '
+      'granularity this client does not have, because it completes a '
+      '**reading**, never a chapter.',
+    ),
+    'again': _I18nOutcome.carried(
+      '`redesign.html:963` writes `again:["read again","اقرأ مجددًا"]`, the '
+      'result card\'s primary CTA at `:724`. The client carries that slot '
+      'as `resultBackHome` — "Back home" — because this client has **no '
+      'reading to return to**: §2\'s route table gives `/reading` no '
+      'passage parameter, so it always renders *today\'s* reading and "read '
+      'again" would name a destination the reader cannot be sent to. The '
+      'mapping is by ACTION, and `result_sheet.dart` records it.',
+      <String>['resultBackHome'],
+    ),
+    'retry': _I18nOutcome.carried(
+      '`redesign.html:963` writes `retry:["retry quiz","أعد الاختبار"]`, the '
+      'result card\'s ghost CTA at `:725`. The client carries that slot as '
+      '`resultReflectAgain` — "Reflect again" — the same action (the quiz '
+      'again) under the client\'s own wording, and the primary/secondary '
+      '**emphasis is inverted** against the prototype\'s, which '
+      '`result_sheet.dart` records as a deliberate divergence.',
+      <String>['resultReflectAgain'],
+    ),
+    // ## THE READING SHEET\'S THREE, AND **ONE** OF THEM IS CUT BY THE PLAN
+    'copy': _I18nOutcome.notDrawn(
+      '`redesign.html:964` writes `copy:["copy verse","نسخ الآية"]`, the '
+      'reading sheet\'s button at `:713`. This client has **no reading '
+      'sheet**: the prototype\'s `.sheet` (`:711-716`) is a bottom sheet a '
+      'verse opens, and the client\'s `/reading` has no such surface — a '
+      'verse is tapped to light the breath guide, and `Clipboard` appears '
+      'nowhere under `lib/`. A key with no call site is a key a translator '
+      'would translate for a screen that does not exist.',
+    ),
+    'share': _I18nOutcome.notDrawn(
+      '`redesign.html:964` writes `share:["share","مشاركة"]`, the reading '
+      'sheet\'s second action at `:714`. **The plan cuts it**: the plan\'s '
+      '"Decisions taken without asking" says "Share and notes are cut", '
+      'because `share_plus` is forbidden by AGENT_CONTEXT §8.4, and '
+      'ADR-0022\'s fiction table records "Share :714, notes :715" as '
+      '**cut**. The journey\'s `journeyRowShare` is a different surface — '
+      'the profile\'s row — and is not this row.',
+    ),
+    'note': _I18nOutcome.notDrawn(
+      '`redesign.html:964` writes `note:["add note","إضافة ملاحظة"]`, the '
+      'reading sheet\'s third action at `:715`. **The plan cuts it** — '
+      '"Share and notes are cut" — because there is no storage layer for '
+      'notes, and ADR-0022\'s fiction table records it as **cut**. A note '
+      'would need an endpoint and a repository port this client does not '
+      'have, and a storage layer it does not have either.',
+    ),
+    // ## THE QUIZ\'S TERMINAL CTA, WITH ITS **GLYPH** DROPPED
+    'seeRes': _I18nOutcome.carried(
+      '`redesign.html:967` writes `seeRes:["see results ✦","النتائج"]`, the '
+      'quiz\'s terminal CTA at `:1431`. The client carries it as '
+      '`quizSeeResults` — "see results" — with the **✦ dropped**: U+2726 is '
+      'in no bundled family, so the star is a painted `FourPointedStar` '
+      'composed by the CTA on the Latin arm and the Arabic arm carries '
+      'none, which is the prototype\'s own pair. The description on that '
+      'key records the measurement.',
+      <String>['quizSeeResults'],
+    ),
+    // ## THE READER\'S TWO TOASTS, AND NEITHER HAS A SURFACE HERE
+    'resumed': _I18nOutcome.notDrawn(
+      '`redesign.html:969` writes `resumed:["resumed","استُؤنف"]`, raised '
+      'as a toast at `:1381` when the reader returns to the verse they '
+      'left. This client draws **no such notice**: the return is marked — '
+      '`verse_line.dart`\'s `.resume` bar, `:168` — and the verse is scrolled '
+      'to, and nothing is said about it. The nearest client string is '
+      '`homeResumeHint`, which is the prototype\'s own `resumeHint` '
+      '(`:928`) and a different sentence.',
+    ),
+    'constDone': _I18nOutcome.notDrawn(
+      '`redesign.html:971` writes '
+      '`constDone:["constellation complete","اكتمل البرج"]`, a toast at '
+      '`:1184` fired when the last verse of a book is lit. This client has '
+      '**no such event**: its sky is keyed `book:chapter:verse` and '
+      'the journey\'s constellation count is a **proxy** — the distinct '
+      'books among the completed scheduled days — so there is no moment at '
+      'which a constellation completes and nothing to announce. ADR-0022\'s '
+      'rule that no screen may render a hard-coded star is why the number '
+      'is derived at all.',
+    ),
+    // ## THE SEALED SHEET\'S THREE, AND THE SHEET DOES NOT EXIST HERE
+    'sealedBy': _I18nOutcome.notDrawn(
+      '`redesign.html:972` writes '
+      '`sealedBy:["finish {b} to unseal","أتمم {b} لفك الختم"]`, the '
+      'sealed-book sheet\'s line at `:733`, filled at `:1044` with the '
+      'book\'s name. This client has **no sealed-book sheet**: the '
+      'library\'s sealed cards are inert — `library_carousel.dart` draws '
+      'them as `Semantics(button: true, enabled: false)` with the '
+      'unavailable reason appended, because `/reading` has no passage '
+      'parameter and tapping "Isaiah" would open John. The unlock rule is '
+      'ADR-0022\'s fiction — "the *unlock* rule … is invented" — and it '
+      'has no surface to live on.',
+    ),
+    'go': _I18nOutcome.notDrawn(
+      '`redesign.html:972` writes `go:["go to {b}","اذهب إلى {b}"]`, the '
+      'sealed sheet\'s primary button at `:734`, filled at `:1045`. The '
+      'same sheet as `sealedBy`: this client has none, and a "go to '
+      '{book}" button would name a destination `/reading` cannot open, '
+      'because it always renders *today\'s* reading. Had the row been '
+      'carried, its `{b}` placeholder would have needed an entry in this '
+      'file\'s `latinIsCorrect` set — a placeholder name is Latin, and a '
+      'non-plural Arabic value holding one fails the gate below.',
+    ),
+    'later': _I18nOutcome.notDrawn(
+      '`redesign.html:972` writes `later:["later","لاحقًا"]`, the sealed '
+      'sheet\'s ghost button at `:735`. The same sheet as `sealedBy` and '
+      '`go`: no sheet, so no button — and a "later" that dismisses a '
+      'dialog this client never opens would be a button with no dialog '
+      'behind it.',
+    ),
+    // ## THE RESULT\'S THREE MESSAGES, AND THE CLIENT\'S ARE ITS OWN
+    'rmsg1': _I18nOutcome.carried(
+      '`redesign.html:973` writes '
+      '`rmsg1:["the light confirms it.","النور يؤكده."]`, the result '
+      'card\'s message at `:722`, selected at `:1435` by `score===qEff`. '
+      'The client carries the message line as `resultCompleteMessage`, one '
+      'of the **three** arms of `ResultStringsPhrases.messageFor` — '
+      'because the prototype\'s own selection needs the question count, '
+      'which the submit response does not carry (AGENT_CONTEXT decision '
+      '93), while the payload sends three states the client *can* name.',
+      <String>['resultCompleteMessage'],
+    ),
+    'rmsg2': _I18nOutcome.carried(
+      '`redesign.html:973` writes '
+      '`rmsg2:["mostly light — a few shadows.","نور غالبًا — ظلال '
+      'قليلة."]`, selected at `:1435` by `score>=qEff/2`. The client '
+      'carries it as `resultPartialMessage` — "Correct. The reading is not '
+      'finished yet." — because a **half-scored band** is not a state the '
+      'payload can express: `SubmitResult` carries `is_correct` and '
+      '`reading_completed`, and "right, and there is more to do" is the arm '
+      'the payload does have.',
+      <String>['resultPartialMessage'],
+    ),
+    'rmsg3': _I18nOutcome.carried(
+      '`redesign.html:973` writes '
+      '`rmsg3:["return, and read once more.","عُد، واقرأ مرة أخرى."]`, '
+      'selected at `:1435` by the fall-through. The client carries it as '
+      '`resultIncorrectMessage` — "Not this time. Every question counts." '
+      '— because the prototype\'s consolation clause is keyed on a *score '
+      'band* and the client has no band: the payload sends `is_correct` '
+      'alone, and the sentence says so without inventing a score.',
+      <String>['resultIncorrectMessage'],
+    ),
+    // ## THE TOASTS THAT NEED A TOAST, AND THE BOOKMARK\'S TWO STATES
+    'copied': _I18nOutcome.notDrawn(
+      '`redesign.html:974` writes `copied:["✓ copied","✓ تم النسخ"]`, a '
+      'toast raised at `:1366` and `:1390` after a verse is copied to the '
+      'clipboard. This client has **no clipboard** — `Clipboard` appears '
+      'nowhere under `lib/` — and no reading sheet to copy from, so '
+      'nothing is ever copied and there is nothing to confirm. The ✓ is a '
+      'glyph in no bundled family besides, so it would have been painted '
+      'rather than typed.',
+    ),
+    'bmk': _I18nOutcome.carried(
+      '`redesign.html:974` writes `bmk:["✦ bookmarked","✦ تم الحفظ"]`, a '
+      'toast raised at `:1394` when the bookmark is lit. The client '
+      'carries the word as `readingBookmarkOn` and the off state as '
+      '`readingBookmarkOff`, both with the **✦ dropped** (U+2726 is in no '
+      'bundled family). **Neither key is read by a page today**, and that '
+      'is a fact rather than an omission: the reading screen\'s bookmark '
+      'is inert — it has no endpoint and no port — so the control\'s own '
+      'name is `readingBookmark` and the toast is unreachable.',
+      <String>['readingBookmarkOn', 'readingBookmarkOff'],
+    ),
+    'flameT': _I18nOutcome.notDrawn(
+      '`redesign.html:975` writes '
+      '`flameT:["the flame keeps you · 12 days","الشعلة تحفظك · ١٢ '
+      'يومًا"]`, a toast raised at `:1322` when the streak chip is tapped. '
+      'The row is **not drawn**, and the reason is the trigger rather than '
+      'the toast: the client\'s streak chip is **not a control** — '
+      '`streak_chip.dart` draws a pill with no tap handler and `home_page.dart` '
+      'passes none — so there is no gesture to raise a notice from, whatever '
+      'the notice is. The row also **bakes a digit**: the 12 is the '
+      'prototype\'s own hard-coded streak (`:989`), while the client\'s is '
+      '`StreakSummary.currentStreak`, a real count that would arrive '
+      'through `digits` and never as a literal.',
+    ),
+  };
+
   group('the ARB pair, structurally', () {
     test('the walk finds the keys, so nothing below is vacuous', () {
       // The anti-vacuity half. A parser that returned an empty map would make every
@@ -151,6 +467,30 @@ void main() {
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**182 → 182 in Phase 7 Steps 1–2 of the Lumen redesign**, for the '
+            '**I18N table**: the count did not move, and the reason is that the '
+            'table was already complete for everything this client draws. '
+            'Measured by **English value** against the prototype\'s own `I18N` '
+            'literal (`eva/redesign.html:924-977`, **128 rows**), **103** rows '
+            'are carried **verbatim**, **13** are carried under **another name** '
+            'or as a live composition, and **12** are **excluded** with a reason '
+            'each.\n\n'
+            '**AND THE MEASUREMENT IS A GATE, NOT A NOTE.** The group at the '
+            'foot of this file parses the prototype\'s literal at test time and '
+            'asserts that the declared map is **exactly** the rows this table '
+            'does not carry verbatim — so a row that is ported properly makes '
+            'the map stale and fails, and every reason in the map is checked '
+            'against the line the row is **really** on, which is the defect '
+            'the seven `/reading` citations below once carried.\n\n'
+            '**AND NO ROW BECAME A KEY, because a row the client does not draw '
+            'gets no key.** "A key nobody reads is a key a translator will '
+            'translate for a screen that does not exist" is why '
+            '`settingsMotionOn` / `settingsMotionOff` were deleted and why '
+            'there is no `sealFabLanguage`; the twenty-five are recorded by name '
+            'instead. Two of them carry a **live** number — `votdRef` is the '
+            'server\'s reference and `medalsCount` is the medals port\'s '
+            '`earned` of `total` — and the rest are surfaces the client does '
+            'not draw.\n\n'
             '**179 → 182 in Phase 7 of the Lumen redesign**, for the **ritual**: '
             '**three** keys arrived (`homeSelahBegin`, `homeSelahEnd` and '
             '`homeSelahAmen`). The last is the prototype\'s own I18N row '
@@ -1245,10 +1585,13 @@ void main() {
       // the ARB disagree about which locales the app supports, which is a
       // configuration error worth a loud failure rather than a silent English
       // screen. `app_test.dart` reads `supportedLocales` off the live `MaterialApp`
-      // and the ARB asserts 93 keys in both arms, so the two are cross-checked.
-      // (93 = the 72 the five hand-rolled tables carried, plus the 21 `settings*`
-      // keys Phase 9 added — see `settings_page.dart`'s own cut table for the four
-      // prototype rows that produced no keys at all.)
+      // and the ARB asserts 182 keys in both arms, so the two are cross-checked.
+      // (182 = the 72 the five hand-rolled tables carried, plus the 21 `settings*`
+      // keys Phase 9 added, plus the keys the redesign's own rows and the
+      // client's written copy arrived as across Tasks 5.1–5.7 and Phase 7's
+      // ritual — see `settings_page.dart`'s own cut table for the four prototype
+      // rows that produced no keys at all, and the group at the foot of this
+      // file for the prototype's 128 rows measured against this table.)
       expect(
         () => lookupAppLocalizations(const Locale('fr')),
         throwsA(isA<FlutterError>()),
@@ -1261,6 +1604,172 @@ void main() {
         lookupAppLocalizations(const Locale('ar', 'EG')).readingBack,
         AppLocalizationsAr().readingBack,
       );
+    });
+  });
+
+  group('the prototype\'s I18N table, measured against this one', () {
+    // ## WHY THIS GROUP IS A **GATE** AND NOT A NOTE
+    //
+    // The prototype's `I18N` literal is **128 rows** of the redesign's own
+    // bilingual surface, and this table is the client's answer to it. The
+    // measurement below is by **English value** — the same measurement the
+    // brief that opened this work was written from — and the number it produces
+    // is 103 rows carried verbatim and 25 accounted for by name.
+    //
+    // **A row that is neither is a hole, and a hole that is not measured is a
+    // hole nobody can see.** The prototype has no tests, so a row this client
+    // never carried would sit in the reference material looking exactly like a
+    // row it did.
+
+    test('the table is read whole, and 103 of its 128 rows are verbatim here', () {
+      // The anti-vacuity half. A parser that found nothing would make every
+      // comparison below an assertion over two empty sets — green, and about
+      // nothing.
+      final List<_I18nRow> rows = _prototypeI18nRows();
+      expect(
+        rows,
+        hasLength(128),
+        reason:
+            '`eva/redesign.html`\'s `I18N` literal carries 128 rows. A different '
+            'number means the prototype changed and this harness must read it '
+            'again — it parses the file rather than quoting it, so a row that '
+            'moved, grew a third element or was removed shows up here rather '
+            'than as a silently shorter table.',
+      );
+      final Set<String> values = <String>{
+        for (final String key in keysOf(en)) en[key]! as String,
+      };
+      final List<_I18nRow> verbatim = rows
+          .where((_I18nRow row) => values.contains(row.en))
+          .toList();
+      expect(
+        verbatim,
+        hasLength(103),
+        reason:
+            'the rows this table carries **verbatim**, measured by English '
+            'value. The other ${rows.length - verbatim.length} are accounted for '
+            'by `i18nRowsAccountedFor` — and a row that moves from that map '
+            'into this one makes this number move, which is the point: the '
+            'table got more faithful to the prototype and the count says so.',
+      );
+    });
+
+    test('and every row this table does not carry verbatim is declared', () {
+      // The completeness half, and the freshness half in the same row: the
+      // declared map must be **exactly** the tail, so a row that is ported
+      // properly leaves a stale entry and fails, and a row that is dropped
+      // from the prototype leaves a missing one and fails the other way.
+      final List<_I18nRow> rows = _prototypeI18nRows();
+      final Set<String> values = <String>{
+        for (final String key in keysOf(en)) en[key]! as String,
+      };
+      final Set<String> verbatim = <String>{
+        for (final _I18nRow row in rows)
+          if (values.contains(row.en)) row.key,
+      };
+      final Set<String> undeclared = <String>{
+        for (final _I18nRow row in rows)
+          if (!verbatim.contains(row.key) &&
+              !i18nRowsAccountedFor.containsKey(row.key))
+            row.key,
+      };
+      expect(
+        undeclared,
+        isEmpty,
+        reason:
+            'these prototype rows are neither carried verbatim nor declared in '
+            '`i18nRowsAccountedFor`. Either the row was ported under another '
+            'name and the map needs it, or it was dropped and the map needs to '
+            'say so — a row nobody wrote down is a row nobody can audit.',
+      );
+      final Set<String> stale = <String>{
+        for (final String key in i18nRowsAccountedFor.keys)
+          if (verbatim.contains(key)) key,
+      };
+      expect(
+        stale,
+        isEmpty,
+        reason:
+            'these declared rows are now carried **verbatim**, so their entry '
+            'in `i18nRowsAccountedFor` is out of date. Delete the entry and '
+            'the count in the row above moves with it.',
+      );
+    });
+
+    test('and every declared row says where it went, and on which line', () {
+      final Map<String, int> lines = <String, int>{
+        for (final _I18nRow row in _prototypeI18nRows()) row.key: row.line,
+      };
+      for (final MapEntry<String, _I18nOutcome> entry
+          in i18nRowsAccountedFor.entries) {
+        final String key = entry.key;
+        final _I18nOutcome outcome = entry.value;
+
+        // **The prototype's own line, and the line it is REALLY on.**
+        //
+        // The seven `/reading` citations in this file were each one line above
+        // the row they named, and no gate could see it: `citation_check.py`
+        // checks that a line exists and is in range, and one line too high
+        // satisfies both. The reason a row carries here names the line, and
+        // this row checks the line against the file.
+        expect(
+          outcome.reason,
+          contains('redesign.html:${lines[key]}'),
+          reason:
+              'the reason for `$key` does not cite the prototype line the row '
+              'is really on (`redesign.html:${lines[key]}`). A citation that '
+              'points at the wrong line is the defect this row exists to '
+              'catch.',
+        );
+        expect(
+          outcome.reason.length,
+          greaterThanOrEqualTo(80),
+          reason:
+              'the reason for `$key` is too short to be a record. It has to say '
+              'where the row went AND why, because a decision that is not '
+              'written down is a decision nobody can audit.',
+        );
+
+        // The three shapes, and each one's own obligation.
+        switch (outcome.kind) {
+          case _I18nOutcomeKind.carried:
+            expect(
+              outcome.clientKeys,
+              isNotEmpty,
+              reason:
+                  '`$key` is declared carried, so it must name the key(s) of '
+                  'this table that carry it. An empty list is a carried row '
+                  'with nowhere to look.',
+            );
+          case _I18nOutcomeKind.composedInDart:
+            expect(
+              outcome.clientKeys,
+              isEmpty,
+              reason:
+                  '`$key` is declared composed in Dart, so it must name no key: '
+                  'the composition is the point.',
+            );
+          case _I18nOutcomeKind.notDrawn:
+            expect(
+              outcome.clientKeys,
+              isEmpty,
+              reason:
+                  '`$key` is declared not drawn, so it must name no key of this '
+                  'table. A key for a row nothing draws is a key a translator '
+                  'would translate for a screen that does not exist.',
+            );
+        }
+        for (final String clientKey in outcome.clientKeys) {
+          expect(
+            keysOf(en),
+            contains(clientKey),
+            reason:
+                'the reason for `$key` names `$clientKey`, and that key is not '
+                'in this table. Either the key was renamed — in which case the '
+                'reason is stale — or the reason is.',
+          );
+        }
+      }
     });
   });
 }
@@ -1293,3 +1802,132 @@ String _digits(int value) {
 /// The decoded ARB at [path].
 Map<String, dynamic> _decode(String path) =>
     jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
+
+/// The prototype file this suite reads for the `I18N` table.
+///
+/// `eva/` is read-only reference material (AGENT_CONTEXT §2, §8), and the
+/// prototype is **parsed** here rather than quoted — the discipline
+/// `home_l10n_test.dart` uses for the greeting rows and `reading_l10n_test.dart`
+/// uses for the seven `/reading` citations. A quoted line and the file it came
+/// from are two copies of one fact, and only one of them can be checked.
+const String prototypePath = 'eva/redesign.html';
+
+/// The three ways a row of the prototype's `I18N` table can land in this table.
+enum _I18nOutcomeKind {
+  /// The row's **content** is in this table under another key.
+  ///
+  /// The value may differ from the prototype's — a glyph dropped because no
+  /// bundled family draws it, a bilingual label split one script per arm, a
+  /// sentence reworded — and the reason says which.
+  carried,
+
+  /// The row is **drawn**, and no ARB row carries it.
+  ///
+  /// What the row says is a count, and the count is the domain function's
+  /// (`digits`), so the composition is Dart's and the table keeps no key for
+  /// it. The reason names the widget that composes it.
+  composedInDart,
+
+  /// The client does not draw the row at all.
+  ///
+  /// The reason names the surface that does not exist, or the live source that
+  /// replaced the prototype's hard-coded number.
+  notDrawn,
+}
+
+/// What became of one row of the prototype's `I18N` table.
+class _I18nOutcome {
+  const _I18nOutcome._({
+    required this.kind,
+    required this.clientKeys,
+    required this.reason,
+  });
+
+  /// The row is carried by these keys of this table.
+  const _I18nOutcome.carried(String reason, List<String> clientKeys)
+    : this._(
+        kind: _I18nOutcomeKind.carried,
+        clientKeys: clientKeys,
+        reason: reason,
+      );
+
+  /// The row is composed in Dart, and no ARB row carries it.
+  const _I18nOutcome.composedInDart(String reason)
+    : this._(
+        kind: _I18nOutcomeKind.composedInDart,
+        clientKeys: const <String>[],
+        reason: reason,
+      );
+
+  /// The client does not draw the row at all.
+  const _I18nOutcome.notDrawn(String reason)
+    : this._(
+        kind: _I18nOutcomeKind.notDrawn,
+        clientKeys: const <String>[],
+        reason: reason,
+      );
+
+  /// Which of the three shapes this is.
+  final _I18nOutcomeKind kind;
+
+  /// The keys of this table that carry the row — empty for the other two kinds.
+  final List<String> clientKeys;
+
+  /// Where the row went, and why.
+  ///
+  /// **Carries the prototype's own `file:line`**, and the group below asserts
+  /// that it is the line the row is really on.
+  final String reason;
+}
+
+/// One row of the prototype's `I18N` table.
+class _I18nRow {
+  const _I18nRow(this.key, this.en, this.ar, this.line);
+
+  /// The prototype's own key for the row.
+  final String key;
+
+  /// The row's English value.
+  final String en;
+
+  /// The row's Arabic value.
+  final String ar;
+
+  /// The line the row is on in `eva/redesign.html`.
+  final int line;
+}
+
+/// The prototype's `I18N` table — every row, both arms, and the line each is on.
+///
+/// `eva/redesign.html:924-977`. The literal is cut out first and the pair
+/// regex runs **inside** it, because the pair shape is not unique: an
+/// unanchored search across the whole file matches every `key:["en","ar"]` in
+/// the prototype, which is how `home_l10n_test.dart`'s `_catsTable` first
+/// matched 134 rows instead of six.
+///
+/// The **line** is part of the row, not a decoration: the seven `/reading`
+/// citations in this suite were each one line above the row they named, and
+/// that defect survived every gate until a test pinned it. So the line is
+/// parsed, and the reason a row carries is checked against it.
+List<_I18nRow> _prototypeI18nRows() {
+  final List<String> lines = File(prototypePath).readAsLinesSync();
+  final RegExp pair = RegExp(
+    r'([A-Za-z_][A-Za-z0-9_]*):\["([^"]*)","([^"]*)"\]',
+  );
+  final List<_I18nRow> rows = <_I18nRow>[];
+  bool inside = false;
+  for (int index = 0; index < lines.length; index++) {
+    final String line = lines[index];
+    if (!inside) {
+      if (line.contains('const I18N=')) inside = true;
+      continue;
+    }
+    if (line.trimLeft().startsWith('};')) break;
+    for (final RegExpMatch match in pair.allMatches(line)) {
+      rows.add(
+        _I18nRow(match.group(1)!, match.group(2)!, match.group(3)!, index + 1),
+      );
+    }
+  }
+  return rows;
+}

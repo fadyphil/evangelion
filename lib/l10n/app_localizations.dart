@@ -1097,7 +1097,11 @@ abstract class AppLocalizations {
 
   /// The focus & ritual group's header. Transcribed: `eva/redesign.html:682` writes `focus & ritual` and `:958` carries the pair.
   ///
-  /// **SIX OF THE SEVEN CONTROLS UNDER IT PERSIST AND ARE READ BY NOTHING YET** — the selah timer, the focus mode, the breath guide, the vespers auto-dim, the calm motion and the haptics are all Phase 7's (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1685-1686`). Only **Reduce motion** is read today, by `app.dart` and `/reading`.
+  /// **SIX OF THE SEVEN CONTROLS UNDER IT ARE READ TODAY, AND THE COUNT WAS “SIX ARE READ BY NOTHING” UNTIL PHASE 7 SHIPPED.**
+  ///
+  /// **The six, and who reads them:** the focus delay (`features/reading/presentation/pages/reading_page.dart` — the focus dim's idle observer), the selah length (`features/home/presentation/widgets/selah_card.dart` — the silence's length), the breath guide (`features/reading/presentation/pages/reading_page.dart` — the anchor it draws under), the vespers auto-dim (`core/design_system/effects/lumen_preferences.dart` → the ambient's `0.78` factor), reduce motion (`app.dart` and `/reading`) and the haptics (`core/design_system/effects/ritual_haptics.dart` — nine call sites).
+  ///
+  /// **AND THE SEVENTH IS `calmMotion`, WHICH PERSISTS AND IS READ BY NOTHING** — and that is the prototype's own behaviour rather than a gap: its `CALM` flag is never read by its loop either, and its Workshop deliberately preserves it across a restore.
   ///
   /// **AND THE SIX INCLUDE THE TWO THE RESTORE DELIBERATELY LEAVES ALONE** — the calm motion and the haptics — which the prototype's own reset (`:1499-1525`) also leaves alone, because they are comfort choices rather than light settings.
   ///
@@ -1123,7 +1127,7 @@ abstract class AppLocalizations {
 
   /// The Breath guide row's title. Transcribed: `eva/redesign.html:685` writes `Breath guide` and `:959` carries the pair.
   ///
-  /// The switch is `checked` in the prototype's markup. The breath ring under the hot verse is Phase 7's.
+  /// The switch is `checked` in the prototype's markup. **The breath ring under the hot verse is Phase 7's, and it SHIPPED** — `features/reading/presentation/pages/reading_page.dart` draws the guide under the reader's chosen verse, and the line's own arithmetic is `features/reading/domain/breath_guide.dart`'s, which is **pure Dart**.
   ///
   /// In en, this message translates to:
   /// **'Breath guide'**
@@ -1131,7 +1135,7 @@ abstract class AppLocalizations {
 
   /// The Vespers auto-dim row's title. Transcribed: `eva/redesign.html:686` writes `Vespers auto-dim` and `:959` carries the pair.
   ///
-  /// The switch is `checked` in the prototype's markup. The gate is 21:00-05:00 (`:886`), and the dimming itself is Phase 7's.
+  /// The switch is `checked` in the prototype's markup. The gate is 21:00-05:00 (`:886`), and **the dimming itself is Phase 7's and it SHIPPED** — `core/design_system/effects/lumen_preferences.dart` carries the reader's switch into the scene, and the factor and the hour test are `core/domain/entities/vespers.dart`'s, which is **pure Dart**.
   ///
   /// In en, this message translates to:
   /// **'Vespers auto-dim'**
@@ -1157,7 +1161,7 @@ abstract class AppLocalizations {
 
   /// The Haptics row's title. Transcribed: `eva/redesign.html:689` writes `Haptics` and `:962` carries the pair.
   ///
-  /// **Persisted and not yet answered.** The client has no haptics until Phase 7, so the Workshop is mute against the prototype, which answers every toggle with a haptic (`:1482`, `:1498`).
+  /// **Persisted AND answered — and the second half arrived in Phase 7, which is why this description used to say “not yet answered”.** The client had no haptics until the Lumen redesign's Phase 7, so the Workshop was mute against the prototype, which answers every toggle with a haptic (`:1482`, `:1498`). The vocabulary is `core/domain/entities/ritual_haptic.dart`'s and the platform call is `core/design_system/effects/ritual_haptics.dart`'s — the only file that calls `HapticFeedback`, because `core/domain/` is Flutter-free. **And the switch is answered by the switch itself**: the tap that turns haptics **on** fires with the **new** value, because a client that read the stored value would stay silent on the very tap a reader most wants to know it worked.
   ///
   /// **The restore action does NOT reset it**, for `settingsCalmMotion`'s reason.
   ///
