@@ -2383,24 +2383,159 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 - [ ] **Step 1: Port ~90 `I18N` keys** (`eva/redesign.html:924-977`) into
   `lib/l10n/app_*.arb`, including the Arabic-Indic digit transform at `:981`.
+  **In flight.**
 - [ ] **Step 2: `flutter gen-l10n`, then hand-format.** Raw output is **not**
   `dart format`-clean and the three committed files are hand-formatted.
-  Re-running the generator re-breaks gate 1.
-- [ ] **Step 3: Ritual.** Selah timer · focus mode (idle → dim) · vespers
+  Re-running the generator re-breaks gate 1. **In flight.**
+- [x] **Step 3: Ritual.** Selah timer · focus mode (idle → dim) · vespers
   auto-dim (21:00–05:00) · breath guide · haptics via `HapticFeedback`
-  (`services` — no new dependency).
+  (`services` — no new dependency). **Shipped** — `feat(ritual)`, `25a6798`.
 - [ ] **Step 4: Reduce motion.** The prototype's `.rm` class kills 11 selectors
   at once (`:48-54`). The Flutter equivalent is `NeuralMotionScope` +
-  `EvaAnimate` + a shader clock frozen at `t = 0`.
-- [ ] **Step 5: Re-run every gate**, including the two `python3` checks:
+  `EvaAnimate` + a shader clock frozen at `t = 0`. **In flight** — the
+  `.rm`-equivalent half is done; the shader clock's freeze is not.
+- [x] **Step 5: Re-run every gate**, including the two `python3` checks:
 
 ```bash
 tool/verify_all.sh --with-build
 ```
 
-- [ ] **Step 6: Compare against the Phase 0 baseline.** Test count and coverage
+  **Green**, including the Linux build — `25a6798`.
+- [x] **Step 6: Compare against the Phase 0 baseline.** Test count and coverage
   must not drop. If they do, `--update-baseline` is a deliberate reviewed
   decision with the diff explained — never a way to turn a red run green.
+  **3691 → 3691 tests, 98.83% held** — `build(ci)`, `9942d7c`.
+
+> ### THE RITUAL IS FIVE BEHAVIOURS, AND **EVERY ARITHMETIC IS PURE DART**
+>
+> The phase's shape is AGENT_CONTEXT §6's split: a decoration's **arithmetic**
+> belongs in `domain`, and a decoration's **clock** belongs to a widget. Every
+> one of the five is in that shape, and every one is a file a reader can open
+> without a `package:flutter` import.
+>
+> | behaviour | prototype | the arithmetic | the clock |
+> | --- | --- | --- | --- |
+> | the selah countdown | `:1324` `let selahDur=60`, `:1335-1340` | `core/domain/entities/selah_countdown.dart` | the card's own `Timer` — `features/home/presentation/widgets/selah_card.dart:191`, **cancelled on dispose** at `:212-213` |
+> | the focus dim | `:888` `focusDim?0.45:1`, the unwired 4-second literal | the reader's own `UserSettings.focusDelaySec` (`core/domain/entities/user_settings.dart:399`) and the ambient's `kLumenFocusDimFactor` (`core/design_system/effects/lumen_scene.dart:29`) | the reading screen's idle observer (`features/reading/presentation/pages/reading_page.dart:159`) — and the selah's own start, which raises the same dim |
+> | the vespers auto-dim | `:886` `isNight()`, `:890` `vespersOn&&isNight()?0.78:1` | `core/domain/entities/vespers.dart` | the **wall clock**, injected — see the next decision |
+> | the breath guide | `:173-175` | `features/reading/domain/breath_guide.dart` | the line's own controller — `features/reading/presentation/widgets/breath_guide_line.dart` |
+> | the haptics | `:914` `haptic(p)`, and the thirteen call sites `:1275`…`:1498` | `core/domain/entities/ritual_haptic.dart` | `core/design_system/effects/ritual_haptics.dart` — **the only file that calls the platform** |
+>
+> **And the triangle both the selah's ring and the breath guide breathe on is
+> ONE number, in `core/common/cycle_phase.dart`.** The two declare their
+> keyframes at 0%, 50% and 100% (`:269-270` and `:174-175`), so both widen over
+> the first half of the cycle and narrow over the second. Two copies of that
+> triangle would be two spellings of one number, and this repository rejects
+> that wherever it finds it. The **curve** is not in that file, because
+> Flutter's `Curves.easeInOut` **is** CSS's `ease-in-out` — it is
+> `Cubic(0.42, 0.0, 0.58, 1.0)`, the exact bezier the CSS keyword names — so
+> the two callers ease the progress themselves and the file owns only the
+> arithmetic.
+>
+> **The timer is the card's and the counting is the file's, and the difference
+> is a hung suite.** A leaked `Timer` is a test that never ends, and this
+> repository has one of those recorded. The count is also shown **before** the
+> first tick, because the prototype paints the full duration the instant the
+> button is pressed (`:1337`) and only then starts decrementing — so a
+> 60-second selah shows `60` for one second and the total silence is 60 ticks
+> and not 61.
+
+> ### THE AMBER WENT DARK AT 22:00, AND THE FIXTURE MADE IT A **FACT ABOUT THE
+> ### HARNESS** RATHER THAN ABOUT THE CLOCK
+>
+> The vespers auto-dim made the ambient's **target** a function of the wall
+> clock. The ambient's brightness is a *target* the scene eases toward
+> (`lumen_scene.dart`), so at 22:00 the target was `0.78 ×` what it was at
+> 09:00 — and the **sixteen background goldens** (eight screens × two themes,
+> `test/core/design_system/effects/goldens/neural_background_*.png`) would have
+> **passed at 09:00 and failed at 22:00**. Sixteen goldens whose result is a
+> fact about the hour the suite happened to run in are sixteen goldens that
+> cannot be compared across two commits, which is the only reason a golden
+> exists.
+>
+> **So the clock became an injectable, and the harness pins it.**
+> `NeuralMotionScope` takes a `now` (`core/design_system/effects/neural_motion.dart:314`,
+> `:376`), `LumenScene` takes one too (`core/design_system/effects/lumen_scene.dart:163`,
+> `:195`), and the harnesses hand in a fixed hour —
+> `test/support/design_system_harness.dart:72` and `:346`,
+> `test/support/home_harness.dart:648` — both at
+> `DateTime(2026, 10, 3, 9, 30)`. The two vespers tests that need the night
+> ask for it explicitly (`test/core/design_system/effects/lumen_scene_test.dart:143`,
+> `:183` — `22:00`).
+>
+> **This is a design decision and not a test fixture**, which is why it is
+> recorded here and not only in the harness. A rule that reads the wall clock
+> is a rule whose output is a function of when it was asked, and this
+> repository has already had one of those: the focus dim was the prototype's
+> unwired 4-second literal, and the **shipped** behaviour is the reader's own
+> `focusDelaySec` instead. The injectable clock is the same discipline applied
+> one level up — the ambient's target is now a function of *the reader's
+> settings and a pinned hour*, and nothing else.
+>
+> **And the goldens are byte-identical** — the fix changed no pixel, because
+> the pinned hour is the hour the goldens were recorded at.
+
+> ### FIVE DIVERGENCES, RECORDED RATHER THAN BURIED
+>
+> Every one of these is a place where the client **cannot** do what the
+> prototype does, and every one says so where a reader will find it.
+>
+> 1. **The haptics' rhythm is lost, and the peak decides.** The prototype's
+>    two rhythms are `[30,40,30]` (`:1330`, `:1445`) and `[40,60,40]`
+>    (`:1428`, `:1429`) — two buzzes with a pause. `HapticFeedback` has **no
+>    pattern API**: it offers four *named* impulses and `vibrate()` asks the
+>    platform for its *default* vibration rather than a list. So a duration has
+>    to become a name, and the only defensible rule is **magnitude** — the
+>    prototype's 10–12 ms are clicks, 15–25 ms bumps, 30 ms a firm bump, and
+>    40 ms and above buzzes. A per-call-site table would be a second table of
+>    the same thirteen moments, and the two would drift. **The strength
+>    survives; the rhythm does not**, because the platform API this client may
+>    use (§8.4 forbids a dependency) cannot carry it.
+>    (`core/domain/entities/ritual_haptic.dart`.)
+> 2. **The amen is a card label and not a toast.** The prototype raises it as
+>    a **toast** anchored to the screen root (`:1330`, `:466-468`, `:1393`),
+>    and this client drew it in the card's count corner because "this client
+>    has no app-level toast surface". **Being closed in this phase's second
+>    pass** — the toast becomes a **shared design-system widget** rather than a
+>    second implementation in a second feature, and the home page — the screen
+>    — owns it, as the prototype's does.
+> 3. **The card's gold snaps instead of transitioning.** The prototype
+>    transitions the card's border and fill over `.3s var(--e-spring)`
+>    (`:262`); this client does not, because the glass surface's decoration
+>    model has no transition on a border and the card's fill is a `BoxDecoration`
+>    rather than an animated one. The change **snaps**, which is also what a
+>    reader who has asked for reduced motion wants.
+>    (`features/home/presentation/widgets/selah_card.dart:337-349`.)
+> 4. **The selah's ring restarts its phase.** CSS does not restart a running
+>    animation when a property changes, so the prototype's ring keeps its
+>    phase across the silence. The client **restarts** it, and the restart is
+>    the better picture: the ring is the silence's own clock, and a clock that
+>    kept a phase from before the silence began would be lying about it.
+>    (`features/home/presentation/widgets/selah_card.dart:508-521`.)
+> 5. **The breath guide rests under reduced motion where the prototype keeps
+>    breathing.** The prototype's `.rm` class kills eleven selectors at once
+>    (`:48-54`) and `.breath` is **not** one of them — so the prototype's
+>    breath guide keeps breathing under reduced motion. This client honours
+>    AGENT_CONTEXT §14 instead, and the line at rest is a **rest** rather than
+>    a keyframe: CSS's `animation-fill-mode` defaults to `none`, and `:173-174`
+>    declares no `transform` and no `opacity` on `.breath`, so the line at rest
+>    is `transform: none` and `opacity: 1` — **wider and more opaque than the
+>    animation's widest keyframe**, which is `scaleX(1)` at `opacity:.6`.
+>    (`features/reading/presentation/widgets/breath_guide_line.dart`.)
+>
+> **And the sixth is not a divergence but an unwiring, and it is the one that
+> is still open.** The prototype's selah completion is one line (`:1330`):
+>
+> ```js
+> if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5; haptic([30,40,30]); }
+> ```
+>
+> `addStar(true)` lights a **flare** star — bigger, `:1148` (`big?5:3+…`) — and
+> the client's witness sky is **keyed `book:chapter:verse`**, because
+> `/reading` lights one star per verse as it crosses the scroll threshold
+> (`:1219`). **A selah lights no verse.** There is no honest key for it, and
+> the fiction table in ADR-0022 is the authority on what may be invented.
+> Recorded as an open question rather than answered with a made-up verse.
 
 ---
 

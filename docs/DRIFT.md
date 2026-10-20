@@ -352,3 +352,65 @@ is the same defect as one that cannot fail: both report a clean run over a surfa
 they never examined. The fourth was the same defect wearing a costume: the gate
 reported a clean run over a surface — *is this file really a page?* — it never
 examined, and the proof that was written down for it was the fool.
+
+---
+
+## 8. The Lumen plan's Phase 7 SAID THE PHASE WAS NOT DONE, AND IT WAS
+
+`docs/superpowers/plans/2026-10-13-lumen-redesign.md`'s **Phase 7 — Ritual, locale,
+close** carried **six unticked checkboxes** and **no recorded decisions** for well
+over a week of committed work.
+
+The ritual had shipped in `25a6798` — the selah timer, the focus dim, the vespers
+auto-dim, the breath guide and the haptics, 3691 tests, 98.83% coverage, every gate
+green including the Linux build. The tree said so. **The plan said the phase had not
+started.**
+
+### What was missing, and what it cost
+
+This repository's rule is that a phase records its decisions in the plan — that is
+where the Lumen phases keep them, and the plan's own Phase 5 and Phase 6 sections
+are the worked example. So the five behaviours, their divergences and one real design
+decision existed **only in a chat transcript**:
+
+* the **five behaviours** and where their arithmetic lives — the four pure-Dart
+  files (`core/domain/entities/selah_countdown.dart`, `core/domain/entities/vespers.dart`,
+  `core/domain/entities/ritual_haptic.dart`, `features/reading/domain/breath_guide.dart`)
+  and the one shared triangle (`core/common/cycle_phase.dart`);
+* the **amber-darkening defect** — the vespers auto-dim made the ambient's *target*
+  a function of the wall clock, which would have made the **sixteen background
+  goldens** pass at 09:00 and fail at 22:00. The fix was an **injectable clock**
+  (`NeuralMotionScope`'s `now`), and the harness pins it. **That is a design
+  decision**, and it is the reason the goldens are comparable at all;
+* the **divergences** — the haptics' rhythm lost to `HapticFeedback`'s four named
+  impulses, the amen drawn in the card rather than as a toast, the card's gold
+  snapping instead of transitioning, the selah's ring restarting its phase, and the
+  breath guide resting under reduced motion where the prototype keeps breathing.
+
+**The cost of the silence was not the writing.** It was that the next agent could not
+learn any of it from the tree, and would have re-derived it — or, worse, shipped a
+change that contradicted a decision nobody could find.
+
+### RESOLVED — the plan's Phase 7 now records all of it
+
+The six checkboxes are ticked against what actually shipped (Steps 3, 5 and 6), the
+two that are still open say so, and the phase's decisions are written out with their
+citations. `docs/agents/AGENT_CONTEXT.md` carries the three that are **invariants** a
+sub-agent must not violate (the pure-Dart split, the injectable clock, the haptics'
+mapping) and points at the plan for the rest — because AGENT_CONTEXT is the document
+**injected into every sub-agent dispatch**, and a sub-agent that read only it would
+have known nothing about the ritual.
+
+### AND THE PLAN'S OWN **STEP 1 ESTIMATE** WAS STALE BY A FACTOR OF THREE
+
+Step 1 says *"Port ~90 `I18N` keys (`eva/redesign.html:924-977`)"*. Measured against
+the ARB pair: the prototype's table holds **128 rows** across 54 lines, and **103 of
+them are already ported** under the client's own naming convention — `witness` →
+`leaderboardWitness`, `cheerSent` → `leaderboardCheerSent`, `bmk` →
+`readingBookmarkOn` / `readingBookmarkOff`, `libCount` → composed from
+`homeScrolls` / `homeOpenBooks` and `digits()`. **Twenty-five** rows remain.
+
+The estimate was made before Tasks 5.1–5.7 landed, and it was never revised as they
+did. **A plan's scope number is a claim like any other**, and this one had quietly
+stopped being true — in the direction that makes a plan look like there is four times
+more work than there is.

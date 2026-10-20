@@ -4237,3 +4237,77 @@ grows should be re-examined whenever the thing grows. The cost here was accepted
 `LeaderboardState`'s dead one, and dropping `AuthState`'s hand-rolled one are each
 defensible, and each is a refactor needing its own decision and tests — not a drift fix
 applied silently to a pattern 2541 tests currently agree on. See `docs/DRIFT.md` §6.
+
+---
+
+### Recorded decisions — the Lumen redesign, Phase 7 (the ritual)
+
+Shipped on `feat/navigation-dock`. **3691 tests, 98.83% coverage.** The phase's full
+decision log lives in `docs/superpowers/plans/2026-10-13-lumen-redesign.md`'s Phase 7 —
+that plan is where the Lumen phases record theirs, and this file carries only the
+**invariants** a sub-agent must not violate. Read the plan section before touching the
+ritual, the ambient or the witness sky.
+
+**157. THE RITUAL'S ARITHMETIC IS PURE DART, AND THE FIVE FILES THAT HOLD IT ARE
+NAMED.**
+
+AGENT_CONTEXT §6 splits a decoration's **arithmetic** (domain) from its **clock**
+(widget). Phase 7 is the first phase to have five decorations at once, and the split is
+load-bearing rather than tidy — a widget that computed a countdown inline would be
+untested logic wearing a `build` method, which is exactly what §6 names.
+
+| behaviour | the arithmetic | the clock |
+| --- | --- | --- |
+| the selah countdown | `core/domain/entities/selah_countdown.dart` | the card's own `Timer` — `features/home/presentation/widgets/selah_card.dart:191`, **cancelled on dispose** |
+| the vespers auto-dim | `core/domain/entities/vespers.dart` | the **injected** wall clock — see 158 |
+| the breath guide | `features/reading/domain/breath_guide.dart` | the line's own controller |
+| the haptics | `core/domain/entities/ritual_haptic.dart` | `core/design_system/effects/ritual_haptics.dart` — the only file that calls the platform |
+| the shared breath triangle | `core/common/cycle_phase.dart` | the two callers' own controllers |
+
+**The triangle is ONE number, and the curve is not in it.** The selah's ring
+(`eva/redesign.html:269-270`) and the breath guide (`:174-175`) declare the same keyframes
+at 0%, 50% and 100%, so they breathe on the same shape — `core/common/cycle_phase.dart`
+owns the arithmetic, because two spellings of one number is what this repository refuses.
+The **curve** stays with the widgets: Flutter's `Curves.easeInOut` **is** CSS's
+`ease-in-out` (`Cubic(0.42, 0.0, 0.58, 1.0)`), so applying it is a presentation concern
+and the file is Flutter-free by construction.
+
+**The timer is the card's, and a leaked timer is a hung suite.** This repository has one
+of those recorded. A `Timer` in a `StatefulWidget` is cancelled in `dispose`, always.
+
+**158. THE AMBIENT READS AN **INJECTABLE** CLOCK, AND A RULE THAT READS THE WALL CLOCK
+IS A RULE WHOSE OUTPUT DEPENDS ON WHEN IT WAS ASKED.**
+
+The vespers auto-dim made the ambient's **target** a function of the wall clock, and the
+**sixteen background goldens** (eight screens × two themes) would have **passed at 09:00
+and failed at 22:00**. Sixteen goldens whose result depends on the hour the suite ran in
+are sixteen goldens that cannot be compared across two commits, which is the only reason
+a golden exists.
+
+So `NeuralMotionScope` takes a `now`
+(`core/design_system/effects/neural_motion.dart:314`, `:376`), `LumenScene` takes one too
+(`core/design_system/effects/lumen_scene.dart:163`, `:195`), and the harnesses pin it —
+`test/support/design_system_harness.dart:72` and `:346`,
+`test/support/home_harness.dart:648`, both at `DateTime(2026, 10, 3, 9, 30)`. The two
+vespers tests that need the night ask for it explicitly
+(`test/core/design_system/effects/lumen_scene_test.dart:143`, `:183`).
+
+**The rule for the next reader: a golden's subject must not be a function of the hour.**
+The same discipline killed the focus dim's unwired 4-second literal in favour of the
+reader's own `UserSettings.focusDelaySec`. If a new feature reads the wall clock, it must
+read it through an injected seam, and the harness must pin it.
+
+**159. THE HAPTICS' **RHYTHM** IS LOST, AND THE **PEAK** DECIDES.**
+
+The prototype's `haptic(p)` is `navigator.vibrate(p)` (`eva/redesign.html:914`) — a
+duration, or a list of durations. Flutter's `HapticFeedback` has **no pattern API**: four
+*named* impulses and a `vibrate()` that asks the platform for its *default* vibration. So
+a duration must become a name, and the rule is **magnitude** — 10–12 ms is a click,
+15–25 ms a bump, 30 ms a firm bump, 40 ms and above a buzz. The prototype's two rhythms
+(`[30,40,30]`, `[40,60,40]`) both peak above 30 ms and both become **one heavy impact**.
+
+**The strength survives; the rhythm does not**, because §8.4 forbids the dependency that
+would carry it. **A per-call-site table is forbidden**: it would be a second table of the
+same thirteen moments, and the two would drift. `RitualHaptic` is the vocabulary and
+`hapticImpactFor` is the single mapping — a new haptic is an **enum member**, never a
+literal at a call site.
