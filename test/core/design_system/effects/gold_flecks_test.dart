@@ -286,7 +286,17 @@ void main() {
       await tester.pump();
       final List<int> before = await _pixels(tester);
 
-      await tester.pump(const Duration(milliseconds: 500));
+      // ## THE AMBIENT'S NOTIFICATION IS **BUDGETED**, AND A TEST PUMPS FOR ONE
+      //
+      // The ambient notifies its listeners twenty times a second — §13 rule 4's
+      // "30 % cost" — so a single pumped frame is not enough to be sure a
+      // notification was due. **The number of frames is read from the budget
+      // rather than written down**, so the test follows the budget rather than
+      // duplicating it.
+      final AmbientTickBudget budget = AmbientTickBudget.resolveForPlatform();
+      for (int frame = 0; frame < budget.notifyEveryNTick + 1; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       final List<int> after = await _pixels(tester);
 
       expect(before.toString(), isNot(after.toString()));

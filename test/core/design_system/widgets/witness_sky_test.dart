@@ -68,6 +68,12 @@ Widget _sky({
   theme: theme,
   disableAnimations: disableAnimations,
   animationsEnabled: animationsEnabled,
+  // **The UN-BUDGETED ambient, and the reason is the golden.** The ambient's
+  // budget decides *which tick* a frame is captured on, and this suite's
+  // goldens capture a **design** — the twinkle's phase, the star's shape. A
+  // budgeted scope would make the captured phase depend on the budget rather
+  // than on the design, and the golden would move every time the budget did.
+  budget: kNoAmbientBudget,
   child: RepaintBoundary(
     key: _layerKey,
     child: WitnessSky(

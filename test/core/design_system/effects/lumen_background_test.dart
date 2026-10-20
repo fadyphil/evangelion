@@ -311,7 +311,16 @@ void main() {
       await tester.pump();
       final Uint8List before = await backgroundPixels(tester);
 
-      await tester.pump(const Duration(seconds: 3));
+      // ## THE AURORA'S **PAINT** IS BUDGETED, AND A TEST PUMPS FOR ONE
+      //
+      // The aurora repaints thirty times a second — §13 rule 4's "30 % cost" —
+      // so a single pumped frame is not enough to be sure a paint was due.
+      // **The number of frames is read from the budget**, so the test follows
+      // the budget rather than duplicating it.
+      final AmbientTickBudget budget = AmbientTickBudget.resolveForPlatform();
+      for (int frame = 0; frame < budget.paintEveryNTick + 1; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
       final Uint8List after = await backgroundPixels(tester);
 
       expect(before.length, after.length, reason: 'same surface, same layer');

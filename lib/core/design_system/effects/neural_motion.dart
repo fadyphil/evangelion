@@ -1,3 +1,4 @@
+import 'package:evangelion/core/design_system/effects/ambient_tick_budget.dart';
 import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
 import 'package:flutter/material.dart';
@@ -82,12 +83,41 @@ class EvaNeuralMotion extends ChangeNotifier {
     required this.float,
     required this.lumen,
     DateTime Function()? now,
-  }) : lumenScene = LumenScene(clock: lumen, now: now) {
+    this.budget = const AmbientTickBudget(
+      paintEveryNTick: 1,
+      notifyEveryNTick: 1,
+    ),
+  }) : lumenScene = LumenScene(clock: lumen, now: now, budget: budget) {
     _sources = Listenable.merge(<Listenable>[float, lumen]);
     _sources.addListener(_onSourceChanged);
   }
 
   late final Listenable _sources;
+
+  /// How often the ambient may **notify** its listeners.
+  ///
+  /// ## WHAT THE NOTIFICATION COSTS
+  ///
+  /// The four consumers are the witness sky's **forty-four stars** — each one
+  /// a `Positioned` / `Transform.scale` / `Opacity` / `DecoratedBox` /
+  /// `SizedBox` chain, so about **265 elements re-instantiated per frame**,
+  /// with **forty-four composited `Opacity` layers** and **eighty-eight shadow
+  /// blurs** — plus the gold flecks, the CTA's breathing bead and the CTA's
+  /// ripple ring.
+  ///
+  /// **All four are seconds-long ambient loops**, and the sky's twinkle has a
+  /// period of seconds, so **twenty notifications a second is well past the
+  /// point where the eye can tell it from a smooth one** — and it is a third
+  /// of the frames.
+  ///
+  /// ## AND WHY THE BUDGET IS ON THE **NOTIFICATION** AND NOT THE **CLOCK**
+  ///
+  /// Because the clock's **ticking** is not the cost — the clock's
+  /// **notification** is. The clock still ticks at the display's rate, so
+  /// everything that reads a clock's **value** — the sky's twinkle phase, the
+  /// flecks' phase — reads the same number it always did. What is rarer is
+  /// the **wake-up**, and the wake-up is what rebuilds the stars.
+  final AmbientTickBudget budget;
 
   bool _notifiedThisFrame = false;
   bool _disposed = false;
@@ -117,11 +147,34 @@ class EvaNeuralMotion extends ChangeNotifier {
   void _onSourceChanged() {
     if (_disposed || _notifiedThisFrame) return;
     _notifiedThisFrame = true;
-    notifyListeners();
+    // ## THE **NOTIFY BUDGET**
+    //
+    // The coalescing above is per **frame**; this is per **interval**. Two
+    // `repeat()`ing controllers each fire their own listener every frame, and
+    // the coalescing turns two notifications into one — but one per frame is
+    // still sixty a second, and the forty-four stars are rebuilt on every one
+    // of them.
+    //
+    // **The gate is over a [Stopwatch], and not over
+    // `SchedulerBinding.currentFrameTimeStamp`.** The frame timestamp is the
+    // obvious choice and it is **wrong**: it asserts that a frame is in
+    // progress, and this notification can arrive **outside** one — the clock's
+    // `setReducedMotion` is called from `setAnimationsEnabled`, which the
+    // composition root calls from a `WidgetsBindingObserver` callback, and
+    // that is not a frame. The first version read it, and the suite caught it.
+    if (_notifyGate.isDue()) {
+      notifyListeners();
+    }
     SchedulerBinding.instance.addPostFrameCallback((Duration _) {
       _notifiedThisFrame = false;
     });
   }
+
+  /// The notify budget's gate.
+  ///
+  /// **Built from [budget], and not from a constant** — a caller that passes
+  /// its own budget gets its own gate.
+  late final AmbientTickGate _notifyGate = budget.notifyGate;
 
   /// The orb float clock. §13.2's reference duration: 20s.
   ///
@@ -282,6 +335,7 @@ class NeuralMotionScope extends StatefulWidget {
     required this.child,
     this.animationsEnabled,
     this.now,
+    this.budget,
     super.key,
   });
 
@@ -344,6 +398,16 @@ class NeuralMotionScope extends StatefulWidget {
   /// carries it, and the harness's fixed hour is only *which* hour the factor
   /// is computed for.
   final DateTime Function()? now;
+
+  /// How often the ambient may paint and notify.
+  ///
+  /// **`null` resolves it from the platform's own display**, which is where
+  /// the cap belongs: a 120 Hz panel can paint four times as often as a 60 Hz
+  /// one, and the budget is what stops the ambient from taking the invitation.
+  ///
+  /// **And a caller may pass one**, which is how the suite asserts the
+  /// budget's own behaviour without a display.
+  final AmbientTickBudget? budget;
 
   /// The motion bundle published to [context]'s descendants.
   ///
@@ -411,6 +475,10 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       float: float,
       lumen: TickedLumenClock(ticker: lumenTicker),
       now: widget.now,
+      // **The platform's own display**, resolved once per scope — and the
+      // scope is mounted **once**, above `MaterialApp`, so it is resolved
+      // once for the life of the process.
+      budget: widget.budget ?? AmbientTickBudget.resolveForPlatform(),
     );
     // **Unconditionally, and not only when the clocks are enabled.**
     //

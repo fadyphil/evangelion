@@ -16,11 +16,17 @@ Future<EvaNeuralMotion> pumpScope(
   WidgetTester tester, {
   bool? animationsEnabled = true,
   Widget child = const SizedBox.expand(),
+  // **The budget, and a caller may pass one.** The D1 rows are about the
+  // **coalescing** — two clocks, one notification — and they pass an
+  // **un-budgeted** scope so the budget is not a second thing in the way. The
+  // budget has its own row.
+  AmbientTickBudget? budget,
 }) async {
   late EvaNeuralMotion captured;
   await tester.pumpWidget(
     NeuralMotionScope(
       animationsEnabled: animationsEnabled,
+      budget: budget,
       child: Builder(
         builder: (BuildContext context) {
           captured = NeuralMotionScope.of(context);
@@ -31,6 +37,16 @@ Future<EvaNeuralMotion> pumpScope(
   );
   return captured;
 }
+
+/// A budget that **does not budget** — every frame notifies.
+///
+/// **And it is the DEFAULT for the scope**, because a scope built without one
+/// must behave the way it always did. The app's scope resolves the real
+/// budget from the platform's display.
+const AmbientTickBudget _noBudget = AmbientTickBudget(
+  paintEveryNTick: 1,
+  notifyEveryNTick: 1,
+);
 
 /// The number of tickers the scheduler currently has callbacks registered for.
 ///
@@ -376,7 +392,7 @@ void main() {
       // The tightened form: three pumped frames must produce three
       // notifications, not one. A "notify only on the first frame ever"
       // mutation — which leaves `greaterThan(0)` green — fails this.
-      final EvaNeuralMotion motion = await pumpScope(tester);
+      final EvaNeuralMotion motion = await pumpScope(tester, budget: _noBudget);
       int notifications = 0;
       void bump() {
         notifications++;
@@ -405,7 +421,7 @@ void main() {
     ) async {
       // One merged listener rather than one per source: two controllers firing
       // two `notifyListeners` in a frame would rebuild the painter twice.
-      final EvaNeuralMotion motion = await pumpScope(tester);
+      final EvaNeuralMotion motion = await pumpScope(tester, budget: _noBudget);
       int notifications = 0;
       void bump() {
         notifications++;

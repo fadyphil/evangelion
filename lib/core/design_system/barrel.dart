@@ -70,6 +70,7 @@
 /// two import styles coexist.
 library;
 
+export 'package:evangelion/core/design_system/effects/ambient_tick_budget.dart';
 export 'package:evangelion/core/design_system/effects/gold_flecks.dart';
 export 'package:evangelion/core/design_system/effects/lumen_background.dart';
 export 'package:evangelion/core/design_system/effects/lumen_canvas.dart';

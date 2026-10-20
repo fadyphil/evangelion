@@ -53,7 +53,7 @@ point: a budget fails the build, so it cannot rot.
 Every one of `/settings`'s thirty-three rows, rebuilt for a change to **one
 number**:
 
-```
+```text
 Container × 99, AnimatedDefaultTextStyle × 81, DefaultTextStyle × 81,
 Text × 57, AnimatedContainer × 47, Builder × 45, GestureDetector × 45,
 RawGestureDetector × 45, Focus × 44, SettingsTile × 31, EvaToggle × 16,
@@ -69,7 +69,7 @@ keeps alive.
 
 The whole screen, the sky included:
 
-```
+```text
 RawGestureDetector × 15, GestureDetector × 14, Text × 11, …,
 VerseLine × 5, _HotGlow × 5, _Reveal × 5, …,
 WitnessSky × 1, _SkyStars × 1,          ← the forty-four-star sky
@@ -119,13 +119,28 @@ for shapes 0–2, **5.04 ns/px** for shafts):
 | default band (`top`) | 2.59 M | **7.7 ms** | 46 % | 69 % | **93 %** |
 | `shafts` | 2.59 M | **13.1 ms** | 78 % | **118 %** | **157 %** |
 
-### 3.2 The three GPU fixes, in the order they should be landed
+### 3.2 What the tick budget already did — **LANDED**
+
+`AmbientTickBudget` (ADR-0025) caps the aurora at **30 paints a second** and the
+ambient's notification at **20**, counted in **ticks** and resolved from the
+platform's own display (**2 and 3** at 60 Hz, **4 and 6** at 120 Hz).
+
+- The aurora's **GPU** cost roughly halves, and the two `BackdropFilter`s that
+  blur it — the dock's σ **22** and Home's σ **24** — re-run at half the rate,
+  because a backdrop filter over an animating layer is re-evaluated whenever
+  the layer changes.
+- The witness sky's **forty-four stars** rebuild **three times less often**,
+  and so do the gold flecks, the CTA's bead and its ripple ring.
+- **The state is untouched.** The aurora's trajectory, the sky's twinkle phase
+  and the flecks' phase are exactly what they were, because every clock still
+  ticks at the display's rate and every consumer still reads the same number.
+
+### 3.3 The GPU fixes still open, in the order they should be landed
 
 | # | the change | the win | the cost |
 | --- | --- | --- | --- |
 | 1 | **Count device pixels in the shafts gate** — `LumenTiers.resolve` takes `devicePixelRatio` | the `shafts` shape stops costing 13–15 ms/frame on a phone | **visible** to a reader who explicitly chose "shafts" (they would see "sides"); the default shape is unaffected |
-| 2 | **Rate-limit the ambient to 30 Hz** — the aurora's *repaint*, not its state, with the three per-frame eases converted to per-second (`k(dt) = 1 - pow(1 - c, dt*60)`, which is **exactly** `c` at 60 Hz) | the aurora's GPU cost halves, and the two `BackdropFilter`s that blur it re-run at half the rate | none visible: a slow-drifting gradient at 30 Hz is indistinguishable from one at 60 Hz, and the motion's wall-clock trajectory is unchanged |
-| 3 | **Fold the light-mode multiply into the shader** — `lumen_background.dart:189-218` wraps the aurora in a `ColorFiltered(ColorFilter.matrix(...))`, a full-screen `saveLayer` plus a full-screen 4×5 matrix pass **per frame** | one fewer full-screen pass in light mode | none visible: the mathematics is identical, and **the goldens are the acceptance test** — if they do not come back byte-identical, the change is dropped |
+| 2 | **Fold the light-mode multiply into the shader** — `lumen_background.dart:189-218` wraps the aurora in a `ColorFiltered(ColorFilter.matrix(...))`, a full-screen `saveLayer` plus a full-screen 4×5 matrix pass **per frame** | one fewer full-screen pass in light mode | none visible: the mathematics is identical, and **the goldens are the acceptance test** — if they do not come back byte-identical, the change is dropped |
 
 **And the one that needs a decision:** rendering the aurora at **half
 resolution** (`Transform.scale` + a `RepaintBoundary`, with `u_res` adjusted
@@ -134,7 +149,7 @@ is normalised by `u_res`, so the aurora's *shape* is unchanged — it is only
 resampled. **It is visible as a slightly softer aurora**, and it is listed here
 as a decision rather than a fix.
 
-### 3.3 The on-device measurement, which does not exist yet
+### 3.4 The on-device measurement, which does not exist yet
 
 **A `flutter test` micro-benchmark cannot see the shader's GPU cost** — the
 test rasteriser is software. The on-device instrument is
@@ -144,6 +159,10 @@ test rasteriser is software. The on-device instrument is
 
 **It is not built yet.** When it is, it is a **profile-mode** run on the
 reader's phone, and the numbers land in this file beside the ones above.
+
+**And it is the only way to confirm §3.1 on the device.** Everything above is
+computed from the tree's own recorded `ns/px` figures and the device's pixel
+count — which is arithmetic, and arithmetic is not a measurement.
 
 ---
 

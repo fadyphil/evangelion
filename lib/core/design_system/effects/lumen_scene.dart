@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:evangelion/core/design_system/effects/ambient_tick_budget.dart';
 import 'package:evangelion/core/design_system/effects/lumen_canvas.dart';
 import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
@@ -161,6 +162,10 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
     required LumenClock clock,
     LumenPreferences preferences = const LumenPreferences(),
     DateTime Function()? now,
+    this.budget = const AmbientTickBudget(
+      paintEveryNTick: 1,
+      notifyEveryNTick: 1,
+    ),
   }) : _clock = clock,
        _preferences = preferences,
        _currentHue = preferences.hue.toDouble(),
@@ -176,6 +181,30 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
 
   /// The clock `u_time` is read from, and the frame signal.
   final LumenClock _clock;
+
+  /// How often the aurora may be **re-rasterised**.
+  ///
+  /// ## AND WHY THE BUDGET GATES THE **NOTIFICATION** AND NOT THE **STATE**
+  ///
+  /// Because the two are different things, and only one of them is expensive.
+  /// The **state** — the eased ambient, the eased hue, the decaying spike — is
+  /// advanced on **every** tick, so the aurora's motion is **exactly** what it
+  /// was before: the prototype's per-frame eases run on the same ticks they
+  /// always did, and its wall-clock trajectory is unchanged. **The budget only
+  /// decides how often the frame is PAINTED.**
+  ///
+  /// **Which is the whole of the win, and the whole of the safety.** The
+  /// alternative — capping the *state* and converting the per-frame eases to
+  /// per-second — would have been a **divergence from the prototype**, because
+  /// `redesign.html:891-892`'s `ambI += (base-ambI)*0.06` is a per-frame
+  /// constant and the prototype's own `dt` is used for the *auto hue* and the
+  /// *time accumulator*, never for the eases. `lumen_scene_test.dart` asserts
+  /// one frame's ease to twelve decimal places, and that assertion is right.
+  ///
+  /// So: the state runs at the display's rate, and the painting runs at the
+  /// budget's. A slow-drifting gradient at 30 Hz is indistinguishable from one
+  /// at 60 Hz, and the shader stops being the most expensive thing on screen.
+  final AmbientTickBudget budget;
 
   /// The wall clock the vespers test reads.
   ///
@@ -445,8 +474,27 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
     );
     _lastTickSeconds = now;
     _advance(delta);
-    notifyListeners();
+    // ## THE **PAINT BUDGET**, AND IT GATES THE NOTIFICATION ONLY
+    //
+    // The state above has already advanced. **What this gates is whether the
+    // frame is PAINTED** — and the painter's `repaint` signal is this
+    // notifier, so an ungated notification is a full re-rasterisation of the
+    // aurora at device resolution.
+    //
+    // **The gate counts FRAMES, and not time.** A time gate needs a clock,
+    // and every clock here is wrong: a wall clock can go backwards, a
+    // `Stopwatch` makes the goldens non-deterministic, the frame timestamp
+    // asserts that a frame is in progress, and the shader clock's own elapsed
+    // time is a frame behind the float clock's. The scene's tick is already
+    // **one per frame**, so a frame count is the unit it is already counted
+    // in. See `ambient_tick_budget.dart`'s class doc for the whole argument.
+    if (_paintGate.isDue()) {
+      notifyListeners();
+    }
   }
+
+  /// The gate the aurora's painter is paced by.
+  late final AmbientTickGate _paintGate = budget.paintGate;
 
   /// The prototype's four steps, in its order.
   ///

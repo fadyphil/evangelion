@@ -55,14 +55,34 @@ void useAmbientSurface(WidgetTester tester, {Size size = kAmbientSurface}) {
 /// depend on the host's accessibility setting — a test that passes on one
 /// machine and paints nothing on another, which reads exactly like a broken
 /// golden. `neural_motion_test.dart` drives the default directly.
+/// A budget that **does not budget** — every tick notifies.
+///
+/// **And it is what a golden wants.** The ambient's budget decides *which
+/// tick* a frame is captured on, and a golden captures a **design** — so a
+/// budgeted scope would make the captured twinkle phase depend on the budget
+/// rather than on the design.
+const AmbientTickBudget kNoAmbientBudget = AmbientTickBudget(
+  paintEveryNTick: 1,
+  notifyEveryNTick: 1,
+);
+
 Widget evaAmbientHarness({
   required Widget child,
   ThemeData? theme,
   bool animationsEnabled = true,
   bool disableAnimations = false,
   Locale locale = const Locale('en'),
+  // **The ambient's budget, and a caller may pass one.**
+  //
+  // **`null` resolves it from the platform's display**, which is what the app
+  // does. A **golden** passes [kNoAmbientBudget] instead, because a golden
+  // captures a *design* and the budget decides *which tick* the design is
+  // captured on — so a budgeted scope would make the captured phase depend on
+  // the budget rather than on the design.
+  AmbientTickBudget? budget,
 }) => NeuralMotionScope(
   animationsEnabled: animationsEnabled,
+  budget: budget,
   // ## THE FIXED HOUR, AND WHY IT IS **FIXED**
   //
   // The ambient's target carries the vespers factor

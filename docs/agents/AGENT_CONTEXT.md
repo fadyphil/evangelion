@@ -4409,7 +4409,7 @@ feature that added a field.
 the three largest and kept on the three smallest:
 
 | state | fields | `copyWith` | alternative in use |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `HomeState` | **13** | disabled `home_bloc.dart:418` | 6 named `with*` writers, each restating all 13 |
 | `AuthState` | **10** | disabled `auth_bloc.dart:239` | 2 writers + a **hand-rolled** `copyWith` `auth_bloc.dart:366` |
 | `QuizState` | **5** | disabled `quiz_bloc.dart:213` | inline full constructors, 11 sites |
@@ -4951,3 +4951,45 @@ they are recorded in `docs/PERFORMANCE.md` §3 with the fixes, the order and
 their costs, and **not** decided here. The one that needs a decision is
 rendering the aurora at half resolution: **4× fewer fragments**, the shape
 unchanged, and **visible as a slightly softer aurora**.
+
+**175. THE AMBIENT PAINTS AT THIRTY TIMES A SECOND AND NOTIFIES AT TWENTY, AND
+BOTH ARE COUNTED IN **TICKS** RATHER THAN IN TIME.**
+
+The ambient is the app's most expensive layer and it had **no budget at all**.
+The **aurora** is a full-screen fragment shader re-rasterised at **device**
+resolution — **2.6 M fragments a frame** on a 1080×2400 phone, which at the
+tree's own measured rate is **7.7 ms**, or **93 % of a 90 Hz frame** — and the
+**notification** rebuilds the witness sky's **forty-four stars** on every vsync.
+
+§13 rule 4 asked for exactly this — *"a `NeuralTier` … drops to `low` on
+low-end devices: no orbs, aurora only, at **30 % cost**"* — and `LumenTiers`
+never grew one. **The ambient's cost is not a pixel cost; it is a frame-rate
+cost, and nothing in the tree counted frames.**
+
+**AND THE BUDGET GATES THE **PAINT** AND THE **NOTIFICATION**, NEVER THE
+**STATE**.** The eased ambient, the eased hue and the decaying spike still
+advance on every tick, with the prototype's per-frame constants untouched — so
+the aurora's trajectory is **exactly** what it was, and only the painting is
+rarer. **Converting the per-frame eases to per-second would have been a
+divergence from the prototype** (`redesign.html:891-892`'s `0.06` is a
+per-frame constant, and the prototype's own `dt` is used for the *auto hue* and
+the *time accumulator*, never for the eases), and
+`lumen_scene_test.dart`'s twelve-decimal-place assertions on one frame's ease
+are **right**.
+
+**AND IT COUNTS TICKS RATHER THAN TIME, BECAUSE EVERY CLOCK HERE IS WRONG.**
+A wall clock can go backwards; a `Stopwatch` makes the goldens
+non-deterministic; `SchedulerBinding.currentFrameTimeStamp` asserts that a
+frame is in progress (and the ambient's notification can arrive **outside**
+one); and the shader clock's own elapsed time is **one frame behind** the
+float clock's, because the two tickers tick in sequence and the float ticks
+first. **All four were tried.** The tick count is exact, reproducible, and the
+unit the thing being budgeted is **already counted in**.
+
+**A GOLDEN MUST ASK FOR AN UN-BUDGETED SCOPE.** The budget decides *which tick*
+a frame is captured on, and a golden captures a **design** — so
+`evaAmbientHarness` takes a `budget` and the witness sky's goldens pass
+`kNoAmbientBudget`. **A golden that captured a budgeted frame would move every
+time the budget did.**
+
+See ADR-0025.

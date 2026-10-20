@@ -1,3 +1,4 @@
+import 'package:evangelion/core/design_system/effects/ambient_tick_budget.dart';
 import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
 import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
@@ -452,13 +453,64 @@ void main() {
   });
 
   group('the notification', () {
-    test('the clock\'s notification is the frame signal', () {
+    test('the clock\'s notification is the frame signal, and it is BUDGETED', () {
+      // ## THE TWO HALVES, AND WHY THEY ARE SEPARATE
+      //
+      // The scene's **notification** is the painter's `repaint` signal, so a
+      // notification is a full re-rasterisation of the aurora at **device**
+      // resolution. That is the expensive half, and it is now budgeted: the
+      // aurora paints at thirty times a second instead of sixty.
+      //
+      // The scene's **state** — the eased ambient, the eased hue, the decaying
+      // spike — advances on **every** tick, because the prototype's eases are
+      // per-frame constants and the prototype's own `dt` is used for the *auto
+      // hue* and the *time accumulator*, never for the eases. So the motion is
+      // **exactly** what it was, and only the painting is rarer.
+      //
+      // **The alternative — capping the state and converting the eases to
+      // per-second — would have been a divergence from the prototype**, and
+      // this suite's twelve-decimal-place assertions on one frame's ease are
+      // right.
+      // ## THE BUDGET IS **EXPLICIT** HERE, AND NOT THE DEFAULT
+      //
+      // A scene built without a budget paints every frame, and that is what the
+      // default is — so this row builds its own, budgeted scene, and the
+      // *state* it asserts is the prototype's either way.
+      final LumenScene budgeted = LumenScene(
+        clock: clock,
+        now: () => DateTime(2026, 10, 3, 9, 30),
+        budget: const AmbientTickBudget(
+          paintEveryNTick: 2,
+          notifyEveryNTick: 3,
+        ),
+      );
       int fired = 0;
-      scene.addListener(() => fired++);
+      budgeted.addListener(() => fired++);
+
+      // The first frame paints, whatever the budget says.
       clock.advance(kFrame);
-      expect(fired, 1);
+      expect(fired, 1, reason: 'the aurora has to paint once.');
+
+      // A frame inside the budget does not, and **the state still advanced**.
+      final double ambientBefore = budgeted.ambient;
       clock.advance(kFrame);
-      expect(fired, 2);
+      expect(
+        fired,
+        1,
+        reason: 'the second frame is inside a two-frame budget.',
+      );
+      expect(
+        budgeted.ambient,
+        isNot(closeTo(ambientBefore, 1e-12)),
+        reason:
+            'the STATE still advanced — the budget gates the painting, not the '
+            'motion. A budget that gated the state would change the '
+            'prototype\'s arithmetic.',
+      );
+
+      // A frame past the budget does.
+      clock.advance(kFrame);
+      expect(fired, 2, reason: 'the third frame is outside the budget.');
     });
 
     test(
