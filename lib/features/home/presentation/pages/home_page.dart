@@ -169,7 +169,12 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   /// The amen's message, or `null` when no toast is up.
-  String? _amen;
+  /// The amen, as a **notifier**.
+  ///
+  /// **And the toast is the only thing that reads it**, so a `setState` here
+  /// rebuilt the whole screen — the greeting, the day's card, the selah card
+  /// and the library carousel — to show one widget and to take it away again.
+  final ValueNotifier<String?> _amen = ValueNotifier<String?>(null);
 
   /// The timer that takes the toast away.
   ///
@@ -182,6 +187,10 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _amenTimer?.cancel();
     _amenTimer = null;
+    // **The notifier is disposed with the page.** A `ValueNotifier` that
+    // outlives its `State` keeps its listeners alive, and a listener that
+    // outlives the element it belongs to fires into a disposed tree.
+    _amen.dispose();
     super.dispose();
   }
 
@@ -194,16 +203,15 @@ class _HomePageState extends State<HomePage> {
   /// two timers racing to clear the same message.
   void _showAmen(String message) {
     _amenTimer?.cancel();
-    setState(() {
-      _amen = message;
-    });
+    _amen.value = message;
     _amenTimer = Timer(kSelahAmenDuration, () {
-      // `mounted` because the timer outlives a route pop: a screen that has been
-      // disposed must not call `setState` on the way out.
-      if (!mounted) return;
-      setState(() {
-        _amen = null;
-      });
+      // **No `mounted` check, and the reason is the timer is cancelled in
+      // [dispose].** The old code needed the check because the timer outlived a
+      // route pop and `setState` on a disposed `State` throws; a notifier
+      // throws too — on a *disposed notifier* — so the answer is the same
+      // either way, and the answer is to **cancel the timer** rather than to
+      // test a flag.
+      _amen.value = null;
     });
   }
 
@@ -229,22 +237,31 @@ class _HomePageState extends State<HomePage> {
   /// that belonged to the row under it. `IgnorePointer` does that, and it
   /// leaves the semantics tree alone — the `liveRegion` announcement is the
   /// point of the toast for a screen-reader user.
-  Widget? _toastOverlay() {
-    final String? message = _amen;
-    if (message == null) return null;
-    return Stack(
-      children: <Widget>[
-        Positioned(
-          left: 20,
-          right: 20,
-          // The prototype's `bottom: 110px` (`:466`) — high enough to clear the
-          // bottom of the screen and the card under it.
-          bottom: 110,
-          child: IgnorePointer(child: EvaToast(message: message)),
-        ),
-      ],
-    );
-  }
+  ///
+  /// ## AND WHY IT IS A **NOTIFIER** AND NOT A `setState`
+  ///
+  /// Because a toast is **one widget in the overlay slot**, and a `setState`
+  /// rebuilt the **whole screen** — the greeting, the day's card, the selah
+  /// card and the library carousel — to show it and to take it away again. The
+  /// notifier's only consumer is the toast.
+  Widget? _toastOverlay() => ValueListenableBuilder<String?>(
+    valueListenable: _amen,
+    builder: (BuildContext context, String? message, Widget? child) {
+      if (message == null) return const SizedBox.shrink();
+      return Stack(
+        children: <Widget>[
+          Positioned(
+            left: 20,
+            right: 20,
+            // The prototype's `bottom: 110px` (`:466`) — high enough to clear the
+            // bottom of the screen and the card under it.
+            bottom: 110,
+            child: IgnorePointer(child: EvaToast(message: message)),
+          ),
+        ],
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) {

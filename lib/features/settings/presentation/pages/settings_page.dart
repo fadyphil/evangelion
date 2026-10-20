@@ -206,7 +206,12 @@ class _SettingsBody extends StatefulWidget {
 
 class _SettingsBodyState extends State<_SettingsBody> {
   /// The toast's message, or `null` when no toast is up.
-  String? _toastMessage;
+  /// The restore's toast, as a **notifier**.
+  ///
+  /// **And the toast is the only thing that reads it**, so a `setState` here
+  /// rebuilt the **whole Workshop** — thirty-three rows — to show one widget
+  /// and to take it away again.
+  final ValueNotifier<String?> _toastMessage = ValueNotifier<String?>(null);
 
   /// The timer that takes the toast away.
   Timer? _toastTimer;
@@ -214,6 +219,10 @@ class _SettingsBodyState extends State<_SettingsBody> {
   @override
   void dispose() {
     _toastTimer?.cancel();
+    // **The notifier is disposed with the page.** A `ValueNotifier` that
+    // outlives its `State` keeps its listeners alive, and a listener that
+    // outlives the element it belongs to fires into a disposed tree.
+    _toastMessage.dispose();
     super.dispose();
   }
 
@@ -226,12 +235,14 @@ class _SettingsBodyState extends State<_SettingsBody> {
   /// racing to clear the same message.
   void _showToast(String message) {
     _toastTimer?.cancel();
-    setState(() => _toastMessage = message);
+    _toastMessage.value = message;
     _toastTimer = Timer(kRestoreToastDuration, () {
-      // `mounted` because the timer outlives a route pop: a screen that has been
-      // disposed must not call `setState` on the way out.
-      if (!mounted) return;
-      setState(() => _toastMessage = null);
+      // **No `mounted` check, and the reason is the timer is cancelled in
+      // [dispose].** The old code needed the check because the timer outlived a
+      // route pop; a notifier throws on a *disposed notifier* just as
+      // `setState` throws on a disposed `State`, so the answer is the same
+      // either way — and the answer is to **cancel the timer**.
+      _toastMessage.value = null;
     });
   }
 
@@ -277,25 +288,27 @@ class _SettingsBodyState extends State<_SettingsBody> {
   /// in the page's own column would be wrong is `/communion`'s: it would scroll
   /// away with the content and it would sit inside the scroll view's box rather
   /// than the viewport's.
-  Widget? _toastOverlay() {
-    final String? message = _toastMessage;
-    if (message == null) return null;
-    return Stack(
-      children: <Widget>[
-        Positioned(
-          left: 20,
-          right: 20,
-          // The prototype's `bottom: 110px` (`:466`).
-          bottom: 110,
-          // `:466` ends `pointer-events:none` — a confirmation is a **notice**,
-          // not a control, and it must never take a tap that belonged to the row
-          // under it. `IgnorePointer` leaves the semantics tree alone, and the
-          // live-region announcement is the point of the toast.
-          child: IgnorePointer(child: WorkshopRestoreToast(message: message)),
-        ),
-      ],
-    );
-  }
+  Widget? _toastOverlay() => ValueListenableBuilder<String?>(
+    valueListenable: _toastMessage,
+    builder: (BuildContext context, String? message, Widget? child) {
+      if (message == null) return const SizedBox.shrink();
+      return Stack(
+        children: <Widget>[
+          Positioned(
+            left: 20,
+            right: 20,
+            // The prototype's `bottom: 110px` (`:466`).
+            bottom: 110,
+            // `:466` ends `pointer-events:none` — a confirmation is a **notice**,
+            // not a control, and it must never take a tap that belonged to the row
+            // under it. `IgnorePointer` leaves the semantics tree alone, and the
+            // live-region announcement is the point of the toast.
+            child: IgnorePointer(child: WorkshopRestoreToast(message: message)),
+          ),
+        ],
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) {

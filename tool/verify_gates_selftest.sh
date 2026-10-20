@@ -667,6 +667,93 @@ else
 fi
 rm -f "$blur_target"
 
+# --- 11. setState budget gate -----------------------------------------------
+# The `setState` gate enforces §13 rule 1 — "no `setState` per frame" — as an
+# allowlist of the sites whose `State.build` output IS the state. It is a Dart
+# test, so its negative control is a file planted in a scratch copy of the tree
+# — and the assertions are about the PLANTED PATH, so they hold whatever else
+# is in flight.
+#
+#   real site  a `setState` in a planted file        -> reported
+#   comment    a `setState` inside a doc comment     -> NOT reported (a
+#              comment is not a site; the scan strips comments first)
+#   stale row  a real site REMOVED                   -> reported (a stale
+#              allowlist row is an amnesty nobody re-read)
+d=$(make_scratch setstate)
+setstate_target="$d/lib/features/reading/presentation/widgets/planted_setstate.dart"
+setstate_run() { ( cd "$d" && flutter test test/setstate_budget_test.dart 2>&1 ); }
+
+# 11a. a real `setState` outside the allowlist is reported.
+cat > "$setstate_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a site, not a comment.
+class PlantedSetState {
+  bool _pressed = false;
+
+  void press() {
+    setState(() {
+      _pressed = true;
+    });
+  }
+}
+EOF
+out=$(setstate_run); rc=$?
+if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'planted_setstate.dart'; then
+  record "setState (new site)" "fired"
+  printf '  %-10s a planted `setState` -> reported, and the gate exited %d\n' "$G" "$rc"
+else
+  record "setState (new site)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa planted `setState` -> exit %d; the gate did not report it\n' \
+    "FAIL" "$R" "$rc"
+fi
+rm -f "$setstate_target"
+
+# 11b. a `setState` inside a doc comment is NOT a site.
+cat > "$setstate_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a comment, not a call site.
+///
+/// A doc comment that says `setState(() { ... })` must not be counted.
+class PlantedComment {
+  const PlantedComment();
+}
+EOF
+out=$(setstate_run); rc=$?
+if [[ $rc -eq 0 ]] && ! printf '%s' "$out" | grep -qF 'planted_setstate.dart'; then
+  record "setState (comment)" "fired"
+  printf '  %-10s a /* setState */ comment -> not reported. A comment is not a site.\n' "$G"
+else
+  record "setState (comment)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa `setState` inside a comment was counted as a site; exit %d\n' \
+    "FAIL" "$R" "$rc"
+fi
+rm -f "$setstate_target"
+
+# 11c. a STALE allowlist row is a failure, not a note.
+#
+# The site is removed from the scratch copy, so the allowlist's row for that
+# file no longer matches anything — and a stale row is an amnesty nobody
+# re-read, so the gate has to be red about it.
+stale_file="$d/lib/core/design_system/widgets/settings_tile.dart"
+if [[ -f "$stale_file" ]]; then
+  # **The hovered `setState` and its guard**, dropped by a line filter rather
+  # than a regex: a regex over Dart source has to know about the source's own
+  # punctuation, and this one only has to drop two lines.
+  grep -v -e 'if (_hovered == value) return;' \
+          -e 'setState(() => _hovered = value);' \
+    "$stale_file" > "$stale_file.tmp" && mv "$stale_file.tmp" "$stale_file"
+  out=$(setstate_run); rc=$?
+  if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'no longer matches the tree'; then
+    record "setState (stale row)" "fired"
+    printf '  %-10s a removed site -> the stale allowlist row is reported\n' "$G"
+  else
+    record "setState (stale row)" "COULD-NOT-FAIL"
+    printf '  %-10s %sa removed site -> exit %d; the stale row was not reported\n' \
+      "FAIL" "$R" "$rc"
+  fi
+else
+  record "setState (stale row)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe file to stale is not in the scratch copy\n' "FAIL" "$R"
+fi
+
 # --- summary -----------------------------------------------------------------
 echo
 echo "${B}Summary${N}"

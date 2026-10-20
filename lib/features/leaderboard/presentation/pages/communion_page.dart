@@ -77,7 +77,13 @@ class _CommunionBody extends StatefulWidget {
 
 class _CommunionBodyState extends State<_CommunionBody> {
   LeaderboardWindow? _requested;
-  String? _toastMessage;
+
+  /// The cheer's toast, as a **notifier**.
+  ///
+  /// **And the toast is the only thing that reads it**, so a `setState` here
+  /// rebuilt the **whole board** — up to fifty rows, the podium and the app
+  /// bar — to show one widget and to take it away again.
+  final ValueNotifier<String?> _toastMessage = ValueNotifier<String?>(null);
   Timer? _toastTimer;
 
   @override
@@ -89,6 +95,10 @@ class _CommunionBodyState extends State<_CommunionBody> {
   @override
   void dispose() {
     _toastTimer?.cancel();
+    // **The notifier is disposed with the page.** A `ValueNotifier` that
+    // outlives its `State` keeps its listeners alive, and a listener that
+    // outlives the element it belongs to fires into a disposed tree.
+    _toastMessage.dispose();
     super.dispose();
   }
 
@@ -129,11 +139,14 @@ class _CommunionBodyState extends State<_CommunionBody> {
 
   void _showCheerToast(String message) {
     _toastTimer?.cancel();
-    setState(() => _toastMessage = message);
+    _toastMessage.value = message;
     _toastTimer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        setState(() => _toastMessage = null);
-      }
+      // **No `mounted` check, and the reason is the timer is cancelled in
+      // [dispose].** The old code needed the check because the timer outlived a
+      // route pop; a notifier throws on a *disposed notifier* just as
+      // `setState` throws on a disposed `State`, so the answer is the same
+      // either way — and the answer is to **cancel the timer**.
+      _toastMessage.value = null;
     });
   }
 
@@ -260,22 +273,24 @@ class _CommunionBodyState extends State<_CommunionBody> {
   /// belonged to the row under it. `IgnorePointer` does that, and it leaves the
   /// semantics tree alone — the `liveRegion` announcement is the point of the
   /// toast for a screen-reader user.
-  Widget? _toastOverlay() {
-    final String? message = _toastMessage;
-    if (message == null) return null;
-    return Stack(
-      children: <Widget>[
-        Positioned(
-          left: 20,
-          right: 20,
-          // The prototype's `bottom: 110px` (`:466`) — high enough to clear the
-          // bottom of the screen and the row under it.
-          bottom: 110,
-          child: IgnorePointer(child: CommunionCheerToast(message: message)),
-        ),
-      ],
-    );
-  }
+  Widget? _toastOverlay() => ValueListenableBuilder<String?>(
+    valueListenable: _toastMessage,
+    builder: (BuildContext context, String? message, Widget? child) {
+      if (message == null) return const SizedBox.shrink();
+      return Stack(
+        children: <Widget>[
+          Positioned(
+            left: 20,
+            right: 20,
+            // The prototype's `bottom: 110px` (`:466`) — high enough to clear the
+            // bottom of the screen and the row under it.
+            bottom: 110,
+            child: IgnorePointer(child: CommunionCheerToast(message: message)),
+          ),
+        ],
+      );
+    },
+  );
 
   Widget _content(
     BuildContext context,
