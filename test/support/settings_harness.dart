@@ -97,6 +97,48 @@ SettingsHarness settingsHarness({
       // itself.
       kVeilWitnessesKey: initial.veilWitnesses,
       kShowPodiumKey: initial.showPodium,
+      // ## THE **TWENTY-THREE** TASK 5.7 KEYS
+      //
+      // **The whole set, and the reason it is the whole set:** a test that says
+      // "the reader chose the shafts" and then asserts on `reach == 42` is
+      // asserting on a store the test itself seeded — and the seed is the claim
+      // under test. A harness that seeded only the six Phase-9 keys would make
+      // every "the restore resets the light preferences" assertion vacuous: the
+      // twenty-three fields would read as their **defaults** whether or not the
+      // reset ran, so the reset could be deleted and the test would stay green.
+      //
+      // That is not hypothetical. It is the reason the restore's own assertion
+      // seeds a value **different** from the default and expects the default
+      // back — which is only a real assertion if the seed reached the store.
+      //
+      // **Every key is written under the name the data source reads it by**
+      // (`settings_local_data_source.dart`), because the store's contract is
+      // "every read answers an unread key with the field's own default" — so a
+      // key spelled differently here would read as a default and the seed would
+      // be a no-op that looked like a seed.
+      kShaderEnabledKey: initial.shaderEnabled,
+      kCurtainShapeKey: initial.curtainShape.storedValue,
+      kReachKey: initial.reach,
+      kGlowKey: initial.glow,
+      kTouchGlowKey: initial.touchGlow,
+      kHueKey: initial.hue,
+      kMultichromeMeltKey: initial.multichromeMelt,
+      kRayCombingKey: initial.rayCombing,
+      kWhiteCoresKey: initial.whiteCores,
+      kDotVeilKey: initial.dotVeil,
+      kStarsOnKey: initial.starsOn,
+      kConstellationsOnKey: initial.constellationsOn,
+      kStarCountKey: initial.starCount,
+      kStarBrightnessKey: initial.starBrightness,
+      kStarShapeKey: initial.starShape.storedValue,
+      kStarFieldKey: initial.starField.storedValue,
+      kTwinkleKey: initial.twinkle,
+      kFocusDelaySecKey: initial.focusDelaySec,
+      kSelahLengthSecKey: initial.selahLengthSec,
+      kBreathGuideKey: initial.breathGuide,
+      kVespersAutoDimKey: initial.vespersAutoDim,
+      kCalmMotionKey: initial.calmMotion,
+      kHapticsKey: initial.haptics,
     },
   });
 

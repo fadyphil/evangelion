@@ -848,6 +848,26 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
     activation: SemanticsAction.tap,
     tappableLabel: "Today's reading",
   ),
+  (
+    // Task 5.7's slider. **THE ACTIVATION IS `increase`, NOT `tap`** — a slider is
+    // not a button, and §14's row for it is "a control the reader can operate",
+    // not "a control the reader can press". `Semantics(increase: …)` and
+    // `Semantics(decrease: …)` are what `Semantics(slider: true)` carries, and
+    // asserting `tap` here would have passed on a node that a reader could
+    // neither increase nor decrease.
+    widget: EvaRangeSlider,
+    name: 'Task 5.7 — the Workshop\'s range input (redesign.html:429-430)',
+    build: () => const EvaRangeSlider(
+      value: 42,
+      min: 18,
+      max: 110,
+      onChanged: _noopInt,
+      semanticLabel: 'Reach',
+      valueLabel: '42',
+    ),
+    activation: SemanticsAction.increase,
+    tappableLabel: 'Reach',
+  ),
 ];
 
 /// The controls that §14's disabled row applies to, and how to build each one

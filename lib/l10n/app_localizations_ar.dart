@@ -350,28 +350,127 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get settingsTitle => 'الإعدادات';
+  String get settingsTitle => 'الورشة';
 
   @override
   String get settingsBack => 'رجوع';
 
   @override
-  String get settingsAppearance => 'المظهر';
+  String get settingsLanguageLabel => 'اللغة';
 
   @override
-  String get settingsTheme => 'السمة';
+  String get settingsWsLang => 'اللغة';
 
   @override
-  String get settingsThemeLight => 'فاتح';
+  String get settingsThemeGroup => 'السمة';
 
   @override
-  String get settingsThemeDark => 'داكن';
+  String get settingsDaylight => 'وضع النهار';
 
   @override
-  String get settingsThemeSystem => 'النظام';
+  String get settingsWsLight => 'ورشة النور';
 
   @override
-  String get settingsFontSize => 'حجم الخط';
+  String get settingsShaderEngine => 'محرك الشفق';
+
+  @override
+  String get settingsCurtainShape => 'شكل الستارة';
+
+  @override
+  String get settingsCurtainTop => 'أعلى';
+
+  @override
+  String get settingsCurtainBottom => 'أسفل';
+
+  @override
+  String get settingsCurtainSides => 'جوانب';
+
+  @override
+  String get settingsCurtainShafts => 'أشعة';
+
+  @override
+  String get settingsReach => 'الامتداد';
+
+  @override
+  String get settingsBrightness => 'السطوع';
+
+  @override
+  String get settingsTouchGlow => 'توهج اللمس';
+
+  @override
+  String get settingsHue => 'اللون';
+
+  @override
+  String get settingsMultichromeMelt => 'انصهار متعدد الألوان';
+
+  @override
+  String get settingsRayCombing => 'تمشيط الأشعة';
+
+  @override
+  String get settingsWhiteCores => 'قلوب بيضاء';
+
+  @override
+  String get settingsDotVeil => 'حجاب النقاط';
+
+  @override
+  String get settingsSkyGroup => 'السماء الشاهدة';
+
+  @override
+  String get settingsStars => 'النجوم';
+
+  @override
+  String get settingsConstellations => 'الأبراج';
+
+  @override
+  String get settingsStarCount => 'عدد النجوم';
+
+  @override
+  String get settingsStarBrightness => 'سطوع النجوم';
+
+  @override
+  String get settingsStarShape => 'شكل النجوم';
+
+  @override
+  String get settingsStarField => 'موضع النجوم';
+
+  @override
+  String get settingsTwinkle => 'وميض';
+
+  @override
+  String get settingsRitualGroup => 'التركيز والطقس';
+
+  @override
+  String get settingsFocusDelay => 'تأخير التركيز';
+
+  @override
+  String get settingsSelahLength => 'مدة سِلاه';
+
+  @override
+  String get settingsBreathGuide => 'دليل النَّفَس';
+
+  @override
+  String get settingsVespersAutoDim => 'خفوت الغروب';
+
+  @override
+  String get settingsReduceMotion => 'تقليل الحركة';
+
+  @override
+  String get settingsCalmMotion => 'حركة هادئة';
+
+  @override
+  String get settingsHaptics => 'الاهتزاز';
+
+  @override
+  String get settingsCommunionGroup => 'الشركة';
+
+  @override
+  String get settingsVeilWitnesses => 'حجب الشهود';
+
+  @override
+  String get settingsShowPodium => 'إظهار المنصة';
+
+  @override
+  String get settingsTypeSize => 'حجم الخط';
 
   @override
   String get settingsFontScale => 'مقياس حجم الخط';
@@ -383,29 +482,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsIncreaseFontSize => 'تكبير الخط';
 
   @override
-  String get settingsReduceMotion => 'تقليل الحركة';
+  String get settingsRestoreDefaults => 'استعادة الافتراضي';
 
   @override
-  String get settingsMotionOn => 'مفعّل';
+  String get settingsRestored => '↺ استُعيدت الافتراضيات';
 
   @override
-  String get settingsMotionOff => 'معطّل';
+  String get settingsAbout => 'حول';
 
   @override
-  String get settingsPreferencesUnavailable =>
-      'تعذّر حفظ تفضيلاتك على هذا الجهاز.';
+  String get settingsShaders => 'الظلال';
 
   @override
-  String get settingsRetry => 'حاول مرة أخرى';
+  String get settingsTokens => 'الرموز';
 
   @override
-  String get settingsReading => 'القراءة';
-
-  @override
-  String get settingsDefaultLanguage => 'اللغة الافتراضية';
-
-  @override
-  String get settingsLanguageSheetTitle => 'اختر اللغة';
+  String get settingsVersion => 'الإصدار';
 
   @override
   String get settingsLanguageEnglish => 'الإنجليزية';
@@ -414,10 +506,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsLanguageArabic => 'العربية';
 
   @override
-  String get settingsAbout => 'حول';
+  String get settingsPreferencesUnavailable =>
+      'تعذّر حفظ تفضيلاتك على هذا الجهاز.';
 
   @override
-  String get settingsVersion => 'الإصدار';
+  String get settingsRetry => 'حاول مرة أخرى';
 
   @override
   String get sealFabOpen => 'افتح القائمة';
@@ -513,5 +606,5 @@ class AppLocalizationsAr extends AppLocalizations {
   String get journeyUnavailableSuffix => 'غير متاح في هذه النسخة';
 
   @override
-  String get journeyRetry => 'أعد المحاولة';
+  String get journeyRetry => 'حاول مرة أخرى';
 }

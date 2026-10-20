@@ -162,7 +162,7 @@ decision 111 and marked here.)*
 | `/reading` | Reading sanctuary, EN and AR, zero chrome | **API** |
 | `/quiz` | Quiz with instant per-question feedback | **API** |
 | `/result` | Result — score, streak, stat tiles | **API** (submit response) |
-| `/settings` | Appearance, reading, about | local |
+| `/settings` | The Workshop — language, theme, light, sky, ritual, communion | local |
 | `/communion` | The cohort's board | **API** |
 | `/journey` | The reader's journey — orb, streak, rings, medals, account | **API** (streak) · local (medals stub) |
 
@@ -203,7 +203,7 @@ lib/
   app/                     composition root: DI, router, bootstrap
   core/
     design_system/         tokens, theme, effects, widgets  (imported by everyone)
-    common/                Result<T>, Failure, AppConfig
+    common/                Result<T>, Failure, AppConfig, range arithmetic
     network/               Dio client, interceptors, error mapper
     domain/                SHARED KERNEL — see below. PURE DART.
   features/<f>/
@@ -229,6 +229,9 @@ core/domain/
     submit_result.dart      SubmitResult                  — quiz, result
     auth_session.dart       AuthSession                   — auth, app
     user_settings.dart      UserSettings, AppThemeMode    — settings, app
+    curtain_shape.dart      CurtainShape                  — settings, design system
+    sky_star_shape.dart     SkyStarShape                  — settings, design system
+    sky_star_field.dart     SkyStarField                  — settings, design system
   repositories/
     reading_repository.dart  streak_repository.dart
     auth_repository.dart     settings_repository.dart

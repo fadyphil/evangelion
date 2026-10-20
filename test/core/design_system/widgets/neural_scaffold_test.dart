@@ -1,6 +1,11 @@
 import 'dart:io';
 
 import 'package:evangelion/core/design_system/barrel.dart';
+// The curtain's shape moved to `core/domain/entities/curtain_shape.dart` in Task
+// 5.7 — see that file's doc for why the prototype's ONE `data-shape` attribute
+// (`:1463`) is one type rather than two. It is imported **by path**, the way
+// every shared-kernel entity is: the barrel re-exports nothing from a domain.
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

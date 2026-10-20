@@ -221,9 +221,15 @@ void main() {
 /// * **this file** — a gate that audits its own text cannot be edited. Its reason
 ///   strings necessarily quote `identical(`, so every edit would rewrite its own
 ///   table, and a table that rewrites itself is not an audit.
-/// * **`test/support/`** — these are libraries, not tests. Their identity sites
-///   are helper code (a `find.byElementPredicate`, a comment stripper), and a
-///   shared fixture cannot be attributed to any one test's claim.
+/// * **`test/support/freezed_types.dart`** — a library, not a test. Its identity
+///   sites are helper code, and a shared fixture cannot be attributed to any one
+///   test's claim.
+///
+/// **AND IT IS **ONE FILE**, NOT THE WHOLE `test/support/` DIRECTORY** — the
+/// bullet used to say "`test/support/`", which is a directory, and the list
+/// holds one file. **`test/support/design_system_harness.dart` IS SCANNED**, and
+/// it is the file with the most identity sites in the tree, so a reader who
+/// believed the bullet would have believed a hole that is not there.
 ///
 /// Asserting the list is exactly these two is what stops it becoming a blanket.
 const Set<String> _excludedFromScan = <String>{
@@ -304,14 +310,37 @@ List<_Site> _identitySites() {
     final List<int> groups = <int>[];
     for (int i = 0; i < lines.length; i++) {
       if (RegExp(r'\bgroup\(').hasMatch(lines[i])) groups.add(i);
-      final RegExpMatch? name = _testDeclaration.firstMatch(lines[i]);
+      // ## THE DECLARATION IS MATCHED AGAINST A **WINDOW**, NOT A LINE
+      //
+      // The name may sit on the next line — this repository has more than one
+      // `test(\n  'a name that is long',\n  () {` — and the pattern below
+      // matches across the newline. **Matching it against one line at a time
+      // found every declaration whose name is on the same line and MISSED every
+      // declaration whose name is not**, and a missed declaration is not a
+      // missing site: it is a site attributed to the *previous* test.
+      //
+      // **AND THAT IS NOT A COSMETIC MISATTRIBUTION.** A site's `testName` is
+      // what the table is keyed on, so a missed boundary means a table row
+      // claims a test holds an identity site when the test holds none, and the
+      // row that DOES hold the site is keyed under the wrong name. Task 5.7
+      // found this the hard way: a new test inserted above two `same(...)`
+      // calls moved those two sites onto the new test's row, and the gate
+      // reported that the *old* row had lost a site it never had.
+      //
+      // The window is **three lines**, which is enough for `test(`, a newline,
+      // the name and its closing quote, and short enough that a declaration
+      // three lines apart cannot be captured by accident.
+      final String window = lines
+          .sublist(i, (i + 3).clamp(0, lines.length))
+          .join('\n');
+      final RegExpMatch? name = _testDeclaration.firstMatch(window);
       if (name == null) continue;
       starts.add(i);
       names.add(_nameOn(name, lines, i));
     }
 
     for (int i = 0; i < lines.length; i++) {
-      if (!_isIdentityCall(lines[i])) continue;
+      if (_identityCallAt(lines[i]) == null) continue;
       final int end = _endOfTest(starts, i, lines.length);
       found.add(
         _Site(
@@ -337,13 +366,99 @@ final RegExp _testDeclaration = RegExp(
   r'''\b(?:test|testWidgets)\(\s*(?:r?)?'([\s\S]*?)'\s*(?:,|\))''',
 );
 
-/// Is this line one of the two identity calls?
+/// The offset of the identity call on [line], or `null` when there is none.
 ///
 /// `same(` needs a word boundary on the left so `isNot(same(x))` matches while
-/// `surname(` and `className(` do not.
-bool _isIdentityCall(String line) =>
-    RegExp(r'\bidentical\(').hasMatch(line) ||
-    RegExp(r'(?<![\w.])same\(').hasMatch(line);
+/// `surname(` and `className()` do not.
+///
+/// ## AND A LINE CARRYING A **TRIPLE-QUOTED** STRING IS SKIPPED WHOLESALE
+///
+/// The comment-stripper this scan sits beside — `withoutDartComments` in
+/// `test/support/project_import_graph.dart` — tracks `'''` blocks explicitly,
+/// because a `'''` block is a string and its contents must not be mistaken for
+/// code. **This helper is per line, so it cannot see a block that spans
+/// lines**, and a `'''` payload that contained the word `identical(` would be
+/// reported as a live site.
+///
+/// **The failure direction is the safe one** — a false positive turns the gate
+/// RED over a file with nothing wrong with it, and a false negative would need
+/// an unterminated string on one line, which is not valid Dart. So the
+/// conservative reading is the right one: **a line that opens or closes a
+/// triple-quoted string is skipped entirely.** The cost is that a real
+/// identity call on the same line as a `'''` is missed — and the tree has
+/// eight `'''` blocks and none of them carries an identity call.
+///
+/// ## AND A MATCH INSIDE A **STRING LITERAL** IS NOT A CALL
+///
+/// The scan reads the tree looking for **calls**, and the word `identical(`
+/// inside a string is prose. There was exactly one of them in the tree when
+/// Task 5.7 measured it, and it was a test's own NAME:
+///
+/// ```dart
+/// test('a factory registration IS distinguishable, so identical() has teeth', …
+/// ```
+///
+/// **And it was in the audited table.** The row for the *previous* test claimed
+/// a site that was the next test's name, and its reason described something
+/// else entirely — which is the failure this whole file exists to prevent: a
+/// row that claims to have reviewed a site, over a site that is not there.
+///
+/// The rule is the same one the comment-stripping above applies, one layer
+/// down: **a call is code, and a word in prose is not a call.** The test's
+/// NAME is still needed — it is the boundary this scan attributes sites to —
+/// so the strings are not stripped; they are simply not mistaken for calls.
+///
+/// **AND THE ROW THAT WAS WRONG BECAUSE OF IT IS GONE, NOT RE-POINTED.**
+/// `test/app/di/injection_test.dart` had a row for *"nothing is registered for
+/// an unregistered type"*, and that test has never contained an identity call —
+/// it asserts `throwsA(isA<StateError>())`. The row was counting the **next**
+/// test's name:
+///
+/// ```dart
+/// test('a factory registration IS distinguishable, so identical() has teeth', …
+/// ```
+///
+/// **The row's reason described something else entirely** — "two sites, both
+/// `isNull`-shaped" — which is the failure this whole file exists to prevent: a
+/// row claiming to have reviewed a site, over a site that was not there. The
+/// row is deleted, and the test it named is now correctly *not* in the table.
+int? _identityCallAt(String line) {
+  // **A line carrying a triple-quoted string is skipped wholesale** — see
+  // [_identityCallAt]'s doc for why the conservative reading is the right one.
+  if (line.contains("'''") || line.contains('"""')) return null;
+  for (final RegExpMatch match in RegExp(
+    r'\bidentical\(|(?<![\w.])same\(',
+  ).allMatches(line)) {
+    if (_insideStringLiteral(line, match.start)) continue;
+    return match.start;
+  }
+  return null;
+}
+
+/// Is [at] inside a quoted string on [line]?
+///
+/// A **character** scan and not a parser, and the reason is that the question
+/// is only ever asked about a match on a single line: a quote that is open at
+/// [at] means the match is prose. Escaped quotes are skipped, and the two
+/// quote characters are tracked separately so a `'` inside a `"…"` does not
+/// close it.
+bool _insideStringLiteral(String line, int at) {
+  bool inSingle = false;
+  bool inDouble = false;
+  for (int i = 0; i < at && i < line.length; i++) {
+    final String character = line[i];
+    if (character == r'\' && (inSingle || inDouble)) {
+      i++;
+      continue;
+    }
+    if (character == "'" && !inDouble) {
+      inSingle = !inSingle;
+    } else if (character == '"' && !inSingle) {
+      inDouble = !inDouble;
+    }
+  }
+  return inSingle || inDouble;
+}
 
 /// The test name from the match, with adjacent literals joined.
 ///
@@ -424,7 +539,7 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'read the locator\'s. `same(...)` pins the wiring and no `==` override '
             'could stand in for it.',
       ),
-  'test/app/app_settings_wiring_test.dart#and the reduce-motion preference reaches the ambient scope':
+  'test/app/app_settings_wiring_test.dart#and `MaterialApp` still declares both palettes by identity':
       _Reviewed(
         sites: 2,
         converted: false,
@@ -434,6 +549,19 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'asserts the preference **swapped** them — so identity is the claim. '
             '`UserSettings` (converted) is what drives it, but the site is about '
             '`ThemeData`.',
+      ),
+  'test/app/app_settings_wiring_test.dart#and the handle READS them back, as a call-through':
+      _Reviewed(
+        sites: 1,
+        converted: true,
+        reason:
+            'The handle\'s `settings` getter must hand back the **same object** the '
+            'cubit holds, not an equal one: a cached copy in the handle would be a '
+            'second source of truth for one preference, which is the hazard the '
+            'handle was written to prevent. `UserSettings` is a **converted** type, '
+            'so this is the canonicalisation trap in its purest form — two equal '
+            'records are the same record to `==` and a different one to '
+            '`identical`.',
       ),
   'test/core/domain/entities/user_settings_test.dart#two identical records are equal and are two objects':
       _Reviewed(
@@ -480,16 +608,6 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
         sites: 1,
         converted: false,
         reason: 'DI lifetime for the `Dio` client.',
-      ),
-  'test/app/di/injection_test.dart#nothing is registered for an unregistered type':
-      _Reviewed(
-        sites: 1,
-        converted: false,
-        reason:
-            'The negative control for the lifetime rows above: an unregistered '
-            'type must hand back `null`, not something equal. Two sites, both '
-            '`isNull`-shaped, and they are what make "a singleton" mean '
-            'something.',
       ),
   'test/app/di/injection_test.dart#resolves to the same instance the app uses':
       _Reviewed(
@@ -811,11 +929,15 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'the same shape as the `StreakSummary` row below, and here the '
             'hand-rolled method guarantees it. Untouched.',
       ),
-  'test/core/design_system/tokens/eva_typography_test.dart#carries the Eva ink colours, not a default black':
+  'test/core/design_system/tokens/eva_typography_test.dart#is a distinct object per palette, and reflects the ink it was given':
       _Reviewed(
         sites: 1,
         converted: false,
-        reason: 'Colour-value identity on a text style. Untouched.',
+        reason:
+            'Colour-value identity on a text style: two `TextTheme`s built from two '
+            'palettes must not be the same object. `EvaColors` is hand-written and '
+            '`TextTheme` is the framework\'s, so no converted type is in the window. '
+            'Untouched.',
       ),
   'test/core/design_system/widgets/sun_burst_test.dart#a palette change repaints the painter':
       _Reviewed(
@@ -1003,12 +1125,16 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'Identity here asserts Dart\'s canonicalisation, and freezed did not '
             'change it.',
       ),
-  'test/features/reading/data/mappers/today_reading_mapper_test.dart#and the message names the body, not a Dart type':
+  'test/features/reading/data/mappers/today_reading_mapper_test.dart#is `const`, so it registers as a singleton and allocates nothing':
       _Reviewed(
         sites: 1,
         converted: false,
         reason:
-            'A `FailureKind`/`String` identity assertion in a mapper '
-            'error-message test. Untouched.',
+            'A `const` mapper\'s identity, and it is worth being exact about what it '
+            'claims: Dart **canonicalises `const` instances**, so `same()` on two '
+            '`const` expressions is true by the language and not by the mapper being '
+            'a singleton. The real claim is that the mapper is declared `const` at '
+            'all, and that is a compile-time fact. `TodayReadingMapper` is '
+            'hand-written, so no converted type is in the window. Untouched.',
       ),
 };

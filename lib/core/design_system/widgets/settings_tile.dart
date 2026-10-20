@@ -48,8 +48,49 @@ class SettingsTile extends StatefulWidget {
     required this.title,
     required this.trailing,
     this.onTap,
+    this.stacked = false,
     super.key,
   });
+
+  /// Whether the control sits **below** the title rather than beside it.
+  ///
+  /// ## WHY THE MODE EXISTS, AND IT IS A **MEASURED** REASON
+  ///
+  /// `redesign.html:653-656`, `:671-674` and `:676-679` are the three
+  /// **four-segment** controls on the Workshop, and the prototype draws them
+  /// **beside** their labels. At 320px they do not fit.
+  ///
+  /// The arithmetic, so a reviewer can check it rather than believe it: at 320
+  /// the content column is `320 − 2×24` (`EvaSpacing.xxl`) = **272px**; the
+  /// row's own horizontal padding is 4px a side (`redesign.html:419`) →
+  /// **264px**; the gap between the label and the control is 10px (`:419`); and
+  /// the four-segment control's **minimum** is `4 × 44 = 176px` (`:183`'s
+  /// `min-width`). So the label would have `264 − 176 − 10 = 78px` — and
+  /// "Curtain shape" at 14.5px (`:419`) is about 88px, so the label wraps to
+  /// two lines and the control takes the rest.
+  ///
+  /// **That is survivable only if the segments can shrink below 44px, which
+  /// the prototype forbids and the client does not implement.** So the three
+  /// segmented rows put the label above the control, and the control takes the
+  /// row's full width.
+  ///
+  /// ## IT CHANGES THE **AXIS** OF THE ROW AND NOTHING ELSE
+  ///
+  /// [minHeight], [contentFloor], [renderedFloor], [titleSize] and the hairline
+  /// are all unchanged, and they are all load-bearing: `primitives_text_scale_
+  /// test.dart` reads the first two, and the hairline is what makes the
+  /// rendered floor 57 rather than 56. A stacked row is the **same row**, laid
+  /// out along the other axis.
+  ///
+  /// ## THE TRAILING IS LAID OUT **FULL WIDTH**
+  ///
+  /// The column is `crossAxisAlignment: stretch`, so the trailing gets the
+  /// row's whole width — which is what the wide segmented control needs, and
+  /// what `:188`'s `width:100%` asks for. **A trailing with an intrinsic width
+  /// would be stretched by it**, so the stacked mode is for a control that
+  /// *wants* the row's width, and the three rows that use it are the segmented
+  /// ones.
+  final bool stacked;
 
   /// The row's label. `redesign.html:419` — `font-size:14.5px`, and no
   /// `font-weight`, so the weight is the UI face's own.
@@ -224,6 +265,51 @@ class _SettingsTileState extends State<SettingsTile> {
     // which of them still runs.
     final bool animate = !MediaQuery.disableAnimationsOf(context);
 
+    final Widget title = ExcludeSemantics(
+      child: AnimatedDefaultTextStyle(
+        // ## `animate ? hoverDuration : Duration.zero`, AND THE ORDER IS
+        // THE WHOLE ARGUMENT
+        //
+        // This read `animate ? Duration.zero : SettingsTile.hoverDuration`,
+        // which is **inverted**, and every other animation in this
+        // repository has always had it the other way round:
+        // [SettingsTile]'s own `AnimatedContainer` twenty lines above,
+        // `eva_button.dart`'s press, `segmented_control.dart`'s thumb.
+        //
+        // Measured before the fix: **0 ms with animations on** — so
+        // `redesign.html:419`'s `transition:.2s` was lost on the one
+        // thing in the row that changes *colour* — and **200 ms under
+        // reduced motion**, which is §14 inverted:
+        // `09-quality-gates.md:184` requires a disabled animation to
+        // "jump straight to the end state", and 200 ms of transition is
+        // the exact opposite.
+        //
+        // The colour does have to transition (`:419`), and the style
+        // lives here rather than on the `Text` so that it can.
+        duration: animate ? SettingsTile.hoverDuration : Duration.zero,
+        curve: EvaMotion.baseCurve,
+        // `arabicAware` here for the same reason as
+        // [EvaSectionHeader]: the row's title is painted by this
+        // widget, so this widget decides the family. Under LTR it is
+        // the identity function, so every existing Latin assertion is
+        // untouched.
+        //
+        // The style lives on the `AnimatedDefaultTextStyle` and the
+        // `Text` below inherits it. Setting both is a bug that looks
+        // like redundancy: an explicit `Text.style` wins over the
+        // ambient default, so the hover colour would snap instead of
+        // transitioning and the animation would be painting nothing.
+        style: arabicAware(
+          Theme.of(context).textTheme.bodyMedium!.copyWith(
+            fontSize: SettingsTile.titleSize,
+            color: _hovered ? colors.emberInk : colors.ink,
+          ),
+          Directionality.of(context),
+        ),
+        child: Text(widget.title),
+      ),
+    );
+
     final Widget row = AnimatedContainer(
       // `.srow{transition:.2s}` (`:419`) covers both the colour and the
       // transform, so both are 200ms.
@@ -256,82 +342,66 @@ class _SettingsTileState extends State<SettingsTile> {
           constraints: const BoxConstraints(
             minHeight: SettingsTile.contentFloor,
           ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                // ## `excludeSemantics` ON THE **TITLE**, AND IT IS NOT THE ROW'S
-                // `excludeSemantics: false` BEING REVERSED
-                //
-                // The row's own `Semantics` keeps `excludeSemantics: false` on purpose
-                // — the comment at the return below says why, and the reasoning stands:
-                // a tappable row *contains* a control, and dropping the subtree would
-                // leave a screen reader with a button that does nothing. What was wrong
-                // is that **this** `Text` then contributed [SettingsTile.title] a second
-                // time. Measured on `/settings`'s language row:
-                //
-                // ```text
-                // lbl="Default language|Default language|English"  tap=true  btn=true
-                // ```
-                //
-                // A name said twice, and — worse — the row was the **only** node carrying
-                // the reader's current language, so the duplicate was not merely untidy,
-                // it was three announced words where one was needed.
-                //
-                // Excluding **only this `Text`** is the smallest fix that keeps both
-                // halves: the title's glyphs are still painted and still readable, and
-                // `trailing`'s own node — a nested control, or the current-value text —
-                // survives to be announced alongside the row's name.
-                child: ExcludeSemantics(
-                  child: AnimatedDefaultTextStyle(
-                    // ## `animate ? hoverDuration : Duration.zero`, AND THE ORDER IS
-                    // THE WHOLE ARGUMENT
-                    //
-                    // This read `animate ? Duration.zero : SettingsTile.hoverDuration`,
-                    // which is **inverted**, and every other animation in this
-                    // repository has always had it the other way round:
-                    // [SettingsTile]'s own `AnimatedContainer` twenty lines above,
-                    // `eva_button.dart`'s press, `segmented_control.dart`'s thumb.
-                    //
-                    // Measured before the fix: **0 ms with animations on** — so
-                    // `redesign.html:419`'s `transition:.2s` was lost on the one
-                    // thing in the row that changes *colour* — and **200 ms under
-                    // reduced motion**, which is §14 inverted:
-                    // `09-quality-gates.md:184` requires a disabled animation to
-                    // "jump straight to the end state", and 200 ms of transition is
-                    // the exact opposite.
-                    //
-                    // The colour does have to transition (`:419`), and the style
-                    // lives here rather than on the `Text` so that it can.
-                    duration: animate
-                        ? SettingsTile.hoverDuration
-                        : Duration.zero,
-                    curve: EvaMotion.baseCurve,
-                    // `arabicAware` here for the same reason as
-                    // [EvaSectionHeader]: the row's title is painted by this
-                    // widget, so this widget decides the family. Under LTR it is
-                    // the identity function, so every existing Latin assertion is
-                    // untouched.
-                    //
-                    // The style lives on the `AnimatedDefaultTextStyle` and the
-                    // `Text` below inherits it. Setting both is a bug that looks
-                    // like redundancy: an explicit `Text.style` wins over the
-                    // ambient default, so the hover colour would snap instead of
-                    // transitioning and the animation would be painting nothing.
-                    style: arabicAware(
-                      Theme.of(context).textTheme.bodyMedium!.copyWith(
-                        fontSize: SettingsTile.titleSize,
-                        color: _hovered ? colors.emberInk : colors.ink,
-                      ),
-                      Directionality.of(context),
+          // ## THE AXIS, AND IT IS THE **ONLY** THING THE STACKED MODE CHANGES
+          //
+          // The default row is a `Row`: the title on the left, the control on
+          // the right, the control pushed to the far edge by the title's
+          // `Expanded`. The stacked row is a `Column`: the title on its own
+          // line, the control **below** it, laid out at the row's full width.
+          //
+          // **Everything else is the same row** — the same padding, the same
+          // hairline, the same [contentFloor], the same title size. The
+          // `Expanded` around the title is what the default row needs to push
+          // the control to the far edge, and the stacked row has no far edge
+          // to push to.
+          child: widget.stacked
+              ? Column(
+                  // `stretch`, so the trailing gets the row's whole width —
+                  // which is what `:188`'s `width:100%` asks for and what the
+                  // wide segmented control needs. See [SettingsTile.stacked].
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    title,
+                    // The row's own gap, on the other axis.
+                    const SizedBox(height: EvaSpacing.md),
+                    widget.trailing,
+                  ],
+                )
+              : Row(
+                  children: <Widget>[
+                    Expanded(
+                      // ## `excludeSemantics` ON THE **TITLE**, AND IT IS NOT
+                      // THE ROW'S `excludeSemantics: false` BEING REVERSED
+                      //
+                      // The row's own `Semantics` keeps `excludeSemantics:
+                      // false` on purpose — the comment at the return below
+                      // says why, and the reasoning stands: a tappable row
+                      // *contains* a control, and dropping the subtree would
+                      // leave a screen reader with a button that does nothing.
+                      // What was wrong is that **this** `Text` then contributed
+                      // [SettingsTile.title] a second time. Measured on
+                      // `/settings`'s language row:
+                      //
+                      // ```text
+                      // lbl="Default language|Default language|English"  tap=true
+                      // ```
+                      //
+                      // A name said twice, and — worse — the row was the
+                      // **only** node carrying the reader's current language,
+                      // so the duplicate was not merely untidy, it was three
+                      // announced words where one was needed.
+                      //
+                      // Excluding **only this `Text`** is the smallest fix that
+                      // keeps both halves: the title's glyphs are still painted
+                      // and still readable, and `trailing`'s own node — a
+                      // nested control, or the current-value text — survives to
+                      // be announced alongside the row's name.
+                      child: title,
                     ),
-                    child: Text(widget.title),
-                  ),
+                    const SizedBox(width: EvaSpacing.md),
+                    widget.trailing,
+                  ],
                 ),
-              ),
-              const SizedBox(width: EvaSpacing.md),
-              widget.trailing,
-            ],
-          ),
         ),
       ),
     );

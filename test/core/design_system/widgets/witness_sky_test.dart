@@ -3,6 +3,22 @@ import 'dart:ui' as ui;
 
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
+// ## THE TWO SKY ENUMS ARE IMPORTED **BY PATH**, AND THAT IS THE POINT
+//
+// `SkyStarShape` and `SkyStarField` moved to `core/domain/entities/` in Task
+// 5.7, because `UserSettings` holds them and `core/domain/` is Flutter-free
+// under Gate 1 — a `core/domain/` entity cannot name a type declared beside a
+// Flutter widget.
+//
+// They are **not** re-exported through the design-system barrel, and this
+// import is the reason that is not a cost: a shared-kernel entity is imported
+// by path, exactly as `sky_entry.dart` above is. `barrel_test.dart` holds the
+// barrel to re-exporting nothing from a domain, and a re-export through a
+// design-system file would make the analyzer report that file's own imports
+// as `unnecessary_import` — the barrel would already provide the enums
+// through that very file.
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;

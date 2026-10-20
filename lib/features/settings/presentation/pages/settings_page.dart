@@ -2,75 +2,88 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
-import 'package:evangelion/core/common/app_config.dart';
+import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
+// The star count's RANGE and its clamp live in the shared kernel, because the
+// sky feature clamps the same number where it becomes a cap and a feature may
+// not import another feature — see the file's doc for why the other seven
+// Workshop ranges are here instead.
+import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:evangelion/features/settings/domain/settings_clamps.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
-import 'package:evangelion/features/settings/presentation/widgets/language_sheet.dart';
+import 'package:evangelion/features/settings/presentation/widgets/workshop_app_bar.dart';
+import 'package:evangelion/features/settings/presentation/widgets/workshop_restore_toast.dart';
+import 'package:evangelion/features/settings/presentation/widgets/workshop_rows.dart';
+import 'package:evangelion/features/settings/presentation/widgets/workshop_segment_row.dart';
+import 'package:evangelion/features/settings/presentation/workshop_logic.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// `/settings` — appearance, reading, about. `SettingsScreen.tsx:33-124`.
+/// `/settings` — **the Workshop** — `eva/redesign.html:638-700`.
 ///
-/// ## IT IS **NOT** A `Scaffold` WITH AN `AppBar`, AND THE STUB IT REPLACED WAS
+/// ## THIS SCREEN IS A **REPLACEMENT**, NOT AN ADDITION
 ///
-/// The Phase-0 stub was `Scaffold(appBar: AppBar(title: Text(AppRoutes.settings)))`
-/// — it drew a **route path** as a screen title, which is the shape of every
-/// placeholder this repository has shipped and the reason each was a stub. The real
-/// screen draws the prototype's own header instead: `SettingsScreen.tsx:39-43` is a
-/// 44×44 chevron button beside a 26px display-serif title, over the same
-/// `NeuralScaffold` the other five screens use, and §13.4 puts `/settings` in
-/// "everything else → `tint`" — which is every row here, since `SettingsTile` is a
-/// `GlassSurface` at [GlassTier.tint] and nothing on this screen blurs.
+/// The Phase-9 screen had three groups (Appearance / Reading / About) and five
+/// controls. The redesign has **seven groups and thirty-three rows**: twenty-nine
+/// interactive controls, one action row, one preview line and two static rows.
+/// The prototype's DOM order **is** the order, and every row below carries the
+/// line it is transcribed from.
 ///
-/// **A `NeuralScaffold` and not a bare `Scaffold`**, so the screen inherits
-/// `AnnotatedRegion<SystemUiOverlayStyle>` (defect #9's other half: edge-to-edge with
-/// light icons on a light palette is an invisible status bar), the ambient background
-/// and the `SafeArea`. The stub had none of the three and was visibly not this
-/// design.
+/// ## THE SEVEN GROUPS
 ///
-/// ## WHAT IS **CUT** FROM THE PROTOTYPE, AND WHY EACH ONE IS CUT
-///
-/// | prototype | this screen | why |
+/// | group | prototype | rows |
 /// | --- | --- | --- |
-/// | `SettingsScreen.tsx:93-110` — the whole **Account** group | — | §2 decision 1 cut the profile screen, and `Change password` has no endpoint either. Three of its four rows would be dead controls, and `LoginPage`'s recorded reason is that "a live control that reports nothing teaches a reader that a button here sometimes answers with a message about the app rather than about the task" |
-/// | `:106` **Notifications** | — | same group, and there is no permission request, no push token and no endpoint |
-/// | `:92` **Verse numbers** | — | see the note below |
-/// | `:118` **Privacy policy** | — | a legal document with no URL, no screen and no endpoint. An inert row whose name says "unavailable in this build" is *worse* than absent for this particular row: a reader looking for a privacy policy deserves an answer, and "unavailable" is not one |
-/// | `:115` **Version** | **kept** | `AppConfig.appVersion`, asserted equal to `pubspec.yaml`'s by `settings_page_test.dart` |
+/// | `language · اللغة` | `:645` | the 2-segment language control (`:646-648`) |
+/// | `theme` | `:649` | the Daylight toggle (`:650`) |
+/// | the light workshop | `:651` | ten (`:652-665`) |
+/// | witness sky | `:666` | seven (`:667-681`) |
+/// | focus & ritual | `:682` | seven (`:683-689`) |
+/// | communion | `:690` | two (`:691-692`), the Type size (`:693`), the preview (`:694`), the restore row (`:695`) |
+/// | about | `:696` | two static rows (`:697-698`) |
 ///
-/// ### Why Verse numbers is cut rather than shipped — and this one is a **scope**
-/// decision, not a product one
+/// ## WHAT IS **NOT** ON THIS SCREEN, AND WHY
 ///
-/// `ReadingCubit`'s doc records the opposite decision for Phase 7, and it is worth
-/// quoting the reason rather than paraphrasing it: *"A `bool` with no writer is the
-/// dead-branch defect twice over, so `ScriptureBlock` always renders the marker."*
+/// | the prototype | why not |
+/// | --- | --- |
+/// | the **language sheet** (the Phase-9 screen's picker) | the redesign's language control is a 2-segment track (`:646-648`), and `SegmentedControl.labelFamilyOf` — a parameter that names the prototype's `:186` rule and had **no caller** — is what makes its Arabic option draw in Amiri inside a Latin screen. The sheet and its ARB key are gone. |
+/// | the **Light / Dark / System** segmented picker | the redesign's theme group holds **one** control, the Daylight toggle (`:650`). The three-state picker is gone — and with it, the `system` arm of `AppThemeMode` becomes unreachable from the UI. See `SettingsCubit.setDaylight`'s doc, which records the cubit's half of that consequence, and [workshop_logic]'s `daylightOnFor`, which records the display half. |
+/// | the **16–26px** Type-size slider (`:693`) | `docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173` already decided that the redesign's slider is "a different model" from this client's 1–5 step, and that decision stands. The row is the existing `FontSizeStepper` plus the preview line. |
+/// | the **Account** group, the privacy row, the verse-numbers row | the Phase-9 screen's own cuts, and the redesign has no such rows at all. |
+/// | the **Version** row | the app's version moved to the app bar's chip (`:642`), which is where the redesign puts it. |
 ///
-/// That reason is now **half** spent: Phase 9 gives it a writer. What it does not give
-/// it is room. `ScriptureBlock` has no `showVerseNumbers` parameter, so shipping the
-/// toggle means changing a Phase-7 widget's public API, and its marker is load-bearing
-/// for **four** gates this phase does not own: `reading_glyph_test.dart`'s declared
-/// Arabic-run table, `reading_geometry_test.dart`'s marker assertions, the §14
-/// overflow group, and `reading_page_test.dart`'s failing-direction assertion that the
-/// marker reaches the tree. AGENT_CONTEXT §2 is not up for renegotiation and §6's
-/// protocol is one task at a time.
+/// ## AND THE TWO **RECORDED DIVERGENCES** THE SCREEN CARRIES AS A WHOLE
 ///
-/// **So the honest accounting is: the prototype's Reading group ships one row of
-/// two**, and the second is a deliberate scope cut rather than an oversight. It is a
-/// one-parameter change plus one ARB key if a later task wants it, and nothing on this
-/// screen has to be redesigned to add it.
+/// 1. **The inter-group gap is the client's.** The redesign says nothing about it:
+///    the `.sgroup`'s own `margin:20px 0 6px` (`:422`) is the margin **above** a
+///    label, and `SettingsGroup` already owns that as its `topGap`. The page's own
+///    [groupGap] is the Phase-9 value (`SettingsScreen.tsx:45`'s `gap: 28`), and
+///    the prototype's separation between a group's last row and the next group's
+///    label is therefore `groupGap + SettingsGroup.topGap` where the prototype's
+///    is 20. **Recorded here** because it is the one number on this screen that
+///    is the client's rather than the prototype's.
+/// 2. **The ten light-workshop controls persist choices the client does not
+///    render.** The aurora shader is not mounted, and the deferral — with the task
+///    that discharges it — is recorded at the group and in the ARB description of
+///    the group's own label. **The controls are neither disabled nor hidden**: a
+///    row that says "Aurora engine" and whose switch does nothing visible is
+///    honest only if the screen says so, and the group's label does.
 ///
-/// ## AND THE BACK TARGET IS `/`, PER THE PHASE PLAN
+/// ## AND THE BACK TARGET
 ///
-/// `08-build-phases.md`'s scope note: "`AppTopBar`'s avatar tap now opens `/settings`,
-/// and settings' back target is `/`." So the chevron is `maybePop`, **not** a push of
-/// `AppRoutes.home` — which would put a second `/` on the stack for a reader who
-/// arrived from it and press Back twice to get home.
+/// **`maybePop`**, as the Phase-9 screen had it. The prototype's chevron carries
+/// `data-back="journey"` (`:640`) and **pushes** `/journey`; this client pops the
+/// route stack, so a reader who arrived from the journey goes back to it and a
+/// reader who arrived from anywhere else goes back to there. **Recorded as a
+/// divergence from `:640`** — and the app bar's own doc repeats it at the
+/// control.
 @RoutePage()
 class SettingsPage extends StatelessWidget {
   /// The settings screen.
@@ -78,27 +91,28 @@ class SettingsPage extends StatelessWidget {
 
   /// The cubit to render.
   ///
-  /// `null` means "resolve [SettingsCubit] from the locator", which is the production
-  /// path — and the reason this page is not a `BlocProvider` of its own: the cubit is
-  /// a **singleton** holding the app's palette, locale and text scale, so a page that
-  /// created one per mount would render its own copy of all three and then vanish,
-  /// taking the reader's toggle with it.
+  /// `null` means "resolve [SettingsCubit] from the locator", which is the
+  /// production path — and the reason this page is not a `BlocProvider` of its
+  /// own: the cubit is a **singleton** holding the app's palette, locale and text
+  /// scale, so a page that created one per mount would render its own copy of all
+  /// three and then vanish, taking the reader's toggle with it.
   ///
   /// A parameter rather than only a lookup because a widget test cannot reach the
   /// locator without configuring the whole graph. Same arrangement as `HomePage.bloc`
   /// and `ReadingPage.cubit`, and for the same reason: **substitution, not
-  /// initialisation** — `_SettingsBody` reads the cubit's current state and dispatches
-  /// nothing on entry, so a passed-in cubit that already holds what the test wants is
-  /// not overwritten.
+  /// initialisation**.
   final SettingsCubit? cubit;
 
-  /// The prototype's content padding. `SettingsScreen.tsx:45` —
-  /// `padding: '24px 24px 48px'`.
+  /// The prototype's content padding.
   ///
-  /// **The scaffold takes `EdgeInsets.zero` and this column supplies its own**, for
-  /// `ReadingPage`'s reason: the scaffold's `padding` is a uniform gutter, and this
-  /// screen's two rows have their own — `SettingsScreen.tsx:39`'s `20px 20px 0` for the
-  /// header and `:45`'s 24 for the content.
+  /// **The redesign's `.scroll` declares `padding:6px 14px 118px` (`:157`), and
+  /// this is not it.** The horizontal inset is this design system's
+  /// [EvaSpacing.xxl] (24) rather than the prototype's 14, and it is the number
+  /// the standing 320×568 viewport matrix is measured against — the four-segment
+  /// control's arithmetic in `WorkshopSegmentRow`'s doc is `320 − 2×24` because
+  /// of it. The bottom inset is [EvaSpacing.huge] (40) rather than the
+  /// prototype's 118, because the 118 is the space the redesign's bottom dock
+  /// occupies and the dock is Phase 6's.
   static const EdgeInsets contentPadding = EdgeInsets.fromLTRB(
     EvaSpacing.xxl,
     0,
@@ -107,18 +121,14 @@ class SettingsPage extends StatelessWidget {
   );
 
   /// The gap between the header and the first group, and between groups.
-  /// `SettingsScreen.tsx:45` — one `gap: 28` on the content column, which is the gap
-  /// between **all** of its children.
   ///
-  /// 28, and not a step on the 4px scale: the prototype's number is not on the scale
-  /// and the nearest step (32) is 14% further apart. `SettingsScreen.tsx`'s own header
-  /// carries 20 + a 26px line above it, so 28 is measured against the composition and
-  /// not invented.
+  /// **The Phase-9 value, and the redesign does not replace it.** The prototype's
+  /// `.scroll` declares no gap between its children, and the only margin in that
+  /// neighbourhood is the `.sgroup`'s own 20px (`:422`), which `SettingsGroup`
+  /// already owns. So the separation between two groups on this screen is
+  /// [groupGap] **plus** `SettingsGroup.topGap` — the client's number, and it is
+  /// recorded here rather than smoothed.
   static const double groupGap = EvaSpacing.xxl + EvaSpacing.xs;
-
-  /// The gap between the back control and the title. `SettingsScreen.tsx:43` —
-  /// `marginLeft: 8`.
-  static const double titleGap = EvaSpacing.sm;
 
   @override
   Widget build(BuildContext context) {
@@ -133,255 +143,647 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Everything below the scaffold: the header row and the three groups.
+/// Everything below the app bar: the seven groups and the restore toast.
 ///
-/// A `StatelessWidget`, and that is the **opposite** of `HomePage._HomeBody` and
-/// `_ReadingBody` — for a measured reason rather than a stylistic one. Both of those
-/// are `StatefulWidget`s because they must fire a request **once**, on entry, and
-/// `didChangeDependencies` is the only phase that may read `Localizations`. This screen
-/// dispatches nothing on entry: its data came from a singleton before the first frame,
-/// and a dispatch in `build` would re-apply a reader's settings on every rebuild of
-/// the page — which, on a palette change, is every rebuild of the app.
-class _SettingsBody extends StatelessWidget {
+/// ## WHY IT IS A **`StatefulWidget`** NOW, AND WHAT DID NOT CHANGE
+///
+/// It was a `StatelessWidget` through Phase 9, and the reason it gave was
+/// measured: "this screen dispatches nothing on entry: its data came from a
+/// singleton before the first frame, and a dispatch in `build` would re-apply a
+/// reader's settings on every rebuild of the page".
+///
+/// **That reason still holds and the dispatch is still absent.** What changed is
+/// that the screen now owns a **piece of local state** — the restore toast's
+/// message and the timer that takes it away again — and a `StatelessWidget` has
+/// nowhere to put either. The state is *not* the reader's preferences: those live
+/// in the cubit, and every row writes through it.
+///
+/// ## AND WHY THE TOAST IS **NOT** IN THE CUBIT
+///
+/// Because it is not a preference. It is a message with a lifetime, it is
+/// announced rather than stored, and nothing reads it back — a field on
+/// `UserSettings` would be a value the reader could not change and could not
+/// clear.
+///
+/// ## AND WHY **THE PAGE** OWNS THE CLOCK, WHICH IS A **DEPARTURE** FROM THE
+/// ## TASK'S OWN BRIEF
+///
+/// The brief said: "**The 1800ms timer belongs to a widget, not to the
+/// page.** … So the toast is a feature-local widget that owns its own
+/// lifetime — a `StatefulWidget` that shows for 1800ms and then hides, with the
+/// timer disposed on unmount. **The page tells it to show; the page does not
+/// own the clock.**"
+///
+/// **The implementation is the other way round, and the reason is that the
+/// brief's own reason does not hold.** The brief's reason was that "a timer is
+/// state" and "the page's body is a `StatelessWidget` today" — but the body
+/// is stateful *because* it holds the toast's **message**, and the message has
+/// to be somewhere the page can clear.
+///
+/// **Splitting them would have put the toast's state in two owners**: the
+/// message in the page and the clock in the widget, which would then need a
+/// `show` flag, a `hide` and a callback for the page to learn that the toast
+/// had gone — **and the page would still be stateful**, because it still held
+/// the message. So the split would have bought a callback and a flag and lost
+/// nothing.
+///
+/// **The page owns the message and the clock; `WorkshopRestoreToast` paints
+/// the message.** The timer is disposed in [dispose] ✓, so a reader who
+/// navigates away mid-toast does not leave a timer running.
+///
+/// This is a **recorded departure from the brief**, and the rule the brief
+/// itself states is the rule it breaks: "Every divergence … is recorded at its
+/// site."
+class _SettingsBody extends StatefulWidget {
   const _SettingsBody();
+
+  @override
+  State<_SettingsBody> createState() => _SettingsBodyState();
+}
+
+class _SettingsBodyState extends State<_SettingsBody> {
+  /// The toast's message, or `null` when no toast is up.
+  String? _toastMessage;
+
+  /// The timer that takes the toast away.
+  Timer? _toastTimer;
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Raises the toast for [message] and takes it away again after
+  /// [kRestoreToastDuration].
+  ///
+  /// **The timer is cancelled first**, because the prototype's own `toast(m)`
+  /// does exactly that (`:1393` — `clearTimeout(t._x)` before the new timeout),
+  /// and a second restore while the first toast is up must not leave two timers
+  /// racing to clear the same message.
+  void _showToast(String message) {
+    _toastTimer?.cancel();
+    setState(() => _toastMessage = message);
+    _toastTimer = Timer(kRestoreToastDuration, () {
+      // `mounted` because the timer outlives a route pop: a screen that has been
+      // disposed must not call `setState` on the way out.
+      if (!mounted) return;
+      setState(() => _toastMessage = null);
+    });
+  }
+
+  /// The restore action.
+  ///
+  /// ## WHAT IT DOES, IN WHICH ORDER
+  ///
+  /// The write first, the toast second. The write is **optimistic** — the cubit
+  /// emits before it persists — so the reader sees the restored values on the
+  /// frame the row is pressed.
+  ///
+  /// ## AND THE TOAST IS RAISED **ONLY WHEN THE WRITE IS CONFIRMED**
+  ///
+  /// The prototype raises it unconditionally (`:1525`), because the prototype's
+  /// reset is local JavaScript and **cannot fail**. **This client's can**:
+  /// `SettingsCubit.apply` rolls back and records the failure, and this screen
+  /// says so in its own **failure notice** above the groups.
+  ///
+  /// **So a toast that said "nocturne defaults restored" over a screen that was
+  /// simultaneously saying "your preferences could not be saved" would be two
+  /// sentences about one event, and they would contradict each other.** The
+  /// toast is therefore raised after the write is confirmed, and it is **not**
+  /// raised at all when the write failed — the failure notice speaks, and it
+  /// says why.
+  ///
+  /// `SettingsCubit.apply` emits optimistically and `_persist` emits again with
+  /// the store's answer, so the status **after** the `await` is the outcome.
+  /// The `await` is what makes the difference, and the method is therefore
+  /// `async` rather than the fire-and-forget it could have been.
+  Future<void> _restore() async {
+    final SettingsCubit cubit = context.read<SettingsCubit>();
+    await cubit.restoreDefaults();
+    // `mounted` first: the reader may have left the screen while the write was
+    // in flight, and `setState` on an unmounted widget throws.
+    if (!mounted) return;
+    if (cubit.state.status == SettingsStatus.failed) return;
+    _showToast(context.l10n.settingsRestored);
+  }
+
+  /// The toast, **anchored to the viewport** and **transparent to taps**.
+  ///
+  /// `NeuralScaffold.overlay` is the viewport-fixed slot, and the reason a toast
+  /// in the page's own column would be wrong is `/communion`'s: it would scroll
+  /// away with the content and it would sit inside the scroll view's box rather
+  /// than the viewport's.
+  Widget? _toastOverlay() {
+    final String? message = _toastMessage;
+    if (message == null) return null;
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          left: 20,
+          right: 20,
+          // The prototype's `bottom: 110px` (`:466`).
+          bottom: 110,
+          // `:466` ends `pointer-events:none` — a confirmation is a **notice**,
+          // not a control, and it must never take a tap that belonged to the row
+          // under it. `IgnorePointer` leaves the semantics tree alone, and the
+          // live-region announcement is the point of the toast.
+          child: IgnorePointer(child: WorkshopRestoreToast(message: message)),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
-    // **Read once, for two callers.** The row's trailing text and the sheet's starting
-    // position must agree, and they both want "which language is on screen" — which is
-    // `selectedLanguageOf`'s answer and not a value the cubit holds. See its doc.
-    final ReadingLanguage onScreen = selectedLanguageOf(context);
 
     return NeuralScaffold(
       variant: NeuralVariant.settings,
-      // `SettingsScreen.tsx:36` — `overflowY: 'auto'` on the **root**, so the page
-      // scrolls rather than the content. `NeuralScaffold`'s doc names `/settings` as
-      // one of the three screens whose root scrolls.
+      // `eva/redesign.html:644`'s `.scroll` container is the page's own scroll, and
+      // `NeuralScaffold`'s doc names `/settings` as one of the three screens whose
+      // root scrolls. **The page does not fit at 320×568** and that is the
+      // standing gate's assertion, not an accident.
       scrollable: true,
       padding: EdgeInsets.zero,
+      // The viewport-fixed slot — see [_toastOverlay].
+      overlay: _toastOverlay(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const _Header(),
+          const WorkshopAppBar(),
           const SizedBox(height: SettingsPage.groupGap),
           BlocBuilder<SettingsCubit, SettingsState>(
             builder: (BuildContext context, SettingsState state) => Padding(
               padding: SettingsPage.contentPadding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  // ## THE ONE PLACE `status` IS READ, AND IT IS THE REASON THIS
-                  // PHASE 10 EXISTED FOR THIS SCREEN
-                  //
-                  // `_SettingsFailureNotice` is rendered **above** the groups and the
-                  // groups are rendered regardless — deliberately, and the reasoning is
-                  // in its own doc. The short form:
-                  //
-                  // * `ErrorView` **fills** its box (`Center` → `SingleChildScrollView`),
-                  //   so it cannot sit above three groups without nesting two scroll
-                  //   views, and this screen's root already scrolls (`scrollable: true`);
-                  // * **replacing** the form with it contradicts
-                  //   `SettingsStatus.failed`'s own doc — "the defaults are still on
-                  //   screen, and the reader's next write may still succeed" — and it is
-                  //   worse than a layout objection on the **write** arm, where the
-                  //   control the reader just tapped is the thing that vanished;
-                  // * its `message` contract is `ApiErrorMapper`'s, and
-                  //   `SettingsRepositoryImpl._unreachable` is not a mapper — it
-                  //   interpolates the raw Dart exception.
-                  //
-                  // So the failure is a **notice** carrying the same four §14 properties
-                  // `ErrorView` holds: a differently-shaped `err`-coloured icon,
-                  // `Semantics(liveRegion:)`, the sentence, and an action.
-                  if (state.status == SettingsStatus.failed)
-                    _SettingsFailureNotice(strings: strings),
-                  SettingsGroup(
-                    label: strings.settingsAppearance,
-                    children: <Widget>[
-                      SettingsTile(
-                        title: strings.settingsTheme,
-                        trailing: SegmentedControl<AppThemeMode>(
-                          values: AppThemeMode.values,
-                          selected: state.settings.themeMode,
-                          // **The row's own title**, so the track names the control
-                          // ("Theme") and the three segments name the options
-                          // ("Light", "Dark", "System"). Without it the track's node is
-                          // named after the **selected value**, which puts two
-                          // activatable nodes on screen with the identical label —
-                          // the `readingTextSize` defect, and the whole reason this
-                          // parameter exists. See `SegmentedControl.semanticLabel`.
-                          semanticLabel: strings.settingsTheme,
-                          labelOf: (AppThemeMode mode) => switch (mode) {
-                            AppThemeMode.light => strings.settingsThemeLight,
-                            AppThemeMode.dark => strings.settingsThemeDark,
-                            AppThemeMode.system => strings.settingsThemeSystem,
-                          },
-                          onChanged: (AppThemeMode mode) =>
-                              context.read<SettingsCubit>().setThemeMode(mode),
-                        ),
-                      ),
-                      SettingsTile(
-                        title: strings.settingsFontSize,
-                        trailing: FontSizeStepper(
-                          step: state.settings.fontStep,
-                          onChanged: (int step) =>
-                              context.read<SettingsCubit>().setFontStep(step),
-                          labels: FontSizeStepperLabels(
-                            decrease: strings.settingsDecreaseFontSize,
-                            increase: strings.settingsIncreaseFontSize,
-                            track: strings.settingsFontScale,
-                          ),
-                        ),
-                      ),
-                      SettingsTile(
-                        title: strings.settingsReduceMotion,
-                        trailing: EvaToggle(
-                          value: state.settings.reducedMotion,
-                          onChanged: (bool reduced) => context
-                              .read<SettingsCubit>()
-                              .setReducedMotion(reduced: reduced),
-                          labels: EvaToggleLabels(
-                            on: strings.settingsMotionOn,
-                            off: strings.settingsMotionOff,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: SettingsPage.groupGap),
-                  SettingsGroup(
-                    label: strings.settingsReading,
-                    children: <Widget>[
-                      SettingsTile(
-                        title: strings.settingsDefaultLanguage,
-                        // `onTap` on the row and a `Text` for the trailing, which is
-                        // what `SettingsTile`'s own doc asks for: "a tappable settings
-                        // row *contains* a control, and dropping the subtree would
-                        // leave a screen reader with a button that does nothing" —
-                        // inverted, here the row is the control and the trailing is
-                        // its **current value**, which is a fact and not a target.
-                        // A second control here would be a second tab stop for one
-                        // answer.
-                        onTap: () => unawaited(showLanguageSheet(context)),
-                        trailing: Text(
-                          strings.languageLabelFor(onScreen),
-                          style: arabicAware(
-                            Theme.of(context).textTheme.bodyMedium!,
-                            Directionality.of(context),
-                          ).copyWith(color: context.colors.ink2),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: SettingsPage.groupGap),
-                  SettingsGroup(
-                    label: strings.settingsAbout,
-                    children: <Widget>[
-                      SettingsTile(
-                        title: strings.settingsVersion,
-                        trailing: Text(
-                          AppConfig.appVersion,
-                          // `SettingsScreen.tsx:115` — `F.mono, 10, 700,
-                          // letterSpacing 0.08em, ink3`. A version string is an
-                          // identifier and the prototype's own choice is the mono
-                          // face; `monoCaps` uppercases, and a version has no cased
-                          // letters, so this is the same styling stated rather than
-                          // inherited.
-                          style: EvaTypography.monoCaps(context.colors)
-                              .copyWith(
-                                fontSize: EvaSpacing.sm + 2,
-                                color: context.colors.ink2,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              child: _groups(context, state, strings),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-/// The prototype's header row: a back chevron and the title.
-///
-/// `SettingsScreen.tsx:39-43` — `padding: '20px 20px 0'`, then a 44×44
-/// borderless button wrapping `<polyline points="15,18 9,12 15,6">` at
-/// `strokeWidth: 2` in `ink2`, then the title at `marginLeft: 8`.
-///
-/// **`Icons.arrow_back_ios_new` and not `Icons.chevron_left`**, because the
-/// prototype's is a *chevron* and Material's `arrow_back` is an arrow. The glyph that
-/// is actually the prototype's chevron is `arrow_back_ios_new` — `reading_controls.dart`
-/// records the mirror half of the same rule, where `Icons.arrow_back` **is** the right
-/// answer because that prototype drew a chevron *and* a spine. This one drew only the
-/// chevron.
-///
-/// **The direction mirrors itself for free.** `Icons.arrow_back_ios_new` is declared
-/// `matchTextDirection: true` in the SDK, so the ambient RTL from `MaterialApp.locale`
-/// points it rightwards — which is `SettingsScreen.tsx:39`'s `<polyline>` under the
-/// same `direction: rtl` its root inherits, and no second icon has to be chosen.
-class _Header extends StatelessWidget {
-  const _Header();
+  /// The seven groups, in the prototype's DOM order.
+  ///
+  /// ## WHY IT IS A **METHOD** AND NOT A BUILD-TIME LIST
+  ///
+  /// Because the groups read the **state**, and the state changes: a reader who
+  /// drags the Hue slider has to see the swatch move, and a reader who flips the
+  /// Daylight switch has to see the whole screen repaint. A list built once would
+  /// be a list built from the first frame's state.
+  Widget _groups(
+    BuildContext context,
+    SettingsState state,
+    AppLocalizations strings,
+  ) {
+    final SettingsCubit cubit = context.read<SettingsCubit>();
+    // The **handle**, and only for the two communion rows.
+    //
+    // `SettingsCubit` has no `setVeilWitnesses` and no `setShowPodium` — the two
+    // `/communion` fields were given their writers on the **handle**, which is the
+    // widget-facing projection of the cubit (`settings_handle.dart:142,149`). The
+    // handle's `write` is the same cubit's `apply`, so the write is the same write.
+    final SettingsHandle handle = SettingsScope.of(context);
 
-  @override
-  Widget build(BuildContext context) {
-    final AppLocalizations strings = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // ## THE FAILURE NOTICE, ABOVE THE GROUPS
+        //
+        // `_SettingsFailureNotice` is rendered **above** the groups and the
+        // groups are rendered regardless — deliberately, and the reasoning is in
+        // its own doc, which has not changed.
+        if (state.status == SettingsStatus.failed)
+          _SettingsFailureNotice(strings: strings),
 
-    return Padding(
-      // `SettingsScreen.tsx:39` — `padding: '20px 20px 0'`. `EvaSpacing.xl` is 20
-      // and is the token the prototype's own number maps to.
-      padding: const EdgeInsets.only(
-        top: EvaSpacing.xl,
-        left: EvaSpacing.xl,
-        right: EvaSpacing.xl,
-      ),
-      child: Row(
-        children: <Widget>[
-          IconActionButton(
-            icon: Icons.arrow_back_ios_new,
-            tooltip: strings.settingsBack,
-            // The title row is app chrome, not a reading passage, so it takes the
-            // ambient family exactly as `_StreakSubtitle` on `/` does — and the
-            // tooltip is Arabic on the Arabic arm, which is defect #2's mechanism if
-            // it does not.
-            tooltipFamily: arabicAwareFamily(
-              Directionality.of(context),
-              EvaTypography.uiFamily,
+        // --- 1. the language group (`:645-648`) ---------------------------
+        SettingsGroup(
+          label: strings.settingsWsLang,
+          children: <Widget>[
+            // The full-width 2-segment control. **Not** a `SettingsTile`: the
+            // prototype's `:646-648` is a bare `.segp.wide` in the scroll
+            // container, with no `.srow` around it.
+            SegmentedControl<ReadingLanguage>(
+              values: ReadingLanguage.values,
+              // The language **on screen**, and not the stored one: the stored
+              // value is `null` for "follow the platform", so a control that read
+              // it would show no selection at all on a screen that is entirely in
+              // Arabic. `selectedLanguageOf` is the derivation for exactly that
+              // question.
+              selected: selectedLanguageOf(context),
+              // The client's own-script names — `settings_l10n.dart`'s rule, "a
+              // language names itself in its own script". **A divergence from
+              // `:647`**, which writes the raw `English` and `العربية`.
+              labelOf: strings.languageLabelFor,
+              // `:186` — `.segp button[data-l=ar]{font-family:var(--ar);…}`.
+              // The rule is keyed on the **option**, not on the direction, and
+              // `SegmentedControl.labelFamilyOf`'s own doc says so in as many
+              // words: "on the **English** arm the Arabic option is still Amiri,
+              // because the selector is `data-l=ar`". Under RTL `arabicAware`
+              // resolves the whole control to Amiri anyway, which is what `:190`
+              // asks for.
+              //
+              // **The English option is given the control's own family** — which is
+              // what it would have had anyway — because `labelFamilyOf` is a
+              // `String Function(T)` and a function that returns nothing is not
+              // one.
+              //
+              // ## AND THE **THREE** DIVERGENCES THIS ONE CALL SITE CARRIES
+              //
+              // 1. **The labels are the client's own-script names**, not `:647`'s
+              //    raw `English` / `العربية` — the `settings_l10n.dart` rule, and
+              //    the divergence the brief records.
+              // 2. **So the Arabic-named option carries the Arabic face on the
+              //    English arm too**, where its own text is the Latin word
+              //    "Arabic". That is a direct consequence of (1) and of `:186`
+              //    being keyed on the option; it is recorded here rather than
+              //    "fixed", because the prototype's own rule is the one being
+              //    transcribed.
+              // 3. **The Arabic option is 13px in the prototype** (`:186`) and
+              //    the client draws every wide segment at 11px (`:189`). The
+              //    control has no per-option size, and the wide mode's 11px is
+              //    what makes four segments fit at 320px.
+              labelFamilyOf: (ReadingLanguage language) =>
+                  language == ReadingLanguage.arabic
+                  ? EvaTypography.arabicFamily
+                  : EvaTypography.monoFamily,
+              // The control's own name. **Not** the group's header: the header is
+              // the prototype's bilingual label (`language · اللغة`), and a name
+              // that reads "language · language" aloud is not a name.
+              semanticLabel: strings.settingsLanguageLabel,
+              wide: true,
+              onChanged: (ReadingLanguage language) =>
+                  unawaited(cubit.setLanguage(language)),
             ),
-            // `maybePop`, not a push of `/` — see the page's doc. `unawaited` because
-            // §4 forbids dropping a `Future` as a bare expression statement.
-            onPressed: () => unawaited(context.router.maybePop()),
-          ),
-          const SizedBox(width: SettingsPage.titleGap),
-          Expanded(
-            child: Text(
-              strings.settingsTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  arabicAware(
-                    Theme.of(context).textTheme.headlineMedium!,
-                    Directionality.of(context),
-                  ).copyWith(
-                    // `SettingsScreen.tsx:43` — `F.display 26 / 600 / ink /
-                    // letterSpacing -0.01em`. `headlineMedium` is 28sp in Material 3 and
-                    // `headlineSmall` is 24sp (which is what `AppTopBar`'s wordmark
-                    // uses); 26 is between them, so the size is transcribed on the slot
-                    // that carries the display serif, and the difference from 28 is well
-                    // under a pixel per character — the honest size of a number this
-                    // design system has no slot for.
-                    fontSize: 26,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.01,
-                    color: context.colors.ink,
-                  ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 2. the theme group (`:649-650`) ------------------------------
+        SettingsGroup(
+          label: strings.settingsThemeGroup,
+          children: <Widget>[
+            WorkshopToggleRow(
+              title: strings.settingsDaylight,
+              // ## THE NARROWING, AND THE PRODUCT CONSEQUENCE IT HAS
+              //
+              // A stored `system` renders the switch **off**, and the stored
+              // value is **not** changed until the reader touches the control —
+              // so a reader who stored `system` keeps following the OS until
+              // they touch it.
+              //
+              // **And touching it narrows the choice for good.** The only
+              // writer of the theme on this screen is `SettingsCubit.setDaylight`,
+              // and it writes `light` or `dark` and never `system` — so the
+              // `system` arm of `AppThemeMode`, a shipped capability since
+              // Phase 0 ("the reader asked to follow the OS"), becomes
+              // **unreachable from the UI**. The cubit's own doc carries that
+              // half of the record; this is the control's half.
+              value: daylightOnFor(state.settings.themeMode),
+              onChanged: (bool daylight) =>
+                  unawaited(cubit.setDaylight(daylight: daylight)),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 3. the light workshop (`:651-665`) ---------------------------
+        //
+        // ## THE TEN CONTROLS BELOW PERSIST REAL CHOICES AND THE CLIENT RENDERS
+        // ## NONE OF THEM
+        //
+        // `LumenCanvas` is mounted nowhere in production, and the ten
+        // `eva.shader.*` preferences target uniforms nothing reads. The plan
+        // deferred exactly this — "Wiring constraint for whoever mounts the
+        // painter (Phase 5) … Hoist one `LumenCanvas` above the rebuild boundary"
+        // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`).
+        //
+        // **The controls are neither disabled nor hidden.** A row that says
+        // "Aurora engine" and whose switch does nothing visible is honest only if
+        // the screen says so — and the group's own ARB label says so, because a
+        // reader's own string is where a promise is made.
+        SettingsGroup(
+          label: strings.settingsWsLight,
+          children: <Widget>[
+            WorkshopToggleRow(
+              title: strings.settingsShaderEngine,
+              value: state.settings.shaderEnabled,
+              onChanged: (bool enabled) =>
+                  unawaited(cubit.setShaderEnabled(enabled: enabled)),
+            ),
+            WorkshopSegmentRow<CurtainShape>(
+              title: strings.settingsCurtainShape,
+              values: CurtainShape.values,
+              selected: state.settings.curtainShape,
+              labelOf: (CurtainShape shape) => switch (shape) {
+                CurtainShape.top => strings.settingsCurtainTop,
+                CurtainShape.bottom => strings.settingsCurtainBottom,
+                CurtainShape.sides => strings.settingsCurtainSides,
+                CurtainShape.shafts => strings.settingsCurtainShafts,
+              },
+              onChanged: (CurtainShape shape) =>
+                  unawaited(cubit.setCurtainShape(shape)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsReach,
+              value: state.settings.reach,
+              min: kReachMin,
+              max: kReachMax,
+              onChanged: (int reach) => unawaited(cubit.setReach(reach)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsBrightness,
+              value: state.settings.glow,
+              min: kGlowMin,
+              max: kGlowMax,
+              onChanged: (int glow) => unawaited(cubit.setGlow(glow)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsTouchGlow,
+              value: state.settings.touchGlow,
+              min: kTouchGlowMin,
+              max: kTouchGlowMax,
+              onChanged: (int touchGlow) =>
+                  unawaited(cubit.setTouchGlow(touchGlow)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsHue,
+              value: state.settings.hue,
+              min: kHueMin,
+              max: kHueMax,
+              onChanged: (int hue) => unawaited(cubit.setHue(hue)),
+              // `:661` — the swatch sits **after** the range input.
+              after: HueSwatch(hue: state.settings.hue),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsMultichromeMelt,
+              value: state.settings.multichromeMelt,
+              onChanged: (bool melting) =>
+                  unawaited(cubit.setMultichromeMelt(melting: melting)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsRayCombing,
+              value: state.settings.rayCombing,
+              onChanged: (bool combing) =>
+                  unawaited(cubit.setRayCombing(combing: combing)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsWhiteCores,
+              value: state.settings.whiteCores,
+              onChanged: (bool white) =>
+                  unawaited(cubit.setWhiteCores(white: white)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsDotVeil,
+              value: state.settings.dotVeil,
+              onChanged: (bool veiled) =>
+                  unawaited(cubit.setDotVeil(veiled: veiled)),
+            ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 4. the witness sky (`:666-681`) -------------------------------
+        //
+        // **This is the one group whose switches change what is on screen today.**
+        // The seven `eva.sky.pref.*` preferences are consumed by `/reading`'s sky.
+        SettingsGroup(
+          label: strings.settingsSkyGroup,
+          children: <Widget>[
+            WorkshopToggleRow(
+              title: strings.settingsStars,
+              value: state.settings.starsOn,
+              // **Stars-off HIDES the sky; it does not delete it.** The
+              // prototype's Stars-off calls `clearStars()` (`:1483`), but the
+              // prototype has no persistence — its stars are DOM elements — while
+              // this client's sky is a reader's own record of what they have
+              // read. **A divergence from `:1483`, and a decision.**
+              onChanged: (bool on) => unawaited(cubit.setStarsOn(on: on)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsConstellations,
+              value: state.settings.constellationsOn,
+              onChanged: (bool on) =>
+                  unawaited(cubit.setConstellationsOn(on: on)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsStarCount,
+              value: state.settings.starCount,
+              min: kStarCountMin,
+              max: kStarCountMax,
+              onChanged: (int count) => unawaited(cubit.setStarCount(count)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsStarBrightness,
+              value: state.settings.starBrightness,
+              min: kStarBrightnessMin,
+              max: kStarBrightnessMax,
+              onChanged: (int brightness) =>
+                  unawaited(cubit.setStarBrightness(brightness)),
+            ),
+            WorkshopSegmentRow<SkyStarShape>(
+              title: strings.settingsStarShape,
+              values: SkyStarShape.values,
+              selected: state.settings.starShape,
+              // ## THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH
+              //
+              // `:673` carries **no `data-i18n`** on any of its four buttons, so
+              // these are the prototype's own words and they stay that way. They
+              // are **widget literals, not ARB keys** — an ARB key whose two arms
+              // are identical would have to join `app_localizations_test.dart`'s
+              // `mustBeIdentical` set, and that set is the gate that catches an
+              // untranslated string.
+              //
+              // **The fourth is `gem`, not `diamond`**: the prototype's class name
+              // is `s-diamond` and its label is `gem`, and the two answer
+              // different questions — the class name reaches the geometry and the
+              // label reaches the reader.
+              labelOf: (SkyStarShape shape) => switch (shape) {
+                SkyStarShape.dot => kStarShapeDot,
+                SkyStarShape.star => kStarShapeStar,
+                SkyStarShape.cross => kStarShapeCross,
+                SkyStarShape.diamond => kStarShapeGem,
+              },
+              onChanged: (SkyStarShape shape) =>
+                  unawaited(cubit.setStarShape(shape)),
+            ),
+            WorkshopSegmentRow<SkyStarField>(
+              title: strings.settingsStarField,
+              values: SkyStarField.values,
+              selected: state.settings.starField,
+              // The prototype's own untranslated English, for the Star shape
+              // segment's reason: `:678` carries no `data-i18n` either.
+              labelOf: (SkyStarField field) => switch (field) {
+                SkyStarField.crown => kStarFieldCrown,
+                SkyStarField.high => kStarFieldHigh,
+                SkyStarField.full => kStarFieldFull,
+              },
+              onChanged: (SkyStarField field) =>
+                  unawaited(cubit.setStarField(field)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsTwinkle,
+              value: state.settings.twinkle,
+              // **Combined with the reduce-motion signal, never instead of it** —
+              // the prototype's handler sets `notwinkle` when the switch is off
+              // **or** reduce motion is on (`:1489`), and the client's sky does
+              // the same.
+              onChanged: (bool twinkling) =>
+                  unawaited(cubit.setTwinkle(twinkling: twinkling)),
+            ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 5. focus & ritual (`:682-689`) --------------------------------
+        //
+        // **SIX of the seven persist and are read by nothing yet** — the selah
+        // timer, the focus mode, the breath guide, the vespers auto-dim, the
+        // calm motion and the haptics are Phase 7's
+        // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1685-1686`).
+        // Only **Reduce motion** is read today, by `app.dart` and `/reading`.
+        SettingsGroup(
+          label: strings.settingsRitualGroup,
+          children: <Widget>[
+            WorkshopSliderRow(
+              title: strings.settingsFocusDelay,
+              value: state.settings.focusDelaySec,
+              min: kFocusDelaySecMin,
+              max: kFocusDelaySecMax,
+              onChanged: (int seconds) =>
+                  unawaited(cubit.setFocusDelaySec(seconds)),
+            ),
+            WorkshopSliderRow(
+              title: strings.settingsSelahLength,
+              value: state.settings.selahLengthSec,
+              min: kSelahLengthSecMin,
+              max: kSelahLengthSecMax,
+              // `:684` — `step="5"`, the prototype's **only** stepped slider.
+              step: kSelahLengthSecStep,
+              onChanged: (int seconds) =>
+                  unawaited(cubit.setSelahLengthSec(seconds)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsBreathGuide,
+              value: state.settings.breathGuide,
+              onChanged: (bool on) => unawaited(cubit.setBreathGuide(on: on)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsVespersAutoDim,
+              value: state.settings.vespersAutoDim,
+              onChanged: (bool on) =>
+                  unawaited(cubit.setVespersAutoDim(on: on)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsReduceMotion,
+              value: state.settings.reducedMotion,
+              // An **existing** field, and the prototype's own switch.
+              onChanged: (bool reduced) =>
+                  unawaited(cubit.setReducedMotion(reduced: reduced)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsCalmMotion,
+              value: state.settings.calmMotion,
+              onChanged: (bool calm) =>
+                  unawaited(cubit.setCalmMotion(calm: calm)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsHaptics,
+              value: state.settings.haptics,
+              // **The Workshop is mute against the prototype.** The prototype
+              // answers every toggle with a haptic (`:1482`, `:1498`) and this
+              // client has no haptics until Phase 7.
+              onChanged: (bool on) => unawaited(cubit.setHaptics(on: on)),
+            ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 6. communion (`:690-695`) -------------------------------------
+        SettingsGroup(
+          label: strings.settingsCommunionGroup,
+          children: <Widget>[
+            WorkshopToggleRow(
+              title: strings.settingsVeilWitnesses,
+              value: state.settings.veilWitnesses,
+              // **Through the handle, not the cubit** — see the note where the
+              // handle is resolved. The two `/communion` fields are the only ones
+              // on this screen whose writer lives there.
+              onChanged: (bool veiled) =>
+                  unawaited(handle.setVeilWitnesses(veiled: veiled)),
+            ),
+            WorkshopToggleRow(
+              title: strings.settingsShowPodium,
+              value: state.settings.showPodium,
+              onChanged: (bool shown) =>
+                  unawaited(handle.setShowPodium(shown: shown)),
+            ),
+            SettingsTile(
+              title: strings.settingsTypeSize,
+              // ## THE EXISTING STEPPER, AND THE DIVERGENCE FROM `:693`
+              //
+              // The prototype's Type-size row is a 16–26px range input
+              // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173`
+              // calls it "a different model") and this client keeps its 1–5 step.
+              // **The slider is not transcribed**, and the divergence is recorded
+              // here.
+              trailing: FontSizeStepper(
+                step: state.settings.fontStep,
+                onChanged: (int step) => unawaited(cubit.setFontStep(step)),
+                labels: FontSizeStepperLabels(
+                  decrease: strings.settingsDecreaseFontSize,
+                  increase: strings.settingsIncreaseFontSize,
+                  // The **track's** slider label, and it is deliberately a
+                  // different string from the row's title: the two name the
+                  // control from two positions — a row title and a slider.
+                  track: strings.settingsFontScale,
+                ),
+              ),
+            ),
+            // The preview line (`:694`, CSS `:431`).
+            //
+            // **The widget owns the margin** — `:431`'s `margin:10px 2px 2px` —
+            // so nothing is wrapped around it here. The prototype's 10px above
+            // the line is the `.prevline`'s own; the **group's** 10px row gap
+            // (`SettingsGroup.rowGap`) is the client's, and the two together put
+            // the preview 20px below the Type size row where the prototype has
+            // 10. That is the same +10 the client puts between every pair of
+            // rows, and it is the client's own number.
+            PreviewLine(
+              // The prototype's own two literals, in its own scripts (`:996`).
+              // **Not an ARB key** — the prototype does not put them in its
+              // `I18N` table, and a key whose two arms differ by script rather
+              // than by language would be a translation decision nobody made.
+              text: previewTextFor(isArabic: strings.isArabicArm),
+            ),
+            WorkshopRestoreRow(
+              title: strings.settingsRestoreDefaults,
+              onTap: () => unawaited(_restore()),
+            ),
+          ],
+        ),
+        const SizedBox(height: SettingsPage.groupGap),
+
+        // --- 7. about (`:696-698`) ----------------------------------------
+        SettingsGroup(
+          label: strings.settingsAbout,
+          children: <Widget>[
+            // The prototype's **own** literals, and they name the **design
+            // system's** versions rather than this client's — the client's shader
+            // program is `kLumenShaderAsset` and it is not mounted. **Recorded as
+            // such at the row.**
+            WorkshopValueRow(
+              title: strings.settingsShaders,
+              value: kShadersVersion,
+            ),
+            WorkshopValueRow(
+              title: strings.settingsTokens,
+              value: kTokensVersion,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -406,8 +808,8 @@ class _Header extends StatelessWidget {
 ///    controls it is about.
 /// 2. **`ErrorView` fills its box.** `Center` → `SingleChildScrollView` → `Padding`
 ///    → `Column`, and this screen's root **already scrolls** (`scrollable: true`,
-///    `SettingsScreen.tsx:36`'s `overflowY: 'auto'` on the root). Nesting the two
-///    gives two scroll views fighting over one gesture.
+///    `eva/redesign.html:644`'s `.scroll`). Nesting the two gives two scroll views
+///    fighting over one gesture.
 /// 3. **Its message is not this failure's message.** `ErrorView.message` is required
 ///    and undocumented-as-optional precisely because `ApiErrorMapper` is the single
 ///    source of a displayable failure message in this app, and that claim is true of
@@ -468,7 +870,7 @@ class _SettingsFailureNotice extends StatelessWidget {
 
     return Padding(
       // `EvaSpacing.sm` above and `SettingsPage.groupGap` below: the notice is a
-      // peer of the three groups, not one of their rows, so it takes the same
+      // peer of the seven groups, not one of their rows, so it takes the same
       // separation from its neighbours that they take from each other.
       padding: const EdgeInsets.only(
         top: EvaSpacing.sm,

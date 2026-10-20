@@ -117,8 +117,31 @@ class SegmentedControl<T> extends StatefulWidget {
     required this.onChanged,
     this.semanticLabel,
     this.labelFamilyOf,
+    this.wide = false,
     super.key,
   });
+
+  /// Whether the control is the prototype's **wide** geometry.
+  ///
+  /// `redesign.html:188-189`:
+  ///
+  /// ```css
+  /// .segp.wide{width:100%}
+  /// .segp.wide button{padding:12px 0;font-size:11px}
+  /// ```
+  ///
+  /// **A separate, opt-in geometry — it does not re-open the default mode's
+  /// decision.** The default mode deliberately refuses the prototype's equal
+  /// thirds, and the reason is written down on [SegmentedControl.segmentPadding]
+  /// and in `_measureThumb`'s doc: a control that stops hugging its own content
+  /// is a different control, and the default mode is used by every control the
+  /// app has today.
+  ///
+  /// The wide mode exists for a **measured** reason, not a taste one: the
+  /// four-segment control cannot share a row with a 14.5px label at 320px, and
+  /// the standing 320×568 viewport matrix is a gate. The arithmetic is in
+  /// [wideTrackMinimumWidth]'s doc.
+  final bool wide;
 
   /// The family an option's label renders in, **when the label's script needs a
   /// different face from the control's**.
@@ -238,6 +261,73 @@ class SegmentedControl<T> extends StatefulWidget {
     horizontal: EvaSpacing.md,
     vertical: EvaSpacing.xs,
   );
+
+  /// The wide mode's label size. `redesign.html:189` — `font-size:11px`.
+  ///
+  /// **The wide mode transcribes `:189`'s own size rather than reusing the
+  /// default mode's**, and the reason is arithmetic rather than taste. At 320px
+  /// the content column is `320 − 2×24` = 272px, the row's own horizontal
+  /// padding is 4px a side, so the row is 264px; the track's own
+  /// `padding:3px` and 1px rim (`:178`) take 8 of it, so the four segments
+  /// share **256px — 64 each**. "SHAFTS" at 11 × 1.22 = 13.4px in the mono
+  /// face is about 54px — it fits, and `padding:12px 0` (zero horizontal) is
+  /// what makes it fit. With the default mode's 12sp mono and 12px horizontal
+  /// padding it would not.
+  static const double wideLabelSize = 11;
+
+  /// The wide mode's button padding. `redesign.html:189` — `padding:12px 0`.
+  ///
+  /// **Vertical 12, horizontal 0** — the CSS order.
+  static const EdgeInsets wideSegmentPadding = EdgeInsets.symmetric(
+    vertical: 12,
+  );
+
+  /// The label's tracking, in em. `redesign.html:184` — `letter-spacing:.08em`.
+  ///
+  /// **Premultiplied by the label's own size before it becomes a Flutter
+  /// `letterSpacing`**, because Flutter's is a logical-pixel advance and CSS's
+  /// is relative to the element's own font. See [wideLabelLetterSpacing] and
+  /// the house rule in `stat_tile.dart:142-147`.
+  static const double labelTracking = 0.08;
+
+  /// The wide mode's label tracking, in logical pixels. **0.88.**
+  ///
+  /// `11 × 0.08`. The raw `0.08` would be **eight to twelve times too
+  /// small**, and that is the single most likely defect in this widget: the
+  /// handoff's lesson 1 records 5.6 shipping seven sites with the raw `em`
+  /// number.
+  static const double wideLabelLetterSpacing = wideLabelSize * labelTracking;
+
+  /// The tap-target floor for one segment. `redesign.html:183` —
+  /// `min-width:44px`.
+  static const double segmentMinWidth = 44;
+
+  /// The wide track's minimum width: the floor for every segment, times the
+  /// number of segments.
+  ///
+  /// ## WHY THE FLOOR IS REAL, AND WHY IT IS NOT THE SAME AS CSS'S
+  ///
+  /// `redesign.html:183` gives every button `min-width:44px` alongside
+  /// `flex:1`, and the floor is a **tap-target** floor: a segment narrower than
+  /// 44px is a target a finger cannot reliably hit.
+  ///
+  /// The brief's arithmetic is what makes this mode exist at all: at 320px the
+  /// content column is `320 − 2×24` = **272px**, the row's own horizontal
+  /// padding is 4px a side (`redesign.html:419`), so the row is **264px**, and
+  /// the four-segment control's minimum is `4 × 44 = 176px`. A 14.5px label
+  /// ("Curtain shape", about 88px) would then have `264 − 176 − 10 = 78px` and
+  /// wrap to two lines. The three segmented rows therefore put the label
+  /// **above** the control, and the control takes the row's full width — which
+  /// gives the segments 256px, **64 each**, against the prototype's own 44px
+  /// floor.
+  ///
+  /// **CSS would overflow its container rather than shrink; Flutter's
+  /// constraints clamp instead.** So on a row narrower than the floor the
+  /// segments would fall below 44px here, where the prototype would have
+  /// overflowed. The floor holds wherever it is measured — the 320×568 matrix
+  /// gives the wide rows 264px, which is 66px a segment — and the clamp is
+  /// recorded here rather than pretended away.
+  static double wideTrackMinimumWidth(int count) => segmentMinWidth * count;
 
   /// The thumb's slide. `redesign.html:182` —
   /// `transition:left .35s var(--e-spring),width .35s var(--e-spring)`.
@@ -359,6 +449,23 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
   /// So the thumb's geometry is **measured**, which is the difference the Phase 4
   /// brief asks for: nothing here is a guess, an average, or a fraction of the
   /// track that assumes the segments are equal.
+  ///
+  /// ## AND WHAT THE DEFAULT MODE **RENDERS** TODAY, MEASURED
+  ///
+  /// The mechanism above is not the same as the rendering, and a reader
+  /// comparing this mode with the wide one needs both. The `_Segment`'s
+  /// `Container(alignment: Alignment.center)` expands to the **flex
+  /// allocation** it is handed, so the default mode's segments come out
+  /// **equal** — measured at **104px each** in a 320px surface with a
+  /// three-segment control — and the track comes out **full width**.
+  ///
+  /// **The prototype's equal thirds are still not *transcribed*.** They are
+  /// what the layout *produced*, not what this widget *asked for*: the widths
+  /// are not arithmetic on any number the widget holds, and a change to the
+  /// segment's own box — a wider label, a different padding — moves them.
+  /// The **wide** mode is the one that *asks* for them (`Expanded`, a tight
+  /// share each), which is what makes its geometry a **guarantee** rather than
+  /// an outcome. That contrast is the reason the two modes are separate.
   void _measureThumb() {
     if (!mounted) return;
     final RenderObject? track = _trackKey.currentContext?.findRenderObject();
@@ -465,6 +572,23 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
               ? widget.selected
               : widget.values.first,
         );
+
+    final List<Widget> segments = <Widget>[
+      for (final (int i, T value) in widget.values.indexed)
+        _Segment<T>(
+          key: _segmentKeys[i],
+          label: widget.labelOf(value),
+          labelFamily: widget.labelFamilyOf?.call(value),
+          selected: value == widget.selected,
+          colors: colors,
+          animate: _animate,
+          wide: widget.wide,
+          // Taps are per segment, so the segments are individual
+          // `InkWell`s — but they take **no** focus node, because the
+          // control's single tab stop is the ring's node above them.
+          onTap: () => widget.onChanged(value),
+        ),
+    ];
 
     final Widget track = Container(
       // `redesign.html:178` —
@@ -588,23 +712,33 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
           // **Second, and only because it is second.** See the z-order block above
           // the thumb: `redesign.html:183`'s `z-index:2` is this line.
           Row(
-            mainAxisSize: MainAxisSize.min,
+            // ## THE WIDE MODE'S TWO LAYOUT DECISIONS, AND THEY ARE **EXPLICIT**
+            //
+            // `:188` — `.segp.wide{width:100%}` — and `:183`'s `flex:1`, which
+            // is the prototype's equal thirds.
+            //
+            // The wide mode takes the available width by construction
+            // (`mainAxisSize: max`) and its segments are equal by construction
+            // (`Expanded`, which hands each child a **tight** share of the
+            // track). The default mode leaves both to the layout — its segments
+            // are `Flexible` (loose) in a `mainAxisSize: min` row — and
+            // `_measureThumb`'s doc records what that actually renders.
+            //
+            // **The difference is guarantee versus outcome**, and it is the
+            // whole reason the mode is separate. The default mode's equal
+            // thirds today are an *emergent* property of the segment's own box
+            // expanding to its flex allocation; the wide mode's are *asked
+            // for*, so a change to a label's width cannot move them.
+            mainAxisSize: widget.wide ? MainAxisSize.max : MainAxisSize.min,
             children: <Widget>[
-              for (final (int i, T value) in widget.values.indexed)
-                Flexible(
-                  child: _Segment<T>(
-                    key: _segmentKeys[i],
-                    label: widget.labelOf(value),
-                    labelFamily: widget.labelFamilyOf?.call(value),
-                    selected: value == widget.selected,
-                    colors: colors,
-                    animate: _animate,
-                    // Taps are per segment, so the segments are individual
-                    // `InkWell`s — but they take **no** focus node, because the
-                    // control's single tab stop is the ring's node above them.
-                    onTap: () => widget.onChanged(value),
-                  ),
-                ),
+              for (final Widget segment in segments)
+                // `Expanded` in the wide mode, `Flexible` in the default one.
+                // The default's tree is **unchanged** — `Flexible` is what it
+                // has always used, and the goldens of the default mode are
+                // recorded against it.
+                widget.wide
+                    ? Expanded(child: segment)
+                    : Flexible(child: segment),
             ],
           ),
         ],
@@ -649,7 +783,28 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
           // supplies the ink for a tap that lands on the track's padding.
           onPressed: () => _move(1),
           borderRadius: BorderRadius.circular(SegmentedControl.trackRadius),
-          child: track,
+          // ## THE WIDE MODE'S FLOOR, AND IT IS THE **TRACK'S** WIDTH
+          //
+          // `:183` gives every button `min-width:44px`. In CSS that is a floor
+          // on the button; in Flutter the honest translation is a floor on the
+          // **track**, because the track is what hands the buttons their
+          // widths — so the track's minimum is `44 × the number of segments`
+          // and every button inherits its share of it.
+          //
+          // **The default mode has no floor**, and that is not an oversight:
+          // the default control is short (three segments) and the floor is the
+          // wide mode's geometry. The wide mode's own doc carries the
+          // arithmetic.
+          child: widget.wide
+              ? ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: SegmentedControl.wideTrackMinimumWidth(
+                      widget.values.length,
+                    ),
+                  ),
+                  child: track,
+                )
+              : track,
         ),
       ),
     );
@@ -667,6 +822,7 @@ class _Segment<T> extends StatelessWidget {
     required this.selected,
     required this.colors,
     required this.animate,
+    required this.wide,
     required this.onTap,
     super.key,
   });
@@ -680,10 +836,23 @@ class _Segment<T> extends StatelessWidget {
   final bool selected;
   final EvaColors colors;
   final bool animate;
+
+  /// Whether this segment belongs to the **wide** control.
+  ///
+  /// `redesign.html:189` — `.segp.wide button{padding:12px 0;font-size:11px}`.
+  /// Both halves are the wide mode's own, and **neither** is the default
+  /// mode's: the default keeps [SegmentedControl.segmentPadding] and the
+  /// `monoCaps` slot's own size.
+  final bool wide;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    // **THE DIRECTION, ONCE.** `redesign.html:190` gives the `.segp button`
+    // rule under RTL a family swap, **no tracking** and **no transform** — and
+    // the transform is the one that changes the *string* rather than the style.
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
     final Widget body = Semantics(
       // §14's prescription for a selectable chip, and the reason the segments
       // need their own nodes: without `selected`, a screen-reader user cannot
@@ -709,6 +878,40 @@ class _Segment<T> extends StatelessWidget {
         style: arabicAware(
           EvaTypography.monoCaps(colors).copyWith(
             fontFamily: labelFamily,
+            // ## THE WIDE MODE'S OWN SIZE AND TRACKING, AND THE `em` RULE
+            //
+            // `:189` — `.segp.wide button{…font-size:11px}` — and `:184` —
+            // `letter-spacing:.08em`.
+            //
+            // **The tracking is the em value PREMULTIPLIED by the size**,
+            // because Flutter's `letterSpacing` is a logical-pixel advance and
+            // CSS's `em` is relative to the element's own font: `11 × 0.08 =
+            // 0.88`. The raw `0.08` would be **eleven times too small**, and
+            // the house rule is in `stat_tile.dart:142-147` and
+            // `eva_section_header.dart:191-206`.
+            //
+            // **`null` in the default mode, which keeps the slot's own values**
+            // — so the default mode's rendering is byte-for-byte what it was.
+            fontSize: wide ? SegmentedControl.wideLabelSize : null,
+            // **AND IT IS **ZERO** UNDER RTL**, which is `redesign.html:190`:
+            // `[dir=rtl] .segp button{font-family:var(--ui-ar);letter-spacing:0;
+            // text-transform:none}`.
+            //
+            // The prototype states it for the `.segp` class exactly as `:135`
+            // states it for `.mono`, and this widget's labels are a `.mono` run
+            // inside a `.segp button` — so the rule applies twice over and the
+            // tracking is zero either way.
+            //
+            // **AND IT IS ALSO THE RIGHT THING FOR THE SCRIPT.** The Workshop's
+            // seven untranslated segment labels are **Latin literals** — `dot`,
+            // `star`, `cross`, `gem`, `crown`, `high`, `full` — and on the Arabic
+            // arm the prototype writes them in their own case
+            // (`text-transform:none`), so upper-casing them there is a second
+            // divergence from `:190`, and one a reader sees: `DOT` where the
+            // prototype writes `dot`.
+            letterSpacing: wide && !rtl
+                ? SegmentedControl.wideLabelLetterSpacing
+                : null,
             // `redesign.html:185` — `.segp button.on{color:#1c1608;
             // font-weight:600}`.
             //
@@ -763,7 +966,14 @@ class _Segment<T> extends StatelessWidget {
           // §14 — when animations are off the duration is zero, so the label
           // colour lands on the frame the selection changes: the end state,
           // immediately.
-          padding: SegmentedControl.segmentPadding,
+          //
+          // `:189` — `.segp.wide button{padding:12px 0}` — and the default
+          // mode's own [SegmentedControl.segmentPadding]. The wide mode's
+          // padding has **zero horizontal**, and that is what makes a
+          // four-segment control fit beside a 320px screen.
+          padding: wide
+              ? SegmentedControl.wideSegmentPadding
+              : SegmentedControl.segmentPadding,
           alignment: Alignment.center,
           // **No fill.** `redesign.html:183` gives `button` `background:none` and
           // `:184` gives it `border-radius:999px`; the selected segment is drawn
@@ -773,7 +983,17 @@ class _Segment<T> extends StatelessWidget {
           child: Text(
             // `SettingsScreen.tsx:55` / `redesign.html:183` —
             // `text-transform: uppercase`, which Flutter has no equivalent for.
-            label.toUpperCase(),
+            //
+            // **AND IT IS SKIPPED UNDER RTL**, which is `redesign.html:190`:
+            // `[dir=rtl] .segp button{…text-transform:none}`. On the Arabic arm
+            // the prototype writes the label in its own case, and the
+            // Workshop's seven untranslated labels are **Latin** — so the
+            // client read `DOT` where the prototype writes `dot`.
+            //
+            // `toUpperCase()` is a no-op on Arabic itself (Arabic has no case),
+            // so the change is invisible on a translated label and visible on
+            // the prototype's own English ones.
+            rtl ? label : label.toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,

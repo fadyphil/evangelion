@@ -88,7 +88,7 @@ authority document is stale — see [ROADMAP.md § Docs debt](ROADMAP.md#docs-de
 | `/reading` | Reading sanctuary, EN and AR, zero chrome | **API** |
 | `/quiz` | Reflection questions with per-answer feedback | **API** |
 | `/result` | Score, streak, stat tiles | **API** — the submit response, held in memory |
-| `/settings` | Appearance, reading, about | Local — `shared_preferences` |
+| `/settings` | The Workshop — language, theme, light, sky, ritual, communion | Local — `shared_preferences` |
 | `/communion` | The Communion — the cohort's board | **API**, or a stub via `--dart-define` |
 | `/journey` | The Journey — the reader's own profile | **API** (streak) · local (stars) · a stub (medals) |
 
@@ -194,8 +194,8 @@ lib/
     router/              AppRouter, AuthGuard, generated routes
   core/
     common/              Result<T>, Failure, AppConfig          pure Dart
-    design_system/       tokens, theme, effects, 23 widgets
-    domain/              SHARED KERNEL: entities + 5 ports       pure Dart
+    design_system/       tokens, theme, effects, 28 widgets
+    domain/              SHARED KERNEL: entities + 7 ports       pure Dart
     navigation/          route constants, AuthStatus             pure Dart
     network/             Dio client, interceptors, error mapper
   features/
@@ -208,7 +208,7 @@ lib/
 tool/                    verification: verify_all.sh, verify_purity.sh, gates/
 docs/                    architecture, seams, drift, ADRs, the port plan
 eva/                     the React design prototype — read-only reference
-test/                    157 files, 2507 tests, 148 goldens
+test/                    201 files, 3478 tests, 183 goldens
 ```
 
 ---

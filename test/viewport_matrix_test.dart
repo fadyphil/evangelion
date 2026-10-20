@@ -1,5 +1,9 @@
 import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
@@ -133,7 +137,11 @@ void main() {
     ('430x932', kGeometrySurface),
   ];
 
-  void matrix(String screen, List<Mount> mounts) {
+  void matrix(
+    String screen,
+    List<Mount> mounts, {
+    void Function(WidgetTester tester, String surface, Size size)? alsoExpect,
+  }) {
     for (final Mount mount in mounts) {
       for (final (String size, Size surface) in surfaces) {
         testWidgets('$screen — ${mount.state} — $size', (
@@ -148,6 +156,19 @@ void main() {
             somethingRendered: () => mount.landmark.evaluate().isNotEmpty,
             surface: '$screen / ${mount.state} / $size',
           );
+          // ## AND THE EXTRA READING COMES **AFTER** THE OVERFLOW ONE
+          //
+          // `expectNoOverflow` is the instrument that has to go first, and it
+          // keeps the two properties this file's header calls load-bearing:
+          // the **landmark** is evaluated **before** the drain, and the drain
+          // runs in a **loop** (one `takeException()` hides the second overflow
+          // on a page that has two).
+          //
+          // So the extra reading below is a **second opinion on the same
+          // frame** and never a replacement for the first — a page that
+          // overflows is a bigger finding than a page whose rows are in the
+          // wrong place, and it is the finding that stops the test.
+          alsoExpect?.call(tester, '$screen / ${mount.state} / $size', surface);
         });
       }
     }
@@ -328,15 +349,34 @@ void main() {
     ]);
 
     // ---------------------------------------------------------------------------
+    //
+    // ## `/settings` IS THE ONE ARM THAT **SCROLLS**, AND THE NAMES SAY SO
+    //
+    // The Phase-9 screen was three groups and five controls, and it **fit**.
+    // The Workshop is seven groups and twenty-nine interactive controls, and
+    // its content is about **2960** tall — so it does not fit in 568, or in
+    // 844, or in 932, and it **scrolls**.
+    //
+    // **"The page fits" was a true claim about the old screen and is false
+    // about this one**, so the state names below say "the page SCROLLS" rather
+    // than leaving a reader to infer it. The honest claim about a scrolling
+    // page is "it scrolls and nothing overflows", and that is what the matrix
+    // asserts: `expectNoOverflow` asks the framework, which knows the
+    // difference between a scroll and an overflow.
+    //
+    // **And the third state is no longer about a language sheet.** The
+    // redesign replaced the Phase-9 sheet with a two-segment track
+    // (`eva/redesign.html:646-648`), so the Arabic arm's own state is the
+    // segment and the taller script — not a sheet a tap away.
     matrix('/settings', <Mount>[
       (
-        state: 'ready',
+        state: 'ready — the page SCROLLS: 29 rows do not fit in 568',
         pump: (WidgetTester tester) =>
             pumpSettings(tester, size: _currentSurface),
         landmark: find.byType(SettingsPage),
       ),
       (
-        state: 'the failure notice, whose sentence wraps',
+        state: 'the failure notice, whose sentence wraps — and it SCROLLS',
         pump: (WidgetTester tester) => pumpSettings(
           tester,
           cubit: _unreachableStore(),
@@ -345,7 +385,7 @@ void main() {
         landmark: find.byType(SettingsPage),
       ),
       (
-        state: 'the Arabic arm, whose language sheet is a tap away',
+        state: 'the Arabic arm, with the language segment — and it SCROLLS',
         pump: (WidgetTester tester) => pumpSettings(
           tester,
           locale: const Locale('ar'),
@@ -353,7 +393,7 @@ void main() {
         ),
         landmark: find.byType(SettingsPage),
       ),
-    ]);
+    ], alsoExpect: _expectTheWorkshopFits);
   });
 
   // ---------------------------------------------------------------------------
@@ -417,7 +457,7 @@ void main() {
       );
     });
 
-    testWidgets('and the same row at 430 does NOT overflow', (
+    testWidgets('and a planted 320px row at 390 does NOT overflow', (
       WidgetTester tester,
     ) async {
       // The **other half** of the negative control, and the half that stops it being
@@ -425,6 +465,23 @@ void main() {
       // If the detector reported everything, this would fail; if it reported
       // nothing, the previous test would. Between them the instrument is pinned from
       // both sides.
+      //
+      // ## AND IT IS PUMPED AT **390**, WHICH IS THE POINT
+      //
+      // This test used to be named "at 430" and its reason spoke of a 390
+      // surface, while `pumpPrimitive`'s **default** size is `kNarrowSurface` —
+      // 320×568. So the row was laid out at 320, exactly filling it, and the
+      // reason's "70 to spare" was a claim about a surface the test never
+      // mounted. **The name and the reason were both false about the frame
+      // under test**, which is the one thing a negative control's words have to
+      // be true about.
+      //
+      // Now the surface is **390** — `kAmbientSurface`, the middle of the
+      // matrix — so the row has **70 pixels to spare** and the assertion is
+      // about the surface it names. **And the half that matters is the
+      // direction**: a 320px row at 320 is exactly full, and a detector that
+      // reported on a row that exactly fills its box would be a detector that
+      // reports on clean layouts.
       await pumpPrimitive(
         tester,
         Row(
@@ -433,6 +490,7 @@ void main() {
             for (int i = 0; i < 8; i++) const SizedBox(width: 40, height: 20),
           ],
         ),
+        size: kAmbientSurface,
       );
 
       expect(
@@ -516,6 +574,126 @@ const SubmitResult _aResult = SubmitResult(
   longestStreak: 30,
   readingCompleted: true,
 );
+
+/// `/settings`'s own two claims, measured off the rendered tree.
+///
+/// ## ONE: THE PAGE **SCROLLS**, AND THAT IS NOT AN OVERFLOW
+///
+/// The Workshop is seven groups and twenty-nine interactive controls, and its
+/// content is about **2960** tall — **2958** at 390 and 430, and **2968** at
+/// 320, where the narrower column wraps two lines more — so it is taller than
+/// **every** surface in the matrix, and the claim the matrix can honestly make
+/// is that it scrolls.
+/// "The page fits" was a true claim about the Phase-9 screen and is false
+/// about this one.
+///
+/// **And the measurement is the scroll view's own**, not a re-derivation of the
+/// screen's row heights: `maxScrollExtent` is the framework's answer to "is
+/// there more below than there is room for".
+///
+/// ## TWO: THE THREE SEGMENTED ROWS **FIT**, AT EVERY SIZE IN THE MATRIX
+///
+/// This is the **new** horizontal risk on this screen, and it is specific.
+///
+/// The prototype puts each segmented control's label **beside** it (`:653`,
+/// `:671`, `:676`), but the client puts the label **above** it and the control
+/// **full width** — because at 320 the four-segment control's floor is
+/// `4 × 44px` (`:183`'s `min-width:44px`, the prototype's tap-target floor)
+/// and a 14.5px label ("Curtain shape") cannot share a row with it. That is
+/// the divergence `WorkshopSegmentRow`'s own doc records, with the arithmetic.
+///
+/// **So the claim this row makes is that the stacking WORKED**: the control
+/// stays inside its row, and every segment still gets its share of the
+/// prototype's 44px floor. Both are measured off the rendered tree — the
+/// control's rectangle against its row's, and the control's width against the
+/// number of segments the **domain enum** says there are — so a row that
+/// overflowed would be caught twice, once here and once by the framework's own
+/// overflow report.
+void _expectTheWorkshopFits(WidgetTester tester, String surface, Size size) {
+  // --- one: the page SCROLLS ----------------------------------------------
+  final Finder scrolls = find.descendant(
+    of: find.byType(SettingsPage),
+    matching: find.byType(Scrollable),
+  );
+  expect(
+    scrolls,
+    findsWidgets,
+    reason:
+        'the page has a scroll view — `NeuralScaffold` names `/settings` as one '
+        'of the three screens whose root scrolls. A page that stopped scrolling '
+        'would make the measurement below vacuous.',
+  );
+  final ScrollableState page = tester.state<ScrollableState>(scrolls.first);
+  expect(
+    page.position.maxScrollExtent,
+    greaterThan(0),
+    reason:
+        'the Workshop is 29 rows and its content is about 2960 tall, so it is '
+        'taller than the $size surface and it SCROLLS. The honest claim about '
+        'a scrolling page is that it scrolls and nothing overflows — "the page '
+        'fits" was true of the Phase-9 screen and is false of this one.',
+  );
+
+  // --- two: the three segmented rows fit ----------------------------------
+  for (final (Finder finder, int segments) in <(Finder, int)>[
+    (find.byType(SegmentedControl<CurtainShape>), CurtainShape.values.length),
+    (find.byType(SegmentedControl<SkyStarShape>), SkyStarShape.values.length),
+    (find.byType(SegmentedControl<SkyStarField>), SkyStarField.values.length),
+  ]) {
+    expect(
+      finder,
+      findsOneWidget,
+      reason:
+          'the segmented row is on the screen at $surface — a row that was not '
+          'laid out would make every measurement below vacuous.',
+    );
+
+    final Rect control = tester.getRect(finder);
+    final Finder rowFinder = find.ancestor(
+      of: finder,
+      matching: find.byType(SettingsTile),
+    );
+    expect(
+      rowFinder,
+      findsOneWidget,
+      reason:
+          'the segmented control is inside a `SettingsTile` — that row is the '
+          'box the control has to stay within, and a control with no row above '
+          'it is not a row at all.',
+    );
+    final Rect row = tester.getRect(rowFinder);
+
+    expect(
+      control.left,
+      greaterThanOrEqualTo(row.left),
+      reason:
+          'the control must stay inside its row at $surface. The label is ABOVE '
+          'the control and the control takes the row\'s full width, because at '
+          '320 the four segments\' 4 x 44px floor (the prototype\'s '
+          '`min-width:44px`, `eva/redesign.html:183`) cannot share a row with a '
+          '14.5px label. A control that spills out of its row is a horizontal '
+          'overflow.',
+    );
+    expect(
+      control.right,
+      lessThanOrEqualTo(row.right),
+      reason:
+          'and the other end of it too — the same claim, measured from the other '
+          'side, so a control that spilled only to the left would be caught as '
+          'well.',
+    );
+    expect(
+      control.width / segments,
+      greaterThanOrEqualTo(SegmentedControl.segmentMinWidth),
+      reason:
+          'each of the $segments segments gets its share of the control, and the '
+          'share has to clear the prototype\'s 44px tap-target floor '
+          '(`eva/redesign.html:183`). The client does not shrink a segment '
+          'below it — a row narrower than the floor overflows rather than fits '
+          '— so a share under 44 at $surface means the row does not fit.',
+    );
+  }
+}
 
 /// A cubit over a store that cannot be reached, for `/settings`' failure notice.
 ///

@@ -1,4 +1,5 @@
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/settings_handle.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/features/sky/data/datasources/sky_local_data_source.dart';
 import 'package:evangelion/features/sky/data/repositories/sky_repository_impl.dart';
@@ -50,7 +51,29 @@ abstract class SkyModule {
   SkyLocalDataSource get skyLocalDataSource => SkyLocalDataSource();
 
   /// The one [SkyRepository] that ships. Typed as the port; see the class doc.
+  ///
+  /// **THE CAP READER IS FED HERE, AND IT IS THE SAME READER THE CUBIT GETS.**
+  /// The sky's cap is the reader's choice — `UserSettings.starCount`, the
+  /// prototype's `starCap` (`eva/redesign.html:1131`, re-pinned at `:1512`) —
+  /// and the two writers that enforce it may not import each other: one is this
+  /// adapter and the other is `SkyCubit`'s optimistic frame, and the dependency
+  /// direction is strictly inward. **The composition root is the one place
+  /// allowed to know about both**, so it hands each writer the same reader.
+  ///
+  /// **The lookup is inside the closure, not at construction.** The handle is
+  /// registered by `configureNavigation()` — after the injector has built this
+  /// repository — so a lookup at construction would throw `StateError` for a
+  /// type that is about to exist.
+  ///
+  /// **And `settings_handle.dart` imports no Flutter**, which is what lets this
+  /// module name it: `injection_test.dart`'s "the composition root is
+  /// Flutter-free" gate walks the whole graph from `injection.dart`, and this
+  /// module is in it.
   @lazySingleton
-  SkyRepository get skyRepository =>
-      SkyRepositoryImpl(getIt<SkyLocalDataSource>());
+  SkyRepository get skyRepository => SkyRepositoryImpl(
+    getIt<SkyLocalDataSource>(),
+    // The cap the reader chose. The RULE lives in
+    // `features/sky/domain/sky_star_cap.dart`; the wiring lives here.
+    capReader: () => getIt<SettingsHandle>().settings.starCount,
+  );
 }

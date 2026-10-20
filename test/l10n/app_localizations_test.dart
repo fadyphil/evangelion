@@ -93,6 +93,30 @@ void main() {
     'leaderboardPassHint',
     'leaderboardResetsIn',
     'leaderboardCheerSent',
+    // ## AND IT IS **EMPTY** AGAIN IN TASK 5.7, WHICH IS A RESULT RATHER THAN A GAP
+    //
+    // The Workshop's language group header was the one candidate: the
+    // prototype's `wsLang` is **bilingual** — `eva/redesign.html:949` writes
+    // `language · اللغة` and `اللغة · language` — so it would have been the
+    // first member of this set that is *prose* rather than a brand mark or a
+    // MessageFormat keyword.
+    //
+    // **It is not here, because the client renders each arm in its own
+    // script.** The English-arm half of the bilingual contract is ABSOLUTE —
+    // "the English arm holds no Arabic script at all" is a separate test with
+    // no exemption list at all — and a bilingual value breaks it in both
+    // directions at once. So `settingsWsLang` keeps the prototype's first half
+    // on each arm (`language` and `اللغة`) and the pairing is a divergence
+    // recorded in that key's own ARB description and at the group header.
+    //
+    // **THE SEVEN UNTRANSLATED SEGMENT LABELS ARE NOT HERE EITHER**, and that
+    // is the point of them being widget literals: `dot`/`star`/`cross`/`gem`
+    // and `crown`/`high`/`full` (`eva/redesign.html:673`, `:678`) carry no
+    // `data-i18n` in the prototype and are kept as its own untranslated
+    // English. Putting them in the ARB would have forced them into
+    // `mustBeIdentical` — the set that catches an untranslated string — and
+    // their correctness on the Arabic arm is asserted where they are painted:
+    // `arabic_typography_test.dart`'s `/settings` group.
   };
 
   /// The keys whose two values are **identical**, and must stay identical.
@@ -121,12 +145,19 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        147,
+        178,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**147 → 180 → 178 in Task 5.7**, for the Workshop: **forty-two** new '
+            'keys and **eleven** dead ones. The dead nine are the Phase-9 keys whose '
+            'strings the redesign does not draw — the Appearance and Reading group '
+            'labels, the three theme segments, the "Font size" row title, the '
+            '"Default language" row title and the language sheet\'s heading — and the '
+            'two more are the reduce-motion switch\'s position names, which the '
+            'Workshop\'s row-title naming made unread the same day they arrived.\n\n'
             '**146 → 147 in the Task 5.6 review pass**, for the journey\'s **own** '
             'retry key. The screen was borrowing `leaderboardRetry`, and the '
             'repository namespaces `retry` per screen on purpose — '
@@ -345,27 +376,39 @@ void main() {
       // exactly one of the two markers, and the `WRITTEN` ones must name the prototype
       // line they are working around.
       const Map<String, String> written = <String, String>{
-        'settingsFontScale': 'SettingsScreen.tsx:66',
-        'settingsDecreaseFontSize': 'SettingsScreen.tsx:66',
-        'settingsIncreaseFontSize': 'SettingsScreen.tsx:66',
-        'settingsReduceMotion': 'no motion row',
-        'settingsMotionOn': 'EvaToggle',
-        'settingsMotionOff': 'EvaToggle',
-        'settingsLanguageSheetTitle': 'SettingsScreen.tsx:77',
-        'settingsLanguageEnglish': 'SettingsScreen.tsx:88',
-        // Both added in Phase 10, and both are working around the same absence:
-        // `SettingsScreen.tsx` cannot fail, because every value on it is a
-        // `useState` in a file with no data layer, so the prototype has no error
-        // state and nothing to transcribe. `settingsRetry` carries the same words the
-        // *other three* retry keys carry for the same reason — see `homeRetry`.
+        // ## THE SIX WRITTEN KEYS, AND EACH ONE NAMES WHAT THE PROTOTYPE LACKED
         //
-        // The phrase is `no error state` rather than `no data layer` because that is
-        // what the two descriptions actually say, and the assertion below is a
-        // substring match on the description. It is deliberately strict: a `written`
-        // entry that drifts from the wording it is checking is a manifest that no
-        // longer describes anything, which is the failure this test exists to catch.
-        'settingsPreferencesUnavailable': 'no error state',
-        'settingsRetry': 'no error state',
+        // **Three of them are the stepper's own three strings**, and they are
+        // written because the redesign's Type-size row is a range input with no
+        // accessible name: `eva/redesign.html:693` draws
+        // `<input type="range" min="16" max="26" value="20">` and names it
+        // nowhere. §14's first row applied to a control the row does not name.
+        'settingsFontScale': 'eva/redesign.html:693',
+        'settingsDecreaseFontSize': 'eva/redesign.html:693',
+        'settingsIncreaseFontSize': 'eva/redesign.html:693',
+        // **One of them is the language segment's name.** The redesign's
+        // segment (`:646-648`) has no name of its own, and the group header
+        // above it is a *bilingual* label that would read as
+        // `language · language` aloud.
+        //
+        // **And two of them are the failure notice's two strings**, which have
+        // no prototype line at all because the redesign draws no failure state.
+        //
+        // **AND TWO MORE WERE WRITTEN AND THEN REMOVED IN THE SAME TASK.** The
+        // reduce-motion switch's position names (`settingsMotionOn` /
+        // `settingsMotionOff`) were written for the same reason — the redesign
+        // draws a bare checkbox (`:687`) with no position words — and then
+        // **deleted**, because the Workshop names every switch by its **row
+        // title** in both arms: the control's own name, with
+        // `Semantics(toggled:)` carrying the state. A position name that
+        // changed with the switch would have named the control by something
+        // other than what it is. `EvaToggle`'s `EvaToggleLabels` is still
+        // required, so the screen passes the row title in both arms, and those
+        // two keys are read by nothing. **A key nobody reads is a key a
+        // translator will translate for a screen that does not exist.**
+        'settingsLanguageLabel': 'eva/redesign.html:646-648',
+        'settingsPreferencesUnavailable': 'no failure state',
+        'settingsRetry': 'no failure state',
       };
       final List<String> keys = keysOf(
         en,
@@ -373,13 +416,18 @@ void main() {
 
       expect(
         keys,
-        hasLength(23),
+        hasLength(54),
         reason:
             'the /settings ARB surface. This is a declared count so that a dropped '
             'key is a failure rather than a smaller green, exactly as the file-level '
-            'count is above. **21 → 23 in Phase 10**, for the failure notice; the '
-            'two added keys are in the `written` map above with the reason they were '
-            'invented.',
+            'count is above. **23 → 56 → 54 in Task 5.7**, for the Workshop: the '
+            'redesign\'s seven groups, twenty-nine controls, one action row, one '
+            'preview and two about rows. Nine Phase-9 keys died with the controls '
+            'they named (the Appearance and Reading group labels, the three theme '
+            'segments, the "Font size" row title, the "Default language" row title '
+            'and the language sheet\'s heading), forty-two new ones arrived, and '
+            '**two of the new ones died the same day** — the reduce-motion switch\'s '
+            'position names, which the Workshop\'s row-title naming made unread.',
       );
 
       final List<String> unmarked = <String>[];
@@ -476,19 +524,70 @@ void main() {
         'homeVerses': 'redesign.html:966',
         'homeDays': 'redesign.html:925',
         // Phase 9, `/settings`. The full citation list, one per transcribed key.
-        'settingsTitle': 'SettingsScreen.tsx:43',
-        'settingsBack': 'SettingsScreen.tsx:39',
-        'settingsAppearance': 'SettingsScreen.tsx:47',
-        'settingsTheme': 'SettingsScreen.tsx:50',
-        'settingsThemeLight': 'SettingsScreen.tsx:52',
-        'settingsThemeDark': 'SettingsScreen.tsx:52',
-        'settingsThemeSystem': 'SettingsScreen.tsx:52',
-        'settingsFontSize': 'SettingsScreen.tsx:62',
-        'settingsReading': 'SettingsScreen.tsx:70',
-        'settingsDefaultLanguage': 'SettingsScreen.tsx:76',
-        'settingsLanguageArabic': 'SettingsScreen.tsx:88',
-        'settingsAbout': 'SettingsScreen.tsx:107',
-        'settingsVersion': 'SettingsScreen.tsx:115',
+        // ## TASK 5.7's WORKSHOP — **FORTY-EIGHT ROWS, EVERY ONE A `redesign.html`
+        // ## LINE**, and the count is the point
+        //
+        // The redesign's `#rSettings` is `eva/redesign.html:638-700` and its
+        // `I18N` table is `:924-977`. Every row below is a line the client
+        // painted from, and each one is the **markup** line rather than the
+        // `I18N` line — the markup is what a reader sees, and the two disagree
+        // in two places (`Brightness` is `glow` in the table at `:953` and
+        // `Brightness` in the markup at `:659`; `about` is `wsAbout` in the
+        // table at `:949` and the markup at `:696`).
+        //
+        // **The nine Phase-9 entries that died** are gone rather than
+        // re-pointed, because the strings they named are gone: the Appearance
+        // and Reading group labels, the three theme segments, the "Font size"
+        // row title, the "Default language" row title and the language sheet's
+        // heading. The redesign draws none of them.
+        'settingsTitle': 'redesign.html:641',
+        'settingsBack': 'redesign.html:640',
+        'settingsWsLang': 'redesign.html:645',
+        'settingsThemeGroup': 'redesign.html:649',
+        'settingsDaylight': 'redesign.html:650',
+        'settingsWsLight': 'redesign.html:651',
+        'settingsShaderEngine': 'redesign.html:652',
+        'settingsCurtainShape': 'redesign.html:653',
+        'settingsCurtainTop': 'redesign.html:655',
+        'settingsCurtainBottom': 'redesign.html:655',
+        'settingsCurtainSides': 'redesign.html:655',
+        'settingsCurtainShafts': 'redesign.html:655',
+        'settingsReach': 'redesign.html:658',
+        'settingsBrightness': 'redesign.html:659',
+        'settingsTouchGlow': 'redesign.html:660',
+        'settingsHue': 'redesign.html:661',
+        'settingsMultichromeMelt': 'redesign.html:662',
+        'settingsRayCombing': 'redesign.html:663',
+        'settingsWhiteCores': 'redesign.html:664',
+        'settingsDotVeil': 'redesign.html:665',
+        'settingsSkyGroup': 'redesign.html:666',
+        'settingsStars': 'redesign.html:667',
+        'settingsConstellations': 'redesign.html:668',
+        'settingsStarCount': 'redesign.html:669',
+        'settingsStarBrightness': 'redesign.html:670',
+        'settingsStarShape': 'redesign.html:671',
+        'settingsStarField': 'redesign.html:676',
+        'settingsTwinkle': 'redesign.html:681',
+        'settingsRitualGroup': 'redesign.html:682',
+        'settingsFocusDelay': 'redesign.html:683',
+        'settingsSelahLength': 'redesign.html:684',
+        'settingsBreathGuide': 'redesign.html:685',
+        'settingsVespersAutoDim': 'redesign.html:686',
+        'settingsReduceMotion': 'redesign.html:687',
+        'settingsCalmMotion': 'redesign.html:688',
+        'settingsHaptics': 'redesign.html:689',
+        'settingsCommunionGroup': 'redesign.html:690',
+        'settingsVeilWitnesses': 'redesign.html:691',
+        'settingsShowPodium': 'redesign.html:692',
+        'settingsTypeSize': 'redesign.html:693',
+        'settingsRestoreDefaults': 'redesign.html:695',
+        'settingsRestored': 'redesign.html:975',
+        'settingsAbout': 'redesign.html:696',
+        'settingsShaders': 'redesign.html:697',
+        'settingsTokens': 'redesign.html:698',
+        'settingsVersion': 'redesign.html:642',
+        'settingsLanguageEnglish': 'redesign.html:647',
+        'settingsLanguageArabic': 'redesign.html:647',
         'quizCheckAnswer': 'QuizScreen.tsx:127',
         // **`quizNextQuestion` left this map in Task 5.4, and the departure is the
         // claim.** Its value is no longer the superseded prototype's

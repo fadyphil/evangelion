@@ -1,5 +1,6 @@
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
+import 'package:flutter/widgets.dart';
 
 /// The settings feature's derived strings.
 ///
@@ -56,8 +57,8 @@ import 'package:evangelion/l10n/app_localizations.dart';
 ///    repository's own gate: transliterating would have required arguing for an
 ///    exception to the "no English left in the Arabic arm" test.
 /// 2. **This file therefore introduces no tofu and needs no `arabicAware` of its
-///    own** — the widgets that render it do that (`_LanguageRow` and `SettingsPage`
-///    both take the ambient family).
+///    own** — the widgets that render it do that (the language segment and the
+///    screen's own rows both take the ambient family).
 extension SettingsLanguageName on AppLocalizations {
   /// The name [language]'s own speakers use for it.
   String languageLabelFor(ReadingLanguage language) => switch (language) {
@@ -65,3 +66,38 @@ extension SettingsLanguageName on AppLocalizations {
     ReadingLanguage.arabic => settingsLanguageArabic,
   };
 }
+
+/// The language on screen right now, for **a control's own selected value**.
+///
+/// ## THIS IS NOT THE CUBIT'S ANSWER, AND THE DIFFERENCE IS THE WHOLE OF IT
+///
+/// `UserSettings.language` is `null` until the reader chooses — `null` meaning
+/// "follow the platform". So on a fresh install on an Arabic device the cubit holds
+/// `null` while the app renders Arabic, and a control that read `language` directly
+/// would show **no selection** on a screen that is entirely in Arabic.
+///
+/// The resolution is to ask the question the control is actually asking — "which
+/// language am I looking at?" — and `MaterialApp.locale` already holds the answer,
+/// because `app.dart` resolves it from `UserSettings.language` *or* leaves it null
+/// for the platform. So:
+///
+/// | stored | app renders | this returns |
+/// | --- | --- | --- |
+/// | `null` | `en` (platform) | `english` |
+/// | `null` | `ar` (platform) | `arabic` |
+/// | `arabic` | `ar` | `arabic` |
+/// | `english` | `en` | `english` |
+///
+/// `ReadingLanguage.forLocale` is the function, and its own doc names the fallback as
+/// the same one `gen_l10n` makes "for a widget pumped outside a `MaterialApp`, which
+/// several suites do" — which is exactly the case this function has to survive.
+///
+/// ## WHY IT LIVES **HERE** AND NOT IN THE WIDGETS DIRECTORY
+///
+/// It used to live in `widgets/language_sheet.dart`, and that file is **gone** —
+/// the redesign's language control is a 2-segment track
+/// (`eva/redesign.html:646-648`) and not a sheet. The function is a **fact about
+/// the arm**, and this file is the settings feature's derived-facts file; a
+/// widget file is a place a fact has to be looked for.
+ReadingLanguage selectedLanguageOf(BuildContext context) =>
+    ReadingLanguage.forLocale(Localizations.localeOf(context).languageCode);

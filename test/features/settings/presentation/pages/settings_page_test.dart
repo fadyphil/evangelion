@@ -1,536 +1,525 @@
 import 'dart:io';
-import 'dart:ui' show Tristate;
 
-import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/common/app_config.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+// `CurtainShape` is hidden from the barrel because the design system has one
+// too — `NeuralScaffold`'s scrim ramp — and this screen's is the aurora's.
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/settings_repository.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
-import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
-import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
-import 'package:evangelion/features/settings/presentation/widgets/language_sheet.dart';
-
-import 'package:evangelion/l10n/app_localizations_ar.dart';
+import 'package:evangelion/features/settings/presentation/widgets/workshop_restore_toast.dart';
+import 'package:evangelion/features/settings/presentation/workshop_logic.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../../support/design_system_harness.dart';
 import '../../../../support/settings_harness.dart';
 
-/// `/settings` — what is on screen, in both arms.
+/// `/settings` — **the Workshop** — the screen suite.
 ///
-/// ## WHAT IS ASSERTED HERE AND WHAT IS **NOT**
+/// ## WHAT THIS FILE IS, AND WHAT IT IS **NOT**
 ///
-/// This file is about the **rendered tree**: which groups, which controls, which
-/// strings, and which widget *types*. It is not about the app-wide consequences of a
-/// tap — `test/app/app_settings_wiring_test.dart` owns "the palette reached every
-/// screen", `test/core/domain/repositories/settings_repository_test.dart` owns "the
-/// value survived a restart", and this file owns "the control that does it is on the
-/// screen and is the shared widget".
+/// It is the screen's **composition** suite: the claims that are about the page
+/// as a whole rather than about one control. Four of them are the brief's own:
+///
+/// 1. the **seven group headers, in the prototype's DOM order**;
+/// 2. the **restore row** — that it is tappable, that it resets the prototype's
+///    twenty-three fields, and that it leaves the prototype's six alone;
+/// 3. the **toast** — that it is raised, that it lasts the prototype's 1800ms,
+///    and that it is **not** raised when the write fails;
+/// 4. the **version chip** — that it carries the app's real version, and that
+///    the constant is pinned to `pubspec.yaml`.
+///
+/// **It is not the screen's own suite.** `workshop_page_test.dart` holds the
+/// smoke test — that the page builds, that every row writes, and that the
+/// Daylight toggle narrows — and the four widget suites beside it hold each
+/// widget's own contract. This file is deliberately narrow so that the two do
+/// not overlap, and every claim here is one the other file cannot see.
+///
+/// ## AND WHY THE **ORDER** IS A CLAIM AND NOT A FORMATTING DETAIL
+///
+/// The redesign's DOM order **is** the order, and the order is what a reader
+/// reads: the language, then the palette, then the light, then the sky, then
+/// the ritual, then the communion, then the about. A screen that kept all seven
+/// groups and moved one of them would pass every "the seven headers are there"
+/// assertion in the repository — and the screen's own suite has exactly such an
+/// assertion, which is why this file adds the one it cannot make.
 void main() {
-  group('the three groups, and their order', () {
-    testWidgets('Appearance, Reading, About — the prototype\'s own order', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
+  final AppLocalizationsEn strings = AppLocalizationsEn();
 
-      expect(find.byType(SettingsGroup), findsNWidgets(3));
-      // **UPPERCASED**, because `EvaSectionHeader` transcribes
-      // `SettingsScreen.tsx:29`'s `textTransform: 'uppercase'` in Dart, which Flutter
-      // has no equivalent for. Asserting the ARB value here would be asserting a
-      // string the screen deliberately does not draw — and the section labels are the
-      // one place where the prototype's casing is a *rendering* rule rather than a
-      // data field.
-      expect(find.text('APPEARANCE'), findsOneWidget);
-      expect(find.text('READING'), findsOneWidget);
-      expect(find.text('ABOUT'), findsOneWidget);
-      expect(
-        find.text('SettingsGroup'),
-        findsNothing,
-        reason: 'anti-vacuity: the class is not named as a string anywhere',
-      );
-    });
-
-    testWidgets('and the group labels are in paint order, top to bottom', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
-
-      final List<double> tops = <double>[
-        for (final String label in <String>['APPEARANCE', 'READING', 'ABOUT'])
-          tester.getTopLeft(find.text(label)).dy,
-      ];
-      expect(
-        tops,
-        orderedEquals(<double>[...tops]..sort()),
-        reason: 'Appearance above Reading above About',
-      );
-    });
-
-    testWidgets('the cut rows are genuinely ABSENT, not drawn inert', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
-      final AppLocalizationsEn strings = AppLocalizationsEn();
-
-      // The prototype's fourth group and its four rows. Each one has a reason recorded
-      // on `SettingsPage`; this is the assertion that the reasons were acted on rather
-      // than the rows being shipped disabled.
-      expect(find.text('ACCOUNT'), findsNothing, reason: 'and uppercased');
-      expect(find.text('Edit profile'), findsNothing);
-      expect(find.text('Change password'), findsNothing);
-      expect(find.text(strings.settingsVersion), findsOneWidget);
-      expect(
-        find.text('Privacy policy'),
-        findsNothing,
-        reason:
-            'a legal document with no URL and no screen. An inert row that answers '
-            '"unavailable in this build" is worse than no row at all.',
-      );
-      expect(
-        find.text(strings.settingsReduceMotion),
-        findsOneWidget,
-        reason:
-            'and the one row the prototype does NOT have is here — it is the debt '
-            '`app.dart` recorded in its own words',
-      );
-    });
-  });
-
-  group('`SettingsGroup` and the screen share the IDENTICAL `SegmentedControl`', () {
-    // ## THE PLAN'S VERIFICATION, AND WHY IT IS A TYPE IDENTITY
+  group('the seven groups, in the prototype\'s DOM order', () {
+    // ## THE SEVEN HEADERS, AND THE ORDER THEY ARE IN
     //
-    // "SettingsGroup and the settings screen share the identical SegmentedControl
-    // instance type." Two look-alike classes would satisfy every behavioural
-    // assertion in this file — same keyboard model, same semantics, same goldens — and
-    // satisfy it by being two implementations of one idea, which is the defect this
-    // repository has already paid for in `qa`/`santa` shape ("a name-checker with
-    // false positives"). So the assertion is on the **runtime type** of the widget the
-    // tree actually holds, read off the element.
+    // `eva/redesign.html:645`, `:649`, `:651`, `:666`, `:682`, `:690`, `:696` —
+    // and `SettingsGroup`'s own doc says "**seven** of them", which is now true
+    // of this screen.
+    //
+    // **The order is asserted twice, and the two assertions are independent.**
+    // The first reads the tree — the seven `SettingsGroup`s in the order the
+    // page composed them, which is the claim. The second reads the **geometry**
+    // — the seven labels' `dy`, which is what a reader sees, and which is what
+    // a `Column` that reordered its children would fail. One of them alone would
+    // be enough; both together are what makes a reordering visible rather than
+    // merely arguable.
     testWidgets(
-      'the theme control is the barrel\'s `SegmentedControl<AppThemeMode>`',
+      'the seven headers, above one another, in the prototype\'s order',
       (WidgetTester tester) async {
         await pumpSettings(tester);
 
-        expect(find.byType(SegmentedControl<AppThemeMode>), findsOneWidget);
-        // **The failing direction is the same line**: a second, private `SegmentedControl`
-        // in `features/settings/` would satisfy nothing here, because the barrel's generic
-        // type is not what the tree would hold.
+        final List<String> expected = <String>[
+          strings.settingsWsLang,
+          strings.settingsThemeGroup,
+          strings.settingsWsLight,
+          strings.settingsSkyGroup,
+          strings.settingsRitualGroup,
+          strings.settingsCommunionGroup,
+          strings.settingsAbout,
+        ];
+
+        expect(find.byType(SettingsGroup), findsNWidgets(7));
         expect(
           tester
-              .widget(find.byType(SegmentedControl<AppThemeMode>))
-              .runtimeType,
-          SegmentedControl<AppThemeMode>,
+              .widgetList<SettingsGroup>(find.byType(SettingsGroup))
+              .map((SettingsGroup group) => group.label),
+          expected,
+          reason:
+              'the tree order is the DOM order: `eva/redesign.html:645`, `:649`, '
+              '`:651`, `:666`, `:682`, `:690`, `:696`',
         );
-        // And no other `SegmentedControl` at all, so the "identical instance type" claim
-        // is not satisfied by two instances of two types.
-        expect(find.byType(SegmentedControl<Object>), findsNothing);
+
+        // **The geometry**, and the labels are **uppercased** because
+        // `EvaSectionHeader` transcribes `SettingsScreen.tsx:29`'s
+        // `textTransform: 'uppercase'` in Dart, which Flutter has no equivalent
+        // for.
+        final List<double> tops = <double>[
+          for (final String label in expected)
+            tester.getTopLeft(find.text(label.toUpperCase())).dy,
+        ];
+        expect(
+          tops,
+          orderedEquals(<double>[...tops]..sort()),
+          reason:
+              'each header is above the next one. The order of the groups is the '
+              'one claim a "the seven headers are on screen" assertion cannot make.',
+        );
       },
     );
 
-    testWidgets('and it carries the barrel\'s own constants, not copies', (
+    // ## AND THE **TWENTY-NINE** CONTROLS, COUNTED
+    //
+    // The brief's inventory: 29 interactive controls, one action row, one
+    // preview line and two static rows. The screen's own suite proves that the
+    // fifteen switches it names write; this counts **all** of them, so a row
+    // that stopped being drawn would move the number rather than quietly
+    // reduce the screen.
+    testWidgets('and twenty-nine interactive controls, of four kinds', (
       WidgetTester tester,
     ) async {
       await pumpSettings(tester);
 
-      final SegmentedControl<AppThemeMode> control = tester.widget(
-        find.byType(SegmentedControl<AppThemeMode>),
-      );
-      expect(
-        control.values,
-        AppThemeMode.values,
-        reason:
-            'the theme picker is the prototype\'s three options in the prototype\'s '
-            'order, and `AppThemeMode.values` is where that list lives',
-      );
-      expect(control.selected, AppThemeMode.dark);
-      // ## RE-POINTED IN PHASE 4.2, AND THE CLAIM DID NOT WEAKEN
-      //
-      // This was `8` — `SettingsScreen.tsx:51`'s `borderRadius: 8`, the React
-      // prototype's number. `redesign.html:178` replaces it with
-      // `border-radius:999px`, and `SegmentedControl.trackRadius` is now
-      // [EvaRadii.chip], which is that. The assertion's *subject* is unchanged
-      // and is the point of the test: the screen must read the **barrel's own**
-      // constant, not a copy of it. Spelling `8` here made this a second source
-      // of truth that would have had to be edited in lockstep with the widget —
-      // and it was, in fact, missed by the whole first pass of the restyle,
-      // because nothing on the feature side was looking at it.
-      //
-      // So it now asserts the token by name. A copy (`999` written out) would
-      // satisfy the number and not the claim, which is exactly the defect this
-      // group exists to catch.
-      expect(SegmentedControl.trackRadius, EvaRadii.chip);
-      expect(
-        EvaRadii.chip,
-        999.0,
-        reason: '`redesign.html:178` — `border-radius:999px`',
-      );
-    });
-
-    testWidgets('a tap on a segment writes the setting', (
-      WidgetTester tester,
-    ) async {
-      final SettingsCubit cubit = await pumpSettings(tester);
-
-      await tester.tap(find.text('LIGHT'));
-      await tester.pump();
-
-      expect(
-        cubit.state.settings.themeMode,
-        AppThemeMode.light,
-        reason:
-            'the picker is a **controlled** component — it reports and the caller feeds '
-            'the value back — so the control moving and the setting changing are two '
-            'claims and this is the second',
-      );
-    });
-  });
-
-  group('the font stepper is the shared widget, and it writes through', () {
-    testWidgets('it is `FontSizeStepper`, sitting on the stored step', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester, stored: const UserSettings(fontStep: 5));
-
+      // The sixteen switches: the Daylight toggle, the ten light-workshop and
+      // sky switches, the five ritual switches and the two communion ones.
+      expect(find.byType(EvaToggle), findsNWidgets(16));
+      // The eight sliders.
+      expect(find.byType(EvaRangeSlider), findsNWidgets(8));
+      // The four segmented controls — one per generic type, because
+      // `find.byType` compares the **runtime** type and a
+      // `SegmentedControl<Object>` matches none of them.
+      expect(find.byType(SegmentedControl<ReadingLanguage>), findsOneWidget);
+      expect(find.byType(SegmentedControl<CurtainShape>), findsOneWidget);
+      expect(find.byType(SegmentedControl<SkyStarShape>), findsOneWidget);
+      expect(find.byType(SegmentedControl<SkyStarField>), findsOneWidget);
+      // The one stepper.
       expect(find.byType(FontSizeStepper), findsOneWidget);
-      final FontSizeStepper stepper = tester.widget(
-        find.byType(FontSizeStepper),
-      );
-      expect(stepper.step, 5);
-      expect(
-        stepper.labels.track,
-        AppLocalizationsEn().settingsFontScale,
-        reason:
-            'the labels are the app\'s strings, not the design system\'s defaults — '
-            '`FontSizeStepperLabels` has no defaults precisely so this cannot regress',
-      );
-    });
-
-    testWidgets('the increment writes, and the stepper follows the setting', (
-      WidgetTester tester,
-    ) async {
-      final SettingsCubit cubit = await pumpSettings(
-        tester,
-        stored: const UserSettings(),
-      );
-
-      await tester.tap(find.byIcon(Icons.add).first);
-      await tester.pump();
-
-      expect(cubit.state.settings.fontStep, 4);
-      expect(
-        tester.widget<FontSizeStepper>(find.byType(FontSizeStepper)).step,
-        4,
-        reason:
-            'the widget reads its `step` from the cubit, so the knob cannot sit at a '
-            'position the setting does not own',
-      );
-    });
-
-    testWidgets('and a corrupt stored step renders as the top of the table', (
-      WidgetTester tester,
-    ) async {
-      // A stored `99` reaches the page because `SettingsCubit` clamps on load; the
-      // stepper then shows 5 rather than a knob past the end of the track.
-      final SettingsCubit cubit = await pumpSettings(
-        tester,
-        stored: const UserSettings(fontStep: 5),
-      );
-      expect(cubit.state.settings.fontStep, kFontStepMax);
-      expect(
-        tester.widget<FontSizeStepper>(find.byType(FontSizeStepper)).step,
-        kFontStepMax,
-      );
     });
   });
 
-  group('the reduce-motion switch is the shared widget, with LOCALISED labels', () {
-    testWidgets('`EvaToggle` is on screen and its labels are the ARB strings', (
+  group('the restore row', () {
+    // ## IT IS THE **ONLY** TAPPABLE ROW
+    //
+    // `eva/redesign.html:695` is a `.srow` **without** `style="cursor:default"`
+    // — every other row in the markup carries it, and this one does not. The
+    // prototype's own handler is bound to the row (`:1499`), so the row is the
+    // control.
+    //
+    // **The claim is "only", not "tappable".** A screen that made every row
+    // tappable would satisfy a test that only looked for one tappable row, and
+    // it would be a worse screen: twenty-nine rows that answer a tap with
+    // nothing.
+    testWidgets('it is the only tappable row on the screen', (
       WidgetTester tester,
     ) async {
       await pumpSettings(tester);
 
-      expect(find.byType(EvaToggle), findsOneWidget);
-      // **Field by field, not `expect(labels, labels)`.** `EvaToggleLabels` is a
-      // plain `@immutable` value object with no `==` — `FontSizeStepperLabels`
-      // beside it is the same — so an object comparison here is an **identity**
-      // comparison and would be red even with the strings agreeing. The fields are
-      // the assertion.
-      final EvaToggleLabels labels = tester
-          .widget<EvaToggle>(find.byType(EvaToggle))
-          .labels;
-      expect(labels.on, AppLocalizationsEn().settingsMotionOn);
-      expect(labels.off, AppLocalizationsEn().settingsMotionOff);
-      expect(labels.on, 'On');
-      expect(labels.off, 'Off');
+      final List<SettingsTile> tappable = <SettingsTile>[
+        for (final SettingsTile tile in tester.widgetList<SettingsTile>(
+          find.byType(SettingsTile),
+        ))
+          if (tile.onTap != null) tile,
+      ];
+
+      expect(
+        tappable,
+        hasLength(1),
+        reason:
+            '`:695` is the one `.srow` without `cursor:default`. Every other row '
+            'is inert, and a row that answers a tap with nothing is a control '
+            'that lies.',
+      );
+      expect(tappable.single.title, strings.settingsRestoreDefaults);
     });
 
-    testWidgets(
-      'and on the ARABIC arm they are Arabic, not the English defaults',
-      (WidgetTester tester) async {
-        // ## THE DEFECT THIS CLOSES, AND WHY NOTHING CAUGHT IT FOR SIX PHASES
-        //
-        // `EvaToggle` published `Semantics(label: value ? 'On' : 'Off')` — two English
-        // words on both arms. No gate could see it: a semantics label is not painted, the
-        // Arabic glyph gate walks the **painted** tree, and a golden captures no
-        // semantics. It became visible only because Phase 9 built the screen the switch
-        // ships on.
-        await pumpSettings(tester, locale: const Locale('ar'));
+    // ## AND IT RESETS THE PROTOTYPE'S **TWENTY-THREE**
+    //
+    // The brief's D9.1 table, field by field, each with the prototype's own
+    // line. **Every one is seeded away from its default**, so the assertion is
+    // "the reset happened" and not "the field was already at its default" —
+    // which is the failure mode a harness that seeds nothing would have.
+    testWidgets('it restores the twenty-three fields the prototype restores', (
+      WidgetTester tester,
+    ) async {
+      final SettingsCubit cubit = await pumpSettings(
+        tester,
+        stored: const UserSettings(
+          shaderEnabled: false,
+          curtainShape: CurtainShape.shafts,
+          reach: 100,
+          glow: 40,
+          touchGlow: 0,
+          hue: 100,
+          multichromeMelt: true,
+          rayCombing: false,
+          whiteCores: false,
+          dotVeil: true,
+          starsOn: false,
+          constellationsOn: false,
+          starCount: 10,
+          starBrightness: 30,
+          starShape: SkyStarShape.diamond,
+          starField: SkyStarField.full,
+          twinkle: false,
+          focusDelaySec: 10,
+          selahLengthSec: 20,
+          breathGuide: false,
+          vespersAutoDim: false,
+          veilWitnesses: true,
+          showPodium: false,
+        ),
+      );
 
-        final EvaToggleLabels arabic = tester
-            .widget<EvaToggle>(find.byType(EvaToggle))
-            .labels;
-        expect(arabic.on, AppLocalizationsAr().settingsMotionOn);
-        expect(arabic.off, AppLocalizationsAr().settingsMotionOff);
-        expect(arabic.on, isNot('On'));
-        expect(arabic.off, isNot('Off'));
-        expect(
-          arabic.on,
-          isNot(matches(RegExp('[A-Za-z]'))),
-          reason:
-              'no Latin script on the Arabic arm at all, which is why '
-              'the Arabic arm carries no Latin script here, which is why the ARB '
-              "test's `latinIsCorrect` exception list does not grow",
-        );
-      },
-    );
+      // ## THE SEED **REACHED THE STORE**
+      //
+      // **Without this the whole test is vacuous.** A harness that seeded
+      // nothing would leave every field at its **default**, and the reset's
+      // answer is the default — so the assertion below would pass with the
+      // restore deleted. Asserting the pre-reset state is the **seeded** value
+      // is what makes the reset observable at all.
+      expect(
+        cubit.state.settings.reach,
+        100,
+        reason:
+            'the harness seeds the store, and the store is what the cubit read. '
+            'A seed that did not reach it would leave every field at its default '
+            'and make the reset a no-op that looks like a pass.',
+      );
+      expect(cubit.state.settings.curtainShape, CurtainShape.shafts);
+      expect(cubit.state.settings.veilWitnesses, isTrue);
 
-    testWidgets('a tap writes the preference', (WidgetTester tester) async {
-      final SettingsCubit cubit = await pumpSettings(tester);
+      await _tapRestore(tester);
 
-      await tester.tap(find.byType(EvaToggle));
-      await tester.pump();
+      final UserSettings after = cubit.state.settings;
+      // **A map, not a whole-object comparison.** `freezed` derives `==` from
+      // the constructor, so `expect(after, const UserSettings(...))` would
+      // answer "some field differs" and name none of them. A map names the
+      // field that differs, and the table beside it is the brief's D9.1.
+      expect(
+        <String, Object>{
+          'shaderEnabled': after.shaderEnabled,
+          'curtainShape': after.curtainShape,
+          'reach': after.reach,
+          'glow': after.glow,
+          'touchGlow': after.touchGlow,
+          'hue': after.hue,
+          'multichromeMelt': after.multichromeMelt,
+          'rayCombing': after.rayCombing,
+          'whiteCores': after.whiteCores,
+          'dotVeil': after.dotVeil,
+          'starsOn': after.starsOn,
+          'constellationsOn': after.constellationsOn,
+          'starCount': after.starCount,
+          'starBrightness': after.starBrightness,
+          'starShape': after.starShape,
+          'starField': after.starField,
+          'twinkle': after.twinkle,
+          'focusDelaySec': after.focusDelaySec,
+          'selahLengthSec': after.selahLengthSec,
+          'breathGuide': after.breathGuide,
+          'vespersAutoDim': after.vespersAutoDim,
+          'veilWitnesses': after.veilWitnesses,
+          'showPodium': after.showPodium,
+        },
+        <String, Object>{
+          // `:1500` … `:1523`.
+          'shaderEnabled': true,
+          'curtainShape': CurtainShape.top,
+          'reach': 42,
+          'glow': 100,
+          'touchGlow': 55,
+          'hue': 312,
+          'multichromeMelt': false,
+          'rayCombing': true,
+          'whiteCores': true,
+          'dotVeil': false,
+          'starsOn': true,
+          'constellationsOn': true,
+          'starCount': 44,
+          'starBrightness': 100,
+          'starShape': SkyStarShape.dot,
+          'starField': SkyStarField.crown,
+          'twinkle': true,
+          'focusDelaySec': 4,
+          'selahLengthSec': 60,
+          'breathGuide': true,
+          'vespersAutoDim': true,
+          'veilWitnesses': false,
+          'showPodium': true,
+        },
+      );
+    });
 
+    // ## AND IT LEAVES THE PROTOTYPE'S **SIX**
+    //
+    // D9.2. The set is **not** empty, and two of its members are **new**
+    // fields — `calmMotion` and `haptics` — which the prototype's handler
+    // deliberately leaves alone.
+    testWidgets('and it leaves the six the prototype leaves alone', (
+      WidgetTester tester,
+    ) async {
+      final SettingsCubit cubit = await pumpSettings(
+        tester,
+        stored: const UserSettings(
+          language: ReadingLanguage.arabic,
+          themeMode: AppThemeMode.light,
+          fontStep: 5,
+          reducedMotion: true,
+          calmMotion: true,
+          haptics: false,
+        ),
+      );
+
+      // ## THE SEED **REACHED THE STORE**
+      //
+      // The same reason as the reset test above: the "left alone" claim is
+      // only a claim if the six fields were **not** already at the values the
+      // restore leaves them at.
+      expect(cubit.state.settings.language, ReadingLanguage.arabic);
+      expect(cubit.state.settings.themeMode, AppThemeMode.light);
+      expect(cubit.state.settings.fontStep, 5);
       expect(cubit.state.settings.reducedMotion, isTrue);
-      expect(tester.widget<EvaToggle>(find.byType(EvaToggle)).value, isTrue);
-    });
-  });
+      expect(cubit.state.settings.calmMotion, isTrue);
+      expect(cubit.state.settings.haptics, isFalse);
 
-  group('the language row and its sheet', () {
-    testWidgets('the row shows the CURRENT language as a name', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
+      await _tapRestore(tester);
+
+      final UserSettings after = cubit.state.settings;
       expect(
-        find.text(
-          AppLocalizationsEn().languageLabelFor(ReadingLanguage.english),
-        ),
-        findsOneWidget,
+        <String, Object?>{
+          'language': after.language,
+          'themeMode': after.themeMode,
+          'fontStep': after.fontStep,
+          'reducedMotion': after.reducedMotion,
+          'calmMotion': after.calmMotion,
+          'haptics': after.haptics,
+        },
+        <String, Object?>{
+          // `:1499-1525` touches none of them.
+          'language': ReadingLanguage.arabic,
+          // The prototype DOES reset the daylight (`:1501`) and this client does
+          // **not** — the three-state `themeMode` is an existing reader choice.
+          'themeMode': AppThemeMode.light,
+          'fontStep': 5,
+          'reducedMotion': true,
+          // `calmMotion` and `haptics` are **new** fields the prototype still
+          // leaves alone, because they are comfort choices.
+          'calmMotion': true,
+          'haptics': false,
+        },
       );
     });
 
-    testWidgets(
-      'and it names the PLATFORM language when the reader has not chosen',
-      (WidgetTester tester) async {
-        // `UserSettings.language` is `null` for "follow the platform", and the row's
-        // trailing is `selectedLanguageOf(context)` — the *rendered* language. On an
-        // Arabic device with no stored choice the row must read Arabic, or a screen that
-        // is entirely Arabic shows an empty selection.
-        await pumpSettings(tester, locale: const Locale('ar'));
-
-        expect(
-          find.text(
-            AppLocalizationsAr().languageLabelFor(ReadingLanguage.arabic),
-          ),
-          findsOneWidget,
-          reason: 'the Arabic device\'s language, not the entity default',
-        );
-        expect(
-          selectedLanguageOf(tester.element(find.byType(SettingsPage))),
-          ReadingLanguage.arabic,
-        );
-      },
-    );
-
-    testWidgets('a tap opens a REAL bottom sheet with both languages', (
+    // ## AND IT RAISES THE **TOAST**
+    //
+    // `:1525` — `toast(tr('restored'))`.
+    testWidgets('and it raises the confirmation toast', (
       WidgetTester tester,
     ) async {
       await pumpSettings(tester);
 
-      expect(find.byType(BottomSheet), findsNothing);
-      await tester.tap(find.text(AppLocalizationsEn().settingsDefaultLanguage));
-      await tester.pumpAndSettle();
+      expect(find.byType(WorkshopRestoreToast), findsNothing);
 
-      // **A `showModalBottomSheet` and not an inline disclosure**, because defect #7 is
-      // "a language control that navigates nowhere" and the fix is a control that opens
-      // something and then does the thing.
-      expect(find.byType(BottomSheet), findsOneWidget);
-      expect(
-        find.text(AppLocalizationsEn().settingsLanguageSheetTitle),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          AppLocalizationsEn().languageLabelFor(ReadingLanguage.english),
-        ),
-        findsWidgets,
-      );
-      expect(
-        find.text(
-          AppLocalizationsEn().languageLabelFor(ReadingLanguage.arabic),
-        ),
-        findsOneWidget,
-      );
+      await _tapRestore(tester);
+
+      expect(find.byType(WorkshopRestoreToast), findsOneWidget);
+      expect(find.text(strings.settingsRestored), findsOneWidget);
     });
 
-    testWidgets('picking Arabic WRITES the setting and closes the sheet', (
+    // ## AND THE TOAST LASTS THE PROTOTYPE'S **1800ms**
+    //
+    // `:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`.
+    //
+    // **The "still up" half is the one the screen's own suite does not have.**
+    // It asserts the toast is there and then that it is gone; a toast that
+    // lasted 100ms would pass both. So the clock is read at **1799ms** — one
+    // millisecond before the deadline — and the toast has to still be there.
+    testWidgets('and the toast is still up one millisecond before 1800ms', (
       WidgetTester tester,
     ) async {
-      final SettingsCubit cubit = await pumpSettings(tester);
+      await pumpSettings(tester);
+      await _tapRestore(tester);
+      expect(find.byType(WorkshopRestoreToast), findsOneWidget);
 
-      await tester.tap(find.text(AppLocalizationsEn().settingsDefaultLanguage));
-      await tester.pumpAndSettle();
-      // The row is named in the arm the sheet opens in, so the English arm's Arabic row
-      // reads `Arabic` and the Arabic arm's reads `العربية`.
-      await tester.tap(
-        find.text(
-          AppLocalizationsEn().languageLabelFor(ReadingLanguage.arabic),
-        ),
+      await tester.pump(
+        kRestoreToastDuration - const Duration(milliseconds: 1),
       );
-      await tester.pumpAndSettle();
-
       expect(
-        cubit.state.settings.language,
-        ReadingLanguage.arabic,
+        find.byType(WorkshopRestoreToast),
+        findsOneWidget,
         reason:
-            'the sheet\'s job is the WRITE, not the opening. Closing without writing '
-            'is defect #7 restated one layer down, and this is the assertion that '
-            'tells the two apart.',
+            'the prototype holds the toast for 1800ms (`:1393`), and a toast that '
+            'went away early would be a confirmation the reader did not have time '
+            'to read.',
       );
-      expect(find.byType(BottomSheet), findsNothing, reason: 'and it closes');
+
+      await tester.pump(const Duration(milliseconds: 2));
+      expect(find.byType(WorkshopRestoreToast), findsNothing);
     });
-
-    testWidgets(
-      'and picking the language that is ALREADY CHOSEN closes without a write',
-      (WidgetTester tester) async {
-        // **Seeded with `english`**, not merely rendering it. On a fresh install
-        // `language` is `null` — "follow the platform" — and picking `English` is a
-        // **real** change from inheriting to pinning, which the first version of this
-        // test got wrong and which is the case one line below.
-        final SettingsCubit cubit = await pumpSettings(
-          tester,
-          stored: const UserSettings(language: ReadingLanguage.english),
-        );
-        final UserSettings before = cubit.state.settings;
-
-        await tester.tap(
-          find.text(AppLocalizationsEn().settingsDefaultLanguage),
-        );
-        await tester.pumpAndSettle();
-        // **Descendant of the sheet**, because the settings row's trailing already
-        // renders `English` and the finder is otherwise ambiguous — the first version
-        // tapped the row's own text and hit "Found 2 widgets", which is a failure about
-        // the test and not about the screen.
-        await tester.tap(
-          find.descendant(
-            of: find.byType(BottomSheet),
-            matching: find.text(
-              AppLocalizationsEn().languageLabelFor(ReadingLanguage.english),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.byType(BottomSheet), findsNothing);
-        expect(
-          cubit.state.settings,
-          before,
-          reason:
-              'no change, so `SettingsCubit.apply` emits nothing and the app does not '
-              'rebuild. Its "no emit for an unchanged value" rule is what makes a '
-              'reader\'s second tap free.',
-        );
-      },
-    );
-
-    testWidgets(
-      'and picking the language a reader has only INHERITED is a real change',
-      (WidgetTester tester) async {
-        // The distinction the case above is about, asserted rather than described: the
-        // row shows the *rendered* language, which on a fresh install comes from the
-        // platform, and `UserSettings.language` is `null`. Choosing it therefore moves
-        // the setting from "follow the platform" to "pinned to English" — which is a
-        // write, not a no-op, and a screen that treated it as a no-op would leave a
-        // reader on an Arabic device unable to pin English at all.
-        final SettingsCubit cubit = await pumpSettings(tester);
-        expect(cubit.state.settings.language, isNull);
-
-        await tester.tap(
-          find.text(AppLocalizationsEn().settingsDefaultLanguage),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(
-            of: find.byType(BottomSheet),
-            matching: find.text(
-              AppLocalizationsEn().languageLabelFor(ReadingLanguage.english),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(cubit.state.settings.language, ReadingLanguage.english);
-      },
-    );
-
-    testWidgets(
-      'the sheet rows are `Semantics(selected:)` so the choice announces',
-      (WidgetTester tester) async {
-        await pumpSettings(tester);
-        await tester.tap(
-          find.text(AppLocalizationsEn().settingsDefaultLanguage),
-        );
-        await tester.pumpAndSettle();
-
-        final SemanticsHandle handle = tester.ensureSemantics();
-        final SemanticsData row = semanticsTree(tester).firstWhere(
-          (SemanticsData node) =>
-              node.label ==
-              AppLocalizationsEn().languageLabelFor(ReadingLanguage.english),
-        );
-        expect(
-          // **A `Tristate` and not a `bool`** — `SemanticsFlags.isSelected` is
-          // tri-state in Flutter 3.47, so `isTrue` is an identity check against
-          // `Tristate.isTrue` that reads as a boolean assertion and is not one.
-          row.flagsCollection.isSelected,
-          Tristate.isTrue,
-          reason:
-              'the CURRENT one is selected. Without `selected` a screen reader cannot '
-              'tell which of the two is in force, which is §14\'s colour-only row applied '
-              'to a language picker.',
-        );
-        expect(row.flagsCollection.isButton, isTrue);
-        // **Disposed in the BODY**, never in `addTearDown` — recorded decision 38
-        // measured eight failures across two suites for exactly that: `testWidgets`
-        // compares the live handle count against the one taken before the framework
-        // takes its own, so a teardown that runs after that check is a leak it reports
-        // as an unrelated-looking assertion. (It did, here, on the first run.)
-        handle.dispose();
-      },
-    );
   });
 
-  group('the About group, and its one row', () {
-    testWidgets('the version is shown, and it MATCHES `pubspec.yaml`', (
+  group('the restore, and a write that fails', () {
+    // ## WHY THE TOAST IS **NOT** RAISED
+    //
+    // The prototype raises it unconditionally (`:1525`), because the
+    // prototype's reset is local JavaScript and **cannot fail**. This client's
+    // can: `SettingsCubit.apply` rolls back and records the failure.
+    //
+    // **A toast that said "nocturne defaults restored" over a screen that was
+    // simultaneously saying "your preferences could not be saved" would be two
+    // sentences about one event, and they would contradict each other.** So the
+    // page awaits the confirmed write, reads `cubit.state.status`, and stays
+    // silent on `SettingsStatus.failed`.
+    //
+    // ## AND WHY THE STORED VALUE IS **AWAY FROM THE DEFAULTS**
+    //
+    // `SettingsCubit.apply` has a rule this test would otherwise trip over: it
+    // **does not write a value that did not change** — "an emit that changes
+    // nothing is a full rebuild that changes nothing". A store already holding
+    // the defaults would therefore make the restore a **no-op**, no write would
+    // be attempted, and the failure this test is about would never happen. The
+    // first version of this test asserted `SettingsStatus.failed` over a
+    // default store and read `Actual: SettingsStatus.ready`, which is the
+    // no-op rule working exactly as documented.
+    testWidgets(
+      'a failed write raises NO toast, and the notice speaks instead',
+      (WidgetTester tester) async {
+        final SettingsCubit cubit = _cubitThatFailsToWrite();
+        addTearDown(cubit.close);
+
+        await pumpSettings(tester, cubit: cubit);
+        expect(
+          cubit.state.status,
+          SettingsStatus.ready,
+          reason:
+              'sanity: the read succeeded, so the failure below is the write',
+        );
+        expect(find.byType(WorkshopRestoreToast), findsNothing);
+
+        await _tapRestore(tester);
+
+        expect(cubit.state.status, SettingsStatus.failed);
+        expect(
+          find.byType(WorkshopRestoreToast),
+          findsNothing,
+          reason:
+              'the write was refused, so nothing was restored and the confirmation '
+              'would be a lie.',
+        );
+        expect(
+          find.text(strings.settingsPreferencesUnavailable),
+          findsOneWidget,
+          reason: 'the failure notice speaks instead — one sentence about one event.',
+        );
+      },
+    );
+
+    // ## AND THE RESTORE **ROLLS BACK**
+    //
+    // `SettingsCubit.apply` emits optimistically and `_persist` emits again
+    // with the store's answer, so the state after the `await` **is** the
+    // outcome: the values the reader had before the tap.
+    testWidgets('and the settings roll back to what the store confirmed', (
+      WidgetTester tester,
+    ) async {
+      final SettingsCubit cubit = _cubitThatFailsToWrite();
+      addTearDown(cubit.close);
+
+      await pumpSettings(tester, cubit: cubit);
+      final UserSettings before = cubit.state.settings;
+      expect(
+        before.reach,
+        100,
+        reason: 'sanity: the store holds something the reset would change',
+      );
+
+      await _tapRestore(tester);
+
+      expect(
+        cubit.state.settings,
+        before,
+        reason:
+            'the optimistic emit is undone by the store\'s answer. A screen that '
+            'showed restored values over a refused write would show the reader a '
+            'state the device does not have.',
+      );
+    });
+  });
+
+  group('the version chip', () {
+    // ## IT CARRIES THE APP'S **REAL** VERSION
+    //
+    // `eva/redesign.html:642` writes the literal `v1.2`, which is the **design
+    // system's** version. The client's chip carries `AppConfig.appVersion` — a
+    // reader looking at a version chip wants the version of the app they are
+    // holding.
+    //
+    // **And the constant is pinned to `pubspec.yaml`,** which is the half the
+    // app-bar widget's own suite does not have: a chip that carries a version
+    // nobody maintains is worse than a chip that carries the prototype's.
+    testWidgets('it carries the app\'s real version, and `pubspec.yaml` agrees', (
       WidgetTester tester,
     ) async {
       await pumpSettings(tester);
 
       expect(find.text(AppConfig.appVersion), findsOneWidget);
-      expect(AppConfig.appVersion, '1.0.0 (1)');
+      expect(
+        find.text('v1.2'),
+        findsNothing,
+        reason:
+            '`:642` writes `v1.2`, and that is the design system\'s version — the '
+            'same string the About group\'s "Tokens" row carries (`:698`).',
+      );
 
       // **The whole reason the constant is a constant.** `pubspec.yaml` is the
-      // authority and a bump without bumping this is a lie on a reader's screen; this
-      // reads the file so the two cannot drift silently.
+      // authority and a bump without bumping this is a lie on a reader's
+      // screen; this reads the file so the two cannot drift silently.
       final String pubspec = File('pubspec.yaml').readAsStringSync();
       final RegExpMatch version = RegExp(
         r'^version:\s*(\S+)',
@@ -543,619 +532,171 @@ void main() {
         AppConfig.appVersion,
         '$name ($build)',
         reason:
-            'pubspec.yaml declares `$declared` and `/settings` must not disagree. '
+            'pubspec.yaml declares `$declared` and the chip must not disagree. '
             'Bump the version and this goes red until `AppConfig.appVersion` moves.',
       );
     });
-
-    testWidgets('and the prototype\'s `(42)` build number is NOT transcribed', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
-      expect(
-        find.text('1.0.0 (42)'),
-        findsNothing,
-        reason:
-            '`SettingsScreen.tsx:115` writes `1.0.0 (42)` and that build number is a '
-            'fabricated fixture of a React preview. This package\'s is 1.',
-      );
-    });
   });
 
-  group('the header row is the prototype\'s, and back goes where it came from', () {
-    testWidgets('a chevron and the title, and NOT a route path as a title', (
+  group('the failure notice', () {
+    // ## A FAILED **WRITE** REPORTS IT
+    //
+    // A failed read happens once, at launch, while the reader is looking at
+    // `/`. A failed write happens **because of something the reader just did**,
+    // and without the notice that is a control that moves and undoes itself
+    // with nothing said.
+    testWidgets('a failed write puts the notice on screen', (
       WidgetTester tester,
     ) async {
-      await pumpSettings(tester);
-
-      expect(find.byIcon(Icons.arrow_back_ios_new), findsOneWidget);
-      expect(find.text(AppLocalizationsEn().settingsTitle), findsOneWidget);
-      expect(
-        find.text('/settings'),
-        findsNothing,
-        reason:
-            'the Phase-0 stub drew `AppRoutes.settings` — a route path — as the screen '
-            'title. That placeholder is what this assertion retires.',
-      );
-    });
-
-    testWidgets('the back control is `maybePop`, so it cannot duplicate `/`', (
-      WidgetTester tester,
-    ) async {
-      // **`maybePop` and not `pushPath(AppRoutes.home)`.** Pushing `/` would put a
-      // second home page on the stack for a reader who arrived from one, and Back would
-      // land on home again. Asserted structurally — a routerless harness has no
-      // `RouterScope` to pop, so this checks the wiring rather than performing it, and
-      // `home_navigation_test.dart` owns the real navigation.
-      await pumpSettings(tester);
-      final IconActionButton back = tester.widget(
-        find.widgetWithIcon(IconActionButton, Icons.arrow_back_ios_new),
-      );
-      expect(
-        () => back.onPressed!(),
-        // **`FlutterError` and not `Exception`.** auto_route's `context.router` lookup
-        // reports a missing `AutoRouter` as a `FlutterError`, which is neither an
-        // `Exception` nor an `Error` subclass the matcher would find by default — the
-        // first version asserted `isA<Exception>()` and failed on the type, not on the
-        // behaviour.
-        throwsA(isA<FlutterError>()),
-        reason:
-            'the callback reaches for a router, which this harness has none of. A '
-            '`pushPath(AppRoutes.home)` would throw the same way, so this asserts that '
-            'the control is WIRED rather than inert — the inert reading is what the '
-            'stub had.',
-      );
-    });
-
-    testWidgets('and the tooltip is in the reader\'s language', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester, locale: const Locale('ar'));
-      final IconActionButton back = tester.widget(
-        find.widgetWithIcon(IconActionButton, Icons.arrow_back_ios_new),
-      );
-      expect(
-        back.tooltip,
-        AppLocalizationsAr().settingsBack,
-        reason:
-            'and its family follows the arm, which is defect #2\'s mechanism — the '
-            'tooltip is Arabic text going into a widget that names a family explicitly',
-      );
-      expect(back.tooltipFamily, EvaTypography.arabicFamily);
-    });
-  });
-
-  // ## §14 AND THE PHASE-10 BULLET: `/settings` HAD A FAILURE STATE AND DREW NOTHING
-  //
-  // `08-build-phases.md`'s Phase 10 line is "`EmptyState`/`ErrorView` wired into
-  // every async page". Phase 10 measured all six screens rather than assuming, and
-  // `/settings` is the one that was genuinely unwired:
-  //
-  // | screen | failure status | a failure surface |
-  // | --- | --- | --- |
-  // | `/` | `HomeSectionStatus.failed` | `ErrorView` in `today_reading_panel.dart` |
-  // | `/reading` | `ReadingStatus.failed` | `ErrorView` in `reading_page.dart:402` |
-  // | `/quiz` | both | `ErrorView` at `quiz_page.dart:879` |
-  // | `/login` | **none** — `AuthSessionStatus` has no failure arm and auth is a header | n/a, measured |
-  // | `/result` | **none** — `SubmitResult` is a required constructor parameter, so the screen cannot exist without a result | n/a, compile-enforced |
-  // | **`/settings`** | **`SettingsStatus.failed`** | **nothing, before this group** |
-  //
-  // And the cost was **written down** rather than left open:
-  // `settings_state.dart:50-52` says "a reader whose store is unreachable sees the
-  // app in its default palette **and is never told** … (the failure is in [failure],
-  // which `/settings` does not draw — **see its page for why**)". This page is
-  // that page, and until this group it contained no such reason. The dangling
-  // cross-reference was the finding.
-  group('§14 — the failure is reported, and the screen still works', () {
-    /// A cubit whose store is unreachable, which is the only way to reach the state.
-    SettingsCubit unreachableStore() {
-      const Failure failure = Failure(
-        kind: FailureKind.storage,
-        message:
-            'the preferences could not be reached: '
-            'MissingPluginException(No implementation found)',
-      );
-      final SettingsCubit cubit = SettingsCubit(
-        getSettings: const GetSettings(FailingSettingsRepository(failure)),
-        updateSettings: const UpdateSettings(
-          FailingSettingsRepository(failure),
-        ),
-      );
-      addTearDown(cubit.close);
-      return cubit;
-    }
-
-    testWidgets('a failed READ puts the notice on screen', (
-      WidgetTester tester,
-    ) async {
-      // ## RED-FIRST
-      //
-      // Written against the page as Phase 9 shipped it and failed on the first
-      // assertion with `Expected: at least one widget matching: ...` and zero
-      // matches — the notice did not exist. Nothing else in the file went red,
-      // which is the point of putting this in its own group: the page was not
-      // broken, it was silent.
-      final SettingsCubit cubit = unreachableStore();
-      await pumpSettings(tester, cubit: cubit);
-      await pumpSettingsFrames(tester, 4);
-
-      expect(cubit.state.status, SettingsStatus.failed);
-      expect(
-        find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
-        findsOneWidget,
-        reason:
-            '§14: a failure that arrives after the screen has settled has to be '
-            'visible, not only announced. `settings_state.dart` named the silence as '
-            'the cost; this is the cost being paid.',
-      );
-    });
-
-    testWidgets('and a failed WRITE reports it too — the harder arm', (
-      WidgetTester tester,
-    ) async {
-      // ## WHY THE WRITE ARM IS THE ONE THAT MATTERS
-      //
-      // A failed read happens once, at launch, while the reader is looking at
-      // `/` — not at this screen. A failed write happens **because of something the
-      // reader just did**: they tap the theme switch, `_persist` answers a
-      // `FailureResult`, `settings_cubit.dart:188-194` emits
-      // `status: failed, settings: _confirmed`, and the control visibly springs back
-      // to where it was. Without the notice that is a control that moves and undoes
-      // itself with nothing said, which is the exact failure `LoginPage`'s doc
-      // records for the four inert social buttons ("a live control that reports
-      // nothing teaches a reader that a button here sometimes answers with a message
-      // about the app rather than about the task").
-      //
-      // Driven through the **real** cubit rather than by emitting a state: a test
-      // that hand-builds `SettingsState(failed: …)` would pass against a page that
-      // never called `load()` and would not notice that the *write* path emits the
-      // same status. This one taps.
       final SettingsHarness harness = settingsHarness(loadImmediately: false);
       final SettingsCubit cubit = SettingsCubit(
         getSettings: GetSettings(harness.repository),
-        updateSettings: const UpdateSettings(
-          FailingSettingsRepository(
-            Failure(kind: FailureKind.storage, message: 'write refused'),
-          ),
-        ),
+        updateSettings: const UpdateSettings(_SaveFailingRepository()),
       );
       addTearDown(cubit.close);
-      await cubit.load();
-      expect(cubit.state.status, SettingsStatus.ready, reason: 'sanity');
 
       await pumpSettings(tester, cubit: cubit);
       expect(
-        find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
+        find.text(strings.settingsPreferencesUnavailable),
         findsNothing,
         reason: 'nothing has failed yet, so nothing is claimed',
       );
 
-      // **`find.text('LIGHT')`, the uppercased label** — the same tap the
-      // "a tap on a segment writes the setting" test above makes. `SegmentedControl`
-      // uppercases every label itself (the prototype's `textTransform: 'uppercase'`
-      // has no Flutter equivalent), so `find.text('Light')` matches nothing; the
-      // first run of this test failed on exactly that, which says nothing about the
-      // notice it was checking.
-      await tester.tap(find.text('LIGHT'));
-      await pumpSettingsFrames(tester, 6);
+      // **The Daylight toggle**, the first control on the screen.
+      await tester.tap(find.byType(EvaToggle).first);
+      await pumpSettingsFrames(tester, 4);
 
       expect(cubit.state.status, SettingsStatus.failed);
-      expect(
-        find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
-        findsOneWidget,
-      );
+      expect(find.text(strings.settingsPreferencesUnavailable), findsOneWidget);
     });
 
-    testWidgets('and the notice is NOT `Failure.message`', (
+    // ## AND THE NOTICE IS **NOT** THE REPOSITORY'S MESSAGE
+    //
+    // `SettingsRepositoryImpl._unreachable` builds
+    // `'The preferences could not be reached: $error'` — it interpolates the
+    // raw Dart exception, and a real one on a real device is
+    // `MissingPluginException(No implementation found for method … on channel …)`.
+    // Rendering that would put an exception's `toString()` on a reader's
+    // screen.
+    testWidgets('and it is not the repository\'s message', (
       WidgetTester tester,
     ) async {
-      // ## THE STRING ON THIS SCREEN IS **NOT** THE REPOSITORY'S, AND THAT IS THE
-      // ## ONE ASSERTION HERE THAT IS ABOUT SAFETY RATHER THAN VISIBILITY
-      //
-      // `SettingsRepositoryImpl._unreachable` builds
-      // `'The preferences could not be reached: $error'` — it interpolates the raw
-      // Dart exception, and a real one on a real device is
-      // `MissingPluginException(No implementation found for method … on channel …)`.
-      // Rendering that would put an exception's `toString()` on a reader's screen.
-      //
-      // Every other `ErrorView` in this app shows `Failure.message` because
-      // `ApiErrorMapper`'s wording is the **server's**, and deliberately verbatim.
-      // `/settings` is the first non-network failure surface, so it is the first
-      // one whose message is a developer string, and `error_view.dart`'s own claim
-      // — "the failure messages this app shows come from `ApiErrorMapper`" — stops
-      // being true of all of them the moment this ships.
-      final SettingsCubit cubit = unreachableStore();
+      final SettingsCubit cubit = SettingsCubit(
+        getSettings: const GetSettings(
+          FailingSettingsRepository(
+            Failure(
+              kind: FailureKind.storage,
+              message: 'the preferences could not be reached',
+            ),
+          ),
+        ),
+        updateSettings: const UpdateSettings(
+          FailingSettingsRepository(
+            Failure(kind: FailureKind.storage, message: 'the store is gone'),
+          ),
+        ),
+      );
+      addTearDown(cubit.close);
+
       await pumpSettings(tester, cubit: cubit);
       await pumpSettingsFrames(tester, 4);
 
       expect(
-        find.textContaining('MissingPluginException'),
+        find.textContaining('the preferences could not be reached'),
         findsNothing,
         reason:
             'the repository message is a developer string. Asserted by content and '
-            'not by equality so it goes red for ANY exception text, not only the one '
-            'this fixture happens to use.',
+            'not by equality so it goes red for ANY exception text, not only the '
+            'one this fixture happens to use.',
       );
-      expect(find.textContaining(cubit.state.failure!.message), findsNothing);
-    });
-
-    testWidgets('and the form is STILL on screen — this is a notice, not a state', (
-      WidgetTester tester,
-    ) async {
-      // ## THE SHAPE OF THE FIX, AND IT IS THE CONTROVERSIAL HALF
-      //
-      // `ErrorView` **fills** its box (`Center` → `SingleChildScrollView`), so
-      // dropping it into `/settings` either nests two scroll views or eats the form.
-      // Replacing the form with it instead contradicts two things this repository
-      // has already written down:
-      //
-      // * `SettingsStatus.failed` — "the defaults are still on screen, and the
-      //   reader's next write may still succeed";
-      // * the **write** failure above, where replacing the screen erases the very
-      //   control the reader just tapped, so the screen stops making sense
-      //   without explaining why.
-      //
-      // So the failure is a **notice above the groups**, built from the design
-      // system's own tokens, and this assertion is what holds that shape.
-      final SettingsCubit cubit = unreachableStore();
-      await pumpSettings(tester, cubit: cubit);
-      await pumpSettingsFrames(tester, 4);
-
-      expect(find.byType(SettingsGroup), findsNWidgets(3));
-      expect(find.byType(SegmentedControl<AppThemeMode>), findsOneWidget);
-      expect(find.byType(EvaToggle), findsOneWidget);
-      expect(find.byType(FontSizeStepper), findsOneWidget);
-      expect(
-        find.byType(ErrorView),
-        findsNothing,
-        reason:
-            'and `ErrorView` is deliberately not the widget here. It fills its box, '
-            'so it cannot sit above three groups without a nested scroll view, and '
-            'its message contract is `ApiErrorMapper`\'s — a contract this repository '
-            'does not have a message for. The shape is a notice with the same four '
-            '§14 properties: an `err`-coloured icon of a different shape from '
-            '`EmptyState`\'s, `Semantics(liveRegion:)`, the sentence, and an action.',
-      );
-    });
-
-    testWidgets(
-      'the notice offers a retry, and it clears when the store answers',
-      (WidgetTester tester) async {
-        // ## WHY A RETRY, AND WHY IT CALLS `load()`
-        //
-        // §14 says an error "must offer a retry", and `SettingsCubit` has exactly one
-        // operation that can clear the status without the reader changing anything:
-        // `load()`. `_persist`'s success path also clears it, but reaching that means
-        // asking the reader to change a setting — which is the wrong thing to ask of
-        // someone whose settings just failed to save.
-        //
-        // Driven through a **switchable** repository so the retry has somewhere to
-        // succeed: a test that only asserted "a button exists" would be satisfied by
-        // an inert one, which is §14's forbidden state.
-        final SettingsHarness harness = settingsHarness(loadImmediately: false);
-        final _SwitchableSettingsRepository store =
-            _SwitchableSettingsRepository(harness.repository);
-        final SettingsCubit cubit = SettingsCubit(
-          getSettings: GetSettings(store),
-          updateSettings: UpdateSettings(store),
-        );
-        addTearDown(cubit.close);
-
-        store.delegate = const FailingSettingsRepository(
-          Failure(kind: FailureKind.storage, message: 'unreachable'),
-        );
-        await cubit.load();
-        await pumpSettings(tester, cubit: cubit);
-        await pumpSettingsFrames(tester, 4);
-        expect(
-          find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
-          findsOneWidget,
-        );
-
-        // The store comes back, and the reader presses the button.
-        store.delegate = harness.repository;
-        await tester.tap(find.text(AppLocalizationsEn().settingsRetry));
-        await pumpSettingsFrames(tester, 6);
-
-        expect(cubit.state.status, SettingsStatus.ready);
-        expect(
-          find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
-          findsNothing,
-          reason: 'and the notice goes away, which is what makes it a notice',
-        );
-      },
-    );
-
-    testWidgets(
-      'and it is announced — a live region, and named in the reader\'s language',
-      (WidgetTester tester) async {
-        final SemanticsHandle handle = tester.ensureSemantics();
-        final SettingsCubit cubit = unreachableStore();
-        await pumpSettings(tester, cubit: cubit);
-        await pumpSettingsFrames(tester, 4);
-
-        // The same contract `ErrorView` holds: a failure that arrives after the
-        // screen has settled is announced, or a screen-reader user finds out from the
-        // retry button being there.
-        // ## THE TWO ASSERTIONS THAT CAUGHT A DEFECT THIS NOTICE INTRODUCED
-        //
-        // The first version put the retry button **inside** the
-        // `Semantics(liveRegion: true)`, and the pumped tree fused the two into one
-        // node — measured, not reasoned about:
-        //
-        // ```text
-        // live=true  btn=true  label="Your preferences could not be saved on this device.|Try again"
-        // ```
-        //
-        // A screen reader would have announced a sentence as a button, and the retry
-        // control had **no node of its own**. `Semantics` with the default
-        // `container: false` merges its subtree, and one labelled `EvaButton` under it
-        // is enough to do it. The fix was to move the action out; these two assertions
-        // are why it stays moved.
-        final List<SemanticsData> nodes = semanticsTree(tester);
-
-        final Iterable<SemanticsData> live = nodes.where(
-          (SemanticsData node) => node.flagsCollection.isLiveRegion,
-        );
-        expect(
-          live.map((SemanticsData node) => node.label),
-          contains(AppLocalizationsEn().settingsPreferencesUnavailable),
-          reason:
-              '§14, and the reason `ErrorView` sets `liveRegion: true`. Asserted on the '
-              'label and not only on the flag, because a live region carrying nothing '
-              'is the shape that announces nothing.',
-        );
-
-        final Iterable<SemanticsData> retry = nodes.where(
-          (SemanticsData node) =>
-              node.label == AppLocalizationsEn().settingsRetry,
-        );
-        expect(
-          retry,
-          hasLength(1),
-          reason:
-              'the retry is a control with its OWN name. Fused into the live region '
-              'it would have no node of its own, and §14\'s first row is about '
-              'controls rather than about announcements.',
-        );
-        expect(
-          retry.single.flagsCollection.isButton,
-          isTrue,
-          reason: 'and it is announced as the control it is',
-        );
-        handle.dispose();
-      },
-    );
-
-    testWidgets('and on the Arabic arm it is Arabic, with no Latin left in it', (
-      WidgetTester tester,
-    ) async {
-      // `app_localizations_test.dart`'s rule is about the ARB files; this is the
-      // half about the **screen** — that the value the page renders is the one the
-      // Arabic arm holds, and that neither the sentence nor the retry label reaches
-      // screen as English. `EvaButton.labelFamily` is required precisely because a
-      // design-system button cannot know which script its caller's label is in.
-      final SemanticsHandle handle = tester.ensureSemantics();
-      final SettingsCubit cubit = unreachableStore();
-      await pumpSettings(tester, cubit: cubit, locale: const Locale('ar'));
-      await pumpSettingsFrames(tester, 4);
-
-      expect(
-        find.text(AppLocalizationsAr().settingsPreferencesUnavailable),
-        findsOneWidget,
-      );
-      expect(
-        find.text(AppLocalizationsEn().settingsPreferencesUnavailable),
-        findsNothing,
-        reason: 'the English sentence must not survive into the Arabic arm',
-      );
-      expect(find.text(AppLocalizationsAr().settingsRetry), findsOneWidget);
-      expect(
-        tester.widget<EvaButton>(find.byType(EvaButton)).labelFamily,
-        EvaTypography.arabicFamily,
-        reason:
-            'a localized label going into a button that names its family explicitly. '
-            '`ErrorView.retryFamily` is the precedent and its doc gives the reason.',
-      );
-      handle.dispose();
-    });
-  });
-
-  group('the scope publishes ONE handle, and swaps it without leaking', () {
-    // ## THE TWO LINES THIS EXISTS FOR ARE `didUpdateWidget`'s, AND THEY ARE
-    // ## UNREACHABLE FROM ANY PAGE TEST
-    //
-    // `SettingsScope` is a `StatefulWidget` whose `_SettingsBridge` is created once and
-    // reused, because the handle is a locator **singleton**: a bridge built in the
-    // constructor would subscribe again on every `app.dart` rebuild and the handle's
-    // listener list would grow for the life of the process. The other half of that fix
-    // is `didUpdateWidget` swapping the bridge when the handle itself changes — and a
-    // page test cannot reach it, because every page test mounts one harness and never
-    // swaps it.
-    //
-    // So this arm builds the swap directly. It is the only test in the file that does
-    // not go through `pumpSettings`, and that is the point: it is testing the *scope*,
-    // not the screen.
-    testWidgets('a different handle above the same subtree re-bridges it', (
-      WidgetTester tester,
-    ) async {
-      // **Two bare handles, not two harnesses.** A second `settingsHarness()` call
-      // re-seeds `SharedPreferences.setMockInitialValues` and re-registers the locator,
-      // so the *first* cubit's unawaited `load()` resolves against the second store and
-      // both cubits end up holding the second harness's value. Measured: the first arm
-      // then rendered `light` and the failure read "the first handle is missing", which
-      // is a fixture collision, not a scope defect.
-      //
-      // The claim under test is about the *bridge*, so the handles are the smallest
-      // thing that can carry it: a read closure over a literal, and a write closure that
-      // drops the mutation.
-      // `themeMode` is `UserSettings`' own `dark` default, so the first handle is an
-      // explicit dark only by being spelled — the *pair* is what this test is
-      // about, and the two handles have to differ.
-      final SettingsHandle first = _handleOver(const UserSettings());
-      final SettingsHandle second = _handleOver(
-        const UserSettings(themeMode: AppThemeMode.light),
-      );
-      addTearDown(first.dispose);
-      addTearDown(second.dispose);
-
-      final Widget probe = Builder(
-        builder: (BuildContext context) => Text(
-          SettingsScope.of(context).settings.themeMode.storedValue,
-          textDirection: TextDirection.ltr,
-        ),
-      );
-
-      await tester.pumpWidget(
-        evaPrimitiveHarness(
-          theme: EvaThemeDark.theme,
-          child: SettingsScope(
-            key: const Key('scope-one'),
-            handle: first,
-            child: probe,
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(find.text('dark'), findsOneWidget, reason: 'the first handle');
-
-      await tester.pumpWidget(
-        evaPrimitiveHarness(
-          theme: EvaThemeDark.theme,
-          child: SettingsScope(
-            key: const Key('scope-one'),
-            handle: second,
-            child: probe,
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(
-        find.text('light'),
-        findsOneWidget,
-        reason:
-            'the new handle is what descendants read. Without the swap the scope would '
-            'keep answering from the **old** handle\'s bridge, and a screen that had '
-            'been re-pointed at a different settings source would read a value nothing '
-            'had announced to it.',
-      );
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-      'and an announcement after the scope is gone is dropped, not thrown',
-      (WidgetTester tester) async {
-        // The bridge's `_disposed` guard, and the reason it is not a suppression: the
-        // handle outlives every scope (it is a locator singleton), so a scope torn down
-        // without dropping its subscription would call `notifyListeners` on a disposed
-        // `ChangeNotifier` — and Flutter answers that with an assertion from inside the
-        // framework, in a test that is about something else entirely.
-        final SettingsHarness harness = settingsHarness();
-        await tester.pumpWidget(
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            child: SettingsScope(
-              key: const Key('scope-drop'),
-              handle: harness.handle,
-              child: const SizedBox.shrink(),
-            ),
-          ),
-        );
-        await tester.pump();
-
-        await tester.pumpWidget(
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            child: const SizedBox.shrink(),
-          ),
-        );
-
-        harness.handle.announce();
-        expect(tester.takeException(), isNull);
-      },
-    );
-  });
-
-  group('the page is NOT the stub it replaced', () {
-    testWidgets('no placeholder text survives anywhere', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
-      expect(find.textContaining('Placeholder'), findsNothing);
-      expect(find.textContaining(routePath), findsNothing);
-    });
-
-    testWidgets('and it renders on a `NeuralScaffold`, not a bare `Scaffold`', (
-      WidgetTester tester,
-    ) async {
-      await pumpSettings(tester);
-      expect(find.byType(NeuralScaffold), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
-      // **As a descendant of the scaffold**, so "the screen renders inside the shared
-      // root" is a structural claim and not "a `NeuralScaffold` exists somewhere in the
-      // tree".
-      expect(
-        find.descendant(
-          of: find.byType(NeuralScaffold),
-          matching: find.text('Settings'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.ancestor(
-          of: find.byType(NeuralScaffold),
-          matching: find.byType(MaterialApp),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byType(NeuralScaffold),
-          matching: find.text('Settings'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text(strings.settingsPreferencesUnavailable), findsOneWidget);
     });
   });
 }
 
-/// The route path, spelled so the "no placeholder" assertion above is not a tautology.
+/// Scrolls the restore row into view and taps it.
 ///
-/// `AppRoutes.settings` imported here would make the assertion "no `'/settings'` on
-/// screen" depend on a constant from `lib/core/navigation/`, which is fine — but the
-/// string is written out so a reader can see the assertion is about the *literal the
-/// stub drew*.
-const String routePath = '/settings';
+/// The row is the last of the communion group's rows and the screen scrolls,
+/// so the tap has to be preceded by a scroll — a tap on a row that is not on
+/// screen is a tap on nothing, and `tester.tap` would throw rather than fail
+/// the claim.
+Future<void> _tapRestore(WidgetTester tester) async {
+  // **The ARB value and not a literal**, so a translator's change to the row's
+  // title does not turn this helper into a finder that matches nothing.
+  final Finder title = find.text(AppLocalizationsEn().settingsRestoreDefaults);
+  await tester.ensureVisible(title);
+  await tester.pump();
+  await tester.tap(title);
+  // **Two frames**, and the reason is the `await` in `_restore`. The page
+  // awaits the confirmed write before it decides whether to raise the toast,
+  // so the toast is up one microtask-turn after the write answers — and the
+  // write answers inside the store's own `Future`.
+  await tester.pump();
+  await tester.pump();
+}
 
-/// A [SettingsHandle] over a fixed value, with no cubit and no store behind it.
+/// The stored value the failing-write tests read.
 ///
-/// For the two scope tests that are about the **bridge**: a harness would put a cubit,
-/// a `shared_preferences` mock and a locator registration between the test and the one
-/// thing it is checking, and two of them in one test collide (the second seeds the mock
-/// store the first's unawaited `load()` is about to read).
-SettingsHandle _handleOver(UserSettings value) => SettingsHandle(
-  read: () => value,
-  write: (UserSettings Function(UserSettings) mutation) async {},
+/// **Away from the defaults on purpose** — see the group's own doc: a store
+/// already holding the defaults makes the restore a no-op, and `apply` does
+/// not write a value that did not change.
+const UserSettings _storedAwayFromTheDefaults = UserSettings(
+  reach: 100,
+  glow: 40,
+  shaderEnabled: false,
+  starsOn: false,
 );
 
-/// A [SettingsRepository] whose delegate can be swapped mid-test.
+/// A cubit that **reads** a fixed value and **refuses every write**.
+SettingsCubit _cubitThatFailsToWrite() => SettingsCubit(
+  getSettings: const GetSettings(
+    _FixedSettingsRepository(_storedAwayFromTheDefaults),
+  ),
+  updateSettings: const UpdateSettings(_SaveFailingRepository()),
+);
+
+/// A repository that answers [load] with a fixed value and refuses every write.
 ///
-/// `settings_cubit_test.dart` keeps a private copy for the cubit-level "the store
-/// went away and came back" test. This one exists for the **screen**, where the
-/// question is whether a reader who presses "Try again" gets a working screen back
-/// — which needs the store to answer *after* the button was tapped, and a fixed
-/// double cannot do that.
-final class _SwitchableSettingsRepository implements SettingsRepository {
-  _SwitchableSettingsRepository(this.delegate);
+/// **The refusal is the point, and the load is a fixture.** The read has to
+/// succeed — the failure this file is about is the **write**'s, and a read
+/// that failed too would put the screen in its failed state before the reader
+/// had touched anything, which is a different scenario with the same symptom.
+final class _FixedSettingsRepository implements SettingsRepository {
+  const _FixedSettingsRepository(this.settings);
 
-  /// What both calls go to, right now.
-  SettingsRepository delegate;
-
-  @override
-  Future<Result<UserSettings>> load() => delegate.load();
+  /// What the read answers with.
+  final UserSettings settings;
 
   @override
-  Future<Result<UserSettings>> save(UserSettings settings) =>
-      delegate.save(settings);
+  Future<Result<UserSettings>> load() async =>
+      Result<UserSettings>.right(settings);
+
+  @override
+  Future<Result<UserSettings>> save(UserSettings settings) async =>
+      Result<UserSettings>.left(_SaveFailingRepository.failure);
+}
+
+/// A repository whose **write** always fails.
+///
+/// The read is never asked of it — the cubit's `GetSettings` points at
+/// [_FixedSettingsRepository] — so the failure it produces is unambiguously the
+/// **write**'s, which is the arm that matters: a failed read happens once at
+/// launch, while a failed write happens because of something the reader just
+/// did.
+final class _SaveFailingRepository implements SettingsRepository {
+  const _SaveFailingRepository();
+
+  /// The failure every write answers with.
+  static const Failure failure = Failure(
+    kind: FailureKind.storage,
+    message: 'the store refused the write',
+  );
+
+  @override
+  Future<Result<UserSettings>> load() async =>
+      Result<UserSettings>.left(failure);
+
+  @override
+  Future<Result<UserSettings>> save(UserSettings settings) async =>
+      Result<UserSettings>.left(failure);
 }

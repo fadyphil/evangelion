@@ -239,13 +239,27 @@ class _ScaleLetter extends StatelessWidget {
   final double size;
   final EvaColors colors;
 
+  /// The glyph is **decorative**, and it is excluded from the semantics tree.
+  ///
+  /// **It is a letter, and it is announced.** A screen reader read this row as
+  /// "A, A" — the little scale indicators on either side of the track, each one
+  /// a `Text('A')` and each one a node of its own, because nothing excluded
+  /// them. The stepper's own controls are named ("Decrease font size", "Increase
+  /// font size") and its track is named ("Font size"), so the two glyphs added
+  /// nothing but noise.
+  ///
+  /// **`ExcludeSemantics` and not a `String` of nothing**, because the glyph is
+  /// still painted: the reader sees the scale, and the screen reader is not told
+  /// about a letter that means "bigger here".
   @override
-  Widget build(BuildContext context) => Text(
-    'A',
-    style: TextStyle(
-      fontFamily: EvaTypography.uiFamily,
-      fontSize: size,
-      color: colors.ink2,
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Text(
+      'A',
+      style: TextStyle(
+        fontFamily: EvaTypography.uiFamily,
+        fontSize: size,
+        color: colors.ink2,
+      ),
     ),
   );
 }

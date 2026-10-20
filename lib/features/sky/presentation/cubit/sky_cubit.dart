@@ -65,12 +65,45 @@ import 'package:fpdart/fpdart.dart';
 /// that changes nothing is a rebuild of every sky reader that changes nothing.
 class SkyCubit extends Cubit<SkyState> {
   /// Drives the witness sky through [repository].
-  SkyCubit({required SkyRepository repository})
+  ///
+  /// ## AND [capReader] IS THE **CAP SEAM** — ONE READER, TWO WRITERS
+  ///
+  /// The cap is the reader's choice (`UserSettings.starCount`, the prototype's
+  /// `starCap` at `eva/redesign.html:1131`), and it changes while the app runs —
+  /// so it cannot be a value handed over here, and it must not be a field: a
+  /// field would be a snapshot, and two writers holding two snapshots of one
+  /// number is the drift `sky_star_cap.dart` exists to prevent.
+  ///
+  /// **So the cap is asked for, at write time, through a closure** — and the
+  /// composition root hands the *same* closure to this cubit and to
+  /// `SkyRepositoryImpl`, which is what makes the optimistic frame and the
+  /// durable eviction agree about the number. `sky_star_cap.dart` carries the
+  /// argument in full; the two lines that feed it live in `lib/app/di/`, which
+  /// is outside this slice's paths and is named in the task's report.
+  ///
+  /// **The default is the prototype's 44** — the same number the preference
+  /// defaults to — so a reader who never moves the slider gets the prototype's
+  /// sky, and a test that wants another cap injects one.
+  SkyCubit({required SkyRepository repository, int Function()? capReader})
     : super(const SkyState(entries: <SkyEntry>[])) {
     _repository = repository;
+    _capReader = capReader ?? _defaultCapReader;
   }
 
   late final SkyRepository _repository;
+
+  /// Answers the cap the sky is held to right now.
+  ///
+  /// **A closure and not a value**, and the reason is [SkyCubit]'s constructor
+  /// doc: the reader changes the cap at runtime.
+  late final int Function() _capReader;
+
+  /// The cap a cubit built without a reader holds.
+  ///
+  /// **The prototype's 44**, which is also `UserSettings.starCount`'s default —
+  /// so the fallback and the preference agree and a sky with no reader wired
+  /// into it is a sky with default settings.
+  static int _defaultCapReader() => skyStarCap;
 
   /// The last sky the store confirmed, and the value a failed write rolls back to.
   ///
@@ -122,8 +155,29 @@ class SkyCubit extends Cubit<SkyState> {
   /// lighting *and* clears (`:1483`) — so the caller (the wiring phase, not this
   /// cubit) must skip [record] while Stars-off is set, or the next scroll pass
   /// re-lights what the switch just cleared.
+  ///
+  /// **AND THE CUBIT DOES NOT CLEAR THE SKY EITHER**, which is the second half
+  /// of the same divergence and is a decision, not an omission: the prototype's
+  /// Stars-off calls `clearStars()` (`:1483`) and its stars are DOM elements, so
+  /// removing one removes it for good — while this client's sky is **persisted**
+  /// and a reader's lit verses are their own record of what they have read.
+  /// Deleting that because a decoration was turned off is a destructive action
+  /// with no undo, so Stars-off **hides** the sky and stops the lighting, and
+  /// [clear] stays the prototype's own `clearStars()` for whoever asks for it
+  /// deliberately. `/reading` is the caller, and `reading_page.dart` records the
+  /// decision at the gate.
+  ///
+  /// ## AND THE CAP IS ASKED FOR **PER WRITE**, not held
+  ///
+  /// The frame below trims to the cap the reader chose
+  /// (`UserSettings.starCount`), read through the cap seam this cubit was built
+  /// with — so a reader who lowers the cap sees the sky shrink at the next
+  /// lighting, and the durable eviction in `SkyRepositoryImpl` trims to the very
+  /// same number because both writers are handed the same reader. See
+  /// `sky_star_cap.dart` for the shape and for why lowering the cap deletes
+  /// nothing by itself.
   Future<void> record(SkyEntry entry) async {
-    final List<SkyEntry> next = _withRecord(state.entries, entry);
+    final List<SkyEntry> next = _withRecord(state.entries, entry, _cap());
     if (identical(next, state.entries)) {
       // **Identity and not equality, and the helper guarantees it.** `_withRecord`
       // returns its input list itself when nothing changed, so this is a value
@@ -220,22 +274,39 @@ class SkyCubit extends Cubit<SkyState> {
     }
   }
 
+  /// The cap the sky is held to right now — the reader's chosen count, clamped.
+  ///
+  /// **Asked at write time**, because the reader changes the cap at runtime and
+  /// a value held in a field would be a snapshot of a preference. The clamp is
+  /// [skyStarCapFor]'s — the one clamp — so this cubit and the adapter cannot
+  /// disagree about what a count of 999 means.
+  int _cap() => skyStarCapFor(_capReader());
+
   /// The optimistic lighting [record] announces before the store answers.
   ///
   /// The same rule `SkyRepositoryImpl` enforces, restated for the one frame the
   /// store has not answered yet: appends keep lit-event order, re-lights keep the
   /// first instant, flares upgrade in place and never downgrade, and past
-  /// [skyStarCap] the oldest goes first. The number is shared with the adapter
+  /// [cap] the oldest goes first. The number is shared with the adapter
   /// through `sky_star_cap.dart` so the two spellings cannot disagree about it;
   /// the confirm re-read is what heals any other disagreement.
   ///
+  /// **And [cap] is the reader's choice, not the constant** — the prototype's
+  /// `starCap` is a variable (`:1131`) that the slider writes (`:1487`), and this
+  /// client's is `UserSettings.starCount`. The default reader answers the
+  /// prototype's 44, which is that preference's default.
+  ///
   /// Returns its input list **itself** when nothing changed, so [record] can tell
   /// "nothing" by identity rather than by walking the list.
-  static List<SkyEntry> _withRecord(List<SkyEntry> current, SkyEntry entry) {
+  static List<SkyEntry> _withRecord(
+    List<SkyEntry> current,
+    SkyEntry entry,
+    int cap,
+  ) {
     final int at = current.indexWhere((SkyEntry held) => held.key == entry.key);
     if (at == -1) {
       final List<SkyEntry> next = List<SkyEntry>.of(current)..add(entry);
-      while (next.length > skyStarCap) {
+      while (next.length > cap) {
         next.removeAt(0);
       }
       return next;

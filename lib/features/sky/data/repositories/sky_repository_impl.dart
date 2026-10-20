@@ -39,14 +39,22 @@ import 'package:fpdart/fpdart.dart';
 ///
 /// `SkyRepository`'s doc says the cap "is unmodelled: no cap field or method on
 /// this port" — and this adapter enforces it anyway, because the prototype evicts
-/// inside `addStar` itself (`eva/redesign.html:1147`) rather than in a caller: every
-/// writer goes through [record], so the one-at-a-time eviction inside [record] is
-/// the faithful spelling. The number itself lives one layer inward, in the
-/// feature's pure-Dart domain, because `SkyCubit`'s optimistic frame needs the same
-/// number and neither writer may import it from the other — see that file's doc.
-/// A cap on the port would have made every reader depend on a number only writers
-/// need; a cap nowhere would have let the sky grow past the `44` the slider
-/// re-trims to (`eva/redesign.html:1486-1487`).
+/// inside `addStar` itself (`eva/redesign.html:1147`) rather than in a caller:
+/// every writer goes through [record], so the one-at-a-time eviction inside
+/// [record] is the faithful spelling. The number itself lives one layer inward,
+/// in the feature's pure-Dart domain, because `SkyCubit`'s optimistic frame
+/// needs the same number and neither writer may import it from the other — see
+/// that file's doc. A cap on the port would have made every reader depend on a
+/// number only writers need; a cap nowhere would have let the sky grow past
+/// what the reader chose.
+///
+/// **And the cap is the READER'S CHOICE** — the prototype's `starCap` is a
+/// variable the Star-count slider writes (`eva/redesign.html:1131`, `:1487`),
+/// and this client's is `UserSettings.starCount`. It arrives through the cap
+/// seam this adapter was built with, and the composition root hands the same
+/// reader to `SkyCubit`, so the durable eviction and the optimistic frame
+/// cannot disagree about the number. `sky_star_cap.dart` carries the shape and
+/// the argument; this file's constructor carries the seam.
 ///
 /// ## AND EVERY ARM WRAPS **THROWING** INTO A TYPED FAILURE
 ///
@@ -61,9 +69,50 @@ final class SkyRepositoryImpl implements SkyRepository {
   ///
   /// Not `const`: [_tail] is per-instance mutable state — the chain this adapter
   /// serializes on — and a `const` constructor needs every field `final`.
-  SkyRepositoryImpl(this._store);
+  ///
+  /// ## AND [capReader] IS THE **CAP SEAM**
+  ///
+  /// The cap is the reader's choice (`UserSettings.starCount`, the prototype's
+  /// `starCap` at `eva/redesign.html:1131`) and it changes while the app runs,
+  /// so it cannot be a value handed over here: a value would be a snapshot, and
+  /// this adapter and `SkyCubit` holding two snapshots of one number is the
+  /// drift `sky_star_cap.dart` exists to prevent.
+  ///
+  /// **So the cap is asked for, at write time, through a closure** — and the
+  /// composition root hands the *same* closure to this adapter and to
+  /// `SkyCubit`, which is what makes the durable eviction and the optimistic
+  /// frame agree about the number. `sky_star_cap.dart` carries the argument in
+  /// full; the two lines that feed it live in `lib/app/di/`, which is outside
+  /// this slice's paths and is named in the task's report.
+  ///
+  /// **The default is the prototype's 44** — the same number the preference
+  /// defaults to — so a reader who never moves the slider gets the prototype's
+  /// sky.
+  SkyRepositoryImpl(this._store, {int Function()? capReader}) {
+    _capReader = capReader ?? _defaultCapReader;
+  }
 
   final SkyLocalDataSource _store;
+
+  /// Answers the cap the sky is held to right now.
+  ///
+  /// **A closure and not a value**, and the reason is the constructor's doc: the
+  /// reader changes the cap at runtime.
+  late final int Function() _capReader;
+
+  /// The cap an adapter built without a reader holds.
+  ///
+  /// **The prototype's 44**, which is also `UserSettings.starCount`'s default —
+  /// so the fallback and the preference agree.
+  static int _defaultCapReader() => skyStarCap;
+
+  /// The cap the sky is held to right now — the reader's chosen count, clamped.
+  ///
+  /// **Asked at write time**, because the reader changes the cap at runtime and
+  /// a value held in a field would be a snapshot of a preference. The clamp is
+  /// [skyStarCapFor]'s — the one clamp — so this adapter and `SkyCubit` cannot
+  /// disagree about what a count of 999 means.
+  int _cap() => skyStarCapFor(_capReader());
 
   /// The tail of the mutation chain: the turn no running mutation has released.
   ///
@@ -127,7 +176,7 @@ final class SkyRepositoryImpl implements SkyRepository {
   Future<Result<SkyEntry>> _recordNow(SkyEntry entry) async {
     try {
       final List<SkyEntry> current = await _store.read();
-      final SkyEntry stored = _applyRecord(current, entry);
+      final SkyEntry stored = _applyRecord(current, entry, _cap());
       await _store.write(current);
       return Result<SkyEntry>.of(stored);
     } on Object catch (error) {
@@ -146,7 +195,7 @@ final class SkyRepositoryImpl implements SkyRepository {
   /// the caller writes back exactly what it read plus this lighting:
   ///
   /// * a verse never lit is appended, keeping lit-event order — and past
-  ///   [skyStarCap] the oldest goes first, which is the prototype's
+  ///   [cap] the oldest goes first, which is the prototype's
   ///   one-at-a-time eviction inside `addStar` (`eva/redesign.html:1147`);
   /// * a verse lit before keeps its position and its first [SkyEntry.litAt];
   /// * a re-record with [SkyEntry.isFlare] set upgrades the stored ordinary star
@@ -160,11 +209,26 @@ final class SkyRepositoryImpl implements SkyRepository {
   /// Returns the entry **as stored** — the `SettingsRepository.save` contract,
   /// mirrored — so a caller that re-lights a verse sees the first lit instant it
   /// actually holds, never having to re-read to find out.
-  static SkyEntry _applyRecord(List<SkyEntry> current, SkyEntry entry) {
+  ///
+  /// ## AND [cap] IS **THE READER'S CHOICE**, TRIMMED AT WRITE TIME
+  ///
+  /// The prototype's `starCap` is a variable the slider writes
+  /// (`eva/redesign.html:1131`, `:1487`) and this client's is
+  /// `UserSettings.starCount` — so the number arrives through the cap seam and
+  /// is clamped by [skyStarCapFor], the one clamp. **Lowering the cap trims
+  /// nothing by itself**: the trim happens here, on the next write, which is the
+  /// prototype's own eviction (`:1147`) and not the slider's immediate re-trim
+  /// (`:1486-1487`) — the divergence `sky_star_cap.dart` records, and the reason
+  /// a reader's lit verses are not deleted by a decoration setting.
+  static SkyEntry _applyRecord(
+    List<SkyEntry> current,
+    SkyEntry entry,
+    int cap,
+  ) {
     final int at = current.indexWhere((SkyEntry held) => held.key == entry.key);
     if (at == -1) {
       current.add(entry);
-      while (current.length > skyStarCap) {
+      while (current.length > cap) {
         current.removeAt(0);
       }
       return entry;

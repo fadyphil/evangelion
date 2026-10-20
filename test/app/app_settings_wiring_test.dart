@@ -7,6 +7,9 @@ import 'package:evangelion/core/common/app_config.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
@@ -486,6 +489,100 @@ void main() {
             'Phase 9 pays the debt `app.dart` recorded in its own words ("A later '
             'phase replaces that default with the persisted `UserSettings` value"). '
             'The scope is ABOVE `MaterialApp`, so this cannot be a `MediaQuery` read.',
+      );
+    });
+  });
+
+  group('the seven sky preferences are written by the cubit and read by the handle', () {
+    // ## WHY THE WRITER IS THE CUBIT AND THE READER IS THE HANDLE
+    //
+    // `/reading` draws the witness sky and may not name `features/settings/` —
+    // AGENT_CONTEXT §3 forbids a feature importing another with no exceptions —
+    // so the READER of these seven is the handle, and `handle.settings.<field>`
+    // is the call-through it uses.
+    //
+    // **THE WRITER IS THE CUBIT, and it was the handle until a review found
+    // the difference.** The brief asked the handle to carry seven writers as
+    // well, on the premise that "`/reading` needs to write the sky
+    // preferences" — and that premise was **wrong**: `/reading` reads the
+    // seven and writes none of them, and `/settings`, which may name its own
+    // cubit, writes them. So the handle's seven writers would have been seven
+    // public methods with **no production caller**, and a test calling a
+    // method to prove it works is not a reader.
+    //
+    // **So the seven writers are the cubit's** — as the other twenty-seven
+    // fields' are — and this suite now proves the thing that actually
+    // matters about a seam: **what the cubit writes, the handle reads.**
+    testWidgets('and the cubit holds exactly what the reader chose', (
+      WidgetTester tester,
+    ) async {
+      await pumpApp(tester);
+      final SettingsCubit cubit = getIt<SettingsCubit>();
+
+      await cubit.setStarsOn(on: false);
+      await cubit.setConstellationsOn(on: false);
+      await cubit.setStarCount(12);
+      await cubit.setStarBrightness(150);
+      await cubit.setStarShape(SkyStarShape.star);
+      await cubit.setStarField(SkyStarField.full);
+      await cubit.setTwinkle(twinkling: false);
+
+      final UserSettings settings = getIt<SettingsCubit>().state.settings;
+      expect(settings.starsOn, isFalse);
+      expect(settings.constellationsOn, isFalse);
+      expect(
+        settings.starCount,
+        12,
+        reason: 'inside the slider\'s range (0…60) and therefore unchanged',
+      );
+      expect(settings.starBrightness, 150);
+      expect(settings.starShape, SkyStarShape.star);
+      expect(settings.starField, SkyStarField.full);
+      expect(settings.twinkle, isFalse);
+    });
+
+    testWidgets('and the STORE holds them too', (WidgetTester tester) async {
+      await pumpApp(tester);
+      final SettingsCubit cubit = getIt<SettingsCubit>();
+
+      await cubit.setStarCount(12);
+      await cubit.setStarShape(SkyStarShape.star);
+      await cubit.setTwinkle(twinkling: false);
+
+      // **A fresh data source over the same store** — the only way to prove the
+      // value was persisted rather than held in the cubit. The language arm
+      // above is the precedent, and the reason is the same.
+      final SettingsLocalDataSource fresh = SettingsLocalDataSource();
+      addTearDown(fresh.resetForTest);
+      final UserSettings stored = await fresh.read();
+      expect(stored.starCount, 12);
+      expect(stored.starShape, SkyStarShape.star);
+      expect(stored.twinkle, isFalse);
+    });
+
+    testWidgets('and the handle READS them back, as a call-through', (
+      WidgetTester tester,
+    ) async {
+      // **The readers are `handle.settings.<field>`** — and the handle's
+      // `settings` getter is a call-through to the cubit's state, so there is
+      // one copy of the preference in the process and the reader sees the
+      // value the writer just wrote.
+      await pumpApp(tester);
+      final SettingsHandle handle = getIt<SettingsHandle>();
+      final SettingsCubit cubit = getIt<SettingsCubit>();
+
+      await cubit.setStarCount(30);
+      await cubit.setTwinkle(twinkling: false);
+
+      expect(handle.settings.starCount, 30);
+      expect(handle.settings.twinkle, isFalse);
+      expect(
+        identical(handle.settings, getIt<SettingsCubit>().state.settings),
+        isTrue,
+        reason:
+            'the same object, not an equal one — a cached copy in the handle '
+            'would be a second source of truth for one preference, which is '
+            'the hazard the handle was written to prevent',
       );
     });
   });

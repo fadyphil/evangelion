@@ -830,6 +830,265 @@ void main() {
     });
   });
 
+  group('the wide mode — redesign.html:188-189', () {
+    // ## WHY THE WIDE MODE EXISTS AT ALL, AND IT IS A **MEASURED** REASON
+    //
+    // `:188` — `.segp.wide{width:100%}` — and `:189` —
+    // `.segp.wide button{padding:12px 0;font-size:11px}`.
+    //
+    // The four-segment control **cannot** share a row with a 14.5px label at
+    // 320px, and the standing 320×568 viewport matrix is a gate. The
+    // arithmetic: at 320 the content column is `320 − 2×24` = 272px, the row's
+    // own horizontal padding is 4px a side, so the row is 264px; the
+    // four-segment control's minimum is `4 × 44 = 176px` (`:183`'s
+    // `min-width`), so a label would have `264 − 176 − 10 = 78px` — and
+    // "Curtain shape" at 14.5px is about 88px.
+    //
+    // **The default mode's refusal of equal thirds is NOT re-opened.** It is
+    // recorded on `SegmentedControl.segmentPadding` and in the widget's
+    // `_measureThumb` doc, and it stands: the default mode is used by every
+    // control the app has today. The wide mode is a **separate, opt-in
+    // geometry**.
+
+    Future<void> pumpWide(
+      WidgetTester tester, {
+      double width = 264,
+      ThemeData? theme,
+    }) => pumpPrimitive(
+      tester,
+      Align(
+        alignment: Alignment.topCenter,
+        // **A `maxWidth` constraint and not a `SizedBox`.** A `SizedBox` hands
+        // its child a TIGHT width, and a tight width makes even the default
+        // mode fill the box — so the assertion that the wide mode *fills* the
+        // space would be satisfied by the mode it is meant to distinguish
+        // itself from. A loose constraint is the honest arrangement, and it is
+        // the one the stacked row's trailing arrives with.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: width),
+          child: const _Wide(),
+        ),
+      ),
+      theme: theme,
+    );
+
+    testWidgets('the track fills the width it is given', (
+      WidgetTester tester,
+    ) async {
+      await pumpWide(tester);
+      expect(
+        tester.getSize(find.byType(SegmentedControl<String>)).width,
+        264,
+        reason: '`:188` — `.segp.wide{width:100%}`',
+      );
+    });
+
+    testWidgets('under RTL it drops the transform and the tracking', (
+      WidgetTester tester,
+    ) async {
+      // `eva/redesign.html:190` —
+      // `[dir=rtl] .segp button{font-family:var(--ui-ar);letter-spacing:0;
+      // text-transform:none}` — and `:136` says the same for the `.mono` class
+      // these labels are.
+      //
+      // **THE TRANSFORM IS THE ONE A READER SEES.** The Workshop's seven
+      // untranslated segment labels are **Latin** — `dot`, `star`, `cross`,
+      // `gem`, `crown`, `high`, `full` — so upper-casing them on the Arabic arm
+      // read `DOT` where the prototype writes `dot`.
+      Widget control() => Align(
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: 264,
+          child: SegmentedControl<String>(
+            values: const <String>['dot', 'star'],
+            selected: 'dot',
+            labelOf: (String value) => value,
+            onChanged: (String _) {},
+            wide: true,
+          ),
+        ),
+      );
+
+      await pumpPrimitive(tester, control());
+      await tester.pump();
+      expect(
+        find.text('DOT'),
+        findsOneWidget,
+        reason: "under LTR the prototype's transform applies",
+      );
+
+      await pumpPrimitive(tester, control(), textDirection: TextDirection.rtl);
+      await tester.pump();
+      expect(
+        find.text('dot'),
+        findsOneWidget,
+        reason:
+            'the prototype drops the transform under RTL, so the label keeps '
+            'its own case',
+      );
+      expect(
+        find.text('DOT'),
+        findsNothing,
+        reason: 'and it is NOT upper-cased there',
+      );
+    });
+
+    testWidgets('the segments are EQUAL, which is `:183`\'s `flex:1`', (
+      WidgetTester tester,
+    ) async {
+      await pumpWide(tester);
+      final List<Rect> rects = segmentRects(tester);
+      expect(rects, hasLength(4));
+      // **With a tolerance.** Three 64.5-wide segments and one 64.499999999
+      // are equal for every purpose, and a set of raw doubles would call them
+      // different — a test that fails on the last bit of a float is a test
+      // that cannot be read.
+      final double first = rects.first.width;
+      for (final Rect rect in rects) {
+        expect(
+          rect.width,
+          moreOrLessEquals(first, epsilon: 0.01),
+          reason:
+              'the segments are equal — the widths were '
+              '${rects.map((Rect r) => r.width).toList()}',
+        );
+      }
+    });
+
+    testWidgets('every segment keeps the prototype\'s 44px tap-target floor', (
+      WidgetTester tester,
+    ) async {
+      await pumpWide(tester);
+      expect(SegmentedControl.segmentMinWidth, 44);
+      expect(SegmentedControl.wideTrackMinimumWidth(4), 176);
+      for (final Rect rect in segmentRects(tester)) {
+        expect(
+          rect.width,
+          greaterThanOrEqualTo(SegmentedControl.segmentMinWidth),
+          reason:
+              '`:183` — `min-width:44px` is a tap-target floor, and the '
+              'segment was ${rect.width} wide',
+        );
+      }
+    });
+
+    testWidgets('the button padding is `12px 0`', (WidgetTester tester) async {
+      await pumpWide(tester);
+      // Scoped to the segment's own `InkWell`, for the reason
+      // `segmentStyleOf` gives: the track's `Container` is also a `Container`,
+      // and a bare descendant finder resolves to whichever came first.
+      final Container segment = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.ancestor(
+                of: find.text('TOP'),
+                matching: find.byType(InkWell),
+              ),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(segment.padding, const EdgeInsets.symmetric(vertical: 12));
+      expect(
+        SegmentedControl.wideSegmentPadding,
+        const EdgeInsets.symmetric(vertical: 12),
+        reason:
+            '`:189` — `padding:12px 0`, and the zero horizontal is what '
+            'makes the label fit',
+      );
+    });
+
+    testWidgets('the label is 11px, and its tracking is 0.88px', (
+      WidgetTester tester,
+    ) async {
+      await pumpWide(tester);
+      final TextStyle style = segmentStyleOf(tester, 'top');
+      expect(style.fontSize, 11);
+      // ## THE `em` RULE, AND THIS IS WHERE IT IS EASY TO GET WRONG
+      //
+      // `:184` declares `letter-spacing:.08em` and `:189` declares
+      // `font-size:11px`. Flutter's `letterSpacing` is an absolute advance in
+      // logical pixels and CSS's `em` is relative to the element's own font —
+      // so the value is `11 × 0.08 = 0.88`, and the raw `0.08` would be
+      // **eleven times too small**. The house rule is in `stat_tile.dart:142-147`
+      // and `eva_section_header.dart:191-206`.
+      expect(style.letterSpacing, 0.88);
+      expect(SegmentedControl.wideLabelSize, 11);
+      expect(SegmentedControl.wideLabelLetterSpacing, 0.88);
+      expect(SegmentedControl.labelTracking, 0.08);
+    });
+
+    testWidgets('the default mode is left exactly as it was', (
+      WidgetTester tester,
+    ) async {
+      // The wide mode is **opt-in**, and this is the assertion that it is: the
+      // default mode keeps the `monoCaps` slot's own size and its own padding.
+      // A change here would churn every default-mode golden in the repository,
+      // and the wide mode's whole reason for being is that it does **not**
+      // need those numbers changed.
+      await pumpPrimitive(
+        tester,
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 264),
+            child: const _Three(),
+          ),
+        ),
+      );
+      final TextStyle style = segmentStyleOf(tester, 'Dark');
+      expect(style.fontSize, isNot(11), reason: 'the default keeps the slot');
+      expect(style.letterSpacing, isNot(0.88));
+      final Container segment = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.ancestor(
+                of: find.text('DARK'),
+                matching: find.byType(InkWell),
+              ),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      expect(
+        segment.padding,
+        SegmentedControl.segmentPadding,
+        reason:
+            'the default keeps `padding: 12px 4px`-ish — the wide mode\'s '
+            '`12px 0` is the wide mode\'s own',
+      );
+    });
+
+    testWidgets('the thumb still follows the selection, and it is MEASURED', (
+      WidgetTester tester,
+    ) async {
+      await pumpWide(tester);
+      await tester.pump();
+      final Rect? thumb = thumbRect(tester);
+      expect(thumb, isNotNull, reason: 'the thumb is painted');
+      final List<Rect> rects = segmentRects(tester);
+      expect(
+        thumb!.width,
+        moreOrLessEquals(rects.first.width, epsilon: 0.01),
+        reason:
+            'the thumb spans the SELECTED segment, and the segments are '
+            'equal in the wide mode — so the thumb is as wide as any of them',
+      );
+    });
+
+    for (final (String theme, ThemeData data) in kEvaThemes) {
+      testWidgets('a golden per theme — $theme', (WidgetTester tester) async {
+        await pumpWide(tester, theme: data);
+        await tester.pump();
+        expect(thumb(tester), isNotNull);
+        await expectLater(
+          find.byType(SegmentedControl<String>),
+          matchesGoldenFile('goldens/segmented_control_wide_$theme.png'),
+        );
+      });
+    }
+  });
+
   for (final (String theme, ThemeData data) in kEvaThemes) {
     testWidgets('a golden per theme — $theme', (WidgetTester tester) async {
       await pump(tester, theme: data);
@@ -897,3 +1156,61 @@ class _LiveState extends State<_Live> {
 String _identity(String value) => value;
 
 void _ignore(String value) {}
+
+/// The prototype's **wide** control — `redesign.html:188-189` — with the four
+/// segments the Workshop's three segmented rows use.
+///
+/// The labels are the prototype's own untranslated English
+/// (`redesign.html:653-656`, `:671-674`, `:676-679`), because that is what the
+/// class doc for the segments' labels says: the class name reaches the
+/// geometry and the label reaches the reader.
+class _Wide extends StatefulWidget {
+  const _Wide();
+
+  @override
+  State<_Wide> createState() => _WideState();
+}
+
+class _WideState extends State<_Wide> {
+  static const List<String> values = <String>[
+    'top',
+    'bottom',
+    'sides',
+    'shafts',
+  ];
+
+  String _selected = values.first;
+
+  @override
+  Widget build(BuildContext context) => SegmentedControl<String>(
+    wide: true,
+    values: values,
+    selected: _selected,
+    labelOf: (String value) => value,
+    onChanged: (String value) => setState(() => _selected = value),
+  );
+}
+
+/// The **default** control, in a box wide enough to show that it does not
+/// take the box.
+///
+/// Three segments rather than four, because that is what the app's own
+/// controls use and the default mode's geometry is the one under test.
+class _Three extends StatefulWidget {
+  const _Three();
+
+  @override
+  State<_Three> createState() => _ThreeState();
+}
+
+class _ThreeState extends State<_Three> {
+  String _selected = 'Dark';
+
+  @override
+  Widget build(BuildContext context) => SegmentedControl<String>(
+    values: const <String>['Light', 'Dark', 'System'],
+    selected: _selected,
+    labelOf: (String value) => value,
+    onChanged: (String value) => setState(() => _selected = value),
+  );
+}

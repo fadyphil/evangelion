@@ -92,7 +92,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'font_coverage.dart';
 
 /// One rendered run of text: what it says, and the family it renders in.
-typedef RenderedRun = ({String label, String family});
+/// One painted run: what it says, which family renders it, and **which families
+/// stand behind it**.
+///
+/// **THE FALLBACKS ARE PART OF THE RUN, and they were missing.** Flutter falls
+/// back **per glyph**, so a run whose primary family has no glyph for one
+/// character is rendered by a fallback — and a gate that asked only the primary
+/// family reported that character as tofu when the screen is showing it
+/// correctly.
+///
+/// The first case in this repository is the `↺` (U+21BA) of the Workshop's
+/// restore row: it is drawn in `JetBrainsMono` with
+/// `fontFamilyFallback: [Inter]`, and **U+21BA is in no bundled mono or
+/// scripture face** — it is in `Inter` and `IBMPlexSansArabic` only. So the
+/// run's primary family has no glyph for it and the fallback does, and the
+/// engine picks the fallback.
+typedef RenderedRun = ({String label, String family, List<String> fallbacks});
 
 /// Whether [rune] is in one of the four Unicode blocks Arabic script occupies.
 ///
@@ -455,7 +470,16 @@ Future<void> expectNoTofuInAnyRun(
           '`MaterialApp`\'s own fallback, `monospace`, is a finding, not a skip.',
     );
     if (!kBundledFontFamilies.contains(run.family)) continue;
-    final Set<int> available = codepointsForFamily(run.family);
+    // **THE COVERAGE IS THE FAMILY'S **AND** ITS FALLBACKS'.** Flutter falls
+    // back per glyph, so a character the primary family lacks is drawn by the
+    // first fallback that has it — and asking only the primary family reports a
+    // **correctly rendered** character as tofu.
+    final Set<int> available = <int>{
+      ...codepointsForFamily(run.family),
+      for (final String candidate in run.fallbacks)
+        if (kBundledFontFamilies.contains(candidate))
+          ...codepointsForFamily(candidate),
+    };
     final List<int> missing = <int>{
       for (final int unit in run.label.codeUnits)
         if (!isIgnorableCodeUnit(unit) && !available.contains(unit)) unit,
@@ -464,7 +488,9 @@ Future<void> expectNoTofuInAnyRun(
       missing,
       isEmpty,
       reason:
-          '`${run.label}` is rendered in `${run.family}`, which has no glyph for '
+          '`${run.label}` is rendered in `${run.family}`'
+          '${run.fallbacks.isEmpty ? '' : ' with the fallbacks ${run.fallbacks.join(", ")}'}, '
+          'and none of them has a glyph for '
           '${missing.map((int u) => 'U+${u.toRadixString(16).toUpperCase()}').join(", ")} — '
           'these would be tofu boxes on $screen.',
     );
@@ -606,6 +632,7 @@ List<RenderedRun> _paintedRuns(WidgetTester tester, String fallback) {
       runs.add((
         label: span.toPlainText(),
         family: inherited?.fontFamily ?? fallback,
+        fallbacks: inherited?.fontFamilyFallback ?? const <String>[],
       ));
       return;
     }
@@ -631,6 +658,7 @@ List<RenderedRun> _paintedRuns(WidgetTester tester, String fallback) {
       runs.add((
         label: span.text ?? label,
         family: effective.fontFamily ?? fallback,
+        fallbacks: effective.fontFamilyFallback ?? const <String>[],
       ));
     }
     for (final InlineSpan child in span.children ?? const <InlineSpan>[]) {

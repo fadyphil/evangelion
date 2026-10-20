@@ -252,6 +252,61 @@ void main() {
       expect(skyStarCap, 44);
     });
 
+    test('and the READER\'S cap is the one that evicts', () async {
+      // ## THE CAP IS A **SEAM**, AND THE READER'S CHOICE IS WHAT COMES THROUGH IT
+      //
+      // The prototype's `starCap` is a variable the Star-count slider writes
+      // (`eva/redesign.html:1131`, `:1487`) and this client's is
+      // `UserSettings.starCount` — so the adapter must evict to what the
+      // reader chose, and not to the constant.
+      //
+      // **Lowering the cap deletes nothing by itself**: the trim happens on the
+      // next write, which is the prototype's own eviction (`:1147`) and not the
+      // slider's immediate re-trim (`:1486-1487`). That is why this test
+      // records five verses and reads the survivors — nothing was deleted when
+      // the cap was set.
+      final SkyRepository repo = SkyRepositoryImpl(
+        freshStore(),
+        capReader: () => 3,
+      );
+      for (int v = 1; v <= 5; v++) {
+        await repo.record(verse(verse: v, at: v));
+      }
+
+      final List<SkyEntry> entries = await entriesThroughFreshStore();
+      expect(
+        entries.map((SkyEntry e) => e.key).toList(),
+        <String>['John:3:3', 'John:3:4', 'John:3:5'],
+        reason:
+            'the reader\'s cap (3) and not the prototype\'s 44 — and the oldest '
+            'goes first, which is the prototype\'s '
+            '`while(starCount()>=starCap …)` (`eva/redesign.html:1147`)',
+      );
+    });
+
+    test('and a count outside the range is clamped before it evicts', () async {
+      // A corrupt or hand-edited preference must not be able to make the sky
+      // unbounded — the same argument `clampFontStep` makes for the font step,
+      // and the same one `sky_star_cap.dart`'s clamp makes.
+      final SkyRepository repo = SkyRepositoryImpl(
+        freshStore(),
+        capReader: () => 999,
+      );
+      for (int v = 1; v <= 3; v++) {
+        await repo.record(verse(verse: v, at: v));
+      }
+
+      final List<SkyEntry> entries = await entriesThroughFreshStore();
+      expect(
+        entries,
+        hasLength(3),
+        reason:
+            '999 is clamped to the slider\'s max (60), so three verses fit — a '
+            'cap that was not clamped would still hold three here, and the '
+            'difference shows the moment there are more than 60',
+      );
+    });
+
     test('a 45th record evicts the OLDEST first', () async {
       final SkyRepository repo = SkyRepositoryImpl(freshStore());
       for (int v = 1; v <= skyStarCap + 1; v++) {

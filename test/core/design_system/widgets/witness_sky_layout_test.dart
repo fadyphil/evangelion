@@ -1,5 +1,10 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
+// The two sky enums moved to `core/domain/entities/` in Task 5.7 — see
+// `witness_sky_test.dart`'s note on why they are imported by path rather than
+// re-exported through the design-system barrel.
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,16 +1,27 @@
+// **The design system's own `CurtainShape` is HIDDEN**: see the note in
+// `settings_cubit.dart`'s import block. The design system declares a
+// `CurtainShape` for the **scrim** and the domain declares one for the **aurora
+// curtain**, and a file that imports both gets an ambiguous-name error.
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// `UserSettings` and `AppThemeMode` — the shared kernel's four-field record and the
-/// three-value palette preference.
+/// `UserSettings` and `AppThemeMode` — the shared kernel's preferences record and
+/// the three-value palette preference.
 ///
-/// Red-first per `AGENT_CONTEXT` §6 ("domain logic"), and the two properties that make
-/// this file more than a field list are both about **what the null and the fallback
+/// Red-first per `AGENT_CONTEXT` §6 ("domain logic"), and the properties that make
+/// this file more than a field list are all about **what the null and the fallback
 /// mean**, because those are the two places a preference is wrong in a way a reader
 /// sees.
+///
+/// The record is no longer six fields: Task 5.5 added the two `/communion` ones and
+/// Task 5.7 added twenty-three more, and the twenty-three are asserted here
+/// against the **prototype's** literals.
 void main() {
   group('AppThemeMode', () {
     test('is exactly the prototype\'s three options, in its order', () {
@@ -196,6 +207,150 @@ void main() {
       expect(still.reducedMotion, isTrue);
       expect(still.themeMode, const UserSettings().themeMode);
       expect(still.fontStep, const UserSettings().fontStep);
+    });
+  });
+
+  group('the TWENTY-THREE new fields default to the PROTOTYPE\'S literals', () {
+    // ## WHY THESE ARE ASSERTED AND NOT INHERITED
+    //
+    // `UserSettings()` is the app's "a reader who has chosen nothing" record, and
+    // its defaults are the **prototype's** literals — `eva/redesign.html` is the
+    // design source of truth, and a default that was invented would be a design
+    // decision made by a data file. Every one below is therefore a claim about a
+    // specific line of the prototype, and a claim about a number has to be
+    // checkable.
+    //
+    // ## AND THE COUNT IS ASSERTED, because it is a CLAIM ABOUT THE TASK
+    //
+    // The task's brief counts twenty-three new fields, and the research report's
+    // "twenty-five" is stale (Task 5.5 had already landed `veilWitnesses` and
+    // `showPodium`). A twenty-fourth field added here is a change the task did not
+    // make, and this assertion is where it shows.
+    test('the shader group, and its ten', () {
+      const UserSettings settings = UserSettings();
+      expect(settings.shaderEnabled, isTrue, reason: 'eva/redesign.html:652');
+      expect(
+        settings.curtainShape,
+        CurtainShape.top,
+        reason: 'eva/redesign.html:654-655 — data-s="0"',
+      );
+      expect(settings.reach, 42, reason: 'eva/redesign.html:658 — value="42"');
+      expect(settings.glow, 100, reason: 'eva/redesign.html:659 — value="100"');
+      expect(
+        settings.touchGlow,
+        55,
+        reason: 'eva/redesign.html:660 — value="55"',
+      );
+      expect(settings.hue, 312, reason: 'eva/redesign.html:661 — value="312"');
+      expect(
+        settings.multichromeMelt,
+        isFalse,
+        reason: 'eva/redesign.html:662',
+      );
+      expect(settings.rayCombing, isTrue, reason: 'eva/redesign.html:663');
+      expect(settings.whiteCores, isTrue, reason: 'eva/redesign.html:664');
+      expect(settings.dotVeil, isFalse, reason: 'eva/redesign.html:665');
+    });
+
+    test('the sky group, and its seven', () {
+      const UserSettings settings = UserSettings();
+      expect(settings.starsOn, isTrue, reason: 'eva/redesign.html:667');
+      expect(
+        settings.constellationsOn,
+        isTrue,
+        reason: 'eva/redesign.html:668',
+      );
+      expect(
+        settings.starCount,
+        44,
+        reason: 'eva/redesign.html:669 — value="44"',
+      );
+      expect(
+        settings.starBrightness,
+        100,
+        reason: 'eva/redesign.html:670 — value="100"',
+      );
+      expect(
+        settings.starShape,
+        SkyStarShape.dot,
+        reason: 'eva/redesign.html:672-673 — data-v="s-dot"',
+      );
+      expect(
+        settings.starField,
+        SkyStarField.crown,
+        reason: 'eva/redesign.html:677-678 — data-v="crown"',
+      );
+      expect(settings.twinkle, isTrue, reason: 'eva/redesign.html:681');
+    });
+
+    test('the ritual group, and its six', () {
+      const UserSettings settings = UserSettings();
+      expect(
+        settings.focusDelaySec,
+        4,
+        reason: 'eva/redesign.html:683 — value="4"',
+      );
+      expect(
+        settings.selahLengthSec,
+        60,
+        reason: 'eva/redesign.html:684 — value="60"',
+      );
+      expect(settings.breathGuide, isTrue, reason: 'eva/redesign.html:685');
+      expect(settings.vespersAutoDim, isTrue, reason: 'eva/redesign.html:686');
+      expect(settings.calmMotion, isFalse, reason: 'eva/redesign.html:688');
+      expect(settings.haptics, isTrue, reason: 'eva/redesign.html:689');
+    });
+
+    test('and there are exactly twenty-three of them', () {
+      // The task's own count, asserted so a twenty-fourth field is a visible
+      // change rather than a silent one. The two `/communion` fields are **not**
+      // counted here: they were Task 5.5's, and the research report's "twenty-five"
+      // counted them as new — which is why the number is twenty-three.
+      const UserSettings settings = UserSettings();
+      final List<Object> newFields = <Object>[
+        settings.shaderEnabled,
+        settings.curtainShape,
+        settings.reach,
+        settings.glow,
+        settings.touchGlow,
+        settings.hue,
+        settings.multichromeMelt,
+        settings.rayCombing,
+        settings.whiteCores,
+        settings.dotVeil,
+        settings.starsOn,
+        settings.constellationsOn,
+        settings.starCount,
+        settings.starBrightness,
+        settings.starShape,
+        settings.starField,
+        settings.twinkle,
+        settings.focusDelaySec,
+        settings.selahLengthSec,
+        settings.breathGuide,
+        settings.vespersAutoDim,
+        settings.calmMotion,
+        settings.haptics,
+      ];
+      expect(newFields, hasLength(23));
+    });
+
+    test('and the HUE default is 312, NOT the prototype\'s boot state', () {
+      // The prototype's slider attribute says `312` (`:661`) and its boot state
+      // says `autoH=258` (`:882`). The **declared control default** is 312 — it is
+      // what the control shows a reader and what the reset returns to — and the
+      // divergence is recorded at the field rather than resolved silently.
+      expect(const UserSettings().hue, 312);
+      expect(const UserSettings().hue, isNot(258));
+    });
+
+    test('and the STAR COUNT default is the sky\'s own cap', () {
+      // The prototype's cap is `starCap=44` (`eva/redesign.html:1131`) and the
+      // slider's default is `value="44"` (`:669`). The client's cap constant lives
+      // in `features/sky/domain/sky_star_cap.dart` — a different feature, and
+      // `features/sky/domain/` may not be imported from here without breaking Gate
+      // 2 — so the number is asserted here against the prototype's literal.
+      expect(const UserSettings().starCount, 44);
     });
   });
 }

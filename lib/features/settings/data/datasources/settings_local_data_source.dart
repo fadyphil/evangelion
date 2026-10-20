@@ -1,5 +1,8 @@
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,7 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// readings, questions, submissions and a streak, and `SettingsRepository` has no
 /// HTTP method to call. So this file has no `Dio` in it and there is no `sync`, no
 /// `lastSyncedAt` and no conflict rule. A second store would be a second source of
-/// truth for four fields, which is the drift this repository has already paid for
+/// truth for every field, which is the drift this repository has already paid for
 /// twice (`05-domain-model.md`'s two hex tables, and `Failure`'s excluded `details`).
 ///
 /// ## WHY THE INSTANCE IS **LAZY** AND THE DATA SOURCE IS A SYNCHRONOUS `@module`
@@ -31,10 +34,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// 2.5.x ships `SharedPreferencesWithCache`, which is the package's own recommendation
 /// for new code. It is not used here, for one reason worth recording: this app stores
-/// **four scalar fields** and reads them **once per launch**. The cache exists to
-/// avoid a disk read per access, and there is nothing to amortise — a second layer of
-/// invalidation between the store and the domain entity is a second way for the
-/// rendered theme to disagree with the stored one.
+/// **twenty-nine fields** — the six Phase 9 wrote and the twenty-three Task 5.7
+/// added — and reads them **once per launch**. The cache exists to avoid a disk read
+/// per access, and there is nothing to amortise — a second layer of invalidation
+/// between the store and the domain entity is a second way for the rendered theme to
+/// disagree with the stored one.
 ///
 /// `SharedPreferences.setMockInitialValues` is on this class and not on the async one,
 /// which is why the round-trip test in `settings_repository_test.dart` can drive a
@@ -54,6 +58,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// default palette, which is materially better than an app that will not open — and it
 /// is why `SettingsRepository`'s contract reserves [FailureKind] for the *store* being
 /// unreachable rather than for a value inside it.
+///
+/// ## THE TWENTY-THREE NEW KEYS, AND WHY ADDING THEM NEEDS **NO MIGRATION**
+///
+/// Task 5.7 added twenty-three fields — the Workshop's shader, sky and ritual
+/// preferences. This store has **no versioning scheme and needs none**, and the
+/// reason is the contract above: **every read answers an unread or untypeable key
+/// with the field's own default.** There is no "this build does not know this key"
+/// state, because there is no "this build knows this key" state either — the key is
+/// asked for and it answers.
+///
+/// So the twenty-three keys are **purely additive**. A store written by a build that
+/// had none of them reads as twenty-three defaults, and a store written by a build
+/// that had all of them reads as itself. There is no third state to migrate
+/// between, and **no migration code exists or is needed**.
+///
+/// ## THE **FOUR** PREFIXES, AND WHY THE PLAN NAMED THREE
+///
+/// | prefix | fields | why |
+/// | --- | --- | --- |
+/// | `eva.shader.*` | 10 | the aurora engine's own group |
+/// | `eva.sky.pref.*` | 7 | **not** a bare `eva.sky.*` — `eva.sky.order` and `eva.sky.entries` are the **star-record store's** keys (`sky_local_data_source.dart`), and a reader poking at the store must be able to tell a preference from a record |
+/// | `eva.ritual.*` | 6 | focus and ritual |
+/// | `eva.communion.*` | 2 | **already here** from Task 5.5 — the communion group's two toggles, and this task adds **no** new communion key |
+///
+/// The plan named three and the code has four, and the fourth is not an invention:
+/// `eva.communion.veil_witnesses` and `eva.communion.show_podium` were written by
+/// Task 5.5 and are read by this file today.
+///
+/// ## AND **NONE** OF THE TWENTY-THREE HAS AN "ABSENT" DEFAULT
+///
+/// A new field whose default is "absent" — a `null`, an empty string — would need a
+/// `remove` rather than a write, because a write of `''` would leave a key that says
+/// "this reader chose nothing" in a form no other code writes. **Every one of the
+/// twenty-three is a non-nullable `bool`, `int` or enum**, so plain writes suffice
+/// and the `remove` arm of [write] stays the one the language alone needs.
 final class SettingsLocalDataSource {
   /// A store holding nothing yet.
   SettingsLocalDataSource();
@@ -100,8 +139,21 @@ final class SettingsLocalDataSource {
   /// and is the reason the returned type is not nullable. A store written by a build
   /// that had fewer fields is half-written, so "is the store empty" is not a question
   /// with one useful answer — **every field is asked for itself** and answers its own
-  /// default, and a store with three of the four keys reads as the fourth one's
-  /// default.
+  /// default, and a store holding three of the twenty-nine keys reads as the other
+  /// twenty-six ones' defaults.
+  ///
+  /// ## AND EVERY DEFAULT IS READ FROM **[UserSettings] ITSELF**
+  ///
+  /// The `defaults` below is a `const UserSettings()`, and each field's answer is
+  /// `defaults.<field>`. A literal written here would be a **second copy** of a
+  /// number `user_settings.dart` already owns, and "two writers must not hold two
+  /// spellings of one number" is the drift this repository rejects wherever it
+  /// finds it — `sky_star_cap.dart`'s whole argument is about it.
+  ///
+  /// **[UserSettings.language] is the one exception**, and it is not an
+  /// inconsistency: its default is the *absence* of a value, so its answer is
+  /// `null` and there is nothing to read a default from. The note below says why
+  /// that is a third answer rather than an absence.
   ///
   /// [UserSettings.language] is the one field where that is more than tidiness,
   /// because its default **is** `null` and `null` there is a third answer ("follow
@@ -110,19 +162,73 @@ final class SettingsLocalDataSource {
   /// own default already says it exactly.
   Future<UserSettings> read() async {
     final SharedPreferences preferences = await _preferences;
+    // **The one place each default is spelled.** See the doc above.
+    const UserSettings defaults = UserSettings();
     return UserSettings(
       themeMode:
           AppThemeMode.fromStored(
             _stringAt(preferences, kThemeModeKey) ?? '',
           ) ??
-          AppThemeMode.dark,
-      fontStep: _intAt(preferences, kFontStepKey) ?? kDefaultFontStep,
+          defaults.themeMode,
+      fontStep: _intAt(preferences, kFontStepKey) ?? defaults.fontStep,
       language: ReadingLanguage.fromCode(
         _stringAt(preferences, kLanguageKey) ?? '',
       ),
-      reducedMotion: _boolAt(preferences, kReducedMotionKey) ?? false,
-      veilWitnesses: _boolAt(preferences, kVeilWitnessesKey) ?? false,
-      showPodium: _boolAt(preferences, kShowPodiumKey) ?? true,
+      reducedMotion:
+          _boolAt(preferences, kReducedMotionKey) ?? defaults.reducedMotion,
+      veilWitnesses:
+          _boolAt(preferences, kVeilWitnessesKey) ?? defaults.veilWitnesses,
+      showPodium: _boolAt(preferences, kShowPodiumKey) ?? defaults.showPodium,
+      // ## THE TWENTY-THREE NEW FIELDS
+      //
+      // **Every one answers its own default, and the default is read from
+      // [UserSettings] rather than written here.** The two enum fields go through
+      // `fromStored`, which answers `null` for a value it does not know — so an
+      // unrecognised stored string becomes the default and never a wrong shape.
+      shaderEnabled:
+          _boolAt(preferences, kShaderEnabledKey) ?? defaults.shaderEnabled,
+      curtainShape:
+          CurtainShape.fromStored(
+            _stringAt(preferences, kCurtainShapeKey) ?? '',
+          ) ??
+          defaults.curtainShape,
+      reach: _intAt(preferences, kReachKey) ?? defaults.reach,
+      glow: _intAt(preferences, kGlowKey) ?? defaults.glow,
+      touchGlow: _intAt(preferences, kTouchGlowKey) ?? defaults.touchGlow,
+      hue: _intAt(preferences, kHueKey) ?? defaults.hue,
+      multichromeMelt:
+          _boolAt(preferences, kMultichromeMeltKey) ?? defaults.multichromeMelt,
+      rayCombing: _boolAt(preferences, kRayCombingKey) ?? defaults.rayCombing,
+      whiteCores: _boolAt(preferences, kWhiteCoresKey) ?? defaults.whiteCores,
+      dotVeil: _boolAt(preferences, kDotVeilKey) ?? defaults.dotVeil,
+      starsOn: _boolAt(preferences, kStarsOnKey) ?? defaults.starsOn,
+      constellationsOn:
+          _boolAt(preferences, kConstellationsOnKey) ??
+          defaults.constellationsOn,
+      starCount: _intAt(preferences, kStarCountKey) ?? defaults.starCount,
+      starBrightness:
+          _intAt(preferences, kStarBrightnessKey) ?? defaults.starBrightness,
+      starShape:
+          SkyStarShape.fromStored(
+            _stringAt(preferences, kStarShapeKey) ?? '',
+          ) ??
+          defaults.starShape,
+      starField:
+          SkyStarField.fromStored(
+            _stringAt(preferences, kStarFieldKey) ?? '',
+          ) ??
+          defaults.starField,
+      twinkle: _boolAt(preferences, kTwinkleKey) ?? defaults.twinkle,
+      focusDelaySec:
+          _intAt(preferences, kFocusDelaySecKey) ?? defaults.focusDelaySec,
+      selahLengthSec:
+          _intAt(preferences, kSelahLengthSecKey) ?? defaults.selahLengthSec,
+      breathGuide:
+          _boolAt(preferences, kBreathGuideKey) ?? defaults.breathGuide,
+      vespersAutoDim:
+          _boolAt(preferences, kVespersAutoDimKey) ?? defaults.vespersAutoDim,
+      calmMotion: _boolAt(preferences, kCalmMotionKey) ?? defaults.calmMotion,
+      haptics: _boolAt(preferences, kHapticsKey) ?? defaults.haptics,
     );
   }
 
@@ -161,6 +267,20 @@ final class SettingsLocalDataSource {
   }
 
   /// Replaces the stored preferences.
+  ///
+  /// ## THE **TWENTY-NINE** WRITES, AND WHY **NONE** OF THEM IS A `remove`
+  ///
+  /// The six older keys and the twenty-three new ones are written the same way:
+  /// a `set*` per field, mirroring [read] field for field. **Only [kLanguageKey] is
+  /// removed rather than written**, and that is because its default is *absent* —
+  /// "follow the platform" is the absence of a stored value, and writing `''` would
+  /// leave a key in a form no other code writes.
+  ///
+  /// **None of the twenty-three new fields has an absent default.** Every one is a
+  /// non-nullable `bool`, `int` or enum, so a plain write is the whole of the story
+  /// and there is no `remove` arm for them. The class doc says so too, because the
+  /// next field added to this store should have to answer the question rather than
+  /// copy the pattern.
   Future<void> write(UserSettings settings) async {
     final SharedPreferences preferences = await _preferences;
     await preferences.setString(kThemeModeKey, settings.themeMode.storedValue);
@@ -179,6 +299,33 @@ final class SettingsLocalDataSource {
     await preferences.setBool(kReducedMotionKey, settings.reducedMotion);
     await preferences.setBool(kVeilWitnessesKey, settings.veilWitnesses);
     await preferences.setBool(kShowPodiumKey, settings.showPodium);
+    // ## THE TWENTY-THREE NEW KEYS
+    await preferences.setBool(kShaderEnabledKey, settings.shaderEnabled);
+    await preferences.setString(
+      kCurtainShapeKey,
+      settings.curtainShape.storedValue,
+    );
+    await preferences.setInt(kReachKey, settings.reach);
+    await preferences.setInt(kGlowKey, settings.glow);
+    await preferences.setInt(kTouchGlowKey, settings.touchGlow);
+    await preferences.setInt(kHueKey, settings.hue);
+    await preferences.setBool(kMultichromeMeltKey, settings.multichromeMelt);
+    await preferences.setBool(kRayCombingKey, settings.rayCombing);
+    await preferences.setBool(kWhiteCoresKey, settings.whiteCores);
+    await preferences.setBool(kDotVeilKey, settings.dotVeil);
+    await preferences.setBool(kStarsOnKey, settings.starsOn);
+    await preferences.setBool(kConstellationsOnKey, settings.constellationsOn);
+    await preferences.setInt(kStarCountKey, settings.starCount);
+    await preferences.setInt(kStarBrightnessKey, settings.starBrightness);
+    await preferences.setString(kStarShapeKey, settings.starShape.storedValue);
+    await preferences.setString(kStarFieldKey, settings.starField.storedValue);
+    await preferences.setBool(kTwinkleKey, settings.twinkle);
+    await preferences.setInt(kFocusDelaySecKey, settings.focusDelaySec);
+    await preferences.setInt(kSelahLengthSecKey, settings.selahLengthSec);
+    await preferences.setBool(kBreathGuideKey, settings.breathGuide);
+    await preferences.setBool(kVespersAutoDimKey, settings.vespersAutoDim);
+    await preferences.setBool(kCalmMotionKey, settings.calmMotion);
+    await preferences.setBool(kHapticsKey, settings.haptics);
   }
 
   /// The platform store, read once.
@@ -223,3 +370,153 @@ const String kVeilWitnessesKey = 'eva.communion.veil_witnesses';
 
 /// The preferences key holding [UserSettings.showPodium]. See [kVeilWitnessesKey].
 const String kShowPodiumKey = 'eva.communion.show_podium';
+
+// ---------------------------------------------------------------------------
+// Task 5.7 — the Workshop's twenty-three new keys.
+//
+// ## EVERY KEY IS `eva.`-PREFIXED AND **NAMESPACED BY ITS GROUP**
+//
+// The four prefixes are `eva.shader.*` (ten), `eva.sky.pref.*` (seven),
+// `eva.ritual.*` (six) — and the `eva.communion.*` pair above, which Task 5.5
+// wrote and this task adds nothing to.
+//
+// The sub-namespace in `eva.sky.pref.*` is load-bearing: `eva.sky.order` and
+// `eva.sky.entries` are the **star-record store's** keys
+// (`sky_local_data_source.dart`), and a developer poking at the store has to be
+// able to tell a *preference* from a *record*.
+//
+// ## AND EVERY DEFAULT BELOW IS THE **PROTOTYPE'S LITERAL**
+//
+// `eva/redesign.html` is the design source of truth. The defaults live in
+// `user_settings.dart` — this file reads them from there, so there is one
+// spelling of each — and the citations are the prototype's own lines.
+// ---------------------------------------------------------------------------
+
+/// The preferences key holding [UserSettings.shaderEnabled].
+///
+/// `eva.shader.enabled` — the Aurora engine switch. `eva/redesign.html:652`,
+/// `checked`.
+const String kShaderEnabledKey = 'eva.shader.enabled';
+
+/// The preferences key holding [UserSettings.curtainShape]'s `storedValue`.
+///
+/// `eva.shader.shape` — the Curtain shape segment. `eva/redesign.html:654-655`,
+/// `data-s="0"`.
+const String kCurtainShapeKey = 'eva.shader.shape';
+
+/// The preferences key holding [UserSettings.reach].
+///
+/// `eva.shader.reach` — the Reach slider. `eva/redesign.html:658`, `value="42"`.
+const String kReachKey = 'eva.shader.reach';
+
+/// The preferences key holding [UserSettings.glow].
+///
+/// `eva.shader.glow` — the Brightness slider. `eva/redesign.html:659`,
+/// `value="100"`.
+const String kGlowKey = 'eva.shader.glow';
+
+/// The preferences key holding [UserSettings.touchGlow].
+///
+/// `eva.shader.touch_glow` — the Touch glow slider. `eva/redesign.html:660`,
+/// `value="55"`.
+const String kTouchGlowKey = 'eva.shader.touch_glow';
+
+/// The preferences key holding [UserSettings.hue].
+///
+/// `eva.shader.hue` — the Hue slider. `eva/redesign.html:661`, `value="312"`.
+const String kHueKey = 'eva.shader.hue';
+
+/// The preferences key holding [UserSettings.multichromeMelt].
+///
+/// `eva.shader.melt` — the Multichrome melt switch. `eva/redesign.html:662`.
+const String kMultichromeMeltKey = 'eva.shader.melt';
+
+/// The preferences key holding [UserSettings.rayCombing].
+///
+/// `eva.shader.rays` — the Ray combing switch. `eva/redesign.html:663`,
+/// `checked`.
+const String kRayCombingKey = 'eva.shader.rays';
+
+/// The preferences key holding [UserSettings.whiteCores].
+///
+/// `eva.shader.white` — the White cores switch. `eva/redesign.html:664`, `checked`.
+const String kWhiteCoresKey = 'eva.shader.white';
+
+/// The preferences key holding [UserSettings.dotVeil].
+///
+/// `eva.shader.dots` — the Dot veil switch. `eva/redesign.html:665`.
+const String kDotVeilKey = 'eva.shader.dots';
+
+/// The preferences key holding [UserSettings.starsOn].
+///
+/// `eva.sky.pref.stars_on` — the Stars switch. `eva/redesign.html:667`, `checked`.
+const String kStarsOnKey = 'eva.sky.pref.stars_on';
+
+/// The preferences key holding [UserSettings.constellationsOn].
+///
+/// `eva.sky.pref.constellations` — the Constellations switch.
+/// `eva/redesign.html:668`, `checked`.
+const String kConstellationsOnKey = 'eva.sky.pref.constellations';
+
+/// The preferences key holding [UserSettings.starCount].
+///
+/// `eva.sky.pref.count` — the Star count slider. `eva/redesign.html:669`,
+/// `value="44"`.
+const String kStarCountKey = 'eva.sky.pref.count';
+
+/// The preferences key holding [UserSettings.starBrightness].
+///
+/// `eva.sky.pref.brightness` — the Star brightness slider. `eva/redesign.html:670`,
+/// `value="100"`.
+const String kStarBrightnessKey = 'eva.sky.pref.brightness';
+
+/// The preferences key holding [UserSettings.starShape]'s `storedValue`.
+///
+/// `eva.sky.pref.shape` — the Star shape segment. `eva/redesign.html:672-673`,
+/// `data-v="s-dot"`.
+const String kStarShapeKey = 'eva.sky.pref.shape';
+
+/// The preferences key holding [UserSettings.starField]'s `storedValue`.
+///
+/// `eva.sky.pref.field` — the Star field segment. `eva/redesign.html:677-678`,
+/// `data-v="crown"`.
+const String kStarFieldKey = 'eva.sky.pref.field';
+
+/// The preferences key holding [UserSettings.twinkle].
+///
+/// `eva.sky.pref.twinkle` — the Twinkle switch. `eva/redesign.html:681`, `checked`.
+const String kTwinkleKey = 'eva.sky.pref.twinkle';
+
+/// The preferences key holding [UserSettings.focusDelaySec].
+///
+/// `eva.ritual.focus_delay` — the Focus delay slider. `eva/redesign.html:683`,
+/// `value="4"`. The unit is seconds.
+const String kFocusDelaySecKey = 'eva.ritual.focus_delay';
+
+/// The preferences key holding [UserSettings.selahLengthSec].
+///
+/// `eva.ritual.selah_length` — the Selah length slider. `eva/redesign.html:684`,
+/// `value="60"`, `step="5"`. The unit is seconds.
+const String kSelahLengthSecKey = 'eva.ritual.selah_length';
+
+/// The preferences key holding [UserSettings.breathGuide].
+///
+/// `eva.ritual.breath` — the Breath guide switch. `eva/redesign.html:685`,
+/// `checked`.
+const String kBreathGuideKey = 'eva.ritual.breath';
+
+/// The preferences key holding [UserSettings.vespersAutoDim].
+///
+/// `eva.ritual.vespers` — the Vespers auto-dim switch. `eva/redesign.html:686`,
+/// `checked`.
+const String kVespersAutoDimKey = 'eva.ritual.vespers';
+
+/// The preferences key holding [UserSettings.calmMotion].
+///
+/// `eva.ritual.calm` — the Calm motion switch. `eva/redesign.html:688`.
+const String kCalmMotionKey = 'eva.ritual.calm';
+
+/// The preferences key holding [UserSettings.haptics].
+///
+/// `eva.ritual.haptics` — the Haptics switch. `eva/redesign.html:689`, `checked`.
+const String kHapticsKey = 'eva.ritual.haptics';

@@ -77,14 +77,40 @@ UserSettings unwrap(Result<UserSettings> result) => switch (result) {
 ///
 /// The constant that holds [key].
 ///
-/// A `switch` over the four keys rather than a derived name, because the mapping from
-/// value to identifier is **not** mechanical (`eva.reduced_motion` →
-/// `kReducedMotionKey`) and a derived guess would be a second place to get it wrong.
+/// A `switch` over the twenty-nine keys rather than a derived name, because the
+/// mapping from value to identifier is **not** mechanical (`eva.reduced_motion`
+/// → `kReducedMotionKey`) and a derived guess would be a second place to get it
+/// wrong.
 String _constantFor(String key) => switch (key) {
   kThemeModeKey => 'kThemeModeKey',
   kFontStepKey => 'kFontStepKey',
   kLanguageKey => 'kLanguageKey',
   kReducedMotionKey => 'kReducedMotionKey',
+  kVeilWitnessesKey => 'kVeilWitnessesKey',
+  kShowPodiumKey => 'kShowPodiumKey',
+  kShaderEnabledKey => 'kShaderEnabledKey',
+  kCurtainShapeKey => 'kCurtainShapeKey',
+  kReachKey => 'kReachKey',
+  kGlowKey => 'kGlowKey',
+  kTouchGlowKey => 'kTouchGlowKey',
+  kHueKey => 'kHueKey',
+  kMultichromeMeltKey => 'kMultichromeMeltKey',
+  kRayCombingKey => 'kRayCombingKey',
+  kWhiteCoresKey => 'kWhiteCoresKey',
+  kDotVeilKey => 'kDotVeilKey',
+  kStarsOnKey => 'kStarsOnKey',
+  kConstellationsOnKey => 'kConstellationsOnKey',
+  kStarCountKey => 'kStarCountKey',
+  kStarBrightnessKey => 'kStarBrightnessKey',
+  kStarShapeKey => 'kStarShapeKey',
+  kStarFieldKey => 'kStarFieldKey',
+  kTwinkleKey => 'kTwinkleKey',
+  kFocusDelaySecKey => 'kFocusDelaySecKey',
+  kSelahLengthSecKey => 'kSelahLengthSecKey',
+  kBreathGuideKey => 'kBreathGuideKey',
+  kVespersAutoDimKey => 'kVespersAutoDimKey',
+  kCalmMotionKey => 'kCalmMotionKey',
+  kHapticsKey => 'kHapticsKey',
   final String other => throw ArgumentError.value(
     other,
     'key',
@@ -310,26 +336,57 @@ void main() {
     });
   });
 
-  group('the raw keys are namespaced, and the file declares the four', () {
+  group('the raw keys are namespaced, and the file declares all of them', () {
     // The plan's file map says nothing about key names, so this is the one place they
     // are pinned — and it is a *source* assertion as well as a behavioural one, because
     // a store's keys are an interface with the device and with a future migration and
     // nothing else in the app can see them.
+    //
+    // **THE LIST GREW FROM FOUR TO TWENTY-NINE IN TASK 5.7**, and the gate grew with
+    // it rather than staying a sample of four. The list is written out here rather
+    // than discovered, because a declaration that moved out of the file is the
+    // failure this is for — and a *discovered* list would have discovered the
+    // twenty-five new keys and declared the gate satisfied by construction.
     const List<String> keys = <String>[
       kThemeModeKey,
       kFontStepKey,
       kLanguageKey,
       kReducedMotionKey,
+      kVeilWitnessesKey,
+      kShowPodiumKey,
+      kShaderEnabledKey,
+      kCurtainShapeKey,
+      kReachKey,
+      kGlowKey,
+      kTouchGlowKey,
+      kHueKey,
+      kMultichromeMeltKey,
+      kRayCombingKey,
+      kWhiteCoresKey,
+      kDotVeilKey,
+      kStarsOnKey,
+      kConstellationsOnKey,
+      kStarCountKey,
+      kStarBrightnessKey,
+      kStarShapeKey,
+      kStarFieldKey,
+      kTwinkleKey,
+      kFocusDelaySecKey,
+      kSelahLengthSecKey,
+      kBreathGuideKey,
+      kVespersAutoDimKey,
+      kCalmMotionKey,
+      kHapticsKey,
     ];
 
     test('they are distinct and `eva.`-prefixed', () {
-      expect(keys.toSet(), hasLength(4));
+      expect(keys.toSet(), hasLength(29));
       for (final String key in keys) {
         expect(key, startsWith('eva.'), reason: '$key must be namespaced');
       }
     });
 
-    test('and the file that writes them declares all four', () {
+    test('and the file that writes them declares all of them', () {
       final String source = File(
         'lib/features/settings/data/datasources/settings_local_data_source.dart',
       ).readAsStringSync();

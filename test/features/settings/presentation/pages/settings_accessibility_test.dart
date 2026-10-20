@@ -1,16 +1,13 @@
 import 'dart:ui' show Tristate;
 
 import 'package:evangelion/core/common/failure.dart';
-import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
-import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
-import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
@@ -19,93 +16,142 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/settings_harness.dart';
 
-/// §14 for `/settings`: no unlabeled interactive node, a focus ring on everything a
-/// keyboard can reach, and no state carried by colour alone.
+/// §14 for `/settings` — **the Workshop**.
 ///
-/// ## WHY THIS FILE EXISTS
+/// ## WHY THIS FILE EXISTS, AND WHY IT IS NOT THE OLD ONE
 ///
-/// `09-quality-gates.md` §14's target is "all 6 pages pass a semantics sweep with no
-/// unlabeled interactive node". `login`, `/`, `/reading`, `/quiz` and `/result` each
-/// have a `*_accessibility_test.dart` whose first group is that sweep over the page's
-/// whole semantics tree. `/settings` had **no** such file after Phase 9 — five of six
-/// pages, and the sentence could not be claimed for the app.
+/// `09-quality-gates.md` §14's target is "all 6 pages pass a semantics sweep with
+/// no unlabeled interactive node", and the redesign's `/settings` is the page
+/// where that sweep is **hardest**: twenty-nine interactive controls of four
+/// different kinds, and every one of them sits on a row whose title the
+/// design system's `SettingsTile` **excludes from the semantics tree**
+/// (`settings_tile.dart:268`).
 ///
-/// ## AND THIS IS THE PAGE WHERE §14'S ROWS ARE HARDEST, BECAUSE EVERY ROW HAS A
-/// ## CONTROL ON IT
+/// **That exclusion is the whole reason this screen needed a new shape of
+/// sweep.** On the Phase-9 screen the row's title was the control's name; on
+/// this one the trailing control is the only node that can name its row, so a
+/// row whose control forgot to name itself is a row a screen reader reaches and
+/// cannot identify. Every one of the twenty-nine therefore has to carry its
+/// row's title as its own accessible name.
 ///
-/// The other five screens have one or two controls this design system owns.
-/// `/settings` has **four distinct interactive widgets** from `core/design_system/` —
-/// `SegmentedControl`, `FontSizeStepper` (three `IconActionButton`s and a slider
-/// track), `EvaToggle` and `SettingsTile`'s own row button — and `focus_ring_gate_test.dart`'s
-/// source walk covers `lib/core/design_system/widgets/` only, so it confirms each of
-/// those widgets is sound and says nothing about whether `/settings` **composed** them
-/// into named, focusable, correctly-labelled controls.
+/// ## WHAT CHANGED FROM THE PHASE-9 SWEEP, AND WHY THE OLD ASSERTIONS ARE GONE
 ///
-/// `login_accessibility_test.dart` states the same argument for `/login`'s two
-/// feature-owned controls; this is the same gap with four design-system ones.
+/// The Phase-9 screen had a **three-segment** theme picker and a language
+/// **sheet**, and this suite asserted:
 ///
-/// ## AND THE `already_answered`-STYLE ROWS DO NOT APPLY HERE
+/// * the theme track was named "Theme" — **gone**: the theme group holds one
+///   control now, the Daylight toggle (`:650`), and the track does not exist;
+/// * the switch was named "Off" / "On" — **gone**: `EvaToggle` publishes
+///   `Semantics(label: labels.on / labels.off)`, and a name that changes with
+///   the state is a **state** name, not a **control** name. Every switch on
+///   this screen is now named by its **row title in both arms**, and the state
+///   is carried by `Semantics(toggled:)`.
 ///
-/// Recorded rather than left for a reader to assume: `/settings` has **no disabled
-/// control** and **no spoiler**, because it has no state machine a reader can be
-/// caught out by — the language row is always live, the theme track always has a
-/// selection, the stepper is always in range. The states that *do* exist are
-/// `SettingsStatus.loading` (never rendered — the screen shows the defaults, which is
-/// the same tree) and `SettingsStatus.failed` (Phase 10's notice, swept below).
+/// **Asserting the old names would be asserting a defect.** A suite that
+/// expected "Off" would go red on the fix and green on the regression.
+///
+/// ## AND THE **DUPLICATE-NAME** DEFECT, WHICH IS THE ONE THIS SCREEN CAN STILL
+/// ## FALL INTO
+///
+/// `settings_tile.dart` measures it: **one string describing two focusable,
+/// activatable nodes** is a §14 failure in the one place §14 is unambiguous. On
+/// this screen the risk is real — sixteen switches and nine sliders are named
+/// by their rows' titles, and a row whose title is also a control's name would
+/// put the same string on two activatable nodes.
 void main() {
-  final AppLocalizations strings = AppLocalizationsEn();
+  final AppLocalizationsEn en = AppLocalizationsEn();
+  final AppLocalizationsAr ar = AppLocalizationsAr();
 
-  group('no unlabeled interactive node', () {
-    testWidgets('the ready screen, every control named', (
+  group('every control has an accessible name', () {
+    // ## THE SWEEP, AND WHY IT IS **NOT** AN ASSERTION ABOUT FLAGS
+    //
+    // `SemanticsData.hasAction` against the **data**, never against the
+    // presence of a `Semantics` widget — `controls_test.dart`'s own header
+    // records the measurement: six of the eleven interactive widgets shipped a
+    // node a reader could read and could not press, and every committed test
+    // passed because they all used `tester.tap()`, which goes through the
+    // pointer path.
+    testWidgets('every activatable node on the screen is named', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpSettings(tester);
 
-      final List<SemanticsData> tappable = nodesOffering(
-        tester,
-        SemanticsAction.tap,
-      );
-
+      final List<SemanticsData> activatable = _activatable(tester);
       expect(
-        tappable,
-        isNotEmpty,
+        activatable,
+        hasLength(greaterThan(40)),
         reason:
-            'the screen has a back button, a theme track, two stepper buttons, a '
-            'motion switch and a language row; an empty list means the walk saw '
-            'nothing and everything below would be vacuously true',
+            'the screen has twenty-nine controls and a back button, so a walk that '
+            'found fewer than forty activatable nodes has seen less than the screen '
+            'has. An empty list would make every assertion below vacuously true.',
       );
-      for (final SemanticsData node in tappable) {
+      for (final SemanticsData node in activatable) {
         expect(
           node.label.trim(),
           isNotEmpty,
           reason:
-              'an interactive node with no accessible name. §14\'s first row. '
-              'flags=${node.flagsCollection} actions=${node.actions}',
+              'an activatable node with no accessible name. §14\'s first row. '
+              'actions=${node.actions}',
         );
       }
 
       handle.dispose();
     });
 
-    testWidgets('and the failed state, whose notice adds a control', (
+    // ## AND THE **ARABIC** ARM, WHERE THE NAMES ARE THE READER'S OWN
+    //
+    // **The same sweep, on the arm whose script differs.** The names are the
+    // ARB's own strings there, so an English name surviving into the Arabic
+    // arm would be a defect a length check would not see.
+    testWidgets('and the same on the Arabic arm, in the reader\'s own script', (
       WidgetTester tester,
     ) async {
-      // Swept as its own test rather than folded into the one above for the reason
-      // `home_accessibility_test.dart` records: one looping test names a *state* in
-      // prose and a *line* that is the same for all of them, so an empty node list
-      // cannot say which state produced it. An error view is also exactly where a
-      // label goes missing — Phase 10's notice is a new control and a new label, and
-      // this is what holds it.
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester, locale: const Locale('ar'));
+
+      for (final SemanticsData node in _activatable(tester)) {
+        expect(
+          node.label.trim(),
+          isNotEmpty,
+          reason: 'the same sweep, in Arabic',
+        );
+
+        // **The seven untranslated labels are the exception, and they are
+        // named.** `eva/redesign.html:673` and `:678` carry no `data-i18n`, so
+        // the prototype's own English is kept — and the brief's D11 says so
+        // explicitly. The exclusion is a **list**, not a blanket waiver: every
+        // other name on the Arabic arm is Arabic.
+        if (_untranslatedSegmentLabels.contains(node.label.trim())) continue;
+        expect(
+          node.label,
+          isNot(matches(RegExp('[A-Za-z]'))),
+          reason:
+              'the node "${node.label}" carries Latin script on the Arabic arm. '
+              'Only the seven untranslated segment labels may, and they are '
+              'listed in this file.',
+        );
+      }
+
+      handle.dispose();
+    });
+
+    // ## AND THE **FAILED** STATE, WHOSE NOTICE ADDS A CONTROL
+    //
+    // Swept as its own test rather than folded into the one above for the
+    // reason `home_accessibility_test.dart` records: one looping test names a
+    // *state* in prose and a *line* that is the same for all of them, so an
+    // empty node list cannot say which state produced it.
+    testWidgets('and in the failed state, whose notice adds a control', (
+      WidgetTester tester,
+    ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpSettings(tester, cubit: _unreachableStore());
+      await pumpSettingsFrames(tester, 4);
 
-      final List<SemanticsData> tappable = nodesOffering(
-        tester,
-        SemanticsAction.tap,
-      );
-      expect(tappable, isNotEmpty);
-      for (final SemanticsData node in tappable) {
+      final List<SemanticsData> activatable = _activatable(tester);
+      expect(activatable, isNotEmpty);
+      for (final SemanticsData node in activatable) {
         expect(
           node.label.trim(),
           isNotEmpty,
@@ -117,314 +163,461 @@ void main() {
 
       handle.dispose();
     });
+  });
 
-    testWidgets('and the Arabic arm', (WidgetTester tester) async {
-      final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpSettings(tester, locale: const Locale('ar'));
-
-      for (final SemanticsData node in nodesOffering(
-        tester,
-        SemanticsAction.tap,
-      )) {
-        expect(
-          node.label.trim(),
-          isNotEmpty,
-          reason: 'the same sweep on the arm whose script differs',
-        );
-      }
-
-      handle.dispose();
-    });
-
-    testWidgets('the named controls are the ones the screen draws', (
+  group('no two activatable nodes share a name', () {
+    // ## THE DEFECT, AND WHY IT IS **ACTIVATABLE** NODES AND NOT ALL NODES
+    //
+    // §14's row is "one string describing two **focusable, activatable**
+    // nodes" — and the qualifier is the whole of it. A static label is a
+    // different thing: §14 has nothing to say about two paragraphs using the
+    // same word.
+    //
+    // **The two duplications this file measured and did NOT count**, named here
+    // so that a reader knows the sweep saw them rather than missed them:
+    //
+    // * the two **"A"** nodes the type-size stepper's buttons paint — they
+    //   are the `FontSizeStepper`'s own glyphs, they carry no action, and the
+    //   button each sits in is named "Decrease font size" / "Increase font
+    //   size". `font_size_stepper.dart` owns them, not this screen;
+    // * the Arabic arm's **"اللغة"**, which is both the language group's
+    //   header and the language control's own name. The header is a static
+    //   label and the control is the activatable one, so §14's rule is not
+    //   broken — but the reader does hear the word twice, and that is a
+    //   consequence of the single-script group header the brief's A1 records.
+    testWidgets('on the English arm, no two carry the same name', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpSettings(tester);
 
-      // **Enumerated, not "some of them."** §14's gap is an *unnamed* control, and a
-      // label that drifted off the control it names is the same defect one step later
-      // — which is what `settingsFontScale` versus `settingsFontSize` is about, two
-      // names for two nodes on this very screen.
-      expect(find.bySemanticsLabel(strings.settingsBack), findsOneWidget);
+      _expectNoDuplicateNames(tester);
 
-      // **Nodes, not widgets.** `find.bySemanticsLabel` returns *widgets*, and one
-      // `SemanticsNode` can be contributed to by several — so `findsOneWidget` on it
-      // answers "how many widgets carry this label", which is not the question. The
-      // sweep's own currency is `SemanticsData`, and the rest of this group uses it.
-      //
-      // It is not a hypothetical: `settingsTitle` matched **two** widgets for one
-      // node, and a draft of this test asserted `findsOneWidget` on all eight labels
-      // and failed on the title with `Found 2 widgets with a semantics label
-      // matching the pattern` — a failure about `find`, not about the screen.
-      int nodesNamed(String label) =>
-          semanticsTree(tester)
-              .where((SemanticsData node) => node.label.trim() == label)
-              .length;
+      handle.dispose();
+    });
 
-      expect(nodesNamed(strings.settingsTitle), 1);
+    testWidgets('and on the Arabic arm', (WidgetTester tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester, locale: const Locale('ar'));
 
-      // The theme track: three segments, each a button, each named **once**.
-      //
-      // And the track itself — a fourth activatable node — named for the control
-      // rather than for one of its options. Both halves are
-      // `SegmentedControl.semanticLabel`'s subject; the second is the assertion that
-      // holds it, since a track named "Dark" is a second activatable "Dark" here.
-      for (final String mode in <String>[
-        strings.settingsThemeLight,
-        strings.settingsThemeDark,
-        strings.settingsThemeSystem,
-      ]) {
-        expect(
-          nodesNamed(mode),
-          1,
-          reason:
-              'a segment is a control, §14 asks it to be named, and one name must '
-              'not describe two activatable nodes — the `readingTextSize` defect',
-        );
-      }
-      expect(
-        nodesNamed(strings.settingsTheme),
-        1,
-        reason:
-            'and the track is named for the control. It was named for the SELECTED '
-            'VALUE until Phase 10, which put two activatable nodes on this screen '
-            'with the label "Dark" — measured, and the reason '
-            '`SegmentedControl.semanticLabel` exists.',
-      );
-
-      // The stepper: three labels for three nodes — the track is the SLIDER and the
-      // two buttons are buttons. One string for all three would be the
-      // `readingTextSize` defect, and the ARB deliberately gives the track its own
-      // (`settingsFontScale`).
-      expect(
-        find.bySemanticsLabel(strings.settingsFontScale),
-        findsOneWidget,
-        reason: 'the slider track is its own node and its own name',
-      );
-      expect(
-        find.bySemanticsLabel(strings.settingsDecreaseFontSize),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(strings.settingsIncreaseFontSize),
-        findsOneWidget,
-      );
-
-      // The motion switch, on **its own localised label** rather than the English
-      // `On`/`Off` that `EvaToggle` used to hard-code for six phases.
-      // **The English arm's `settingsMotionOff` is literally `"Off"`**, so asserting
-      // `findsNothing` for the string `'Off'` here would be asserting the screen is
-      // broken — and it did, with `Found 1 widget with a semantics label named
-      // "Off"`. The hard-coded-English regression can only be asked on the Arabic
-      // arm, and it is asked there, in the last group. This is the positive claim: the
-      // switch is named by the ARB, which on this arm is "Off".
-      expect(nodesNamed(strings.settingsMotionOff), 1);
-
-      // The language row. **`contains`, not equality** — and the reason is
-      // `SettingsTile`'s own recorded decision: the row keeps `excludeSemantics:
-      // false` so a nested control survives, which means the trailing text is
-      // announced **inside** the row's name. Measured before Phase 10 and after:
-      //
-      // ```text
-      // lbl="Default language|Default language|English"   <- the title twice
-      // lbl="Default language|English"                    <- the title once
-      // ```
-      //
-      // and the first version of this assertion, `findsOneWidget` on
-      // `bySemanticsLabel('Default language')`, failed with `Found 0 widgets` —
-      // because the label is no longer *equal* to the row title, and
-      // `bySemanticsLabel` with a plain String is an equality test.
-      expect(
-        semanticsTree(tester).where(
-          (SemanticsData node) =>
-              node.label.trim().startsWith(strings.settingsDefaultLanguage) &&
-              node.hasAction(SemanticsAction.tap),
-        ),
-        hasLength(1),
-        reason:
-            'exactly one activatable node is named for the language row, and its name '
-            'begins with the row\'s own title',
-      );
+      _expectNoDuplicateNames(tester);
 
       handle.dispose();
     });
   });
 
-  group('§14 — a choice is announced as a choice', () {
+  group('the switches announce their state', () {
+    // ## THE SIXTEEN, EACH NAMED BY ITS ROW **AND** ANNOUNCING ITS POSITION
+    //
+    // **The state is read from the setting and compared with the node**, so
+    // the assertion is "the switch says what it is" rather than "the switch
+    // says what the default is" — a table of defaults would be a second copy
+    // of `UserSettings`' own.
+    //
+    // The seeded values are chosen to **disagree with the defaults** for half
+    // the switches, so a switch that announced a constant would be caught.
+    testWidgets('each is named by its row and announces its position', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final SettingsCubit cubit = await pumpSettings(
+        tester,
+        stored: const UserSettings(
+          shaderEnabled: false,
+          multichromeMelt: true,
+          rayCombing: false,
+          whiteCores: false,
+          dotVeil: true,
+          starsOn: false,
+          constellationsOn: false,
+          twinkle: false,
+          breathGuide: false,
+          vespersAutoDim: false,
+          reducedMotion: true,
+          calmMotion: true,
+          haptics: false,
+          veilWitnesses: true,
+          showPodium: false,
+        ),
+      );
+      final UserSettings settings = cubit.state.settings;
+
+      final List<(String, bool Function(UserSettings))> switches =
+          <(String, bool Function(UserSettings))>[
+            (
+              en.settingsDaylight,
+              (UserSettings s) => s.themeMode == AppThemeMode.light,
+            ),
+            (en.settingsShaderEngine, (UserSettings s) => s.shaderEnabled),
+            (en.settingsMultichromeMelt, (UserSettings s) => s.multichromeMelt),
+            (en.settingsRayCombing, (UserSettings s) => s.rayCombing),
+            (en.settingsWhiteCores, (UserSettings s) => s.whiteCores),
+            (en.settingsDotVeil, (UserSettings s) => s.dotVeil),
+            (en.settingsStars, (UserSettings s) => s.starsOn),
+            (en.settingsConstellations, (UserSettings s) => s.constellationsOn),
+            (en.settingsTwinkle, (UserSettings s) => s.twinkle),
+            (en.settingsBreathGuide, (UserSettings s) => s.breathGuide),
+            (en.settingsVespersAutoDim, (UserSettings s) => s.vespersAutoDim),
+            (en.settingsReduceMotion, (UserSettings s) => s.reducedMotion),
+            (en.settingsCalmMotion, (UserSettings s) => s.calmMotion),
+            (en.settingsHaptics, (UserSettings s) => s.haptics),
+            (en.settingsVeilWitnesses, (UserSettings s) => s.veilWitnesses),
+            (en.settingsShowPodium, (UserSettings s) => s.showPodium),
+          ];
+      expect(
+        switches,
+        hasLength(16),
+        reason: 'the screen has sixteen switches',
+      );
+
+      for (final (String title, bool Function(UserSettings) read) in switches) {
+        final SemanticsData node = _named(tester, title);
+        expect(
+          node.label.trim(),
+          title,
+          reason:
+              'a switch is named by its **row title in both arms** — a name that '
+              'changes with the state is a state name, not a control name',
+        );
+        expect(
+          node.flagsCollection.isToggled,
+          read(settings) ? Tristate.isTrue : Tristate.isFalse,
+          reason: 'the "$title" switch announces the position it is in',
+        );
+        expect(
+          node.hasAction(SemanticsAction.tap),
+          isTrue,
+          reason: 'a switch a reader cannot flip is not a control',
+        );
+      }
+
+      handle.dispose();
+    });
+
+    // ## AND THE **ARABIC** ARM CARRIES THE **ARABIC** TITLE
+    //
+    // The Phase-9 defect this repository has already paid for once: `EvaToggle`
+    // published two English words — "On" and "Off" — on both arms for six
+    // phases, and no gate could see it, because a semantics label is not
+    // painted and a golden captures no semantics.
+    testWidgets('and on the Arabic arm the name is the Arabic title', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester, locale: const Locale('ar'));
+
+      for (final SemanticsData node in _activatable(tester)) {
+        if (node.flagsCollection.isToggled == Tristate.none) continue;
+        expect(
+          node.label,
+          isNot(matches(RegExp('[A-Za-z]'))),
+          reason:
+              'the switch "${node.label}" is named in English on the Arabic arm. '
+              'The name is the row\'s own title, and the row\'s title is Arabic '
+              'there.',
+        );
+      }
+
+      handle.dispose();
+    });
+  });
+
+  group('the sliders are named, and announce their value', () {
+    // ## THE EIGHT, EACH NAMED BY ITS ROW **AND** CARRYING ITS NUMBER
+    //
+    // **`Semantics(slider: true, value: …)` is the claim, and the value is the
+    // raw number** — the prototype paints no number at all (`:429-430`), so
+    // the client paints none either, but a slider a reader can move and cannot
+    // read is not a control.
+    testWidgets('each is named by its row and announces its value', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final SettingsCubit cubit = await pumpSettings(
+        tester,
+        stored: const UserSettings(
+          reach: 60,
+          glow: 80,
+          touchGlow: 50,
+          hue: 200,
+          starCount: 30,
+          starBrightness: 80,
+          focusDelaySec: 8,
+          selahLengthSec: 45,
+        ),
+      );
+      final UserSettings settings = cubit.state.settings;
+
+      final List<(String, int Function(UserSettings))> sliders =
+          <(String, int Function(UserSettings))>[
+            (en.settingsReach, (UserSettings s) => s.reach),
+            (en.settingsBrightness, (UserSettings s) => s.glow),
+            (en.settingsTouchGlow, (UserSettings s) => s.touchGlow),
+            (en.settingsHue, (UserSettings s) => s.hue),
+            (en.settingsStarCount, (UserSettings s) => s.starCount),
+            (en.settingsStarBrightness, (UserSettings s) => s.starBrightness),
+            (en.settingsFocusDelay, (UserSettings s) => s.focusDelaySec),
+            (en.settingsSelahLength, (UserSettings s) => s.selahLengthSec),
+          ];
+      expect(sliders, hasLength(8), reason: 'the screen has eight sliders');
+
+      for (final (String title, int Function(UserSettings) read) in sliders) {
+        final SemanticsData node = _named(tester, title);
+        expect(
+          node.label.trim(),
+          title,
+          reason: 'the slider is named by its row',
+        );
+        expect(
+          node.flagsCollection.isSlider,
+          isTrue,
+          reason: 'the "$title" control is announced as a slider',
+        );
+        expect(
+          node.value,
+          '${read(settings)}',
+          reason:
+              'the "$title" slider announces the number it is on, and the number '
+              'is the raw value — the prototype paints none, so the client paints '
+              'none and the announced value is the raw one',
+        );
+        expect(
+          node.hasAction(SemanticsAction.increase) &&
+              node.hasAction(SemanticsAction.decrease),
+          isTrue,
+          reason:
+              'a slider is operated by increasing and decreasing it, not by '
+              'pressing it. `controls_test.dart` asserts the same for the widget '
+              'alone; this is the screen\'s composition of it.',
+        );
+      }
+
+      handle.dispose();
+    });
+
+    // ## AND A SLIDER AT THE END OF ITS RANGE OFFERS NO ACTION PAST IT
+    //
+    // **The boundary is the claim, and it is `EvaRangeSlider`'s own rule**:
+    // `onIncrease` is `null` when the value cannot go up and `onDecrease` is
+    // `null` when it cannot go down. A node that offered a decrease that
+    // could not happen would be a reader pressing a button that does nothing.
     testWidgets(
-      'the theme track carries `selected`, so the answer is knowable',
+      'and a slider at the end of its range offers no action past it',
       (WidgetTester tester) async {
         final SemanticsHandle handle = tester.ensureSemantics();
-        await pumpSettings(
-          tester,
-          stored: const UserSettings(themeMode: AppThemeMode.light),
-        );
+        // **The Brightness slider at its minimum** — `eva/redesign.html:659`'s
+        // `min="40"`.
+        await pumpSettings(tester, stored: const UserSettings(glow: 40));
 
-        // **Filtered on the three segment labels, by name.** The earlier filter was
-        // `label.contains(settingsTheme)` and it found nothing, for the measured
-        // reason `SegmentedControl.semanticLabel` documents: until Phase 10 the
-        // track was named after the *selected value*, so no node on this screen
-        // carried the word "Theme" except the row's painted title. Naming the three
-        // options is exact, and cannot drift as the track's name changes.
-        final List<String> optionLabels = <String>[
-          strings.settingsThemeLight,
-          strings.settingsThemeDark,
-          strings.settingsThemeSystem,
-        ];
-        final Iterable<SemanticsData> segments = semanticsTree(tester).where(
-          (SemanticsData node) => optionLabels.contains(node.label.trim()),
+        final SemanticsData node = _named(tester, en.settingsBrightness);
+        expect(node.value, '40');
+        expect(
+          node.hasAction(SemanticsAction.decrease),
+          isFalse,
+          reason: 'there is nothing below 40 to go to',
         );
         expect(
-          segments,
-          hasLength(3),
-          reason:
-              'three segments, so a `selected` filter over them is meaningful. Fewer '
-              'would make it vacuous; more would mean a duplicate name.',
+          node.hasAction(SemanticsAction.increase),
+          isTrue,
+          reason: 'and there is plenty above it',
         );
-
-        // **A `Tristate` and not a `bool`** — `SemanticsFlags.isSelected` is tri-state
-        // in Flutter 3.47, so `isTrue` is an identity check against `Tristate.isTrue`
-        // that reads as a boolean assertion and is not one. `settings_page_test.dart`
-        // records the same for the language sheet's rows.
-        final Iterable<SemanticsData> chosen = segments.where(
-          (SemanticsData node) =>
-              node.flagsCollection.isSelected == Tristate.isTrue,
-        );
-        expect(
-          chosen,
-          hasLength(1),
-          reason:
-              'exactly one segment is the reader\'s current palette. Three colours in a '
-              'row with no `selected` is §14\'s colour-only row applied to a picker, and '
-              'it is the same row the language sheet\'s rows answer.',
-        );
-        expect(chosen.single.label, contains(strings.settingsThemeLight));
 
         handle.dispose();
       },
     );
 
-    testWidgets('the language row announces the language that is in force', (
+    // ## AND THE STEPPED ONE STEPS BY FIVE
+    //
+    // `:684` — `step="5"`. The announced neighbours are what a reader hears
+    // when they ask for "a bit more", so they have to be reachable values.
+    testWidgets('and the stepped one announces multiples of its step', (
       WidgetTester tester,
     ) async {
-      // The row is inverted relative to a settings row: `onTap` is on the **row** and
-      // the trailing `Text` is a **fact** (which language is current), not a target.
-      // §14's requirement is that the reader can tell what the answer is, and a fact
-      // announced as a fact is what that needs.
       final SemanticsHandle handle = tester.ensureSemantics();
-      // **Pumped in the Arabic arm, and that is the whole point.** The row's trailing
-      // text is `languageLabelFor(selectedLanguageOf(context))` — the language the
-      // app is *rendering* in, which is the ambient locale, not the stored setting.
-      // The first version of this test stored `language: arabic`, pumped `locale: en`
-      // and asserted the row said "Arabic"; it failed with
-      // `Expected: contains 'Arabic' / Actual: 'Default language\n'` — and the row
-      // was **right**, because the app was rendering in English. A stored setting the
-      // app has not applied yet is exactly the state the first frame of a launch is
-      // in, so the row reporting the ambient arm is the correct behaviour and the test
-      // was asking the wrong question.
-      await pumpSettings(
-        tester,
-        stored: const UserSettings(language: ReadingLanguage.arabic),
-        locale: const Locale('ar'),
-      );
+      await pumpSettings(tester);
 
-      // **`AppLocalizationsAr()`, not the `strings` this file holds.** The first
-      // version looked for `strings.settingsDefaultLanguage` on a page pumped in the
-      // Arabic arm and threw `Bad state: No element` — `strings` is the *English* arm,
-      // so it was asking an Arabic node to carry an English name. It is the same
-      // mistake `arabic_typography_test.dart`'s header warns a reader about in the
-      // other direction, and the fix is to read the node's own arm.
-      final AppLocalizations ar = AppLocalizationsAr();
-      final SemanticsData row = semanticsTree(tester).firstWhere(
-        (SemanticsData node) =>
-            node.hasAction(SemanticsAction.tap) &&
-            node.label.contains(ar.settingsDefaultLanguage),
-      );
-      expect(row.flagsCollection.isButton, isTrue);
-      expect(
-        row.label,
-        contains(ar.languageLabelFor(ReadingLanguage.arabic)),
-        reason:
-            'the row\'s name carries the current value as well as the row\'s own '
-            'purpose, so a screen-reader user is told what is in force without '
-            'opening the sheet. `SettingsPage` inverted this row deliberately — see '
-            'its comment — and the inversion is what makes the value belong in the '
-            'name.',
-      );
+      final SemanticsData node = _named(tester, en.settingsSelahLength);
+      expect(node.value, '60');
+      expect(node.increasedValue, '65', reason: '`:684` — `step="5"`');
+      expect(node.decreasedValue, '55', reason: '`:684` — `step="5"`');
 
       handle.dispose();
     });
   });
 
-  group('reduced motion, and the three controls that animate', () {
-    testWidgets('with the flag on, all three animate nothing', (
+  group('the language control', () {
+    // ## IT IS NAMED, AND IT IS **NOT** NAMED FOR THE GROUP'S HEADER
+    //
+    // The control's own name is `settingsLanguageLabel` — "Language" — and
+    // **not** the group's header. The header is the prototype's own label and
+    // on the English arm the two differ only in case; a name that reads
+    // "language · language" aloud is not a name.
+    testWidgets(
+      'it is named, and the language in force is announced as selected',
+      (WidgetTester tester) async {
+        final SemanticsHandle handle = tester.ensureSemantics();
+        await pumpSettings(tester);
+
+        final SemanticsData track = _named(tester, en.settingsLanguageLabel);
+        expect(
+          track.hasAction(SemanticsAction.tap),
+          isTrue,
+          reason: 'the track is the control\'s single tab stop',
+        );
+
+        final SemanticsData english = _named(
+          tester,
+          en.languageLabelFor(ReadingLanguage.english),
+        );
+        final SemanticsData arabic = _named(
+          tester,
+          en.languageLabelFor(ReadingLanguage.arabic),
+        );
+        expect(
+          english.flagsCollection.isSelected,
+          Tristate.isTrue,
+          reason:
+              'the English arm is rendering in English, so the English option is '
+              'the one in force. Without `selected` a screen reader cannot tell '
+              'which of the two is in force.',
+        );
+        expect(arabic.flagsCollection.isSelected, Tristate.isFalse);
+        expect(english.flagsCollection.isButton, isTrue);
+        expect(arabic.flagsCollection.isButton, isTrue);
+
+        handle.dispose();
+      },
+    );
+
+    // ## AND ON THE **ARABIC** ARM THE OPTIONS ARE THE **OWN-SCRIPT** NAMES
+    //
+    // `settings_l10n.dart`'s rule: "a language names itself in its own
+    // script". Both options are Arabic on the Arabic arm, and the option in
+    // force is the one the arm is rendering in.
+    testWidgets('and on the Arabic arm both options are in Arabic', (
       WidgetTester tester,
     ) async {
-      // `/settings` is the **only** screen that puts three independently-animating
-      // controls in one place — `SegmentedControl`'s track, `EvaToggle`'s knob and
-      // `EvaButton`'s pressed fill — and all three read
-      // `MediaQuery.disableAnimationsOf` themselves. This asserts the flag reaches
-      // them through the page rather than trusting three widgets' own suites; the
-      // widgets' contracts are `segmented_control_test.dart`'s and `eva_toggle_test.dart`'s.
-      await pumpSettings(tester, disableAnimations: true);
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester, locale: const Locale('ar'));
 
+      final SemanticsData english = _named(
+        tester,
+        ar.languageLabelFor(ReadingLanguage.english),
+      );
+      final SemanticsData arabic = _named(
+        tester,
+        ar.languageLabelFor(ReadingLanguage.arabic),
+      );
+      expect(english.label, isNot(matches(RegExp('[A-Za-z]'))));
+      expect(arabic.label, isNot(matches(RegExp('[A-Za-z]'))));
       expect(
-        MediaQuery.disableAnimationsOf(
-          tester.element(find.byType(SettingsPage)),
-        ),
+        arabic.flagsCollection.isSelected,
+        Tristate.isTrue,
+        reason: 'the Arabic arm is rendering in Arabic',
+      );
+      expect(english.flagsCollection.isSelected, Tristate.isFalse);
+
+      handle.dispose();
+    });
+  });
+
+  group('the restore row', () {
+    // ## IT IS A **BUTTON**, AND IT IS NAMED BY ITS TITLE
+    //
+    // `:695` is the one `.srow` without `cursor:default`, and the client's
+    // shape for that is `SettingsTile` with an `onTap` — which brings its own
+    // `Semantics(button: true)`.
+    testWidgets('it is a button, named by its title', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester);
+
+      final SemanticsData row = semanticsTree(tester).firstWhere(
+        (SemanticsData node) =>
+            node.label.startsWith(en.settingsRestoreDefaults),
+      );
+      expect(
+        row.flagsCollection.isButton,
         isTrue,
-        reason:
-            'the page must sit under the flag it forwards. A harness that dropped '
-            'the parameter would render the screen animations are forbidden to run '
-            'and every assertion below would be about nothing.',
+        reason: 'the row is the control, so it is announced as one',
       );
-
-      final SegmentedControl<AppThemeMode> track = tester.widget(
-        find.byType(SegmentedControl<AppThemeMode>),
-      );
+      expect(row.hasAction(SemanticsAction.tap), isTrue);
       expect(
-        track.selected,
-        AppThemeMode.dark,
-        reason: 'sanity: it is on screen',
+        row.label,
+        startsWith(en.settingsRestoreDefaults),
+        reason: 'the row is named by its title',
       );
 
-      // **The durations, not a screenshot.** Each widget collapses its own duration to
-      // zero when the flag is set, so the observable difference is that a second pump
-      // reaches the same state. Asserting `find.byType(EvaToggle)` and the stepper are
-      // on screen is the anti-vacuity half: a screen with no controls has nothing to
-      // animate.
-      expect(find.byType(EvaToggle), findsOneWidget);
-      expect(find.byType(FontSizeStepper), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('and the arrow it carries is not named on its own', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpSettings(tester);
+
+      // The `↺` is the row's **trailing value** and it is merged into the
+      // row's own name, so a reader hears "Restore nocturne defaults, ↺" as
+      // one thing. A node of its own would be a second announcement of a
+      // glyph.
+      final Iterable<SemanticsData> arrows = semanticsTree(tester)
+          .where((SemanticsData node) => node.label.trim() == '↺');
+      expect(
+        arrows,
+        isEmpty,
+        reason:
+            'the arrow rides in the row\'s own name. A node of its own would be '
+            'a glyph announced by itself, which is §14\'s "a decorative icon '
+            'announced alone" shape.',
+      );
+
+      handle.dispose();
     });
   });
 
   group('the notice, and §14\'s four properties of an error', () {
-    testWidgets('it is not colour alone, and it is announced', (
+    // ## IT IS **ANNOUNCED**, AND THE RETRY IS A CONTROL **OF ITS OWN**
+    //
+    // A failure that arrives after the screen has settled has to be announced,
+    // or a screen-reader user finds out from the retry button being there.
+    testWidgets('it is a live region, and the retry is its own control', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpSettings(tester, cubit: _unreachableStore());
+      await pumpSettingsFrames(tester, 4);
 
-      // **The glyph, not `colors.err`.** `ErrorView` draws `Icons.error_outline`
-      // precisely because a shape that differs from `EmptyState`'s tells the two
-      // states apart without colour, and the notice reuses it. If a future edit drops
-      // the `Icon` and leaves only the tinted `GlassSurface`, this goes red.
-      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+      final List<SemanticsData> nodes = semanticsTree(tester);
 
-      // And the live region carries the sentence — asserted by label, because a live
-      // region carrying nothing is the shape that announces nothing.
       expect(
-        semanticsTree(tester)
+        nodes
             .where((SemanticsData node) => node.flagsCollection.isLiveRegion)
             .map((SemanticsData node) => node.label),
-        contains(strings.settingsPreferencesUnavailable),
+        contains(en.settingsPreferencesUnavailable),
+        reason:
+            'asserted on the label and not only on the flag, because a live '
+            'region carrying nothing announces nothing',
       );
+
+      final Iterable<SemanticsData> retry = nodes.where(
+        (SemanticsData node) => node.label == en.settingsRetry,
+      );
+      expect(
+        retry,
+        hasLength(1),
+        reason:
+            'the retry is a control with its OWN name. Fused into the live region '
+            'it would have no node of its own, and §14\'s first row is about '
+            'controls rather than about announcements.',
+      );
+      expect(retry.single.flagsCollection.isButton, isTrue);
 
       handle.dispose();
     });
 
-    testWidgets('and the Arabic arm names it in Arabic', (
+    testWidgets('and on the Arabic arm it is Arabic', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
@@ -433,17 +626,16 @@ void main() {
         cubit: _unreachableStore(),
         locale: const Locale('ar'),
       );
+      await pumpSettingsFrames(tester, 4);
 
-      final AppLocalizations ar = AppLocalizationsAr();
+      // **The half the Arabic glyph gate cannot see.** That gate walks the
+      // **painted** tree, and a `Semantics` label is not painted.
       expect(find.text(ar.settingsPreferencesUnavailable), findsOneWidget);
       expect(find.bySemanticsLabel(ar.settingsRetry), findsOneWidget);
       expect(
-        find.text(ar.settingsPreferencesUnavailable),
-        findsOneWidget,
-        reason:
-            'and the node\'s name is the Arabic sentence — the Arabic glyph gate walks '
-            'the painted tree and a `Semantics` label is not painted, so this is the '
-            'half `arabic_typography_test.dart` cannot see.',
+        find.bySemanticsLabel(en.settingsRetry),
+        findsNothing,
+        reason: 'the English sentence must not survive into the Arabic arm',
       );
 
       handle.dispose();
@@ -451,14 +643,83 @@ void main() {
   });
 }
 
+/// The seven untranslated segment labels — `eva/redesign.html:673` and `:678`.
+///
+/// **A list and not a blanket waiver.** The Arabic arm may carry Latin script
+/// in exactly these seven names, and the brief's D11 says why: the prototype
+/// puts no `data-i18n` on them, so they are the prototype's own English and
+/// the client's decision keeps them that way. Every **other** name on the
+/// Arabic arm is Arabic.
+const List<String> _untranslatedSegmentLabels = <String>[
+  'dot',
+  'star',
+  'cross',
+  'gem',
+  'crown',
+  'high',
+  'full',
+];
+
+/// Every node a reader could **do** something with.
+///
+/// A tap, an increase or a decrease — and **not** a `focus` action, because a
+/// focusable node that nothing can be done to is a stop in the reading order
+/// rather than a control.
+List<SemanticsData> _activatable(WidgetTester tester) => <SemanticsData>[
+  for (final SemanticsData node in semanticsTree(tester))
+    if (node.hasAction(SemanticsAction.tap) ||
+        node.hasAction(SemanticsAction.increase) ||
+        node.hasAction(SemanticsAction.decrease))
+      node,
+];
+
+/// The one node named [label].
+///
+/// **A node and not a widget.** `find.bySemanticsLabel` returns *widgets*, and
+/// one `SemanticsNode` can be contributed to by several — so `findsOneWidget`
+/// on it answers "how many widgets carry this label", which is not the
+/// question. The sweep's own currency is `SemanticsData`.
+SemanticsData _named(WidgetTester tester, String label) {
+  final Iterable<SemanticsData> found = semanticsTree(tester)
+      .where((SemanticsData node) => node.label.trim() == label);
+  expect(
+    found,
+    hasLength(1),
+    reason:
+        'exactly one node is named "$label". More than one is §14\'s duplicate-name '
+        'defect, and none is an unnamed control.',
+  );
+  return found.single;
+}
+
+/// Asserts that no two activatable nodes carry the same name.
+void _expectNoDuplicateNames(WidgetTester tester) {
+  final Map<String, int> counts = <String, int>{};
+  for (final SemanticsData node in _activatable(tester)) {
+    final String label = node.label.trim();
+    counts[label] = (counts[label] ?? 0) + 1;
+  }
+  final List<String> duplicates = <String>[
+    for (final MapEntry<String, int> entry in counts.entries)
+      if (entry.value > 1) '${entry.key} (${entry.value} nodes)',
+  ];
+  expect(
+    duplicates,
+    isEmpty,
+    reason:
+        'one string describing two activatable nodes is §14\'s duplicate-name '
+        'defect, and the reader cannot tell which control they are on:\n'
+        '${duplicates.join('\n')}',
+  );
+}
+
 /// A cubit over a store that cannot be reached, which is the only route to
 /// `SettingsStatus.failed`.
 ///
-/// **Built here rather than shared** because `settings_page_test.dart` has the same
-/// shape for its own seven tests, and the two differ in what they need: this one only
-/// has to *reach* the state for the sweep, where that file also drives the write arm
-/// and the retry. One is a fixture; the other is a flow, and folding them together
-/// would make the sweep depend on a `load()` the sweep is not about.
+/// **Built here rather than shared** because the screen's own suite has the
+/// same shape for its own test, and the two differ in what they need: this one
+/// only has to *reach* the state for the sweep, where that file also drives
+/// the restore and the write arm.
 SettingsCubit _unreachableStore() {
   const Failure failure = Failure(
     kind: FailureKind.storage,

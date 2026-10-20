@@ -1,9 +1,28 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+// The barrel is imported for `clampFontStep` — the font step's clamp, which the
+// design system owns beside the widget that draws the track.
+//
+// **AND THERE IS NO LONGER A `CurtainShape` TO HIDE.** The design system used
+// to declare one of its own, beside `NeuralScaffold` — the **scrim's**
+// direction, with three members — and Task 5.7's
+// `core/domain/entities/curtain_shape.dart` declared a second one with four
+// members, so every file that imported both the barrel and the entity had to
+// write `hide CurtainShape`.
+//
+// **They are now one.** The prototype has a single `data-shape` attribute with
+// four values (`eva/redesign.html:1463`), read by two rules — the shader's
+// `u_shape` and the `.scrim` overrides (`:114`, `:115`) — and the client now
+// has one type for it, in the shared kernel. The scrim's ramps stayed in
+// `neural_scaffold.dart`, where they are.
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:evangelion/features/settings/domain/settings_clamps.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
@@ -142,12 +161,273 @@ class SettingsCubit extends Cubit<SettingsState> {
   Future<void> setReducedMotion({required bool reduced}) =>
       apply((UserSettings current) => current.copyWith(reducedMotion: reduced));
 
+  // ---------------------------------------------------------------------------
+  // Task 5.7 — the Workshop's twenty-three field writers. (`setDaylight` and
+  // `restoreDefaults` are the two that are not a *field* writer, and they stand
+  // outside this block.)
+  //
+  // ## EVERY ONE OF THEM FUNNELS THROUGH [apply]
+  //
+  // One emit, one write, and the clamp applied on the way in — and **none of them
+  // writes a field directly.** A writer that emitted its own state would skip the
+  // clamp and would skip the rollback, and the two are the whole of this cubit's
+  // contract: the reader's gesture is answered on the frame it happened, and a
+  // store that refuses it puts them back where they were.
+  //
+  // ## AND THE NAMES ARE FIXED, because other code is written against them
+  //
+  // `SettingsHandle` is the widget-facing projection of this cubit and
+  // `/reading` writes the sky preferences through it, so a rename here is a rename
+  // there. The names say what the reader *did* — `setStarsOn`, not
+  // `setStars` — because the handle's method is the reader's gesture, not a field
+  // assignment.
+  //
+  // ## AND EACH ONE'S RANGE IS THE **PROTOTYPE'S**
+  //
+  // The eight ranged values are clamped by [apply] through `_clamp`, which is the
+  // app's only clamp boundary. The ranges themselves live in
+  // `features/settings/domain/settings_clamps.dart`, beside the prototype lines
+  // they are transcribed from.
+  // ---------------------------------------------------------------------------
+
+  /// Turns the aurora engine on or off. `eva/redesign.html:652`.
+  Future<void> setShaderEnabled({required bool enabled}) =>
+      apply((UserSettings current) => current.copyWith(shaderEnabled: enabled));
+
+  /// Sets the shape the aurora curtain takes. `eva/redesign.html:654-655`.
+  Future<void> setCurtainShape(CurtainShape shape) =>
+      apply((UserSettings current) => current.copyWith(curtainShape: shape));
+
+  /// Sets how far the aurora band reaches. `eva/redesign.html:658` — 18-110.
+  Future<void> setReach(int reach) =>
+      apply((UserSettings current) => current.copyWith(reach: reach));
+
+  /// Sets the aurora's brightness. `eva/redesign.html:659` — 40-130.
+  Future<void> setGlow(int glow) =>
+      apply((UserSettings current) => current.copyWith(glow: glow));
+
+  /// Sets how brightly the aurora answers a touch. `eva/redesign.html:660` —
+  /// 0-100.
+  Future<void> setTouchGlow(int touchGlow) =>
+      apply((UserSettings current) => current.copyWith(touchGlow: touchGlow));
+
+  /// Sets the aurora's hue, in degrees. `eva/redesign.html:661` — 0-360.
+  Future<void> setHue(int hue) =>
+      apply((UserSettings current) => current.copyWith(hue: hue));
+
+  /// Turns the multichrome melt on or off. `eva/redesign.html:662`.
+  Future<void> setMultichromeMelt({required bool melting}) => apply(
+    (UserSettings current) => current.copyWith(multichromeMelt: melting),
+  );
+
+  /// Turns the ray combing on or off. `eva/redesign.html:663`.
+  Future<void> setRayCombing({required bool combing}) =>
+      apply((UserSettings current) => current.copyWith(rayCombing: combing));
+
+  /// Turns the white cores on or off. `eva/redesign.html:664`.
+  Future<void> setWhiteCores({required bool white}) =>
+      apply((UserSettings current) => current.copyWith(whiteCores: white));
+
+  /// Turns the dot veil on or off. `eva/redesign.html:665`.
+  Future<void> setDotVeil({required bool veiled}) =>
+      apply((UserSettings current) => current.copyWith(dotVeil: veiled));
+
+  /// Turns the witness sky on or off. `eva/redesign.html:667`.
+  Future<void> setStarsOn({required bool on}) =>
+      apply((UserSettings current) => current.copyWith(starsOn: on));
+
+  /// Turns the constellation on or off. `eva/redesign.html:668`.
+  Future<void> setConstellationsOn({required bool on}) =>
+      apply((UserSettings current) => current.copyWith(constellationsOn: on));
+
+  /// Sets how many stars the witness sky holds. `eva/redesign.html:669` — 0-60.
+  Future<void> setStarCount(int count) =>
+      apply((UserSettings current) => current.copyWith(starCount: count));
+
+  /// Sets how bright the stars are. `eva/redesign.html:670` — 30-150.
+  Future<void> setStarBrightness(int brightness) => apply(
+    (UserSettings current) => current.copyWith(starBrightness: brightness),
+  );
+
+  /// Sets the silhouette every star is drawn in. `eva/redesign.html:672-673`.
+  Future<void> setStarShape(SkyStarShape shape) =>
+      apply((UserSettings current) => current.copyWith(starShape: shape));
+
+  /// Sets the vertical band the stars sit in. `eva/redesign.html:677-678`.
+  Future<void> setStarField(SkyStarField field) =>
+      apply((UserSettings current) => current.copyWith(starField: field));
+
+  /// Turns the twinkle on or off. `eva/redesign.html:681`.
+  Future<void> setTwinkle({required bool twinkling}) =>
+      apply((UserSettings current) => current.copyWith(twinkle: twinkling));
+
+  /// Sets how long the reader must be idle before the screen dims, in seconds.
+  /// `eva/redesign.html:683` — 2-15.
+  Future<void> setFocusDelaySec(int seconds) =>
+      apply((UserSettings current) => current.copyWith(focusDelaySec: seconds));
+
+  /// Sets how long the selah lasts, in seconds. `eva/redesign.html:684` — 15-120,
+  /// in steps of five.
+  Future<void> setSelahLengthSec(int seconds) => apply(
+    (UserSettings current) => current.copyWith(selahLengthSec: seconds),
+  );
+
+  /// Turns the breath guide on or off. `eva/redesign.html:685`.
+  Future<void> setBreathGuide({required bool on}) =>
+      apply((UserSettings current) => current.copyWith(breathGuide: on));
+
+  /// Turns the vespers auto-dim on or off. `eva/redesign.html:686`.
+  Future<void> setVespersAutoDim({required bool on}) =>
+      apply((UserSettings current) => current.copyWith(vespersAutoDim: on));
+
+  /// Turns the calm motion on or off. `eva/redesign.html:688`.
+  Future<void> setCalmMotion({required bool calm}) =>
+      apply((UserSettings current) => current.copyWith(calmMotion: calm));
+
+  /// Turns the haptics on or off. `eva/redesign.html:689`.
+  Future<void> setHaptics({required bool on}) =>
+      apply((UserSettings current) => current.copyWith(haptics: on));
+
+  /// Turns the daylight palette on or off.
+  ///
+  /// ## THE MAPPING, AND IT IS **NARROWER** THAN [AppThemeMode]
+  ///
+  /// On writes [AppThemeMode.light]; off writes [AppThemeMode.dark]. The
+  /// prototype's control is a two-state toggle (`eva/redesign.html:650`) and it has
+  /// no third state.
+  ///
+  /// ## THE CUBIT'S HALF OF A **PRODUCT CONSEQUENCE**
+  ///
+  /// [AppThemeMode]'s `system` arm — "the reader asked to follow the OS" — becomes
+  /// **unreachable from the UI**, because this method is the UI's only writer of the
+  /// theme and it never writes `system`.
+  ///
+  /// **[setThemeMode] still exists and can still write `system`** — it is the
+  /// programmatic writer, and the store's contract is not this method's business.
+  /// What is unreachable is the *reader-facing* way to choose it: the redesign's
+  /// theme group holds one control, the Daylight toggle (`eva/redesign.html:649-650`),
+  /// and the Phase-9 three-segment Light/Dark/System picker is gone.
+  ///
+  /// **A reader whose stored value is `system` keeps it until they touch the
+  /// control**, and touching it narrows the choice to `light` or `dark` for good.
+  /// This client has no way to select `system` again.
+  ///
+  /// The narrowing is a **recorded decision**, not drift: the prototype has no
+  /// `system` arm to lose, and the orchestrator's decision protects the stored
+  /// value as an existing reader choice until the reader touches the control. The
+  /// control's own half of this record lives with the control.
+  Future<void> setDaylight({required bool daylight}) => apply(
+    (UserSettings current) => current.copyWith(
+      themeMode: daylight ? AppThemeMode.light : AppThemeMode.dark,
+    ),
+  );
+
+  /// Restores the prototype's "nocturne defaults" — in **ONE** apply, and so in
+  /// one emit and one write.
+  ///
+  /// ## WHAT IT RESETS, FIELD BY FIELD, EACH WITH ITS PROTOTYPE LINE
+  ///
+  /// The prototype's handler is `eva/redesign.html:1499-1525`.
+  ///
+  /// | field | reset to | prototype |
+  /// | --- | --- | --- |
+  /// | `shaderEnabled` | `true` | :1500 |
+  /// | `reach` | `42` | :1502 |
+  /// | `glow` | `100` | :1503 |
+  /// | `touchGlow` | `55` | :1504 |
+  /// | `curtainShape` | `top` | :1505 |
+  /// | `multichromeMelt` | `false` | :1506 |
+  /// | `rayCombing` | `true` | :1507 |
+  /// | `whiteCores` | `true` | :1508 |
+  /// | `dotVeil` | `false` | :1509 |
+  /// | `starsOn` | `true` | :1510 |
+  /// | `constellationsOn` | `true` | :1511 |
+  /// | `starCount` | `44` | :1512 |
+  /// | `starBrightness` | `100` | :1513 |
+  /// | `starShape` | `dot` | :1514 |
+  /// | `starField` | `crown` | :1515 |
+  /// | `twinkle` | `true` | :1516 |
+  /// | `focusDelaySec` | `4` | :1517 |
+  /// | `selahLengthSec` | `60` | :1518 |
+  /// | `breathGuide` | `true` | :1519 |
+  /// | `vespersAutoDim` | `true` | :1520 |
+  /// | `veilWitnesses` | `false` | :1521 |
+  /// | `showPodium` | `true` | :1522 |
+  /// | `hue` | `312` | :1523 — see the substitution below |
+  ///
+  /// ## WHAT IT DOES **NOT** RESET, AND THE SET IS **NOT** EMPTY
+  ///
+  /// The prototype's handler touches none of these, and neither does this client.
+  ///
+  /// | field | why not |
+  /// | --- | --- |
+  /// | `language` | `:1499-1525` never touches it; it is an existing reader choice |
+  /// | `themeMode` | **the prototype DOES reset the daylight** (`:1501`, `u_light=0`) and this client does **not** — see below |
+  /// | `fontStep` | `:1499-1525` never touches it; the Type size is the reader's reading size |
+  /// | `reducedMotion` | `:1499-1525` never touches it; it is an accessibility choice |
+  /// | `calmMotion` | `:1499-1525` never touches it, **even though it is a new field** — the prototype deliberately preserves it |
+  /// | `haptics` | `:1499-1525` never touches it, **even though it is a new field** |
+  ///
+  /// ## THE **THREE** DELIBERATE DEPARTURES FROM THE PROTOTYPE
+  ///
+  /// 1. **`themeMode` is not reset.** The prototype resets the daylight to dark
+  ///    (`:1501`). This client's `themeMode` is a **three-state** enum whose
+  ///    `system` arm the prototype has no word for, and the orchestrator's decision
+  ///    protects it as an existing reader choice. **Recorded at the action row,
+  ///    citing `:1501`.**
+  /// 2. **`calmMotion` is not reset**, although it is a new field. The prototype
+  ///    leaves it — its handler touches neither `setCalm` nor `setHap` — because it
+  ///    is a comfort choice. **Recorded.**
+  /// 3. **`haptics` is not reset**, for the same reason. **Recorded.**
+  ///
+  /// ## AND THE **HUE** SUBSTITUTION
+  ///
+  /// The prototype's reset restores the **current book's** hue (`:1523`,
+  /// `BOOKS[curBook].hsl.h`). **This client has no per-book hue**, so the reset
+  /// uses the **declared control default** of `312` (`:661`) — the value the
+  /// slider shows a reader and the value the field itself defaults to. The
+  /// substitution is recorded at the field and here.
+  ///
+  /// ## AND IT IS **ONE** APPLY, NOT TWENTY-THREE
+  ///
+  /// [apply] emits once and persists once. Twenty-three calls would emit
+  /// twenty-three times and write twenty-three times, and `app.dart` rebuilds the
+  /// whole app on every settings emit — so the difference is not a tidiness
+  /// question but a frame-count one.
+  Future<void> restoreDefaults() => apply(
+    (UserSettings current) => current.copyWith(
+      shaderEnabled: true,
+      reach: 42,
+      glow: 100,
+      touchGlow: 55,
+      curtainShape: CurtainShape.top,
+      multichromeMelt: false,
+      rayCombing: true,
+      whiteCores: true,
+      dotVeil: false,
+      starsOn: true,
+      constellationsOn: true,
+      starCount: 44,
+      starBrightness: 100,
+      starShape: SkyStarShape.dot,
+      starField: SkyStarField.crown,
+      twinkle: true,
+      focusDelaySec: 4,
+      selahLengthSec: 60,
+      breathGuide: true,
+      vespersAutoDim: true,
+      veilWitnesses: false,
+      showPodium: true,
+      hue: 312,
+    ),
+  );
+
   /// Applies [change] to the current settings, persists the result, and rolls back if
   /// the store refuses it.
   ///
   /// [change] takes the **current** settings and returns the edited record, rather
-  /// than this method taking a whole new value, because the four setters above are
-  /// four edits of one record and reading it here is what makes them composable:
+  /// than this method taking a whole new value, because every writer above is one
+  /// edit of one record and reading it here is what makes them composable:
   /// `apply((s) => s.copyWith(fontStep: 4))` cannot interleave two writers between
   /// the read and the write, which is the failure a read-then-write pair has.
   Future<void> apply(UserSettings Function(UserSettings) change) async {
@@ -196,12 +476,40 @@ class SettingsCubit extends Cubit<SettingsState> {
     }
   }
 
-  /// [settings] with its font step inside §5.2's table.
+  /// [settings] with every ranged value inside its own table.
   ///
   /// **The only clamp in the app**, and `ReadingCubit` used to be the other one. One
   /// boundary is the whole of the argument `font_size_stepper.dart` makes: a step
   /// outside `kFontStepMin`…`kFontStepMax` would reach `evaScalerFor`'s `_` arm as
   /// `1.22×` while the stepper's knob sat at a position no step owns.
-  UserSettings _clamp(UserSettings settings) =>
-      settings.copyWith(fontStep: clampFontStep(settings.fontStep));
+  ///
+  /// ## AND THE **EIGHT** WORKSHOP RANGES JOIN IT HERE
+  ///
+  /// The eight clamps have **two homes, and the split is §3's placement test
+  /// rather than a convenience**: seven live in
+  /// `features/settings/domain/settings_clamps.dart` — pure Dart, pure
+  /// functions, each with the prototype's own `min`/`max` beside it — and the
+  /// **star count's** lives in `core/domain/entities/user_settings.dart`, with
+  /// the field it bounds, because the sky feature clamps the same number where
+  /// it becomes a cap and a feature may not import another feature.
+  ///
+  /// All eight are applied **here** and nowhere else, for the reason above: a
+  /// second boundary is a second table, and a value could then be legal on one
+  /// side of it and not the other.
+  ///
+  /// This is also where a **stored** value is caught: [load] reads the store and
+  /// clamps what it read, so a hand-edited preference cannot reach a slider that
+  /// has no position for it — the same argument `clampFontStep`'s doc makes about
+  /// `evaScalerFor`.
+  UserSettings _clamp(UserSettings settings) => settings.copyWith(
+    fontStep: clampFontStep(settings.fontStep),
+    reach: clampReach(settings.reach),
+    glow: clampGlow(settings.glow),
+    touchGlow: clampTouchGlow(settings.touchGlow),
+    hue: clampHue(settings.hue),
+    starCount: clampStarCount(settings.starCount),
+    starBrightness: clampStarBrightness(settings.starBrightness),
+    focusDelaySec: clampFocusDelaySec(settings.focusDelaySec),
+    selahLengthSec: clampSelahLengthSec(settings.selahLengthSec),
+  );
 }

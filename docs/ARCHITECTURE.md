@@ -109,14 +109,14 @@ forbids and which would be the wrong dependency regardless. Declaring it once
 in `core/domain/` is what lets three features share one implementation without
 sharing a feature.
 
-Verified contents: **30 `.dart` files** under `lib/core/domain/`, of which
-**5** are ports, **1** is `usecase/usecase.dart`, and **24** are entities —
-15 hand-written plus **9** generated `.freezed.dart` companions.
+Verified contents: **39 `.dart` files** under `lib/core/domain/`, of which
+**7** are ports, **1** is `usecase/usecase.dart`, and **31** are entities —
+20 hand-written plus **11** generated `.freezed.dart` companions.
 
 ```tree
 core/domain/
-  entities/    15 hand-written files, 9 generated .freezed.dart companions
-  repositories/ 5 files, 5 abstract interface classes
+  entities/    20 hand-written files, 11 generated .freezed.dart companions
+  repositories/ 7 files, 7 abstract interface classes
   usecase/     usecase.dart — UseCase<In, Out>, NoParamsUseCase<Out>
 ```
 
@@ -125,6 +125,19 @@ Two entries in this tree differ from AGENT_CONTEXT §3. That section lists
 `entities/app_theme_mode.dart:32`, and `UserRole` is a third entity file at
 `entities/user_role.dart:97` that §3 does not list at all. The entity list has
 grown past the table that describes it.
+
+**Task 5.7 added three more, and they are the first ones that had to MOVE.**
+`CurtainShape`, `SkyStarShape` and `SkyStarField` are enums the design system
+draws with and `UserSettings` holds — and `UserSettings` is in
+`core/domain/`, which **Gate 1 holds Flutter-free**. `SkyStarShape` and
+`SkyStarField` were declared inside
+`core/design_system/widgets/witness_sky.dart` until Task 5.7 and had to move
+out, because a `core/domain/` entity cannot name a type declared beside a
+Flutter widget. **They are imported by path, not re-exported through the
+design-system barrel** — `barrel_test.dart` holds the barrel to re-exporting
+nothing from a domain, and a re-export through a design-system file makes the
+analyzer report that file's own imports as `unnecessary_import`, because the
+barrel already provides the enums through that very file.
 
 ## The ports and their adapters
 
@@ -472,7 +485,7 @@ lib/
       app_router.gr.dart           GENERATED
       auth_guard.dart              depends on AuthStatus, not AuthBloc
   core/
-    common/                        Result<T>, Failure (12 kinds), AppConfig
+    common/                        Result<T>, Failure (12 kinds), AppConfig, ranges
     design_system/                 23 widgets, effects, motion, theme, tokens/
     domain/                        THE SHARED KERNEL — 30 files, pure Dart
       entities/                    15 hand-written + 9 generated .freezed.dart

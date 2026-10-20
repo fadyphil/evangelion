@@ -106,6 +106,37 @@ final class SettingsHandle {
   /// The reader's preferences, as the owning cubit currently holds them.
   UserSettings get settings => read();
 
+  // ---------------------------------------------------------------------------
+  // ## WHAT THIS SEAM'S WRITERS ARE, EXACTLY, AND WHO CALLS THEM
+  //
+  // **THIS IS THE APP'S SETTINGS WRITE SURFACE, and a writer on it is a
+  // PROMISE THAT SOMEWHERE ELSE MAY NEED IT.** The class doc above gives the
+  // reason: the writer has to be reachable from three places that may not know
+  // each other, and `lib/app/` is the only directory Gate 2 exempts.
+  //
+  // **AND TWO OF THE SIX HAVE NO PRODUCTION CALLER TODAY** — `setThemeMode`
+  // and `setReducedMotion` — and that is not an oversight; it is what a seam
+  // is. A feature that wants to follow the OS's brightness, or to offer the
+  // reader a motion switch outside `/settings`, is the caller that has not
+  // arrived yet, and **the seam is where its writer has to be** — writing it
+  // into `features/settings/` instead would put the seam's whole purpose
+  // somewhere a feature may not reach.
+  //
+  // **AND THAT IS WHY TASK 5.7's SEVEN SKY WRITERS ARE NOT HERE.** The
+  // brief asked for them — "`/reading` needs to write the sky preferences" —
+  // and that premise was **wrong**: `/reading` *reads* the seven (through
+  // `SettingsScope.of(context).settings`) and writes none of them, and
+  // `/settings`, which may name its own cubit, writes them through
+  // `SettingsCubit`. So the seven would have been **seven public methods with
+  // no production caller** — a test calling a method to prove it works is not
+  // a reader — and they are gone, with the screen writing the sky seven
+  // through the cubit like every other field it owns.
+  //
+  // **THE PREFERENCES THEMSELVES ARE UNTOUCHED.** The seven `eva.sky.pref.*`
+  // preferences are read by `/reading`'s sky and written by `/settings`, and
+  // the cubit owns all seven setters.
+  // ---------------------------------------------------------------------------
+
   /// Reports a new font [step].
   ///
   /// **Clamped here as well as in `SettingsCubit`.** That is a deliberate duplication

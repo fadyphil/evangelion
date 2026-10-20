@@ -283,7 +283,22 @@ void configureNavigation() {
   // states: a second instance would be a second sky, and `/reading` lighting a
   // verse through one while `journey` counted the other would show a reader a
   // star that is not there.
-  final SkyCubit skyCubit = SkyCubit(repository: getIt<SkyRepository>());
+  //
+  // **AND IT GETS THE **SAME** CAP READER THE ADAPTER GOT.** The sky's cap is
+  // the reader's choice — `UserSettings.starCount`, the prototype's `starCap`
+  // (`eva/redesign.html:1131`) — and two writers that enforce it may not import
+  // each other: this cubit is presentation and the adapter is data, and the
+  // dependency direction is strictly inward. So the composition root hands each
+  // of them a reader over the same handle, and neither holds a cap of its own.
+  // **Two writers asking one reader cannot disagree about the number**, which
+  // is the whole argument of `features/sky/domain/sky_star_cap.dart`.
+  //
+  // The lookup is inside the closure because the handle is registered *below*:
+  // a lookup at construction would throw for a type that is about to exist.
+  final SkyCubit skyCubit = SkyCubit(
+    repository: getIt<SkyRepository>(),
+    capReader: () => getIt<SettingsHandle>().settings.starCount,
+  );
 
   // **The sky's seam, built from `SkyCubit` two lines below and for the same reason
   // `settings_handle.dart` gives**: `/reading` lights a star per verse it scrolls

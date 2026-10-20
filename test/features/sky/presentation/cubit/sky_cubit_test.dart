@@ -40,6 +40,21 @@ void main() {
     return cubit;
   }
 
+  /// A cubit whose cap is the reader's choice rather than the prototype's 44.
+  ///
+  /// **The cap seam, in one line** — and the reason it is a constructor
+  /// argument and not a field is `sky_star_cap.dart`'s argument: the reader
+  /// changes the cap at runtime, and two writers holding two spellings of one
+  /// number is the drift that file exists to prevent.
+  SkyCubit buildWithCap(int cap) {
+    final SkyCubit cubit = SkyCubit(
+      repository: repository,
+      capReader: () => cap,
+    );
+    addTearDown(cubit.close);
+    return cubit;
+  }
+
   SkyEntry verse({required int verse, required int at, bool flare = false}) =>
       SkyEntry(
         book: 'John',
@@ -358,6 +373,44 @@ void main() {
   });
 
   group('the cap', () {
+    test('a record past the READER\'S cap evicts to that cap, not to 44', () async {
+      // ## THE CAP IS THE READER'S CHOICE, AND THE FRAME HONOURS IT
+      //
+      // The prototype's `starCap` is a variable the Star-count slider writes
+      // (`eva/redesign.html:1131`, `:1487`) and this client's is
+      // `UserSettings.starCount` — so the frame trims to what the reader
+      // chose, and not to the constant.
+      //
+      // **The store never answers**, so what is on screen is the *optimistic
+      // frame* — the half the cubit owns. A store that answered would replace
+      // the frame with its own answer and the assertion would be about the
+      // store, not about this cubit.
+      when(() => repository.record(any()))
+          .thenAnswer((_) => Completer<Result<SkyEntry>>().future);
+      final SkyCubit cubit = buildWithCap(3);
+
+      for (int v = 1; v <= 5; v++) {
+        // **Not awaited**: the confirm never answers, so awaiting it would hang
+        // the test rather than show the frame.
+        unawaited(cubit.record(verse(verse: v, at: v)));
+      }
+
+      expect(
+        cubit.state.entries.map((SkyEntry e) => e.key).toList(),
+        <String>['John:3:3', 'John:3:4', 'John:3:5'],
+        reason:
+            'three stars, the newest three — the cap the reader chose (3), not '
+            'the prototype\'s 44. A frame that ignored the cap would hold five.',
+      );
+    });
+
+    test('and the default cap is the prototype\'s 44', () {
+      // A cubit built without a cap reader is a sky with default settings, and
+      // `UserSettings.starCount`'s default is the same number — so the
+      // fallback and the preference agree.
+      expect(skyStarCap, 44);
+    });
+
     blocTest<SkyCubit, SkyState>(
       'a record past 44 publishes the STORE answer, not the optimistic frame',
       build: build,

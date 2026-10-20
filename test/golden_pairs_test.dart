@@ -236,4 +236,21 @@ const List<String> kGoldenRoots = <String>[
   'test/core/design_system/effects/goldens',
   'test/features/leaderboard/presentation/goldens',
   'test/features/journey/goldens',
+  // ## THE WORKSHOP'S TWO
+  //
+  // `test/features/settings/presentation/goldens` holds `workshop_dark.png` and
+  // `workshop_light.png` — the app bar and the restore toast, in the two
+  // themes.
+  //
+  // **They are a genuine pair and not a duplicate**, and the gate is what says
+  // so: the app bar's title and the toast's pill are both ink-and-ember
+  // surfaces whose colours resolve from the ambient palette, so the two
+  // captures differ. **A directory the gate does not walk is a directory whose
+  // pairs are never compared** — so its two themes could be byte-identical and
+  // nothing would say so, which is the exact failure this gate exists for.
+  //
+  // The path is a **relative** one, resolved against the package root, and
+  // the depth is part of it: this directory is three levels below `test/`,
+  // where the widget goldens are four.
+  'test/features/settings/presentation/goldens',
 ];

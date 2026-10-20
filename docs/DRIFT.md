@@ -297,6 +297,17 @@ The three options were real and all were defensible:
 * **delete it** — **taken**, along with the 8 goldens and their test surface;
 * **allowlist it** — as a design-system primitive kept for prototype parity.
 
+> **The first bullet's line reference is STALE, and Task 5.7 made it stale
+> twice.** The theme row used a three-segment Light/Dark/System picker at
+> `settings_page.dart:203`, and the redesign replaces it with the **Daylight
+> toggle** (`eva/redesign.html:650`) — a two-state switch against a three-state
+> field, with `AppThemeMode.system` becoming unreachable from the UI. The
+> Workshop's segmented rows are the three *shape* controls, and they use
+> `SegmentedControl(wide: true)`. **The bullet is a record of a counterfactual
+> that never shipped, so it is left as it was and annotated rather than
+> rewritten**: the history of the decision is the point of this file, and a
+> reader who needs today's answer is looking at `settings_page.dart`.
+
 Nothing is lost that any shipped screen could use. The doc comments that *named*
 the widget were reworded, not deleted — they explain why a control is announceable
 or colour-safe, and that reasoning outlives the class.

@@ -833,87 +833,361 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{point} other{points}}'**
   String resultTotalCaption(int count);
 
-  /// The screen's title, beside the back chevron. Transcribed: SettingsScreen.tsx:43 writes `Settings` in `F.display 26 / 600 / ink`.
+  /// The screen's title, in the app bar's centred slot. Transcribed: `eva/redesign.html:641` writes `The Workshop`, and `:949` carries the same pair.
   ///
-  /// The prototype is English-only — `eva/src` has one `SettingsScreen.tsx` and no Arabic variant — so the Arabic value is written, not transcribed.
+  /// **REPLACED THE PHASE-9 VALUE.** The old key said `Settings` and was transcribed from `SettingsScreen.tsx:43`, which is the React prototype this task supersedes. The redesign names the screen, and the name is the title.
   ///
   /// In en, this message translates to:
-  /// **'Settings'**
+  /// **'The Workshop'**
   String get settingsTitle;
 
-  /// The header row's chevron's accessible name. Transcribed by position from SettingsScreen.tsx:39-42, which draws a bare `<button>` around an inline `<svg>` with **no label at all** — §14's first row, and the reason the name is a caller string rather than a design-system default.
+  /// The app bar's chevron's tooltip. Transcribed: `eva/redesign.html:640` draws the chevron, and the React prototype's tooltip is kept because the redesign draws the glyph and no name.
   ///
-  /// Deliberately the same word `readingBack` uses. Two features, one sentence: a back control is called Back in both, and a second wording would be a translation decision nobody made.
+  /// **The design system owns the name's family, so the string does not.** `IconActionButton.tooltipFamily` is required (decision 66), and the tooltip is Arabic on the Arabic arm.
   ///
   /// In en, this message translates to:
   /// **'Back'**
   String get settingsBack;
 
-  /// The first section label. Transcribed: SettingsScreen.tsx:47 writes `Appearance` through its local `SectionLabel`, which `EvaSectionHeader` now renders.
+  /// The language segment's accessible name. **Written, not transcribed** — `eva/redesign.html:646-648` draws the segment with no name of its own, and the group header above it is a *bilingual* label that would read as `language · language` aloud.
   ///
-  /// The prototype's third group is `Account` (`:93`) and is CUT with the profile screen, so this screen has three groups where the prototype has four.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance'**
-  String get settingsAppearance;
-
-  /// The theme picker's row title. Transcribed: SettingsScreen.tsx:50 writes `Theme`.
-  ///
-  /// The prototype's picker is a `useState<'Light' | 'Dark' | 'System'>` whose initial value is `'Dark'`, which is why `UserSettings.themeMode`'s default is `dark` and not `system` — see `app_theme_mode.dart`'s doc.
+  /// §14's first row is a control with no name in the reader's own language, and the name has to name the **control** rather than the group it sits in. The prototype's own group header is `settingsWsLang`.
   ///
   /// In en, this message translates to:
-  /// **'Theme'**
-  String get settingsTheme;
+  /// **'Language'**
+  String get settingsLanguageLabel;
 
-  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `Light`.
+  /// The language group's header. Transcribed: `eva/redesign.html:645` writes `language · اللغة` and `:949` carries the pair.
   ///
-  /// The prototype renders the labels through `textTransform: 'uppercase'`, which Flutter has no equivalent for; `SegmentedControl` uppercases each label itself and is asserted on that. So the ARB value is the prototype's own casing and the widget changes it.
+  /// **THE PROTOTYPE'S LABEL IS BILINGUAL AND THIS ONE IS NOT, and that is a divergence with a gate behind it.** `:949`'s two arms are `language · اللغة` and `اللغة · language` — each names the thing in the reader's script and then in the *other* one, which is a language-picker flourish and cannot be one ARB value: the English arm would hold Arabic script and the Arabic arm would hold Latin script.
+  ///
+  /// `app_localizations_test.dart` holds both halves of the bilingual contract, and the English half is **absolute** — no English-arm value may hold Arabic script, with no exemption list. So each arm keeps the prototype's first half: `language` on the English arm and `اللغة` on the Arabic one, which is the same word in each arm's own script.
+  ///
+  /// **THE PROTOTYPE'S BRAND-MARK LITERALS ARE NOT HERE**, and the distinction is the precedent. Task 5.1 gave `/login` five widget literals — `EVANGELION`, `αω · nocturne v1.2` — precisely so the ARB would not have to hold a value in two scripts at once. A **brand mark** may be a literal; a **group header** is prose, and prose belongs in the ARB, translated, in one script per arm.
   ///
   /// In en, this message translates to:
-  /// **'Light'**
-  String get settingsThemeLight;
+  /// **'language'**
+  String get settingsWsLang;
 
-  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `Dark`.
+  /// The theme group's header. Transcribed: `eva/redesign.html:649` writes `theme` and `:950` carries the pair.
   ///
-  /// This is the prototype's initial value (`useState<…>('Dark')`), so it is also the value a reader who has never opened this screen is in.
+  /// **THE GROUP HOLDS ONE CONTROL.** The redesign's theme group is the Daylight toggle alone (`:650`); the Phase-9 Light/Dark/System segmented picker is gone.
   ///
   /// In en, this message translates to:
-  /// **'Dark'**
-  String get settingsThemeDark;
+  /// **'theme'**
+  String get settingsThemeGroup;
 
-  /// One of the three segments on the theme track. Transcribed: SettingsScreen.tsx:52 writes `System`.
+  /// The Daylight mode row's title. Transcribed: `eva/redesign.html:650` writes `Daylight mode` and `:950` carries the pair.
   ///
-  /// `System` is NOT the app's default: `app_theme_mode.dart` records why it is dark instead, and this segment is the reader's way to ask for the OS's answer rather than the app's.
+  /// **THE TOGGLE IS TWO-STATE AGAINST A THREE-STATE FIELD.** On means the light palette and off means the dark one; a stored `system` renders the toggle off and the stored value is not changed until the reader touches it. The `system` arm of `AppThemeMode` therefore becomes unreachable from the UI, and that regression is recorded in the Task 5.7 plan block.
   ///
   /// In en, this message translates to:
-  /// **'System'**
-  String get settingsThemeSystem;
+  /// **'Daylight mode'**
+  String get settingsDaylight;
 
-  /// The stepper's row title. Transcribed: SettingsScreen.tsx:62 writes `Font size`.
+  /// The light workshop group's header. Transcribed: `eva/redesign.html:651` writes `the light workshop` and `:949` carries the pair.
   ///
-  /// NAMESPACED `settings*` rather than reused from `readingTextSize`, which is the `Aa` disclosure's tooltip on `/reading`. Same control, two positions on two screens, and the two widgets ask for their own string so a translator can move one without the other.
+  /// **The ten controls under it persist real choices and the client does not yet render them.** The aurora shader is not mounted, and the deferral — with the task that discharges it — is recorded in the Task 5.7 plan block, citing `docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`.
   ///
   /// In en, this message translates to:
-  /// **'Font size'**
-  String get settingsFontSize;
+  /// **'the light workshop'**
+  String get settingsWsLight;
 
-  /// The stepper track's slider label, announced as a slider. **Written, not transcribed**: SettingsScreen.tsx:66 is the prototype's `<input type="range" min={1} max={5}>` and it carries **no accessible name at all**, so this is §14's first row applied to a control the row does not name.
+  /// The Aurora engine row's title. Transcribed: `eva/redesign.html:652` writes `Aurora engine` and `:951` carries the pair.
   ///
-  /// A distinct string from `settingsFontSize` because the two name the control from two positions — a row title and a slider — and `FontSizeStepperLabels`'s doc argues for exactly one value for its own three strings for the opposite reason.
+  /// **The switch persists the choice and nothing reads it yet.** The shader is not mounted; see `settingsWsLight`.
+  ///
+  /// In en, this message translates to:
+  /// **'Aurora engine'**
+  String get settingsShaderEngine;
+
+  /// The Curtain shape row's title. Transcribed: `eva/redesign.html:653` writes `Curtain shape` and `:952` carries the pair.
+  ///
+  /// **The row's control is the redesign's `.segp.wide`, not the plain `.segp` the prototype uses at `:654`.** The four segments cannot share a row with a 14.5px label at 320px — the standing 320×568 viewport matrix is a gate — and the prototype's own `min-width:44px` (`:183`) is a tap-target floor the client does not shrink. The label therefore goes above the control, and that is a recorded divergence.
+  ///
+  /// In en, this message translates to:
+  /// **'Curtain shape'**
+  String get settingsCurtainShape;
+
+  /// One of the four Curtain shape segments. Transcribed: `eva/redesign.html:655` writes `top` and `:952` carries the pair.
+  ///
+  /// `CurtainShape.top` is `u_shape` 0 — the prototype's `data-s="0"`.
+  ///
+  /// In en, this message translates to:
+  /// **'top'**
+  String get settingsCurtainTop;
+
+  /// One of the four Curtain shape segments. Transcribed: `eva/redesign.html:655` writes `bottom` and `:952` carries the pair.
+  ///
+  /// `CurtainShape.bottom` is `u_shape` 1 — the prototype's `data-s="1"`.
+  ///
+  /// In en, this message translates to:
+  /// **'bottom'**
+  String get settingsCurtainBottom;
+
+  /// One of the four Curtain shape segments. Transcribed: `eva/redesign.html:655` writes `sides` and `:952` carries the pair.
+  ///
+  /// In en, this message translates to:
+  /// **'sides'**
+  String get settingsCurtainSides;
+
+  /// One of the four Curtain shape segments. Transcribed: `eva/redesign.html:655` writes `shafts` and `:952` carries the pair.
+  ///
+  /// **The one shape the prototype gates above about 2 Mpx** — the shafts measure 5.04 ns/px against the bands' 2.98. The client does not mount the shader, so the gate has nothing to act on yet.
+  ///
+  /// In en, this message translates to:
+  /// **'shafts'**
+  String get settingsCurtainShafts;
+
+  /// The Reach row's title. Transcribed: `eva/redesign.html:658` writes `Reach` and `:953` carries the pair.
+  ///
+  /// The slider runs 18-110 with a default of 42 — the prototype's own `min`, `max` and `value` attributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach'**
+  String get settingsReach;
+
+  /// The Brightness row's title. Transcribed: `eva/redesign.html:659` writes `Brightness` and `:953` carries the pair.
+  ///
+  /// **The prototype's own label is `glow` in its `I18N` table** (`:953`) and `Brightness` in its markup (`:659`); the markup is the one a reader sees, so the markup is the one transcribed. The slider runs 40-130 with a default of 100.
+  ///
+  /// **NOT A UNIFORM.** The prototype folds it into the ambient target (`:891`) and never sends it to the GPU.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get settingsBrightness;
+
+  /// The Touch glow row's title. Transcribed: `eva/redesign.html:660` writes `Touch glow` and `:951` carries the pair.
+  ///
+  /// The slider runs 0-100 with a default of 55. The prototype's conversion is `(v/100)*0.6` (`:1471`) — the ceiling the glow may reach — and it is not the same `/100` the other two sliders use.
+  ///
+  /// In en, this message translates to:
+  /// **'Touch glow'**
+  String get settingsTouchGlow;
+
+  /// The Hue row's title. Transcribed: `eva/redesign.html:661` writes `Hue` and `:953` carries the pair.
+  ///
+  /// The slider runs 0-360 with a default of **312** — the declared control default at `:661`. The prototype's *boot* state is 258 (`:882`), and the two disagree; the declared default is the one transcribed, and the disagreement is recorded at the field.
+  ///
+  /// In en, this message translates to:
+  /// **'Hue'**
+  String get settingsHue;
+
+  /// The Multichrome melt row's title. Transcribed: `eva/redesign.html:662` writes `Multichrome melt` and `:954` carries the pair.
+  ///
+  /// The switch is off in the prototype's markup, which is the default the field carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Multichrome melt'**
+  String get settingsMultichromeMelt;
+
+  /// The Ray combing row's title. Transcribed: `eva/redesign.html:663` writes `Ray combing` and `:954` carries the pair.
+  ///
+  /// The switch is `checked` in the prototype's markup, which is the default the field carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Ray combing'**
+  String get settingsRayCombing;
+
+  /// The White cores row's title. Transcribed: `eva/redesign.html:664` writes `White cores` and `:954` carries the pair.
+  ///
+  /// The switch is `checked` in the prototype's markup, which is the default the field carries.
+  ///
+  /// In en, this message translates to:
+  /// **'White cores'**
+  String get settingsWhiteCores;
+
+  /// The Dot veil row's title. Transcribed: `eva/redesign.html:665` writes `Dot veil` and `:954` carries the pair.
+  ///
+  /// The switch is off in the prototype's markup, which is the default the field carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Dot veil'**
+  String get settingsDotVeil;
+
+  /// The witness sky group's header. Transcribed: `eva/redesign.html:666` writes `witness sky` and `:955` carries the pair.
+  ///
+  /// **All seven controls under it are consumed**, by `/reading`'s `WitnessSky` and by the sky's cap. That is the one group in the Workshop whose switches change what is on screen today.
+  ///
+  /// In en, this message translates to:
+  /// **'witness sky'**
+  String get settingsSkyGroup;
+
+  /// The Stars row's title. Transcribed: `eva/redesign.html:667` writes `Stars` and `:955` carries the pair.
+  ///
+  /// **OFF HIDES THE SKY; IT DOES NOT DELETE IT.** The prototype's Stars-off calls `clearStars()` (`:1483`), but the prototype has no persistence — its stars are DOM elements — while this client's sky is a reader's own record of what they have read. The divergence is recorded at the control.
+  ///
+  /// In en, this message translates to:
+  /// **'Stars'**
+  String get settingsStars;
+
+  /// The Constellations row's title. Transcribed: `eva/redesign.html:668` writes `Constellations` and `:955` carries the pair.
+  ///
+  /// The prototype **removes the constellation's `svg` outright** (`:1484-1485`) rather than hiding it, and `WitnessSky` has the same shape: the `showConstellation` switch decides whether the line is drawable at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Constellations'**
+  String get settingsConstellations;
+
+  /// The Star count row's title. Transcribed: `eva/redesign.html:669` writes `Star count` and `:956` carries the pair.
+  ///
+  /// The slider runs 0-60 with a default of 44 — the prototype's `starCap=44` (`:1131`). **This is the sky's CAP, not a paint parameter**: it decides how many lit verses the store keeps.
+  ///
+  /// In en, this message translates to:
+  /// **'Star count'**
+  String get settingsStarCount;
+
+  /// The Star brightness row's title. Transcribed: `eva/redesign.html:670` writes `Star brightness` and `:956` carries the pair.
+  ///
+  /// The slider runs 30-150 with a default of 100. The prototype writes `--starB = v/100` (`:1488`) and `WitnessSky.brightness` takes 0.3-1.5, so the conversion is `/100`.
+  ///
+  /// In en, this message translates to:
+  /// **'Star brightness'**
+  String get settingsStarBrightness;
+
+  /// The Star shape row's title. Transcribed: `eva/redesign.html:671` writes `Star shape` and `:957` carries the pair.
+  ///
+  /// **THE SEGMENT'S FOUR LABELS ARE THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH** — `dot`, `star`, `cross`, `gem` at `:673` — and they are kept as they are, because they are widget literals and not ARB keys. Putting them in this file would force them into `app_localizations_test.dart`'s `mustBeIdentical` set, and that set is the gate that catches an untranslated string. The Arabic typography gate declares the runs as they render.
+  ///
+  /// In en, this message translates to:
+  /// **'Star shape'**
+  String get settingsStarShape;
+
+  /// The Star field row's title. Transcribed: `eva/redesign.html:676` writes `Star field` and `:957` carries the pair.
+  ///
+  /// **THE SEGMENT'S THREE LABELS ARE THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH** — `crown`, `high`, `full` at `:678` — and they are kept as they are, for `settingsStarShape`'s reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Star field'**
+  String get settingsStarField;
+
+  /// The Twinkle row's title. Transcribed: `eva/redesign.html:681` writes `Twinkle` and `:957` carries the pair.
+  ///
+  /// **COMBINED WITH REDUCE MOTION, NEVER INSTEAD OF IT.** The prototype's handler sets `notwinkle` when the switch is off **or** reduce motion is on (`:1489`), and the client combines the reader's preference with the platform's the same way.
+  ///
+  /// In en, this message translates to:
+  /// **'Twinkle'**
+  String get settingsTwinkle;
+
+  /// The focus & ritual group's header. Transcribed: `eva/redesign.html:682` writes `focus & ritual` and `:958` carries the pair.
+  ///
+  /// **Four of the seven controls under it persist and are read by nothing yet** — the selah timer, the focus mode, the breath guide and the vespers auto-dim are Phase 7's (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1340-1345`).
+  ///
+  /// In en, this message translates to:
+  /// **'focus & ritual'**
+  String get settingsRitualGroup;
+
+  /// The Focus delay row's title. Transcribed: `eva/redesign.html:683` writes `Focus delay` and `:958` carries the pair.
+  ///
+  /// The slider runs 2-15 with a default of 4, and the unit is **seconds** — the prototype multiplies it by 1000 at `:1287`.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus delay'**
+  String get settingsFocusDelay;
+
+  /// The Selah length row's title. Transcribed: `eva/redesign.html:684` writes `Selah length` and `:958` carries the pair.
+  ///
+  /// The slider runs 15-120 in **steps of 5** (`:684`'s `step="5"`) — the prototype's only stepped slider — with a default of 60.
+  ///
+  /// In en, this message translates to:
+  /// **'Selah length'**
+  String get settingsSelahLength;
+
+  /// The Breath guide row's title. Transcribed: `eva/redesign.html:685` writes `Breath guide` and `:959` carries the pair.
+  ///
+  /// The switch is `checked` in the prototype's markup. The breath ring under the hot verse is Phase 7's.
+  ///
+  /// In en, this message translates to:
+  /// **'Breath guide'**
+  String get settingsBreathGuide;
+
+  /// The Vespers auto-dim row's title. Transcribed: `eva/redesign.html:686` writes `Vespers auto-dim` and `:959` carries the pair.
+  ///
+  /// The switch is `checked` in the prototype's markup. The gate is 21:00-05:00 (`:886`), and the dimming itself is Phase 7's.
+  ///
+  /// In en, this message translates to:
+  /// **'Vespers auto-dim'**
+  String get settingsVespersAutoDim;
+
+  /// The Reduce motion row's title. Transcribed: `eva/redesign.html:687` writes `Reduce motion` and `:960` carries the pair.
+  ///
+  /// **The field was already there** — `UserSettings.reducedMotion` — and the prototype's switch is the same switch. It is an *existing* reader choice, and the restore action deliberately does not touch it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce motion'**
+  String get settingsReduceMotion;
+
+  /// The Calm motion row's title. Transcribed: `eva/redesign.html:688` writes `Calm motion` and `:962` carries the pair.
+  ///
+  /// The prototype's meaning is that the staggers collapse to zero (`:1097`, `:1126`) and the verse reveal becomes instant (`:1382`).
+  ///
+  /// **The restore action does NOT reset it**, even though it is a new field: the prototype's own reset leaves it alone, because it is a comfort choice rather than a light setting.
+  ///
+  /// In en, this message translates to:
+  /// **'Calm motion'**
+  String get settingsCalmMotion;
+
+  /// The Haptics row's title. Transcribed: `eva/redesign.html:689` writes `Haptics` and `:962` carries the pair.
+  ///
+  /// **Persisted and not yet answered.** The client has no haptics until Phase 7, so the Workshop is mute against the prototype, which answers every toggle with a haptic (`:1482`, `:1498`).
+  ///
+  /// **The restore action does NOT reset it**, for `settingsCalmMotion`'s reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Haptics'**
+  String get settingsHaptics;
+
+  /// The communion group's header. Transcribed: `eva/redesign.html:690` writes `communion` and `:948` carries the pair.
+  ///
+  /// **The two toggles under it were already there** — `UserSettings.veilWitnesses` and `UserSettings.showPodium` — and Task 5.5 added them for `/communion` to read.
+  ///
+  /// In en, this message translates to:
+  /// **'communion'**
+  String get settingsCommunionGroup;
+
+  /// The Veil witnesses row's title. Transcribed: `eva/redesign.html:691` writes `Veil witnesses` and `:948` carries the pair.
+  ///
+  /// The switch is off in the prototype's markup, and it is off in the field — the veil is opt-in, and the reader's own name is never the one that is hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Veil witnesses'**
+  String get settingsVeilWitnesses;
+
+  /// The Show podium row's title. Transcribed: `eva/redesign.html:692` writes `Show podium` and `:948` carries the pair.
+  ///
+  /// The switch is `checked` in the prototype's markup, and the field carries the same default.
+  ///
+  /// In en, this message translates to:
+  /// **'Show podium'**
+  String get settingsShowPodium;
+
+  /// The Type size row's title. Transcribed: `eva/redesign.html:693` writes `Type size` and `:961` carries the pair.
+  ///
+  /// **REPLACED THE PHASE-9 `settingsFontSize`**, which was transcribed from `SettingsScreen.tsx:62`.
+  ///
+  /// **THE PROTOTYPE'S SLIDER IS NOT TRANSCRIBED.** `:693` is a 16-26px range input, and the client keeps the 1-5 step model that `docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173` already decided on. The row is the existing `FontSizeStepper` plus the preview line, and the divergence is recorded at the row.
+  ///
+  /// In en, this message translates to:
+  /// **'Type size'**
+  String get settingsTypeSize;
+
+  /// The stepper's track's slider label, announced as a slider. **Written, not transcribed**: `eva/redesign.html:693` is the redesign's `<input type="range" min="16" max="26" value="20">` and it carries **no accessible name at all**, so this is §14's first row applied to a control the row does not name.
+  ///
+  /// A distinct string from `settingsTypeSize` because the two name the control from two positions — a row title and a slider.
   ///
   /// In en, this message translates to:
   /// **'Font scale'**
   String get settingsFontScale;
 
-  /// The stepper's decrement button's tooltip and accessible name. **Written, not transcribed**: SettingsScreen.tsx:66 supplies its own stepper affordances on a native `<input type="range">`, and a native input brings its own buttons with **no labels of its own**, so §14 required two names here that the prototype never wrote.
+  /// The stepper's decrement button's tooltip and accessible name. **Written, not transcribed**, for `settingsFontScale`'s reason: `eva/redesign.html:693`'s native range input carries its own `+` with no label.
   ///
-  /// Deliberately the same sentence as `readingDecreaseFontSize`: two screens draw the same control and a second wording would be a translation decision nobody made.
+  /// Deliberately the same sentence as `readingDecreaseFontSize`, for the same reason.
   ///
   /// In en, this message translates to:
   /// **'Decrease font size'**
   String get settingsDecreaseFontSize;
 
-  /// The stepper's increment button's tooltip and accessible name. **Written, not transcribed**, for `settingsDecreaseFontSize`'s reason: SettingsScreen.tsx:66's native range input carries its own `+` with no label.
+  /// The stepper's increment button's tooltip and accessible name. **Written, not transcribed**, for `settingsFontScale`'s reason: `eva/redesign.html:693`'s native range input carries its own `+` with no label.
   ///
   /// Deliberately the same sentence as `readingIncreaseFontSize`, for the same reason.
   ///
@@ -921,105 +1195,89 @@ abstract class AppLocalizations {
   /// **'Increase font size'**
   String get settingsIncreaseFontSize;
 
-  /// The switch's row title. **Written, not transcribed — and there is no prototype row to transcribe from**: `SettingsScreen.tsx` has no motion row at all. This control exists because AGENT_CONTEXT §14 asks for reduced motion and `app.dart` recorded that a later phase would replace the platform-only default with the persisted `UserSettings` value. This is that phase.
+  /// The restore action row's title. Transcribed: `eva/redesign.html:695` writes `Restore nocturne defaults` and `:961` carries the pair.
   ///
-  /// Placed under APPEARANCE rather than READING because what it changes is how the app moves, not what it says.
+  /// **THE RESET IS SCOPED, AND THE SCOPE IS THE PROTOTYPE'S.** It restores the light, the sky, the ritual and the communion settings to the prototype's literals and it touches **nothing else** — not the language, not the type size, not the palette, not the reduce motion, and not the calm motion or the haptics, which the prototype's own handler (`:1499-1525`) leaves alone as well.
   ///
-  /// In en, this message translates to:
-  /// **'Reduce motion'**
-  String get settingsReduceMotion;
-
-  /// The switch's accessible name while it is on. **Written, not transcribed**: `EvaToggle` shipped hard-coding the English words `On` and `Off` into its `Semantics` node for six phases, and no gate could see it because a semantics label is not painted — the Arabic glyph gate walks the painted tree, and a golden captures no semantics. Phase 9 made the switch's labels required and this is the shipped spelling.
-  ///
-  /// The Arabic is a participle rather than a transliterated `On`, so the Arabic arm holds no Latin script and `app_localizations_test.dart`'s exception list does not grow.
+  /// The per-field tables are in the Task 5.7 plan block, each row citing its prototype line.
   ///
   /// In en, this message translates to:
-  /// **'On'**
-  String get settingsMotionOn;
+  /// **'Restore nocturne defaults'**
+  String get settingsRestoreDefaults;
 
-  /// The switch's accessible name while it is off. **Written, not transcribed**, as `settingsMotionOn` says — and `EvaToggle` is the widget that used to hard-code the English.
+  /// The confirmation toast after a restore. Transcribed: `eva/redesign.html:975` writes `↺ nocturne defaults restored` and the handler raises it at `:1525`; the toast shows for 1800ms (`:1393`).
   ///
-  /// `Off` and `On` are the words a screen reader has to distinguish to answer "is animation on?", so neither value may be empty and neither may be the other's translation of itself.
+  /// **THE `↺` (U+21BA) IS IN NO BUNDLED MONO OR SCRIPTURE FACE** — measured against `JetBrainsMono`, `EBGaramond` and `Amiri` — and it is in `Inter` and `IBMPlexSansArabic`. It is therefore rendered with a `fontFamilyFallback`, so the mono face draws the letters and Inter draws the arrow.
   ///
   /// In en, this message translates to:
-  /// **'Off'**
-  String get settingsMotionOff;
+  /// **'↺ nocturne defaults restored'**
+  String get settingsRestored;
 
-  /// The notice shown when `SettingsStatus` is `failed`. **Written, not transcribed**, because the prototype has nothing to transcribe from: `eva/src` has no data layer and therefore no error state anywhere, and `SettingsScreen.tsx` cannot fail because every value on it is a `useState` in the same file. `homeRetry` makes the same argument for the same reason.
+  /// The about group's header. Transcribed: `eva/redesign.html:696` writes `about` and `:949` carries the pair.
   ///
-  /// THE SENTENCE IS **NOT** `Failure.message`, and that is the point of this key existing. Every other `ErrorView` in this app shows the mapper's wording — `error_view.dart` states that `ApiErrorMapper` is the only source of a displayable failure message, and that claim is true of all three of them. `/settings` is the fourth call site and the first **non-network** one: `SettingsRepositoryImpl._unreachable` builds `'The preferences could not be reached: $error'`, which interpolates the raw Dart exception, so rendering it would put a `MissingPluginException` on a reader's screen. A developer string and a reader's sentence are different things and only one of them is translated here.
-  ///
-  /// WRITTEN AS ONE SENTENCE COVERING BOTH FAILURE ARMS, because the cubit reports a failed READ and a failed WRITE through one status and the reader cannot tell from the screen which happened. 'Your preferences could not be saved' is true of both — the read failed, so what is on screen is not what is stored, which is the same fact from the other side.
+  /// **REPLACED THE PHASE-9 VALUE'S SOURCE**, though the painted result is the same: `EvaSectionHeader` upper-cases the label, so `about` and `About` both paint `ABOUT`.
   ///
   /// In en, this message translates to:
-  /// **'Your preferences could not be saved on this device.'**
-  String get settingsPreferencesUnavailable;
+  /// **'about'**
+  String get settingsAbout;
 
-  /// The notice's action, which re-runs `SettingsCubit.load()`. **Written, not transcribed** — `SettingsScreen.tsx` has no error state and therefore no retry control, exactly as `homeRetry`, `quizRetry` and `readingRetry` do not.
+  /// The Shaders row's title. Transcribed: `eva/redesign.html:697` writes `Shaders` and `:962` carries the pair.
   ///
-  /// Deliberately the same sentence as those three, which is a pattern rather than a coincidence: `settingsBack` and `readingBack` share their wording for the same reason, and four independently-written keys saying 'Try again' in two languages is four translation decisions nobody made.
-  ///
-  /// NAMESPACED `settings*` because five features now carry this field name.
+  /// **The value beside it is the prototype's own literal** — `aurora.frag v8` — and it names the *design system's* shader asset, not this client's. The client does not mount a shader at all; see `settingsWsLight`.
   ///
   /// In en, this message translates to:
-  /// **'Try again'**
-  String get settingsRetry;
+  /// **'Shaders'**
+  String get settingsShaders;
 
-  /// The second section label. Transcribed: SettingsScreen.tsx:70 writes `Reading` through the same local `SectionLabel`.
+  /// The Tokens row's title. Transcribed: `eva/redesign.html:698` writes `Tokens` and `:962` carries the pair.
   ///
-  /// This group ships ONE row of the prototype's two. `SettingsScreen.tsx:92`'s verse-numbers switch is cut for scope reasons recorded at length on `SettingsPage`, because `ScriptureBlock` has no `showVerseNumbers` parameter and its marker is load-bearing for four gates this phase does not own.
+  /// **The value beside it is the prototype's own literal** — `lumen v1.2` — and it is the design system's version, transcribed.
   ///
   /// In en, this message translates to:
-  /// **'Reading'**
-  String get settingsReading;
+  /// **'Tokens'**
+  String get settingsTokens;
 
-  /// The language row's title, and the row that opens the sheet. Transcribed: SettingsScreen.tsx:76 writes `Default language`.
+  /// The app bar's version chip's accessible name. Transcribed: `eva/redesign.html:642` writes the chip, and the React prototype's `Version` row title is kept because the redesign draws a chip and no name.
   ///
-  /// This row is where **defect #7** is fixed, and the fix is not the row — the prototype's row was never broken. It is that the control writes `UserSettings.language` and `app.dart` installs it as `MaterialApp.locale`. The sheet is `features/settings/presentation/widgets/language_sheet.dart` and its doc records that the FAB this defect names was cut with the profile screen.
+  /// **THE CHIP CARRIES THE APP'S REAL VERSION**, which is `AppConfig.appVersion` and not an ARB key, because it is not prose: it is `pubspec.yaml`'s own `version:` with a build suffix, and the settings suite parses `pubspec.yaml` and asserts the two agree. Putting it in this file would have been a number a translator could edit and nothing would check.
+  ///
+  /// **THE PROTOTYPE'S CHIP IS THE DESIGN SYSTEM'S VERSION** (`v1.2`, the same string as the Tokens row), and the divergence is recorded at the chip.
   ///
   /// In en, this message translates to:
-  /// **'Default language'**
-  String get settingsDefaultLanguage;
+  /// **'Version'**
+  String get settingsVersion;
 
-  /// The sheet's own heading. **Written, not transcribed** — SettingsScreen.tsx:77-90 draws the language pills inline and defines no sheet, no heading and no dismiss affordance at all. A bottom sheet needs a name for §14's first row, and inventing a row for it inside the screen is this client's own contribution.
+  /// The language segment's English option. Transcribed: `eva/redesign.html:647` writes `English`.
   ///
-  /// The sentence is an instruction rather than a noun phrase because the sheet's two rows are both languages and neither can be named "the language".
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a language'**
-  String get settingsLanguageSheetTitle;
-
-  /// The English row in the language sheet. Transcribed in **kind** from SettingsScreen.tsx:88, which writes the pill's own label as `l === 'EN' ? 'English' : 'العربية'` — so the prototype already draws one end of this pair in Arabic, which is where the Arabic form of `العربية` comes from. **Written** for the other end: the prototype has no `الإنجليزية` string anywhere, so that half is this client's own.
-  ///
-  /// The Arabic value here is `الإنجليزية` and not `English`, deliberately: an Arabic reader who cannot read Latin would otherwise be unable to choose English, which is the one choice whose absence locks them out of the other arm. That decision also keeps `app_localizations_test.dart`'s `latinIsCorrect` exception list from growing, which an earlier draft of `settings_l10n.dart` claimed was not the case.
+  /// **THE ARABIC ARM NAMES IT IN ARABIC** — `الإنجليزية` — which is the `settings_l10n.dart` rule: a language names itself in its own script, on both arms. The prototype writes `English` in Latin on the Arabic arm, and the divergence is recorded at the segment.
   ///
   /// In en, this message translates to:
   /// **'English'**
   String get settingsLanguageEnglish;
 
-  /// The Arabic row in the language sheet. **Transcribed**: SettingsScreen.tsx:88 writes the pill's label as `l === 'EN' ? 'English' : 'العربية'`, so `العربية` is the prototype's own string for this row and it is the evidence for the rule the whole file follows — a language names itself in its own script.
+  /// The language segment's Arabic option. Transcribed: `eva/redesign.html:647` writes `العربية`, which the prototype carries in Arabic on **both** arms.
   ///
-  /// The prototype draws the two-letter codes `EN` and `AR` beside the names; this client draws the **names only**, because `EN` and `AR` are Latin script on the Arabic arm and the two codes are also exactly what `ReadingLanguage.code` already holds for the API path — so they are rendered from the domain enum rather than translated.
+  /// **THE ENGLISH ARM IS ALSO ARABIC** — `العربية` — and the prototype does the same, so there is no divergence on this one. The face is the one `eva/redesign.html:186` asks for: an Arabic option inside a Latin screen is drawn in the Arabic face, which is what `SegmentedControl.labelFamilyOf` exists for.
   ///
   /// In en, this message translates to:
   /// **'Arabic'**
   String get settingsLanguageArabic;
 
-  /// The third section label. Transcribed: SettingsScreen.tsx:107 writes `About` through the same local `SectionLabel`.
+  /// The failure notice's sentence, on the `/settings` arm. **Written, not transcribed** — the redesign draws no failure state at all.
   ///
-  /// The group ships ONE row of the prototype's two: `SettingsScreen.tsx:118`'s Privacy policy is cut because it is a legal document with no URL, no screen and no endpoint, and an inert row that answers "unavailable in this build" is worse than no row at all for that particular question.
+  /// It is the app's own localised sentence and deliberately not `state.failure!.message`: `SettingsRepositoryImpl._unreachable` interpolates the raw Dart exception, which on a real device is a `MissingPluginException`.
   ///
   /// In en, this message translates to:
-  /// **'About'**
-  String get settingsAbout;
+  /// **'Your preferences could not be saved on this device.'**
+  String get settingsPreferencesUnavailable;
 
-  /// The version row's title. Transcribed: SettingsScreen.tsx:115 writes `Version`, with the value beside it.
+  /// The failure notice's retry button's label. **Written, not transcribed** — the redesign draws no failure state at all.
   ///
-  /// The **value** is `AppConfig.appVersion`, not an ARB key, because it is not prose: it is `pubspec.yaml`'s own `version:` with a build suffix, and `settings_page_test.dart` parses `pubspec.yaml` and asserts the two agree. Putting it in this file would have been a number a translator could edit and nothing would check.
+  /// **NAMESPACED `settings*` rather than reused from `homeRetry`, `quizRetry` and `readingRetry`**, which are three separate keys with identical values; the repository namespaces `retry` per screen on purpose.
   ///
   /// In en, this message translates to:
-  /// **'Version'**
-  String get settingsVersion;
+  /// **'Try again'**
+  String get settingsRetry;
 
   /// `ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is.
   ///
@@ -1263,7 +1521,7 @@ abstract class AppLocalizations {
   /// be wrong.
   ///
   /// In en, this message translates to:
-  /// **'retry'**
+  /// **'Try again'**
   String get journeyRetry;
 }
 

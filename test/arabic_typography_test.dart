@@ -54,6 +54,7 @@ import 'dart:ui' as ui;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/core/common/app_config.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -108,8 +109,11 @@ import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.d
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/result/presentation/result_l10n.dart';
-import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
+import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
+import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/settings_l10n.dart';
+import 'package:evangelion/features/settings/presentation/workshop_logic.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
@@ -973,161 +977,526 @@ void main() {
     });
   });
 
-  group('`/settings`', () {
-    // ## NO LONGER VACUOUS — THE **LAST** SCREEN TO GET ITS ARABIC, IN PHASE 9
+  group('`/settings` — the Workshop', () {
+    // ------------------------------------------------------------------------
+    // THE SCREEN, AND WHY THIS GROUP IS A **REWRITE** RATHER THAN AN EDIT
+    // ------------------------------------------------------------------------
     //
-    // Decision 79 declared `/settings` vacuous with the note "Phase 9 writes it", and
-    // this is that arm. `/quiz` was lifted in Phase 8 by the same edit shape: the
-    // `Placeholder for /settings` literal is gone, `vacuousBecause` is now `null`, and
-    // the list is **declared**, which is decision 79's whole mechanism — a run cannot
-    // disappear and leave the gate satisfied by the ones that remain.
+    // `/settings` was the **last** screen to get its Arabic, in Phase 9, and it
+    // was the **smallest**: three groups, five controls, and a declared list of
+    // **sixteen** runs. Task 5.7 replaced the screen with the Workshop —
+    // `eva/redesign.html:638-700`, **seven groups and thirty-three rows** — and
+    // the list below is a rewrite of the Phase-9 one: every dead key removed,
+    // every new key added, and the one run the redesign adds that the old
+    // screen never had — the restore toast — given an arm of its own.
     //
-    // Built from `AppLocalizationsAr()`, never transcribed. A hand-typed Arabic list is
-    // the "second declaration" this gate's own doc warns against: a dropped combining
-    // mark is invisible in a diff and the failure then reads as "the widget rendered the
-    // wrong string" instead of "the test typed the wrong string".
+    // ## WHAT DIED, AND WHY NONE OF IT IS A RUN ANY MORE
+    //
+    // | the Phase-9 key | what replaced it |
+    // | --- | --- |
+    // | `settingsAppearance`, `settingsReading` | the two headers the redesign does not have. `:645`, `:649`, `:651`, `:666`, `:682`, `:690` and `:696` are the **seven** it does, and `SettingsGroup`'s own doc says "seven of them" — which is now true of this screen. |
+    // | `settingsTheme`, `settingsThemeLight`, `settingsThemeDark`, `settingsThemeSystem` | the three-segment theme picker is **gone**: `:650` holds **one** control, the Daylight toggle. |
+    // | `settingsFontSize` | `settingsTypeSize` — the prototype's "Type size" (`:693`), not Phase 9's "Font size". |
+    // | `settingsDefaultLanguage`, `settingsLanguageSheetTitle` | the language **sheet** is gone: `:646-648` is a two-segment track. |
+    // | `settingsMotionOn`, `settingsMotionOff` | **dead, and gone from the ARB with them**: the screen names every switch by its **row title** in both arms, so the position words are read by nothing. |
+    //
+    // **And `settingsVersion` is not a run either.** It is the app bar's version
+    // chip's **accessible name** (`_VersionChip`'s `Semantics(label:)`), and an
+    // accessible name never reaches a glyph buffer — the same category error
+    // `/quiz`'s `quizProgress` records. The chip **paints**
+    // `AppConfig.appVersion`, and that is one of the eleven Latin runs below.
+    //
+    // ## THE LIST IS BUILT FROM THE ARB, NEVER TRANSCRIBED
+    //
+    // For `/`'s reason: a hand-typed Arabic list in a test is a second copy of
+    // the corpus, and a dropped combining mark is invisible in a diff and reads
+    // as "the widget rendered the wrong string" instead of "the test typed the
+    // wrong string".
     final AppLocalizations ar = AppLocalizationsAr();
+
+    /// The Arabic runs the Workshop paints on its ready arm.
+    ///
+    /// ## AND THE ORDER IS THE **PROTOTYPE'S DOM ORDER**
+    ///
+    /// `:645`, `:649`, `:651`, `:666`, `:682`, `:690`, `:696` — the seven
+    /// headers in that order, and the rows under each of them in the order the
+    /// prototype writes them. The gate compares **sets**, so the order here is
+    /// documentation rather than a constraint; it is here so that a reader
+    /// checking one run against the prototype finds it in one place.
     final List<String> arabic = <String>[
-      ar.settingsTitle,
-      // The three `SettingsGroup` headers.
-      ar.settingsAppearance,
-      ar.settingsReading,
-      ar.settingsAbout,
-      // The **theme** control's three options. `SegmentedControl` renders them as
-      // text, and this is the run most likely to regress: `AppThemeMode` maps to
-      // `ThemeMode` at the app root, and a wrong mapping would still render *some*
-      // label, so only the declared set catches it.
-      ar.settingsTheme,
-      ar.settingsThemeLight,
-      ar.settingsThemeDark,
-      ar.settingsThemeSystem,
-      // The font stepper's row and its two control labels.
-      ar.settingsFontSize,
-      ar.settingsDecreaseFontSize,
-      ar.settingsIncreaseFontSize,
-      // The reduce-motion row.
-      ar.settingsReduceMotion,
-      // The default-language row, and the row's **trailing value** — the language the
-      // screen is currently in. Declared as a function of the arm rather than as a
-      // literal: the setting is `null` here ("follow the platform"), so the effective
-      // language in this arm is Arabic and the row says `العربية`. That is the string
-      // the whole `ReadingLanguage` derivation exists to produce, and it is also the
-      // run that catches the setting being ignored: a page that lost the locale would
-      // render `English` here and fail the family arm as tofu-free Latin in an RTL arm.
-      ar.settingsDefaultLanguage,
-      ar.languageLabelFor(ReadingLanguage.arabic),
-      // The About group's row.
-      ar.settingsVersion,
-      // The header: the title and the back chevron's label. `AppTopBar`-style
-      // headers put the back control's name in a tooltip, and §14 forced that string
-      // into this client, so it is a painted run on a screen with a header.
+      // --- the app bar (`:639-643`) ------------------------------------------
+      // The title, and the back control's **tooltip**. A `Tooltip` paints
+      // nothing until a gesture, and the gate's probe holds every one of them
+      // open — so the name is a painted run, exactly as `/communion`'s back
+      // tooltip is.
       ar.settingsTitle,
       ar.settingsBack,
+      // --- 1. the language group (`:645-648`) -------------------------------
+      ar.settingsWsLang,
+      // The segment's two options, in the client's own-script names
+      // (`settings_l10n.dart`'s rule: "a language names itself in its own
+      // script"). **Both** are Arabic on this arm.
+      //
+      // **And they are read through the same `languageLabelFor` derivation the
+      // control itself uses**, so the list cannot disagree with the widget about
+      // what a language is called — `/communion`'s group gives that argument.
+      ar.languageLabelFor(ReadingLanguage.english),
+      ar.languageLabelFor(ReadingLanguage.arabic),
+      // --- 2. the theme group (`:649-650`) ----------------------------------
+      ar.settingsThemeGroup,
+      ar.settingsDaylight,
+      // --- 3. the light workshop (`:651-665`) -------------------------------
+      ar.settingsWsLight,
+      ar.settingsShaderEngine,
+      ar.settingsCurtainShape,
+      // The four Curtain-shape options — `:655`'s own four `data-i18n` keys.
+      ar.settingsCurtainTop,
+      ar.settingsCurtainBottom,
+      ar.settingsCurtainSides,
+      ar.settingsCurtainShafts,
+      ar.settingsReach,
+      ar.settingsBrightness,
+      ar.settingsTouchGlow,
+      ar.settingsHue,
+      ar.settingsMultichromeMelt,
+      ar.settingsRayCombing,
+      ar.settingsWhiteCores,
+      ar.settingsDotVeil,
+      // --- 4. the witness sky (`:666-681`) -----------------------------------
+      ar.settingsSkyGroup,
+      ar.settingsStars,
+      ar.settingsConstellations,
+      ar.settingsStarCount,
+      ar.settingsStarBrightness,
+      ar.settingsStarShape,
+      ar.settingsStarField,
+      ar.settingsTwinkle,
+      // --- 5. focus & ritual (`:682-689`) -----------------------------------
+      ar.settingsRitualGroup,
+      ar.settingsFocusDelay,
+      ar.settingsSelahLength,
+      ar.settingsBreathGuide,
+      ar.settingsVespersAutoDim,
+      ar.settingsReduceMotion,
+      ar.settingsCalmMotion,
+      ar.settingsHaptics,
+      // --- 6. communion (`:690-695`) -----------------------------------------
+      ar.settingsCommunionGroup,
+      ar.settingsVeilWitnesses,
+      ar.settingsShowPodium,
+      ar.settingsTypeSize,
+      // The preview line (`:694`) — the prototype's own Arabic literal, and a
+      // run for the same reason the seven segment labels are: the prototype
+      // writes it in a script, not in its own `I18N` table.
+      kPreviewTextArabic,
+      ar.settingsRestoreDefaults,
+      // --- 7. about (`:696-698`) ---------------------------------------------
+      ar.settingsAbout,
+      ar.settingsShaders,
+      ar.settingsTokens,
+      // --- the type-size stepper's two tooltips (`:693`) ---------------------
+      //
+      // The two steppers are `IconActionButton`s, so their names are
+      // **tooltips** — and a tooltip the gate's probe holds open is a painted
+      // run. The track's own label (`settingsFontScale`) is **not** here: it is
+      // the `_Track`'s `Semantics(label:)`, and a semantics label never reaches
+      // a glyph buffer.
+      ar.settingsDecreaseFontSize,
+      ar.settingsIncreaseFontSize,
     ];
 
-    // ## `settingsMotionOn` / `settingsMotionOff` ARE **DELIBERATELY NOT** IN THE LIST
-    //
-    // `EvaToggle` publishes its state as `Semantics(label: labels.on/off,
-    // excludeSemantics: true)` and paints **no** text: the control is a thumb and a
-    // track. A semantics label never reaches a glyph buffer, so this gate — which reads
-    // painted runs — cannot see it, and declaring either label fails the other half of
-    // the gate with `Declared but NOT rendered`. The same category error
-    // `/quiz`'s `quizProgress` group records, for the same reason.
-    //
-    // The labels are still asserted, at the layer that can see them:
-    // `settings_page_test.dart` reads the merged semantics node. Phase 9 made them
-    // **required** (`EvaToggleLabels`) precisely because they used to be the two
-    // hard-coded English words `On` and `Off`.
-
-    testWidgets('the Arabic arm, on the written screen', (
-      WidgetTester tester,
-    ) async {
-      // Built in the test body, per `settings_harness.dart`'s recorded reason: a bloc
-      // built in `setUp` runs its events outside the fake-async zone `pump` drains.
-      final SettingsHarness settings = settingsHarness();
-      await tester.pumpWidget(
-        settingsScope(
-          tester,
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            locale: const Locale('ar'),
-            textDirection: TextDirection.rtl,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            child: SettingsPage(cubit: settings.cubit),
-          ),
-        ),
+    testWidgets('the Arabic arm, on the Workshop', (WidgetTester tester) async {
+      await pumpSettings(
+        tester,
+        locale: const Locale('ar'),
+        size: _settingsWholeScreenSurface,
       );
-      await tester.pump();
+      _expectTheWholeScreenIsOnTheSurface(
+        tester,
+        restoreRowTitle: ar.settingsRestoreDefaults,
+      );
 
       await expectArabicTypography(
         tester,
         screen: '/settings',
         expectedArabic: arabic,
       );
-      await expectNoTofuInAnyRun(tester, screen: '/settings');
+      await _expectSettingsTofuFree(tester, screen: '/settings');
+
+      // ## AND THE GROUP HEADER IS **SINGLE-SCRIPT**, WHICH IS THE DIVERGENCE
+      // ## FROM THE PROTOTYPE'S OWN BILINGUAL LABEL
+      //
+      // `eva/redesign.html:949` writes the language group's header as
+      // `language · اللغة` on the English arm and `اللغة · language` on the
+      // Arabic one — each arm names the thing in the reader's script and then
+      // in the *other* one. **That cannot be one ARB value**:
+      // `app_localizations_test.dart`'s English-arm gate is **absolute** ("the
+      // English arm holds no Arabic script at all", no exemption list), and a
+      // bilingual value breaks it in both directions at once.
+      //
+      // So each arm keeps the prototype's **first** half, and the pairing is a
+      // **recorded divergence**. **This assertion is the divergence's other
+      // half** — it says the Arabic arm's value really is the single-script
+      // one, and not a bilingual string that happens to have been trimmed:
+      // the value carries **no ASCII at all**, so neither the Latin half nor
+      // the `·` that joined them is in it.
+      expect(
+        ar.settingsWsLang.runes.where((int rune) => rune < 0x80),
+        isEmpty,
+        reason:
+            'the Arabic arm\'s value for the language group\'s header is the '
+            'prototype\'s first half only. A bilingual value would carry Latin '
+            'script here — and it would carry Arabic script in the English '
+            'arm, which `app_localizations_test.dart` forbids outright.',
+      );
     });
 
-    testWidgets('and the LANGUAGE SHEET is gated, which is the only place', (
+    testWidgets('and the eleven literals the screen paints are on this arm', (
       WidgetTester tester,
     ) async {
-      // The sheet is a `showModalBottomSheet` route of its own, so it is a second
-      // screen inside `/settings` and it needs its own pump — the same reason
-      // `/reading`'s `Aa` disclosure has one.
+      // ## WHY THESE ELEVEN ARE ASSERTED **HERE** AND NOT IN `expectedArabic`
       //
-      // **`settingsLanguageSheetTitle` is the run this catches most:** the sheet is
-      // reachable only by tapping the default-language row, so a sheet that opened
-      // with no title — or with the row's label repeated — would leave this list
-      // unsatisfied, which is the assertion working rather than the test being fussy.
-      final SettingsHarness settings = settingsHarness();
-      await tester.pumpWidget(
-        settingsScope(
-          tester,
-          evaPrimitiveHarness(
-            theme: EvaThemeDark.theme,
-            locale: const Locale('ar'),
-            textDirection: TextDirection.rtl,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            child: SettingsPage(cubit: settings.cubit),
+      // **`expectedArabic` is a set of ARABIC runs**, and the gate's predicate
+      // is a range over the four Arabic blocks — so a Latin run cannot go in
+      // it. Declaring 'DOT' there would fail the gate's other half with
+      // "Declared but NOT rendered", which is the exact failure the gate exists
+      // to catch.
+      //
+      // **And that is the whole reason this row exists.** The seven segment
+      // labels are the prototype's own **untranslated English** — `:673` and
+      // `:678` carry no `data-i18n` — and a reader of the Arabic arm sees
+      // "DOT", "STAR", "CROSS", "GEM", "CROWN", "HIGH" and "FULL" in a row.
+      // That is a **recorded decision** (the orchestrator's: an ARB key whose
+      // two arms are identical would have to join `app_localizations_test
+      // .dart`'s `mustBeIdentical` set, and that set is the gate that catches
+      // an untranslated string), and a decision that is not asserted anywhere is
+      // a decision nobody made on purpose. **This is where they are painted,
+      // so this is where they are asserted.**
+      await pumpSettings(
+        tester,
+        locale: const Locale('ar'),
+        size: _settingsWholeScreenSurface,
+      );
+      _expectTheWholeScreenIsOnTheSurface(
+        tester,
+        restoreRowTitle: ar.settingsRestoreDefaults,
+      );
+
+      // ## THE FAMILIES ARE READ OFF THE **RENDERED** TREE, NOT THE WIDGETS
+      //
+      // `familyOfText` answers "what family was *passed* to this `Text`", and
+      // the seven segment labels carry theirs on an `AnimatedDefaultTextStyle`
+      // with a `Text` that has **no** style of its own — so `familyOfText`
+      // answers `''` for them. That is the truth about the *widget* and not
+      // about the *rendering*, and this row is about the rendering. The gate's
+      // own instrument reads the resolved family, and one read serves all
+      // eleven.
+      final Map<String, String> families = <String, String>{
+        for (final RenderedRun run in await renderedRuns(tester))
+          run.label: run.family,
+      };
+
+      // --- the seven untranslated segment labels (`:673`, `:678`) -----------
+      //
+      // **They are painted in their OWN CASE on the Arabic arm**, because
+      // `eva/redesign.html:190` says so: `[dir=rtl] .segp button{…text-
+      // transform:none}` — and the prototype's `:136` says the same for the
+      // `.mono` class these labels are.
+      //
+      // **AND THAT IS A FIX, not a divergence.** The widget used to upper-case
+      // every label on both arms, so the Arabic arm read `DOT` where the
+      // prototype writes `dot` — and the gate recorded it as a divergence
+      // rather than "fixing" it, because the fix belonged to the widget. The
+      // widget now skips the transform under RTL, and the two rules that
+      // changed together — the transform AND the tracking — are the ones
+      // `:190` states.
+      for (final String label in <String>[
+        ...kStarShapeLabels,
+        ...kStarFieldLabels,
+      ]) {
+        expect(
+          find.text(label),
+          findsOneWidget,
+          reason:
+              '`$label` is one of the seven untranslated segment labels, and the '
+              'Arabic arm paints it as the prototype wrote it — in its own case '
+              '(`:190` drops the transform under RTL) and untranslated, which is '
+              'the recorded decision.',
+        );
+        expect(
+          families[label],
+          EvaTypography.arabicFamily,
+          reason:
+              '`$label` is a Latin word on the Arabic arm, and it renders in '
+              'the ambient arm\'s face — `arabicAware` resolves the whole '
+              'segmented control under RTL, which is the prototype\'s `:190` '
+              'rule. The family is what the control resolved it to.',
+        );
+      }
+
+      // --- the app bar's version chip (`:642`) -------------------------------
+      expect(
+        find.text(AppConfig.appVersion),
+        findsOneWidget,
+        reason:
+            'the chip carries the app\'s real version, not the design system\'s '
+            '`v1.2` — a reader looking at a version chip wants the version of '
+            'the app they are holding.',
+      );
+      expect(
+        families[AppConfig.appVersion],
+        EvaTypography.arabicFamily,
+        reason:
+            'the chip is a `.mono` run (`:642`, `:30`), and under RTL it is in '
+            'the ambient arm\'s face.',
+      );
+
+      // --- the About group's two values (`:697-698`) ------------------------
+      for (final String value in <String>[kShadersVersion, kTokensVersion]) {
+        expect(
+          find.text(value),
+          findsOneWidget,
+          reason:
+              '`$value` is the prototype\'s own literal for the design system\'s '
+              'version, and the row says so rather than claiming it is this '
+              'client\'s.',
+        );
+        expect(
+          families[value],
+          EvaTypography.arabicFamily,
+          reason:
+              'the `.ar` style (`:421`) is a mono run, and under RTL it is in the '
+              'ambient arm\'s face.',
+        );
+      }
+
+      // --- the restore row's arrow (`:695`) ---------------------------------
+      expect(
+        find.text(kRestoreGlyph),
+        findsOneWidget,
+        reason: 'the restore row carries the prototype\'s own `↺` (`:695`).',
+      );
+      expect(
+        families[kRestoreGlyph],
+        EvaTypography.arabicFamily,
+        reason:
+            'the arrow is painted in the ambient arm\'s face, and the **glyph** '
+            'is drawn by the fallback — which is the next assertion.',
+      );
+      expect(
+        tester.widget<Text>(find.text(kRestoreGlyph)).style?.fontFamilyFallback,
+        contains(EvaTypography.uiFamily),
+        reason:
+            'U+21BA is in **no** bundled mono or scripture face — measured, it is '
+            'in `Inter` and `IBMPlexSansArabic` alone — so the row declares '
+            '`fontFamilyFallback: [Inter]` and the engine draws the arrow out of '
+            'it. A row that lost the fallback would render a tofu box, and this '
+            'is the assertion that says so.',
+      );
+      expect(
+        familyCovers(EvaTypography.uiFamily, <int>[0x21BA]),
+        isTrue,
+        reason:
+            'the fallback family has to carry the arrow, or the fallback is a '
+            'fiction.',
+      );
+      expect(
+        familyCovers(EvaTypography.arabicFamily, <int>[0x21BA]),
+        isFalse,
+        reason:
+            'and the primary family has **not** to carry it — otherwise the '
+            'fallback would be decoration and this row would be measuring '
+            'nothing.',
+      );
+
+      // **And the arrow is mirrored under RTL**, which is `:138` —
+      // `[dir=rtl] .srow .ar{transform:scaleX(-1)}` — and the only glyph **on
+      // this screen** that has to be mirrored by hand, because U+21BA has no
+      // `Bidi_Mirrored` property and no text engine mirrors it by itself.
+      final Iterable<Transform> mirrors = tester.widgetList<Transform>(
+        find.ancestor(
+          of: find.text(kRestoreGlyph),
+          matching: find.byType(Transform),
+        ),
+      );
+      expect(
+        mirrors.any((Transform mirror) => mirror.transform.entry(0, 0) < 0),
+        isTrue,
+        reason:
+            'the arrow is the prototype\'s `.srow .ar` span (`:695`), and `:138` '
+            'mirrors it under RTL. A scale of +1 would draw it pointing the '
+            'wrong way.',
+      );
+    });
+
+    testWidgets('and the FAILURE notice is two more runs', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS ARM EXISTS, AND IT IS THE FILE'S OWN ARGUMENT
+      //
+      // `/quiz` has an "EMPTY state is gated too" arm, `/communion` has a
+      // "FAILED board is the retry label and nothing else" arm, and `/journey`
+      // has a "FAILED screen is the app bar and the retry label" arm. **The
+      // failure state is a state the viewport matrix itself sweeps** — the
+      // `/settings` arm mounts it at all three sizes — and it is the state
+      // whose **sentence wraps**, so it is the one most likely to tofu.
+      //
+      // **And the notice's two strings are the app's own**, so on the Arabic
+      // arm they are Arabic and they are runs:
+      //
+      // * the sentence, painted by the notice's own `Text` and resolved by
+      //   `arabicAware` — so in Amiri, not in the Latin UI face;
+      // * the retry label, and `EvaButton.labelFamily` is **required** (decision
+      //   66), so the button names its own family — `arabicAwareFamily` puts it
+      //   in Amiri on this arm.
+      //
+      // **And the failure's own `message` is deliberately NOT declared.** The
+      // notice renders `settingsPreferencesUnavailable` and **not**
+      // `state.failure!.message` — the server's string is deliberately kept off
+      // the screen — so there is no run to declare. (The one this fixture
+      // carries is English anyway.)
+      final SettingsCubit failing = SettingsCubit(
+        getSettings: const GetSettings(
+          FailingSettingsRepository(
+            Failure(
+              kind: FailureKind.storage,
+              message: 'the preferences could not be reached',
+            ),
+          ),
+        ),
+        updateSettings: const UpdateSettings(
+          FailingSettingsRepository(
+            Failure(
+              kind: FailureKind.storage,
+              message: 'the preferences could not be reached',
+            ),
           ),
         ),
       );
-      await tester.pump();
+      addTearDown(failing.close);
 
-      // Tapped by its rendered label, not a key: `SettingsPage` has no key on that
-      // row, and adding a test-only key to production markup to make a test easier is
-      // the coupling this repository's harnesses exist to avoid.
-      await tester.tap(find.text(ar.settingsDefaultLanguage));
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
+      await pumpSettings(
+        tester,
+        cubit: failing,
+        locale: const Locale('ar'),
+        size: _settingsWholeScreenSurface,
+      );
+      _expectTheWholeScreenIsOnTheSurface(
+        tester,
+        restoreRowTitle: ar.settingsRestoreDefaults,
+      );
+
+      expect(
+        find.text(ar.settingsPreferencesUnavailable),
+        findsOneWidget,
+        reason:
+            'the notice is on the screen — a failure that showed no sentence '
+            'would leave the reader with twenty-nine controls and no word '
+            'about what went wrong.',
+      );
 
       await expectArabicTypography(
         tester,
-        screen: '/settings (language sheet)',
-        // **The page's own runs are still painted behind the modal sheet**, so the
-        // declaration is the union: a modal bottom sheet covers the screen, it does not
-        // unmount it. Spreading `arabic` is also what makes this arm a *second*
-        // independent reading of the page's list — if the page's runs changed and only
-        // the first test were updated, this one would fail on the difference.
-        //
-        // Built from the same `languageLabelFor` derivation the sheet itself uses, so
-        // the list cannot disagree with the widget about what a language is called.
+        screen: '/settings (failure notice)',
+        // The page's own runs are still painted under the notice, so the
+        // declaration is the union.
         expectedArabic: <String>[
-          // **`settingsBack` is excluded here and declared in the page arm.**
-          //
-          // `IconActionButton`'s accessible name feeds a `Tooltip`, and `icon_action_
-          // button.dart` records that a `Tooltip` "paints nothing until a gesture". So
-          // whether its message is a *painted* run depends on the gesture state of the
-          // tree, and this arm's tap is a gesture: with the sheet up, the back label is
-          // not among the painted runs, and declaring it here fails the gate's
-          // `Declared but NOT rendered` half. The page arm above is where that run
-          // belongs, and it declares it — a run needs one owning arm, not two.
-          ...arabic.where((String run) => run != ar.settingsBack),
-          ar.settingsLanguageSheetTitle,
-          ...ReadingLanguage.values.map(ar.languageLabelFor),
+          ...arabic,
+          ar.settingsPreferencesUnavailable,
+          ar.settingsRetry,
         ],
       );
+      await _expectSettingsTofuFree(
+        tester,
+        screen: '/settings (failure notice)',
+      );
+    });
+
+    testWidgets('and the RESTORE TOAST is a run of its own', (
+      WidgetTester tester,
+    ) async {
+      // ## THE ONE RUN THE TOAST ADDS
+      //
+      // `settingsRestored` is the prototype's own `:975` pair — "↺ nocturne
+      // defaults restored" / "↺ استُعيدت الافتراضيات" — and the toast is
+      // raised **only when the write is confirmed** (`_SettingsBody._restore`),
+      // so the arm has to press the row rather than assert the string.
+      //
+      // **And the arrow is inside the message**, which is why this arm's tofu
+      // check is the local one: the message's family is the ambient arm's, and
+      // U+21BA is not in it. The toast declares the same
+      // `fontFamilyFallback: [Inter]` the row does, and the assertion below is
+      // that it does.
+      await pumpSettings(
+        tester,
+        locale: const Locale('ar'),
+        size: _settingsWholeScreenSurface,
+      );
+      _expectTheWholeScreenIsOnTheSurface(
+        tester,
+        restoreRowTitle: ar.settingsRestoreDefaults,
+      );
+
+      // The restore row is the **last** row of the sixth group, and the surface
+      // holds the whole screen — so the tap below reaches it.
+      await tester.tap(find.text(ar.settingsRestoreDefaults));
+      for (int frame = 0; frame < 8; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(
+        find.text(ar.settingsRestored),
+        findsOneWidget,
+        reason:
+            'the toast is up — a restore that raised no confirmation would leave '
+            'a reader with twenty-three changed values and no word about them.',
+      );
+      expect(
+        tester
+            .widget<Text>(find.text(ar.settingsRestored))
+            .style
+            ?.fontFamilyFallback,
+        contains(EvaTypography.uiFamily),
+        reason:
+            'the toast\'s own message carries the arrow, and the arrow is in no '
+            'bundled mono or scripture face — the toast declares the same '
+            '`fontFamilyFallback: [Inter]` the restore row does.',
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/settings (restore toast)',
+        // The page's own runs are still painted behind the toast, so the
+        // declaration is the union.
+        expectedArabic: <String>[...arabic, ar.settingsRestored],
+      );
+      await _expectSettingsTofuFree(
+        tester,
+        screen: '/settings (restore toast)',
+      );
+    });
+
+    testWidgets('and in English renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      // The control, for `/`'s reason: with no Arabic on screen the Arabic
+      // assertions above are vacuously true, so this row is what catches a
+      // screen that stopped honouring the locale.
+      //
+      // **And it is a real control here**, because the language segment's two
+      // options are the app's own-script names — "English" and "Arabic" on
+      // this arm — so the English screen shows an option called "Arabic" and
+      // **not one Arabic character**. (The Arabic option is Amiri on this arm,
+      // because `SegmentedControl.labelFamilyOf` is keyed on the **option**
+      // and not on the direction — `:186`'s rule — but the *text* is Latin.)
+      await pumpSettings(tester, size: _settingsWholeScreenSurface);
+      _expectTheWholeScreenIsOnTheSurface(
+        tester,
+        restoreRowTitle: AppLocalizationsEn().settingsRestoreDefaults,
+      );
+
+      await _expectNoArabic(tester, '/settings');
+      await _expectSettingsTofuFree(tester, screen: '/settings (en)');
     });
   });
 
@@ -2801,6 +3170,147 @@ Future<void> _expectNoArabic(WidgetTester tester, String screen) async {
         'strings are not localised for this arm or the locale did not reach the '
         'page.',
   );
+}
+
+/// The surface the `/settings` gate is pumped on.
+///
+/// ## WHY IT IS **TALLER THAN A PHONE**
+///
+/// The gate reads the **painted** tree, and a `Tooltip` paints its message
+/// only while it is held open — and the gate's probe holds each tooltip open
+/// with a **long press on the tooltip's own target**. A target that is
+/// **off-screen** cannot be long-pressed, so its tooltip never paints and its
+/// name is not a run at all.
+///
+/// The Workshop's type-size stepper is in the **sixth** of its seven groups, so
+/// at a phone's height it is below the fold and its two names — "Decrease font
+/// size" and "Increase font size" — would silently drop out of the declared
+/// set. **The gate would then be measuring a window rather than a screen**,
+/// which `/journey`'s group refuses to do for exactly this reason ("A declared
+/// set that changed with the viewport would be a gate measuring the window
+/// rather than the screen").
+///
+/// **So the surface holds the whole screen.** The page's content is about
+/// **2960** tall in the ready state and about **3134** in the failure state —
+/// the notice above the groups adds its own height — and this surface is
+/// **3200**, so the scroll view has nothing to scroll in **either** state and
+/// every tooltip on the page is reachable.
+///
+/// **And the arm asserts the extent is zero** (see
+/// [_expectTheWholeScreenIsOnTheSurface]), so a screen that grew past this
+/// surface fails with "the surface is too short now" rather than with a
+/// puzzling "the list is stale".
+const Size _settingsWholeScreenSurface = Size(390, 3200);
+
+/// The Workshop's own scroll view has nothing to scroll on
+/// [_settingsWholeScreenSurface].
+///
+/// ## WHY THIS IS ASSERTED RATHER THAN ASSUMED
+///
+/// The surface is a number in a test, and the screen's content is another
+/// number that moves every time a row is added. When the content outgrows the
+/// surface the page scrolls again, the type-size stepper falls below the fold,
+/// and its two tooltips stop painting — which would make the declared set
+/// **wrong** rather than the screen broken, and the failure would read as "the
+/// list is stale".
+///
+/// This assertion turns that into the truth it is: the surface is too short
+/// for the screen it is meant to hold.
+void _expectTheWholeScreenIsOnTheSurface(
+  WidgetTester tester, {
+  required String restoreRowTitle,
+}) {
+  final Finder restoreRow = find.text(restoreRowTitle);
+  expect(
+    restoreRow,
+    findsOneWidget,
+    reason:
+        'the restore row is on the screen — it is the last row of the sixth '
+        'group, and the scroll view below is measured through it.',
+  );
+  final ScrollableState page = tester.state<ScrollableState>(
+    find.ancestor(of: restoreRow, matching: find.byType(Scrollable)).first,
+  );
+  expect(
+    page.position.maxScrollExtent,
+    0,
+    reason:
+        'the `/settings` gate is pumped on a surface tall enough to hold the '
+        'whole screen, so that every tooltip on it is reachable. The page has '
+        'grown past that surface: raise `_settingsWholeScreenSurface`, or the '
+        'type-size stepper falls below the fold and its two names stop being '
+        'runs.',
+  );
+}
+
+/// Every painted run on `/settings` is carried by a bundled face — **the run's
+/// own, or the fallback the screen declares for the arrow**.
+///
+/// ## WHY THIS IS NOT `expectNoTofuInAnyRun`
+///
+/// The shared instrument reads a run's **primary** family and asks that family
+/// for the glyph. One run on this screen is painted by a **fallback**: the `↺`
+/// (U+21BA) is in **no** bundled mono or scripture face — measured, it is in
+/// `Inter` and `IBMPlexSansArabic` alone — and both the restore row
+/// (`workshop_rows.dart`'s `_arValueStyle`) and the restore toast
+/// (`workshop_restore_toast.dart`) declare `fontFamilyFallback: [Inter]`, so
+/// the engine draws the **arrow** out of `Inter` and the letters out of the
+/// face the run names.
+///
+/// The shared instrument would report that arrow as **tofu**, which it is not,
+/// and the arrow is the one glyph on this screen the instrument cannot see. So
+/// the check below is the shared one **plus the fallback**.
+///
+/// ## AND THE UNION IS **NARROW** ON PURPOSE
+///
+/// Only the runs that carry the arrow get `Inter` added to their coverage.
+/// Every other run is checked against its own family alone, exactly as the
+/// shared instrument checks it — so a run that stopped being carried by its own
+/// face is still a finding.
+///
+/// **And the fallback's presence is asserted, not assumed.** The row that owns
+/// the arrow declares it (`workshop_rows.dart`), and the `/settings` group's own
+/// row reads the declaration off the rendered `Text` — so a row that lost its
+/// `fontFamilyFallback` fails there and fails here, and the two are the same
+/// claim read from two sides.
+Future<void> _expectSettingsTofuFree(
+  WidgetTester tester, {
+  required String screen,
+}) async {
+  for (final RenderedRun run in await renderedRuns(tester)) {
+    // **The framework's own family is allowed**, exactly as the shared
+    // instrument allows it: an `Icon` builds a `RichText` in the framework's
+    // `MaterialIcons` font, the icons carry no text, and the coverage check
+    // cannot ask about a family `pubspec.yaml` does not declare.
+    if (kFrameworkFamilies.contains(run.family)) continue;
+    expect(
+      kBundledFontFamilies.contains(run.family),
+      isTrue,
+      reason:
+          '`${run.label}` renders in `${run.family}`, which `pubspec.yaml` does '
+          'not declare. A name outside the declared families resolves to the '
+          'engine\'s default font with no error at all — and the engine\'s '
+          'default font is not one this project ships.',
+    );
+    if (!kBundledFontFamilies.contains(run.family)) continue;
+    final Set<int> available = <int>{
+      ...codepointsForFamily(run.family),
+      if (run.label.contains(kRestoreGlyph))
+        ...codepointsForFamily(EvaTypography.uiFamily),
+    };
+    final List<int> missing = <int>{
+      for (final int unit in run.label.codeUnits)
+        if (!isIgnorableCodeUnit(unit) && !available.contains(unit)) unit,
+    }.toList()..sort();
+    expect(
+      missing,
+      isEmpty,
+      reason:
+          '`${run.label}` is rendered in `${run.family}`, which has no glyph for '
+          '${missing.map((int u) => 'U+${u.toRadixString(16).toUpperCase()}').join(", ")} — '
+          'these would be tofu boxes on $screen.',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

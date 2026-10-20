@@ -7,6 +7,7 @@ import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/reading/domain/reading_focus.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
@@ -192,6 +193,27 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// layout and rebuild the reader on every frame a star was lit.
   SkyHandle get _sky => SkyScope.read(context);
 
+  /// The reader's preferences, as of the last build.
+  ///
+  /// ## WHY A FIELD AND NOT A `context` READ IN THE SCROLL CALLBACK
+  ///
+  /// The Stars-off gate ([_recordStar]) is asked on a scroll frame, and
+  /// `SettingsScope.of` is a **dependent** lookup — `dependOnInheritedWidgetOf
+  /// ExactType` — which may not be called outside a build: registering a
+  /// dependency during layout is what `WitnessSky`'s own `_reducedMotion` field
+  /// exists to avoid, and the same rule applies here.
+  ///
+  /// So the build reads the settings (once, watched, and the scope rebuilds
+  /// this page when they change) and the scroll callback reads the field. **The
+  /// field is a cache of the last built frame, not a second copy of the
+  /// preference**: it is overwritten on every build, and the only writer of the
+  /// preference is the settings cubit, which announces through the scope.
+  ///
+  /// **The default is the default install's preferences** — `UserSettings()` —
+  /// so a page that has not built yet answers the gate the way it would render
+  /// anyway: with the stars on.
+  UserSettings _skySettings = const UserSettings();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -368,6 +390,20 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// render, the crumb's count is right, and the join between the two key spaces
   /// belongs to Task 5.6, where the constellation and the rings meet.
   void _recordStar(int number) {
+    // ## THE STARS-OFF GATE, AND IT IS **HERE** AND NOT IN THE CUBIT
+    //
+    // The prototype gates lighting on `starsOn` inside `addStar` itself
+    // (`eva/redesign.html:1144`), and `SkyCubit.record`'s doc says the same
+    // thing about this client: the cubit does not check the switch, so **the
+    // caller** must skip the record while Stars is off — or the next scroll
+    // pass re-lights what the switch just stopped.
+    //
+    // **And the verse is still marked as lit** (`_lit` is filled by the
+    // observer, above), which is the prototype's own behaviour: it sets
+    // `p.dataset.star='1'` and unobserves the verse (`:1217-1218`) whether or
+    // not `addStar` went on to add anything. A verse crossed while the stars
+    // are off is not re-lit later either — in the prototype or here.
+    if (!_skySettings.starsOn) return;
     final ScriptureText? passage = _passage;
     if (passage == null) return;
     final Verse? verse = passage.verses
@@ -415,6 +451,20 @@ class _ReadingBodyState extends State<_ReadingBody> {
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
     final ReadingLanguage language = _language;
+    // ## THE SKY'S PREFERENCES, READ **ONCE** AND WATCHED
+    //
+    // `SettingsScope.of` is a dependent lookup, so this registers the page's
+    // dependency on the settings scope: when the reader changes a sky
+    // preference in `/settings`, the scope announces, this page rebuilds, and
+    // the sky is redrawn with the new shape. **A page pumped bare would not
+    // rebuild** — `SettingsScope.of`'s locator fallback is not watched, and
+    // `settings_harness.dart`'s header records that warning — so the reading
+    // harness installs the scope.
+    //
+    // The value is also stashed for the scroll callback, which cannot depend on
+    // an inherited widget mid-layout: see [_skySettings].
+    final UserSettings settings = SettingsScope.of(context).settings;
+    _skySettings = settings;
 
     return BlocBuilder<ReadingCubit, ReadingState>(
       builder: (BuildContext context, ReadingState state) {
@@ -459,7 +509,44 @@ class _ReadingBodyState extends State<_ReadingBody> {
             child: Stack(
               fit: StackFit.expand,
               children: <Widget>[
-                WitnessSky(entries: _sky.entries),
+                // ## AND THE SKY IS **THE READER'S** SKY — EVERY KNOB IS THEIRS
+                //
+                // `eva/redesign.html:667-681` is the witness-sky group of the
+                // Workshop, and each of its seven controls reaches this widget:
+                //
+                // | preference | reaches | how |
+                // | --- | --- | --- |
+                // | `starsOn` | whether the sky is drawn at all | the widget is not mounted |
+                // | `constellationsOn` | `showConstellation` | |
+                // | `starShape` | `shape` | |
+                // | `starField` | `field` | |
+                // | `starBrightness` | `brightness` | `--starB = value/100` (`:1488`) |
+                // | `twinkle` | `twinkle` | **and** reduce motion (`:1489`) |
+                // | `starCount` | the sky's **cap** | the two writers, not this widget |
+                //
+                // **Stars-off does not mount the sky at all**, which is the
+                // prototype's own reading of the switch: `addStar` returns
+                // early when it is off (`:1144`) and `drawConstellation` refuses
+                // while it is off (`:1168`).
+                //
+                // **And the crumb's `sky N` keeps counting the stored stars
+                // while they are off** — a consequence of the decision that
+                // Stars-off hides and does not clear (`:1483` would have
+                // cleared them, and the count with them). The count is the
+                // reader's own record of what they have read, so it stays
+                // true.
+                if (settings.starsOn)
+                  WitnessSky(
+                    entries: _sky.entries,
+                    brightness: skyBrightnessFor(settings.starBrightness),
+                    twinkle: skyTwinklesFor(
+                      twinkle: settings.twinkle,
+                      reducedMotion: settings.reducedMotion,
+                    ),
+                    shape: settings.starShape,
+                    field: settings.starField,
+                    showConstellation: settings.constellationsOn,
+                  ),
                 Column(
                   children: <Widget>[
                     _bars(context, strings, state),
@@ -676,3 +763,36 @@ const double chromeDimOpacity = 0.2;
 
 /// `eva/redesign.html:176`'s `transition: opacity .9s var(--e-out)`.
 const Duration focusDimTransition = Duration(milliseconds: 900);
+
+/// The witness sky's brightness — `--starB` — from the reader's slider value.
+///
+/// `eva/redesign.html:1488` writes `--starB` as `value/100`, and the slider is
+/// 30…150 (`:670`), so the sky's brightness is 0.3…1.5 — the range
+/// `WitnessSky.brightness` takes.
+///
+/// **A named function and not an inline `/ 100`**, for the reason AGENT_CONTEXT
+/// §6 gives: domain logic must not be buried inside a widget, and a division
+/// whose wrong answer is a sky at 44× or at 0.01× is worth a name and a test.
+///
+/// **And it lives here rather than in the sky feature** because the cap's rule
+/// is read by *two* writers that may not import each other — which is why that
+/// one is in `features/sky/domain/sky_star_cap.dart` — while the brightness is
+/// read by **one** consumer, this page. The rule follows the number of readers.
+double skyBrightnessFor(int brightness) => brightness / 100;
+
+/// Whether the witness sky twinkles.
+///
+/// `eva/redesign.html:1489` toggles `notwinkle` when the switch is off **or**
+/// reduce motion is on, and `:1491` says the same from the other side — the two
+/// are one rule.
+///
+/// **Reduce motion is combined with the twinkle, never substituted for it**:
+/// the reader's own reduce-motion preference is an *additional* off switch
+/// (`UserSettings.reducedMotion`'s doc), and the platform's signal is applied
+/// by `WitnessSky` itself, which reads `MediaQuery.disableAnimationsOf`.
+///
+/// **A named function and not an inline `&&`**, for AGENT_CONTEXT §6's reason:
+/// the rule is a decision with a prototype line behind it, and it is worth
+/// being able to name it in a test.
+bool skyTwinklesFor({required bool twinkle, required bool reducedMotion}) =>
+    twinkle && !reducedMotion;

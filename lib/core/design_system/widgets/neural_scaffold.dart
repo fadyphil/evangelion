@@ -1,39 +1,27 @@
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Which way a curtain closes.
+/// ## THE ENUM MOVED TO `core/domain/entities/curtain_shape.dart`
 ///
-/// ## ONE CSS CLASS, THREE `data-shape` OVERRIDES, THREE DIFFERENT GEOMETRIES
+/// It was declared here until Task 5.7, with three members, and it was the
+/// design system's own. **The prototype has one attribute with four values**
+/// — `el('screen').dataset.shape` (`:1463`) — read by two rules: the shader's
+/// `u_shape` and the `.scrim` CSS overrides (`:114`, `:115`). So the three
+/// members here were a *subset* of the prototype's, and a second type for the
+/// same attribute.
 ///
-/// `eva/redesign.html:112-115` declares `.scrim` **once** and then overrides the
-/// whole `background` per `data-shape` on the `.screen` element:
+/// `UserSettings` now holds the fourth member (`eva.shader.shape`), and
+/// `core/domain/` is Flutter-free under Gate 1 — so a `core/domain/` entity
+/// could not name a type declared beside a Flutter widget, and the two types'
+/// names collided in every file that imported both the barrel and the entity.
 ///
-/// | line | shape | CSS gradient |
-/// | --- | --- | --- |
-/// | `:113` | (default) | `linear-gradient(180deg, transparent 0%, … 22%, … 46%, … 100%)` |
-/// | `:114` | `bottom` | `linear-gradient(0deg, transparent 0%, … 22%, … 46%, … 100%)` |
-/// | `:115` | `sides` | `linear-gradient(90deg, … .88 0%, transparent 20% 80%, … .88 100%)` |
-///
-/// So the shape is not a direction on one ramp; it selects **between two different
-/// ramps**. `:113`/`:114` are the same four stops running in opposite directions,
-/// and `:115` is a different pair of alphas (`.88`, not `.92`) with a flat centre
-/// band written as a CSS double-position stop `transparent 20% 80%`.
-enum CurtainShape {
-  /// `.scrim`'s default, `eva/redesign.html:113` — `180deg`, dark top to bottom.
-  top,
-
-  /// `.screen[data-shape="bottom"] .scrim`, `:114` — the same ramp, `0deg`.
-  ///
-  /// **The shape this widget actually paints.** `ReadingEnScreen.tsx:80-86` puts
-  /// its gradient on the sticky CTA, and a CTA's shade closes downward; every
-  /// screen that sets [NeuralScaffold.bottomFade] gets this one.
-  bottom,
-
-  /// `.screen[data-shape="sides"] .scrim`, `:115` — `90deg`, opaque at both
-  /// edges and clear through the middle 60%.
-  sides,
-}
+/// **The ramps stayed here**, because they are this widget's own geometry and
+/// moving them would have churned a shipped file for no gain. `shafts` paints
+/// the `180deg` ramp, which is the prototype's own behaviour: the CSS has
+/// overrides for `bottom` and `sides` only, so a `data-shape="shafts"` element
+/// falls through to the base `.scrim` rule (`:112-113`).
 
 /// The `180deg` ramp's four stops — `eva/redesign.html:113` and `:114`.
 ///
@@ -425,18 +413,27 @@ class NeuralScaffold extends StatelessWidget {
 /// The **alphas** are transcribed verbatim in all three tables above, because an
 /// alpha is the one part of an `rgba()` that is not a palette decision.
 ///
-/// ## THE THREE SHAPES ARE THREE DIFFERENT RAMPS
+/// ## THE THREE RAMPS, AND WHY THE SHAPE IS NOT A DIRECTION
 ///
-/// `:113` (`top`) and `:114` (`bottom`) share their stops and alphas and differ
-/// only in direction; `:115` (`sides`) is a **different** pair of alphas (`.88`,
-/// not `.92`) with a flat transparent centre. Reading the enum as "a direction on
-/// one ramp" is the reading that would get `sides` wrong, which is why
-/// [CurtainShape]'s doc says so and why this is a `switch` over the shape rather
-/// than a `begin`/`end` pair plus a shared table.
+/// `eva/redesign.html:112-115` declares `.scrim` **once** and then overrides the
+/// whole `background` per `data-shape` on the `.screen` element:
 ///
-/// `[dir=rtl]` does **not** mirror a curtain. `:114` is selected by a
-/// `data-shape` attribute, not by direction, and the prototype ships no RTL
-/// override for `.scrim` — an RTL screen shades its CTA from the same edge.
+/// | line | shape | CSS gradient |
+/// | --- | --- | --- |
+/// | `:113` | (default — `top` and `shafts`) | `linear-gradient(180deg, transparent 0%, … 22%, … 46%, … 100%)` |
+/// | `:114` | `bottom` | `linear-gradient(0deg, transparent 0%, … 22%, … 46%, … 100%)` |
+/// | `:115` | `sides` | `linear-gradient(90deg, … .88 0%, transparent 20% 80%, … .88 100%)` |
+///
+/// So the shape is not a direction on one ramp; it selects **between two
+/// different ramps**. `:113`/`:114` are the same four stops running in opposite
+/// directions, and `:115` is a different pair of alphas (`.88`, not `.92`) with
+/// a flat centre band written as a CSS double-position stop
+/// `transparent 20% 80%`.
+///
+/// **AND `shafts` IS THE DEFAULT, NOT A FOURTH RAMP** — the CSS has overrides
+/// for `bottom` and `sides` only, so a `data-shape="shafts"` element falls
+/// through to the base rule. That is the prototype's own behaviour and it is
+/// why the `shafts` arm below is the `top` arm.
 LinearGradient kNeuralCurtain(
   CurtainShape shape,
   EvaColors colors,
@@ -474,6 +471,18 @@ LinearGradient kNeuralCurtain(
           : curtainSideAlphaLight,
     ),
     stops: curtainSideStops,
+  ),
+  // `:113` again — **THE PROTOTYPE'S OWN FALL-THROUGH, NOT A FOURTH RAMP.** The
+  // CSS declares overrides for `data-shape="bottom"` and `data-shape="sides"`
+  // only, so a `data-shape="shafts"` screen gets the base `.scrim` rule, which
+  // is the `180deg` ramp — the same one `top` gets. Transcribing that as "the
+  // shafts fall in the same shade as the top" is the prototype's behaviour, and
+  // the fourth shape is a *shader* shape that the scrim has no opinion about.
+  CurtainShape.shafts => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: curtainRamp(colors, curtainAlphasFor(brightness)),
+    stops: curtainStops,
   ),
 };
 

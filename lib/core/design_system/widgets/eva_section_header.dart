@@ -195,6 +195,20 @@ class EvaSectionHeader extends StatelessWidget {
         // `mono` no tracking), which is why this reads as a much wider label than
         // the 0.5 that slot carries.
         //
+        // **AND IT IS **ZERO** UNDER RTL**, which is `eva/redesign.html:135`:
+        // `[dir=rtl] .mono{letter-spacing:0}`. Task 5.7 found this by
+        // comparison rather than by reading — the Workshop's own version chip
+        // follows `:135` (the prototype's `.mono` tracking is zeroed under RTL
+        // everywhere, and the chip is a `.mono` span), and the group headers
+        // under it did not, so **one screen was rendering two `.mono` runs two
+        // different ways**. The prototype's rule is one rule for the whole
+        // `.mono` class, and the tracking is zeroed under RTL.
+        //
+        // **It IS ALSO THE RIGHT THING FOR THE SCRIPT.** Under RTL this label
+        // is Arabic, and Arabic script does not take letter-spacing well — the
+        // prototype's own zeroing is a typographic decision and not only a
+        // mirror one.
+        //
         // `weight: w400`, because `:30` declares no weight on the element this
         // widget paints, and the prototype **is** explicit about weight when it
         // wants one (`:39` declares none for `.rail h4`; `:185` `.segp
@@ -203,7 +217,9 @@ class EvaSectionHeader extends StatelessWidget {
         // label is not.
         EvaSectionHeaderSize.section => EvaTypography.monoCaps(colors).copyWith(
           fontSize: sectionSize,
-          letterSpacing: sectionSize * sectionTracking,
+          letterSpacing: Directionality.of(context) == TextDirection.rtl
+              ? 0
+              : sectionSize * sectionTracking,
           color: colors.emberInk,
           fontWeight: FontWeight.w400,
         ),

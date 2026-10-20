@@ -3,13 +3,21 @@ import 'dart:async';
 import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+// **The design system's own `CurtainShape` is HIDDEN**: see the note in
+// `settings_cubit.dart`'s own import block. The design system declares a
+// `CurtainShape` for the **scrim** and the domain declares one for the **aurora
+// curtain**, and a file that imports both gets an ambiguous-name error.
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/settings_repository.dart';
 import 'package:evangelion/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:evangelion/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:evangelion/features/settings/domain/settings_clamps.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -435,6 +443,271 @@ void main() {
       },
     );
   });
+
+  group('the twenty-four Workshop writers', () {
+    for (final _Writer writer in _writers) {
+      test(
+        '${writer.name} lands its value, announces ONE state, and reaches the disk',
+        () async {
+          harness = settingsHarness(loadImmediately: false);
+          await harness.cubit.load();
+
+          final List<SettingsState> seen = <SettingsState>[];
+          final StreamSubscription<SettingsState> sub = harness.cubit.stream
+              .listen(seen.add);
+          addTearDown(sub.cancel);
+
+          await writer.write(harness.cubit);
+
+          expect(
+            writer.read(harness.cubit.state.settings),
+            writer.expected,
+            reason: 'the value must land in the state',
+          );
+          expect(
+            seen,
+            hasLength(1),
+            reason:
+                'one writer is one `apply`, and `apply` emits once — the confirmed '
+                'emit that follows the write is identical and the cubit suppresses it',
+          );
+          expect(
+            writer.read(seen.single.settings),
+            writer.expected,
+            reason: 'and the announced state carries the value',
+          );
+          expect(
+            writer.read(
+              (await SettingsRepositoryImpl(
+                SettingsLocalDataSource(),
+              ).load()).successValue,
+            ),
+            writer.expected,
+            reason: 'and the value reached the disk',
+          );
+        },
+      );
+    }
+  });
+
+  group('the eight RANGED writers clamp on the way in', () {
+    for (final _RangedWriter ranged in _rangedWriters) {
+      test(
+        '${ranged.name} pulls an out-of-range value into its table',
+        () async {
+          harness = settingsHarness(loadImmediately: false);
+          await harness.cubit.load();
+
+          await ranged.low(harness.cubit);
+          expect(
+            ranged.read(harness.cubit.state.settings),
+            ranged.min,
+            reason: 'a value below the minimum must land on the minimum',
+          );
+          expect(
+            ranged.read(
+              (await SettingsRepositoryImpl(
+                SettingsLocalDataSource(),
+              ).load()).successValue,
+            ),
+            ranged.min,
+            reason:
+                'and the DISK half, which a state-only assertion misses: a clamp in the '
+                'cubit with no clamp in the store leaves the raw value written, and a '
+                'second app launch reads it back',
+          );
+
+          await ranged.high(harness.cubit);
+          expect(
+            ranged.read(harness.cubit.state.settings),
+            ranged.max,
+            reason: 'a value above the maximum must land on the maximum',
+          );
+          expect(
+            ranged.read(
+              (await SettingsRepositoryImpl(
+                SettingsLocalDataSource(),
+              ).load()).successValue,
+            ),
+            ranged.max,
+          );
+        },
+      );
+    }
+
+    test(
+      'and the SELAH is the one that lands only on multiples of five',
+      () async {
+        harness = settingsHarness(loadImmediately: false);
+        await harness.cubit.load();
+
+        await harness.cubit.setSelahLengthSec(63);
+        expect(
+          harness.cubit.state.settings.selahLengthSec,
+          65,
+          reason:
+              'the prototype\'s only stepped slider (`eva/redesign.html:684`, '
+              '`step="5"`), so 63 snaps to the nearer 65',
+        );
+        await harness.cubit.setSelahLengthSec(62);
+        expect(harness.cubit.state.settings.selahLengthSec, 60);
+      },
+    );
+  });
+
+  group('`setDaylight` and the `system` arm it can never write', () {
+    test('on writes `light` and off writes `dark`', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.cubit.load();
+
+      await harness.cubit.setDaylight(daylight: true);
+      expect(harness.cubit.state.settings.themeMode, AppThemeMode.light);
+
+      await harness.cubit.setDaylight(daylight: false);
+      expect(harness.cubit.state.settings.themeMode, AppThemeMode.dark);
+    });
+
+    test('and it NEVER writes `system`, so a stored `system` is narrowed on touch', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.cubit.load();
+
+      await harness.cubit.setThemeMode(AppThemeMode.system);
+      expect(
+        harness.cubit.state.settings.themeMode,
+        AppThemeMode.system,
+        reason:
+            'a stored `system` survives until the reader touches the control',
+      );
+
+      await harness.cubit.setDaylight(daylight: true);
+      expect(
+        harness.cubit.state.settings.themeMode,
+        AppThemeMode.light,
+        reason:
+            'and touching it narrows the choice for good — the `system` arm becomes '
+            'unreachable from the UI. That is a recorded decision, not drift.',
+      );
+      expect(
+        (await SettingsRepositoryImpl(
+          SettingsLocalDataSource(),
+        ).load()).successValue.themeMode,
+        AppThemeMode.light,
+        reason: 'and the disk agrees',
+      );
+    });
+  });
+
+  group('`restoreDefaults` — the prototype\'s `resetLight`', () {
+    test('resets EVERY field the prototype resets, to its literal', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.store.write(_resetSeed);
+      await harness.cubit.load();
+
+      await harness.cubit.restoreDefaults();
+
+      for (final _ResetCase resetCase in _resetCases) {
+        expect(
+          resetCase.read(harness.cubit.state.settings),
+          resetCase.expected,
+          reason:
+              '${resetCase.name} must be reset to its prototype literal '
+              '(${resetCase.line})',
+        );
+      }
+    });
+
+    test('and changes NOTHING the prototype leaves alone', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.store.write(_resetSeed);
+      await harness.cubit.load();
+
+      await harness.cubit.restoreDefaults();
+
+      for (final _ResetCase untouched in _untouchedCases) {
+        expect(
+          untouched.read(harness.cubit.state.settings),
+          untouched.expected,
+          reason:
+              '${untouched.name} must survive the reset (${untouched.line}) — the '
+              'prototype\'s handler touches neither `setCalm` nor `setHap`',
+        );
+      }
+    });
+
+    test('and the DISK holds the same twenty-nine fields', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.store.write(_resetSeed);
+      await harness.cubit.load();
+
+      await harness.cubit.restoreDefaults();
+
+      final UserSettings stored = (await SettingsRepositoryImpl(
+        SettingsLocalDataSource(),
+      ).load()).successValue;
+
+      for (final _ResetCase resetCase in _resetCases) {
+        expect(
+          resetCase.read(stored),
+          resetCase.expected,
+          reason:
+              '${resetCase.name} must be on the disk at its prototype literal '
+              '(${resetCase.line}) — the state and the store are two answers to one '
+              'question and they must agree',
+        );
+      }
+      for (final _ResetCase untouched in _untouchedCases) {
+        expect(
+          untouched.read(stored),
+          untouched.expected,
+          reason:
+              '${untouched.name} must be on the disk unchanged too '
+              '(${untouched.line})',
+        );
+      }
+      expect(
+        stored,
+        harness.cubit.state.settings,
+        reason: 'and the two records are the same record',
+      );
+    });
+
+    test('and it is ONE emit and ONE write, not twenty-three', () async {
+      harness = settingsHarness(loadImmediately: false);
+      await harness.store.write(_resetSeed);
+
+      final _CountingRepository counting = _CountingRepository(
+        harness.repository,
+      );
+      final SettingsCubit cubit = SettingsCubit(
+        getSettings: GetSettings(counting),
+        updateSettings: UpdateSettings(counting),
+      );
+      addTearDown(cubit.close);
+      await cubit.load();
+
+      final List<SettingsState> seen = <SettingsState>[];
+      final StreamSubscription<SettingsState> sub = cubit.stream.listen(
+        seen.add,
+      );
+      addTearDown(sub.cancel);
+
+      await cubit.restoreDefaults();
+
+      expect(
+        seen,
+        hasLength(1),
+        reason:
+            'one `apply` emits once. Twenty-three would emit twenty-three times, and '
+            '`app.dart` rebuilds the whole app on every settings emit',
+      );
+      expect(
+        counting.saves,
+        1,
+        reason:
+            'and it writes once. Twenty-three would write twenty-three times.',
+      );
+    });
+  });
 }
 
 /// The value of a [Success], for the two disk assertions.
@@ -511,4 +784,552 @@ final class _SwitchableRepository implements SettingsRepository {
   @override
   Future<Result<UserSettings>> save(UserSettings settings) =>
       delegate.save(settings);
+}
+
+/// One of the twenty-four Workshop writers, and the field it writes.
+///
+/// **A top-level class and not a local one**, because Dart has no local classes.
+final class _Writer {
+  const _Writer({
+    required this.name,
+    required this.write,
+    required this.read,
+    required this.expected,
+  });
+
+  /// The writer's own name, for the test heading.
+  final String name;
+
+  /// The writer itself.
+  final Future<void> Function(SettingsCubit) write;
+
+  /// Reads the written field out of a record.
+  final Object? Function(UserSettings) read;
+
+  /// The value the writer must land.
+  final Object? expected;
+}
+
+/// One of the eight **ranged** writers, and the table it must land in.
+final class _RangedWriter {
+  const _RangedWriter({
+    required this.name,
+    required this.low,
+    required this.high,
+    required this.min,
+    required this.max,
+    required this.read,
+  });
+
+  /// The writer's own name, for the test heading.
+  final String name;
+
+  /// A call that writes a value **below** the range.
+  final Future<void> Function(SettingsCubit) low;
+
+  /// A call that writes a value **above** the range.
+  final Future<void> Function(SettingsCubit) high;
+
+  /// The prototype's `min`.
+  final int min;
+
+  /// The prototype's `max`.
+  final int max;
+
+  /// Reads the written field out of a record.
+  final int Function(UserSettings) read;
+}
+
+/// One field of the reset: what it must become, or what it must stay, and the
+/// prototype line it is transcribed from.
+final class _ResetCase {
+  const _ResetCase(this.name, this.read, this.expected, this.line);
+
+  /// The field's own name.
+  final String name;
+
+  /// Reads the field out of a record.
+  final Object? Function(UserSettings) read;
+
+  /// The value the field must hold afterwards.
+  final Object? expected;
+
+  /// The prototype's own line, so **every** row of the table carries its citation.
+  final String line;
+}
+
+/// The twenty-four writers, each with a value that **differs from its default**.
+///
+/// **A value that differs is the whole point**: `apply` announces nothing when the
+/// value does not change, so a writer tested with the default would prove only
+/// that it did nothing.
+final List<_Writer> _writers = <_Writer>[
+  _Writer(
+    name: 'setShaderEnabled',
+    write: (SettingsCubit c) => c.setShaderEnabled(enabled: false),
+    read: (UserSettings s) => s.shaderEnabled,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setCurtainShape',
+    write: (SettingsCubit c) => c.setCurtainShape(CurtainShape.shafts),
+    read: (UserSettings s) => s.curtainShape,
+    expected: CurtainShape.shafts,
+  ),
+  _Writer(
+    name: 'setReach',
+    write: (SettingsCubit c) => c.setReach(60),
+    read: (UserSettings s) => s.reach,
+    expected: 60,
+  ),
+  _Writer(
+    name: 'setGlow',
+    write: (SettingsCubit c) => c.setGlow(120),
+    read: (UserSettings s) => s.glow,
+    expected: 120,
+  ),
+  _Writer(
+    name: 'setTouchGlow',
+    write: (SettingsCubit c) => c.setTouchGlow(10),
+    read: (UserSettings s) => s.touchGlow,
+    expected: 10,
+  ),
+  _Writer(
+    name: 'setHue',
+    write: (SettingsCubit c) => c.setHue(200),
+    read: (UserSettings s) => s.hue,
+    expected: 200,
+  ),
+  _Writer(
+    name: 'setMultichromeMelt',
+    write: (SettingsCubit c) => c.setMultichromeMelt(melting: true),
+    read: (UserSettings s) => s.multichromeMelt,
+    expected: true,
+  ),
+  _Writer(
+    name: 'setRayCombing',
+    write: (SettingsCubit c) => c.setRayCombing(combing: false),
+    read: (UserSettings s) => s.rayCombing,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setWhiteCores',
+    write: (SettingsCubit c) => c.setWhiteCores(white: false),
+    read: (UserSettings s) => s.whiteCores,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setDotVeil',
+    write: (SettingsCubit c) => c.setDotVeil(veiled: true),
+    read: (UserSettings s) => s.dotVeil,
+    expected: true,
+  ),
+  _Writer(
+    name: 'setStarsOn',
+    write: (SettingsCubit c) => c.setStarsOn(on: false),
+    read: (UserSettings s) => s.starsOn,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setConstellationsOn',
+    write: (SettingsCubit c) => c.setConstellationsOn(on: false),
+    read: (UserSettings s) => s.constellationsOn,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setStarCount',
+    write: (SettingsCubit c) => c.setStarCount(20),
+    read: (UserSettings s) => s.starCount,
+    expected: 20,
+  ),
+  _Writer(
+    name: 'setStarBrightness',
+    write: (SettingsCubit c) => c.setStarBrightness(130),
+    read: (UserSettings s) => s.starBrightness,
+    expected: 130,
+  ),
+  _Writer(
+    name: 'setStarShape',
+    write: (SettingsCubit c) => c.setStarShape(SkyStarShape.star),
+    read: (UserSettings s) => s.starShape,
+    expected: SkyStarShape.star,
+  ),
+  _Writer(
+    name: 'setStarField',
+    write: (SettingsCubit c) => c.setStarField(SkyStarField.full),
+    read: (UserSettings s) => s.starField,
+    expected: SkyStarField.full,
+  ),
+  _Writer(
+    name: 'setTwinkle',
+    write: (SettingsCubit c) => c.setTwinkle(twinkling: false),
+    read: (UserSettings s) => s.twinkle,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setFocusDelaySec',
+    write: (SettingsCubit c) => c.setFocusDelaySec(9),
+    read: (UserSettings s) => s.focusDelaySec,
+    expected: 9,
+  ),
+  _Writer(
+    name: 'setSelahLengthSec',
+    write: (SettingsCubit c) => c.setSelahLengthSec(30),
+    read: (UserSettings s) => s.selahLengthSec,
+    expected: 30,
+  ),
+  _Writer(
+    name: 'setBreathGuide',
+    write: (SettingsCubit c) => c.setBreathGuide(on: false),
+    read: (UserSettings s) => s.breathGuide,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setVespersAutoDim',
+    write: (SettingsCubit c) => c.setVespersAutoDim(on: false),
+    read: (UserSettings s) => s.vespersAutoDim,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setCalmMotion',
+    write: (SettingsCubit c) => c.setCalmMotion(calm: true),
+    read: (UserSettings s) => s.calmMotion,
+    expected: true,
+  ),
+  _Writer(
+    name: 'setHaptics',
+    write: (SettingsCubit c) => c.setHaptics(on: false),
+    read: (UserSettings s) => s.haptics,
+    expected: false,
+  ),
+  _Writer(
+    name: 'setDaylight',
+    write: (SettingsCubit c) => c.setDaylight(daylight: true),
+    read: (UserSettings s) => s.themeMode,
+    expected: AppThemeMode.light,
+  ),
+];
+
+/// The eight ranged writers and the prototype's table each one lands in.
+final List<_RangedWriter> _rangedWriters = <_RangedWriter>[
+  _RangedWriter(
+    name: 'setReach',
+    low: (SettingsCubit c) => c.setReach(0),
+    high: (SettingsCubit c) => c.setReach(999),
+    min: kReachMin,
+    max: kReachMax,
+    read: (UserSettings s) => s.reach,
+  ),
+  _RangedWriter(
+    name: 'setGlow',
+    low: (SettingsCubit c) => c.setGlow(0),
+    high: (SettingsCubit c) => c.setGlow(999),
+    min: kGlowMin,
+    max: kGlowMax,
+    read: (UserSettings s) => s.glow,
+  ),
+  _RangedWriter(
+    name: 'setTouchGlow',
+    low: (SettingsCubit c) => c.setTouchGlow(-5),
+    high: (SettingsCubit c) => c.setTouchGlow(999),
+    min: kTouchGlowMin,
+    max: kTouchGlowMax,
+    read: (UserSettings s) => s.touchGlow,
+  ),
+  _RangedWriter(
+    name: 'setHue',
+    low: (SettingsCubit c) => c.setHue(-1),
+    high: (SettingsCubit c) => c.setHue(400),
+    min: kHueMin,
+    max: kHueMax,
+    read: (UserSettings s) => s.hue,
+  ),
+  _RangedWriter(
+    name: 'setStarCount',
+    low: (SettingsCubit c) => c.setStarCount(-1),
+    high: (SettingsCubit c) => c.setStarCount(999),
+    min: kStarCountMin,
+    max: kStarCountMax,
+    read: (UserSettings s) => s.starCount,
+  ),
+  _RangedWriter(
+    name: 'setStarBrightness',
+    low: (SettingsCubit c) => c.setStarBrightness(0),
+    high: (SettingsCubit c) => c.setStarBrightness(999),
+    min: kStarBrightnessMin,
+    max: kStarBrightnessMax,
+    read: (UserSettings s) => s.starBrightness,
+  ),
+  _RangedWriter(
+    name: 'setFocusDelaySec',
+    low: (SettingsCubit c) => c.setFocusDelaySec(0),
+    high: (SettingsCubit c) => c.setFocusDelaySec(99),
+    min: kFocusDelaySecMin,
+    max: kFocusDelaySecMax,
+    read: (UserSettings s) => s.focusDelaySec,
+  ),
+  _RangedWriter(
+    name: 'setSelahLengthSec',
+    low: (SettingsCubit c) => c.setSelahLengthSec(0),
+    high: (SettingsCubit c) => c.setSelahLengthSec(999),
+    min: kSelahLengthSecMin,
+    max: kSelahLengthSecMax,
+    read: (UserSettings s) => s.selahLengthSec,
+  ),
+];
+
+/// The record the reset is tested against: **every** field the prototype resets
+/// differs from its reset value, and **every** field it leaves alone is set to
+/// something the reset must not touch.
+///
+/// **Every ranged value is inside its table**, so the reset's result is not a
+/// question about the clamp: a value the clamp would move could not tell a reset
+/// from a clamp.
+const UserSettings _resetSeed = UserSettings(
+  // ## D9.1 — the twenty-three the prototype's handler resets.
+  shaderEnabled: false,
+  reach: 60,
+  glow: 110,
+  touchGlow: 20,
+  curtainShape: CurtainShape.shafts,
+  multichromeMelt: true,
+  rayCombing: false,
+  whiteCores: false,
+  dotVeil: true,
+  starsOn: false,
+  constellationsOn: false,
+  starCount: 10,
+  starBrightness: 120,
+  starShape: SkyStarShape.diamond,
+  starField: SkyStarField.full,
+  twinkle: false,
+  focusDelaySec: 9,
+  selahLengthSec: 30,
+  breathGuide: false,
+  vespersAutoDim: false,
+  veilWitnesses: true,
+  showPodium: false,
+  hue: 100,
+  // ## D9.2 — the six the prototype's handler leaves alone.
+  language: ReadingLanguage.arabic,
+  themeMode: AppThemeMode.system,
+  fontStep: 5,
+  reducedMotion: true,
+  calmMotion: true,
+  haptics: false,
+);
+
+/// The twenty-three fields the prototype's `resetLight` resets, and the literal
+/// each one must land on.
+///
+/// ## AND WHY THERE IS **NO** SINGLE `UserSettings` LITERAL FOR THE EXPECTED RECORD
+///
+/// `avoid_redundant_argument_values` refuses a `UserSettings(...)` whose arguments
+/// equal the declared defaults — and every one of the twenty-three reset literals
+/// **is** a declared default. So the expected record cannot be written as a
+/// constructor call, and the two ways around it are both bad:
+///
+/// * `const UserSettings()` — **vacuous**. Both sides would be the same object, and
+///   the test could not fail. `user_settings_test.dart` says this in its own words:
+///   "the declared defaults ARE those literals, so the two sides could never
+///   differ and the test could not fail".
+/// * a `copyWith` over the defaults — the same vacuity by another route.
+///
+/// So the expectation is **the table**, twenty-three rows and six rows, each naming
+/// its field so a failure names the field that moved. Between them the twenty-nine
+/// rows cover every field of the record, and the "the disk holds the same record"
+/// test closes the loop on the store.
+final List<_ResetCase> _resetCases = <_ResetCase>[
+  _ResetCase(
+    'shaderEnabled',
+    (UserSettings s) => s.shaderEnabled,
+    true,
+    'eva/redesign.html:1500',
+  ),
+  _ResetCase(
+    'reach',
+    (UserSettings s) => s.reach,
+    42,
+    'eva/redesign.html:1502',
+  ),
+  _ResetCase('glow', (UserSettings s) => s.glow, 100, 'eva/redesign.html:1503'),
+  _ResetCase(
+    'touchGlow',
+    (UserSettings s) => s.touchGlow,
+    55,
+    'eva/redesign.html:1504',
+  ),
+  _ResetCase(
+    'curtainShape',
+    (UserSettings s) => s.curtainShape,
+    CurtainShape.top,
+    'eva/redesign.html:1505',
+  ),
+  _ResetCase(
+    'multichromeMelt',
+    (UserSettings s) => s.multichromeMelt,
+    false,
+    'eva/redesign.html:1506',
+  ),
+  _ResetCase(
+    'rayCombing',
+    (UserSettings s) => s.rayCombing,
+    true,
+    'eva/redesign.html:1507',
+  ),
+  _ResetCase(
+    'whiteCores',
+    (UserSettings s) => s.whiteCores,
+    true,
+    'eva/redesign.html:1508',
+  ),
+  _ResetCase(
+    'dotVeil',
+    (UserSettings s) => s.dotVeil,
+    false,
+    'eva/redesign.html:1509',
+  ),
+  _ResetCase(
+    'starsOn',
+    (UserSettings s) => s.starsOn,
+    true,
+    'eva/redesign.html:1510',
+  ),
+  _ResetCase(
+    'constellationsOn',
+    (UserSettings s) => s.constellationsOn,
+    true,
+    'eva/redesign.html:1511',
+  ),
+  _ResetCase(
+    'starCount',
+    (UserSettings s) => s.starCount,
+    44,
+    'eva/redesign.html:1512',
+  ),
+  _ResetCase(
+    'starBrightness',
+    (UserSettings s) => s.starBrightness,
+    100,
+    'eva/redesign.html:1513',
+  ),
+  _ResetCase(
+    'starShape',
+    (UserSettings s) => s.starShape,
+    SkyStarShape.dot,
+    'eva/redesign.html:1514',
+  ),
+  _ResetCase(
+    'starField',
+    (UserSettings s) => s.starField,
+    SkyStarField.crown,
+    'eva/redesign.html:1515',
+  ),
+  _ResetCase(
+    'twinkle',
+    (UserSettings s) => s.twinkle,
+    true,
+    'eva/redesign.html:1516',
+  ),
+  _ResetCase(
+    'focusDelaySec',
+    (UserSettings s) => s.focusDelaySec,
+    4,
+    'eva/redesign.html:1517',
+  ),
+  _ResetCase(
+    'selahLengthSec',
+    (UserSettings s) => s.selahLengthSec,
+    60,
+    'eva/redesign.html:1518',
+  ),
+  _ResetCase(
+    'breathGuide',
+    (UserSettings s) => s.breathGuide,
+    true,
+    'eva/redesign.html:1519',
+  ),
+  _ResetCase(
+    'vespersAutoDim',
+    (UserSettings s) => s.vespersAutoDim,
+    true,
+    'eva/redesign.html:1520',
+  ),
+  _ResetCase(
+    'veilWitnesses',
+    (UserSettings s) => s.veilWitnesses,
+    false,
+    'eva/redesign.html:1521',
+  ),
+  _ResetCase(
+    'showPodium',
+    (UserSettings s) => s.showPodium,
+    true,
+    'eva/redesign.html:1522',
+  ),
+  _ResetCase('hue', (UserSettings s) => s.hue, 312, 'eva/redesign.html:1523'),
+];
+
+/// The six fields the prototype's `resetLight` leaves alone.
+final List<_ResetCase> _untouchedCases = <_ResetCase>[
+  _ResetCase(
+    'language',
+    (UserSettings s) => s.language,
+    ReadingLanguage.arabic,
+    'eva/redesign.html:1499-1525',
+  ),
+  _ResetCase(
+    'themeMode',
+    (UserSettings s) => s.themeMode,
+    AppThemeMode.system,
+    'eva/redesign.html:1501',
+  ),
+  _ResetCase(
+    'fontStep',
+    (UserSettings s) => s.fontStep,
+    5,
+    'eva/redesign.html:1499-1525',
+  ),
+  _ResetCase(
+    'reducedMotion',
+    (UserSettings s) => s.reducedMotion,
+    true,
+    'eva/redesign.html:1499-1525',
+  ),
+  _ResetCase(
+    'calmMotion',
+    (UserSettings s) => s.calmMotion,
+    true,
+    'eva/redesign.html:1499-1525',
+  ),
+  _ResetCase(
+    'haptics',
+    (UserSettings s) => s.haptics,
+    false,
+    'eva/redesign.html:1499-1525',
+  ),
+];
+
+/// A repository that counts its writes.
+///
+/// **The count is the assertion the brief's "one write, not twenty-three" needs**,
+/// and a `Future` returned by a spy would not have been: the number of writes is
+/// what has to be observed, not the number of emissions.
+final class _CountingRepository implements SettingsRepository {
+  _CountingRepository(this.inner);
+
+  /// The real repository behind [load] and [save].
+  final SettingsRepository inner;
+
+  /// How many times [save] has been called.
+  int saves = 0;
+
+  @override
+  Future<Result<UserSettings>> load() => inner.load();
+
+  @override
+  Future<Result<UserSettings>> save(UserSettings settings) {
+    saves++;
+    return inner.save(settings);
+  }
 }

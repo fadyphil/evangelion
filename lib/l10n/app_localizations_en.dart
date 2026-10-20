@@ -342,28 +342,127 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsTitle => 'Settings';
+  String get settingsTitle => 'The Workshop';
 
   @override
   String get settingsBack => 'Back';
 
   @override
-  String get settingsAppearance => 'Appearance';
+  String get settingsLanguageLabel => 'Language';
 
   @override
-  String get settingsTheme => 'Theme';
+  String get settingsWsLang => 'language';
 
   @override
-  String get settingsThemeLight => 'Light';
+  String get settingsThemeGroup => 'theme';
 
   @override
-  String get settingsThemeDark => 'Dark';
+  String get settingsDaylight => 'Daylight mode';
 
   @override
-  String get settingsThemeSystem => 'System';
+  String get settingsWsLight => 'the light workshop';
 
   @override
-  String get settingsFontSize => 'Font size';
+  String get settingsShaderEngine => 'Aurora engine';
+
+  @override
+  String get settingsCurtainShape => 'Curtain shape';
+
+  @override
+  String get settingsCurtainTop => 'top';
+
+  @override
+  String get settingsCurtainBottom => 'bottom';
+
+  @override
+  String get settingsCurtainSides => 'sides';
+
+  @override
+  String get settingsCurtainShafts => 'shafts';
+
+  @override
+  String get settingsReach => 'Reach';
+
+  @override
+  String get settingsBrightness => 'Brightness';
+
+  @override
+  String get settingsTouchGlow => 'Touch glow';
+
+  @override
+  String get settingsHue => 'Hue';
+
+  @override
+  String get settingsMultichromeMelt => 'Multichrome melt';
+
+  @override
+  String get settingsRayCombing => 'Ray combing';
+
+  @override
+  String get settingsWhiteCores => 'White cores';
+
+  @override
+  String get settingsDotVeil => 'Dot veil';
+
+  @override
+  String get settingsSkyGroup => 'witness sky';
+
+  @override
+  String get settingsStars => 'Stars';
+
+  @override
+  String get settingsConstellations => 'Constellations';
+
+  @override
+  String get settingsStarCount => 'Star count';
+
+  @override
+  String get settingsStarBrightness => 'Star brightness';
+
+  @override
+  String get settingsStarShape => 'Star shape';
+
+  @override
+  String get settingsStarField => 'Star field';
+
+  @override
+  String get settingsTwinkle => 'Twinkle';
+
+  @override
+  String get settingsRitualGroup => 'focus & ritual';
+
+  @override
+  String get settingsFocusDelay => 'Focus delay';
+
+  @override
+  String get settingsSelahLength => 'Selah length';
+
+  @override
+  String get settingsBreathGuide => 'Breath guide';
+
+  @override
+  String get settingsVespersAutoDim => 'Vespers auto-dim';
+
+  @override
+  String get settingsReduceMotion => 'Reduce motion';
+
+  @override
+  String get settingsCalmMotion => 'Calm motion';
+
+  @override
+  String get settingsHaptics => 'Haptics';
+
+  @override
+  String get settingsCommunionGroup => 'communion';
+
+  @override
+  String get settingsVeilWitnesses => 'Veil witnesses';
+
+  @override
+  String get settingsShowPodium => 'Show podium';
+
+  @override
+  String get settingsTypeSize => 'Type size';
 
   @override
   String get settingsFontScale => 'Font scale';
@@ -375,29 +474,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsIncreaseFontSize => 'Increase font size';
 
   @override
-  String get settingsReduceMotion => 'Reduce motion';
+  String get settingsRestoreDefaults => 'Restore nocturne defaults';
 
   @override
-  String get settingsMotionOn => 'On';
+  String get settingsRestored => '↺ nocturne defaults restored';
 
   @override
-  String get settingsMotionOff => 'Off';
+  String get settingsAbout => 'about';
 
   @override
-  String get settingsPreferencesUnavailable =>
-      'Your preferences could not be saved on this device.';
+  String get settingsShaders => 'Shaders';
 
   @override
-  String get settingsRetry => 'Try again';
+  String get settingsTokens => 'Tokens';
 
   @override
-  String get settingsReading => 'Reading';
-
-  @override
-  String get settingsDefaultLanguage => 'Default language';
-
-  @override
-  String get settingsLanguageSheetTitle => 'Choose a language';
+  String get settingsVersion => 'Version';
 
   @override
   String get settingsLanguageEnglish => 'English';
@@ -406,10 +498,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageArabic => 'Arabic';
 
   @override
-  String get settingsAbout => 'About';
+  String get settingsPreferencesUnavailable =>
+      'Your preferences could not be saved on this device.';
 
   @override
-  String get settingsVersion => 'Version';
+  String get settingsRetry => 'Try again';
 
   @override
   String get sealFabOpen => 'Open menu';
@@ -505,5 +598,5 @@ class AppLocalizationsEn extends AppLocalizations {
   String get journeyUnavailableSuffix => 'unavailable in this build';
 
   @override
-  String get journeyRetry => 'retry';
+  String get journeyRetry => 'Try again';
 }

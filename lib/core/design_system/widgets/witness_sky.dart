@@ -1,32 +1,41 @@
 import 'dart:ui' show PathMetric;
 
+// ## THE TWO SKY ENUMS ARE **NOT** RE-EXPORTED, AND THAT IS THE POINT
+//
+// They were declared in this file until Task 5.7, and the reason they moved is
+// the reason `UserSettings` needs them: `core/domain/` is **pure Dart** under
+// Gate 1, so `core/domain/entities/user_settings.dart` — which now holds
+// `eva.sky.pref.shape` and `eva.sky.pref.field` — could not have named an enum
+// declared beside a Flutter widget.
+//
+// They are **imported directly** here, exactly as `sky_entry.dart` is, and
+// they are **not** re-exported through the barrel. Two reasons, and the
+// second is the one that decides it:
+//
+// 1. `barrel_test.dart` asserts that every URI the barrel exports starts with
+//    `package:evangelion/core/design_system/` and contains neither
+//    `features/` nor `/domain/` — so the barrel cannot export a `core/domain/`
+//    path directly, and the only way to reach the enum *through* the barrel
+//    would be a re-export from a design-system file.
+//
+// 2. A re-export from **this** file would make the two imports below
+//    `unnecessary_import` — the analyzer sees the barrel already providing
+//    the enums, through this very file — and `--fatal-infos` makes that an
+//    error. The way out of it is a circular barrel→widget→barrel dependency,
+//    which is exactly the kind of thing that bites later.
+//
+// So the enums are **shared-kernel entities** and they are imported the way
+// every other shared-kernel entity is imported: by path. A consumer that
+// names `SkyStarShape` — `features/reading`, `features/settings`, the sky's
+// own tests — imports
+// `package:evangelion/core/domain/entities/sky_star_shape.dart`, and the
+// barrel is not involved.
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
+import 'package:evangelion/core/domain/entities/sky_star_field.dart';
+import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
-
-/// The four star silhouettes the reader can choose.
-///
-/// `eva/redesign.html:671-674` — the segmented control carries four values,
-/// `s-dot` / `s-star` / `s-cross` / `s-diamond`, labelled *dot* / *star* /
-/// *cross* / **gem**. The prototype's fourth class is `s-diamond` and its
-/// label is `gem`; the class name is the one that reaches the geometry, so it is
-/// the one this enum uses, and the label is Phase 5's settings row.
-enum SkyStarShape {
-  /// `s-dot` — `eva/redesign.html:120`, `border-radius: 50%`. **Not a polygon**,
-  /// which is the one shape whose transcription is a circle rather than a point
-  /// list; see [skyStarPathFor].
-  dot,
-
-  /// `s-star` — `eva/redesign.html:121`, an eight-point polygon.
-  star,
-
-  /// `s-cross` — `eva/redesign.html:122`, an eight-point polygon.
-  cross,
-
-  /// `s-diamond` — `eva/redesign.html:123`, the four-point "gem".
-  diamond,
-}
 
 /// The size multiplier each silhouette is drawn at.
 ///
@@ -40,16 +49,11 @@ extension SkyStarShapeScale on SkyStarShape {
 }
 
 /// Where down the screen stars may sit.
-enum SkyStarField {
-  /// The default (`eva/redesign.html:1131`, re-pinned at `:1515`).
-  crown,
-
-  /// A taller band.
-  high,
-
-  /// The whole upper field.
-  full,
-}
+///
+/// **The enum moved to `core/domain/entities/sky_star_field.dart`** in Task
+/// 5.7; see that file's doc for the reason. The **bands** stayed here, because
+/// they are this widget's own geometry and moving them would have churned a
+/// shipped file for no gain.
 
 /// `POSRANGE` — the vertical band, in percent, each field places stars in.
 ///
