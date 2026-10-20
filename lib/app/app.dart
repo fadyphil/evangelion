@@ -7,6 +7,7 @@ import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
+import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
@@ -178,6 +179,48 @@ class _EvangelionAppState extends State<EvangelionApp>
   /// for the measurement that makes this necessary rather than tidy.
   RouterConfig<UrlState>? _routerConfig;
 
+  /// The three settings **`MaterialApp` itself consumes**, as they were the last
+  /// time this element rebuilt.
+  ///
+  /// ## WHY THEY ARE HERE AND NOT A `buildWhen`
+  ///
+  /// Because this element is **above** the scope, so an inherited notification
+  /// cannot reach it — the class doc records that, and the reason it is above
+  /// the scope at all. So the guard has to be a **field comparison** against the
+  /// last built values, and the three fields are the whole of it.
+  ///
+  /// ## AND WHY THE NUMBER THEY REPLACE MATTERED
+  ///
+  /// The rebuild this guard removes was **the entire application** — every
+  /// route, every page, every list — on **every** settings write, including the
+  /// ones `MaterialApp` does not read at all: a change to the aurora's hue, to
+  /// the star count, to the haptics. **Measured** by
+  /// `test/rebuild_isolation_budget_test.dart`.
+  AppThemeMode? _materialThemeMode;
+
+  /// The language `MaterialApp` installs, as it was the last time this element
+  /// rebuilt. `null` is "follow the platform", and it is a real value here.
+  ReadingLanguage? _materialLanguage;
+
+  /// The font step `MaterialApp`'s builder installs, as it was the last time
+  /// this element rebuilt.
+  int? _materialFontStep;
+
+  /// The reader's own "reduce motion" preference, as it was the last time this
+  /// element rebuilt.
+  ///
+  /// **The FOURTH field, and it is not a `MaterialApp` property** — it is
+  /// [NeuralMotionScope]'s `animationsEnabled`, and the scope is **above**
+  /// `MaterialApp`. So it reaches the four shared clocks through this element's
+  /// rebuild, exactly as the theme, the locale and the step reach theirs
+  /// through theirs.
+  ///
+  /// **It was missing from the guard the first time, and
+  /// `app_settings_wiring_test.dart` said so** — which is the whole argument for
+  /// the test existing. A guard that watches three of the four fields is a guard
+  /// that breaks the fourth.
+  bool? _materialReducedMotion;
+
   @override
   void initState() {
     super.initState();
@@ -196,7 +239,7 @@ class _EvangelionAppState extends State<EvangelionApp>
     // rebuilds; `NeuralMotionScope.didUpdateWidget` then applies the new value
     // to the clocks, which is the mechanism it already had.
     WidgetsBinding.instance.addObserver(this);
-    _subscription = _settings.stream.listen((SettingsState _) {
+    _subscription = _settings.stream.listen((SettingsState state) {
       if (!mounted) return;
       // **Two notifications and both are needed.** [SettingsScope] is an
       // `InheritedNotifier` over [_handle], so `notifyListeners()` is what rebuilds the
@@ -206,7 +249,30 @@ class _EvangelionAppState extends State<EvangelionApp>
       // `locale` and the step are all `MaterialApp` properties and nothing below it
       // can change them.
       _handle.announce();
-      setState(() {});
+      // ## THE **GUARD**, AND THE THREE FIELDS IT WATCHES
+      //
+      // `themeMode` (`:353`), `locale` (`:328-332`), the text scale
+      // (`:412-415`) and `reducedMotion` (the scope's `animationsEnabled`,
+      // `:277-278`) are the only settings **this element** reads, and
+      // **nothing below it can change them** — which is the whole reason this
+      // element exists above the scope.
+      //
+      // So a write that touches **none** of them needs no rebuild here at all:
+      // the scope's notification has already reached the pages that read the
+      // setting, and the shell has nothing to say about it. Without the guard,
+      // a reader dragging the Hue slider rebuilt **the entire application** on
+      // every frame of the drag.
+      final UserSettings settings = state.settings;
+      final bool materialChanged =
+          settings.themeMode != _materialThemeMode ||
+          settings.language != _materialLanguage ||
+          settings.fontStep != _materialFontStep ||
+          settings.reducedMotion != _materialReducedMotion;
+      _materialThemeMode = settings.themeMode;
+      _materialLanguage = settings.language;
+      _materialFontStep = settings.fontStep;
+      _materialReducedMotion = settings.reducedMotion;
+      if (materialChanged) setState(() {});
     });
     // The one read, fired here rather than in `build`: `SharedPreferences` is async,
     // so the answer cannot be available for the first frame. `SettingsCubit`'s doc

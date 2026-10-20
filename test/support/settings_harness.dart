@@ -255,7 +255,7 @@ Widget settingsScope(WidgetTester tester, Widget child) => SettingsScope(
   // every widget test a permanently stale step.
   child: Builder(
     builder: (BuildContext context) => EvaTypeScale(
-      step: SettingsScope.of(context).read().fontStep,
+      step: SettingsScope.readingOf(context).fontStep,
       child: child,
     ),
   ),

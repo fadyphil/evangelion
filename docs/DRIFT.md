@@ -779,3 +779,70 @@ It is corrected, and the CI now runs **all eight gates** in three jobs, with
 the runner image, the Flutter version and every action **pinned** — because a
 coverage floor and a golden PNG are only meaningful against a fixed
 toolchain, and `ubuntu-latest` had already begun migrating to Ubuntu 26.
+
+---
+
+## 14. TWO CLAIMS ABOUT THE AMBIENT LAYER WERE WRONG, AND ONE COMMENT
+## DESCRIBED A DIM THE BUILD DOES NOT APPLY
+
+Three claims about the app's own code, checked against the source on
+2026-10-20 while measuring the rebuild boundary. None of them was a *number*,
+which is why none of them was caught: they were claims about **what the code
+does**, written in prose, and the code was never executed to check them.
+
+### 14.1 "A keyboard opening triggers a shader repaint"
+
+**The claim**, in the course of the performance work: `LumenBackground`'s
+`didChangeDependencies` calls `scene.retarget(...)`, which calls
+`notifyListeners()` — so **any** inherited dependency change would repaint the
+aurora, and a soft keyboard changes `MediaQuery`.
+
+**The reality.** `MediaQuery` is an `InheritedModel<_MediaQueryAspect>`, and
+the code reads `MediaQuery.sizeOf(context)` and
+`MediaQuery.disableAnimationsOf(context)` — **aspect-scoped** reads. A
+keyboard changes `viewInsets` and `padding`; it does not change `size` or
+`disableAnimations`, so `didChangeDependencies` **does not fire**.
+
+And `LumenScene.retarget` (`lumen_scene.dart:352-396`) **early-returns**
+when the preferences, the brightness and the shafts allowance are all
+unchanged — so even when it *does* fire, it does not notify.
+
+**All twelve `didChangeDependencies` sites in `lib/` are guarded, latched, or
+aspect-scoped.** This seam is the best-implemented in the codebase, and the
+claim had it backwards. `lumen_background.dart` is left alone.
+
+### 14.2 "One verse's hot glow damages the whole list"
+
+**The claim:** the reading page's verse list has no `RepaintBoundary`, so a
+repainting verse's glow would re-record the whole list's display list.
+
+**The reality.** `ListView.builder` defaults `addRepaintBoundaries: true`, and
+`SliverChildBuilderDelegate.build` wraps each item in a `RepaintBoundary`. So
+**each verse already has its own**, and one verse's glow does not reach its
+siblings. The claim was wrong, and no boundary was added — because there was
+nothing to add.
+
+**AND THE TRUE COST OF THE LIST WAS ELSEWHERE**: the problem was not a
+repaint reaching too far, it was a **rebuild** reaching too far. A tap
+rebuilt **211** widgets — the sky, the scaffold, the app bar and every visible
+verse. See `docs/PERFORMANCE.md` §2.
+
+### 14.3 "The CTA and the pill carry `chromeDimOpacity` from the same constant"
+
+**The claim**, in `reading_page.dart:676-677`: *"**Only the bars are dimmed
+here**, which is faithful to `:176` … and is also the whole of the correction:
+the CTA and the pill carry [chromeDimOpacity] from the same constant."*
+
+**The reality.** `chromeDimOpacity` is referenced at **exactly one place** —
+`reading_page.dart:687`, the app bar's `AnimatedOpacity`. A search over
+`lib/` returns two hits: the constant's own declaration and that one use.
+
+**So the comment describes a dim the build does not apply** — and the sentence
+that follows it, "**and `VerseLine`'s three-state enum is what makes 'the
+verses are not dimmed' expressible rather than accidental**", attributes the
+correction to a mechanism that is not there.
+
+**Not fixed here**, because the code is right and the comment is wrong, and
+rewriting a comment that says the code does something it does not is a
+**behaviour** question for whoever owns the reader's focus mode. Recorded
+here so the next reader does not take the comment's word for the code's.

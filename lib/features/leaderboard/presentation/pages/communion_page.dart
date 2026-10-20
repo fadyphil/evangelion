@@ -5,7 +5,6 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
-import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/leaderboard/domain/leaderboard_ranking.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
@@ -145,8 +144,14 @@ class _CommunionBodyState extends State<_CommunionBody> {
     // second (`settings_scope.dart`'s doc), and it is a **dependency**, so a change to
     // the veil rebuilds this body. A page that read the value once would keep
     // rendering the un-veiled names after the button was pressed.
-    final SettingsHandle handle = SettingsScope.of(context);
-    final UserSettings settings = handle.settings;
+    // **The handle WITHOUT a dependency** — it is read for the two *writers*
+    // below, and its identity never changes, so a dependent lookup would rebuild
+    // this whole board on every settings write.
+    final SettingsHandle handle = SettingsScope.handleOf(context);
+    // **And the COMMUNION SLICE for the values** — the two fields this page
+    // actually draws. A whole-record lookup would rebuild the board for a change
+    // to the aurora's hue, which the board does not draw.
+    final CommunionSettings settings = SettingsScope.communionOf(context);
 
     return BlocBuilder<LeaderboardCubit, LeaderboardState>(
       builder: (BuildContext context, LeaderboardState state) {
@@ -275,7 +280,7 @@ class _CommunionBodyState extends State<_CommunionBody> {
   Widget _content(
     BuildContext context,
     LeaderboardState state,
-    UserSettings settings,
+    CommunionSettings settings,
   ) => switch (state.status) {
     LeaderboardStatus.failed => ErrorView(
       message: state.failure?.message ?? '',
@@ -317,7 +322,7 @@ class _CommunionBodyState extends State<_CommunionBody> {
     BuildContext context,
     LeaderboardState state,
     LeaderboardBoard board,
-    UserSettings settings,
+    CommunionSettings settings,
   ) {
     final AppLocalizations strings = context.l10n;
 
@@ -414,7 +419,7 @@ class _CommunionBodyState extends State<_CommunionBody> {
   Future<void> _cheer(
     LeaderboardRow row,
     List<LeaderboardRow> sorted,
-    UserSettings settings,
+    CommunionSettings settings,
   ) async {
     final bool cheered = await context.read<LeaderboardCubit>().cheer(
       row.userId,

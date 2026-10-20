@@ -29,7 +29,7 @@ These were decided with the user. Do not re-litigate. Do not expand scope. **The
 | 3 | **Login and onboarding are UI-only.** A `FakeAuthRepository` returns a seeded session. There is **no auth endpoint on the backend** and no login API call. |
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
 | 5 | **No servant/admin portal.** Those backend routes stay untested from the client. |
-| 6 | **Dark glassmorphic design system** per `docs/plans/03-design-system.md`, including the five mandatory performance mitigations in `docs/plans/09-quality-gates.md` §13. |
+| 6 | **Dark glassmorphic design system** per `docs/plans/03-design-system.md`, including the five mandatory performance mitigations in `docs/plans/09-quality-gates.md` §13. **Amended 2026-10-20 (ADR-0024):** §13's rules 1 and 4 are now **enforced** — a state change rebuilds its target and nothing else, and the boundary is a **budget** rather than a paragraph. The measurements are in `docs/PERFORMANCE.md`; the gate is `test/rebuild_isolation_budget_test.dart`; the decisions are 170–174 below. |
 | 7 | **Error handling is `Result<T>`, a `typedef` for `fp_dart`'s `Either<Failure, T>`.** Amended again by §2.1's `fp_dart` correction below — the original wording said "NOT fp_dart" and was wrong. |
 | 8 | **States and entities use `freezed`; localization is ARB + `gen_l10n`.** Added by amendment — §2.1. |
 
@@ -4854,3 +4854,100 @@ moving it would be churn."* So the surviving `ds.tsx` citations were
 **deliberate** — they are where the redesign has no counterpart and the old
 number is the receipt of the difference — and what they needed was not a new
 line but a **sentence that stands on its own**.
+
+---
+
+**170. A STATE CHANGE REBUILDS ITS TARGET AND NOTHING ELSE, AND THE BOUNDARY IS
+A GATE.**
+
+§13 rule 1 says *"No `setState` per frame"*, and ADR-0019 says *"No `setState`
+per frame"* — and **neither was ever enforced against anything**. ADR-0019 is
+marked *superseded by ADR-0022*, with the note that *"`lib/` carries the old
+values until the plan's Phases 2–6 land it."* Those phases landed. **The values
+were never checked.**
+
+**AND THE MEASUREMENT IS NOT A GUESS.** A Hue slider drag rebuilt **1,236
+widgets** — every one of `/settings`'s thirty-three rows, for a change to one
+number. A verse tap rebuilt **211** — the whole screen, the **forty-four-star
+sky** included. Both figures are now **budgets** in
+`test/rebuild_isolation_budget_test.dart`, and the budgets are **27** and
+**55**. The instrument is `test/support/rebuild_counter.dart`, which counts the
+framework's own `debugOnRebuildDirtyWidget` hook.
+
+**THE MECHANISM IS FLUTTER'S AND IT IS ONE LINE.** `Element.update`
+short-circuits when the new widget is **identical** to the old, so a rebuild
+stops descending at the first unchanged subtree. The cost of a state change is
+therefore decided by **how wide the thing that changed is** — and it was the
+whole screen. ADR-0024 records the decision; `docs/PERFORMANCE.md` records the
+measurements and the commands that reproduce them.
+
+**171. THE SELECTORS AND THE SCOPE ARE **ONE** CHANGE, AND THE ORDER WAS
+MEASURED, NOT ASSUMED.**
+
+The per-row `BlocSelector` split on `/settings` was landed **first**, and the
+number got **worse**: 1,236 → **1,358**. Each of the twenty-eight selectors
+added its own rebuild, because `BlocSelector.build` calls its builder
+**unconditionally** — so a selector whose **parent** rebuilt rebuilds its child
+anyway.
+
+**So narrowing the scope is the selectors' PRECONDITION, not their
+refinement.** `SettingsScope` was one `InheritedNotifier` over the whole
+thirty-field `UserSettings` and notified on every write, and every dependent
+rebuilt on every write — including the three invisible tab screens the dock
+keeps alive. It now publishes four **slices**, each with its own notifier and
+each a **distinct runtime type**, because `InheritedWidget`'s dependency
+granularity is per type. **And the handle is read WITHOUT a dependency**,
+because its identity never changes.
+
+**172. THE COMPOSITION ROOT REBUILDS ONLY FOR WHAT `MaterialApp` READS.**
+
+`app.dart` rebuilt the **entire application** on every settings write,
+including the ones `MaterialApp` does not read at all. It now compares the
+**four** settings that reach the shell — `themeMode`, `locale`, `fontStep` and
+**`reducedMotion`** — against the last built values, and a write that touches
+none of them does not rebuild the shell.
+
+**`reducedMotion` WAS MISSING FROM THE GUARD THE FIRST TIME**, and
+`app_settings_wiring_test.dart` said so. It reaches `NeuralMotionScope`, which
+is **above** `MaterialApp` — so it is a shell-level setting even though it is
+not a `MaterialApp` property. **A guard that watches three of the four fields
+is a guard that breaks the fourth**, which is the whole argument for the test
+existing.
+
+**173. A PAGE'S OWN STATE LIVES IN NOTIFIERS, NOT IN `setState`.**
+
+`/reading` called `setState` five times, and every one of them rebuilt the
+**whole screen** — the scaffold, the sky, every visible verse — because the
+page's `build` carries them. The selected verse, the reveal frontier, the
+focus dim, the bookmark and the language arm are now five `ValueNotifier`s,
+each with a `ValueListenableBuilder` around its **one** consumer.
+**`/reading` no longer calls `setState` at all.**
+
+**AND TWO OF THE FIVE ARE FREE.** Tapping the **already selected** verse costs
+**nothing**: a `ValueNotifier` ignores an equal value, where the `setState` it
+replaced rebuilt the screen every time. And the reveal frontier no longer
+rebuilds the screen **once per verse** — a thirty-verse chapter used to rebuild
+it thirty times in its first second.
+
+**174. THE AURORA'S PIXEL BUDGET IS COUNTED IN **LOGICAL** PIXELS, AND THE
+COST IS IN **DEVICE** PIXELS.**
+
+`lumen_tier.dart:89`'s `kShaftsPixelBudget` is compared against
+`MediaQuery.sizeOf(context)` — **logical** pixels — while the cost it protects
+is GPU fragments, which are **device** pixels. On a 1080×2400 phone at dpr
+2.75 that is **0.343 Mpx** against **2.592 Mpx**: the gate under-counts by
+**dpr²**, about **7.6×**. At the file's own recorded rates (2.98 ns/px for
+shapes 0–2) the default band costs **7.7 ms** of a 60 Hz frame — and **93 %**
+of a 90 Hz one.
+
+**AND THE AURORA REPAINTS ON EVERY VSYNC, WITH NO CAP** — no
+`devicePixelRatio` read anywhere in `lib/`, no `TickerMode`, no
+`setFrameRate`, no resolution scaling. §13 rule 4 asked for exactly this
+("a tier that drops to `low` on low-end devices … at **30 % cost**") and
+`LumenTiers` has no such member.
+
+**Both are OPEN, and both are GPU problems rather than rebuild problems** — so
+they are recorded in `docs/PERFORMANCE.md` §3 with the fixes, the order and
+their costs, and **not** decided here. The one that needs a decision is
+rendering the aurora at half resolution: **4× fewer fragments**, the shape
+unchanged, and **visible as a slightly softer aurora**.

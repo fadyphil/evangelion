@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Twenty-three records of the architectural decisions that shaped this client, why
+Twenty-four records of the architectural decisions that shaped this client, why
 each was taken, and what it cost. Each names the recorded decision in
 [`docs/agents/AGENT_CONTEXT.md`](../agents/AGENT_CONTEXT.md) that it came from, so
 any claim here can be traced to its source and checked.
@@ -13,7 +13,7 @@ decision and the wrong place to *find* one: the file is over four thousand lines
 long, and reading it end to end to answer "why is `Result<T>` a typedef" is not
 a reasonable thing to ask of a new contributor.
 
-These ADRs are a curated index over that record — twenty-three architectural
+These ADRs are a curated index over that record — twenty-four architectural
 decisions rather than 156 chronological entries. Each one carries the parts that
 are worth keeping when the surrounding chronology is not: the constraint that
 forced it, the alternatives that were rejected and why, and the consequences

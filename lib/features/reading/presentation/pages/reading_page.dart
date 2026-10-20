@@ -8,7 +8,6 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/reading/domain/reading_focus.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
@@ -118,7 +117,14 @@ class _ReadingBodyState extends State<_ReadingBody> {
   ///
   /// [_load] keeps it in step with the locale, so a settings change still wins:
   /// the dial is a local override, the locale is the owner.
-  ReadingLanguage _arm = ReadingLanguage.english;
+  ///
+  /// **And a [ValueNotifier] and not a field**, because the page's own `build`
+  /// must not run when the dial moves: the `build` also carries the scaffold
+  /// and the **forty-four-star sky**, and a whole-page rebuild redraws every
+  /// one of them. The notifier's only consumer is the dial itself.
+  final ValueNotifier<ReadingLanguage> _arm = ValueNotifier<ReadingLanguage>(
+    ReadingLanguage.english,
+  );
 
   /// The reader's font step, read back out of the installed scaler.
   ///
@@ -136,7 +142,12 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// is strictly increasing (`80 + 25n`), so the revealed set is always a prefix
   /// and a count is the whole of it. A set could describe a state the prototype
   /// cannot reach, and a screen that reaches it has a bug nobody would notice.
-  int _revealed = 0;
+  ///
+  /// **And a [ValueNotifier] and not a field**, for the same reason as [_arm]:
+  /// the entrance fires **once per verse** — thirty times for a long chapter —
+  /// and a `setState` per verse rebuilt the entire screen thirty times in the
+  /// first second. The notifier's only consumers are the verse rows.
+  final ValueNotifier<int> _revealed = ValueNotifier<int>(0);
 
   /// The passage whose entrance is running or has run, so it runs **once** per
   /// passage rather than on every state change.
@@ -152,11 +163,19 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// **`null` until one is chosen, and that is the prototype's own default**:
   /// nothing opens a sheet with a verse selected, and `:1443`'s 460 ms timer adds
   /// `.hot` to the verse that was tapped.
-  int? _hot;
+  ///
+  /// **And a [ValueNotifier] and not a field**, for the same reason as [_arm]:
+  /// a tap on a verse must not rebuild the screen around it.
+  final ValueNotifier<int?> _hot = ValueNotifier<int?>(null);
 
   /// Whether focus mode is dimming the chrome. `:1292` adds `.focus` after the
   /// idle delay; `:1290` removes it on any pointer press.
-  bool _focusDim = false;
+  ///
+  /// **And a [ValueNotifier] and not a field**, because the idle timer fires it
+  /// on **every** idle period, and the consumer is a single `AnimatedOpacity`.
+  /// A `setState` here rebuilt the whole screen — the scaffold, the sky and
+  /// every verse — to change one number on one widget.
+  final ValueNotifier<bool> _focusDim = ValueNotifier<bool>(false);
 
   /// The idle timer behind [_focusDim]. See [_poke].
   Timer? _idle;
@@ -175,7 +194,10 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// else, and §2's route table has no bookmark endpoint — so a stored bookmark
   /// would be a fiction in the one place this screen is otherwise entirely real.
   /// It survives a rebuild and nothing else.
-  bool _bookmarked = false;
+  ///
+  /// **And a [ValueNotifier] and not a field**, because the consumer is a
+  /// single icon in the app bar and the producer is a single tap.
+  final ValueNotifier<bool> _bookmarked = ValueNotifier<bool>(false);
 
   /// A key per built verse, so the observer can measure it.
   ///
@@ -184,6 +206,45 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// is why the map holds only verses `ListView.builder` has **built** — the ones
   /// the observer can actually see — and the next passage starts from empty.
   final Map<int, GlobalKey> _verseKeys = <int, GlobalKey>{};
+
+  /// The two notifiers whose changes alter what a **row** looks like.
+  ///
+  /// **Created once, and not per build** — `Listenable.merge` allocates, and a
+  /// per-build merge would allocate on every rebuild of the list, which is the
+  /// churn `neural_motion.dart`'s `repaint` getter exists to remove.
+  late final Listenable _verseListenable = Listenable.merge(<Listenable>[
+    _hot,
+    _revealed,
+  ]);
+
+  /// The verse rows, cached so an unchanged row is handed back **identical**.
+  ///
+  /// ## WHY THIS EXISTS, AND THE NUMBER THAT PROVED IT
+  ///
+  /// `ListView.builder` re-runs its `itemBuilder` for **every built index**
+  /// whenever the list rebuilds, and a fresh widget instance is a rebuilt
+  /// subtree: Flutter's `Element.update` short-circuits only when the new
+  /// widget is the **same instance**. So a list that rebuilt handed every
+  /// visible verse a new `VerseLine`, and every visible verse re-derived its
+  /// `TextStyle`, re-built its `TextSpan` tree and re-laid out its paragraph.
+  ///
+  /// **Measured:** one tap on a verse rebuilt **211 widgets** — every visible
+  /// verse, the app bar, the pill, the CTA, the scaffold and the entire
+  /// forty-four-star sky. The measurement is
+  /// `test/rebuild_isolation_budget_test.dart`, and it is a budget there.
+  ///
+  /// ## HOW THE CACHE DECIDES WHETHER A ROW CHANGED
+  ///
+  /// By a **signature** — the three booleans that make a row what it is: is it
+  /// revealed, is it the hot one, is it the resume one. A row whose signature
+  /// is unchanged is handed back **the same instance**, and the framework's
+  /// short-circuit does the rest. A row whose signature changed is rebuilt and
+  /// the cache entry replaced.
+  final Map<int, Widget> _verseRows = <int, Widget>{};
+
+  /// The signature each cached row was built with.
+  final Map<int, (bool, bool, bool)> _verseRowSignatures =
+      <int, (bool, bool, bool)>{};
 
   /// The verses already credited with a star. `:1218`'s `vObs.unobserve(p)`.
   final Set<int> _lit = <int>{};
@@ -214,7 +275,23 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// **The default is the default install's preferences** — `UserSettings()` —
   /// so a page that has not built yet answers the gate the way it would render
   /// anyway: with the stars on.
-  UserSettings _skySettings = const UserSettings();
+  /// The **witness slice**, cached for [_skySettings]'s reason.
+  ///
+  /// **A field and not a lookup at the point of use**, because a slice lookup
+  /// is a *dependent* lookup and the scroll callback and the pointer handlers
+  /// are not places where registering a dependency is allowed. The nullable
+  /// form is honest about the window before the first build, and every read
+  /// falls back to the same default `UserSettings` carried.
+  WitnessSettings? _skySettings;
+
+  /// The **ritual slice**, cached for the same reason.
+  ///
+  /// **A second field and not one combined record**, because the two slices
+  /// change for different reasons: a sky preference redraws the sky, and a
+  /// ritual preference changes the reader's comfort. One combined field would
+  /// put them back into one dependency — which is the defect the slices exist
+  /// to remove.
+  RitualSettings? _ritualSettings;
 
   /// The reader's focus delay, as of the last build.
   ///
@@ -242,7 +319,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
   void _load() {
     final ReadingLanguage language = _language;
     _requested = language;
-    _arm = language;
+    _arm.value = language;
     context.read<ReadingCubit>().load(language);
   }
 
@@ -254,11 +331,12 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// difference between a control that feels connected and one that waits for a
   /// disk.
   void _onLanguageChanged(ReadingLanguage chosen) {
-    setState(() {
-      _requested = chosen;
-      _arm = chosen;
-    });
-    unawaited(SettingsScope.of(context).setLanguage(chosen));
+    // **The arm is a notifier, and the request is a plain field** — the
+    // request is read in [didChangeDependencies] and in [_load] and never in a
+    // build, so it has no business being in a `setState` at all.
+    _requested = chosen;
+    _arm.value = chosen;
+    unawaited(SettingsScope.handleOf(context).setLanguage(chosen));
     context.read<ReadingCubit>().load(chosen);
   }
 
@@ -277,9 +355,21 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // whole app dimmed. The prototype's `focusDim` is a global flag with the
     // same problem — and the same answer, which is that the next `poke()`
     // clears it — except that this client's reader may never come back.
-    if (_focusDim) {
+    if (_focusDim.value) {
       _scene?.undimFocus();
     }
+    // ## THE **FIVE NOTIFIERS**, AND WHY THEY ARE DISPOSED HERE
+    //
+    // A `ValueNotifier` that outlives its `State` keeps its listeners alive,
+    // and a listener that outlives the element it belongs to is a listener that
+    // fires into a disposed tree. The framework does not own these — they are
+    // this class's — so this class disposes them, in the same place it
+    // disposes its timers.
+    _hot.dispose();
+    _revealed.dispose();
+    _focusDim.dispose();
+    _bookmarked.dispose();
+    _arm.dispose();
     super.dispose();
   }
 
@@ -309,7 +399,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // prototype's `:882`, `:1490` and `:1530-1532` are three paths to the same
     // branch, and the harness's `disableAnimations:` flag drives this one.
     if (MediaQuery.disableAnimationsOf(context)) {
-      if (mounted) setState(() => _revealed = count);
+      if (mounted) _revealed.value = count;
       return;
     }
     final List<Duration> schedule = verseEntranceSchedule(
@@ -321,7 +411,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
       if (!mounted || step >= schedule.length) return;
       _stagger = Timer(schedule[step], () {
         step++;
-        if (mounted) setState(() => _revealed = step);
+        if (mounted) _revealed.value = step;
         next();
       });
     }
@@ -360,7 +450,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
     _setFocusDim(false);
     _idle = Timer(_focusDelay, () {
       if (!mounted) return;
-      setState(() => _focusDim = true);
+      _focusDim.value = true;
       // ## THE **AMBIENT** DIMS TOO, AND NOT ONLY THE CHROME
       //
       // `eva/redesign.html:891` — `base=ambBase*bright*vesp*(focusDim?0.45:1)`
@@ -377,8 +467,8 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// (`eva/redesign.html:884`) and two consequences for it: the chrome's
   /// opacity (`:176`) and the aurora's intensity (`:891`).
   void _setFocusDim(bool dimmed) {
-    if (_focusDim == dimmed) return;
-    if (mounted) setState(() => _focusDim = dimmed);
+    if (_focusDim.value == dimmed) return;
+    if (mounted) _focusDim.value = dimmed;
     if (dimmed) {
       _scene?.dimFocus();
     } else {
@@ -462,7 +552,7 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // `p.dataset.star='1'` and unobserves the verse (`:1217-1218`) whether or
     // not `addStar` went on to add anything. A verse crossed while the stars
     // are off is not re-lit later either — in the prototype or here.
-    if (!_skySettings.starsOn) return;
+    if (!(_skySettings?.starsOn ?? true)) return;
     final ScriptureText? passage = _passage;
     if (passage == null) return;
     final Verse? verse = passage.verses
@@ -502,12 +592,15 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // `eva/redesign.html:1396-1397` — `el('fPlus').onclick=()=>{…;haptic(10)};`
     // and `el('fMinus')` likewise. The tick is on the **press**, so it is
     // fired here rather than after the write.
-    fireRitualHaptic(RitualHaptic.fontStep, enabled: _skySettings.haptics);
+    fireRitualHaptic(
+      RitualHaptic.fontStep,
+      enabled: _ritualSettings?.haptics ?? true,
+    );
     // `unawaited` because §4 forbids dropping a `Future` as a bare expression
     // statement, and the write is fire-and-forget from here: the optimistic emit
     // in `SettingsCubit.apply` has already moved the app's scale by the time the
     // next frame runs.
-    unawaited(SettingsScope.of(context).setFontStep(step));
+    unawaited(SettingsScope.handleOf(context).setFontStep(step));
   }
 
   @override
@@ -525,90 +618,132 @@ class _ReadingBodyState extends State<_ReadingBody> {
     //
     // The value is also stashed for the scroll callback, which cannot depend on
     // an inherited widget mid-layout: see [_skySettings].
-    final UserSettings settings = SettingsScope.of(context).settings;
-    _skySettings = settings;
+    //
+    // **AND IT IS THE TWO SLICES, NOT THE WHOLE RECORD.** The page draws the
+    // sky and the reader's comfort settings, and nothing else — so it depends
+    // on the witness slice and the ritual slice, and a change to the aurora's
+    // hue (which the page does not draw) no longer rebuilds it.
+    final WitnessSettings witness = SettingsScope.witnessOf(context);
+    final RitualSettings ritual = SettingsScope.ritualOf(context);
+    _skySettings = witness;
+    _ritualSettings = ritual;
     // **The reader's own focus delay**, read with the rest of the settings.
-    _focusDelay = Duration(seconds: settings.focusDelaySec);
+    _focusDelay = Duration(seconds: ritual.focusDelaySec);
 
-    return BlocBuilder<ReadingCubit, ReadingState>(
-      builder: (BuildContext context, ReadingState state) {
-        final ScriptureText? passage = state.scripture;
+    // ## THE CUBIT'S HALF, AND **ONLY** THE CUBIT'S HALF
+    //
+    // The scaffold and the **forty-four-star sky** used to live **inside** the
+    // `BlocBuilder`, so every emit of `ReadingCubit` rebuilt them: the sky
+    // re-instantiated 44 stars × 5 widgets, and the scaffold re-ran its three
+    // inherited lookups.
+    //
+    // **Measured:** one tap on a verse rebuilt **211 widgets** — the whole
+    // screen, the sky included. The measurement is
+    // `test/rebuild_isolation_budget_test.dart`, and it is a budget there.
+    //
+    // The scaffold and the sky read the **witness slice** and the **ritual
+    // slice**, never `ReadingState` — so they are hoisted above the builder,
+    // and only the content that actually reads the cubit is left inside it.
+    //
+    // The pointer that arms focus mode, wrapping the scaffold rather than
+    // sitting inside it: `:1294` listens for the **press itself** on the
+    // screen, not for a tap some child may have consumed — a pointer that
+    // lands on a verse and is swallowed by that verse's own gesture still
+    // counts as the reader being there. A [Listener] and not a
+    // `GestureDetector` because it wants the pointer, not the gesture arena.
+    return Listener(
+      onPointerDown: (PointerDownEvent _) => _poke(),
+      child: NeuralScaffold(
+        // `EdgeInsets.zero`: the route's own `padding` is `:142`'s and
+        // `:159`'s, transcribed by the two widgets that own them, and a second
+        // inset here would compose with them.
+        padding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            // ## AND THE SKY IS **THE READER'S** SKY — EVERY KNOB IS THEIRS
+            //
+            // `eva/redesign.html:667-681` is the witness-sky group of the
+            // Workshop, and each of its seven controls reaches this widget:
+            //
+            // | preference | reaches | how |
+            // | --- | --- | --- |
+            // | `starsOn` | whether the sky is drawn at all | the widget is not mounted |
+            // | `constellationsOn` | `showConstellation` | |
+            // | `starShape` | `shape` | |
+            // | `starField` | `field` | |
+            // | `starBrightness` | `brightness` | `--starB = value/100` (`:1488`) |
+            // | `twinkle` | `twinkle` | **and** reduce motion (`:1489`) |
+            // | `starCount` | the sky's **cap** | the two writers, not this widget |
+            //
+            // **Stars-off does not mount the sky at all**, which is the
+            // prototype's own reading of the switch: `addStar` returns
+            // early when it is off (`:1144`) and `drawConstellation` refuses
+            // while it is off (`:1168`).
+            //
+            // **And the crumb's `sky N` keeps counting the stored stars
+            // while they are off** — a consequence of the decision that
+            // Stars-off hides and does not clear (`:1483` would have
+            // cleared them, and the count with them). The count is the
+            // reader's own record of what they have read, so it stays
+            // true.
+            if (witness.starsOn)
+              WitnessSky(
+                entries: _sky.entries,
+                brightness: skyBrightnessFor(witness.starBrightness),
+                twinkle: skyTwinklesFor(
+                  twinkle: witness.twinkle,
+                  reducedMotion: ritual.reducedMotion,
+                ),
+                shape: witness.starShape,
+                field: witness.starField,
+                showConstellation: witness.constellationsOn,
+              ),
+            BlocBuilder<ReadingCubit, ReadingState>(
+              // ## THE **THREE** FIELDS THE CONTENT ACTUALLY READS
+              //
+              // `ReadingState` carries four, and the fourth —
+              // `textSizePanelOpen` — is **read by nobody in `lib/`**:
+              // `ReadingCubit.toggleTextSizePanel` has no caller outside the
+              // test suite, so every call rebuilt the entire screen for a
+              // value nothing renders. This predicate is what makes that
+              // call cost nothing, and the field stays in the state so the
+              // cubit's own suite and the freezed-equality gate keep passing.
+              buildWhen: (ReadingState previous, ReadingState current) =>
+                  previous.status != current.status ||
+                  previous.scripture != current.scripture ||
+                  previous.failure != current.failure,
+              builder: (BuildContext context, ReadingState state) {
+                final ScriptureText? passage = state.scripture;
 
-        // The entrance runs **once per passage**, keyed on its reading id — see
-        // [_entranceFor]'s note on why a state comparison would not do.
-        if (passage != null && _entranceFor != passage.readingId) {
-          _entranceFor = passage.readingId;
-          _lit.clear();
-          _verseKeys.clear();
-          _resume = _sky.lastLit?.verse;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            _runEntrance(passage);
-            // **`:1377` arms focus mode on entry**, not on the first press:
-            // `enterReader(){ renderVerses(); observeVerses(); poke(); ... }`. A
-            // reader who opens the passage and reads without touching anything is
-            // exactly the reader focus mode exists for, so arming the idle timer
-            // only from `onPointerDown` would make the mode unreachable for them.
-            // [_poke] carries the four seconds and `:683`'s unwired slider.
-            _poke();
-          });
-        }
+                // The entrance runs **once per passage**, keyed on its reading
+                // id — see [_entranceFor]'s note on why a state comparison
+                // would not do.
+                if (passage != null && _entranceFor != passage.readingId) {
+                  _entranceFor = passage.readingId;
+                  _lit.clear();
+                  _verseKeys.clear();
+                  // **The row cache goes with the keys**, because a row holds
+                  // its key: a new passage means new rows.
+                  _verseRows.clear();
+                  _verseRowSignatures.clear();
+                  _resume = _sky.lastLit?.verse;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _runEntrance(passage);
+                    // **`:1377` arms focus mode on entry**, not on the first
+                    // press: `enterReader(){ renderVerses(); observeVerses();
+                    // poke(); ... }`. A reader who opens the passage and
+                    // reads without touching anything is exactly the reader
+                    // focus mode exists for, so arming the idle timer only
+                    // from `onPointerDown` would make the mode unreachable
+                    // for them. [_poke] carries the four seconds and
+                    // `:683`'s unwired slider.
+                    _poke();
+                  });
+                }
 
-        // The pointer that arms focus mode, wrapping the scaffold rather than
-        // sitting inside it: `:1294` listens for the **press itself** on the
-        // screen, not for a tap some child may have consumed — a pointer that
-        // lands on a verse and is swallowed by that verse's own gesture still
-        // counts as the reader being there. A [Listener] and not a
-        // `GestureDetector` because it wants the pointer, not the gesture arena.
-        return Listener(
-          onPointerDown: (PointerDownEvent _) => _poke(),
-          child: NeuralScaffold(
-            // `EdgeInsets.zero`: the route's own `padding` is `:142`'s and
-            // `:159`'s, transcribed by the two widgets that own them, and a second
-            // inset here would compose with them.
-            padding: EdgeInsets.zero,
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                // ## AND THE SKY IS **THE READER'S** SKY — EVERY KNOB IS THEIRS
-                //
-                // `eva/redesign.html:667-681` is the witness-sky group of the
-                // Workshop, and each of its seven controls reaches this widget:
-                //
-                // | preference | reaches | how |
-                // | --- | --- | --- |
-                // | `starsOn` | whether the sky is drawn at all | the widget is not mounted |
-                // | `constellationsOn` | `showConstellation` | |
-                // | `starShape` | `shape` | |
-                // | `starField` | `field` | |
-                // | `starBrightness` | `brightness` | `--starB = value/100` (`:1488`) |
-                // | `twinkle` | `twinkle` | **and** reduce motion (`:1489`) |
-                // | `starCount` | the sky's **cap** | the two writers, not this widget |
-                //
-                // **Stars-off does not mount the sky at all**, which is the
-                // prototype's own reading of the switch: `addStar` returns
-                // early when it is off (`:1144`) and `drawConstellation` refuses
-                // while it is off (`:1168`).
-                //
-                // **And the crumb's `sky N` keeps counting the stored stars
-                // while they are off** — a consequence of the decision that
-                // Stars-off hides and does not clear (`:1483` would have
-                // cleared them, and the count with them). The count is the
-                // reader's own record of what they have read, so it stays
-                // true.
-                if (settings.starsOn)
-                  WitnessSky(
-                    entries: _sky.entries,
-                    brightness: skyBrightnessFor(settings.starBrightness),
-                    twinkle: skyTwinklesFor(
-                      twinkle: settings.twinkle,
-                      reducedMotion: settings.reducedMotion,
-                    ),
-                    shape: settings.starShape,
-                    field: settings.starField,
-                    showConstellation: settings.constellationsOn,
-                  ),
-                Column(
+                return Column(
                   children: <Widget>[
                     _bars(context, strings, state),
                     Expanded(child: _body(context, strings, state)),
@@ -629,38 +764,51 @@ class _ReadingBodyState extends State<_ReadingBody> {
                         onPressed: () =>
                             unawaited(context.router.pushPath(AppRoutes.quiz)),
                       ),
-                    ReadingPill(
-                      fontStep: _fontStep,
-                      onFontStepChanged: _onFontStepChanged,
-                      language: _arm,
-                      // **The dial writes the LANGUAGE SETTING, and the app's
-                      // own rebuild does the rest.** `eva/redesign.html:1477-1480`'s
-                      // `data-l` buttons set `lang` and re-render in place; this
-                      // client's equivalent of "the language" is
-                      // `UserSettings.language`, and `app.dart` rebuilds
-                      // `MaterialApp` with the locale it names — which is the
-                      // trigger [didChangeDependencies] exists for, and the reason
-                      // `_load` guards on which arm was *asked for* rather than on
-                      // a bool. Writing the setting is also what makes the choice
-                      // survive a restart, which a local `setState` would not.
-                      onLanguageChanged: _onLanguageChanged,
+                    // **The dial's arm is a notifier**, and the pill is wrapped in
+                    // it: the dial is the one control whose change must move a
+                    // thumb on the frame the reader taps it, and a `setState`
+                    // would have rebuilt the whole screen — the sky included — to
+                    // do it.
+                    ValueListenableBuilder<ReadingLanguage>(
+                      valueListenable: _arm,
+                      builder:
+                          (
+                            BuildContext context,
+                            ReadingLanguage arm,
+                            Widget? child,
+                          ) => ReadingPill(
+                            fontStep: _fontStep,
+                            onFontStepChanged: _onFontStepChanged,
+                            language: arm,
+                            // **The dial writes the LANGUAGE SETTING, and the app's
+                            // own rebuild does the rest.** `eva/redesign.html:1477-1480`'s
+                            // `data-l` buttons set `lang` and re-render in place; this
+                            // client's equivalent of "the language" is
+                            // `UserSettings.language`, and `app.dart` rebuilds
+                            // `MaterialApp` with the locale it names — which is the
+                            // trigger [didChangeDependencies] exists for, and the reason
+                            // `_load` guards on which arm was *asked for* rather than on
+                            // a bool. Writing the setting is also what makes the choice
+                            // survive a restart, which a local `setState` would not.
+                            onLanguageChanged: _onLanguageChanged,
 
-                      // **`onListen` is deliberately not passed**, and that is
-                      // the whole of that control in this build: there is no audio
-                      // in the prototype and none here, so the button ships inert
-                      // with its accessible name carrying the reason. The analyzer
-                      // calls the omitted argument redundant and it is right — the
-                      // *record* belongs in this comment and in
-                      // `reading_pill.dart`'s doc, which carries the `grep` that
-                      // established it and why the `.wave` is not built either.
+                            // **`onListen` is deliberately not passed**, and that is
+                            // the whole of that control in this build: there is no audio
+                            // in the prototype and none here, so the button ships inert
+                            // with its accessible name carrying the reason. The analyzer
+                            // calls the omitted argument redundant and it is right — the
+                            // *record* belongs in this comment and in
+                            // `reading_pill.dart`'s doc, which carries the `grep` that
+                            // established it and why the `.wave` is not built either.
+                          ),
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -683,41 +831,58 @@ class _ReadingBodyState extends State<_ReadingBody> {
   ) {
     final ScriptureText? passage = state.scripture;
 
-    return AnimatedOpacity(
-      opacity: _focusDim ? chromeDimOpacity : 1,
-      duration: focusDimTransition,
-      curve: EvaMotion.interactiveCurve,
-      child: ReadingAppBar(
-        // `:1345` — `bookTitle(b)`. **The passage's own reference, and there is
-        // no better source**: §2's route table has no endpoint that enumerates
-        // books, so a book *name* here would be the catalogue fiction ADR-0022
-        // removed from `/`.
-        title: passage?.reference ?? '',
-        meta: strings.crumbMeta(
-          // **The book number, not a category word** — and the divergence from
-          // `:1346`'s `CATS[b.cat][li()]` is real. That clause is a `/`-side
-          // fiction (`LibraryCategory.label`, which `home_l10n.dart` owns because
-          // the `CATS` table is shared); a passage carries no category at all, and
-          // inventing one here would put a second book's metadata on a screen whose
-          // data is real. The number is what the passage knows.
-          category: passage == null || passage.verses.isEmpty
-              ? '—'
-              : '${passage.verses.first.bookNumber}',
-          verses: passage?.verses.length ?? 0,
-          litStars: _sky.litCount,
-        ),
-        onBack: () => unawaited(context.router.maybePop()),
-        onBookmarkToggled: () {
-          // `eva/redesign.html:1394` — `el('bmBtn').onclick=function(){
-          // this.classList.toggle('lit'); haptic(12); … }`.
-          fireRitualHaptic(
-            RitualHaptic.bookmark,
-            enabled: _skySettings.haptics,
-          );
-          setState(() => _bookmarked = !_bookmarked);
-        },
-        bookmarked: _bookmarked,
-      ),
+    // ## THE DIM IS A NOTIFIER, AND **ONLY** THE DIM IS A NOTIFIER
+    //
+    // The chrome's opacity is the whole of what `_focusDim` reaches on this
+    // screen — so the `AnimatedOpacity` is wrapped in it, and the app bar is
+    // **not** rebuilt by an idle tick. The idle timer fires every
+    // `focusDelaySec` of a reader who is not touching the screen, and it used
+    // to rebuild the whole screen — the scaffold, the sky and every verse.
+    return ValueListenableBuilder<bool>(
+      valueListenable: _focusDim,
+      builder: (BuildContext context, bool focusDim, Widget? child) =>
+          AnimatedOpacity(
+            opacity: focusDim ? chromeDimOpacity : 1,
+            duration: focusDimTransition,
+            curve: EvaMotion.interactiveCurve,
+            // **And the bookmark is a notifier too**, because its consumer is a
+            // single icon and a `setState` reached the whole screen to change it.
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _bookmarked,
+              builder: (BuildContext context, bool bookmarked, Widget? child) =>
+                  ReadingAppBar(
+                    // `:1345` — `bookTitle(b)`. **The passage's own reference, and there is
+                    // no better source**: §2's route table has no endpoint that enumerates
+                    // books, so a book *name* here would be the catalogue fiction ADR-0022
+                    // removed from `/`.
+                    title: passage?.reference ?? '',
+                    meta: strings.crumbMeta(
+                      // **The book number, not a category word** — and the divergence from
+                      // `:1346`'s `CATS[b.cat][li()]` is real. That clause is a `/`-side
+                      // fiction (`LibraryCategory.label`, which `home_l10n.dart` owns because
+                      // the `CATS` table is shared); a passage carries no category at all, and
+                      // inventing one here would put a second book's metadata on a screen whose
+                      // data is real. The number is what the passage knows.
+                      category: passage == null || passage.verses.isEmpty
+                          ? '—'
+                          : '${passage.verses.first.bookNumber}',
+                      verses: passage?.verses.length ?? 0,
+                      litStars: _sky.litCount,
+                    ),
+                    onBack: () => unawaited(context.router.maybePop()),
+                    onBookmarkToggled: () {
+                      // `eva/redesign.html:1394` — `el('bmBtn').onclick=function(){
+                      // this.classList.toggle('lit'); haptic(12); … }`.
+                      fireRitualHaptic(
+                        RitualHaptic.bookmark,
+                        enabled: _ritualSettings?.haptics ?? true,
+                      );
+                      _bookmarked.value = !_bookmarked.value;
+                    },
+                    bookmarked: bookmarked,
+                  ),
+            ),
+          ),
     );
   }
 
@@ -775,69 +940,127 @@ class _ReadingBodyState extends State<_ReadingBody> {
     //
     // **And the reader's own switch decides whether there is one at all** —
     // `UserSettings.breathGuide`, the Workshop's `:685`.
-    final int? anchor = _skySettings.breathGuide ? (_hot ?? _resume) : null;
-    final int anchorIndex = anchor == null
-        ? -1
-        : passage.verses.indexWhere((Verse v) => v.number == anchor);
-
+    // ## THE LIST IS UNDER A [ListenableBuilder], AND THE **CACHE** IS WHAT
+    // ## MAKES THAT CHEAP
+    //
+    // The two notifiers change what a **row** looks like, so the list has to
+    // rebuild when they change — and a rebuild re-runs `itemBuilder` for every
+    // built index. **The cache is what keeps that cheap**: a row whose
+    // signature is unchanged is handed back **the same widget instance**, and
+    // Flutter's `Element.update` short-circuits on an identical widget, so its
+    // subtree is not rebuilt at all.
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
-      child: ListView.builder(
-        // `:159` — `padding: 14px 26px 12px`. **14 and 26 are not spacing
-        // tokens**, for the reason `VerseLine.verseGap` records.
-        padding: const EdgeInsets.fromLTRB(26, 14, 26, 12),
-        // **One extra row, and it is the guide.** A `Column` around each verse
-        // would have changed **every** verse's layout to accommodate one
-        // verse's guide, and the reading harness measures those verses.
-        itemCount: passage.verses.length + (anchorIndex >= 0 ? 1 : 0),
-        itemBuilder: (BuildContext context, int index) {
-          if (anchorIndex >= 0 && index == anchorIndex + 1) {
-            return const BreathGuideLine();
-          }
-          final int verseIndex = anchorIndex >= 0 && index > anchorIndex
-              ? index - 1
-              : index;
-          final Verse verse = passage.verses[verseIndex];
-          final GlobalKey key = _verseKeys.putIfAbsent(
-            verse.number,
-            GlobalKey.new,
-          );
-          return GestureDetector(
-            // `:1385-1386` — tapping a verse makes it the selected one and
-            // removes `.hot` from every other. **The sheet itself is not built**:
-            // `openSheet` opens a bottom sheet the redesign's reader route does
-            // not contain a trigger for beyond the verse itself, and Phase 7's
-            // ritual step is where it belongs. What this port keeps is the
-            // selection, which is the state a sheet would read.
-            onTap: () => setState(() => _hot = verse.number),
-            behavior: HitTestBehavior.opaque,
-            child: VerseLine(
-              key: key,
-              number: verse.number,
-              // **`Verse.text`, NOT `displayText`** — recorded decision 51, and
-              // the Arabic arm's typography gate is what caught this page getting
-              // it wrong: `displayText` is the *preview* projection
-              // (`textClean ?? text`), so the sanctuary was rendering every verse
-              // with its diacritics stripped, and the gate reported the fixture's
-              // diacritised `text` as a declared-but-unrendered run while the tree
-              // held the cleaned one. The reading screen shows scripture whole.
-              text: verse.text,
-              paint: versePaintFor(
-                // The **stagger's** answer, not the observer's. The prototype's
-                // `.in` class is what the schedule adds (`:1383`), so "revealed"
-                // is a question about the schedule and not about the scroll
-                // position — the observer's visibility answer is spent on
-                // *stars* (`_onScroll`), never on paint.
-                visibility: index < _revealed
-                    ? VerseVisibility.inView
-                    : VerseVisibility.outOfView,
-                hot: _hot == verse.number,
-                entranceComplete: index < _revealed,
-              ),
-              resume: _resume == verse.number,
-            ),
+      child: ListenableBuilder(
+        listenable: _verseListenable,
+        builder: (BuildContext context, Widget? child) {
+          // ## THE ANCHOR IS COMPUTED **HERE**, AND THAT IS THE POINT
+          //
+          // The anchor is the verse the guide hangs under, and it moves with
+          // the selection — so it has to be recomputed **inside** this builder,
+          // which is the one that re-runs when the selection changes. Computed
+          // outside it, it would be a **stale** local: the list would rebuild
+          // with the anchor the reader had *before* the tap, and the guide
+          // would never appear.
+          final int? anchor = (_ritualSettings?.breathGuide ?? true)
+              ? (_hot.value ?? _resume)
+              : null;
+          final int anchorIndex = anchor == null
+              ? -1
+              : passage.verses.indexWhere((Verse v) => v.number == anchor);
+          return ListView.builder(
+            // `:159` — `padding: 14px 26px 12px`. **14 and 26 are not spacing
+            // tokens**, for the reason `VerseLine.verseGap` records.
+            padding: const EdgeInsets.fromLTRB(26, 14, 26, 12),
+            // **One extra row, and it is the guide.** A `Column` around each verse
+            // would have changed **every** verse's layout to accommodate one
+            // verse's guide, and the reading harness measures those verses.
+            itemCount: passage.verses.length + (anchorIndex >= 0 ? 1 : 0),
+            itemBuilder: (BuildContext context, int index) {
+              if (anchorIndex >= 0 && index == anchorIndex + 1) {
+                return const BreathGuideLine();
+              }
+              final int verseIndex = anchorIndex >= 0 && index > anchorIndex
+                  ? index - 1
+                  : index;
+              final Verse verse = passage.verses[verseIndex];
+              final GlobalKey key = _verseKeys.putIfAbsent(
+                verse.number,
+                GlobalKey.new,
+              );
+              // ## THE **SIGNATURE**, AND WHY IT IS THREE BOOLEANS
+              //
+              // A row's appearance is decided by three things: is it revealed, is
+              // it the hot one, is it the resume one. **Everything else about it is
+              // the passage's**, and the passage does not change under a tap. So
+              // those three are the whole of "has this row changed?".
+              final bool revealed = index < _revealed.value;
+              final bool hot = _hot.value == verse.number;
+              final bool resume = _resume == verse.number;
+              final (bool, bool, bool) signature = (revealed, hot, resume);
+              if (_verseRowSignatures[verse.number] != signature) {
+                _verseRowSignatures[verse.number] = signature;
+                _verseRows[verse.number] = _verseRow(
+                  context: context,
+                  verse: verse,
+                  key: key,
+                  revealed: revealed,
+                  hot: hot,
+                  resume: resume,
+                );
+              }
+              // **The SAME instance**, and that is the whole point: an identical
+              // widget is one the framework does not rebuild.
+              return _verseRows[verse.number]!;
+            },
           );
         },
+      ),
+    );
+  }
+
+  /// One verse's row, built for the state the signature names.
+  Widget _verseRow({
+    required BuildContext context,
+    required Verse verse,
+    required Key key,
+    required bool revealed,
+    required bool hot,
+    required bool resume,
+  }) {
+    return GestureDetector(
+      // `:1385-1386` — tapping a verse makes it the selected one and
+      // removes `.hot` from every other. **The sheet itself is not built**:
+      // `openSheet` opens a bottom sheet the redesign's reader route does
+      // not contain a trigger for beyond the verse itself, and Phase 7's
+      // ritual step is where it belongs. What this port keeps is the
+      // selection, which is the state a sheet would read.
+      onTap: () => _hot.value = verse.number,
+      behavior: HitTestBehavior.opaque,
+      child: VerseLine(
+        key: key,
+        number: verse.number,
+        // **`Verse.text`, NOT `displayText`** — recorded decision 51, and
+        // the Arabic arm's typography gate is what caught this page getting
+        // it wrong: `displayText` is the *preview* projection
+        // (`textClean ?? text`), so the sanctuary was rendering every verse
+        // with its diacritics stripped, and the gate reported the fixture's
+        // diacritised `text` as a declared-but-unrendered run while the tree
+        // held the cleaned one. The reading screen shows scripture whole.
+        text: verse.text,
+        paint: versePaintFor(
+          // The **stagger's** answer, not the observer's. The prototype's
+          // `.in` class is what the schedule adds (`:1383`), so "revealed"
+          // is a question about the schedule and not about the scroll
+          // position — the observer's visibility answer is spent on
+          // *stars* (`_onScroll`), never on paint.
+          visibility: revealed
+              ? VerseVisibility.inView
+              : VerseVisibility.outOfView,
+          hot: hot,
+          entranceComplete: revealed,
+        ),
+        resume: resume,
       ),
     );
   }

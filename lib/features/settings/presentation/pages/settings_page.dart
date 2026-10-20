@@ -315,11 +315,9 @@ class _SettingsBodyState extends State<_SettingsBody> {
         children: <Widget>[
           const WorkshopAppBar(),
           const SizedBox(height: SettingsPage.groupGap),
-          BlocBuilder<SettingsCubit, SettingsState>(
-            builder: (BuildContext context, SettingsState state) => Padding(
-              padding: SettingsPage.contentPadding,
-              child: _groups(context, state, strings),
-            ),
+          Padding(
+            padding: SettingsPage.contentPadding,
+            child: _groups(context, strings),
           ),
         ],
       ),
@@ -334,11 +332,24 @@ class _SettingsBodyState extends State<_SettingsBody> {
   /// drags the Hue slider has to see the swatch move, and a reader who flips the
   /// Daylight switch has to see the whole screen repaint. A list built once would
   /// be a list built from the first frame's state.
-  Widget _groups(
-    BuildContext context,
-    SettingsState state,
-    AppLocalizations strings,
-  ) {
+  ///
+  /// ## AND WHY IT NO LONGER TAKES THE STATE
+  ///
+  /// **Because each row reads its own setting, through its own
+  /// [BlocSelector].** This method used to take the whole `SettingsState` and
+  /// hand it to thirty-three rows, and the cost of that was measured rather than
+  /// assumed: **one hue change rebuilt 1,236 widgets** — every row, every
+  /// control, every `SettingsTile` — because a single `BlocBuilder` over the
+  /// whole form re-ran this method and every row was a fresh widget instance.
+  ///
+  /// A reader who drags the Hue slider changes **one number**, and the screen
+  /// now rebuilds **one row**. The rows that read nothing are not rebuilt at
+  /// all, because they are not under a selector.
+  ///
+  /// The measurement is `test/rebuild_isolation_budget_test.dart`, and the
+  /// budget is asserted there — which is the only kind of claim about a number
+  /// this repository accepts.
+  Widget _groups(BuildContext context, AppLocalizations strings) {
     final SettingsCubit cubit = context.read<SettingsCubit>();
     // The **handle**, and only for the two communion rows.
     //
@@ -346,7 +357,14 @@ class _SettingsBodyState extends State<_SettingsBody> {
     // `/communion` fields were given their writers on the **handle**, which is the
     // widget-facing projection of the cubit (`settings_handle.dart:142,149`). The
     // handle's `write` is the same cubit's `apply`, so the write is the same write.
-    final SettingsHandle handle = SettingsScope.of(context);
+    //
+    // **And it is read WITHOUT a dependency** — `SettingsScope.handleOf`, not
+    // `SettingsScope.of`. The handle is a locator singleton whose identity never
+    // changes, so a dependent lookup here would rebuild this whole thirty-three-row
+    // form on **every** settings write, which is what it used to do: one hue
+    // change rebuilt **1,236 widgets**. The rows read their own values through
+    // their own `_SettingRow`, so nothing here needs the whole record.
+    final SettingsHandle handle = SettingsScope.handleOf(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -356,8 +374,17 @@ class _SettingsBodyState extends State<_SettingsBody> {
         // `_SettingsFailureNotice` is rendered **above** the groups and the
         // groups are rendered regardless — deliberately, and the reasoning is in
         // its own doc, which has not changed.
-        if (state.status == SettingsStatus.failed)
-          _SettingsFailureNotice(strings: strings),
+        //
+        // **And it reads the status through its own selector**, so a write that
+        // succeeds does not rebuild it — and a write that fails rebuilds it
+        // without rebuilding the thirty-two rows below.
+        BlocSelector<SettingsCubit, SettingsState, SettingsStatus>(
+          selector: (SettingsState state) => state.status,
+          builder: (BuildContext context, SettingsStatus status) =>
+              status == SettingsStatus.failed
+              ? _SettingsFailureNotice(strings: strings)
+              : const SizedBox.shrink(),
+        ),
 
         // --- 1. the language group (`:645-648`) ---------------------------
         SettingsGroup(
@@ -426,33 +453,48 @@ class _SettingsBodyState extends State<_SettingsBody> {
         SettingsGroup(
           label: strings.settingsThemeGroup,
           children: <Widget>[
-            WorkshopToggleRow(
-              title: strings.settingsDaylight,
-              // ## THE NARROWING, AND THE PRODUCT CONSEQUENCE IT HAS
-              //
-              // A stored `system` renders the switch **off**, and the stored
-              // value is **not** changed until the reader touches the control —
-              // so a reader who stored `system` keeps following the OS until
-              // they touch it.
-              //
-              // **And touching it narrows the choice for good.** The only
-              // writer of the theme on this screen is `SettingsCubit.setDaylight`,
-              // and it writes `light` or `dark` and never `system` — so the
-              // `system` arm of `AppThemeMode`, a shipped capability since
-              // Phase 0 ("the reader asked to follow the OS"), becomes
-              // **unreachable from the UI**. The cubit's own doc carries that
-              // half of the record; this is the control's half.
-              value: daylightOnFor(state.settings.themeMode),
-              onChanged: (bool daylight) {
-                // `eva/redesign.html:1482` — `el('setDaylight').onchange=e=>{…
-                // if(V)V.spike=.4; haptic(15); }`. The tick is on the change,
-                // and it is the **reader's own** switch being answered.
-                fireRitualHaptic(
-                  RitualHaptic.daylightToggled,
-                  enabled: state.settings.haptics,
-                );
-                unawaited(cubit.setDaylight(daylight: daylight));
-              },
+            // ## IT READS **TWO** SETTINGS, AND THAT IS WHY IT IS A **RECORD**
+            //
+            // The switch's own value is the theme, and the haptic it fires reads
+            // the haptics setting — so a change to **either** must rebuild this
+            // row, or the switch and the tick would disagree.
+            //
+            // A Dart **record** compares structurally, so `(bool, bool)` is
+            // compared field by field and rebuilds exactly when one of the two
+            // moves. Two separate selectors would not do: the second would
+            // rebuild the row on its own, and the first would have to be told
+            // about the second.
+            _SettingRow<(bool, bool)>(
+              read: (UserSettings s) => (daylightOnFor(s.themeMode), s.haptics),
+              builder: (BuildContext context, (bool, bool) value) => WorkshopToggleRow(
+                title: strings.settingsDaylight,
+                // ## THE NARROWING, AND THE PRODUCT CONSEQUENCE IT HAS
+                //
+                // A stored `system` renders the switch **off**, and the stored
+                // value is **not** changed until the reader touches the control —
+                // so a reader who stored `system` keeps following the OS until
+                // they touch it.
+                //
+                // **And touching it narrows the choice for good.** The only
+                // writer of the theme on this screen is
+                // `SettingsCubit.setDaylight`, and it writes `light` or `dark`
+                // and never `system` — so the `system` arm of `AppThemeMode`, a
+                // shipped capability since Phase 0 ("the reader asked to follow
+                // the OS"), becomes **unreachable from the UI**. The cubit's own
+                // doc carries that half of the record; this is the control's
+                // half.
+                value: value.$1,
+                onChanged: (bool daylight) {
+                  // `eva/redesign.html:1482` — `el('setDaylight').onchange=e=>{…
+                  // if(V)V.spike=.4; haptic(15); }`. The tick is on the change,
+                  // and it is the **reader's own** switch being answered.
+                  fireRitualHaptic(
+                    RitualHaptic.daylightToggled,
+                    enabled: value.$2,
+                  );
+                  unawaited(cubit.setDaylight(daylight: daylight));
+                },
+              ),
             ),
           ],
         ),
@@ -477,79 +519,110 @@ class _SettingsBodyState extends State<_SettingsBody> {
         SettingsGroup(
           label: strings.settingsWsLight,
           children: <Widget>[
-            WorkshopToggleRow(
-              title: strings.settingsShaderEngine,
-              value: state.settings.shaderEnabled,
-              onChanged: (bool enabled) =>
-                  unawaited(cubit.setShaderEnabled(enabled: enabled)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.shaderEnabled,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsShaderEngine,
+                value: value,
+                onChanged: (bool enabled) =>
+                    unawaited(cubit.setShaderEnabled(enabled: enabled)),
+              ),
             ),
-            WorkshopSegmentRow<CurtainShape>(
-              title: strings.settingsCurtainShape,
-              values: CurtainShape.values,
-              selected: state.settings.curtainShape,
-              labelOf: (CurtainShape shape) => switch (shape) {
-                CurtainShape.top => strings.settingsCurtainTop,
-                CurtainShape.bottom => strings.settingsCurtainBottom,
-                CurtainShape.sides => strings.settingsCurtainSides,
-                CurtainShape.shafts => strings.settingsCurtainShafts,
-              },
-              onChanged: (CurtainShape shape) =>
-                  unawaited(cubit.setCurtainShape(shape)),
+            _SettingRow<CurtainShape>(
+              read: (UserSettings s) => s.curtainShape,
+              builder: (BuildContext context, CurtainShape value) =>
+                  WorkshopSegmentRow<CurtainShape>(
+                    title: strings.settingsCurtainShape,
+                    values: CurtainShape.values,
+                    selected: value,
+                    labelOf: (CurtainShape shape) => switch (shape) {
+                      CurtainShape.top => strings.settingsCurtainTop,
+                      CurtainShape.bottom => strings.settingsCurtainBottom,
+                      CurtainShape.sides => strings.settingsCurtainSides,
+                      CurtainShape.shafts => strings.settingsCurtainShafts,
+                    },
+                    onChanged: (CurtainShape shape) =>
+                        unawaited(cubit.setCurtainShape(shape)),
+                  ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsReach,
-              value: state.settings.reach,
-              min: kReachMin,
-              max: kReachMax,
-              onChanged: (int reach) => unawaited(cubit.setReach(reach)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.reach,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsReach,
+                value: value,
+                min: kReachMin,
+                max: kReachMax,
+                onChanged: (int reach) => unawaited(cubit.setReach(reach)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsBrightness,
-              value: state.settings.glow,
-              min: kGlowMin,
-              max: kGlowMax,
-              onChanged: (int glow) => unawaited(cubit.setGlow(glow)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.glow,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsBrightness,
+                value: value,
+                min: kGlowMin,
+                max: kGlowMax,
+                onChanged: (int glow) => unawaited(cubit.setGlow(glow)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsTouchGlow,
-              value: state.settings.touchGlow,
-              min: kTouchGlowMin,
-              max: kTouchGlowMax,
-              onChanged: (int touchGlow) =>
-                  unawaited(cubit.setTouchGlow(touchGlow)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.touchGlow,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsTouchGlow,
+                value: value,
+                min: kTouchGlowMin,
+                max: kTouchGlowMax,
+                onChanged: (int touchGlow) =>
+                    unawaited(cubit.setTouchGlow(touchGlow)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsHue,
-              value: state.settings.hue,
-              min: kHueMin,
-              max: kHueMax,
-              onChanged: (int hue) => unawaited(cubit.setHue(hue)),
-              // `:661` — the swatch sits **after** the range input.
-              after: HueSwatch(hue: state.settings.hue),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.hue,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsHue,
+                value: value,
+                min: kHueMin,
+                max: kHueMax,
+                onChanged: (int hue) => unawaited(cubit.setHue(hue)),
+                // `:661` — the swatch sits **after** the range input.
+                after: HueSwatch(hue: value),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsMultichromeMelt,
-              value: state.settings.multichromeMelt,
-              onChanged: (bool melting) =>
-                  unawaited(cubit.setMultichromeMelt(melting: melting)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.multichromeMelt,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsMultichromeMelt,
+                value: value,
+                onChanged: (bool melting) =>
+                    unawaited(cubit.setMultichromeMelt(melting: melting)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsRayCombing,
-              value: state.settings.rayCombing,
-              onChanged: (bool combing) =>
-                  unawaited(cubit.setRayCombing(combing: combing)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.rayCombing,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsRayCombing,
+                value: value,
+                onChanged: (bool combing) =>
+                    unawaited(cubit.setRayCombing(combing: combing)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsWhiteCores,
-              value: state.settings.whiteCores,
-              onChanged: (bool white) =>
-                  unawaited(cubit.setWhiteCores(white: white)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.whiteCores,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsWhiteCores,
+                value: value,
+                onChanged: (bool white) =>
+                    unawaited(cubit.setWhiteCores(white: white)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsDotVeil,
-              value: state.settings.dotVeil,
-              onChanged: (bool veiled) =>
-                  unawaited(cubit.setDotVeil(veiled: veiled)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.dotVeil,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsDotVeil,
+                value: value,
+                onChanged: (bool veiled) =>
+                    unawaited(cubit.setDotVeil(veiled: veiled)),
+              ),
             ),
           ],
         ),
@@ -562,86 +635,109 @@ class _SettingsBodyState extends State<_SettingsBody> {
         SettingsGroup(
           label: strings.settingsSkyGroup,
           children: <Widget>[
-            WorkshopToggleRow(
-              title: strings.settingsStars,
-              value: state.settings.starsOn,
-              // **Stars-off HIDES the sky; it does not delete it.** The
-              // prototype's Stars-off calls `clearStars()` (`:1483`), but the
-              // prototype has no persistence — its stars are DOM elements — while
-              // this client's sky is a reader's own record of what they have
-              // read. **A divergence from `:1483`, and a decision.**
-              onChanged: (bool on) => unawaited(cubit.setStarsOn(on: on)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.starsOn,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsStars,
+                value: value,
+                // **Stars-off HIDES the sky; it does not delete it.** The
+                // prototype's Stars-off calls `clearStars()` (`:1483`), but the
+                // prototype has no persistence — its stars are DOM elements — while
+                // this client's sky is a reader's own record of what they have
+                // read. **A divergence from `:1483`, and a decision.**
+                onChanged: (bool on) => unawaited(cubit.setStarsOn(on: on)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsConstellations,
-              value: state.settings.constellationsOn,
-              onChanged: (bool on) =>
-                  unawaited(cubit.setConstellationsOn(on: on)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.constellationsOn,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsConstellations,
+                value: value,
+                onChanged: (bool on) =>
+                    unawaited(cubit.setConstellationsOn(on: on)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsStarCount,
-              value: state.settings.starCount,
-              min: kStarCountMin,
-              max: kStarCountMax,
-              onChanged: (int count) => unawaited(cubit.setStarCount(count)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.starCount,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsStarCount,
+                value: value,
+                min: kStarCountMin,
+                max: kStarCountMax,
+                onChanged: (int count) => unawaited(cubit.setStarCount(count)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsStarBrightness,
-              value: state.settings.starBrightness,
-              min: kStarBrightnessMin,
-              max: kStarBrightnessMax,
-              onChanged: (int brightness) =>
-                  unawaited(cubit.setStarBrightness(brightness)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.starBrightness,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsStarBrightness,
+                value: value,
+                min: kStarBrightnessMin,
+                max: kStarBrightnessMax,
+                onChanged: (int brightness) =>
+                    unawaited(cubit.setStarBrightness(brightness)),
+              ),
             ),
-            WorkshopSegmentRow<SkyStarShape>(
-              title: strings.settingsStarShape,
-              values: SkyStarShape.values,
-              selected: state.settings.starShape,
-              // ## THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH
-              //
-              // `:673` carries **no `data-i18n`** on any of its four buttons, so
-              // these are the prototype's own words and they stay that way. They
-              // are **widget literals, not ARB keys** — an ARB key whose two arms
-              // are identical would have to join `app_localizations_test.dart`'s
-              // `mustBeIdentical` set, and that set is the gate that catches an
-              // untranslated string.
-              //
-              // **The fourth is `gem`, not `diamond`**: the prototype's class name
-              // is `s-diamond` and its label is `gem`, and the two answer
-              // different questions — the class name reaches the geometry and the
-              // label reaches the reader.
-              labelOf: (SkyStarShape shape) => switch (shape) {
-                SkyStarShape.dot => kStarShapeDot,
-                SkyStarShape.star => kStarShapeStar,
-                SkyStarShape.cross => kStarShapeCross,
-                SkyStarShape.diamond => kStarShapeGem,
-              },
-              onChanged: (SkyStarShape shape) =>
-                  unawaited(cubit.setStarShape(shape)),
+            _SettingRow<SkyStarShape>(
+              read: (UserSettings s) => s.starShape,
+              builder: (BuildContext context, SkyStarShape value) =>
+                  WorkshopSegmentRow<SkyStarShape>(
+                    title: strings.settingsStarShape,
+                    values: SkyStarShape.values,
+                    selected: value,
+                    // ## THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH
+                    //
+                    // `:673` carries **no `data-i18n`** on any of its four buttons, so
+                    // these are the prototype's own words and they stay that way. They
+                    // are **widget literals, not ARB keys** — an ARB key whose two arms
+                    // are identical would have to join `app_localizations_test.dart`'s
+                    // `mustBeIdentical` set, and that set is the gate that catches an
+                    // untranslated string.
+                    //
+                    // **The fourth is `gem`, not `diamond`**: the prototype's class name
+                    // is `s-diamond` and its label is `gem`, and the two answer
+                    // different questions — the class name reaches the geometry and the
+                    // label reaches the reader.
+                    labelOf: (SkyStarShape shape) => switch (shape) {
+                      SkyStarShape.dot => kStarShapeDot,
+                      SkyStarShape.star => kStarShapeStar,
+                      SkyStarShape.cross => kStarShapeCross,
+                      SkyStarShape.diamond => kStarShapeGem,
+                    },
+                    onChanged: (SkyStarShape shape) =>
+                        unawaited(cubit.setStarShape(shape)),
+                  ),
             ),
-            WorkshopSegmentRow<SkyStarField>(
-              title: strings.settingsStarField,
-              values: SkyStarField.values,
-              selected: state.settings.starField,
-              // The prototype's own untranslated English, for the Star shape
-              // segment's reason: `:678` carries no `data-i18n` either.
-              labelOf: (SkyStarField field) => switch (field) {
-                SkyStarField.crown => kStarFieldCrown,
-                SkyStarField.high => kStarFieldHigh,
-                SkyStarField.full => kStarFieldFull,
-              },
-              onChanged: (SkyStarField field) =>
-                  unawaited(cubit.setStarField(field)),
+            _SettingRow<SkyStarField>(
+              read: (UserSettings s) => s.starField,
+              builder: (BuildContext context, SkyStarField value) =>
+                  WorkshopSegmentRow<SkyStarField>(
+                    title: strings.settingsStarField,
+                    values: SkyStarField.values,
+                    selected: value,
+                    // The prototype's own untranslated English, for the Star shape
+                    // segment's reason: `:678` carries no `data-i18n` either.
+                    labelOf: (SkyStarField field) => switch (field) {
+                      SkyStarField.crown => kStarFieldCrown,
+                      SkyStarField.high => kStarFieldHigh,
+                      SkyStarField.full => kStarFieldFull,
+                    },
+                    onChanged: (SkyStarField field) =>
+                        unawaited(cubit.setStarField(field)),
+                  ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsTwinkle,
-              value: state.settings.twinkle,
-              // **Combined with the reduce-motion signal, never instead of it** —
-              // the prototype's handler sets `notwinkle` when the switch is off
-              // **or** reduce motion is on (`:1489`), and the client's sky does
-              // the same.
-              onChanged: (bool twinkling) =>
-                  unawaited(cubit.setTwinkle(twinkling: twinkling)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.twinkle,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsTwinkle,
+                value: value,
+                // **Combined with the reduce-motion signal, never instead of it** —
+                // the prototype's handler sets `notwinkle` when the switch is off
+                // **or** reduce motion is on (`:1489`), and the client's sky does
+                // the same.
+                onChanged: (bool twinkling) =>
+                    unawaited(cubit.setTwinkle(twinkling: twinkling)),
+              ),
             ),
           ],
         ),
@@ -675,76 +771,97 @@ class _SettingsBodyState extends State<_SettingsBody> {
         SettingsGroup(
           label: strings.settingsRitualGroup,
           children: <Widget>[
-            WorkshopSliderRow(
-              title: strings.settingsFocusDelay,
-              value: state.settings.focusDelaySec,
-              min: kFocusDelaySecMin,
-              max: kFocusDelaySecMax,
-              onChanged: (int seconds) =>
-                  unawaited(cubit.setFocusDelaySec(seconds)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.focusDelaySec,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsFocusDelay,
+                value: value,
+                min: kFocusDelaySecMin,
+                max: kFocusDelaySecMax,
+                onChanged: (int seconds) =>
+                    unawaited(cubit.setFocusDelaySec(seconds)),
+              ),
             ),
-            WorkshopSliderRow(
-              title: strings.settingsSelahLength,
-              value: state.settings.selahLengthSec,
-              min: kSelahLengthSecMin,
-              max: kSelahLengthSecMax,
-              // `:684` — `step="5"`, the prototype's **only** stepped slider.
-              step: kSelahLengthSecStep,
-              onChanged: (int seconds) =>
-                  unawaited(cubit.setSelahLengthSec(seconds)),
+            _SettingRow<int>(
+              read: (UserSettings s) => s.selahLengthSec,
+              builder: (BuildContext context, int value) => WorkshopSliderRow(
+                title: strings.settingsSelahLength,
+                value: value,
+                min: kSelahLengthSecMin,
+                max: kSelahLengthSecMax,
+                // `:684` — `step="5"`, the prototype's **only** stepped slider.
+                step: kSelahLengthSecStep,
+                onChanged: (int seconds) =>
+                    unawaited(cubit.setSelahLengthSec(seconds)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsBreathGuide,
-              value: state.settings.breathGuide,
-              onChanged: (bool on) => unawaited(cubit.setBreathGuide(on: on)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.breathGuide,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsBreathGuide,
+                value: value,
+                onChanged: (bool on) => unawaited(cubit.setBreathGuide(on: on)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsVespersAutoDim,
-              value: state.settings.vespersAutoDim,
-              onChanged: (bool on) =>
-                  unawaited(cubit.setVespersAutoDim(on: on)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.vespersAutoDim,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsVespersAutoDim,
+                value: value,
+                onChanged: (bool on) =>
+                    unawaited(cubit.setVespersAutoDim(on: on)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsReduceMotion,
-              value: state.settings.reducedMotion,
-              // An **existing** field, and the prototype's own switch.
-              onChanged: (bool reduced) =>
-                  unawaited(cubit.setReducedMotion(reduced: reduced)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.reducedMotion,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsReduceMotion,
+                value: value,
+                // An **existing** field, and the prototype's own switch.
+                onChanged: (bool reduced) =>
+                    unawaited(cubit.setReducedMotion(reduced: reduced)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsCalmMotion,
-              value: state.settings.calmMotion,
-              onChanged: (bool calm) =>
-                  unawaited(cubit.setCalmMotion(calm: calm)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.calmMotion,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsCalmMotion,
+                value: value,
+                onChanged: (bool calm) =>
+                    unawaited(cubit.setCalmMotion(calm: calm)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsHaptics,
-              value: state.settings.haptics,
-              // `eva/redesign.html:1498` — `el('setHap').onchange=e=>{
-              // HAPTICS=e.target.checked; if(HAPTICS)haptic(15); }`.
-              //
-              // **The tick is on the way UP only** — the prototype's own `if`
-              // says so, and it is the only sensible reading: a reader who has
-              // just turned haptics **off** must not be answered with one.
-              onChanged: (bool on) {
-                if (on) {
-                  // ## THE TICK IS GATED ON THE **NEW** VALUE
-                  //
-                  // The prototype's handler sets `HAPTICS` **first** and then
-                  // asks (`:1498` — `HAPTICS=e.target.checked; if(HAPTICS)
-                  // haptic(15);`), so the tick is the answer to the switch
-                  // being **on** — not to the value it held before the tap.
-                  //
-                  // That matters for the one moment a reader most wants to
-                  // know it worked: **the tap that turns haptics on**. A
-                  // client that read the old value would stay silent on that
-                  // very tap, because the old value is `false` — and the
-                  // reader would be left not knowing whether the switch did
-                  // anything.
-                  fireRitualHaptic(RitualHaptic.hapticsEnabled, enabled: on);
-                }
-                unawaited(cubit.setHaptics(on: on));
-              },
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.haptics,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsHaptics,
+                value: value,
+                // `eva/redesign.html:1498` — `el('setHap').onchange=e=>{
+                // HAPTICS=e.target.checked; if(HAPTICS)haptic(15); }`.
+                //
+                // **The tick is on the way UP only** — the prototype's own `if`
+                // says so, and it is the only sensible reading: a reader who has
+                // just turned haptics **off** must not be answered with one.
+                onChanged: (bool on) {
+                  if (on) {
+                    // ## THE TICK IS GATED ON THE **NEW** VALUE
+                    //
+                    // The prototype's handler sets `HAPTICS` **first** and then
+                    // asks (`:1498` — `HAPTICS=e.target.checked; if(HAPTICS)
+                    // haptic(15);`), so the tick is the answer to the switch
+                    // being **on** — not to the value it held before the tap.
+                    //
+                    // That matters for the one moment a reader most wants to
+                    // know it worked: **the tap that turns haptics on**. A
+                    // client that read the old value would stay silent on that
+                    // very tap, because the old value is `false` — and the
+                    // reader would be left not knowing whether the switch did
+                    // anything.
+                    fireRitualHaptic(RitualHaptic.hapticsEnabled, enabled: on);
+                  }
+                  unawaited(cubit.setHaptics(on: on));
+                },
+              ),
             ),
           ],
         ),
@@ -754,40 +871,49 @@ class _SettingsBodyState extends State<_SettingsBody> {
         SettingsGroup(
           label: strings.settingsCommunionGroup,
           children: <Widget>[
-            WorkshopToggleRow(
-              title: strings.settingsVeilWitnesses,
-              value: state.settings.veilWitnesses,
-              // **Through the handle, not the cubit** — see the note where the
-              // handle is resolved. The two `/communion` fields are the only ones
-              // on this screen whose writer lives there.
-              onChanged: (bool veiled) =>
-                  unawaited(handle.setVeilWitnesses(veiled: veiled)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.veilWitnesses,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsVeilWitnesses,
+                value: value,
+                // **Through the handle, not the cubit** — see the note where the
+                // handle is resolved. The two `/communion` fields are the only ones
+                // on this screen whose writer lives there.
+                onChanged: (bool veiled) =>
+                    unawaited(handle.setVeilWitnesses(veiled: veiled)),
+              ),
             ),
-            WorkshopToggleRow(
-              title: strings.settingsShowPodium,
-              value: state.settings.showPodium,
-              onChanged: (bool shown) =>
-                  unawaited(handle.setShowPodium(shown: shown)),
+            _SettingRow<bool>(
+              read: (UserSettings s) => s.showPodium,
+              builder: (BuildContext context, bool value) => WorkshopToggleRow(
+                title: strings.settingsShowPodium,
+                value: value,
+                onChanged: (bool shown) =>
+                    unawaited(handle.setShowPodium(shown: shown)),
+              ),
             ),
-            SettingsTile(
-              title: strings.settingsTypeSize,
-              // ## THE EXISTING STEPPER, AND THE DIVERGENCE FROM `:693`
-              //
-              // The prototype's Type-size row is a 16–26px range input
-              // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173`
-              // calls it "a different model") and this client keeps its 1–5 step.
-              // **The slider is not transcribed**, and the divergence is recorded
-              // here.
-              trailing: FontSizeStepper(
-                step: state.settings.fontStep,
-                onChanged: (int step) => unawaited(cubit.setFontStep(step)),
-                labels: FontSizeStepperLabels(
-                  decrease: strings.settingsDecreaseFontSize,
-                  increase: strings.settingsIncreaseFontSize,
-                  // The **track's** slider label, and it is deliberately a
-                  // different string from the row's title: the two name the
-                  // control from two positions — a row title and a slider.
-                  track: strings.settingsFontScale,
+            _SettingRow<int>(
+              read: (UserSettings s) => s.fontStep,
+              builder: (BuildContext context, int value) => SettingsTile(
+                title: strings.settingsTypeSize,
+                // ## THE EXISTING STEPPER, AND THE DIVERGENCE FROM `:693`
+                //
+                // The prototype's Type-size row is a 16–26px range input
+                // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173`
+                // calls it "a different model") and this client keeps its 1–5 step.
+                // **The slider is not transcribed**, and the divergence is
+                // recorded here.
+                trailing: FontSizeStepper(
+                  step: value,
+                  onChanged: (int step) => unawaited(cubit.setFontStep(step)),
+                  labels: FontSizeStepperLabels(
+                    decrease: strings.settingsDecreaseFontSize,
+                    increase: strings.settingsIncreaseFontSize,
+                    // The **track's** slider label, and it is deliberately a
+                    // different string from the row's title: the two name the
+                    // control from two positions — a row title and a slider.
+                    track: strings.settingsFontScale,
+                  ),
                 ),
               ),
             ),
@@ -837,6 +963,62 @@ class _SettingsBodyState extends State<_SettingsBody> {
       ],
     );
   }
+}
+
+/// One Workshop row, rebuilt **only** when the setting it reads changes.
+///
+/// ## WHY THIS EXISTS, AND THE NUMBER THAT PROVED IT
+///
+/// `/settings` is the largest form in the app: seven groups, thirty-three rows.
+/// It used to read them all from **one** `BlocBuilder` over the whole
+/// `SettingsState`, which meant a reader who dragged the Hue slider rebuilt
+/// **every row on the screen**.
+///
+/// **That number is measured, not asserted.** One `cubit.setHue(300)` rebuilt
+/// **1,236 widgets** — thirty-one `SettingsTile`s, sixteen `EvaToggle`s, eight
+/// `EvaRangeSlider`s, four `SegmentedControl`s and every `Text` under them —
+/// for a change to **one number**. The measurement is
+/// `test/rebuild_isolation_budget_test.dart`, and it is a **budget** there, so
+/// the number cannot go back up without a red test.
+///
+/// ## WHY A **`BlocSelector`** AND NOT A `buildWhen`
+///
+/// Because `buildWhen` is all-or-nothing. Every write to the settings changes
+/// `state.settings`, so a `buildWhen` on that would never say no — and the
+/// question is not *whether* the page rebuilds but *which row* does. A
+/// `BlocSelector` narrows the question to one field and rebuilds only when that
+/// field's value changes.
+///
+/// ## AND WHY THE VALUE IS **PROJECTED** RATHER THAN THE WHOLE STATE
+///
+/// `BlocSelector` compares the selected value with `==`. `UserSettings` is a
+/// freezed record, so selecting the whole thing would compare **all thirty
+/// fields** and rebuild on any of them — which is the defect in miniature.
+/// Selecting one `bool`, one `int` or one enum is a comparison of one value.
+///
+/// **A `List` or a `Set` would be a trap**: Dart gives both **identity**
+/// equality, so a selector returning one would rebuild on every emit. No
+/// setting here is a collection, and the type parameter is what keeps that
+/// true.
+class _SettingRow<T> extends StatelessWidget {
+  /// A row that reads the one setting [read] names.
+  const _SettingRow({required this.read, required this.builder});
+
+  /// The one setting this row shows, projected out of the whole record.
+  final T Function(UserSettings settings) read;
+
+  /// The row, given the value [read] produced.
+  final Widget Function(BuildContext context, T value) builder;
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocSelector<SettingsCubit, SettingsState, T>(
+        selector: (SettingsState state) => read(state.settings),
+        // A **tearoff**, and not a closure: `builder` already has the shape
+        // `BlocSelector` wants, and a closure that only forwards its arguments
+        // is a closure the analyzer asks to be removed.
+        builder: builder,
+      );
 }
 
 /// The notice `/settings` shows when `SettingsState.status` is

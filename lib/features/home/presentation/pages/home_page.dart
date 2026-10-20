@@ -5,7 +5,6 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
-import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/library_book.dart';
@@ -550,7 +549,12 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
     // **A page pumped bare would not rebuild** — `SettingsScope.of`'s locator
     // fallback is not watched — so the home harness installs the scope. See
     // `home_harness.dart`'s `pumpHome`.
-    final UserSettings settings = SettingsScope.of(context).settings;
+    //
+    // **And it is the RITUAL SLICE, not the whole record** — the home reads two
+    // settings (the selah's length and the haptics), and a whole-record lookup
+    // would rebuild this page for a change to the aurora's hue, which the home
+    // does not draw.
+    final RitualSettings settings = SettingsScope.ritualOf(context);
 
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (BuildContext context, HomeState state) {
