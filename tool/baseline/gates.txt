@@ -33,12 +33,19 @@
 # MID-SESSION, the prototype's 128-row I18N table MEASURED, and the orphan
 # gate's inventory widened to all of `lib/` with its router DERIVED.
 #
+# **3744 → 3634 and 98.85% HELD with the old design's ORBS retired.** The count
+# FELL by 110, and the fall is the point: the orbs' three suites went with the
+# orbs they tested (41 + 51 + 11 tests), the motion suite lost its hue and
+# aurora clock assertions (13), and the token suite lost the twelve dead
+# members' assertions. **Coverage did not move**, because the code that went
+# and the tests that went were the same code.
+#
 # **The `--update-baseline` script REWROTE this file down to three lines, and
 # the history was put back by hand.** The file's own rule is that the old and
 # the new values are visible in the commit, and a running history is how a
-# reader tells a STRENGTHENING from a LOWERED floor: 2541 → 3691 → 3744 with
-# coverage rising at every step, and every re-recording taken from a GREEN run.
-# A bare `test_count` line cannot say that, and the next re-recording would
-# have had nothing to point at.
-test_count      3744
+# reader tells a STRENGTHENING from a LOWERED floor: 2541 → 3691 → 3744 → 3634,
+# with coverage rising or holding at every step, and every re-recording taken
+# from a GREEN run. A bare `test_count` line cannot say that, and the next
+# re-recording would have had nothing to point at.
+test_count      3634
 coverage_pct    98.85
