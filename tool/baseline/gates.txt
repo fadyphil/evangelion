@@ -19,5 +19,9 @@
 # run that lost a thousand tests would still have passed it. Re-recording it is a
 # **strengthening** — the run it was recorded from was green, and the floor now
 # sits at the suite's own size.
-test_count      3591
-coverage_pct    98.74
+#
+# **3591 → 3691 and 98.74% → 98.83% with Phase 7's ritual** (the selah timer,
+# the focus dim, the vespers auto-dim, the breath guide and the haptics), plus
+# the three regression tests a review asked for and the two gate closures.
+test_count      3691
+coverage_pct    98.83
