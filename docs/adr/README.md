@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Twenty-two records of the architectural decisions that shaped this client, why
+Twenty-three records of the architectural decisions that shaped this client, why
 each was taken, and what it cost. Each names the recorded decision in
 [`docs/agents/AGENT_CONTEXT.md`](../agents/AGENT_CONTEXT.md) that it came from, so
 any claim here can be traced to its source and checked.
@@ -13,7 +13,7 @@ decision and the wrong place to *find* one: the file is over four thousand lines
 long, and reading it end to end to answer "why is `Result<T>` a typedef" is not
 a reasonable thing to ask of a new contributor.
 
-These ADRs are a curated index over that record — twenty-two architectural
+These ADRs are a curated index over that record — twenty-three architectural
 decisions rather than 156 chronological entries. Each one carries the parts that
 are worth keeping when the surrounding chronology is not: the constraint that
 forced it, the alternatives that were rejected and why, and the consequences
@@ -33,6 +33,7 @@ day the file was written.
 | `proposed` | Under discussion, not yet committed to. |
 | `accepted` | In effect and being followed. |
 | `accepted — under review` | In effect and testable **today**, but a planned change will re-examine it. Not `superseded`, because nothing has replaced it yet. |
+| `accepted — amended by ADR-NNNN` | In effect, and a later record changed **part** of it. Not `superseded`, because the decision it recorded still stands. ADR-0002 is the one case: it decided to read from the live API, and it still is; ADR-0023 changed the host it named. |
 | `superseded by ADR-NNNN` | A newer record replaced it. Always links the replacement. |
 | `rejected` | Considered and declined. Kept so the option is not re-proposed. |
 
@@ -67,7 +68,7 @@ the layer model, the ports, the dependency-injection split or the error algebra.
 | ADR | Title | Status | Decided |
 | --- | --- | --- | --- |
 | [0001](0001-six-screens-library-and-profile-cut.md) | Ship six screens; cut the library and the profile | **superseded by ADR-0022** | 2026-10-02 |
-| [0002](0002-live-api-is-the-only-data-source.md) | Read from the live API; auth stays UI-only and settings stay local | accepted | 2026-10-02 |
+| [0002](0002-live-api-is-the-only-data-source.md) | Read from the live API; auth stays UI-only and settings stay local | accepted — **base URL amended by ADR-0023** | 2026-10-02 |
 | [0003](0003-strict-three-layer-clean-architecture.md) | Keep three layers with strictly inward dependency direction | accepted | 2026-10-02 |
 | [0004](0004-shared-kernel-in-core-domain.md) | Put types two or more features consume in the shared kernel | accepted | 2026-10-02 |
 | [0005](0005-four-narrow-ports-no-fat-repository.md) | Declare four narrow repository ports; a fat repository is forbidden | accepted | 2026-10-02 |
@@ -88,6 +89,7 @@ the layer model, the ports, the dependency-injection split or the error algebra.
 | [0020](0020-a-gate-that-cannot-fail-is-worse-than-no-gate.md) | Treat a gate that cannot fail as worse than no gate | accepted | 2026-10-07 |
 | [0021](0021-tdd-for-domain-and-behaviour-tests-for-widgets.md) | Test-drive the domain; test alongside the widgets | accepted | 2026-10-02 |
 | [0022](0022-full-fidelity-redesign-supersedes-0001.md) | Ship the LUMEN redesign at full fidelity, and supersede ADR-0001 | accepted | 2026-10-13 |
+| [0023](0023-point-the-client-at-the-deployed-backend.md) | Point the client at the deployed backend, and make TLS the release posture | accepted | 2026-10-20 |
 
 ## Reading order
 

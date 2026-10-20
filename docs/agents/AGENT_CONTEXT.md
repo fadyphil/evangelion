@@ -25,7 +25,7 @@ These were decided with the user. Do not re-litigate. Do not expand scope. **The
 | # | Decision |
 | --- | --- |
 | 1 | **Seven screens, and the library and the profile are BACK.** `/login`, `/`, `/reading`, `/quiz`, `/journey` (the profile), `/communion` (the board) and `/settings`; the library carousel returns to `/`, and `/result` retires to a modal. **This row SUPERSEDES `docs/adr/0001-six-screens-library-and-profile-cut.md`, which cut the library and the profile on 2026-10-02 and is now `superseded by ADR-0022`.** The reason it is reversed is not a change of taste: `eva/redesign.html:1244` names seven routes, `rJourney:576` is the profile and the carousel `:536` is the library, and the backend inventory re-measured for ADR-0022 found **`GET /leaderboard` and `GET /streak` real** while confirming that a profile, a book catalogue, medals, a cheer, a share and notes have **no** endpoint. ADR-0001's Context named those same missing endpoints and concluded the opposite — ship six. The conclusion was right about the data and wrong about what to do with it: the redesign is now adopted **at full fidelity**, and the invented parts are enumerated, priced and put behind repository ports instead of being avoided by cutting screens. What that costs is recorded in the ADR's fiction table, and it is not free: medals, cheer, the starfield and the book catalogue ship as stubs. |
-| 2 | **Live API** against `http://localhost:3000` for reading / quiz / result / streak. |
+| 2 | **Live API** against `https://evangelion-backend.vercel.app` for reading / quiz / result / streak. **Amended 2026-10-20 (ADR-0023):** the base URL was `http://localhost:3000` and the deployed host is now the default; the local backend remains a second target behind `--dart-define=API_BASE_URL=http://localhost:3000`. §5's contract is held by **both** and they differ in three places — §5.1 lists them. |
 | 3 | **Login and onboarding are UI-only.** A `FakeAuthRepository` returns a seeded session. There is **no auth endpoint on the backend** and no login API call. |
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
 | 5 | **No servant/admin portal.** Those backend routes stay untested from the client. |
@@ -325,21 +325,46 @@ Remediation: `dart fix --apply --code=deprecated_member_use`
 
 ## 5. Backend contract — verified facts, not guesses
 
-Base URL: `http://localhost:3000` (in-memory backend, zero infrastructure).
-Prefix: `/api/v1`. CORS is wide open. Auth is **not** implemented — identity is a header.
+Base URL: **`https://evangelion-backend.vercel.app`** (the deployed backend — Vercel
+serverless, Neon Postgres, Redis). Prefix: `/api/v1`. CORS is wide open. Auth is
+**not** implemented — identity is a header.
+
+**The local backend is still `http://localhost:3000`, and it is a second target,
+not the first.** The deployed host is what `AppConfig.apiBaseUrl` defaults to
+(ADR-0023); the loopback one is reached with
+`--dart-define=API_BASE_URL=http://localhost:3000`. Every claim in this section
+was re-measured against **both**, on 2026-10-20, and the two disagree in three
+places — see [§5.1](#51-the-two-backends-and-where-they-disagree) and
+`docs/BACKEND-VERIFICATION.md`.
 
 ### Identity headers — required on every request
 
 | Header | Rule |
 | --- | --- |
-| `X-User-Id` | **Must be a non-empty string.** Absent → **400** (Fastify schema, `headers must have required property 'x-user-id'`). Present but **empty** → **401**. A **non-UUID** value such as `not-a-uuid` is accepted with **200** and echoed back as `user_id`. |
+| `X-User-Id` | **Must be a non-empty string.** Absent → **400** (Fastify schema, `headers must have required property 'x-user-id'`). Present but **empty** → **401**. A **non-UUID** value such as `not-a-uuid` is **accepted with 200 and echoed back** by the **local** backend, and is a **500** by the **deployed** one. |
 | `X-Group-Id` | Required for reading + leaderboard routes. Integer string. Use **`3`**. |
 | `X-User-Role` | Parsed but **never checked**. Send `kid`. Decorative. |
 
 Missing required header returns **400, not 401**. Do not write client logic that
 distinguishes "unauthenticated" from "bad request" on a missing header.
 
-### Seeded working data (in-memory fallback)
+**The non-UUID row is the one that changed, and the client is unaffected — but
+its documented reason did not survive.** The local backend's in-memory fallback
+stores the id as a string and echoes it; the deployed backend is real Postgres,
+where the id column is `uuid`, so a non-UUID is a cast error and the request
+**500s**. `buildApiDio` therefore still rejects a non-UUID at composition time
+(`isValidUserId`) — the check now prevents a **server fault** rather than a
+mystery, and it is worth more than it was. What is wrong is the *reason* the
+check's own doc gives, which says the server "accepts and stores" the value.
+`docs/DRIFT.md` carries the entry.
+
+### Seeded working data
+
+The deployed backend's Neon database was seeded once, on **2026-10-19**, by
+`src/db/seeds/001_seed_groups_and_scripture.sql`. The local backend's
+in-memory fallback seeds the same three users and the same John 3:1-5 reading,
+but computes `scheduled_date` from the clock at module load, so its "today" is
+always today. **The deployed one does not** — see below.
 
 | Entity | Value |
 | --- | --- |
@@ -347,9 +372,12 @@ distinguishes "unauthenticated" from "bad request" on a missing header.
 | Reading | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` — John 3:1-5 |
 | Question | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` |
 
-**Group 3 / John 3:1-5 is the only path that works end-to-end.** The in-memory fallback
-fabricates non-UUID ids (`question-group-3`) for any other group or date, and
-`POST /readings/:id/submit` then rejects them with `400 body/question_id must match format "uuid"`.
+**Group 3 / John 3:1-5 is the only path that works end-to-end.** The local
+in-memory fallback fabricates non-UUID ids (`question-group-3`) for any other
+group or date, and `POST /readings/:id/submit` then rejects them with
+`400 body/question_id must match format "uuid"`. The deployed backend has no
+such fabrication: its ids come from Postgres, and the only rows that exist are
+the seeded ones.
 
 ### Endpoints this client uses
 
@@ -486,7 +514,8 @@ today_completed, next_milestone, days_to_milestone, … }`.
     disable what `already_answered == true` says is done, rather than spending the
     request to learn it.
 
-11. **`readings/today` IS THE ONLY READING, AND ITS ID IS DATE-STAMPED.** §2's route
+11. **`readings/today` IS THE ONLY READING, AND ITS ID IS DATE-STAMPED — ON THE
+    LOCAL BACKEND ONLY.** §2's route
     table gives `/` one reading and `/reading` another, and Phase 8 found the two are
     the **same resource**. `GET /readings/today/{lang}` returns
     `reading_id: "reading-group-3-2026-10-04"`, and that value is what
@@ -498,6 +527,16 @@ today_completed, next_milestone, days_to_milestone, … }`.
     silently. `ScriptureText.readingId`'s doc records it, and the harness builds
     passages through `englishPassageWith` rather than transcribing the block per
     fixture, so the date lives in exactly one place.
+
+    **AND THE DEPLOYED BACKEND DOES NOT FABRICATE AT ALL.** That date-stamped id is
+    the **local in-memory fallback** auto-provisioning a reading for a date it has
+    no row for. The deployed backend has one row — the seeded one, with the
+    **UUID** `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` — and every other date answers
+    **404**. `docs/BACKEND-VERIFICATION.md` already corrected this once for the
+    local backend ("today's reading is the seeded UUID; anything else is
+    auto-provisioned"), and the deployed backend removes the second half of the
+    correction entirely: there is no auto-provisioning there, so there is no
+    second kind of id at all.
 
     This is also why the result has **no repository, no use case and no
     endpoint**: the submit response is the only artifact it renders, and that
@@ -517,6 +556,66 @@ today_completed, next_milestone, days_to_milestone, … }`.
     pinned is **gone because the route is gone**, and the test was **deleted
     rather than weakened** — a test asserting that a path literal fails to
     match would be a test about a typo, not about the app.
+
+12. **A DATE WITH NO SCHEDULED READING IS A 404, AND ON THE DEPLOYED BACKEND
+    THAT IS THE COMMON CASE.** `GET /readings/today/{lang}` answers
+    `404 {"error":"Not Found","message":"No scheduled reading found for your
+    cohort today"}` for a date the database has no row for.
+
+    The local backend never produced a 404 here, because its fallback
+    auto-provisioned a reading for any date. The deployed backend does, because
+    `daily_readings.scheduled_date` was written **once**, as `CURRENT_DATE`, when
+    the Neon database was seeded on **2026-10-19** — and `runSeeds()` is a CLI
+    (`npm run migrate`), not a boot step, so the schedule does not roll forward.
+    Nineteen consecutive dates were probed on 2026-10-20: **2026-10-19 answers
+    200 and every other one answers 404.**
+
+    **The client's answer to it is unchanged and already written**: the 404 maps
+    to `FailureKind.notFound` (`api_error_mapper.dart:217`) and the Reading page
+    renders it through `ErrorView` with the server's verbatim message and a live
+    retry. **A designed empty state is NOT part of this change** — see
+    `docs/adr/0023-the-deployed-backend-is-the-vercel-instance.md`'s "What this
+    change does not do" — so the reader sees the server's English sentence in an
+    Arabic app until someone schedules tomorrow's reading.
+
+### 5.1 The two backends, and where they disagree
+
+`AGENT_CONTEXT` §5 is the contract, and the contract is now held by **two**
+servers. They agree on the shape of everything the client depends on, and they
+disagree on three things. Measured on 2026-10-20 against both; the raw
+transcripts are in `docs/BACKEND-VERIFICATION.md`.
+
+| # | Claim | Local `:3000` | Deployed `.vercel.app` |
+| --- | --- | --- | --- |
+| 1 | absent `X-User-Id` | 400 | **400** — same |
+| 2 | empty `X-User-Id` | 401 | **401** — same |
+| 3 | **non-UUID `X-User-Id`** | **200**, echoed back | **500** ← *differs* |
+| 4 | EN `text_clean` | absent | **absent** — same |
+| 5 | AR `text_clean` | present | **present** — same |
+| 6 | `/api/v1` prefix | yes | **yes** — same |
+| 7 | **a date with no scheduled reading** | 200, a fabricated id | **404** ← *differs* |
+| 8 | `?date=YYYY-MM-DD` | 400 | **400** — same |
+| 9 | leaderboard | 3 rows | **3 rows**, and **durable** (real Redis) |
+| 10 | `today_status` | `pending` | **`off_day`** (real Postgres) |
+| 11 | `current_streak` | 4 | **0** (real Postgres, not the fallback seed) |
+
+Rows 3, 7 and 11 are the same cause seen three times: **the deployed backend has
+a database and the local one does not.** The local fallback stores what it is
+given; Postgres enforces the types and holds only the rows that exist.
+
+**What this means for the client, concretely:**
+
+* **Nothing in `lib/` changes shape.** Every response the client's mappers
+  parse has the same keys on both servers. `today_reading_mapper.dart`,
+  `submit_result_mapper.dart`, `streak_summary_mapper.dart` and
+  `leaderboard_mapper.dart` are unchanged by this move, and the golden tests
+  that hold them are unchanged.
+* **The streak the app shows is now 0, not 4.** The fallback seeded
+  `current_streak: 4`; the Neon row says `0`. That is the truth of the
+  database, and a smaller number on the home screen is not a regression.
+* **The leaderboard is now durable.** The deployment has a real Redis, so a
+  quiz submission moves the reader up the board and the board survives a cold
+  start. `USE_STUB_LEADERBOARD` stays available and stays off by default.
 
 ---
 
@@ -925,6 +1024,29 @@ the seed is `kSeedUserId` / `kSeedGroupId` / `kSeedUserRole` in
 `features/auth/data/datasources/auth_local_data_source.dart`. `core_module.dart` is
 the one line in the app that touches both, which is the point — it is the single
 place the two facts have to agree.
+
+**16a. Decision 16's prediction is now OBSERVABLE, and it was HALF RIGHT — so the
+"amended" note is here rather than a rewrite of the decision above.** Decision 16
+said: *"A deployment pointed at a real database keeps the first and loses the
+second"* — the base URL, and the hard-coded `11111111-…`.
+
+**It kept both.** The deployed backend is a real Postgres, and its Neon
+database was seeded by the same `src/db/seeds/001_seed_groups_and_scripture.sql`
+that seeds the local fallback's memory, so `11111111-1111-1111-1111-111111111111`
+is a row in `users` there — the same David Mina, in the same group 3, with the
+same `total_points`. The reason the prediction was wrong is a fact about **how
+the seed was written**: it seeds the same three users whether the target is
+Postgres or the memory fallback, so "a real database" did not mean "a different
+set of users". It would have meant that if the real database had been seeded
+differently — or not seeded at all.
+
+**What the split bought, therefore, is not that the seed is gone; it is that the
+seed is somewhere the base URL is not.** That is the property the decision
+actually wanted, and it survives: `AppConfig` holds transport, the seed lives
+beside `FakeAuthRepository`, and `core_module.dart` is the one place they meet.
+The deployed backend is now the default target (ADR-0023), and the seed still
+works against it — verified live, 2026-10-20: `GET /streak/summary` with
+`X-User-Id: 11111111-…` answers 200 for that user and 500 for a non-UUID one.
 
 **17. `AuthBloc` is hand-registered, and that made `configureNavigation` DEPEND on
 `configureDependencies` for the first time.** Decision 11 predicted the wall exactly:

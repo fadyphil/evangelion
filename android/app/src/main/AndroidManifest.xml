@@ -3,20 +3,26 @@
          manifests already declare this, so without it here every network call
          fails in release only. -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- `android:usesCleartextTraffic="true"` is REQUIRED, not cosmetic. The
-         dev backend is plain HTTP at http://localhost:3000, and since API 28
-         cleartext traffic defaults to false once targetSdk >= 28 (here
-         targetSdk = flutter.targetSdkVersion, see build.gradle.kts). Android
-         grants NO localhost exemption, so without this attribute the release
-         build fails at the first request with `SocketException: Cleartext HTTP
-         traffic to localhost not permitted` while debug still works.
-         REMOVE this attribute once the backend is served over TLS — it must
-         never ship to production. -->
+    <!-- `android:usesCleartextTraffic="true"` is NOT HERE, and its absence is
+         the point.
+
+         It WAS here, and the comment that stood in this place said what to do
+         with it: "REMOVE this attribute once the backend is served over TLS —
+         it must never ship to production." The backend IS served over TLS now
+         (`https://evangelion-backend.vercel.app`, ADR-0023), so the release
+         build talks HTTPS and needs no exemption. Since API 28 cleartext
+         traffic defaults to false once targetSdk >= 28 (here targetSdk =
+         flutter.targetSdkVersion, see build.gradle.kts), the ABSENCE of the
+         attribute is what blocks it.
+
+         The two development build types carry the attribute themselves — see
+         `android/app/src/debug/AndroidManifest.xml` and
+         `.../profile/AndroidManifest.xml` — because the local backend is
+         still plain HTTP. Release does not. -->
     <application
         android:label="evangelion"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

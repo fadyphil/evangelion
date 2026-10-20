@@ -22,8 +22,10 @@ import 'package:evangelion/core/network/interceptors/identity_headers.dart';
 /// * **The base URL**, three ways a `--dart-define` can be wrong: no scheme
 ///   (`Uri.parse('localhost:3000')` reads `localhost` as the *scheme*), no host,
 ///   and a trailing slash that would produce `http://host//api/v1/...`.
-/// * **The user id**, because the backend does not (D2 — a non-UUID `X-User-Id`
-///   is accepted with 200 and echoed back).
+/// * **The user id**, because the backend's header check covers **presence**
+///   and not shape (D2 — an absent `X-User-Id` is a 400 and an empty one is a
+///   401), and because the deployed backend's database is a `uuid` column, so a
+///   non-UUID there is a 500 rather than an echo.
 ///
 /// Both throw [ArgumentError] naming the offending value. That is deliberate:
 /// these are composition-time inputs supplied by code, so a wrong one is a
@@ -64,10 +66,13 @@ Dio buildApiDio({
     throw ArgumentError.value(
       identity.userId,
       'identity.userId',
-      'X-User-Id must be a UUID. This backend validates none of it: absent is a '
-          '400, empty is a 401, and a non-UUID is accepted with 200 and echoed '
-          'back, so a malformed id here becomes a mystery rather than an error. '
-          'Received "${identity.userId}".',
+      'X-User-Id must be a UUID. The deployed backend does not validate the '
+          'header\'s presence — absent is a 400, empty is a 401 — and its '
+          'database is a uuid column, so a non-UUID is a 500. The local '
+          'backend\'s in-memory fallback accepted one with 200 and echoed it '
+          'back, which is why this check was once a nicety. It is not one '
+          'now: a malformed id here would be a server fault rather than a '
+          'message anybody can show. Received "${identity.userId}".',
     );
   }
 

@@ -54,8 +54,10 @@ final class AuthLocalDataSource {
 ///
 /// AGENT_CONTEXT §5 lists the three seeded users and names group 3 as the only
 /// cohort with a real scheduled reading. **It is a UUID and the client checks
-/// that**, because the backend does not: a non-UUID `X-User-Id` is accepted with
-/// 200 and echoed back (D2, verified live against `HEAD = 4a1c834`).
+/// that**, because the backend's header check covers presence and not shape
+/// (D2, verified live against `HEAD = 4a1c834`) — and because the deployed
+/// backend's database is a `uuid` column, so a non-UUID `X-User-Id` there is a
+/// **500** rather than an echo (ADR-0023, `docs/DRIFT.md` §11).
 const String kSeedUserId = '11111111-1111-1111-1111-111111111111';
 
 /// `X-Group-Id` for the seeded user.

@@ -4,4 +4,25 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Cleartext HTTP is allowed in PROFILE builds only, and the attribute
+         lives HERE rather than in `src/main` because the deployed backend is
+         served over TLS (ADR-0023).
+
+         A profile build is the one that is instrumented but still installed
+         on a developer's own device, so it is the build that still reaches a
+         plaintext local backend — and the same reason as the debug manifest,
+         stated here rather than copied from it: the local backend is plain
+         HTTP at http://localhost:3000, since API 28 cleartext traffic
+         defaults to false once targetSdk >= 28 (here targetSdk =
+         flutter.targetSdkVersion, see build.gradle.kts), Android grants NO
+         localhost exemption, and the exemption therefore has to be asked for
+         explicitly.
+
+         `src/main` no longer declares it, so a RELEASE build is TLS-only.
+
+         This element merges with `src/main`'s `<application>`: the attribute
+         is declared in one manifest and absent from the other, so the merger
+         adds it rather than resolving a conflict, and no `tools:replace` is
+         needed. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

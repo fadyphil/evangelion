@@ -48,8 +48,10 @@ flutter --version      # 3.47.4 / Dart 3.13.3
 flutter doctor          # the ✓ Linux toolchain line is the one that matters
 ```
 
-Run the app on the desktop target with `flutter run -d linux`. To point it at
-a different backend, pass the base URL at build time:
+Run the app on the desktop target with `flutter run -d linux`. **It talks to
+the deployed backend by default** — `https://evangelion-backend.vercel.app` —
+so there is nothing to start. To point it at the local backend instead, pass
+the base URL at build time:
 
 ```bash
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
@@ -62,9 +64,31 @@ flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
 
 ### The backend
 
-Four of the seven screens read live data, so you need the server running. It is
-a **separate project** in a sibling checkout, and it is read-only reference
-material — this repository does not own it and must never modify it.
+Four of the seven screens read live data. The default target is the
+**deployed** backend, and it is already running:
+
+```bash
+curl -s https://evangelion-backend.vercel.app/health
+```
+
+It is the Fastify 5 application on Vercel serverless, backed by Neon Postgres
+and a real Redis. Every route is under `/api/v1`. ADR-0023 has the full
+decision.
+
+> [!WARNING]
+> **The deployed backend has a reading scheduled for one date only.** Its
+> Neon database was seeded once, on 2026-10-19, with
+> `scheduled_date = CURRENT_DATE`, and the seed is a CLI rather than a boot
+> step — so the schedule does not roll forward. `GET /readings/today` answers
+> **404** for every date that is not in the database. That is a property of
+> the database's contents, not a client bug, and it is measured in
+> [`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md).
+
+### The local backend
+
+If you want the local one, it is a **separate project** in a sibling checkout,
+and it is read-only reference material — this repository does not own it and
+must never modify it.
 
 ```bash
 cd <path-to>/EvangelionBackend

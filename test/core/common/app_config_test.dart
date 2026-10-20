@@ -47,8 +47,12 @@ const String _skipWhenOverridden =
 
 void main() {
   group('apiBaseUrl', () {
-    test('defaults to the local Evangelion API when no dart-define is set', () {
-      expect(AppConfig.apiBaseUrl, 'http://localhost:3000');
+    test('defaults to the deployed Evangelion API when no dart-define is set', () {
+      // The deployed backend, not the loopback one. The local backend is
+      // still reachable — `--dart-define=API_BASE_URL=http://localhost:3000` —
+      // but a build that forgets the flag must land on a live host rather than
+      // on a loopback address that answers nothing. ADR-0023.
+      expect(AppConfig.apiBaseUrl, 'https://evangelion-backend.vercel.app');
     }, skip: _hasBaseUrlOverride ? _skipWhenOverridden : null);
 
     test('targets the /api/v1 host without duplicating the prefix', () {

@@ -436,9 +436,11 @@ AuthBloc registerTestAuthBloc() {
 ///
 /// Built over **fakes**, not the live adapters, and that is what keeps the router
 /// suites about the router: `HomePage` reaching `DioReadingRepository` in a widget
-/// test would either open a socket to `localhost:3000` or fail, and a suite about
+/// test would either open a socket to a live backend or fail, and a suite about
 /// which route is on top would then depend on whether a backend happens to be
-/// running.
+/// running. **Which host that is changed when the default base URL changed**
+/// (ADR-0023) — the point of the fakes is that the answer is *a* host and not
+/// *the* one.
 ///
 /// No `Dio`, so this file stays importable from a suite that must not pull the
 /// network stack into the graph it is asserting on.

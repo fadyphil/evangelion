@@ -27,7 +27,9 @@ pure-Dart ones — because each imports `flutter_test`.
 The analyzer command is `dart analyze`, not `flutter analyze`, so the documented gate is
 byte-identical to AGENT_CONTEXT §7.
 
-Target a different backend at build time:
+Target a different backend at build time. **The default is the deployed
+backend** — `https://evangelion-backend.vercel.app` — so this is only needed
+for the local one:
 
 ```bash
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
@@ -54,12 +56,39 @@ was missing entirely. `tool/verify_linux_build.sh` exists because of that, and
 `flutter doctor`'s `✓ Linux toolchain` line is the one command that checks the
 *machine* rather than the source.
 
-### Running the backend (read-only — never modify it)
+### The deployed backend — the default target
+
+```bash
+curl -s https://evangelion-backend.vercel.app/health
+```
+
+The app talks to **`https://evangelion-backend.vercel.app`** by default
+(ADR-0023). It is the deployed Fastify app on Vercel serverless, backed by
+Neon Postgres and a real Redis. **Nothing needs to be started** — the base URL
+is a build-time override and the default is already the live host.
+
+Two facts about it that the local backend does not have, both measured on
+2026-10-20 and both in
+[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md):
+
+- **`GET /readings/today` answers 404 unless the database has a reading
+  scheduled for that date.** The Neon database was seeded once, on 2026-10-19,
+  with `scheduled_date = CURRENT_DATE`, and the seed is a CLI rather than a
+  boot step — so the schedule does not roll forward. Nineteen consecutive
+  dates were probed: 2026-10-19 answers 200, every other one answers 404.
+- **A non-UUID `X-User-Id` is a 500, not an echo.** The local backend's
+  in-memory fallback accepted one with 200; a `uuid` column does not.
+
+### Running the local backend (read-only — never modify it)
+
+Only needed when you want the local one:
 
 ```bash
 cd /home/fady/Projects/EvangelionBackend
 NODE_ENV=development PORT=3000 node dist/server.js
 ```
+
+Then point the app at it: `flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000`.
 
 `NODE_ENV=development` is **not optional**. `InMemoryRedisFallback`'s constructor
 pre-seeds the leaderboard ZSETs only when `NODE_ENV !== 'test'`, so a server started
@@ -72,7 +101,8 @@ If you background it, use `setsid … & disown`. A plain `&` is killed when the 
 shell exits and every request then returns `000`, which reads like a server fault.
 
 What the running server is actually like is measured in
-[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md).
+[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md), and the two
+backends' differences are tabulated in `AGENT_CONTEXT.md` §5.1.
 
 ## Architecture in one paragraph
 

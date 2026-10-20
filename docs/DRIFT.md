@@ -283,11 +283,14 @@ chips, the `QuizScreen` frame toggle, the FAB dock items. None of those
 destinations shipped, so the widget that was built to carry them has no caller.
 
 **RESOLVED — DELETED.** Both of the prototype's real call sites were the passage
-library, cut by decision 1 (`HomeScreen.tsx:86`, `ds.tsx:389`), and the other three
-pill styles were marked *"do not port"* by defect #12 — so the widget had no caller
-left by construction, not by oversight. Removed: the widget (448 lines), its own
-test suite, 8 goldens, and every reference to it. The design-system barrel export
-is gone with it.
+library, cut by decision 1 — the home screen's category-chip row and the chip inside
+the prototype's passage card — and the other three pill styles were marked *"do not
+port"* by defect #12 — so the widget had no caller left by construction, not by
+oversight. **The redesign draws no chip at all**: its library is a carousel of
+`.bcard`s (`redesign.html:275`) and a book's category is a caption on the card
+(`redesign.html:1313`), so there was never a chip to port. Removed: the widget (448
+lines), its own test suite, 8 goldens, and every reference to it. The design-system
+barrel export is gone with it.
 
 The three options were real and all were defensible:
 
@@ -564,3 +567,71 @@ it.
 
 **A golden is a claim about a specific frame, and sixteen of them were a claim
 about a frame nobody sees.**
+
+---
+
+## 11. §5's HEADER TABLE DESCRIBED A FALLBACK, AND THE DEPLOYED BACKEND IS NOT A FALLBACK
+
+| | |
+| --- | --- |
+| **Claim** | `docs/agents/AGENT_CONTEXT.md` §5, identity-headers table — *"A **non-UUID** value such as `not-a-uuid` is accepted with **200** and echoed back as `user_id`"*, on the authority of the decision's own footnote: *"Verified live against `HEAD = 4a1c834` on 2026-10-03"*. |
+| **Reality** | **Against the deployed backend it is a 500.** `https://evangelion-backend.vercel.app/api/v1/streak/summary` with `X-User-Id: not-a-uuid` answers `500 {"error":"Internal Server Error","message":"Failed to retrieve streak summary"}`. Measured 2026-10-20. |
+| **Fixed?** | **Yes — 2026-10-20, in the same change that moved the client's default base URL** (ADR-0023). §5's table now carries the two answers side by side, and §5.1 is a new subsection listing every place the two backends disagree. |
+
+### WHY IT WAS WRONG, AND IT IS NOT A TYPO
+
+The claim was measured against the **local** backend, and it was **true there**.
+The local backend's in-memory fallback stores the user id as a string and hands
+it back, so a malformed id is accepted and echoed — the table's own words.
+
+The deployed backend has a **Postgres**, where the id column is `uuid`. A
+non-UUID is a cast error, so the request **500s**. Nothing about the API
+changed; what changed is that the server behind the API has a data store that
+enforces a type the fallback did not.
+
+### THE SAME CAUSE, MEASURED THREE TIMES
+
+This is the **third** claim in §5 that is true of the fallback and not of the
+deployment, and all three have the same cause — *the deployed backend has a
+database and the local one does not*:
+
+| # | Claim | Local | Deployed |
+| --- | --- | --- | --- |
+| 1 | non-UUID `X-User-Id` | 200, echoed | **500** |
+| 2 | a date with no scheduled reading | 200, a fabricated id | **404** |
+| 3 | the seeded user's `current_streak` | 4 | **0** |
+
+Number 2 is the one that bites: the local fallback **auto-provisions** a
+reading for any date, so `/readings/today` never 404s there. The deployed
+backend has one seeded row and 404s every other date — because
+`daily_readings.scheduled_date` was written **once**, as `CURRENT_DATE`, on
+2026-10-19, and `runSeeds()` is a CLI rather than a boot step. Nineteen
+consecutive dates were probed; **2026-10-19 answers 200 and every other one
+answers 404.**
+
+### WHAT THE CLIENT DOES WITH IT
+
+**Nothing, and that is the point.** The client's own `isValidUserId` check
+rejects a non-UUID at composition time (`buildApiDio`), so the 500 was never
+reachable from this client — and the check is now worth *more* than it was,
+because it prevents a server fault rather than a mystery.
+
+**But the check's own documentation gave the wrong reason**, and that is what
+drifted. `identity_headers.dart` says the server "performs **no format
+validation at all**: a malformed user id is not rejected, it is *accepted and
+stored*". That sentence is now false of the backend the client actually
+talks to. The check stands; the reason under it did not, and the reason is the
+kind of thing a future reader copies into a new decision.
+
+### THE LESSON, WHICH IS THE SAME ONE THIS FILE KEEPS REPEATING
+
+**A claim about a backend is a claim about a backend, not about an API.** §5
+was titled "verified facts, not guesses" and had been verified — against
+*one* server, and the fact was a property of *that server's* fallback rather
+than of the contract. Nineteen dates and four header shapes were not enough to
+notice, because nothing about the *shape* changed. Only the *storage* did.
+
+The same shape as §1's "six screens" and §10's sixteen goldens: **a green
+check over a surface that was never examined.** §5 examined the local backend
+thoroughly. It did not examine **the backend**, because at the time there was
+one, and it was the fallback.

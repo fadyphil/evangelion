@@ -88,15 +88,28 @@ expectation that the server enforces the same rule: the server enforces
 nothing. The client treats the role as presentation only, and it must stay
 that way.
 
-### All traffic is plaintext HTTP
+### Traffic is TLS, and the host is still not allowlisted
 
-The default base URL is `http://localhost:3000`, with no TLS, and the
-configured host is not allowlisted beyond whatever you pass at build time. That
-is fine for local development against an in-memory backend on loopback.
+The default base URL is `https://evangelion-backend.vercel.app` — the deployed
+backend, served over TLS by Vercel (ADR-0023). **The app's traffic is
+encrypted in transit**, and the Android release build carries no cleartext
+exemption: `android:usesCleartextTraffic="true"` was removed from
+`android/app/src/main/AndroidManifest.xml` and now lives only in the `debug`
+and `profile` manifests, because the local backend is still plain HTTP.
+iOS never had an ATS exception, so it was already TLS-only.
 
-It is **not** acceptable off-device. Anything that leaves the machine should
-use TLS and an explicit host, passed with
-`--dart-define=API_BASE_URL=https://…`.
+**What is still true, and was true before:** the configured host is **not
+allowlisted** beyond whatever you pass at build time. A
+`--dart-define=API_BASE_URL=…` pointing at a plaintext host will be reached
+over plaintext by a debug build, and a release build will refuse it outright —
+which is the Android manifest doing its job, not a client-side check.
+
+**And the identity is still the client's to claim.** `X-User-Id` is a header
+the client sets, and the server enforces **presence**, not the shape of the
+value. The client checks the shape itself, and that check now matters more
+than it did: the deployed backend's database is a `uuid` column, so a
+non-UUID `X-User-Id` is a **500** there rather than an echo
+(`docs/DRIFT.md` §11).
 
 ### Settings are local-only, and there is nothing to protect
 

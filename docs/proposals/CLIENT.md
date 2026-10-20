@@ -327,6 +327,22 @@ curl -H "X-User-Id: 1111…-1111-1111-1111-111111111111" -H "X-Group-Id: 1" \
   localhost:3000/api/v1/readings/today/en | jq '.reading_id,.questions[0].id'
 ```
 
+**Or against the deployed backend, which is what the client uses by default**
+(ADR-0023) — same route, same headers, and **no `docker compose` and no
+`npm run migrate`**, because the database is already seeded:
+
+```bash
+curl -H "X-User-Id: 1111…-1111-1111-1111-111111111111" -H "X-Group-Id: 3" \
+  https://evangelion-backend.vercel.app/api/v1/readings/today/en \
+  | jq '.reading_id,.questions[0].id'
+```
+
+**One thing differs and it matters: the deployed backend answers 404 for a date
+it has no row for.** Its `daily_readings.scheduled_date` was written once, as
+`CURRENT_DATE`, on 2026-10-19, so `?date=2026-10-19` answers 200 and every
+other date answers 404 — including today. Measured 2026-10-20; see
+[`docs/BACKEND-VERIFICATION.md`](../BACKEND-VERIFICATION.md).
+
 Both must be UUIDs → then POST → `200`.
 
 ### 2 — Group per session

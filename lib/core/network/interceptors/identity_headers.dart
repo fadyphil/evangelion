@@ -43,6 +43,32 @@ import 'package:dio/dio.dart';
 /// check the shape itself, and [buildApiDio] is where it does — see
 /// [isValidUserId].
 ///
+/// ## AND THE THIRD ROW IS **TRUE OF THE LOCAL BACKEND ONLY**
+///
+/// Measured live on 2026-10-20 against the deployed backend,
+/// `https://evangelion-backend.vercel.app` (ADR-0023), same route:
+///
+/// | `X-User-Id` sent | response |
+/// | --- | --- |
+/// | *absent* | **400** — same |
+/// | *empty* | **401** — same |
+/// | *not-a-uuid* | **500** `Failed to retrieve streak summary` |
+///
+/// **The third row changed, and the reason is a database.** The local
+/// backend's in-memory fallback stores the id as a string and echoes it. The
+/// deployed backend is real Postgres, where the column is `uuid`, so a
+/// non-UUID is a cast error and the request faults. Nothing about the API
+/// changed — what changed is that the server behind it enforces a type the
+/// fallback did not.
+///
+/// **So the check is worth MORE now, not less, and the paragraph above gives
+/// the wrong reason for it.** The reason used to be "the server will accept
+/// anything, so a malformed id here becomes a mystery rather than an error".
+/// The reason now is "the deployed server will **fault** on it, and a 500 is
+/// not a thing a reader can be shown". The check itself is unchanged, and
+/// [buildApiDio] is still where it happens. `docs/DRIFT.md` §11 carries the
+/// entry.
+///
 /// ## AND WHERE ELSE IT IS CHECKED, SO THE ANSWER IS ONE PLACE
 ///
 /// Two places decide identity, and both call [isValidUserId]:

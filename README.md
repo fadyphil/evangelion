@@ -115,12 +115,16 @@ melos. You also need `rg` (ripgrep) and Python 3 for the verification gates.
 # 1. Install dependencies
 flutter pub get
 
-# 2. Point the app at a backend (defaults to http://localhost:3000)
+# 2. Run the app (it talks to the deployed backend by default)
 flutter run -d linux
+
+# ...or point it at a local backend instead
 flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
-Five of the eight screens need a running backend. See
+The default base URL is the deployed backend,
+`https://evangelion-backend.vercel.app` (ADR-0023), so **nothing needs to be
+started** to run the app. If you want the local one instead, see
 [Running the backend](#running-the-backend) — there are two environment traps
 there that each cost an afternoon if you meet them cold.
 
@@ -333,13 +337,37 @@ Three facts that are not obvious:
 
 ## Running the backend
 
-The backend is a **separate project** in a sibling checkout, and this repository
-must never modify it.
+**The app talks to the deployed backend by default** —
+`https://evangelion-backend.vercel.app` — so there is nothing to start:
+
+```bash
+curl -s https://evangelion-backend.vercel.app/health
+```
+
+It is the Fastify 5 application on Vercel serverless, backed by Neon Postgres
+and a real Redis. ADR-0023 has the decision and
+[`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md) has the live
+measurements.
+
+> [!WARNING]
+> **The deployed backend has a reading scheduled for one date only.** Its Neon
+> database was seeded once, on 2026-10-19, with `scheduled_date = CURRENT_DATE`,
+> and the seed is a CLI rather than a boot step — so the schedule does not roll
+> forward. `GET /readings/today` answers **404** for every date the database has
+> no row for. That is a property of the database's contents, not a client bug.
+
+### The local backend
+
+If you want the local one instead, it is a **separate project** in a sibling
+checkout, and this repository must never modify it.
 
 ```bash
 cd <path-to>/EvangelionBackend
 NODE_ENV=development PORT=3000 node dist/server.js
 ```
+
+Then point the app at it:
+`flutter run -d linux --dart-define=API_BASE_URL=http://localhost:3000`.
 
 > [!WARNING]
 > **`NODE_ENV` must not be `test`.** The in-memory Redis fallback pre-seeds the
@@ -361,9 +389,11 @@ Four endpoints are used, and identity is three headers — `X-User-Id`,
 surprise:
 
 - **`X-User-Id` is not authenticated.** The server checks that it is present and
-  non-empty, and nothing else. A non-UUID value is accepted with a `200` and
-  echoed back. Any deployment of this client needs a real authenticating proxy
-  in front of the API. See [`SECURITY.md`](SECURITY.md).
+  non-empty, and nothing else. The local backend's in-memory fallback accepted a
+  non-UUID value with a `200` and echoed it back; the **deployed** backend has a
+  `uuid` column, so a non-UUID there is a **500**. Either way the id is the
+  client's to claim: any deployment of this client needs a real authenticating
+  proxy in front of the API. See [`SECURITY.md`](SECURITY.md).
 - **`X-User-Role` is parsed and never checked.** Never gate UI on it expecting
   server enforcement.
 

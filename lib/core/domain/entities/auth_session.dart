@@ -76,9 +76,16 @@ final class AuthSession with _$AuthSession {
   /// is the single implementation of that check for the whole client.
   ///
   /// "Must be" is not the backend's rule. D2, verified live against
-  /// `HEAD = 4a1c834`: an absent `X-User-Id` is a 400, an empty one is a 401, and
-  /// a **non-UUID one is accepted with 200 and echoed back**. The server enforces
-  /// presence and nothing else, so the shape is this client's obligation.
+  /// `HEAD = 4a1c834`: an absent `X-User-Id` is a 400 and an empty one is a 401.
+  /// The server enforces **presence** and nothing else, so the shape is this
+  /// client's obligation.
+  ///
+  /// **And the deployed backend makes the obligation heavier, not lighter.**
+  /// The local backend's in-memory fallback accepted a non-UUID with 200 and
+  /// echoed it back; the deployed one is real Postgres, where the column is
+  /// `uuid`, so a non-UUID is a **500** (ADR-0023, and `docs/DRIFT.md` §11).
+  /// The shape was this client's obligation before and still is — but a
+  /// malformed id is now a server fault rather than a curiosity.
   final String userId;
 
   /// The address the reader signed in with.
@@ -94,10 +101,13 @@ final class AuthSession with _$AuthSession {
 
   /// The avatar's two-letter monogram.
   ///
-  /// A field rather than a getter over [displayName] because the prototype draws
-  /// `MK` at 11px (`ds.tsx:525`) and the mapping from a name to a monogram is a
-  /// product decision — two letters, or one for a single-word name — not a
-  /// string operation. Deriving it here would fix both answers at once.
+  /// A field rather than a getter over [displayName] because the design draws
+  /// the monogram as its own element — a literal `M` in the reader's orb
+  /// (`eva/redesign.html:586`) and, on the board, the name's **first
+  /// character** (`eva/redesign.html:1072`) — and the mapping from a name to a
+  /// monogram is a product decision — two letters, or one for a single-word
+  /// name — not a string operation. Deriving it here would fix both answers at
+  /// once.
   final String initials;
 
   /// The role this reader holds, as a [UserRole].
