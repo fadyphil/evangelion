@@ -23,5 +23,22 @@
 # **3591 → 3691 and 98.74% → 98.83% with Phase 7's ritual** (the selah timer,
 # the focus dim, the vespers auto-dim, the breath guide and the haptics), plus
 # the three regression tests a review asked for and the two gate closures.
-test_count      3691
-coverage_pct    98.83
+#
+# **3691 → 3744 and 98.83% → 98.85% with Phase 7's second pass** — the three
+# unplaced widgets PLACED (`GoldFlecks` on the quiz's correct option,
+# `EvaAnimate` on the option card's entrance, `EvaTypeScale` at
+# `MaterialApp.router.builder`), the ritual's three gaps (the quiz's answer
+# haptics, the amen's toast, the selah's flare recorded), the shader clock
+# HELD AT ZERO under reduced motion, the OS's reduce-motion switch honoured
+# MID-SESSION, the prototype's 128-row I18N table MEASURED, and the orphan
+# gate's inventory widened to all of `lib/` with its router DERIVED.
+#
+# **The `--update-baseline` script REWROTE this file down to three lines, and
+# the history was put back by hand.** The file's own rule is that the old and
+# the new values are visible in the commit, and a running history is how a
+# reader tells a STRENGTHENING from a LOWERED floor: 2541 → 3691 → 3744 with
+# coverage rising at every step, and every re-recording taken from a GREEN run.
+# A bare `test_count` line cannot say that, and the next re-recording would
+# have had nothing to point at.
+test_count      3744
+coverage_pct    98.85
