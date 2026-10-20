@@ -58,6 +58,15 @@ abstract class LumenClock extends ChangeNotifier {
   /// **Unwrapped and monotonic** — see the class doc, and the `u_time` test in
   /// `lumen_canvas_test.dart`, which is what keeps that a fact rather than a
   /// paragraph.
+  ///
+  /// ## AND ZERO, WHEN THE READER HAS ASKED FOR REDUCED MOTION
+  ///
+  /// A clock that is *held at zero* reports **0**, whatever the elapsed time
+  /// is. That is the one thing a `LumenClock` is allowed to do to its own
+  /// monotonicity, and it is the whole of Phase 7's "a shader clock frozen at
+  /// `t = 0`" (`plan:2392-2394`). See [TickedLumenClock.setReducedMotion] for
+  /// why it is at zero and not at "wherever it had reached", and for the
+  /// divergence it records against the prototype.
   double get seconds;
 
   /// A clock frozen at [seconds], for tests and goldens.
@@ -154,6 +163,76 @@ final class TickedLumenClock extends LumenClock {
   /// [ticker]'s own elapsed reading at the last observation.
   double _lastRawSeconds = 0;
 
+  /// Whether the clock is **held at zero** because the reader asked for
+  /// reduced motion.
+  ///
+  /// ## WHY A FLAG AND NOT A RESET
+  ///
+  /// Because the freeze is a *reporting* rule and not a destruction of
+  /// history. The elapsed time is the clock's own; the reduced-motion
+  /// decision is the reader's, and it decides what the **shader** is told,
+  /// not how much time has passed. So the accumulator keeps its value and the
+  /// reported `u_time` is pinned to zero — which is what makes "turn it off
+  /// again" hand back the aurora the reader had, rather than a state the app
+  /// has never been in.
+  ///
+  /// ## WHY ZERO AND NOT "WHEREVER IT HAD REACHED"
+  ///
+  /// Because a freeze at the value it had is a function of **how long the app
+  /// has been running** and of **when the reader toggled the setting**. The
+  /// same reader on the same screen would then see two different frames, and
+  /// a golden recorded under reduced motion would be a function of when the
+  /// suite ran. At zero it is a function of the setting and of nothing else —
+  /// the still image every reader and every session sees, and the frame a
+  /// reduced-motion golden can be recorded against.
+  ///
+  /// ## AND THE PROTOTYPE ANSWERS DIFFERENTLY, WHICH IS RECORDED
+  ///
+  /// `eva/redesign.html:888` is
+  /// `timeAcc+=dt*(reduceMotion?0.15:1)` — the prototype **scales** its
+  /// accumulator by `0.15` under reduced motion, so its `u_time` keeps
+  /// *advancing*, slowly. The client **freezes** it. The plan records that as
+  /// a divergence rather than a port (`plan:2004-2007`: "the client freezes
+  /// the clock instead, which is a different answer to the same question").
+  ///
+  /// ## WHY IT IS NOT CALLED "FROZEN"
+  ///
+  /// Because [FixedLumenClock] is already "a clock frozen at [seconds]"
+  /// (this file's own words), and one file cannot use one word for two
+  /// opposites. This is a *held-at-zero* clock, and the reason it is held is
+  /// the reader's request.
+  bool _reducedMotion = false;
+
+  /// Whether the clock is held at zero — the reduced-motion state.
+  ///
+  /// False for a clock that is simply running, and false for a
+  /// [FixedLumenClock], which is a different thing entirely.
+  bool get reducedMotion => _reducedMotion;
+
+  /// Holds the clock's reported time at **zero**, or lets it run again.
+  ///
+  /// ## IT NOTIFIES, AND THE NOTIFICATION IS LOAD-BEARING
+  ///
+  /// The painter's repaint signal is the scene, and the scene's frame signal
+  /// is this clock's notification (`lumen_scene.dart:439-449`). A hold that
+  /// did not notify would leave the **last animated frame on the screen**:
+  /// the aurora would keep the `u_time` it had when the reader asked for
+  /// reduced motion, which is the exact thing the hold exists to stop. The
+  /// notification is also what carries the held value into the scene's table,
+  /// so the frame that is painted is the `t = 0` one.
+  ///
+  /// ## A HOLD THAT IS ALREADY IN FORCE IS A NO-OP
+  ///
+  /// So a caller may state the decision without asking whether it was
+  /// already stated — which is what [EvaNeuralMotion.setAnimationsEnabled]
+  /// does, since it is called on every change of the answer and on the
+  /// scope's first build.
+  void setReducedMotion({required bool reducedMotion}) {
+    if (_reducedMotion == reducedMotion) return;
+    _reducedMotion = reducedMotion;
+    notifyListeners();
+  }
+
   /// Folds a fresh [ticker] reading into the running total.
   ///
   /// A reading that went *backwards* since the last observation is a restart:
@@ -189,8 +268,21 @@ final class TickedLumenClock extends LumenClock {
   /// fires, so only a read observes the backward jump. A pure getter would
   /// report the stopped window as `0` and rewind the aurora every time a
   /// reader asked for reduced motion.
+  ///
+  /// ## AND ZERO, WHEN THE CLOCK IS HELD
+  ///
+  /// The hold short-circuits **before** the accumulator is touched, and the
+  /// order is load-bearing rather than tidy. A held read that went through
+  /// [_noteRaw] would fold the ticker's own reading — which is `0` while the
+  /// ticker is stopped — into [_lastRawSeconds] and lose the distinction
+  /// between "the ticker was stopped" and "the clock was never running". The
+  /// elapsed time is *preserved* while the clock is held: it stays in
+  /// [_lastRawSeconds] until the ticker is restarted, and the restart is what
+  /// folds it into [_offsetSeconds]. That is what makes the resume land on
+  /// the phase the reader had rather than on a fresh one.
   @override
   double get seconds {
+    if (_reducedMotion) return 0;
     final double raw = rawElapsedSeconds;
     _noteRaw(raw);
     return _offsetSeconds + raw;
@@ -224,5 +316,6 @@ final class TickedLumenClock extends LumenClock {
   @override
   String toString() =>
       'TickedLumenClock(seconds: $seconds, raw: '
-      '${rawElapsedSeconds}s, offset: ${_offsetSeconds}s)';
+      '${rawElapsedSeconds}s, offset: ${_offsetSeconds}s, '
+      'reducedMotion: $_reducedMotion)';
 }

@@ -90,6 +90,19 @@ void main() {
     await tester.pump(EvaMotion.screen);
   }
 
+  /// The app's own motion bundle — the four shared clocks above `MaterialApp`.
+  ///
+  /// Read from **below** the scope, because that is the only place the
+  /// bundle is reachable: `NeuralMotionScope` publishes it to its descendants
+  /// and holds no getter for it. `LoginPage` is the descendant the app always
+  /// has, because it is the entry route.
+  ///
+  /// `dependOnInheritedWidgetOfExactType` from a test body is legal: the
+  /// framework's assertion there is that the element is **active**, not that a
+  /// build is in progress.
+  EvaNeuralMotion appMotion(WidgetTester tester) =>
+      NeuralMotionScope.of(tester.element(find.byType(LoginPage)));
+
   /// Signs in for real and lands on `/`, so the guarded routes are reachable.
   ///
   /// **`pushPath` unawaited and then pumped**, and the reason is the same shape as the
@@ -521,6 +534,146 @@ void main() {
             'The scope is ABOVE `MaterialApp`, so this cannot be a `MediaQuery` read.',
       );
     });
+
+    testWidgets('and the shader clock is HELD AT ZERO under the reader\'s own '
+        'switch', (WidgetTester tester) async {
+      // ## WHY THIS IS AN APP TEST AND NOT A SCOPE TEST
+      //
+      // The freeze is a property of the **clock**, and the clock lives in the
+      // scope — but the question that matters is whether the reader's own
+      // switch reaches it, and the reader's switch is the app's business.
+      // `NeuralMotionScope`'s own suite proves the scope holds the clock when
+      // it is *told* to; this proves the app *tells* it.
+      //
+      // The platform's half of the same question is the next test, and the
+      // two together are what "`UserSettings.reducedMotion` is an **additional**
+      // off switch" means in practice: both reach the clock, and neither
+      // replaces the other.
+      await pumpApp(tester);
+      final EvaNeuralMotion motion = appMotion(tester);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(
+        motion.lumen.seconds,
+        greaterThan(0),
+        reason: 'the clock runs while the reader has not asked otherwise',
+      );
+
+      await getIt<SettingsHandle>().setReducedMotion(reduced: true);
+      await pumpThemeChange(tester);
+
+      expect(
+        motion.lumen.seconds,
+        0,
+        reason:
+            'the shader\'s `u_time` is held at ZERO under reduced motion — a '
+            'freeze at "wherever it had reached" would be a function of how '
+            'long the app had been running',
+      );
+    });
+
+    testWidgets('and the platform\'s own signal holds it at zero as well', (
+      WidgetTester tester,
+    ) async {
+      // The other half of the pair, and the half the reader cannot see: the
+      // OS-level "reduce motion" is an **additional** off switch, and it is
+      // combined with the app's own rather than replaced by it
+      // (`app.dart`'s `_animationsEnabled`, and `UserSettings.reducedMotion`'s
+      // own doc). A reader who has asked the OS for less motion gets it
+      // whatever `/settings` says.
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpApp(tester);
+
+      final EvaNeuralMotion motion = appMotion(tester);
+      expect(
+        motion.lumen.seconds,
+        0,
+        reason:
+            'the platform signal alone holds the shader clock at zero, because '
+            '`app.dart` combines it with the reader\'s preference before the '
+            'scope ever sees an answer',
+      );
+      expect(
+        motion.lumen.reducedMotion,
+        isTrue,
+        reason:
+            'and the clock is **held**, which is a different fact from reading '
+            'zero. A scope built with the clocks stopped reports zero too — a '
+            'ticker that never started reads zero — so the value alone cannot '
+            'tell "held at zero" from "never ran", and the difference is the '
+            'whole of the freeze',
+      );
+    });
+
+    testWidgets(
+      'and the OS\'s own switch, FLIPPED MID-SESSION, holds it at zero too',
+      (WidgetTester tester) async {
+        // ## THE THIRD HALF, AND IT IS THE ONE THAT WAS MISSING
+        //
+        // The two halves above are **at launch**: the reader's own switch is
+        // read from the store, and the platform's is read from the dispatcher,
+        // and both are combined by `app.dart`'s `_animationsEnabled` before the
+        // scope ever sees an answer.
+        //
+        // **A reader who turns the OS's "reduce motion" on WHILE THE APP IS
+        // OPEN is a third case, and the app did not honour it.** The platform's
+        // signal reaches the per-widget `MediaQuery.disableAnimationsOf`
+        // checks, because the framework updates that `MediaQuery` — but it did
+        // **not** reach the **four shared clocks**, because
+        // `NeuralMotionScope.didChangeAccessibilityFeatures` acts only
+        // `if (widget.animationsEnabled == null)`, and `app.dart` always passes
+        // an explicit value. The scope's observer was therefore **dead code**,
+        // and `app.dart`'s own class doc — "honoured again if the reader toggles
+        // it mid-session (`NeuralMotionScope` registers a
+        // `WidgetsBindingObserver`)" — was **false**, and contradicted the
+        // helper's own doc three paragraphs below it, which says the opposite.
+        //
+        // **Two doc comments in one file disagreeing is how this survives.** The
+        // fix is in the composition root, because the scope cannot recompute a
+        // value that combines the platform's signal with a **stored**
+        // preference it does not know: `app.dart` observes the platform and
+        // rebuilds, and `NeuralMotionScope.didUpdateWidget` does the rest.
+        await pumpApp(tester);
+        final EvaNeuralMotion motion = appMotion(tester);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(
+          motion.lumen.seconds,
+          greaterThan(0),
+          reason: 'the clock runs while nothing has asked otherwise',
+        );
+
+        // **The platform's switch, flipped while the app is open.** The test
+        // dispatcher fires `onAccessibilityFeaturesChanged` on the setter, which
+        // is the same notification a real platform sends.
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pump();
+        await tester.pump(EvaMotion.screen);
+
+        expect(
+          motion.lumen.seconds,
+          0,
+          reason:
+              'a reader who asks the OS for less motion mid-session gets the four '
+              'shared clocks stopped, and the shader clock held at zero — the same '
+              'answer the same setting gets at launch',
+        );
+        expect(
+          motion.lumen.reducedMotion,
+          isTrue,
+          reason:
+              'and the clock is **held**, not merely stopped where it stood',
+        );
+      },
+    );
   });
 
   group('the seven sky preferences are written by the cubit and read by the handle', () {

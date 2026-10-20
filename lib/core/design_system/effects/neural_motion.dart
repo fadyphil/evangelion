@@ -161,7 +161,8 @@ class EvaNeuralMotion extends ChangeNotifier {
   ///
   /// A [TickedLumenClock] and not a [LumenClock] because this bundle **runs**
   /// clocks: `setAnimationsEnabled` has to stop and start this one with the
-  /// other three, and the only way to do that through an abstraction is to
+  /// other three, **and hold it at zero** when the reader has asked for
+  /// reduced motion, and the only way to do that through an abstraction is to
   /// reach past it. Holding the concrete type is the honest trade — a painter
   /// takes a [LumenClock] and nothing else about the two needs to differ, and a
   /// test that wants a frozen one does not build an `EvaNeuralMotion` at all.
@@ -242,11 +243,40 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// get a still background, not one snapped to the top of its cycle, and
   /// `stop(canceled: false)` leaves each clock wherever it had got to.
   ///
-  /// **The shader clock is included, and stopping it is what makes `u_time`
-  /// freeze rather than rewind.** `TickedLumenClock` reads
-  /// `lastElapsedDuration`, which `stop()` nulls and `repeat()` resets to zero —
-  /// so this method is also the thing that exercises the clock's offset
-  /// arithmetic every time a reader toggles reduced motion.
+  /// ## THE SHADER CLOCK IS HELD AT **ZERO**, AND THAT IS A DIFFERENT THING
+  ///
+  /// The other three clocks stop **wherever they had got to** — a still
+  /// background, not a snapped one. The shader clock does not: under reduced
+  /// motion the shader's `u_time` reads **0**, so the aurora is a still image
+  /// of its initial state rather than of wherever it happened to be. The plan
+  /// asks for exactly that — "a shader clock frozen at `t = 0`"
+  /// (`plan:2392-2394`) — and it is a *different answer* to the prototype's,
+  /// which scales `u_time` by `0.15` and lets it keep advancing
+  /// (`eva/redesign.html:888`). The divergence is recorded at
+  /// `plan:2004-2007` and at `lumen_clock.dart`'s
+  /// [TickedLumenClock.setReducedMotion].
+  ///
+  /// **A freeze at "wherever it had reached" would be a function of how long
+  /// the app had been running** and of when the reader toggled the setting,
+  /// so the same reader on the same screen would see two different frames.
+  /// At zero it is a function of the setting and of nothing else.
+  ///
+  /// ## THE ORDER OF THE TWO HALVES, AND WHY IT IS NOT COSMETIC
+  ///
+  /// The clock's notification is what makes the scene repaint, so the
+  /// notification has to carry the value the clock will report from then on:
+  ///
+  /// * **stopping** — the ticker is stopped *first*, so the hold's
+  ///   notification arrives with the clock fully at rest and reporting `0`;
+  /// * **starting** — the hold is lifted *first*, so the notification arrives
+  ///   with the clock reporting the elapsed time it preserved, and the
+  ///   restored frame is painted before the ticker starts advancing it.
+  ///
+  /// The elapsed time is **preserved** across the hold, so turning reduced
+  /// motion off hands back the aurora the reader had — the same hue, the same
+  /// brightness, the same shader phase — rather than a state the app has never
+  /// been in. What the hold costs is stated in the same place:
+  /// `lumen_clock.dart`'s [TickedLumenClock.setReducedMotion].
   void setAnimationsEnabled({required bool enabled}) {
     if (enabled) {
       float.repeat();
@@ -265,12 +295,19 @@ class EvaNeuralMotion extends ChangeNotifier {
       // `auroraPulse`, and the controller is left running forwards. Same wave,
       // correct period.
       aurora.repeat();
+      // The lift before the restart, for the reason the class doc gives: the
+      // notification is the repaint, and the frame it paints is the restored
+      // one.
+      lumen.setReducedMotion(reducedMotion: false);
       lumen.ticker.repeat();
     } else {
       float.stop(canceled: false);
       hue.stop(canceled: false);
       aurora.stop(canceled: false);
+      // The stop before the hold, for the same reason: the notification
+      // arrives with the clock at rest.
       lumen.ticker.stop(canceled: false);
+      lumen.setReducedMotion(reducedMotion: true);
     }
   }
 
@@ -455,9 +492,16 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       lumen: TickedLumenClock(ticker: lumenTicker),
       now: widget.now,
     );
-    if (_enabled) {
-      motion.setAnimationsEnabled(enabled: true);
-    }
+    // **Unconditionally, and not only when the clocks are enabled.**
+    //
+    // The shader clock's *held at zero* state is a state, not an absence: a
+    // scope built with motion reduced must hold `u_time` at zero from its
+    // first frame, and the way to say that is to state it. Leaving the
+    // bundle untouched would make the clock read zero for the wrong reason —
+    // "the ticker never started" rather than "the reader asked for reduced
+    // motion" — and the difference is invisible in the number and decisive
+    // in the next reader's understanding of it.
+    motion.setAnimationsEnabled(enabled: _enabled);
     return motion;
   }
 

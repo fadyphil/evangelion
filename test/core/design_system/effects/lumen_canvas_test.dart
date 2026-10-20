@@ -296,11 +296,20 @@ typedef ScopeHarness = ({EvaNeuralMotion motion, TickedLumenClock clock});
 /// [MediaQuery] around the child — and a test about a clock needs neither.
 /// `evaPrimitiveHarness` also defaults `ambientAnimations: false`, which is the
 /// opposite of what is wanted here.
-Future<ScopeHarness> pumpScope(WidgetTester tester) async {
+///
+/// [animationsEnabled] is a parameter because the reduced-motion freeze is a
+/// question about *how the scope is built*: a scope that starts with motion
+/// reduced has never ticked, and a scope that is told to stop mid-session has
+/// run. Those are different starting states and the freeze has to hold for
+/// both.
+Future<ScopeHarness> pumpScope(
+  WidgetTester tester, {
+  bool animationsEnabled = true,
+}) async {
   late EvaNeuralMotion motion;
   await tester.pumpWidget(
     NeuralMotionScope(
-      animationsEnabled: true,
+      animationsEnabled: animationsEnabled,
       child: Builder(
         builder: (BuildContext context) {
           motion = NeuralMotionScope.of(context);
@@ -384,15 +393,32 @@ void main() {
       // Exact values because fake-async elapsed time is exact — microseconds
       // integers, not wall-clock floats — so `2.0` here is `2.0`, and a
       // formatting drift fails loudly instead of hiding in a `contains`.
+      //
+      // **`reducedMotion` is in the string because a held clock reports
+      // `seconds: 0.0` and nothing else says why.** A clock that has never
+      // run and a clock that is held at zero print the same three numbers,
+      // and the reader debugging "why is `u_time` zero" needs the fourth.
       final ScopeHarness harness = await pumpScope(tester);
       await tester.pump(const Duration(seconds: 2));
       expect(
         harness.clock.toString(),
-        'TickedLumenClock(seconds: 2.0, raw: 2.0s, offset: 0.0s)',
+        'TickedLumenClock(seconds: 2.0, raw: 2.0s, offset: 0.0s, '
+        'reducedMotion: false)',
+      );
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump();
+      expect(
+        harness.clock.toString(),
+        'TickedLumenClock(seconds: 0.0, raw: 0.0s, offset: 0.0s, '
+        'reducedMotion: true)',
+        reason:
+            'the hold is at zero, and the flag is what says the zero is a '
+            'decision rather than a clock that never started',
       );
     });
 
-    testWidgets('stopping and restarting does NOT rewind it', (
+    testWidgets('the hold keeps the elapsed time, so the resume is continuous', (
       WidgetTester tester,
     ) async {
       final ScopeHarness harness = await pumpScope(tester);
@@ -409,8 +435,11 @@ void main() {
       );
       expect(
         harness.clock.seconds,
-        closeTo(5.0, 1e-6),
-        reason: 'a frozen clock, not a rewound one',
+        0,
+        reason:
+            'the hold is at ZERO — the plan asks for "a shader clock frozen at '
+            '`t = 0`" (`plan:2392-2394`), and a freeze at "wherever it had '
+            'reached" would be a function of how long the app had been running',
       );
 
       harness.motion.setAnimationsEnabled(enabled: true);
@@ -437,13 +466,15 @@ void main() {
         reason:
             'the tick restarted from zero, so only an offset keeps u_time '
             'monotonic — without it the aurora would visibly rewind every time '
-            'a reader asked for reduced motion and then took it back',
+            'a reader asked for reduced motion and then took it back. The hold '
+            'PRESERVES that elapsed time rather than discarding it, which is '
+            'why the resume lands on 5 s and not on 0',
       );
     });
   });
 
   group('NeuralMotionScope publishes it and stops it with the other three', () {
-    testWidgets('a live clock advances, and freezing stops it', (
+    testWidgets('a live clock advances, and the hold stops it at zero', (
       WidgetTester tester,
     ) async {
       final ScopeHarness harness = await pumpScope(tester);
@@ -452,7 +483,153 @@ void main() {
 
       harness.motion.setAnimationsEnabled(enabled: false);
       await tester.pump(const Duration(seconds: 1));
-      expect(harness.motion.lumen.seconds, closeTo(3.0, 1e-6));
+      expect(
+        harness.motion.lumen.seconds,
+        0,
+        reason:
+            'the shader clock is the one of the four that is held at ZERO '
+            'rather than stopped where it stood — the plan\'s "a shader clock '
+            'frozen at `t = 0`" (`plan:2392-2394`)',
+      );
+    });
+  });
+
+  group('the reduced-motion freeze — `u_time` reads ZERO', () {
+    // ## WHY THE FREEZE IS AT ZERO AND NOT AT "WHEREVER IT GOT TO"
+    //
+    // `eva/redesign.html:888` is
+    // `timeAcc+=dt*(reduceMotion?0.15:1)` — the prototype **scales** its
+    // accumulator by 0.15 under reduced motion, so its `u_time` keeps
+    // advancing, slowly. The client **freezes** the clock instead, and the
+    // plan records that as a divergence rather than a port
+    // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:2004-2007`).
+    //
+    // A freeze at *the value it had* is a function of how long the app has
+    // been running and of when the reader toggled the setting: the same
+    // reader, the same screen, two different frames — and a golden recorded
+    // under reduced motion would be a function of when the suite ran. At
+    // **zero** it is a function of nothing but the setting itself: the still
+    // image every reader and every session sees.
+    //
+    // ## AND "OFF AGAIN" IS THE SAME AURORA, NOT A NEW ONE
+    //
+    // The freeze is a *reporting* rule, not a destruction of history: the
+    // clock's accumulator keeps the elapsed time, so turning reduced motion
+    // off restores the aurora to the phase it had reached. The alternative —
+    // resetting the accumulator — would hand back a state that never
+    // existed: the old colour at a brand-new shader phase.
+    testWidgets('the clock reads 0 the moment reduced motion is on', (
+      WidgetTester tester,
+    ) async {
+      final ScopeHarness harness = await pumpScope(tester);
+      await tester.pump(const Duration(seconds: 3));
+      expect(harness.clock.seconds, closeTo(3.0, 1e-6));
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        harness.clock.seconds,
+        0,
+        reason:
+            'the freeze is at ZERO, not at the 3.0 the clock had reached — a '
+            'freeze at "wherever it got to" is a function of how long the app '
+            'had been running, which is the thing the plan\'s divergence '
+            '(`plan:2004-2007`) records the client as answering differently',
+      );
+    });
+
+    testWidgets('and the shader\'s `u_time` in the table is 0 too', (
+      WidgetTester tester,
+    ) async {
+      // The uniform, not the clock. `u_time` is what the GPU is told, and
+      // `LumenScene.tableAt` writes `time: _clock.seconds` — so a clock that
+      // still reported 3.0 would put 3.0 on the GPU.
+      final ScopeHarness harness = await pumpScope(tester);
+      await tester.pump(const Duration(seconds: 3));
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump();
+
+      expect(
+        harness.motion.lumenScene.tableAt(kSurface).time,
+        0,
+        reason: 'this is the value the shader receives as `u_time`',
+      );
+    });
+
+    testWidgets('a scope that starts reduced never leaves t = 0', (
+      WidgetTester tester,
+    ) async {
+      // The byte-stability claim, in the form a golden would take it: the
+      // aurora under reduced motion is a function of the setting and of
+      // nothing else, so it is the same frame for every reader and every
+      // session.
+      final ScopeHarness harness = await pumpScope(
+        tester,
+        animationsEnabled: false,
+      );
+      expect(harness.clock.seconds, 0);
+
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(harness.clock.seconds, 0);
+      expect(harness.motion.lumenScene.tableAt(kSurface).time, 0);
+    });
+
+    testWidgets('turning it off again lets the clock run, and it resumes', (
+      WidgetTester tester,
+    ) async {
+      // "Off again" is the decision this phase had to make and record: the
+      // freeze preserves the elapsed time, so the aurora that comes back is
+      // **the one the reader had** — same hue, same brightness, same shader
+      // phase — rather than a state the app has never been in.
+      final ScopeHarness harness = await pumpScope(tester);
+      await tester.pump(const Duration(seconds: 3));
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump(const Duration(seconds: 1));
+      expect(harness.clock.seconds, 0);
+
+      harness.motion.setAnimationsEnabled(enabled: true);
+      // TWO pumps, and the first is not the measured second — the same
+      // Ticker mechanics the restart test above records: `repeat()` leaves
+      // `_startTime` null and the next frame only ESTABLISHES it.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        harness.clock.seconds,
+        closeTo(4.0, 1e-6),
+        reason:
+            '3 s of elapsed time, 1 s of stopped time, 1 s of running time — '
+            'the stopped second is not lost, because the freeze preserved it',
+      );
+    });
+
+    testWidgets('turning it back on returns the aurora to t = 0', (
+      WidgetTester tester,
+    ) async {
+      final ScopeHarness harness = await pumpScope(tester);
+      await tester.pump(const Duration(seconds: 3));
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump(const Duration(seconds: 1));
+      harness.motion.setAnimationsEnabled(enabled: true);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(harness.clock.seconds, closeTo(4.0, 1e-6));
+
+      harness.motion.setAnimationsEnabled(enabled: false);
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        harness.clock.seconds,
+        0,
+        reason:
+            'NOT 4.0 — the second freeze is at zero as well, so the aurora '
+            'under reduced motion is always the same still image',
+      );
     });
   });
 

@@ -104,15 +104,27 @@ import 'package:flutter/material.dart';
 /// to read from this far up. So `animationsEnabled` is resolved from the **platform's**
 /// own `accessibilityFeatures.disableAnimations` through
 /// `WidgetsBinding.instance.platformDispatcher` — reachable from anywhere, including
-/// above `MaterialApp`, and honoured again if the reader toggles it mid-session
-/// (`NeuralMotionScope` registers a `WidgetsBindingObserver`).
+/// above `MaterialApp`.
+///
+/// **And it is honoured again if the reader toggles it mid-session — by THIS
+/// file's own observer, not by the scope's.** The sentence used to name
+/// `NeuralMotionScope`'s `WidgetsBindingObserver`, and that was **false**:
+/// `NeuralMotionScope.didChangeAccessibilityFeatures` acts only
+/// `if (widget.animationsEnabled == null)`, and this file always passes an
+/// explicit value, so the scope's observer was dead code and the platform's
+/// switch reached the per-widget `MediaQuery` checks but **not** the four shared
+/// clocks. **Two doc comments in one file disagreed** — this one said the signal
+/// was honoured mid-session and [_animationsEnabled]'s said the opposite — and
+/// that disagreement is how the defect survived. The fix is here, in the
+/// composition root, because the scope cannot recompute a value that combines
+/// the platform's signal with a **stored** preference it does not know.
 ///
 /// **The persisted preference is combined with it, not substituted for it.** See
 /// `UserSettings.reducedMotion`'s doc: this app's control is an *additional* off
 /// switch, so a reader who has asked the OS for reduced motion gets it whatever
 /// `/settings` says. The two signals are read through one named helper
-/// ([_animationsEnabled]) so that the `WidgetsBindingObserver` in the scope and the
-/// value passed here cannot be computed differently.
+/// ([_animationsEnabled]) so that this file's observer and the value passed here
+/// cannot be computed differently.
 class EvangelionApp extends StatefulWidget {
   /// The application root.
   const EvangelionApp({super.key, this.locale});
@@ -127,7 +139,8 @@ class EvangelionApp extends StatefulWidget {
   State<EvangelionApp> createState() => _EvangelionAppState();
 }
 
-class _EvangelionAppState extends State<EvangelionApp> {
+class _EvangelionAppState extends State<EvangelionApp>
+    with WidgetsBindingObserver {
   /// The cubit this app reads its settings from, and the only writer of them.
   ///
   /// Resolved from the locator in `initState` rather than in `build`, for a measured
@@ -168,6 +181,21 @@ class _EvangelionAppState extends State<EvangelionApp> {
   @override
   void initState() {
     super.initState();
+    // **The observer, and it is what makes the OS's switch work MID-SESSION.**
+    //
+    // `NeuralMotionScope` registers a `WidgetsBindingObserver` too, but it acts
+    // only `if (widget.animationsEnabled == null)` — and this file **always**
+    // passes an explicit value, because the answer it holds is the *combined*
+    // one. So the scope's observer was **dead code**, and a reader who turned
+    // the OS's "reduce motion" on while the app was open got it for the
+    // per-widget `MediaQuery` checks but **not** for the four shared clocks.
+    //
+    // **The scope cannot fix that by itself**, because it does not know the
+    // reader's *stored* preference, and the combined answer is what the
+    // combined answer is. So the composition root observes the platform and
+    // rebuilds; `NeuralMotionScope.didUpdateWidget` then applies the new value
+    // to the clocks, which is the mechanism it already had.
+    WidgetsBinding.instance.addObserver(this);
     _subscription = _settings.stream.listen((SettingsState _) {
       if (!mounted) return;
       // **Two notifications and both are needed.** [SettingsScope] is an
@@ -186,8 +214,30 @@ class _EvangelionAppState extends State<EvangelionApp> {
     unawaited(_settings.load());
   }
 
+  /// The platform's accessibility features changed — the reader turned the OS's
+  /// "reduce motion" on, or off, while the app was open.
+  ///
+  /// **A rebuild and nothing else**, because the value this file hands the scope
+  /// is [_animationsEnabled]'s, and that is a function of the platform's signal
+  /// as well as the reader's stored preference. `NeuralMotionScope.didUpdateWidget`
+  /// sees the new value and stops or restarts the four clocks, and the shader
+  /// clock's hold follows.
+  ///
+  /// **This is the third half of the reduced-motion contract**, and it is the
+  /// one that was missing: the reader's own switch and the platform's switch
+  /// both worked **at launch**, and only the platform's worked **mid-session** —
+  /// and not at all until this observer existed. The test is
+  /// `app_settings_wiring_test.dart`'s "the OS's own switch, FLIPPED MID-SESSION".
+  @override
+  void didChangeAccessibilityFeatures() {
+    super.didChangeAccessibilityFeatures();
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_subscription?.cancel());
     _handle.dispose();
     super.dispose();
