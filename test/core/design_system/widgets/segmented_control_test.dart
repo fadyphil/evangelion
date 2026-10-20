@@ -40,8 +40,10 @@ double _luminanceOf(Uint8List bytes, int offset) {
 
 /// The Phase 3 keyboard gate: `SegmentedControl` **selects via keyboard**, not
 /// just via taps. `08-build-phases.md` §Phase 3 names it as the phase's verify
-/// line and the prototype cannot pass it — `SettingsScreen.tsx:6,52-61` is three
-/// `<button>`s over a `useState`, so a keyboard reaches them one at a time and
+/// line and the prototype cannot pass it — the superseded prototype's theme
+/// picker was three `<button>`s over a `useState`, and the redesign's `.segp`
+/// (`redesign.html:178-189`, three `<button>`s at `:620-622`) is the same shape,
+/// so a keyboard reaches them one at a time and
 /// arrow keys do nothing at all.
 ///
 /// The model itself ([nextSelection], [selectionStepFor]) is pinned in
@@ -687,8 +689,9 @@ void main() {
     ) async {
       await pump(tester);
       // `redesign.html:178` — one `border-radius:999px` wrapper with a fill and
-      // a 1px rim, not three separate pills. **Was** `SettingsScreen.tsx:51`'s
-      // `borderRadius: 8` with no `border` at all; `:178` is the redesign's own.
+      // a 1px rim, not three separate pills. The superseded prototype's
+      // `borderRadius: 8` with no `border` at all has **no counterpart in the
+      // redesign** — `:178` is the redesign's own.
       final Container track = tester.widget<Container>(
         find
             .descendant(of: controlFinder, matching: find.byType(Container))

@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 ///
 /// ## THE ROLE, AND WHERE ITS NUMBERS COME FROM NOW
 ///
-/// The React prototype declared it as a **local** component — `SettingsScreen.tsx:14-26`
-/// defines `Toggle` inside the screen file rather than in `ds.tsx` — so there was no
-/// `ds.tsx` line to cite and every number was quoted from the screen. The redesigned
+/// The React prototype declared it as a **local** component — `Toggle` was defined
+/// inside the Settings screen file rather than in the shared component file — so
+/// there was no shared line to cite and every number was quoted from the screen. The redesigned
 /// reference publishes the same control globally, as `.tgl`, and the whole geometry
 /// is four CSS rules:
 ///

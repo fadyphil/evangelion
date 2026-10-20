@@ -778,9 +778,12 @@ void main() {
       // ## SCREEN CANNOT PERFORM
       //
       // This used to assert `find.text(en.quizCheckAnswer)`, on the reasoning that
-      // `QuizScreen.tsx:127` transcribes `{checked ? 'Next question' : 'Check
-      // answer'}` and `graded` is false here. But the prototype's `disabled={!checked
-      // && !selected}` covers **one** state — nothing chosen yet — and this is the
+      // the superseded prototype's CTA switch was
+      // `{checked ? 'Next question' : 'Check answer'}` and `graded` is false here.
+      // The redesign has no counterpart for that switch — its `pick` grades the
+      // instant a card is chosen (`redesign.html:1423`) — and the prototype's
+      // `disabled={!checked && !selected}` covers **one** state —
+      // nothing chosen yet — and this is the
       // other: the question is closed by the wire and there is nothing to check
       // *ever*. A disabled "Check answer" names the one action this screen cannot
       // perform, and every other `Text` on the screen is content the reader already

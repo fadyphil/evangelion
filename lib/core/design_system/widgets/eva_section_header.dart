@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 ///
 /// | | `SectionLabel` | `ScreenSectionHeader` |
 /// | --- | --- | --- |
-/// | source | `SettingsScreen.tsx:28-32` → **`redesign.html:30-31`, `:422`** | `ProfileScreen.tsx:53` / `HomeScreen.tsx:78` |
+/// | source | the prototype's `SectionLabel` → **`redesign.html:30-31`, `:422`** | the prototype's profile and home screen headings — **the redesign has no counterpart**, because the profile screen was cut |
 /// | family | `F.mono` | `F.ui` |
 /// | size | 9 → **10.5** | 16–17 |
 /// | ink | `ink3` → **`ink2` → gold** | `ink` |
@@ -25,7 +25,7 @@ import 'package:flutter/material.dart';
 /// ## THE INK WALKED THROUGH THREE VALUES AND ONLY THE LAST ONE IS THE
 /// PROTOTYPE'S
 ///
-/// `SettingsScreen.tsx:29` said `T.ink3`. Decision 149 moved it to `ink2`,
+/// The prototype's `SectionLabel` said `T.ink3`. Decision 149 moved it to `ink2`,
 /// because `ink3` measures 1.65:1 on dark glass and a heading is content, not
 /// decoration — that move was a **contrast** decision and it was right. Phase
 /// 4.2 moved it again, to [EvaColors.emberInk], because that is what
@@ -62,7 +62,8 @@ enum EvaSectionHeaderSize {
   /// decision** on the evidence of `:39` — not from `:31`, which does not apply.
   section,
 
-  /// A screen title inside a body: UI sans, bold, `ink`. `ProfileScreen.tsx:53`.
+  /// A screen title inside a body: UI sans, bold, `ink` — the prototype's profile
+  /// screen heading, which **the redesign has no counterpart for**.
   title,
 }
 
@@ -112,7 +113,8 @@ class EvaSectionHeader extends StatelessWidget {
   /// The [EvaSectionHeaderSize.section] label's size. `redesign.html:30` —
   /// `font-size:10.5px`.
   ///
-  /// Was `9` under `SettingsScreen.tsx:29`, and `12` in practice: the widget drew
+  /// Was `9` under the prototype's `SectionLabel`, and `12` in practice: the widget
+  /// drew
   /// [EvaTypography.monoCaps], which is `labelMedium`'s geometry, so the shipped
   /// label was neither prototype number until Phase 4.2 named one.
   static const double sectionSize = 10.5;
@@ -121,7 +123,7 @@ class EvaSectionHeader extends StatelessWidget {
   /// `letter-spacing:.16em`.
   static const double sectionTracking = 0.16;
 
-  /// `SettingsScreen.tsx:29` — `marginBottom: 10`, which is
+  /// The prototype's `marginBottom: 10`, which is
   /// [EvaSpacing.md] + [EvaSpacing.xs].
   static const double bottomGap = EvaSpacing.md + EvaSpacing.xs;
 
@@ -130,7 +132,7 @@ class EvaSectionHeader extends StatelessWidget {
     final EvaColors colors = context.colors;
 
     final Text header = Text(
-      // `SettingsScreen.tsx:29` — `textTransform: 'uppercase'`. Flutter's `Text`
+      // The prototype's `textTransform: 'uppercase'`. Flutter's `Text`
       // has no `textTransform`, so the transform is applied to the string. It is
       // applied **here** rather than inside the style switch because it changes
       // the glyphs, not the style, and a header that measured differently per
@@ -223,7 +225,8 @@ class EvaSectionHeader extends StatelessWidget {
           color: colors.emberInk,
           fontWeight: FontWeight.w400,
         ),
-        // `ProfileScreen.tsx:53` — `F.ui, 16, 700, color: T.ink`. `titleMedium`
+        // The prototype's profile-screen heading — `F.ui, 16, 700, color: T.ink`.
+        // `titleMedium`
         // is Material 3's 16sp slot, so the prototype's 16 lands exactly. **Kept,
         // not re-pointed**: the redesign has no screen-title role, because the
         // profile screen it belonged to was cut.

@@ -6,8 +6,8 @@ import '../../../support/design_system_harness.dart';
 
 /// RED-FIRST — `ProgressBeads`' three bead states, extracted from the widget.
 ///
-/// `eva/src/components/ds.tsx:350-370` computes each bead from three integers in
-/// a closure, with no name for the outcome. Collapsing it into a widget without
+/// `eva/redesign.html:1415` computes each bead from three integers in a single
+/// ternary, with no name for the outcome. Collapsing it into a widget without
 /// naming the outcome leaves the arithmetic untestable, so it is named here.
 void main() {
   group('beadStateAt', () {
@@ -23,9 +23,10 @@ void main() {
     });
 
     test('the bead at `current` is current, unless it is already done', () {
-      // `ds.tsx:358` — `const curr = i === current && !done`. The `&& !done`
-      // is load-bearing: with `completed: 2, current: 1` the prototype shows
-      // bead 1 as *done*, because a finished bead never un-finishes.
+      // `redesign.html:1415` — `d.className='dot'+(i<qi?' done':i===qi?' cur':'')`.
+      // The `done` branch is tested first, so a finished bead is never `cur`:
+      // with `completed: 2, current: 1` bead 1 is *done*, because a finished bead
+      // never un-finishes.
       expect(
         beadStateAt(index: 3, total: 5, completed: 1, current: 3),
         ProgressBeadState.current,
@@ -138,7 +139,8 @@ void main() {
     });
 
     test('`done` always wins over `current` at the same index', () {
-      // The prototype's `i === current && !done` (`ds.tsx:358`) means a bead is
+      // The redesign's `i<qi ? ' done' : i===qi ? ' cur' : ''`
+      // (`redesign.html:1415`) means a bead is
       // never both, and the enum makes that a compile-time-shaped statement
       // rather than a boolean nobody reads.
       for (int total = 0; total <= 5; total++) {
@@ -167,7 +169,9 @@ void main() {
     //
     // `redesign.html:328` is `gap: 6px`, and a CSS `gap` is the space between
     // adjacent items — never after the last one. The widget padded **every** bead
-    // when it was written against `ds.tsx:355`'s `gap: 8`, so a row measured
+    // when it was written against the superseded prototype's `gap: 8` — the
+    // redesign's is `gap: 6px`, and that is the number the widget uses now — so
+    // a row measured
     // `10n + 8n` where the prototype's arithmetic was `10n + 8(n − 1)`:
     // `total: 1` rendered 18 against 10, `total: 3` rendered 54 against 46,
     // `total: 5` rendered 90 against 82. Eight pixels of dead space at the end of
@@ -240,7 +244,8 @@ void main() {
       // delta that neither formula produces; the true row is `136 | 124 | −12`.
       //
       // `n = 8` is the row that matters: it is the only length at which the row
-      // gets **narrower** than `ds.tsx`'s, because `4n − 4` finally overtakes
+      // gets **narrower** than the superseded prototype's, because `4n − 4`
+      // finally overtakes
       // the flat 18 the 26px pill pushes out. So it is asserted against both
       // columns and against the delta the doc claims.
       const Map<int, (double old, double now)> expected =
@@ -262,13 +267,14 @@ void main() {
           row.value.$2,
           reason: "total: ${row.key} — the doc's `redesign.html` column",
         );
-        // `ds.tsx`'s column, `10n + 8(n − 1)`, spelled out here so the delta is
+        // The superseded prototype's column, `10n + 8(n − 1)`, spelled out here so
+        // the delta is
         // a measured difference rather than a number copied twice.
         final double old = 10 * row.key + 8 * (row.key - 1);
         expect(
           old,
           row.value.$1,
-          reason: "total: ${row.key} — `ds.tsx`'s column",
+          reason: "total: ${row.key} — the superseded prototype's column",
         );
         expect(
           row.value.$2 - row.value.$1,

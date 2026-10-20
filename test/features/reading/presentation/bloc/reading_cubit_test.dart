@@ -33,11 +33,13 @@ class _MockReadingRepository extends Mock implements ReadingRepository {}
 ///   The persistence claim this file used to refuse to make is now made, in
 ///   `test/core/domain/repositories/settings_repository_test.dart`.
 ///
-/// * **Verse numbers are still not state.** The prototype's reading screens draw a
-///   `<sup>` on every verse of both arms (`ReadingEnScreen.tsx:48`,
-///   `ReadingArScreen.tsx:49`) and draw **no control** for turning them off. Phase 9
-///   built `/settings`, whose prototype screen *does* have the switch
-///   (`SettingsScreen.tsx:92`), and still did not ship it — for a **scope** reason
+/// * **Verse numbers are still not state.** The reading screens draw a
+///   superscript number on every verse of both arms (`redesign.html:170` —
+///   `.vline i{vertical-align:super}` — and `:1362` puts the Arabic-Indic
+///   numerals in it) and draw **no control** for turning them off. Phase 9
+///   built `/settings`, and the redesign's workshop has no counterpart for the
+///   verse-number switch the superseded prototype's settings screen carried,
+///   and still did not ship one — for a **scope** reason
 ///   rather than a writer reason, recorded on `SettingsPage`: `ScriptureBlock` has no
 ///   `showVerseNumbers` parameter and its marker is load-bearing for four gates this
 ///   phase does not own.

@@ -25,8 +25,8 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// ## AND THE IDENTITY GATE IS STILL HERE, WITH A NEW NAME
 ///
-/// The old suite scanned for the *old* prototype's literals (`Miriam` from
-/// `HomeScreen.tsx`, `MK` from `ds.tsx`). The redesign has no avatar and so no
+/// The old suite scanned for the *old* prototype's literals (`Miriam` and `MK`,
+/// both from the superseded React prototype). The redesign has no avatar and so no
 /// monogram — `MK` has nothing left to guard — and its own reader is `Mariam`
 /// (`eva/redesign.html:515`, `:993`, and `Mariam Hanna` at `:587`, `:992`,
 /// `:1059`). The scan walks the same directory for the same reason: a **public**

@@ -14,7 +14,8 @@ import '../../../support/design_system_harness.dart';
 ///
 /// Source: `redesign.html` — `.cta` (:381-386), `.qnext` (:363-368),
 /// `.ghosts button` (:388-390). The three states with no redesign line at all
-/// — pressed fill, pressed glow removal, disabled — say `ds.tsx` on the widget.
+/// — pressed fill, pressed glow removal, disabled — are recorded on the widget
+/// as such.
 void main() {
   group('resolveButtonStyle — primary', () {
     test('fills with ember and inks with onEmber', () {
@@ -33,10 +34,11 @@ void main() {
     });
 
     test('presses to emberDeep', () {
-      // `ds.tsx:239` — `background: pressed ? hex.emberDeep : hex.ember`.
+      // The superseded prototype's `background: pressed ? hex.emberDeep :
+      // hex.ember` — **the redesign has no counterpart for it**.
       // `redesign.html` declares **no** `:active` fill: its only `:active` rule
       // for `.cta` is `transform: scale(.97)` (:384), which is paint. So this is a
-      // surviving `ds.tsx` value rather than a transcription, and the widget says
+      // surviving prototype value rather than a transcription, and the widget says
       // so rather than leaving the citation to imply otherwise.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
@@ -53,7 +55,9 @@ void main() {
     });
 
     test('carries the two-part ember glow', () {
-      // `ds.tsx:244` — `0 0 28px rgba(ember,.35), 0 4px 14px rgba(ember,.25)`.
+      // The superseded prototype's
+      // `0 0 28px rgba(ember,.35), 0 4px 14px rgba(ember,.25)` — **the redesign
+      // has no counterpart for it**.
       // Kept: `redesign.html:381` declares no `box-shadow` at all, and the ring
       // it draws is a separate `::after` element rather than a shadow.
       const EvaColors colors = EvaColors.dark();
@@ -70,7 +74,8 @@ void main() {
       expect(style.glow[1].blurRadius, 14);
     });
 
-    test('the pressed glow is empty — ds.tsx:244 says `pressed ? none`', () {
+    test('the pressed glow is empty — the prototype said `pressed ? none`, and the '
+        'redesign has no counterpart', () {
       expect(
         resolveButtonStyle(
           variant: EvaButtonVariant.primary,
@@ -101,7 +106,8 @@ void main() {
   group('resolveButtonStyle — secondary, the `.qnext` gold-rim role', () {
     test('is transparent with a 1px gold rim', () {
       // `redesign.html:363` — `border: 1px solid rgba(232,176,75,.55)`, against
-      // `ds.tsx:261`'s `1.5px solid rgba(ink, 0.2)`. Both halves move: the width
+      // the superseded prototype's `1.5px solid rgba(ink, 0.2)` — which **the
+      // redesign has no counterpart for**. Both halves move: the width
       // and the hue. This is decision 1 of the Task 4.2 status block.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
@@ -123,7 +129,8 @@ void main() {
           isNot(colors.ink.withValues(alpha: 0.20)),
           reason:
               'the old role was an `ink`-at-20% rim. A regression back to it '
-              'would be a regression back to ds.tsx:261 rather than to :363.',
+              'would be a regression back to the superseded prototype rather '
+              'than to the redesign\'s gold rim (`redesign.html:363`).',
         );
         expect(style.glow, isEmpty, reason: 'redesign.html — no box-shadow');
       }
@@ -180,7 +187,8 @@ void main() {
   group('resolveButtonStyle — ghost, `.ghosts button`', () {
     test('is a glass-rimmed pill in `ink2`, not bare ink with no rim', () {
       // `redesign.html:388-389` — `border: 1px solid var(--glass-line)`,
-      // `color: var(--ink-1)`. `ds.tsx:277-279` was `border: none`, `T.ink`.
+      // `color: var(--ink-1)`. The superseded prototype was `border: none`,
+      // `T.ink`, and **the redesign has no counterpart for either of those two**.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
         EvaColors.light(),
@@ -200,7 +208,7 @@ void main() {
           isNot(colors.ink),
           reason:
               '`--ink-1` (`redesign.html:389`) is this system\'s `ink2`. A '
-              'regression to `ink` is the old `ds.tsx:277` value wearing a '
+              'regression to `ink` is the superseded prototype\'s value wearing a '
               'redesign citation.',
         );
         expect(style.pressedBackground, style.background);
@@ -233,7 +241,9 @@ void main() {
     test('the button is a pill and `EvaRadii.button` is still 14', () {
       // `redesign.html:381` — `border-radius: 999px`. The token stays at 14
       // because `login_geometry_test` asserts it as a transcription claim
-      // against `ds.tsx:240`, and `SocialAuthButton` still draws its own box at
+      // against the superseded prototype's `borderRadius: 14` — **which the
+      // redesign has no counterpart for** — and `SocialAuthButton` still draws
+      // its own box at
       // it — which is how the harness keeps being able to see the difference.
       expect(kEvaButtonRadius, 999.0);
       expect(EvaRadii.button, 14.0);

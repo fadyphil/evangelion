@@ -116,10 +116,12 @@ final class Verse with _$Verse {
   /// Recorded as a decision rather than left to be discovered. `text_clean` is a
   /// *preview* string: its own name says so, and Phase 6 uses it for a 56-character
   /// one-line preview where the tashkīl are noise at 17px. `/reading` is the
-  /// opposite — the full passage, 23px, `lineHeight: 2.2`
-  /// (`ReadingArScreen.tsx:47`) — which is the one context in which Arabic vowel
-  /// marks are legible and *are* the content a reader recites from. Stripping them
-  /// there removes information rather than decoration.
+  /// opposite — the full passage, 23px at `lineHeight: 2.2` in the superseded
+  /// prototype and `calc(var(--vsize) + 3px)` at `line-height: 2.1` in the
+  /// redesign's Arabic arm (`eva/redesign.html:140`) — which is the one context
+  /// in which Arabic vowel marks are legible and *are* the content a reader
+  /// recites from. Stripping them there removes information rather than
+  /// decoration.
   ///
   /// The second reason is structural: `text_clean` is **absent** from the English
   /// payload, so a screen that rendered the "clean" text would have to branch on

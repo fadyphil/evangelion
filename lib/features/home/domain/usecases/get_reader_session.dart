@@ -22,10 +22,14 @@ import 'package:evangelion/core/domain/usecase/usecase.dart';
 ///
 /// ## WHY `/` NEEDS IT AT ALL
 ///
-/// Because the prototype's greeting and avatar are **hard-coded**:
-/// `HomeScreen.tsx:27` renders `Miriam` and `ds.tsx:525` renders `MK`. There is no
+/// Because the design's greeting and avatar are **hard-coded**:
+/// `eva/redesign.html:993` writes `peace, Mariam` into the greeting and
+/// `eva/redesign.html:586` puts a literal `M` in the reader's orb — the
+/// superseded prototype's values were `Miriam` and `MK`, and the monogram is
+/// now **one** letter rather than two, because the design's own monogram is the
+/// name's first character (`eva/redesign.html:1072`). There is no
 /// user endpoint and the profile screen is cut, so those two strings are the only
-/// "who is this" the prototype has, and shipping them would be fake data that reads
+/// "who is this" the design has, and shipping them would be fake data that reads
 /// as real — `HomePage`'s Phase-4 stub doc says the same about a hard-coded streak.
 ///
 /// `AuthSession` already carries `displayName: 'David Mina'` and `initials: 'DM'`

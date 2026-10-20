@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 /// A labelled group of [SettingsTile]s.
 ///
 /// The Settings screen's structure: a section label, then a column of rows with
-/// 10px between them (`SettingsScreen.tsx:45-124`). The label and the gap are the
+/// 10px between them — a value **the redesign has no counterpart for**, because
+/// its `.srow` rows are separated by their own `border-bottom` hairline and
+/// declare no gap at all. The label and the gap are the
 /// whole of the widget, and they are the whole of the prototype's contribution.
 ///
 /// **The §3.1 deletion test is DEFERRED, not passed.** This widget is on the
@@ -57,7 +59,8 @@ class SettingsGroup extends StatelessWidget {
   /// worth, known at build time from the screen's own composition.
   final List<Widget> children;
 
-  /// The gap between rows. `SettingsScreen.tsx:49,75,100,114` — `gap: 10`.
+  /// The gap between rows. The prototype's — `gap: 10`, in each of its four
+  /// column layouts.
   ///
   /// 10, not `EvaSpacing.md + EvaSpacing.xs` (16). The prototype's number is not
   /// on the 4px scale and the nearest step that would be 16 is 60% further apart.
@@ -72,7 +75,7 @@ class SettingsGroup extends StatelessWidget {
   /// put a 6px gap above the first row **and** keep 10 between the rows, so the
   /// group would open with a narrower gap than it has internally.
   ///
-  /// So `rowGap` keeps its `SettingsScreen.tsx` citation: 10 is that file's number
+  /// So `rowGap` keeps the prototype's number: 10 is that file's number
   /// and no `redesign.html` line replaces it. The divergence is recorded rather
   /// than smoothed, and the citation is re-pointed for **the label only** — which
   /// is [EvaSectionHeader]'s job, not this widget's.
@@ -80,7 +83,7 @@ class SettingsGroup extends StatelessWidget {
 
   /// The space above the label. `redesign.html:422` — `margin:20px 0 6px`, top.
   ///
-  /// Re-pointed from `SettingsScreen.tsx:45-124`'s implicit layout, where this
+  /// Re-pointed from the prototype's implicit layout, where this
   /// widget had no margin of its own and the column's spacing came from
   /// `SettingsPage.groupGap`.
   static const double topGap = 20;

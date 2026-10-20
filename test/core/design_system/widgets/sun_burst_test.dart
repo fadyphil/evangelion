@@ -17,7 +17,9 @@ Widget _burst({ThemeData? theme, double size = 96}) => evaAmbientHarness(
 
 void main() {
   group('the ray table is the prototype\'s', () {
-    // ResultScreen.tsx:7-15.
+    // The superseded prototype's ray table — fourteen rays, and the redesign has
+    // no counterpart for it: the redesign's result mark is a progress ring, not
+    // a burst.
     test('fourteen rays', () {
       expect(sunBurstRayCount, 14);
       expect(sunBurstRays(), hasLength(14));
@@ -50,9 +52,10 @@ void main() {
     });
 
     test('rays start at i * (360 / 14) degrees, measured from three o\'clock', () {
-      // `ResultScreen.tsx:8` — `const a = (i * (360 / 14) * Math.PI) / 180`,
+      // The superseded prototype's `const a = (i * (360 / 14) * Math.PI) / 180`,
       // consumed by `cos`/`sin`, so angle 0 is +x and the burst sweeps in the
-      // direction +y is on screen. Fourteen rays do NOT include 90°:
+      // direction +y is on screen. The redesign has no counterpart for it.
+      // Fourteen rays do NOT include 90°:
       // 3 x 25.714° is 77.14° and 4 x 25.714° is 102.86°, which is part of why
       // the burst reads as a sunburst and not as a clock face.
       // `atan2` answers in (-pi, pi], so every ray past six o'clock comes back
@@ -117,9 +120,11 @@ void main() {
 
   group('the discs and flecks are the prototype\'s', () {
     test('three discs — r30 at 12%, r24 at 90%, r18 at 60%', () {
-      // ResultScreen.tsx:16-18. The name used to read "r30 at 12% behind r24 at
-      // 90% and r18 at 60%", repeating a claim about the SVG that was false: SVG
-      // paints in document order, so the prototype's r30 halo is last and on top.
+      // The superseded prototype's three discs, in the order it painted them —
+      // and the redesign has no counterpart for any of them. The name used to
+      // read "r30 at 12% behind r24 at 90% and r18 at 60%", repeating a claim
+      // about the SVG that was false: SVG paints in document order, so the
+      // prototype's r30 halo is last and on top.
       // It also implied the order mattered, which it does not — all three discs
       // are `#F5C84C`, and compositing one colour over itself is commutative.
       // `sun_burst.dart`'s doc carries the measurement (173 of 480,000 pixels,
@@ -144,7 +149,8 @@ void main() {
     });
 
     test('five flecks at their exact centres, radii and alphas', () {
-      // ResultScreen.tsx:19-24. Every fleck's radius is pinned: the first version
+      // The superseded prototype's five flecks — and the redesign has no
+      // counterpart for them. Every fleck's radius is pinned: the first version
       // asserted radii for flecks 0 and 3 only, so 1, 2 and 4 could be any
       // plausible-looking number and every golden stayed green.
       expect(sunBurstFlecks, hasLength(5));

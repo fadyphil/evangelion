@@ -10,8 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// of the backend's own union at `identity.middleware.ts:5`
 /// (`role: 'kid' | 'viewer_servant' | 'admin_servant'`), read against
 /// `HEAD = 4a1c834`. This suite deliberately does **not** open that file at test
-/// time, the way `login_geometry_test.dart` opens `eva/`: `EvaScreen.tsx` is a
-/// file in this repository's tree, and `EvangelionBackend` is read-only
+/// time, the way `login_geometry_test.dart` opens the design reference:
+/// `eva/redesign.html` is a file in this repository's tree, and `EvangelionBackend` is read-only
 /// reference material at another path that may not exist on a fresh clone. A
 /// test that cannot load is not a test that can fail, so the provenance is
 /// declared here instead — which is the arrangement `test/support/

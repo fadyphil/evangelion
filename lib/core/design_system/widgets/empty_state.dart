@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 ///
 /// **The prototype has neither this widget nor [ErrorView].** `04-widget-inventory.md`
 /// §6 says so outright ("17. `EmptyState` · 18. `ErrorView` — the prototype has
-/// neither"), and `grep` over `eva/src` finds no empty state and no error state:
-/// every screen in the prototype renders a hardcoded payload and none of them can
-/// fail, because there is no data layer behind it. So **every** value below is a
-/// composition of tokens that exist, and none of them is transcribed from a line
-/// of `ds.tsx`. Where a number appears it is a token or it is named.
+/// neither"), and the **superseded prototype** had neither: every one of its
+/// screens rendered a hardcoded payload and none of them could fail, because
+/// there was no data layer behind it. So **every** value below is a composition
+/// of tokens that exist, and none of them is transcribed from a line of the
+/// prototype. Where a number appears it is a token or it is named.
 ///
 /// ## WHY IT IS IN THE DESIGN SYSTEM AT ALL
 ///

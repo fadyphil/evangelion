@@ -210,9 +210,17 @@ void main() {
     );
 
     blocTest<AuthBloc, AuthState>(
-      'a short password surfaces the prototype\'s own message, live',
-      // The Phase-5 verification line, and the direct replacement for
-      // `LoginScreen.tsx:52`'s hard-coded `error="That password's too short"`.
+      'a short password surfaces the design\'s own message, live',
+      // The Phase-5 verification line, and the direct replacement for the
+      // superseded React prototype's hard-coded
+      // `error="That password's too short"`. The message itself is the redesign's
+      // own row — `redesign.html:976`'s `pwErr` — applied by `:1306`'s one
+      // length test.
+      //
+      // **The name used to say "the prototype's own message", and the constant
+      // is the REDESIGN's row** — the prototype's was a different string
+      // entirely. The name and the value disagreed, and the name was the one
+      // that was wrong.
       build: build,
       act: (AuthBloc bloc) =>
           bloc.add(const AuthPasswordChanged(shortPassword)),

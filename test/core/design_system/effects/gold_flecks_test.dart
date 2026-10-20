@@ -92,8 +92,9 @@ int _alphaAt(List<int> rgba, int width, int x, int y) =>
 void main() {
   group('the fleck constants are the prototype\'s', () {
     test('radius 2.5 from a 5px circle, glow reach 10px', () {
-      // QuizScreen.tsx:15-16 — `width: 5, height: 5` and
-      // `boxShadow: '0 0 10px #E8A33D'`.
+      // The superseded prototype's own — `width: 5, height: 5` and
+      // `boxShadow: '0 0 10px #E8A33D'` — and **the redesign draws no flecks at
+      // all**, so there is no counterpart for either number.
       expect(kFleckRadius, 2.5);
       expect(kFleckGlow, 10.0);
     });
@@ -429,7 +430,8 @@ void main() {
     testWidgets('flecks outside the box are still painted', (
       WidgetTester tester,
     ) async {
-      // `QuizScreen.tsx:94` puts two at x = 356…362 inside a card that is ~350
+      // The superseded prototype puts two at x = 356…362 inside a card that is
+      // ~350
       // wide, i.e. deliberately off the right edge. Clipping them would lose two
       // of the prototype's four.
       //

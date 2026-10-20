@@ -27,9 +27,10 @@ import 'package:flutter/material.dart';
 ///
 /// **The old design's orbs are gone**, and what replaced them is not a
 /// smaller version of them: it is the **canvas fill**, because
-/// `eva/redesign.html:46` gives every screen **one** canvas and the
-/// prototype's screen root is `background: T.canvas` with a transparent
-/// background layer above it (`ds.tsx:162`).
+/// `eva/redesign.html:46` gives every screen **one** canvas. The superseded
+/// prototype did the same thing: its screen root was `background: T.canvas`
+/// and the layer above it — the orb container — declared no background of
+/// its own.
 ///
 /// **The plan asked for the legacy painter, and the reason it gave was the
 /// legacy painter's own.** Task 1.5 Step 3 (`plan:799-801`): *"`low` (or
@@ -162,12 +163,12 @@ class _LumenBackgroundState extends State<LumenBackground> {
     if (!_paintsAurora) {
       // ## THE FALLBACK IS THE **FLAT CANVAS**, AND IT IS THE PROTOTYPE'S OWN
       //
-      // `eva/redesign.html:46` gives every screen **one** canvas, and the
-      // prototype's screen root is `background: T.canvas` with a transparent
-      // background layer above it (`ds.tsx:162` — the container has no
-      // background of its own). **So the canvas fill IS the design**, and the
-      // thing that used to stand in for it — the old design's per-screen orb
-      // groups — was never part of this redesign.
+      // `eva/redesign.html:46` gives every screen **one** canvas. The
+      // superseded prototype did the same thing: its screen root was
+      // `background: T.canvas`, and the layer above it — the orb container —
+      // declared no background of its own. **So the canvas fill IS the
+      // design**, and the thing that used to stand in for it — the old
+      // design's per-screen orb groups — was never part of this redesign.
       //
       // A `ColoredBox` and not a `CustomPaint`: the old painter did the same
       // fill with a `RepaintBoundary` and a `CustomPainter` around it, and a

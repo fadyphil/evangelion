@@ -32,8 +32,10 @@ import 'package:flutter/material.dart';
 /// prototype's own.
 ///
 /// The dimming is the house's disabled treatment — `kEvaButtonDisabledOpacity`
-/// (0.45, `ds.tsx:245`) — and **the prototype has no disabled row to copy**,
-/// so this is a recorded divergence rather than a transcription.
+/// (0.45) — and **the redesign has no disabled row to copy**: its only
+/// `:disabled` rule is `eva/redesign.html:347`'s `cursor:default`, which changes
+/// no opacity. So 0.45 is the value the superseded prototype's disabled button
+/// carried, and this is a recorded divergence rather than a transcription.
 class JourneyAccountRows extends StatelessWidget {
   /// The four rows, with the two live ones wired.
   const JourneyAccountRows({

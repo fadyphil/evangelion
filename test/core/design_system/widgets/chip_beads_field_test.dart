@@ -133,8 +133,9 @@ void main() {
     ) async {
       // `redesign.html:329-332`. Two of the three states changed **fill
       // mechanics**, not colours: `done` and `upcoming` are now solid fills with
-      // **no rim at all**, where `ds.tsx:362-363` drew a filled disc, a 2px ring
-      // and a 1.5px outline respectively.
+      // **no rim at all**, where the superseded prototype drew a filled disc, a
+      // 2px ring and a 1.5px outline respectively — and the redesign has no
+      // counterpart for any of those three.
       Future<BoxDecoration> decorationAt(int index) async {
         final Container bead = tester.widget<Container>(
           find
@@ -214,8 +215,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // `redesign.html:330` — `box-shadow: 0 0 12px rgba(232,176,75,.7)` on
-      // `.cur` only. `ds.tsx:362,364` put `0 0 10px rgba(ember,.65)` on **done**
-      // and `0 0 7px rgba(ember,.45)` on current, so the glow moved from "the
+      // `.cur` only. The superseded prototype put `0 0 10px rgba(ember,.65)` on
+      // **done** and `0 0 7px rgba(ember,.45)` on current, and the redesign has
+      // no counterpart for either of those, so the glow moved from "the
       // ones you have finished" to "the one you are on".
       await pumpAt(
         tester,
@@ -408,8 +410,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // `redesign.html:378` — `box-shadow: 0 0 0 3px rgba(232,176,75,.12)`, one
-      // shadow. `ds.tsx:310` wrote two: that ring at `.18` **and** a 20px fog at
-      // `.12`. Asserted as a *count* and as a *radius*, because "the glow is
+      // shadow. The superseded prototype wrote two — that ring at `.18` **and** a
+      // 20px fog at `.12` — and the redesign has no counterpart for the second.
+      // Asserted as a *count* and as a *radius*, because "the glow is
       // still there" would pass with both of them and is not the claim.
       await pumpAt(tester, field());
       await tester.tap(find.byType(TextField));

@@ -528,31 +528,65 @@ ALLOWLIST: dict[str, str] = {
     # true is a false green, not a harmless leftover — so the row is gone and
     # this paragraph is what remains of it, exactly as `WitnessSky`'s did.
 
+    # ## THE REASON THIS ENTRY EXISTED **EXPIRED**, AND THE ENTRY NOW SAYS SO
+    #
+    # It used to end: "The prototype's own rules name both consumers:
+    # `eva/redesign.html:314` — `.brow{...border-bottom:1px solid
+    # rgba(255,255,255,.05)}` is the journey's book row (Task 5.6), and `:419`/
+    # `:439` — `.srow` and `.sact`, each with a `border-bottom:1px`, are the
+    # settings rows and the sheet actions (Task 5.7)."
+    #
+    # **Tasks 5.6 and 5.7 have shipped, and neither placed it.** The journey
+    # draws its book row with its own hairline and the Workshop's rows draw
+    # theirs, and the widget is still on no screen. **The reason had a future
+    # tense in it, and the future arrived and the thing did not happen** — the
+    # same shape as the plan's unticked Phase 7 checkboxes, and the same lesson:
+    # a forward reference in a written reason is a promise, and a promise that
+    # is never kept must be *revoked*, not left to rot quietly.
+    #
+    # **So the entry now says what is true**, and the decision it was holding
+    # open is named: `docs/DRIFT.md` §7 records `EvaChip` — the same shape, the
+    # same expired reason — and the repo's precedent there was **DELETION**. The
+    # allowlist's own rule says "place it or delete it — never allowlist", so
+    # this row is a **decision that is open**, not a permanent exemption.
     "HairlineDivider": (
-        "Task 5.3 made this one real. Its last two call sites were "
-        "`reading_header.dart` and `reading_controls.dart`, both of which the "
-        "redesigned `/reading` deleted (`eva/redesign.html:540-560` has no "
-        "header block and no settings row), so between Task 5.3 and the two "
-        "tasks below it is genuinely unplaced. The prototype's own rules name "
-        "both consumers: `eva/redesign.html:314` — `.brow{...border-bottom:1px "
-        "solid rgba(255,255,255,.05)}` is the journey's book row (Task 5.6), and "
-        "`:419`/`:439` — `.srow` and `.sact`, each with a `border-bottom:1px`, "
-        "are the settings rows and the sheet actions (Task 5.7). Deleting the "
-        "widget now would mean re-deriving it in two tasks with a second "
-        "spelling. Same mechanism as the entries above: STALE the moment any "
-        "page constructs it."
+        "UNPLACED, AND THE REASON THIS ENTRY EXISTED HAS EXPIRED. Task 5.3 made "
+        "this one real; its last two call sites were `reading_header.dart` and "
+        "`reading_controls.dart`, both deleted by the redesigned `/reading` "
+        "(`eva/redesign.html:540-560` has no header block and no settings row). "
+        "The entry then named the two tasks that were going to place it — the "
+        "journey's book row (Task 5.6) and the settings rows and sheet actions "
+        "(Task 5.7) — and **BOTH TASKS SHIPPED WITHOUT PLACING IT**. The "
+        "redesign draws those hairlines with its own rules and this widget is "
+        "on no screen. `docs/DRIFT.md` §7 records `EvaChip` — the same shape, the "
+        "same expired reason — and the precedent there was DELETION, so whether "
+        "this one is deleted or kept is an OPEN decision, not a settled one. "
+        "STALE the moment any page constructs it."
     ),
+    # ## AND THIS ONE'S REASON EXPIRED THE SAME WAY
+    #
+    # It used to end: "It survives because `/communion` draws
+    # `leaderboardOpenFull` (the 'See all' link, Task 5.5) and `TextLink` is the
+    # component the design system owns for that shape; deleting it now would
+    # mean re-deriving it in 5.5 with a second spelling."
+    #
+    # **Task 5.5 shipped, `/communion` was rebuilt against the redesign, and
+    # there is no 'See all' link to own.** The widget is on no screen, and the
+    # entry's promise — a second spelling avoided by keeping this one — was
+    # never called in. Same precedent, same open decision, and the same lesson
+    # as `HairlineDivider`'s.
     "TextLink": (
-        "Phase 5.2 rebuilt `/` against eva/redesign.html:513-538, and the "
-        "redesign's home has no link-shaped control: the two cards are whole-box "
-        "taps and the carousel's label row is two spans. The two widgets that "
-        "placed it — `today_reading_panel.dart`'s continue link and "
-        "`leaderboard_card.dart`'s see-all link — are both deleted, so between "
-        "Phase 5.2 and Task 5.5 the widget is genuinely unplaced. It survives "
-        "because `/communion` draws `leaderboardOpenFull` (the 'See all' link, "
-        "Task 5.5) and `TextLink` is the component the design system owns for "
-        "that shape; deleting it now would mean re-deriving it in 5.5 with a "
-        "second spelling. Same mechanism as the two entries above: STALE the "
+        "UNPLACED, AND THE REASON THIS ENTRY EXISTED HAS EXPIRED. Phase 5.2 "
+        "rebuilt `/` against eva/redesign.html:513-538, and the redesign's home "
+        "has no link-shaped control: the two cards are whole-box taps and the "
+        "carousel's label row is two spans. The two widgets that placed it — "
+        "`today_reading_panel.dart`'s continue link and `leaderboard_card.dart`'s "
+        "see-all link — are both deleted. The entry then named the task that "
+        "was going to place it — `/communion`'s 'See all' link, Task 5.5 — and "
+        "**THAT TASK SHIPPED, THE COMMUNION WAS REBUILT, AND THERE IS NO 'SEE "
+        "ALL' LINK TO OWN.** The widget is on no screen, `docs/DRIFT.md` §7 "
+        "records `EvaChip` in the same shape with DELETION as the precedent, and "
+        "so whether this one is deleted or kept is an OPEN decision. STALE the "
         "moment any page constructs it."
     ),
 }

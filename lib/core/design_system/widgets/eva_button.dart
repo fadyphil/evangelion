@@ -5,15 +5,16 @@ import 'package:flutter/material.dart';
 
 /// Which of the three prototype buttons this is.
 ///
-/// `eva/src/components/ds.tsx` declared `ButtonPrimary` (:222-250),
-/// `ButtonSecondary` (:253-268) and `ButtonText` (:271-286) as three separate
-/// components with three separate CSS blocks. `04-widget-inventory.md` §3
+/// The superseded React prototype declared `ButtonPrimary`, `ButtonSecondary`
+/// and `ButtonText` as three separate components with three separate CSS
+/// blocks. `04-widget-inventory.md` §3
 /// collapses them into one widget across eight surviving call sites, and this
 /// enum is the collapse.
 ///
 /// ## THE ROLE MAPPING, AND IT IS A **ROLE** MAPPING, NOT A LINE MAP
 ///
-/// `ds.tsx` drew buttons out of a React library. `redesign.html` draws them out
+/// The superseded prototype drew buttons out of a React library.
+/// `redesign.html` draws them out
 /// of a static HTML page, and it has **five** button rules, not three:
 ///
 /// | `EvaButtonVariant` | `redesign.html` | what the rule is |
@@ -25,7 +26,8 @@ import 'package:flutter/material.dart';
 /// The collapse is **three to three only because `redesign.html` merges `.cta`
 /// and `.rcta`** (they differ in `padding` 16 vs 15 and the ripple's alpha
 /// `.65` vs `.7` and its period 2.4s vs 2.2s, and in nothing a reader can
-/// name), and because `ds.tsx`'s `ButtonSecondary` and `ButtonText` collapse
+/// name), and because the prototype's `ButtonSecondary` and `ButtonText`
+/// collapse
 /// the other way — into **one** redesign rule each, from two. So this is a
 /// **role** mapping: the enum answers "which of the page's three action roles
 /// is this", and the citation answers "which CSS block draws that role".
@@ -43,7 +45,7 @@ enum EvaButtonVariant {
   ///
   /// ## THIS IS A RE-ROLE, NOT A RECOLOUR, AND IT IS RECORDED AS ONE
   ///
-  /// The widget used to draw `ds.tsx:253-268`'s `ButtonSecondary`: a 1.5px rim
+  /// The widget used to draw the prototype's `ButtonSecondary`: a 1.5px rim
   /// in `ink` at 20%, `ink` ink. The redesign has no such rule. Its two
   /// rimmed-but-unfilled pills are `.qnext` (gold rim, gold ink) and
   /// `.ghosts button` (`--glass-line` rim, `--ink-1` ink), and **`secondary`
@@ -53,18 +55,20 @@ enum EvaButtonVariant {
   ///
   /// So the rim's hue and width both move, and the *shape* is a pill rather
   /// than `EvaRadii.button`. Only the **fill** is unchanged: `transparent` in
-  /// `ds.tsx:260` and in `redesign.html:363`.
+  /// the prototype's `ButtonSecondary` and in `redesign.html:363`.
   secondary,
 
   /// `.ghosts button` (`redesign.html:388-390`) — transparent, a
   /// `--glass-line` rim, `--ink-1` ink, a pill, and gold on hover.
   ///
-  /// `ds.tsx`'s `ButtonText` was `background: none; border: none` with `T.ink`
+  /// The prototype's `ButtonText` was `background: none; border: none` with
+  /// `T.ink`
   /// and no hover at all, so the rim is new: the redesign's bare-ink pill has
   /// one, and a bare run of text in a pill-shaped box with no edge does not read
   /// as a button on any of the three surfaces this control appears on.
   ///
-  /// The trailing `›` the prototype's `ButtonText` carried (`ds.tsx:283`) is
+  /// The trailing `›` the prototype's `ButtonText` carried — `ember`,
+  /// `fontSize: 16`, `fontWeight: 700` — is
   /// [EvaButton.trailingChevron] and still is — the redesign's ghosts carry no
   /// glyph, so nothing here was invented to keep it and nothing removed it.
   ghost,
@@ -196,7 +200,8 @@ EvaButtonStyle resolveButtonStyle({
     // The pressed fill is the **old** prototype's, and deliberately so:
     // `redesign.html` has no `:active` fill for `.cta` at all — its only
     // `:active` rule is `transform: scale(.97)` (`:384`), which is paint. So
-    // `emberDeep` is a surviving `ds.tsx:239` value, and "the redesign dropped
+    // `emberDeep` is a surviving prototype value — the pressed fill — and
+    // "the redesign dropped
     // it" is not a reason to drop the state a reader's thumb is on.
     pressedBackground: colors.emberDeep,
     // `redesign.html:381` writes no `:hover` fill for `.cta`, so this is the
@@ -208,13 +213,13 @@ EvaButtonStyle resolveButtonStyle({
     // `redesign.html:381` — `border: none`.
     border: null,
     hoverBorder: null,
-    // `ds.tsx:244` —
+    // The prototype's glow —
     //   `0 0 28px rgba(ember, .35), 0 4px 14px rgba(ember, .25)`.
     //
     // **Kept, and this is the one number with no redesign line at all.** The
     // redesign's `.cta` declares no `box-shadow`; the ring it draws is the
     // `::after` (`:385`), which is a separate element rather than a shadow. So
-    // the glow is a *surviving* `ds.tsx` value, kept because a filled gold
+    // the glow is a *surviving* prototype value, kept because a filled gold
     // button that emits no light at all is a different product, and recorded
     // here rather than quietly re-attributed to a line that does not say it.
     //
@@ -231,7 +236,7 @@ EvaButtonStyle resolveButtonStyle({
         blurRadius: 14,
       ),
     ],
-    // `ds.tsx:244` — `pressed ? 'none'`.
+    // The prototype's `pressed ? 'none'`.
     pressedGlow: const <BoxShadow>[],
   ),
   EvaButtonVariant.secondary => EvaButtonStyle(
@@ -241,7 +246,7 @@ EvaButtonStyle resolveButtonStyle({
     // `redesign.html:368` — `.qnext:hover{background: rgba(232,176,75,.12)}`.
     //
     // The prototype's `ButtonSecondary` transitioned `border-color` and nothing
-    // else (`ds.tsx:264`), so this fill is new, not a transcription — and it is
+    // else, so this fill is new, not a transcription — and it is
     // the only hover *fill* in the redesign's five button rules.
     hoverBackground: colors.ember.withValues(alpha: 0.12),
     // `redesign.html:363` — `color: var(--gold)`. Gold ink is `emberInk`
@@ -255,7 +260,8 @@ EvaButtonStyle resolveButtonStyle({
     hoverForeground: colors.emberInk,
     // `redesign.html:363` — `border: 1px solid rgba(232,176,75,.55)`.
     //
-    // **1px**, where `ds.tsx:261` wrote 1.5px, and gold rather than
+    // **1px**, where the prototype's `ButtonSecondary` wrote 1.5px, and gold
+    // rather than
     // `ink`-at-20%. Both halves are the role change recorded on
     // [EvaButtonVariant.secondary].
     border: Border.all(
@@ -299,7 +305,8 @@ EvaButtonStyle resolveButtonStyle({
     // `emberInk` for the same reason it is on `.qnext`.
     hoverForeground: colors.emberInk,
     // `redesign.html:388` — `border: 1px solid var(--glass-line)`, which is
-    // [EvaColors.glassBorder]. **New**: `ds.tsx:278` was `border: 'none'`, and
+    // [EvaColors.glassBorder]. **New**: the prototype's `ButtonText` was
+    // `border: 'none'`, and
     // this is the role re-mapping recorded on [EvaButtonVariant.ghost].
     border: Border.all(color: colors.glassBorder),
     // Identity — see the gold-rim note above; the rim is not implemented.
@@ -329,8 +336,9 @@ EvaButtonStyle resolveButtonStyle({
 /// ## AND WHAT IT IS **NOT**
 ///
 /// [EvaRadii.button] stays at `14`. That is not timidity: `login_geometry_test`
-/// asserts `EvaRadii.button == 14` as a transcription claim against
-/// `ds.tsx:240`, and a widget that stopped being 14 without the token moving
+/// asserts `EvaRadii.button == 14` as a transcription claim against the
+/// prototype's `borderRadius: 14`, and a widget that stopped being 14 without
+/// the token moving
 /// would make that harness green and false. The old `SocialAuthButton` drew its
 /// own box at `EvaRadii.button` and was `login_geometry_test`'s live assertion
 /// that the token means something — and the redesign's `/login` deleted that
@@ -346,17 +354,20 @@ const double kEvaButtonRadius = EvaRadii.chip;
 /// one more number, not one more concept.
 const double kEvaButtonGoldRimAlpha = 0.55;
 
-/// The prototype's primary/secondary height. `ds.tsx:240,262` — `height: 52`.
+/// The prototype's primary/secondary height — `height: 52` on both of them —
+/// and **the redesign has no counterpart for it**: `.cta` declares no height at
+/// all, only `padding: 16px`.
 ///
 /// **Kept, deliberately, against the redesign.** `redesign.html:381` gives
 /// `.cta` no height at all — `padding: 16px` on an 11px label is the whole of
 /// it — so the redesign's button is ~45 tall where this one is 52.
 /// `login_geometry_test` asserts `kEvaButtonHeight == 52` as a transcription
-/// claim against `ds.tsx:240`, and 52 is also §14's affordance. The divergence
+/// claim against the prototype's `height: 52`, and 52 is also §14's
+/// affordance. The divergence
 /// is recorded on [EvaButton] rather than chased.
 const double kEvaButtonHeight = 52;
 
-/// The prototype's disabled opacity. `ds.tsx:245` — `opacity: disabled ? 0.45`.
+/// The prototype's disabled opacity — `opacity: disabled ? 0.45`.
 ///
 /// **Kept.** `redesign.html` declares no `:disabled` rule for any of its five
 /// buttons, so the redesign says nothing about a disabled control at all —
@@ -364,9 +375,9 @@ const double kEvaButtonHeight = 52;
 /// ship one that is 100% opaque.
 const double kEvaButtonDisabledOpacity = 0.45;
 
-/// The prototype's chevron size. `ds.tsx:283` — `fontSize: 16, fontWeight: 700`.
+/// The prototype's chevron size — `fontSize: 16, fontWeight: 700`.
 ///
-/// Still `ds.tsx`'s, because the redesign's ghosts carry no glyph and this is
+/// Still the prototype's, because the redesign's ghosts carry no glyph and this is
 /// the one thing the old `ButtonText` had that the new one does not. Nothing
 /// removed it.
 const double kEvaButtonChevronSize = 16;
@@ -433,9 +444,9 @@ double evaButtonRipplePhase(double elapsedSeconds) =>
 /// | the expanding ring | `redesign.html:385` — `.cta::after` |
 /// | fill, ink, rim, glow | [resolveButtonStyle] |
 /// | hover | `redesign.html:368`, `:389`, `:472` — see the divergence recorded there |
-/// | pressed fill | `ds.tsx:239` — `emberDeep`. **No redesign line**; see [resolveButtonStyle] |
-/// | pressed glow removal | `ds.tsx:244`. **No redesign line** |
-/// | disabled | `ds.tsx:245` — `opacity: 0.45`. **No redesign line** |
+/// | pressed fill | the prototype's `emberDeep`. **No redesign line**; see [resolveButtonStyle] |
+/// | pressed glow removal | the prototype's `pressed ? 'none'`. **No redesign line** |
+/// | disabled | the prototype's `opacity: 0.45`. **No redesign line** |
 /// | focus ring | `09-quality-gates.md` §14 — not in the prototype at all |
 ///
 /// Three rows have no `redesign.html` line and say so in the table rather than
@@ -495,7 +506,7 @@ double evaButtonRipplePhase(double elapsedSeconds) =>
 ///
 /// `redesign.html:382` sets `.cta`'s label to `mono 11 / .22em / uppercase /
 /// w600`, and this widget still renders `titleMedium` at `16 / w700` —
-/// `ds.tsx:237`'s values. The delta is the largest between the two prototypes
+/// the prototype's values. The delta is the largest between the two prototypes
 /// and it is **not** applied, for three reasons that are all mechanical rather
 /// than aesthetic:
 ///
@@ -511,7 +522,8 @@ double evaButtonRipplePhase(double elapsedSeconds) =>
 /// 2. **The size is GEOMETRY-in-effect and two harnesses read it.** `16 → 11` is
 ///    a 31% narrower label, and `login_geometry_test` reads
 ///    `textTheme.titleMedium!.fontSize == 16` as a transcription claim against
-///    `ds.tsx:237`. That row reads the **theme**, so moving this widget's own
+///    the prototype's `fontSize: 16`. That row reads the **theme**, so moving
+///    this widget's own
 ///    label would not move it — but it means the claim the harness is making
 ///    ("the prototype's 16 is what renders") would stop being true of the button
 ///    while the harness stayed green, which is §7's "a gate that cannot fail"
@@ -541,7 +553,7 @@ double evaButtonRipplePhase(double elapsedSeconds) =>
 /// The clocks that drive it are stopped independently by `NeuralMotionScope`, so
 /// the two mechanisms agree rather than one being relied on to cover the other.
 ///
-/// The prototype's press duration is `180ms` (`ds.tsx:242`), which is not a
+/// The prototype's press duration is `180ms`, which is not a
 /// token. `EvaMotion.fast` (150ms) is the nearest and is documented as "press and
 /// hover feedback on a control", so it is used rather than a literal 180.
 class EvaButton extends StatefulWidget {
@@ -564,7 +576,7 @@ class EvaButton extends StatefulWidget {
   /// documented there.
   final String label;
 
-  /// What to run on activation. `null` disables the button: `ds.tsx:245`'s
+  /// What to run on activation. `null` disables the button: the prototype's
   /// 45% opacity, no ink, no focus, and `Semantics(enabled: false)`.
   final VoidCallback? onPressed;
 
@@ -575,11 +587,11 @@ class EvaButton extends StatefulWidget {
   /// does not change the button's optical weight.
   final IconData? icon;
 
-  /// Draws the prototype's trailing `›` (`ds.tsx:283`) — `ember`, 16, w700, and
+  /// Draws the prototype's trailing `›` — `ember`, 16, w700, and
   /// only when the label is not itself ember-coloured.
   final bool trailingChevron;
 
-  /// Whether to fill the available width. `ds.tsx:240` sets `width: '100%'` on
+  /// Whether to fill the available width. The prototype sets `width: '100%'` on
   /// all three components, so this is the faithful default.
   final bool expanded;
 
@@ -629,10 +641,12 @@ class EvaButton extends StatefulWidget {
   ///
   /// ## WHY THIS EXISTS, AND IT IS BECAUSE OF A MEASURED FACT
   ///
-  /// `ds.tsx:237` writes `fontFamily: F.ui` on `ButtonPrimary`, i.e. **DM Sans**. §5.2
+  /// The prototype writes `fontFamily: F.ui` on `ButtonPrimary`, i.e. **DM Sans**.
+  /// §5.2
   /// and `reading_glyph_test.dart`'s coverage check both establish that DM Sans
   /// carries **no Arabic glyphs at all** — the same fact `01-source-analysis.md`'s
-  /// defect **#2** is about, except that #2 names `ReadingArScreen.tsx:35` and `:86`
+  /// defect **#2** is about, except that #2 names the Arabic reading screen's
+  /// metadata line and its ayah-numeral line
   /// and not the *button*.
   ///
   /// So `/reading`'s Arabic arm renders `ابدأ التأمل` through this widget and would
@@ -666,7 +680,8 @@ class _EvaButtonState extends State<EvaButton> {
   ///
   /// An `InkWell` reports it through `onHighlightChanged`, which is why the
   /// press *fill* is a separate concern from the ink splash: the prototype
-  /// changes both (`ds.tsx:239,244`) and they are not the same mechanisms.
+  /// changes both — the fill and the glow — and they are not the same
+  /// mechanisms.
   bool _pressed = false;
 
   /// Hover tracking.
@@ -737,7 +752,7 @@ class _EvaButtonState extends State<EvaButton> {
       // the weight below are the old prototype's — see the class doc's "THE LABEL
       // TYPE IS NOT THE REDESIGN'S".
       style: switch (widget.variant) {
-        // `ds.tsx:237` — `fontSize: 16, fontWeight: 700,
+        // The prototype's `fontSize: 16, fontWeight: 700,
         // letterSpacing: '0.01em'`. The letter spacing is dropped: §5.2 gives
         // `mono` no tracking value and `03-design-system.md` names none for
         // `ui`, so adding 0.01em would be inventing one.
@@ -745,21 +760,22 @@ class _EvaButtonState extends State<EvaButton> {
         // `titleMedium` is Material 3's 16sp slot, so the prototype's 16 lands
         // exactly. `redesign.html:382`'s `mono 11 / .22em / uppercase / w600`
         // is **not** applied; the class doc gives the three mechanical reasons
-        // and `login_geometry_test`'s `dsClaims` row for `ds.tsx:237` is the
+        // and `login_geometry_test`'s `dsClaims` row for the prototype's
+        // `fontSize: 16` is the
         // claim that would quietly stop being true of this widget.
         EvaButtonVariant.primary => _labelStyle(
           context,
           shown.foreground,
           FontWeight.w700,
         ),
-        // `ds.tsx:259` — `fontSize: 16, fontWeight: 600`, kept for the same
+        // The prototype's `fontSize: 16, fontWeight: 600`, kept for the same
         // reason as the primary's 16.
         EvaButtonVariant.secondary => _labelStyle(
           context,
           shown.foreground,
           FontWeight.w600,
         ),
-        // `ds.tsx:277` — `fontSize: 15, fontWeight: 500`.
+        // The prototype's `fontSize: 15, fontWeight: 500`.
         //
         // Recorded: `labelLarge` is Material 3's **14**sp slot, so this is the
         // one button size that does not land on the prototype's number. The slot
@@ -779,7 +795,7 @@ class _EvaButtonState extends State<EvaButton> {
             padding: const EdgeInsets.only(left: EvaSpacing.xs),
             child: Icon(
               // The prototype's `›` is a glyph inside the same button
-              // (`ds.tsx:283`) — a chevron, not a right-pointing triangle, and
+              // (the prototype's `›`) — a chevron, not a right-pointing triangle, and
               // not an arrow. `chevron_right` is the Material equivalent;
               // `Icon` cannot be given a weight, so the prototype's `w700` is
               // carried by the icon's own optical weight instead.
@@ -813,7 +829,7 @@ class _EvaButtonState extends State<EvaButton> {
     final Widget content = DefaultTextStyle.merge(
       style: TextStyle(color: shown.foreground),
       child: Opacity(
-        // `ds.tsx:245` — `opacity: disabled ? 0.45 : 1`.
+        // The prototype's `opacity: disabled ? 0.45 : 1`.
         opacity: enabled ? 1 : kEvaButtonDisabledOpacity,
         child: label,
       ),

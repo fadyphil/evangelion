@@ -30,8 +30,10 @@
 /// 66px less for a sentence to wrap in, and it is why the answer here is "no overflow
 /// and it scrolls" and not "it fits".
 ///
-/// `ResultSheet`'s doc records the divergence from the prototype: `ResultScreen.tsx:34`
-/// is `minHeight: 844` on a non-scrolling flex column, and that value **cannot** be
+/// `ResultSheet`'s doc records the divergence from the prototype: the superseded
+/// prototype's `minHeight: 844` on a non-scrolling flex column — a value the
+/// redesign has no counterpart for, its own `.rcard` (`:444`) declaring none —
+/// and that value **cannot** be
 /// honoured at 320×568 — so the card **scrolls**. That is why the answer here is again
 /// "no overflow and it scrolls", and why "no exception" alone would be a weak
 /// assertion: a card that had dropped its headline would also throw nothing.

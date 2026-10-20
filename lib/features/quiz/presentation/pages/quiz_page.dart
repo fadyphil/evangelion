@@ -34,8 +34,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// a sweep that had to be sophisticated enough to forgive comments would forgive a
 /// comment that quotes the very string it exists to keep out.
 ///
-/// `01-source-analysis.md:81`, on `App.tsx`'s screen switcher and `QuizScreen`'s two
-/// preview buttons — the *Answering* one and the *Feedback* one:
+/// `01-source-analysis.md:81`, on the superseded prototype's screen switcher and
+/// its two preview buttons — the *Answering* one and the *Feedback* one:
 ///
 /// > *"exist only to let the Figma agent preview states … Must not be ported."*
 ///
@@ -126,8 +126,8 @@ class QuizPage extends StatelessWidget {
   final QuizBloc? bloc;
 
   /// The prompt's size. `eva/redesign.html:334` — `font-size: 25px` — **down from
-  /// the old transcription's 26**, which read the superseded prototype's
-  /// `ds.tsx`-era display figure.
+  /// the old transcription's 26**, which read the superseded prototype's own
+  /// display figure.
   static const double promptFontSize = 25;
 
   /// `eva/redesign.html:334` — `line-height: 1.4`.

@@ -9,9 +9,10 @@
 ///
 /// §13 rule 4's per-screen line said "`/`: `.blur` on the today's-reading panel
 /// **and the top bar**", and this file's doc repeated it. **Both were wrong.**
-/// `ds.tsx:499-530` is `TopBar`, and it contains **no `backdropFilter` at all** —
+/// The superseded prototype's `TopBar` contains **no `backdropFilter` at all** —
 /// the prototype's top bar is a transparent `div` over the animated background, and
-/// that is deliberate.
+/// that is deliberate. The redesign's own bar agrees: `.appbar`
+/// (`redesign.html:142-148`) declares no filter either.
 ///
 /// So the shipped budget on `/` is one site, and the ceiling was 1 — which is
 /// what caught a second blur with nothing red. **Phase 6 of the Lumen
@@ -23,7 +24,8 @@
 /// have cost.
 ///
 /// The inventory it is derived from did **not** change: eight prototype sites, of
-/// which six survive in `ds.tsx` after `PassageCard` is cut with the library, plus
+/// which six survive in the superseded prototype after `PassageCard` is cut with
+/// the library, plus
 /// two inline (the Login form and Home's panel) = 8.
 ///
 /// ## THE COUNT IS OF **SITES**, NOT OF LINES, AND THAT IS NOT A DETAIL
@@ -583,7 +585,8 @@ void main() {
           "§13.4 budgets ONE blur site across the six screens — Home's "
           "today's-reading panel — and lists eight prototype sites that would "
           'each be a per-frame saveLayer. The top bar is NOT the second: '
-          '`ds.tsx:499-530` has no `backdropFilter` in it. **Phase 6 added the '
+          'the superseded prototype\'s `TopBar` has no `backdropFilter` in it. '
+          '**Phase 6 added the '
           "second**: the redesign's own dock blurs (`eva/redesign.html:210` — "
           '`backdrop-filter:blur(22px)`), and it is **one** `BackdropFilter` for '
           'three tabs rather than three. The over-budget sites:\n'
@@ -651,8 +654,8 @@ void main() {
           'saveLayer with no screen behind it to justify the budget, and a '
           'hand-built `BackdropFilter` is the same spend with a different '
           "spelling. Only Home's today's-reading panel and the redesign's dock "
-          'may blur — the top bar is NOT a second one, because `ds.tsx:499-530` '
-          "has no `backdropFilter` in it:\n${hits.join('\n')}",
+          'may blur — the top bar is NOT a second one, because the superseded '
+          "prototype's `TopBar` has no `backdropFilter` in it:\n${hits.join('\n')}",
     );
   });
 

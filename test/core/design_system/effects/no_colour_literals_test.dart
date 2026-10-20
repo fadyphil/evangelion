@@ -57,7 +57,9 @@ import '../../../support/project_import_graph.dart';
 /// into a file that claims to be the spec's token table.
 ///
 /// - `widgets/eva_toggle.dart` — `EvaToggleKnob.color`, one literal, `#FFFFFF`,
-///   from `SettingsScreen.tsx:24` (`background: '#ffffff'` on the switch knob).
+///   from the superseded prototype's switch knob (`background: '#ffffff'`), and
+///   **the redesign has no counterpart for it**: its own knob is `--ink-2`
+///   (`redesign.html:426`) and `--gold` when on (`:428`).
 ///   §5.1 publishes no white that means "the handle of a control": `surface` is
 ///   white in light and near-black in dark, and `ink` is the opposite again, so a
 ///   knob that followed either would stop reading as a handle on one palette.
@@ -182,7 +184,8 @@ const List<String> _resolutions = <String>[
 /// `Colors.` is a marker because the Material palette is where an un-tokenable
 /// colour sneaks in (`Colors.deepOrange`, `Colors.pinkAccent`). `transparent`
 /// is the one entry in that namespace that is not a palette choice at all: it is
-/// the *absence* of a fill, which is what `ds.tsx` writes as the bare string
+/// the *absence* of a fill, which is what the superseded prototype writes as the
+/// bare string
 /// `'transparent'` in eight places — the unselected chip, the secondary button,
 /// the current bead. Admitting the prefix would admit the palette with it;
 /// admitting this exact token admits nothing else.

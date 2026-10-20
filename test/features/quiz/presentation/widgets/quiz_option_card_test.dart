@@ -132,8 +132,11 @@ void main() {
     testWidgets(
       'and `isGraded` is true for exactly the two the prototype grades',
       (WidgetTester tester) async {
-        // `ds.tsx:427` and `:450` share this condition, which is what made it one
-        // helper here rather than two.
+        // The superseded prototype's badge fill and its letter colour shared the
+        // same `correct || incorrect` condition — and the redesign has no
+        // counterpart for it, declaring `.opt.correct` (`:352`) and `.opt.wrong`
+        // (`:359`) as two separate rules — which is what made it one helper here
+        // rather than two.
         expect(QuizOptionCard.isGraded(QuizOptionState.correct), isTrue);
         expect(QuizOptionCard.isGraded(QuizOptionState.incorrect), isTrue);
         expect(QuizOptionCard.isGraded(QuizOptionState.selected), isFalse);
@@ -379,15 +382,18 @@ void main() {
   group('the four flecks, and where they sit', () {
     // ## THE DERIVATION, AND WHY IT IS NOT FOUR LITERALS
     //
-    // The prototype places them at `x: -10, -15, 356, 362`
-    // (`eva/src/screens/QuizScreen.tsx:92-95`) **relative to the option card's
-    // own box** — the wrapper `<div style={{position:'relative'}}>` at `:88`.
+    // The superseded prototype places them at `x: -10, -15, 356, 362`
+    // **relative to the option card's
+    // own box** — the wrapper `<div style={{position:'relative'}}>` it put around
+    // each option — and the redesign has no counterpart for them at all: its
+    // `.opt` draws none.
     //
     // Two of those are already card-relative (they are negative: outside the
     // card's left edge). The other two are **screen pixels on a 390px frame**
-    // (`eva/src/App.tsx:89` — `width: 390`), and the card's box is not 390 wide:
-    // the quiz screen's own padding is `20px 20px 28px` (`QuizScreen.tsx:41`),
-    // so the card is `390 - 20 - 20 = 350` wide, and `356` and `362` are
+    // (`redesign.html:43` — `.device{width:390px}`), and the card's box is not
+    // 390 wide: the superseded prototype's quiz screen padded itself
+    // `20px 20px 28px` — a padding the redesign has no counterpart for — so the
+    // card was `390 - 20 - 20 = 350` wide, and `356` and `362` are
     // therefore **6 and 12 pixels past the card's right edge**.
     //
     // The card's width is variable here — the redesign's `.opt` is `width:100%`
@@ -420,9 +426,9 @@ void main() {
     ) async {
       // The brief's own rule — "tiny gold flecks floating near the correct
       // option — sparse, 3–4 max"
-      // (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for
+      // (`eva/brief.txt:97`, and `:114` for
       // the "gold flecks fade in with 150ms delay" line) — and the superseded
-      // prototype that drew them (`QuizScreen.tsx:90-97`: the flecks are
+      // prototype that drew them (the flecks are
       // rendered only `when (checked && opt.letter === CORRECT)`).
       //
       // **The redesign's `.opt` (`:337-362`) does not draw them**, and this
@@ -464,7 +470,7 @@ void main() {
       // The flecks are an **overlay**: `Positioned.fill` inside a `Stack` whose
       // only non-positioned child is the card itself, so they contribute
       // nothing to the layout. The prototype's own flecks are `position:
-      // absolute` (`QuizScreen.tsx:15`) inside the same relative wrapper.
+      // absolute` inside the same relative wrapper.
       //
       // The idle card and the correct card carry the same one-line label, and
       // the correct card's extra verdict glyph sits at the row's far end, so
@@ -679,9 +685,11 @@ void main() {
     testWidgets('a LONG Arabic label grows the card rather than overflowing it', (
       WidgetTester tester,
     ) async {
-      // `ds.tsx:434` is `minHeight: 64` and the first version wrote it as a `SizedBox`
-      // height, which a two-line Arabic label at 1.22× would have overflowed. A
-      // `ConstrainedBox` min is the transcription that holds.
+      // The superseded prototype's `minHeight: 64` — which the redesign's `.opt`
+      // has no counterpart for — and the first version wrote it as a `SizedBox`
+      // height, which a two-line Arabic label at 1.22× would have overflowed. The
+      // card carries no floor of its own now; what has to hold is that it
+      // **grows**.
       await tester.pumpWidget(
         evaPrimitiveHarness(
           theme: EvaThemeDark.theme,

@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// | Arabic-Indic | U+0660–U+0669 | the prototype, and every Arabic-script keyboard |
 /// | Extended Arabic-Indic (Persian) | U+06F0–U+06F9 | Persian and Urdu |
 ///
-/// `ReadingArScreen.tsx:49` writes `١`…`٧` and `:86` writes `٥`, which are the
+/// `redesign.html:1362` writes `١`…`٦` and `:981` writes `٥`, which are the
 /// first block. A rewrite to the second block renders correctly in Arabic and
 /// would be invisible to a reader who does not check codepoints, so the test below
 /// asserts the exact `int` values.

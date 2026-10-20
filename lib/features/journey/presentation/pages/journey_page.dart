@@ -324,11 +324,18 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
     return BlocBuilder<JourneyCubit, JourneyState>(
       builder: (BuildContext context, JourneyState state) {
         return NeuralScaffold(
-          // **The profile's own orbs**, and they were waiting for this screen.
-          // `OrbGroup.profile` has sat in the design system since Phase 2 —
-          // cut-and-kept-for-index-alignment, because the profile was cut then.
-          // The journey IS the profile, and it is the one group whose first orb
-          // cycles backwards (ds.tsx:106).
+          // **The journey IS the profile, and the orbs it once had are gone.**
+          // The old design gave the profile its own orb group — kept in the
+          // design system since Phase 2, when the profile was cut and the group
+          // was kept for index alignment — and this screen was the one that
+          // would have brought it back on screen.
+          //
+          // **The redesign has no counterpart for it.** It draws ONE canvas and
+          // ONE shader for every screen (`eva/redesign.html:46`) and no orbs at
+          // all, and the only hue it animates is the global, forward cycle the
+          // Multichrome-melt switch turns on (`eva/redesign.html:893`). The
+          // journey's ambient is now the same aurora as every other screen's,
+          // and the ambient no longer takes a `variant:` at all.
           scrollable: true,
           // **The prototype's `.scroll` owns the gutter** — `:157` is `6px 14px
           // 118px` — and the scaffold's own padding would be a second one.

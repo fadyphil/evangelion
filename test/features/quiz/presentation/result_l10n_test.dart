@@ -139,7 +139,8 @@ void main() {
         // `اليوم` with an Arabic-Indic numeral is the conventional label too.
         //
         // Making it a plural would render `Days 12` in English — **altering a
-        // transcribed prototype string** (`ResultScreen.tsx:65`) to fix nothing, and
+        // transcribed prototype string** (the superseded prototype's
+        // `Day 12 — your longest yet`) to fix nothing, and
         // changing the pill's visual shape on every screen that shows a streak.
         //
         // The count on this screen that genuinely needed a plural was the score
@@ -160,9 +161,11 @@ void main() {
 
   group('the fields the prototype does **not** have', () {
     test('the `resultBackHome` label is exactly `Back`', () {
-      // The prototype's label is `Back to library` (`ResultScreen.tsx:78`) and there
+      // The superseded prototype's label is `Back to library` and there
       // IS no library — AGENT_CONTEXT §2 decision 1 cut it, and the destination is
-      // `/`. Transcribing the label would be a lie about where the button goes.
+      // `/`. The redesign's own `again` row reads `read again`
+      // (`redesign.html:963`), which is also not a destination for this client.
+      // Transcribing the label would be a lie about where the button goes.
       expect(en.resultBackHome, 'Back');
       expect(en.resultBackHome, isNot(contains('library')));
       expect(ar.resultBackHome, isNot(contains('library')));

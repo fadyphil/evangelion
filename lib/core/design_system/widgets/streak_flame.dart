@@ -5,22 +5,23 @@ import 'package:flutter/material.dart';
 ///
 /// ## THE PATH IS THE PROTOTYPE'S, CHARACTER FOR CHARACTER
 ///
-/// `eva/src/components/ds.tsx:514` draws a `<svg viewBox="0 0 16 20">` with
-/// one `<path>` and no other element. The `d` attribute is transcribed into
+/// The superseded React prototype drew a `<svg viewBox="0 0 16 20">` with one
+/// `<path>` and no other element. The `d` attribute is transcribed into
 /// [flamePath] unchanged — every curve command, every coordinate. Re-deriving a
 /// flame shape from a description would be a different flame.
 ///
-/// **That citation is KEPT, and it now owns only the shape.** The redesign's
-/// `.flame` is a *different* mark with the same job, and the two are cited
-/// separately rather than merged: `ds.tsx:514` says what the flame **is**,
+/// **The shape is the prototype's and the lighting is the redesign's.** The
+/// redesign's `.flame` is a *different* mark with the same job — a CSS
+/// `border-radius` blob, not a path — and the two are kept separate rather than
+/// merged: the prototype's path says what the flame **is**,
 /// `redesign.html:242-244` says what it is lit like.
 ///
 /// ## SIZE
 ///
 /// [size] is the **height**, and the width follows the viewBox's `16:20` ratio,
 /// so the whole box scales uniformly and the path cannot be distorted. The
-/// prototype renders the svg at `width="14" height="18"`
-/// (`ds.tsx:514`) — 0.778 of its height rather than the viewBox's 0.8. The 2%
+/// prototype renders the svg at `width="14" height="18"` — 0.778 of its
+/// height rather than the viewBox's 0.8. The 2%
 /// difference is the viewBox's own horizontal padding (the path spans x 2…14 of
 /// a 16-wide box), and scaling the box uniformly rather than reproducing the
 /// element's pixel box is the choice that keeps the shape honest at any size.
@@ -46,7 +47,7 @@ import 'package:flutter/material.dart';
 ///
 /// | `:242-246` | why it is not here |
 /// | --- | --- |
-/// | `width: 13px; height: 17px` | **The blob is not adopted; the box's HEIGHT is.** Phase 5.2's decision, and it is two halves rather than one. `:242-243` draws the flame as a `border-radius: 50% 50% 46% 46%/62% 62% 38% 38%` box — two radii per axis on a rounded rectangle, which is a *CSS shape* and not a path, and `ds.tsx:514`'s `<path>` is still the only flame outline in the prototype that is data. The **height** is adopted anyway, because the redesign's streak chip (`:516`) is the only place `.flame` is drawn (`:242` has two other mentions and both are selectors) and it is 17 tall, so `/`'s chip renders `StreakFlame(size: 17)`. The **width** is `17 × 16/20 = 13.6` where CSS says `13`: 0.6px, and the ratio is this viewBox's own. Reproducing `13` exactly would mean a `width` parameter and a 4.6% anisotropic stretch of the path, which is the distortion this widget's [aspect] doc declines at any size. `/result`'s card still asks for `size: 18` (`result_sheet.dart`), so `result_sheet_geometry_test.dart`'s `width ≤ 14.5` is untouched. |
+/// | `width: 13px; height: 17px` | **The blob is not adopted; the box's HEIGHT is.** Phase 5.2's decision, and it is two halves rather than one. `:242-243` draws the flame as a `border-radius: 50% 50% 46% 46%/62% 62% 38% 38%` box — two radii per axis on a rounded rectangle, which is a *CSS shape* and not a path, and the prototype's `<path>` is still the only flame outline anywhere that is data. The **height** is adopted anyway, because the redesign's streak chip (`:516`) is the only place `.flame` is drawn (`:242` has two other mentions and both are selectors) and it is 17 tall, so `/`'s chip renders `StreakFlame(size: 17)`. The **width** is `17 × 16/20 = 13.6` where CSS says `13`: 0.6px, and the ratio is this viewBox's own. Reproducing `13` exactly would mean a `width` parameter and a 4.6% anisotropic stretch of the path, which is the distortion this widget's [aspect] doc declines at any size. `/result`'s card still asks for `size: 18` (`result_sheet.dart`), so `result_sheet_geometry_test.dart`'s `width ≤ 14.5` is untouched. |
 /// | `rgba(255,122,24,.35)` at `0 0 30px` | **`#ff7a18` is not in the palette.** Publishing it — or substituting a token for it — is a Phase-2 palette decision, and a palette decision made inside a decorative widget is exactly the failure `eva_colors.dart`'s header forbids. Recorded here rather than added. |
 /// | `radial-gradient(circle at 50% 78%, #fff 0%, --gold 42%, #ff7a18 72%, rgba(255,122,24,0) 100%)` | the same third stop, twice over: `rgba(255,122,24,0)` **is** `#ff7a18`, and `#fff 0%` has no token either. A half-adopted ramp — gold to nothing with the middle stop missing — is a different flame than either prototype, and it would take the readable silhouette with it; see the next section. |
 /// | `@keyframes flick` (`:246`) and `.flame.burst`'s one-shot `flare` (`:245`) | **motion, not paint.** Task 4.2's Decision 5 scopes this batch to *paint only*, and a second ambient controller is barred twice over: §13.2 collapses the app's ambient motion to four shared clocks, and `NeuralBackground`'s orbs already spend them. `EvaMotion.achievementSpring`'s doc names `StreakFlame`'s flare as its own case — the **one-shot** `flare`, not the ambient `flick`. The one-shot belongs to "your streak went up", which is a moment this widget is not told about. |
@@ -183,7 +184,7 @@ class StreakFlame extends StatelessWidget {
 
 /// The flame's outline, in the prototype's own viewBox units.
 ///
-/// Transcribed from `ds.tsx:514`'s `d` attribute. Kept in viewBox units so the
+/// Transcribed from the prototype's `d` attribute. Kept in viewBox units so the
 /// painter can scale the canvas rather than rescale 40 numbers — a rescale is
 /// where a transcription goes wrong.
 ///

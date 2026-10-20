@@ -510,7 +510,7 @@ void main() {
           .toList();
 
       // Exactly two: the rule and the thumb. The third container this widget used to
-      // build was `SettingsScreen.tsx:66`'s `accentColor: ember` fill, and
+      // build was the superseded prototype's `accentColor: ember` fill, and
       // `redesign.html:429` has no such element — a CSS range input is one uniform
       // rule with one gold thumb on it. A count and not a `findsOne`, because "the
       // fill is gone" is a claim about how many things get drawn.
@@ -1145,8 +1145,9 @@ void main() {
     testWidgets(
       'the chevron is ember, like the prototype\'s and like EvaButton\'s',
       (WidgetTester tester) async {
-        // M9. One prototype glyph had two colours in one phase: `ds.tsx:283` writes
-        // `color: hex.ember` on the `›`, `EvaButton` transcribes it as
+        // M9. One prototype glyph had two colours in one phase: the superseded
+        // prototype writes `color: hex.ember` on the `›` — **the redesign has no
+        // counterpart for that glyph** — `EvaButton` transcribes it as
         // `colors.ember`, and `TextLink` was reading `ink` — the link's own colour.
         // It was not among the eight declared divergences, so it was a transcription
         // error rather than a decision, and nothing asserted it: the chevron tests
@@ -1168,7 +1169,8 @@ void main() {
             tester.widget<Icon>(find.byIcon(Icons.chevron_right)).color,
             resolved.extension<EvaColors>()!.ember,
             reason:
-                '$theme — `ds.tsx:283` writes `hex.ember` on the `›`, and the size '
+                '$theme — the superseded prototype writes `hex.ember` on the `›`, '
+                'and the size '
                 'is already 16 to match. The link\'s *label* is a separate '
                 'question, answered by the `color` parameter.',
           );
@@ -1211,10 +1213,10 @@ void main() {
     // `EvaColors.dark().ember` anyway; it is a colour that bypassed the token
     // table to *imitate* one.
     //
-    // With `color` dropped the widget resolves its own default, `ds.tsx:278`'s
-    // `color: color ?? T.ink`, which is `EvaColors.ink` — `#EAE8F5` in dark and
-    // `#120E28` in light. Now the pair differs, and the golden can fail for a
-    // theming regression, which is the only thing it was ever able to check.
+    // With `color` dropped the widget resolves its own default, the superseded
+    // prototype's `color: color ?? T.ink`, which is `EvaColors.ink` — `#EAE8F5` in
+    // dark and `#120E28` in light. Now the pair differs, and the golden can fail
+    // for a theming regression, which is the only thing it was ever able to check.
     //
     // What is *not* lost: the `color` parameter is still pinned, by the test above
     // ("without `color` it inks `ink`, and `ember` on request"), which is a better

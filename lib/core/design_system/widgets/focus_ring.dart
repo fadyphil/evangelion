@@ -315,7 +315,8 @@ class EvaInk extends StatelessWidget {
   ///
   /// Separate from [onPressed] because the prototype's pressed *fill* and its
   /// pressed *glow* are a second, independent state: `ButtonPrimary` changes
-  /// both (`ds.tsx:239,244`) and `InkWell` only ever changes the ink. A widget
+  /// both — the fill and the glow — and `InkWell` only ever changes the ink. A
+  /// widget
   /// that wants a pressed fill listens here rather than inferring one from a
   /// delayed callback.
   final ValueChanged<bool>? onHighlightChanged;

@@ -294,8 +294,8 @@ void main() {
             'inside a `SingleChildScrollView` on four of the seven screens, so a caller '
             'placing a floating control in its own column produces one that scrolls '
             'away — which is not a floating control. The `Stack` this widget already '
-            'owns is the prototype\'s `position: absolute; inset: 0` container '
-            '(`ds.tsx:162`), so an overlay is the shape the prototype had rather than a '
+            'owns is the design\'s `position: absolute; inset: 0` canvas layer '
+            '(`redesign.html:46`), so an overlay is the shape the design had rather than a '
             'second mechanism invented for Flutter. `null` on the four screens that '
             'have none, and `bottomFade` still paints over it so a scrolling screen\'s '
             'CTA gradient covers a bottom-right overlay instead of the other way round.\n\n'
@@ -368,7 +368,7 @@ void main() {
       final LinearGradient gradient = decoration.gradient! as LinearGradient;
       expect(gradient.colors.first.a, 0);
       // `eva/redesign.html:113` — `rgba(6,7,12,.30) 22%`, `.80 46%`, `.92 100%`.
-      // The last stop was `.95` (`ReadingEnScreen.tsx:83`) and the whole ramp was
+      // The superseded prototype's last stop was `.95` and the whole ramp was
       // two stops; `:113` is four, and its peak is *lighter*, which is the point
       // — a two-stop ramp that ends in a step paints a plate over the last verses.
       expect(gradient.stops, <double>[0, 0.22, 0.46, 1]);
@@ -482,8 +482,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // `:112`'s `.scrim` is `position:absolute; inset:0` — the **full-screen**
-      // curtain, a different layer from the reader CTA's
-      // (`ReadingEnScreen.tsx:80-86`), and this widget paints the latter. So the
+      // curtain, a different layer from the reader CTA's gradient block, and
+      // this widget paints the latter. The redesign does not restate that CTA's
+      // extent anywhere, so there is no counterpart for it. So the
       // shape picks the ramp and [kNeuralScaffoldFadeHeight] still picks the
       // height; a `sides` curtain that suddenly went full-bleed would be the other
       // scrim arriving through this parameter.
@@ -563,7 +564,10 @@ void main() {
       //
       // The assertion is the RELATIONSHIP, not a number, so it holds at any width
       // and cannot be satisfied by re-deriving the same mistake.
-      const double contentReserve = 130; // ReadingEnScreen.tsx:26
+      // The superseded prototype's content reserve — its scroll div's
+      // `padding: '28px 24px 130px'` — and **the redesign has no counterpart for
+      // it**, so the number is carried as it stands.
+      const double contentReserve = 130;
       // `eva/redesign.html:113`'s last rung is at 46%, so the shoulder begins
       // `1 - 0.46 = 54%` of the scrim's height above the bottom edge. The old
       // `stops: [0, 0.40]` made it `60%` — so `:113` moved the shoulder 6.2px

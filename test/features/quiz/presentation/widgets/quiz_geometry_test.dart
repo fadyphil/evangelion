@@ -15,7 +15,7 @@ import '../../../../support/design_system_harness.dart';
 ///
 /// ## WHY THIS FILE WAS REWRITTEN, NOT RE-POINTED
 ///
-/// Its predecessor pinned `QuizScreen.tsx` geometry — the fleck pair outside the
+/// Its predecessor pinned the **superseded prototype's** geometry — the fleck pair outside the
 /// card, a 44px spacer at the header's far end, and the feedback banner's 8px dot.
 /// The LUMEN redesign (`eva/redesign.html:562-574`) draws **none** of those: the
 /// options are tint-tier cards with no flecks, the header's far end is the score and

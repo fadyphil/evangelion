@@ -121,8 +121,9 @@ final class LoginValidation with _$LoginValidation {
   /// The first message in field order, or `null` when nothing is wrong.
   ///
   /// Field order rather than "whichever the reader typed last": the email is
-  /// above the password on screen (and in `LoginScreen.tsx:49-63`), so a summary
-  /// that read password-first would name the wrong line.
+  /// above the password on screen (and in the redesign's login form,
+  /// `eva/redesign.html:506-507`), so a summary that read password-first would
+  /// name the wrong line.
   String? get firstError => emailError ?? passwordError;
 }
 
@@ -132,8 +133,10 @@ final class LoginValidation with _$LoginValidation {
 ///
 /// * **the address** must have a local part and a dotted domain, because
 ///   `redesign.html:1305` tests `^\S+@\S+\.\S+$` — the same shape the first
-///   version derived from `LoginScreen.tsx:49`'s `type="email"`, now with the
-///   prototype's own regex as the citation;
+///   version derived from the superseded prototype's `type="email"`, which **the
+///   redesign has no counterpart for** (its address field is a plain `<input>`
+///   with a `placeholder`, `eva/redesign.html:506`, and the rule is the regex),
+///   now with the design's own regex as the citation;
 /// * **the password** must be at least [kMinPasswordLength] characters, which is
 ///   `redesign.html:1306` verbatim — see that constant for how the rule arrived.
 ///

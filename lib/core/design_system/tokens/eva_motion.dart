@@ -12,40 +12,68 @@ import 'package:flutter/widgets.dart';
 /// | `base` | 200ms | `easeOut` |
 /// | `screen` | 250ms | `easeOutCubic` |
 /// | `fleck` | 2000ms | `alternate` |
-/// | `orbFloat` | 14–28s per orb | `easeInOut` |
-/// | `orbHue` | 7–14s per orb | `linear` |
-/// | `aurora` | 14s | `easeInOut` |
+/// | ~~`orbFloat`~~ | ~~14–28s per orb~~ | ~~`easeInOut`~~ |
+/// | ~~`orbHue`~~ | ~~7–14s per orb~~ | ~~`linear`~~ |
+/// | ~~`aurora`~~ | ~~14s~~ | ~~`easeInOut`~~ |
 ///
 /// and, immediately after: "All curves are ease-out. No bounce, no spring."
 ///
-/// ## THAT LAST SENTENCE IS **PARTLY SUPERSEDED** — SEE BELOW
+/// ## THE THREE **STRUCK** ROWS, AND WHY THEY ARE STILL IN THE TABLE
 ///
-/// "No bounce, no spring" is **still true** and is kept: `grep -ri spring eva/src`
-/// over the prototype returns nothing. What was wrong is the implication that every
-/// curve is a plain `easeOut`, because the prototype's own `QuizOption`
-/// (`ds.tsx:438`) uses `cubic-bezier(0.16,1,0.3,1)`. Phase 0 adds
+/// `orbFloat`, `orbHue` and `aurora` were **deleted** — they are the old
+/// design's orb float, orb hue and aurora band, and the orbs' retirement took
+/// all three with it. They are left here, struck, because the table is a
+/// **transcription of §5.3** and the audit trail is worth more than a tidy
+/// table: a reader who wants to know what the design once asked for should be
+/// able to see that it asked and that it is gone.
+///
+/// ## AND "No bounce, no spring" IS **PARTLY SUPERSEDED** — AND THE PART THAT
+/// ## SURVIVED IS NOT THE PART THAT WAS TRUE
+///
+/// The brief's sentence had two halves. **"No bounce, no spring" is NOT true of
+/// the surviving design** — the redesign declares `--e-spring:cubic-bezier(.34,
+/// 1.56,.64,1)` at `eva/redesign.html:18` and spends it on the option row's
+/// entrance (`:339`). The half that **is** true is the client's own: the
+/// tokens **this table ships** carry no spring and no bounce, and
+/// [achievementSpring] is a `SpringDescription` for achievement moments only,
+/// which is a different thing from a spring *curve*.
+///
+/// What was wrong from the start was the implication that every curve is a plain
+/// `easeOut`, because the design's own interactive curve is
+/// `cubic-bezier(.16,1,.3,1)` — declared as `--e-light` at
+/// `eva/redesign.html:18` and spent by the quiz's option row on its
+/// correct-answer animation (`eva/redesign.html:353`). Phase 0 adds
 /// [interactiveCurve] (that curve) and [achievementSpring] (a real spring, for
 /// achievement moments only) under the heading *"Interactive + achievement motion
-/// (Phase 0)"*. Ambient motion is untouched. Full reasoning is there; the table
-/// above stays as §5.3 transcribed it, because the audit trail is worth more than a
-/// tidy table.
+/// (Phase 0)"*. Ambient motion is untouched.
 ///
 /// WHY THE AMBIENT ANIMATIONS ARE NOT `AnimationController`s HELD HERE. There
-/// are four shared controllers app-wide — float, hue, aurora, and the LUMEN
+/// are **two** shared controllers app-wide — the float clock and the LUMEN
 /// shader clock (`09-quality-gates.md` §13, mitigation 2, plus the Task 1.3
 /// clock that `u_time` reads) — and they live in a
 /// `TickerProviderStateMixin` host mounted above `MaterialApp.router`, published
 /// through an inherited scope. That is Phase 2's `NeuralMotionScope`. This file
 /// holds only the numbers and the shapes, which is why it has no `Ticker` and no
 /// `vsync`: a `SingleTickerProvider` here would re-introduce exactly the
-/// per-orb controller explosion that mitigation 2 exists to remove.
+/// per-controller explosion that mitigation 2 exists to remove.
 ///
-/// WHY `fleck`'s "alternate" IS A FLAG AND NOT A CURVE. Flutter has no
+/// **The float clock outlived the orbs**, and it is the reason the count is two
+/// and not one: the old design's *orb* float is still read by `GoldFlecks` and
+/// by the witness sky's twinkle.
+///
+/// WHY THE FLECK'S "ALTERNATE" IS **NOT A TOKEN** ANY MORE. Flutter has no
 /// `Curves.alternate`. There-and-back is a *direction*, expressed as
 /// `AnimationController.repeat(reverse: true)`, and it is orthogonal to the
-/// easing shape. So [fleckCurve] carries the ease-out shape the brief's rule
-/// requires and [fleckAlternates] carries the direction for Phase 2 to act on.
-/// Collapsing the two into one token would have meant inventing a curve.
+/// easing shape — so there were two tokens for it: [fleckCurve] carried the
+/// ease-out shape the brief's rule requires, and `fleckAlternates` carried the
+/// direction, "for Phase 2 to act on".
+///
+/// **Phase 2 came and went without acting on it, and the token is gone.** The
+/// flecks' there-and-back is built by `goldFleckTriangle` instead — from the
+/// float clock's sawtooth, with no controller of its own — so the direction is
+/// the widget's arithmetic and not a token's. Collapsing the two into one curve
+/// would have meant inventing a curve, and keeping a flag nobody reads would
+/// have meant a second source of truth for one fact.
 abstract final class EvaMotion {
   // --- Durations -----------------------------------------------------------
 
@@ -136,21 +164,24 @@ abstract final class EvaMotion {
   // literally. **It was also wrong about the prototype**, which is worth recording
   // because the two are easy to confuse:
   //
-  // | prototype site | curve | Flutter equivalent |
+  // | design site | curve | Flutter equivalent |
   // | --- | --- | --- |
-  // | `ds.tsx:438` `QuizOption` — the most-tapped element in the app | `all 250ms cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
-  // | `ds.tsx:207` orb mouse-parallax | `transform 0.9s cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
+  // | `eva/redesign.html:18` `--e-light` — the curve the quiz's option row, the most-tapped element in the app, spends on its correct-answer animation (`eva/redesign.html:353`) | `cubic-bezier(.16,1,.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
+  // | the superseded prototype's orb mouse-parallax — **the redesign has no counterpart for it**: it draws one canvas and one shader (`eva/redesign.html:46`) and no orbs to move | `transform 0.9s cubic-bezier(0.16,1,0.3,1)` | [interactiveCurve] — an **approximation** of that bezier, not the same curve |
   //
   // **The word "approximation" is the point**, and it was added after a
   // review found the table asserting an identity that was not there:
-  // [interactiveCurve] is `Cubic(0.19, 1.0, 0.22, 1.0)` and the prototype's
+  // [interactiveCurve] is `Cubic(0.19, 1.0, 0.22, 1.0)` and the design's
   // bezier is `Cubic(0.16, 1, 0.3, 1)`. They are close, and the distance is
   // measured — see [interactiveCurve] for the number.
   //
-  // So `QuizOption` — the answer a child presses to answer a question — was never
-  // on a plain `easeOut` in the design this app was transcribed from. "No bounce,
-  // no spring" remains **true** of the prototype: `grep -ri spring eva/src` returns
-  // nothing. What was false was the implied "and no expo".
+  // So the quiz's option row — the answer a child presses to answer a
+  // question — was never on a plain `easeOut` in the design this app was
+  // transcribed from. "No bounce, no spring" was **true** of the superseded
+  // prototype, and **it is the CLIENT'S OWN rule now**: the tokens this table
+  // ships carry no spring and no bounce, and [achievementSpring] is a
+  // `SpringDescription` for achievement moments only — a different thing from a
+  // spring *curve*. What was false was the implied "and no expo".
   //
   // ## TWO FAMILIES, TWO NAMES, ON PURPOSE
   //

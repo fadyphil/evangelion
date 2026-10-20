@@ -11,7 +11,7 @@ enum ProgressBeadState {
   /// Filled gold at 45%, **no glow and no rim**. `redesign.html:332` —
   /// `.dot.done{background: rgba(232,176,75,.45)}`.
   ///
-  /// **No glow**, where `ds.tsx:362,364` drew a filled `ember` with
+  /// **No glow**, where the prototype's `done` bead drew a filled `ember` with
   /// `0 0 10px rgba(ember,.65)`. This is the clearest PAINT change in the
   /// widget: three lit dots in a row used to be the only thing on the header
   /// emitting light, and now the **current** one is the only thing that does.
@@ -24,7 +24,7 @@ enum ProgressBeadState {
   /// box-shadow: 0 0 12px rgba(232,176,75,.7); animation: dp 1.6s ease-in-out
   /// infinite}`.
   ///
-  /// **A different shape, not a bigger dot.** `ds.tsx:363` made the current bead
+  /// **A different shape, not a bigger dot.** The prototype made the current bead
   /// a 2px ring on the same 10×10 circle as its neighbours, so "which one am I
   /// on" was answered by a rim nobody can see at a glance. `redesign.html:329-330`
   /// answers it with an outline→pill change: every dot is a `border-radius:
@@ -35,7 +35,7 @@ enum ProgressBeadState {
   /// Filled `ink` at 14%, **no rim**. `redesign.html:329` — `.dot{
   /// background: rgba(255,255,255,.14)}`.
   ///
-  /// **No rim**, where `ds.tsx:363` drew a `1.5px solid rgba(ink, 0.2)` outline
+  /// **No rim**, where the prototype drew a `1.5px solid rgba(ink, 0.2)` outline
   /// and nothing inside it. On a dark page a 10px circle with a 20%-alpha outline
   /// and a transparent middle reads as a *ring*, which is the same signal the
   /// current bead used to carry. Filling it removes the collision: in this
@@ -46,7 +46,7 @@ enum ProgressBeadState {
 
 /// The state of bead [index] in a row of [total].
 ///
-/// The prototype's rule verbatim (`ds.tsx:357-358`):
+/// The prototype's rule verbatim:
 ///
 /// ```js
 /// const done = i < completed
@@ -125,7 +125,7 @@ List<ProgressBeadState> beadStates({
 /// A dot's height, and every dot's width except the current one's.
 /// `redesign.html:329` — `.dot{width: 8px; height: 8px; border-radius: 99px}`.
 ///
-/// **8, where `ds.tsx:361` wrote 10.** And it is 8 for the *height* of the
+/// **8, where the prototype wrote 10.** And it is 8 for the *height* of the
 /// current pill too — `.dot.cur` overrides `width` and nothing else, so the
 /// current dot is an 8-tall pill and not a larger dot.
 ///
@@ -147,7 +147,7 @@ const double kProgressBeadCurrentWidth = 26;
 
 /// Dot-to-dot gap. `redesign.html:328` — `.dots{gap: 6px}`.
 ///
-/// **6, where `ds.tsx:355` wrote 8** — and like the dot size it pairs with, it
+/// **6, where the prototype wrote 8** — and like the dot size it pairs with, it
 /// is narrower, so the row is *denser* as well as smaller. The two moves were
 /// made together in the redesign for the same reason: `.dots` is
 /// `justify-content: center` inside a quiz header, so the row's whole job is to
@@ -202,8 +202,8 @@ const double kProgressBeadPulseOpacity = 0.55;
 /// How wide one bead of [state] is.
 ///
 /// A pure function rather than a field on [ProgressBeadState], because it is the
-/// arithmetic the enum used to hide: under `ds.tsx` every bead was
-/// [kProgressBeadSize] and the question did not exist. Under `redesign.html` it
+/// arithmetic the enum used to hide: under the superseded prototype every bead
+/// was [kProgressBeadSize] and the question did not exist. Under `redesign.html` it
 /// has two answers, and `progress_beads_test.dart` is what checks the row's
 /// width against `size(n−1) + 26` instead of against `10n`.
 double progressBeadWidthAt(ProgressBeadState state) => switch (state) {
@@ -272,7 +272,7 @@ double progressBeadPulseOpacityAt(double elapsedSeconds) {
 /// dot is 2px smaller and each gap 2px tighter, which pulls in `4n − 4`, and the
 /// pill pushes out a flat 18. So:
 ///
-/// | beads | `ds.tsx` | `redesign.html` | delta |
+/// | beads | the prototype | `redesign.html` | delta |
 /// | --- | --- | --- | --- |
 /// | 1 | 10 | 26 | **+16** |
 /// | 2 | 28 | 40 | **+12** |
@@ -359,7 +359,7 @@ class ProgressBeads extends StatelessWidget {
           //
           // `redesign.html:328` is `gap: 6px`, and a CSS `gap` is the space
           // *between* adjacent items — there is no trailing gap after the last
-          // child. This is the same argument `ds.tsx:355`'s `gap: 8` got and it
+          // child. This is the same argument the prototype's `gap: 8` got and it
           // has not changed; only the number has. The first version of this
           // widget padded every bead, so a row was `10n + 8n` instead of
           // `10n + 8(n − 1)`: `total: 1` rendered 18 against the prototype's 10,
@@ -394,7 +394,7 @@ class _Bead extends StatelessWidget {
       // `ember` fills. (In dark the two are the same value anyway.)
       ProgressBeadState.done => (
         colors.ember.withValues(alpha: 0.45),
-        // **No glow.** `ds.tsx:364`'s `0 0 10px rgba(ember, 0.65)` is gone; see
+        // **No glow.** The prototype's `0 0 10px rgba(ember, 0.65)` is gone; see
         // [ProgressBeadState.done] for why that is the point rather than a loss.
         const <BoxShadow>[],
       ),
@@ -434,14 +434,14 @@ class _Bead extends StatelessWidget {
         color: fill,
         // `redesign.html:329` — `border-radius: 99px`, and `:330` leaves it
         // alone, so the 26-wide current dot is a pill rather than a circle. That
-        // is what makes the shape carry the state: under `ds.tsx` every bead was
-        // `borderRadius: 50%` and the current one was distinguished only by a
+        // is what makes the shape carry the state: under the prototype every bead
+        // was `borderRadius: 50%` and the current one was distinguished only by a
         // rim.
         borderRadius: const BorderRadius.all(
           Radius.circular(kProgressBeadRadius),
         ),
         // **No `border:` field at all.** Both `redesign.html:329` and `:332`
-        // declare none, and `ds.tsx:363`'s `1.5px` rim is gone from all three
+        // declare none, and the prototype's `1.5px` rim is gone from all three
         // states — see [ProgressBeadState.upcoming]. A `BoxDecoration.border`
         // left at `null` is also what keeps these beads out of
         // `renderedBorders`, so nothing here can be mistaken for §14's ring.

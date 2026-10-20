@@ -127,10 +127,15 @@ final class TodayReading with _$TodayReading {
 
   /// `questions.length` — how many reflection questions this reading carries.
   ///
-  /// The live payload has **one**. The prototype's bead row claimed five
-  /// (`HomeScreen.tsx:65` — `total={5} completed={2} current={2}`), which
-  /// described *passage* progress across the library grid that was cut; see
-  /// `features/home/domain/question_progress.dart`.
+  /// The live payload has **one**. The superseded prototype's bead row claimed
+  /// five — `total={5} completed={2} current={2}` — and it described *passage*
+  /// progress across the library grid that was cut; the row lived in
+  /// `features/home/domain/question_progress.dart`, **which was deleted with
+  /// the grid** when `/` was rebuilt against the redesign (`3e89373`).
+  ///
+  /// **The redesign has no counterpart for it**: its home screen draws no bead
+  /// row at all, and the only dot row it has (`eva/redesign.html:568`) counts
+  /// the quiz's questions.
   final int questionCount;
 
   /// How many of [questionCount] carry `already_answered == true`.

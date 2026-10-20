@@ -32,9 +32,11 @@
 ///
 /// ## AND WHY THE ARABIC ARM USES THEM AT ALL
 ///
-/// `ReadingArScreen.tsx:49` and `:86` — the prototype writes `١`…`٧` for the verse
-/// numbers and `٥` for the question count. Transcribing them is the faithful
-/// reading, and it is also the reason the glyph gate is load-bearing rather than
+/// The design writes `١`…`٦` for the verse numbers — the array at
+/// `eva/redesign.html:1362` — and `٥` for the question count, through the digit
+/// table at `eva/redesign.html:981` (`٠١٢٣٤٥٦٧٨٩`, whose `٥` is U+0665).
+/// Transcribing them is the faithful reading, and it is also the reason the
+/// glyph gate is load-bearing rather than
 /// ceremonial: **U+0665 is an Arabic-block codepoint**, so a caption rendering `٥`
 /// in Space Mono is tofu for exactly the same reason the scripture is. A gate that
 /// only checked the passage's body would have passed while the caption beside it
@@ -54,7 +56,7 @@ library;
 /// show nonsense.
 ///
 /// Zero is `٠` and not `۰` (U+06F0, the **Extended** Arabic-Indic digits): the
-/// prototype's `١٢٣٤٥٦٧` and `٥` are U+0661…U+0667 and U+0665 — the Persian-set
+/// design's `٠١٢٣٤٥٦٧٨٩` is U+0660…U+0669 and its `٥` is U+0665 — the Persian-set
 /// forms every Arabic-script keyboard produces — and `font_coverage_test.dart`
 /// pins that choice against the bundled `Amiri`.
 String arabicIndicDigits(int value) {

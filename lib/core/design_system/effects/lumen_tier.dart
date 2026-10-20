@@ -95,10 +95,11 @@ const double kShaftsPixelBudget = 2000000;
 /// ## AND THE RULE'S **REASON** CHANGED WITH THE ORBS
 ///
 /// The old design's `low` tier existed because a viewport that short could
-/// not show the orbs whole — the prototype's home group is authored at
-/// `y: 640` (`ds.tsx:80`), so a 360dp-tall viewport would show none of them.
-/// **That is a rule about ORBS and not about the shader**, and the orbs are
-/// gone.
+/// not show the orbs whole — the superseded prototype's home orb group is
+/// authored at `y: 640`, so a 360dp-tall viewport would show none of them.
+/// **The redesign has no orbs at all**, so that `y` survives here only as the
+/// record of why the old rule was written. **That is a rule about ORBS and
+/// not about the shader**, and the orbs are gone.
 ///
 /// **The rule survives, and this is the honest account of why.** The shader's
 /// own cost at that size is not the binding constraint — a 320×568 window is

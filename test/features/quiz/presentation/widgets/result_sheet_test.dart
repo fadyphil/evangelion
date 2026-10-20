@@ -158,8 +158,10 @@ void main() {
     ) async {
       await pumpResult(tester, result: aSentinelResult);
 
-      // `ResultScreen.tsx:44-45` is `4` beside `/5`; the `5` is a hard-coded literal
-      // and `SubmitResult` carries no question count. So the figure is the total and
+      // The superseded prototype's score was `4` beside `/5`; the `5` was a
+      // hard-coded literal — and the redesign has no counterpart for it, its
+      // result figure being the unported `.bigring .val` (`:452`) — while
+      // `SubmitResult` carries no question count. So the figure is the total and
       // the denominator is **gone** rather than invented — decision 45's rejected
       // "derive a measurement" at its largest.
       //
@@ -303,8 +305,11 @@ void main() {
     testWidgets('the primary says `Reflect again`, the secondary says `Back`', (
       WidgetTester tester,
     ) async {
-      // **`Back`, not `Back to library`.** `ResultScreen.tsx:78` writes the latter and
-      // §2 decision 1 cut the library; the destination is `/`. Transcribing the label
+      // **`Back`, not `Back to library`.** The superseded prototype writes the
+      // latter and
+      // §2 decision 1 cut the library; the destination is `/`. The redesign's own
+      // `again` row reads `read again` (`redesign.html:963`), which is also not a
+      // destination for this client. Transcribing the label
       // would be a lie about where the button leads.
       final AppLocalizations strings = AppLocalizationsEn();
       await pumpResult(tester, result: aSentinelResult);

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 /// One settings row: a title on the left, a control on the right.
 ///
 /// `redesign.html:419-421`'s `.srow`, wrapped around every row on the Settings
-/// screen (`SettingsScreen.tsx:50,63,76,92,101,106,115,118`).
+/// screen. The prototype drew eight of them and the redesign's Workshop draws
+/// its own set; the two lists are not the same, and **the redesign has no
+/// counterpart for the prototype's list**.
 ///
 /// ## THIS ROW IS **FLAT**, AND THAT IS THE REDESIGN, NOT A REGRESSION
 ///
@@ -27,7 +29,7 @@ import 'package:flutter/material.dart';
 /// never it.
 ///
 /// **The blur-budget question evaporates rather than being answered.**
-/// `ds.tsx:487` gave this widget `backdropFilter: blur(12px)` and §13.4's
+/// The prototype gave this widget `backdropFilter: blur(12px)` and §13.4's
 /// per-screen table put `/settings` under "everything else → `tint`", so the
 /// wrapper never blurred. With no wrapper there is no fill to budget at all,
 /// and the "is this one of the eight?" question the enum existed to make
@@ -107,7 +109,7 @@ class SettingsTile extends StatefulWidget {
   /// trailing control take focus on its own.
   final VoidCallback? onTap;
 
-  /// **`ds.tsx:488`'s `borderRadius: 14`, which this row no longer uses.**
+  /// **The prototype's `borderRadius: 14`, which this row no longer uses.**
   ///
   /// Kept because one other widget on `/settings` — the failure notice in
   /// `settings_page.dart` — borrows it for a `GlassSurface` that is a real
@@ -117,7 +119,7 @@ class SettingsTile extends StatefulWidget {
   /// fill and no rim would draw corners the row does not have.
   static const double radius = EvaRadii.button;
 
-  /// The row's total height floor. `ds.tsx:488` — `height: 56`.
+  /// The row's total height floor. The prototype's — `height: 56`.
   ///
   /// **Kept, though `redesign.html:419` has no height at all**, and the
   /// divergence is deliberate rather than an oversight: `.srow` is
@@ -126,7 +128,7 @@ class SettingsTile extends StatefulWidget {
   /// meaningless — and `primitives_text_scale_test.dart`, which this batch does
   /// not own, reads it as the §14 ceiling for the row at 1.22× text scale. A
   /// number two harnesses read is not this batch's to delete; the 56 is
-  /// `ds.tsx`'s and it is re-composed against the new padding as
+  /// the prototype's and it is re-composed against the new padding as
   /// [contentFloor], so a short row is **56 + 1** — the 1 being the hairline.
   static const double minHeight = 56;
 
@@ -141,7 +143,7 @@ class SettingsTile extends StatefulWidget {
   /// The horizontal padding. `redesign.html:419` — `padding: 15px 4px`.
   static const double horizontalPadding = EvaSpacing.xs;
 
-  /// `redesign.html:419` — `padding: 15px 4px`, replacing `ds.tsx:488`'s
+  /// `redesign.html:419` — `padding: 15px 4px`, replacing the prototype's
   /// `'0 16px'`.
   ///
   /// Neither number is on the 4px scale — 15 is not a token at all — so the
@@ -227,7 +229,7 @@ class SettingsTile extends StatefulWidget {
   /// tied to the border rather than drifting into a magic number.
   ///
   /// **57 is not a rounding.** `.srow`'s own row in the prototype is
-  /// `content + 30` with no floor at all; the 56 is `ds.tsx:488`'s, kept because
+  /// `content + 30` with no floor at all; the 56 is the prototype's, kept because
   /// two harnesses read it, and the extra pixel is the rule the redesign adds on
   /// top. See [minHeight] for why the 56 could not simply be deleted.
   static const double renderedFloor = minHeight + 1;

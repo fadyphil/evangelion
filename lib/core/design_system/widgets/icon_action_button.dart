@@ -42,8 +42,9 @@ import 'package:flutter/material.dart';
 ///
 /// ## THE BOX IS 44 AND THE PILL IS 30, AND NEITHER NUMBER IS NEGOTIABLE
 ///
-/// 44 is `iOSTapTargetGuideline`'s minimum *and* the React prototype's
-/// (`SettingsScreen.tsx:39`, `ReadingEnScreen.tsx:14`, `QuizScreen.tsx:46`), and it
+/// 44 is `iOSTapTargetGuideline`'s minimum *and* the React prototype's — its
+/// settings, reading and quiz back buttons each wrote `width: 44, height: 44` —
+/// and it
 /// is asserted rendered by two harnesses. So the pill is a **30px silhouette inside
 /// the existing 44px box** and not a smaller button: `Center` does the inset, the
 /// hit area is untouched, and `quiz_geometry_test.dart`'s `44 ±0.5` keeps meaning
@@ -78,8 +79,9 @@ import 'package:flutter/material.dart';
 /// be a state the widget cannot see.
 ///
 /// The prototype's buttons are all bare `<button>`s with an inline `<svg>` and no
-/// label at all (`SettingsScreen.tsx:39-41`, `ReadingEnScreen.tsx:14-16`,
-/// `QuizScreen.tsx:46-50`), so every string here is one the shipped screens have
+/// label at all — its settings, reading and quiz back buttons were each a
+/// `<button>` wrapping one `<svg>` and nothing else — so every string here is one
+/// the shipped screens have
 /// to supply. There is no sensible default and none is invented.
 class IconActionButton extends StatefulWidget {
   /// A button showing [icon], named [tooltip].
@@ -115,8 +117,8 @@ class IconActionButton extends StatefulWidget {
   /// ## `EvaButton.labelFamily`'S — ONE PHASE, TWO SITES
   ///
   /// The prototype's four buttons are bare `<button>`s with an inline `<svg>` and
-  /// **no label of any kind** (`SettingsScreen.tsx:39-41`,
-  /// `ReadingEnScreen.tsx:14-16`, `QuizScreen.tsx:46-50`), so §14's requirement for
+  /// **no label of any kind** — each was a `<button>` wrapping one `<svg>` and
+  /// nothing else — so §14's requirement for
   /// an accessible name on an icon-only control forced three Arabic strings into
   /// this widget that the prototype never wrote. `reading_controls.dart` supplies
   /// all three, and they render where a reader can see them.
@@ -157,31 +159,32 @@ class IconActionButton extends StatefulWidget {
 
   /// The tap target's edge length.
   ///
-  /// 44 is `ds.tsx`'s literal (`SettingsScreen.tsx:39` — `width: 44, height:
-  /// 44`; `ReadingEnScreen.tsx:14`; `QuizScreen.tsx:46`), and it is also
+  /// 44 is the prototype's literal — its settings, reading and quiz back buttons
+  /// each wrote `width: 44, height: 44` — and it is also
   /// `iOSTapTargetGuideline`'s minimum, so one number satisfies both the
   /// prototype and the platform guideline rather than the prototype being
   /// overridden to satisfy one and silently failing the other.
   final double size;
 
   /// The glyph's size. Defaults to [size] minus a quarter for a bare `.chev`
-  /// — the React prototype's own proportion, 20px in a 44px box
-  /// (`SettingsScreen.tsx:40`) and 18px for the heavier close
-  /// (`QuizScreen.tsx:47`) — and to [pillIconSize] inside a [pilled] pill.
+  /// — the React prototype's own proportion, a 20px glyph in a 44px box
+  /// and an 18px one for the heavier close — and to [pillIconSize] inside a
+  /// [pilled] pill.
   final double? iconSize;
 
   /// Whether this is the redesign's `.iconbtn` pill rather than its `.chev` glyph.
   ///
   /// `false` — the default — paints no fill and no rim, which is `redesign.html:149`'s
   /// `background: none; border: none` and the React prototype's
-  /// `SettingsScreen.tsx:39` with the same words.
+  /// settings-screen back button with the same words.
   ///
   /// ## THE OLD COMMENT POINTED AT THE WRONG FILE, AND `redesign.html` FIXES IT
   ///
-  /// The line this parameter replaced read "No rim. `ds.tsx:39` —
-  /// `background: 'none', border: 'none'`". **`ds.tsx:39` is not a button.** It is
-  /// the light row of `ds.tsx`'s palette table — `canvas: '#F0EEFF', surface:
-  /// '#FFFFFF'` — and the claim is really `SettingsScreen.tsx:39`. It resolved, which
+  /// The line this parameter replaced read "No rim —
+  /// `background: 'none', border: 'none'`", and it cited **the wrong line of the
+  /// wrong file**: the prototype's *palette table* (the light row — `canvas:
+  /// '#F0EEFF', surface: '#FFFFFF'`) and not a button at all. The claim was
+  /// really about the prototype's settings-screen back button. It resolved, which
   /// is all `citation_check.py` asks for: AGENT_CONTEXT's recorded decision 8 says
   /// so outright, "a citation can resolve and still be about the wrong line", and
   /// this is that case, live, in a shipped widget. `redesign.html:149` is now the

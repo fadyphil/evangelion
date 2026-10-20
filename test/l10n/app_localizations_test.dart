@@ -955,7 +955,14 @@ void main() {
         'settingsVersion': 'redesign.html:642',
         'settingsLanguageEnglish': 'redesign.html:647',
         'settingsLanguageArabic': 'redesign.html:647',
-        'quizCheckAnswer': 'QuizScreen.tsx:127',
+        // ## THE THREE THAT NAMED THE **RETIRED** REACT PROTOTYPE
+        //
+        // The React prototype is gone, and a description that cited a line of a
+        // file that no longer exists is a reference a reader cannot follow. The
+        // provenance is still recorded — the value, and what the redesign does
+        // instead — and the marker these three rows now assert is the
+        // **surviving** design source each description names.
+        'quizCheckAnswer': 'redesign.html:1423',
         // **`quizNextQuestion` left this map in Task 5.4, and the departure is the
         // claim.** Its value is no longer the superseded prototype's
         // `{checked ? 'Next question' : …}`; it is the redesign's own
@@ -1023,8 +1030,8 @@ void main() {
         'readingSky': ':968',
         'readingBookmarkOn': ':974',
         'readingBookmarkOff': ':974',
-        'resultReflectAgain': 'ResultScreen.tsx:77',
-        'resultLongestYet': 'ResultScreen.tsx:65',
+        'resultReflectAgain': 'redesign.html:963',
+        'resultLongestYet': 'redesign.html:516',
       };
       for (final MapEntry<String, String> entry in citations.entries) {
         expect(
@@ -1296,9 +1303,11 @@ void main() {
     // same six arms.
 
     test('the caption is derived from the count and never hard-codes the prototype`s 5', () {
-      // `ReadingEnScreen.tsx:89` hard-codes `5 questions` and the live reading
+      // The superseded prototype hard-codes `5 questions` and the live reading
       // carries ONE question, so the prototype's literal is false by a factor of
-      // five. **This row stopped being tautological in Task 5.3**: it used to be a
+      // five. That hard-coded literal has **no counterpart in the redesign**,
+      // whose own count is computed (`redesign.html:1347`). **This row stopped
+      // being tautological in Task 5.3**: it used to be a
       // scan whose subject was `readingCaptionFor(5)`, and that key is deleted. It
       // is now a claim about the table alone — no key in either file can be found
       // holding the prototype's number — which is the stronger of the two and the

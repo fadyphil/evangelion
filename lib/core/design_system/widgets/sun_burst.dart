@@ -40,14 +40,22 @@ class SunBurstRay {
   double get _angle => index * (2 * math.pi / sunBurstRayCount);
 }
 
-/// How many rays the burst has. `ResultScreen.tsx:9` — `Array.from({ length: 14 })`.
+/// How many rays the burst has. The prototype's `Array.from({ length: 14 })` —
+/// a value **the redesign has no counterpart for**: its result modal's mark is
+/// `.bigring` (`redesign.html:447-452`), a progress ring with no rays in it.
 const int sunBurstRayCount = 14;
 
 /// The prototype's ray table, rebuilt as a list of [SunBurstRay].
 ///
-/// `ResultScreen.tsx:7-15`: fourteen rays at `i * (360 / 14)` degrees, inner
+/// The prototype's own table: fourteen rays at `i * (360 / 14)` degrees, inner
 /// radius 26 for all of them, outer 46 on even indices and 39 on odd, stroke
 /// `#F5C84C`, width 2.5 on even and 1.5 on odd, round caps.
+///
+/// **The redesign has no counterpart for the table.** Its result modal's mark is
+/// `.bigring` (`redesign.html:447-452`) — a 132×132 progress ring — and there
+/// is no ray table anywhere on the page. The values below are the prototype's,
+/// and they are kept for the reason [SunBurst]'s own doc gives: Phase 6.2
+/// kept this widget because the ring was never ported.
 ///
 /// The alternating outer radius and stroke width are what make it a sunburst
 /// rather than a starburst, so they are computed rather than flattened into
@@ -63,24 +71,29 @@ List<SunBurstRay> sunBurstRays() => <SunBurstRay>[
     ),
 ];
 
-/// Every ray's inner radius. `ResultScreen.tsx:9` — `const inner = 26`.
+/// Every ray's inner radius. The prototype's `const inner = 26`.
 const double sunBurstInnerRadius = 26;
 
-/// The even-indexed rays' outer radius. `ResultScreen.tsx:9`.
+/// The even-indexed rays' outer radius. The prototype's `outer` on even
+/// indices.
 const double sunBurstOuterRadiusEven = 46;
 
-/// The odd-indexed rays' outer radius. `ResultScreen.tsx:9`.
+/// The odd-indexed rays' outer radius. The prototype's `outer` on odd
+/// indices.
 const double sunBurstOuterRadiusOdd = 39;
 
-/// The even-indexed rays' stroke width. `ResultScreen.tsx:13`.
+/// The even-indexed rays' stroke width. The prototype's `strokeWidth` on even
+/// indices.
 const double sunBurstWidthEven = 2.5;
 
-/// The odd-indexed rays' stroke width. `ResultScreen.tsx:13`.
+/// The odd-indexed rays' stroke width. The prototype's `strokeWidth` on odd
+/// indices.
 const double sunBurstWidthOdd = 1.5;
 
 /// One of the five ember flecks scattered over the burst.
 ///
-/// `ResultScreen.tsx:19-24`.
+/// The prototype's five flecks, in its own source order, at its own radii and
+/// alphas. **The redesign has no counterpart** — `.bigring` draws no flecks.
 @immutable
 class SunBurstFleck {
   /// Creates a fleck at [centre] with the prototype's radius and alpha.
@@ -100,7 +113,7 @@ class SunBurstFleck {
   final double alpha;
 }
 
-/// The burst's five flecks, `ResultScreen.tsx:19-24`, in source order.
+/// The burst's five flecks, in the prototype's source order.
 const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
   SunBurstFleck(centre: Offset(28, 18), radius: 2.5, alpha: 0.9),
   SunBurstFleck(centre: Offset(72, 16), radius: 2, alpha: 0.7),
@@ -109,7 +122,7 @@ const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
   SunBurstFleck(centre: Offset(64, 82), radius: 2, alpha: 0.7),
 ];
 
-/// The three concentric discs, `ResultScreen.tsx:16-18`, largest first.
+/// The three concentric discs, in the prototype's own order, largest first.
 ///
 /// `[radius, alpha]` per disc: the r30 halo at `#F5C84C` / 12%, then `r24` at
 /// 90%, then `r18` at 60%.
@@ -122,7 +135,7 @@ const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
 ///
 /// - **The premise.** SVG has no z-index; it paints in document order. The
 ///   prototype's order is `r24 @0.9`, `r18 @0.6`, `r30 @0.12`
-///   (`ResultScreen.tsx:16-18`), so the r30 halo is **last** and therefore
+///   (the prototype's three `circle`s), so the r30 halo is **last** and therefore
 ///   **on top**, not behind.
 /// - **The conclusion.** All three discs are the same colour, `#F5C84C`. Alpha
 ///   compositing of a single colour over itself is commutative, so the visible
@@ -133,7 +146,8 @@ const List<SunBurstFleck> sunBurstFlecks = <SunBurstFleck>[
 ///   rounding, not of a different colour.
 ///
 /// The same is true of the rays, which the prototype also paints before the
-/// discs (`:7-15` then `:16-18`) and this painter paints after: a 12% `#F5C84C`
+/// discs (its rays, then its discs) and this painter paints after: a 12%
+/// `#F5C84C`
 /// wash over a full-strength `#F5C84C` ray leaves the ray exactly unchanged.
 /// Painting the rays first moves 118 of 480,000 pixels, again only rounding.
 ///
@@ -149,7 +163,7 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// The celebration burst on the Result screen.
 ///
 /// Fourteen rays, three discs and five flecks, transcribed from
-/// `eva/src/screens/ResultScreen.tsx:4-27` into a
+/// the prototype's result screen into a
 /// `CustomPaint` over a `viewBox="0 0 100 100"`.
 ///
 /// ## COLOURS
@@ -157,11 +171,12 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// The rays and the discs are `#F5C84C`, which is [StickerSlot.sun] — the one
 /// prototype colour in this widget that the design system already publishes. The
 /// five flecks are `emberHex`, i.e. [EvaColors.ember], and that is why they are a
-/// different colour from the rays in the prototype (`ResultScreen.tsx:19-24`).
+/// different colour from the rays in the prototype (its fleck block's
+/// `emberHex`).
 ///
 /// ## THE GLOW IS NOT HERE, AND `.bigring` IS WHAT REPLACES IT
 ///
-/// `ResultScreen.tsx:38` wraps the burst in
+/// The prototype's result screen wraps the burst in
 /// `filter: drop-shadow(0 0 36px rgba(#F5C84C, 0.55))`. That is a property of the
 /// **container**, not of the svg — `SunBurst` is the svg, so the glow belongs to
 /// whatever places it (the result card) and adding it here would invent a
@@ -189,8 +204,9 @@ const List<List<double>> sunBurstDiscs = <List<double>>[
 /// choice in its own words: removing it "would have been a second, unrecorded
 /// divergence". The two 40/80 glows on `SealMonogram` are the closest thing this
 /// design system has to a
-/// celebration glow, and `ResultScreen.tsx:4-27` — fourteen rays, three discs,
-/// five flecks — is still the only ray table the prototype has. **Nothing here is
+/// celebration glow, and the prototype's result screen — fourteen rays, three
+/// discs, five flecks — was the only ray table anywhere, and is still the only
+/// one this design system has. **Nothing here is
 /// transcribed from `.bigring`** and nothing here should be read as if it were:
 /// the two marks are a burst and a ring, and the resemblance is a coincidence of
 /// both being round and gold.

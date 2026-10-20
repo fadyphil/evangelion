@@ -255,10 +255,14 @@ void main() {
     //
     // The sweep above cannot fail for a widget that is allowed to grow. The **four**
     // controls below are the ones the design gives a **fixed** height or a floor:
-    // `EvaButton` 52 (`ds.tsx:240`), `EvaTextField`'s shell 52 (`ds.tsx:306`), the
-    // settings row's floor (`ds.tsx:488`'s 56, re-composed by Phase 4.2 to 57 —
-    // see the `SettingsTile` entry), and `IconActionButton`'s 44
-    // (`SettingsScreen.tsx:39`). Those are the places where Phase-1 decision 5's
+    // `EvaButton` 52, `EvaTextField`'s shell 52, the
+    // settings row's floor (the superseded prototype's 56, re-composed by Phase 4.2
+    // to 57 — see the `SettingsTile` entry), and `IconActionButton`'s 44. All
+    // four are the superseded prototype's own numbers, and **the redesign has no
+    // counterpart for any of them** — its `.cta`, its `.field input` and its
+    // `.srow` declare no height at all, and its own icon button is a 30×30 pill
+    // (`redesign.html:151`). Those are the places where Phase-1
+    // decision 5's
     // 57sp `displayLarge` would actually break the layout, so they are the places
     // a text-size regression has to be caught.
     //
@@ -420,9 +424,27 @@ void main() {
     // legibility question rather than a layout failure, and it is named rather
     // than asserted away.
     test('the constants this group checks are the design\'s own', () {
-      expect(kEvaButtonHeight, 52.0, reason: 'ds.tsx:240 — `height: 52`');
-      expect(kEvaTextFieldHeight, 52.0, reason: 'ds.tsx:306 — `height: 52`');
-      expect(SettingsTile.minHeight, 56.0, reason: 'ds.tsx:488 — `height: 56`');
+      expect(
+        kEvaButtonHeight,
+        52.0,
+        reason:
+            'the superseded prototype\'s `height: 52` — the redesign has no '
+            'counterpart for it',
+      );
+      expect(
+        kEvaTextFieldHeight,
+        52.0,
+        reason:
+            'the superseded prototype\'s `height: 52` — the redesign has no '
+            'counterpart for it',
+      );
+      expect(
+        SettingsTile.minHeight,
+        56.0,
+        reason:
+            'the superseded prototype\'s `height: 56` — the redesign has no '
+            'counterpart for it',
+      );
       // And the **rendered** floor the entry above is measured against. Spelled
       // out here because the entry reads the constant, and a constant that is only
       // ever compared against itself cannot catch anything: this is the line that
@@ -431,7 +453,8 @@ void main() {
         SettingsTile.renderedFloor,
         57.0,
         reason:
-            '`ds.tsx:488`\'s 56 plus the 1px bottom hairline `redesign.html:419` '
+            'the superseded prototype\'s 56 plus the 1px bottom hairline '
+            '`redesign.html:419` '
             'gives the row — `BoxDecoration.padding` is the border\'s dimensions, '
             'so the rule takes a pixel of its own',
       );
@@ -617,7 +640,8 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
     finderReason: 'the button is its own box — it sets `height:` on its shell',
     height: kEvaButtonHeight,
     heightReason:
-        'The pill is fixed at 52 (`ds.tsx:240`), and a control that cannot grow '
+        'The pill is fixed at 52 — the superseded prototype\'s number, which the '
+        'redesign has no counterpart for — and a control that cannot grow '
         'absorbs a type-scale change by clipping its own label.',
     text: 'Begin reflection',
     textReason: (String data) => 'the button label is the text under test',
@@ -649,7 +673,8 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
         'is the box SizedBox(height: kEvaTextFieldHeight) draws',
     height: kEvaTextFieldHeight,
     heightReason:
-        'The shell is fixed at 52 (`ds.tsx:306`). The widget as a whole is taller '
+        'The shell is fixed at 52 — the superseded prototype\'s number, which '
+        'the redesign has no counterpart for. The widget as a whole is taller '
         'by design — label plus gap — so this is the shell\'s height and not the '
         'column\'s.',
     // The **entered value**, named by its data. `EditableText` renders it through
@@ -676,7 +701,8 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
         'the button is its own box — it sets `size:` on its `SizedBox`',
     height: 44,
     heightReason:
-        "44 is ds.tsx's literal (`SettingsScreen.tsx:39`) and also "
+        "44 is the superseded prototype's literal — its settings, reading and "
+        'quiz back buttons each wrote `width: 44, height: 44` — and also '
         "`iOSTapTargetGuideline`'s minimum, so one number satisfies both.",
     // **No text, and the reason matters.** There is no `Text` in this widget at
     // all: the content is an `Icon`, and `Icon` does not scale with `TextScaler`,
@@ -731,7 +757,8 @@ final List<_FixedHeight> _fixed = <_FixedHeight>[
     // whole padding renders 87 and turns this red.
     height: SettingsTile.renderedFloor,
     heightReason:
-        'The floor is `max(content, 26) + 2 × 15 + 1` — `ds.tsx:488`\'s 56 '
+        'The floor is `max(content, 26) + 2 × 15 + 1` — the superseded '
+        'prototype\'s 56 '
         're-composed against `redesign.html:419`\'s padding, plus the hairline. '
         "It is a **floor**, not a fixed height (`settings_tile.dart`'s doc says "
         'so at length), and the row is allowed to exceed it when its content needs '

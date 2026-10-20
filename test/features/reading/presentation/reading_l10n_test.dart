@@ -182,8 +182,11 @@ void main() {
     });
 
     test('and the caption carries no duration, because the payload has none', () {
-      // `ReadingEnScreen.tsx:89` wrote `5 questions · about a minute` and `:31`
-      // wrote `Chapter 1 · 4 min`. **Neither duration has a source** — there is no
+      // The superseded prototype wrote `5 questions · about a minute` and
+      // `Chapter 1 · 4 min`. The redesign's own captions carry no duration
+      // either — `redesign.html:1347` writes `quiz · 3 questions` and `:1346`
+      // writes `poetry · 6 verses · sky 0` — and **neither duration has a
+      // source** — there is no
       // duration field anywhere in `GET /readings/today/{lang}` (verified live
       // against `HEAD = 4a1c834`, AGENT_CONTEXT §5) — and inventing one from a
       // word count is inventing a measurement. This survives the plural's

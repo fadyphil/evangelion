@@ -25,8 +25,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// minute of silence and the scrolls.
 ///
 /// `redesign.html:513-538`. **Task 5.2 rebuilt this screen against that range**, and
-/// every number on it is a `redesign.html` line rather than the React prototype's
-/// `HomeScreen.tsx` the previous version transcribed.
+/// every number on it is a `redesign.html` line rather than the React
+/// prototype's own screen the previous version transcribed.
 ///
 /// ## THE PADDING IS FIVE NUMBERS AND FOUR GAPS, AND CSS'S MARGIN COLLAPSE IS WHY
 ///

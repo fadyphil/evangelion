@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// RED-FIRST — `FontSizeStepper`'s clamping, and `SegmentedControl`'s selection
 /// model. Both are calculations the prototype never had to express: the
 /// prototype's font size is an uncontrolled `<input type="range" min=1 max=5>`
-/// (`SettingsScreen.tsx:66`) and its theme picker is three buttons whose state
+/// — and **the redesign has no counterpart for that range**, its own type-size
+/// slider being `min=16 max=26` (`redesign.html:693`) — and its theme picker is
+/// three buttons whose state
 /// lives in a `useState` the browser clamps for free.
 ///
 /// Phase 3's gate — "`SegmentedControl` selects via keyboard" — needs a keyboard

@@ -14,9 +14,10 @@ import 'package:flutter/material.dart';
 ///
 /// This widget is the orb's counterpart, so `:392-395` owns the **treatment**:
 /// the wash's centre ([sealGlowCenter]) and the glyph's ink
-/// ([EvaColors.onEmber]). `LoginScreen.tsx:19` still owns
-/// **`defaultSize = 60`**, and that is a recorded divergence rather than an
-/// oversight — see below.
+/// ([EvaColors.onEmber]). The superseded prototype's own login seal still owns
+/// **`defaultSize = 60`** — a value **the redesign has no counterpart for**,
+/// because its `/login` draws no seal at all — and that is a recorded divergence
+/// rather than an oversight — see below.
 ///
 /// ## WHAT IS ADOPTED FROM `:392-395`, AND WHAT IS NOT
 ///
@@ -26,7 +27,7 @@ import 'package:flutter/material.dart';
 /// | `color: #1c1608` (`:394`) | [EvaColors.onEmber] | **adopted** — the same role `.cta`'s own `#1c1608` has (`:387`) |
 /// | `width/height: 74` (`:392`) | [defaultSize] = 60 | **not adopted** — see below |
 /// | `radial-gradient(circle at 35% 30%, rgba(255,255,255,.5), rgba(232,176,75,.85) 50%, #8a6417 90%)` (`:393`) | [sealGlowAlpha] → [EvaColors.ember] → 0 | **not adopted** — two of its three stops are not tokens |
-/// | `box-shadow: 0 0 34px rgba(232,176,75,.5)` (`:394`) | the two 40/80 `BoxShadow`s from `LoginScreen.tsx:17-26` | kept — the orb has one shadow, this widget has the old pair |
+/// | `box-shadow: 0 0 34px rgba(232,176,75,.5)` (`:394`) | the two 40/80 `BoxShadow`s from the prototype's own login seal | kept — the orb has one shadow, this widget has the old pair |
 /// | `font-size: 30px` at 74px wide (`:394`) | 28px at 60px, [glyphRatio] | kept — see below |
 ///
 /// **The size.** `:392` is `width: 74px`. **This widget stays at 60**, and the
@@ -52,7 +53,8 @@ import 'package:flutter/material.dart';
 /// adopted — a Flutter widget has no `::after` and no pseudo-element to blur.
 ///
 /// **The glyph's size.** `:394` is `font-size: 30px` on a 74px orb — a ratio of
-/// 0.405. This widget's 28px on 60px is 0.4667, which is `LoginScreen.tsx:25`'s.
+/// 0.405. This widget's 28px on 60px is 0.4667, which is the prototype's own
+/// login seal's ratio.
 /// Two different marks at two different sizes have two different ratios, and
 /// changing the ratio would move the glyph inside a box the login harness holds
 /// at 60.
@@ -79,7 +81,8 @@ class SealMonogram extends StatelessWidget {
     super.key,
   });
 
-  /// `LoginScreen.tsx:19` — `width: 60, height: 60`.
+  /// The prototype's own login seal — `width: 60, height: 60` — and **the
+  /// redesign has no counterpart for it**: its `/login` draws no seal at all.
   ///
   /// ## KEPT, AND IT IS A RECORDED DIVERGENCE FROM `:392`
   ///
@@ -150,7 +153,7 @@ class SealMonogram extends StatelessWidget {
 
   /// The glyph's em size as a fraction of the seal's diameter — `0.4667`.
   ///
-  /// `LoginScreen.tsx:25`'s 28 on a 60px seal. **Not** `:394`'s 0.405 (30 on
+  /// The prototype's 28 on a 60px seal. **Not** `:394`'s 0.405 (30 on
   /// 74): those are two marks at two sizes, and the seal's box is held at 60 by
   /// `login_geometry_test.dart`. See the class doc.
   static const double glyphRatio = 0.4667;

@@ -202,7 +202,7 @@ const double kEvaRequiredTextScale = 1.22;
 /// | --- | --- | --- |
 /// | `kNarrowSurface` | 320×568 | §14's overflow requirement, "text scales to 1.22× without overflow at 320px width" |
 /// | `kAmbientSurface` | 390×844 | the ambient — the prototype's own device frame (`eva/redesign.html:43`) |
-/// | `kGeometrySurface` | 430×932 | `/reading`'s and `/quiz`'s geometry suites, at the width `ds.tsx` was drawn at |
+/// | `kGeometrySurface` | 430×932 | `/reading`'s and `/quiz`'s geometry suites — a width wide enough that the superseded prototype's own numbers can be compared without a wrap |
 ///
 /// So the three screens each had **one** viewport asserted against it, and no
 /// viewport had all six. `viewport_matrix_test.dart` is what turns three constants
@@ -731,7 +731,9 @@ typedef InteractiveWidget = ({
 final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   (
     widget: EvaButton,
-    name: 'ds.tsx ButtonPrimary / ButtonSecondary / ButtonText',
+    name:
+        'redesign.html:381 — the three button roles: .cta, .qnext (:363) and '
+        '.ghosts button (:388)',
     build: () => const EvaButton(
       labelFamily: EvaTypography.uiFamily,
       label: 'Sign in',
@@ -742,7 +744,9 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   ),
   (
     widget: EvaTextField,
-    name: 'ds.tsx Input — defect #8 made this readOnly',
+    name:
+        'redesign.html:376 — the `.field input`; the prototype\'s defect #8 made '
+        'its own Input readOnly',
     // The `Material` is a `TextField` requirement, not decoration: its
     // `InputDecorator` asserts on one. A real screen gets it from `Scaffold`,
     // and this harness has no `Scaffold`.
@@ -775,7 +779,7 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   ),
   (
     widget: EvaToggle,
-    name: 'SettingsScreen.tsx:14-26 — the local Toggle component',
+    name: 'redesign.html:423 — the `.tgl` switch',
     build: () => const EvaToggle(
       value: true,
       onChanged: _noopBool,
@@ -786,7 +790,7 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   ),
   (
     widget: FontSizeStepper,
-    name: 'SettingsScreen.tsx:63-69 — the range input row',
+    name: 'redesign.html:693 — the "Type size" range row',
     build: () => const FontSizeStepper(
       step: 3,
       onChanged: _noopInt,
@@ -817,14 +821,16 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
   ),
   (
     widget: TextLink,
-    name: "LoginScreen.tsx:70-72 — the 'Create account' link",
+    name:
+        "the superseded prototype's 'Create account' link — the redesign has no "
+        'counterpart',
     build: () => const TextLink(label: 'Create account', onPressed: _noop),
     activation: SemanticsAction.tap,
     tappableLabel: 'Create account',
   ),
   (
     widget: SettingsTile,
-    name: 'ds.tsx SettingsTile, when the row itself is tappable',
+    name: 'redesign.html:419 — the `.srow`, when the row itself is tappable',
     build: () => const SettingsTile(
       title: 'Edit profile',
       trailing: SizedBox(width: 16, height: 16),
@@ -852,7 +858,9 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
     // `GlassSurface(onTap:)` is interactive and shipped without a focus node at
     // all, so Tab could not reach it.
     widget: GlassSurface,
-    name: 'Phase 2 — ds.tsx had eight glass surfaces, two of them tappable',
+    name:
+        'Phase 2 — the superseded prototype had eight glass surfaces, two of them '
+        'tappable',
     build: () => const GlassSurface(
       onTap: _noop,
       semanticLabel: "Today's reading",
@@ -898,7 +906,9 @@ final List<InteractiveWidget> kInteractiveWidgets = <InteractiveWidget>[
 final List<InteractiveWidget> kDisabledWidgets = <InteractiveWidget>[
   (
     widget: EvaButton,
-    name: 'ds.tsx:245 — `opacity: disabled ? 0.45`',
+    name:
+        "the prototype's `opacity: disabled ? 0.45` — the redesign has no "
+        'counterpart',
     build: () =>
         const EvaButton(labelFamily: EvaTypography.uiFamily, label: 'Sign in'),
     activation: SemanticsAction.tap,
@@ -924,7 +934,7 @@ final List<InteractiveWidget> kDisabledWidgets = <InteractiveWidget>[
   ),
   (
     widget: SettingsTile,
-    name: 'ds.tsx:488 — every prototype row is inert; the control is tappable',
+    name: 'redesign.html:650 — the row is inert; the control in it is tappable',
     build: () => const SettingsTile(
       title: 'Notifications',
       trailing: SizedBox(width: 44, height: 24),

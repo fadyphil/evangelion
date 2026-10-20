@@ -66,10 +66,17 @@ const double curtainSideAlphaLight = 0.9;
 ///   <NeuralBackground variant={N} />
 /// ```
 ///
-/// — `LoginScreen.tsx:11`, `HomeScreen.tsx:14`, `SettingsScreen.tsx:35`,
-/// `QuizScreen.tsx:41`, `ReadingEnScreen.tsx:9`, `ReadingArScreen.tsx:9`,
-/// `ResultScreen.tsx:34`. Nine occurrences of `minHeight: 844` across eight
-/// screens, which is prototype defect **#9**.
+/// — the prototype's eight screen roots, each of which writes it by hand:
+/// `LoginScreen`, `HomeScreen`, `SettingsScreen`, `QuizScreen`,
+/// `ReadingEnScreen`, `ReadingArScreen`, `ResultScreen` and the app shell.
+/// Nine occurrences of `minHeight: 844` across eight screens, which is
+/// prototype defect **#9**.
+///
+/// **And the redesign has no counterpart for it.** Its screen root
+/// (`.screen`, `redesign.html:45`) declares `height: 100%` and no minimum at
+/// all; the 844 survives only on the *device frame* the prototype's own shell
+/// drew around it (`redesign.html:43`), which is a presentation of the
+/// reference and not a rule any screen inherits.
 ///
 /// ## #9, AND WHERE EACH HALF OF THE FIX LIVES
 ///
@@ -78,8 +85,8 @@ const double curtainSideAlphaLight = 0.9;
 ///   whatever the viewport is — 568, 844, 932, a foldable's unfolded height — and
 ///   [scrollable] decides whether the content moves or the page does.
 /// - **`AnnotatedRegion<SystemUiOverlayStyle>`.** The prototype is immersive
-///   (`App.tsx:99` renders a rounded phone frame with the screen bleeding to its
-///   edges), and `main()` calls
+///   (the prototype's app shell renders a rounded phone frame with the screen
+///   bleeding to its edges), and `main()` calls
 ///   `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)`. Edge-to-edge
 ///   without an overlay style means the status bar keeps **light** icons on a
 ///   light canvas and vanishes on a dark one. So the overlay style is resolved
@@ -91,15 +98,15 @@ const double curtainSideAlphaLight = 0.9;
 /// This widget is **partially frozen**, and the split is the whole of Task 4.2's
 /// rule for it: move the citation for what changed, keep it for what survived.
 ///
-/// - **Kept, all eight:** `LoginScreen.tsx:11`, `HomeScreen.tsx:14`,
-///   `SettingsScreen.tsx:35`, `QuizScreen.tsx:41`, `ReadingEnScreen.tsx:9`,
-///   `ReadingArScreen.tsx:9`, `ResultScreen.tsx:34` and `App.tsx:99` above. They
-///   describe the **root role** — the five-line container every prototype screen
-///   writes by hand — and not one word of that container changed. Defect **#9** and
-///   the overlay-style half of the fix are exactly where they were.
-/// - **Moved:** the scrim. `ReadingEnScreen.tsx:83`'s
-///   `linear-gradient(to bottom, transparent, rgba(#05081A, 0.95) 40%)` is
-///   replaced by `eva/redesign.html:112-115` (and its light-mode twin at `:61-63`).
+/// - **Kept, all eight:** the prototype's eight screen roots listed above, plus
+///   its app shell. They describe the **root role** — the five-line container
+///   every prototype screen writes by hand — and not one word of that container
+///   changed. Defect **#9** and the overlay-style half of the fix are exactly
+///   where they were.
+/// - **Moved:** the scrim. The prototype's
+///   `linear-gradient(to bottom, transparent, rgba(#05081A, 0.95) 40%)` — the
+///   English reading screen's sticky-CTA `background` — is replaced by
+///   `eva/redesign.html:112-115` (and its light-mode twin at `:61-63`).
 ///   See [kNeuralCurtain] for the ramp and [curtain] for the shape.
 ///
 /// ### THE PROTOTYPE HAS **TWO** SCRIMS AND THIS WIDGET HAS ONE
@@ -107,7 +114,7 @@ const double curtainSideAlphaLight = 0.9;
 /// `redesign.html:112`'s `.scrim` is `position:absolute; inset:0; z-index:1` with
 /// `data-shape` on the **`.screen`** element: a **full-screen** curtain over
 /// everything the route draws, re-declared per screen. The other one is
-/// `ReadingEnScreen.tsx:80-86`'s, on the sticky CTA, which is what this widget
+/// the prototype's second one, on the sticky CTA, which is what this widget
 /// paints.
 ///
 /// **They are different layers with different extents, and only one of them has a
@@ -118,9 +125,9 @@ const double curtainSideAlphaLight = 0.9;
 /// which screens get it — a screen-level decision for Phase 5, not a paint
 /// change. Recorded so the two are never confused into one.
 ///
-/// `kNeuralScaffoldFadeHeight`'s own doc still cites `ReadingEnScreen.tsx:79-86`,
-/// and that is correct and unchanged: it is the **extent** the prototype's CTA
-/// occupies, which the redesign does not restate anywhere.
+/// `kNeuralScaffoldFadeHeight`'s own doc still measures the prototype's sticky
+/// CTA block, and that is correct and unchanged: it is the **extent** the
+/// prototype's CTA occupies, which the redesign does not restate anywhere.
 
 /// ## D1 — THERE IS NO ELEVATION TOKEN, AND THE ANSWER IS "STRUCTURALLY 0"
 ///
@@ -165,9 +172,9 @@ const double curtainSideAlphaLight = 0.9;
 /// exact hazard Phase 2 recorded.
 ///
 /// **That whole argument was about the ORBS.** The prototype draws a different
-/// orb group per language — English opens blue and has no cyan orb
-/// (`ds.tsx:83-86`), Arabic opens violet and pairs it with cyan
-/// (`ds.tsx:88-91`) — and the redesign has **one** canvas for every screen
+/// orb group per language — English opens blue (`#3B5BDB`) and has **no** cyan
+/// orb, Arabic opens violet (`#6C3FE8`) and pairs it with cyan (`#06B6D4`) —
+/// and the redesign has **one** canvas for every screen
 /// (`eva/redesign.html:46`), so the aurora does not vary by language and the
 /// variant has nothing left to select.
 ///
@@ -208,14 +215,16 @@ class NeuralScaffold extends StatelessWidget {
   /// whose bodies own their own scrollables or centre without one
   /// (`eva/redesign.html:369` — `.login` is `justify-content:center` with no
   /// overflow of its own). `true` is correct for `/` and `/settings`, whose
-  /// roots scroll (`HomeScreen.tsx:11`). The redesigned login was the first
+  /// roots scroll (the prototype's home screen root does). The redesigned login
+  /// was the first
   /// screen to move between the two groups, in Phase 5.1.
   final bool scrollable;
 
   /// Horizontal inset around [child]. Defaults to `EvaSpacing.lg`.
   ///
-  /// `16`, not the prototype's `24` (`ReadingEnScreen.tsx:26`) or `20`
-  /// (`QuizScreen.tsx:41`): the inventory specifies `EvaSpacing.lg`, and a screen
+  /// `16`, not the prototype's `24` (the English reading screen's content
+  /// padding) or `20` (the quiz screen's root padding): the inventory specifies
+  /// `EvaSpacing.lg`, and a screen
   /// gutter is the one number in this design system that Phase 1 already fixed
   /// as a token (`EvaSpacing.screenHorizontal == 20`). The default here is the
   /// inventory's, and a screen that wants `20` passes it. **Recorded as a
@@ -239,7 +248,7 @@ class NeuralScaffold extends StatelessWidget {
   /// `/`'s selah amen — are its callers now.
   ///
   /// The `Stack` here is already the prototype's `position: absolute; inset: 0`
-  /// container (`ds.tsx:162`), so an overlay is the shape the prototype actually had
+  /// container, so an overlay is the shape the prototype actually had
   /// rather than a second one introduced for Flutter.
   ///
   /// It is placed **after** the content and **before** [bottomFade]'s scrim, so a
@@ -253,14 +262,14 @@ class NeuralScaffold extends StatelessWidget {
 
   /// Whether to draw the sticky-CTA scrim along the bottom edge.
   ///
-  /// **The extent** is `ReadingEnScreen.tsx:80-86`'s: the gradient is the sticky
+  /// **The extent** is the prototype's: the gradient is the sticky
   /// CTA's `background`, and the CTA's own `padding: '20px 24px 32px'`, so the
   /// gradient cannot be a constant — [kNeuralScaffoldFadeHeight] is the prototype's
   /// number at its smallest and the gradient is drawn to the bottom of the
   /// viewport above it.
   ///
   /// **The ramp is `eva/redesign.html:112-115`'s, and it used to be the React
-  /// app's.** `ReadingEnScreen.tsx:83` is
+  /// app's.** The prototype's is
   /// `linear-gradient(to bottom, transparent, rgba(#05081A, 0.95) 40%)` — two
   /// stops, reaching `.95` at 40% of the scrim's height. `:113` is four stops,
   /// reaching **.92** at 100% of it, with two intermediate rungs at `.30` and
@@ -326,7 +335,8 @@ class NeuralScaffold extends StatelessWidget {
       // app bar to be behind.
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         // `SystemUiOverlayStyle.light` is *light* icons. The prototype's phone
-        // frame is dark by default (`App.tsx:91`), and `main.dart` puts the app
+        // frame is dark by default (the prototype's app shell paints `#05081A`
+        // behind the screen), and `main.dart` puts the app
         // in `SystemUiMode.edgeToEdge`, so without this the status bar is
         // invisible on the dark canvas and invisible the other way on the light
         // one.
@@ -379,7 +389,8 @@ class NeuralScaffold extends StatelessWidget {
               children: <Widget>[
                 // Behind everything, and full-bleed: the prototype's background
                 // container is `position: absolute; inset: 0`
-                // (`ds.tsx:162`) and the screens above it rely on that to be
+                // (the prototype's background wrapper) and the screens above it rely
+                // on that to be
                 // immersive. The [SafeArea] is applied to the *content*, not to the
                 // stack, so the canvas reaches under the status bar.
                 //
@@ -396,7 +407,8 @@ class NeuralScaffold extends StatelessWidget {
                     child: scrollable
                         ? SingleChildScrollView(
                             // The prototype's `overflowY: 'auto'` is
-                            // `ReadingEnScreen.tsx:11`, on the **root** — so a
+                            // the prototype's reading screen root, on the
+                            // **root** — so a
                             // bouncing scroll is the faithful choice, not the
                             // platform's clamping one.
                             physics: const BouncingScrollPhysics(),
@@ -443,7 +455,7 @@ class NeuralScaffold extends StatelessWidget {
 ///
 /// ## WHAT `:112-115` REPLACED, AND WHY THE NEW RAMP IS **BETTER**
 ///
-/// `ReadingEnScreen.tsx:83` was `linear-gradient(to bottom, transparent,
+/// The prototype's was `linear-gradient(to bottom, transparent,
 /// rgba(#05081A, 0.95) 40%)` — two stops, and the second one is the problem.
 ///
 /// **The old ramp never resolved to anything.** `transparent` at `0` and `canvas`
@@ -578,16 +590,17 @@ List<Color> curtainRamp(EvaColors colors, List<double> alphas) => <Color>[
 
 /// How tall the sticky-CTA scrim is for [constraints].
 ///
-/// `ReadingEnScreen.tsx:79-86` sets the sticky CTA's `background` to the gradient,
-/// so **the scrim's extent is that CTA** — `20` top padding, the button, the
+/// The prototype's sticky CTA sets its `background` to the gradient, so
+/// **the scrim's extent is that CTA** — `20` top padding, the button, the
 /// caption's `marginTop: 8`, and `32` bottom padding — which is `20 + 52 + 8 + 10 +
 /// 32`, recorded here as `104`. It is **not** the content's `130px` bottom padding
-/// from `:26`; that lives on the sibling scroll div and is a *reserve for the
-/// reader*, not the height of anything the prototype paints. Summing the two is
+/// from the content's own bottom padding; that lives on the sibling scroll
+/// div and is a *reserve for the reader*, not the height of anything the
+/// prototype paints. Summing the two is
 /// what made the shade reach opaque over the last line of the passage.
 ///
 /// A constant would be wrong on every other screen, so it scales with the
-/// viewport. The prototype's screen is 390 wide and its `ds.tsx` numbers are the
+/// viewport. The prototype's screen is 390 wide and its own numbers are the
 /// only ones that exist, so 390 is the width the transcription is calibrated
 /// against and other widths are interpolated from it rather than measured.
 ///
@@ -607,11 +620,11 @@ double kNeuralScaffoldFadeHeight(BoxConstraints constraints) {
   // This used to be `(contentReserve * scale) + ctaBlock`, reading its own doc's
   // phrase "the CTA's height plus that padding" as a licence to sum the content's
   // 130px bottom padding into the scrim. Those are two different quantities and
-  // the prototype keeps them apart: `ReadingEnScreen.tsx:79-86` puts the gradient
-  // in the `background` of the sticky-CTA `<div>` itself, so the gradient's extent
+  // the prototype keeps them apart: the sticky-CTA `<div>` puts the gradient
+  // in its own `background`, so the gradient's extent
   // is **that div** — `20px` top padding, the button, the caption's `marginTop: 8`,
   // and `32px` bottom padding — and never the content's reserve. The content's
-  // `padding: '28px 24px 130px'` lives on the *sibling* scroll div at `:26`.
+  // `padding: '28px 24px 130px'` lives on the *sibling* scroll div.
   //
   // ## WHAT THE OLD SUM ACTUALLY DID TO A READER
   //

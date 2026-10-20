@@ -104,10 +104,11 @@ class JourneyMedalsStrip extends StatelessWidget {
 ///
 /// **And the surface brings two things `.medal` does not declare.** The tier
 /// paints the house's `glassFill` and `glassBorder` and the glass ambient
-/// shadow — `ds.tsx:386`'s `0 4px 24px`, which the redesign's `.medal`
-/// (`:412-413`) does not carry — and the house's **light** `--glass-fill` is
-/// 4% black where the prototype's is `rgba(255,255,255,.55)` (`:57`). Those
-/// are the tier's recorded substitutions and the podium's are the same ones —
+/// shadow — `0 4px 24px`, the value the superseded prototype's passage card
+/// carried and **which the redesign's `.medal` (`:412-413`) has no counterpart
+/// for** — and the house's **light** `--glass-fill` is 4% black where the
+/// prototype's is `rgba(255,255,255,.55)` (`:57`). Those are the tier's recorded
+/// substitutions and the podium's are the same ones —
 /// this widget does not re-argue them, and it does not have a switch for them
 /// either.
 ///

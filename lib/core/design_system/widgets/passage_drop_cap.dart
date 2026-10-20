@@ -5,14 +5,15 @@ import 'package:flutter/material.dart';
 
 /// The oversized opening letter of a passage.
 ///
-/// ## D6 — "NO PROTOTYPE", WHICH WAS TRUE OF `eva/src/` AND FALSE OF `redesign.html`
+/// ## D6 — "NO PROTOTYPE", WHICH WAS TRUE OF THE **SUPERSEDED** ONE AND FALSE
+/// ## OF `redesign.html`
 ///
-/// **This doc used to say there was not, and that was true of `eva/src/` and
-/// false of the prototype this client is now built from.** `eva/src/` is the
-/// React app the Phase-3 inventory describes, and a search of it for a drop cap
-/// returns nothing — the only hits are a pasted-text attachment describing a
-/// *different*, discarded design (an oversized Cormorant "I" opening "In the
-/// beginning…" in a Home hero that was cut with the library), and
+/// **This doc used to say there was not, and that was true of the React app
+/// the Phase-3 inventory describes and false of the design this client is now
+/// built from.** That app had no drop cap at all — the only hits in it were a
+/// pasted-text attachment describing a *different*, discarded design (an
+/// oversized Cormorant "I" opening "In the beginning…" in a Home hero that was
+/// cut with the library), and
 /// `05-domain-model.md` §9.1's `Verse` has no `dropCap` member, so the field the
 /// inventory names was invented alongside the widget.
 ///

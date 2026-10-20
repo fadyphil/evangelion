@@ -3,9 +3,17 @@ import 'package:flutter/material.dart';
 
 /// A 1px rule, optionally interrupted by a centred mono-caps label.
 ///
-/// Three surviving call sites (`04-widget-inventory.md` §3): Login's "or"
-/// (`LoginScreen.tsx:76-80`), and the short centred rules under each reading's
-/// title (`ReadingEnScreen.tsx:42`, `ReadingArScreen.tsx:45`).
+/// **Three call sites in the superseded prototype** (`04-widget-inventory.md`
+/// §3): its login drew an "or" rule, and each of its reading screens drew a
+/// short centred rule under the title — **and the redesign has no counterpart for
+/// any of them**: its `/login` carries no divider at all, and its reader draws no
+/// centred stub.
+///
+/// **So the widget is unplaced, and the orphan gate's allowlist says so.** The
+/// reason it is still here is the one the allowlist gives: it is a design-system
+/// primitive kept for a shape the redesign does not currently draw — and the
+/// `docs/DRIFT.md` §7 precedent for `EvaChip` was **deletion**, so the decision
+/// to keep or delete this one is **open**.
 ///
 /// ## THE TWO PROTOTYPE RULES ARE NOT THE SAME RULE
 ///
@@ -35,7 +43,8 @@ import 'package:flutter/material.dart';
 ///
 /// `text.toUpperCase()` is kept and is a no-op on the Arabic arm: Arabic has no
 /// case, so the transform is idempotent there and the prototype's uppercase rule
-/// (`ds.tsx:297`) still holds on the English one.
+/// (the prototype's `textTransform: 'uppercase'`) still holds on the English
+/// one.
 class HairlineDivider extends StatelessWidget {
   /// A rule, optionally labelled [label] in the middle.
   const HairlineDivider({this.label, this.color, this.width, super.key});
@@ -52,8 +61,9 @@ class HairlineDivider extends StatelessWidget {
   /// The rule's thickness, in logical px. `1` everywhere in the prototype.
   static const double thickness = 1;
 
-  /// Gap between a label and each half of the rule. `LoginScreen.tsx:76` —
-  /// `gap: 10`.
+  /// Gap between a label and each half of the rule. The prototype's — `gap: 10` —
+  /// and **the redesign has no counterpart for it**, because it has no labelled
+  /// rule.
   static const double labelGap = 10;
 
   @override
@@ -81,7 +91,7 @@ class HairlineDivider extends StatelessWidget {
                   EvaTypography.monoCaps(colors),
                   Directionality.of(context),
                 ).copyWith(
-                  // `LoginScreen.tsx:78` — `color: T.ink3`.
+                  // The prototype's `color: T.ink3`.
                   color: colors.ink3,
                   fontWeight: FontWeight.w700,
                 ),

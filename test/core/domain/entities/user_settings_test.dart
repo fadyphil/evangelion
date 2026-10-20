@@ -25,7 +25,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('AppThemeMode', () {
     test('is exactly the prototype\'s three options, in its order', () {
-      // `SettingsScreen.tsx:52` — `['Light', 'Dark', 'System']`. Asserted as a list
+      // The superseded prototype's own three options —
+      // `useState<'Light' | 'Dark' | 'System'>('Dark')` — and **the redesign has
+      // no counterpart for them**: its theme group holds exactly one control, the
+      // Daylight toggle (`redesign.html:650`). Asserted as a list
       // rather than a set because the ORDER is what `SegmentedControl` paints in, and a
       // set cannot tell a transposed pair from the right one.
       expect(AppThemeMode.values, <AppThemeMode>[

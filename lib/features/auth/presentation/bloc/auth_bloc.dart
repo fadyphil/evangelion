@@ -1,10 +1,13 @@
 /// Where the sign-in form's state lives, and who owns it.
 ///
-/// AGENT_CONTEXT §6, recorded decision 10: `LoginScreen.tsx:49-52` writes the
-/// email field's focus and the password field's error as **literals** — a field
-/// that is always drawn focused and an error the reader cannot cause. That is
-/// prototype defect #10. This bloc exists so the second one becomes state rather
-/// than a string baked into a widget tree.
+/// AGENT_CONTEXT §6, recorded decision 10: the superseded React prototype wrote
+/// the email field's focus and the password field's error as **literals** — a
+/// field that is always drawn focused and an error the reader cannot cause.
+/// That was prototype defect #10, and **the redesign has no counterpart for
+/// it**: its two login fields (`eva/redesign.html:506-507`) carry *empty*
+/// message placeholders and the text in them is computed at submit time
+/// (`eva/redesign.html:1305-1306`). This bloc exists so the second one becomes
+/// state rather than a string baked into a widget tree.
 ///
 /// ## WHAT THE BLOC OWNS
 ///
@@ -17,8 +20,11 @@
 ///   judgement in `build`, and §6 forbids logic in a widget;
 /// * **the submission status**, because "can this button be pressed" is a question
 ///   about state, and answering it in the widget is how a double-tap ships;
-/// * **password visibility** — the prototype's `useState(showPw)` at
-///   `LoginScreen.tsx:6`, moved somewhere it can be asserted;
+/// * **password visibility** — the superseded prototype's `useState(showPw)`,
+///   which defaulted to `false`; **the redesign has no counterpart for it**,
+///   because its password field (`eva/redesign.html:507`) is a plain
+///   `type="password"` input with no visibility control at all. This client
+///   keeps the toggle and moves it somewhere it can be asserted;
 /// * **the repository's failure**, so `LoginPage` renders a message rather than
 ///   dropping it.
 ///

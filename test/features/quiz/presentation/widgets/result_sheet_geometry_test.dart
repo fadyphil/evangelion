@@ -14,10 +14,12 @@
 /// alternative was a doc comment pointing at nothing. It is the most fragile
 /// transcription in the surface:
 ///
-/// > `ResultScreen.tsx:62-64` is an inline `<svg>` flame **14×18**, which is NOT the
-/// > design system's `StreakFlame` — that one is square (`streak_flame.dart`'s
-/// > `size` sets width **and** height) and is transcribed from `ds.tsx:522`, a
-/// > different site.
+/// > The superseded prototype's result card held an inline `<svg>` flame **14×18**,
+/// > which is NOT the design system's `StreakFlame` — that one is square
+/// > (`streak_flame.dart`'s `size` sets width **and** height) and is transcribed
+/// > from the prototype's own top bar, a different site. The redesign's own
+/// > `.flame` is `13×17` (`redesign.html:242`) — a third shape, and a fourth
+/// > number the client does not use.
 ///
 /// A square icon at 18 is visibly wider than the prototype's. Nothing in a diff says
 /// so — `StreakFlame(size: 18)` reads correctly — and everything on screen does.
@@ -105,7 +107,7 @@ void main() {
         reason:
             'the square `StreakFlame` is fitted down into the 14-wide box. Without the '
             '`SizedBox` the painted flame is 18 wide and the pill is visibly wider '
-            'than `ResultScreen.tsx:62-64`',
+            'than the superseded prototype\'s 14-wide inline flame',
       );
       expect(
         rect.height,

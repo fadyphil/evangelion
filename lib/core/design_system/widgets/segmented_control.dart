@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 /// The keyboard model Phase 3's gate names — "`SegmentedControl` selects via
 /// keyboard" — is this function plus the direction below it. The prototype had
 /// no keyboard model at all: its theme picker is three `<button>`s whose state
-/// lives in a `useState` (`SettingsScreen.tsx:6,52-61`) and whose only input is
+/// lives in a `useState` and whose only input is
 /// a click. A control a keyboard cannot reach is the §14 defect this widget is
 /// built to close, so the model is written down and pinned before the widget.
 ///
@@ -66,8 +66,9 @@ int selectionStepFor({
 /// A segmented picker over any enum or value type.
 ///
 /// `04-widget-inventory.md` §3 collapses two prototype controls into this one:
-/// the Settings **theme** picker (`SettingsScreen.tsx:51-62`) and the **language**
-/// pills (`:77-90`). They disagree on shape — the theme picker is one joined
+/// the Settings **theme** picker (one joined track) and the **language**
+/// pills (two separate pills). They disagree on shape — the theme picker is one
+/// joined
 /// track, the language pills are two separate pills — and this widget transcribes
 /// the **joined track**, which is the one with a track to press, because a
 /// segmented control with no track is two buttons.
@@ -96,8 +97,8 @@ int selectionStepFor({
 /// `box-shadow:0 0 14px rgba(232,176,75,.45), inset 0 0 10px rgba(255,255,255,.28)`,
 /// transitioning `left` **and** `width` over `.35s` on `var(--e-spring)`.
 ///
-/// The prototype's React predecessor had no thumb — `SettingsScreen.tsx:56`
-/// animated each button's own background — so the widget transcribed a control
+/// The prototype's React predecessor had no thumb — it animated each button's
+/// own background — so the widget transcribed a control
 /// that no longer exists in the design. What is left of the old claim is
 /// accurate and kept: there is no hover-only affordance and no `selectedIcon`,
 /// and the selection is still **announced** rather than merely coloured, so §14's
@@ -227,7 +228,7 @@ class SegmentedControl<T> extends StatefulWidget {
 
   /// The track's radius. `redesign.html:178` — `border-radius:999px`.
   ///
-  /// **Was** `SettingsScreen.tsx:51`'s `borderRadius: 8`, which is the number
+  /// **Was** the prototype's `borderRadius: 8`, which is the number
   /// the old `.segp` never had. [EvaRadii.chip], so it is a token rather than a
   /// literal 999 — the redesign writes `999px` and `99px` in different places
   /// (`:178`, `:184`) and they are the same intent.
@@ -248,7 +249,7 @@ class SegmentedControl<T> extends StatefulWidget {
   /// declared `left` on every selection change.
   static const double trackPadding = 3;
 
-  /// Horizontal padding per segment. `SettingsScreen.tsx:58` —
+  /// Horizontal padding per segment. The prototype's —
   /// `padding: 5px 10px`.
   ///
   /// **Kept, and it is a divergence.** `redesign.html:184` says `8px 10px`; this
@@ -406,7 +407,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
     for (int i = 0; i < count; i++) GlobalKey(debugLabel: 'segp.segment.$i'),
   ];
 
-  /// The prototype transitions `all 200ms` (`SettingsScreen.tsx:59`). That is
+  /// The prototype transitions `all 200ms`. That is
   /// `EvaMotion.base` exactly, so unlike the button's 180ms this one needed no
   /// rounding to a token.
   bool get _animate => !MediaQuery.disableAnimationsOf(context);
@@ -492,8 +493,8 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
   /// Moves the selection by [step] list positions.
   ///
   /// Wrapped in one [AnimatedPositioned] rather than one animated container per
-  /// segment, because the prototype's prototype animated each button's own
-  /// background (`SettingsScreen.tsx:56,59`) and `redesign.html:182` replaced
+  /// segment, because the prototype animated each button's own
+  /// background and `redesign.html:182` replaced
   /// that with **one** element that moves. The comment this replaces said "there
   /// is no moving thumb in the prototype to animate" — true of the React
   /// prototype, false of `redesign.html` since Phase 4.2.
@@ -599,7 +600,7 @@ class _SegmentedControlState<T> extends State<SegmentedControl<T>> {
       // (`rgba(20,22,30,.06)` / `rgba(20,22,30,.16)`), and
       // [EvaColors.glassFill] / [EvaColors.glassBorder] are this design system's
       // transcriptions of exactly those two roles. The rim is **new**: the old
-      // `SettingsScreen.tsx:51` track had no `border` at all, only a fill.
+      // prototype's track had no `border` at all, only a fill.
       padding: const EdgeInsets.all(SegmentedControl.trackPadding),
       decoration: BoxDecoration(
         color: colors.glassFill,
@@ -979,9 +980,9 @@ class _Segment<T> extends StatelessWidget {
           // `:184` gives it `border-radius:999px`; the selected segment is drawn
           // by the thumb behind it (`:179`, `:183`'s `z-index:2`), not by a fill
           // of its own. The old `AnimatedContainer` here painted
-          // `SettingsScreen.tsx:56`'s `rgba(…, 0.1)` and is gone.
+          // the prototype's `rgba(…, 0.1)` and is gone.
           child: Text(
-            // `SettingsScreen.tsx:55` / `redesign.html:183` —
+            // the prototype's / `redesign.html:183` —
             // `text-transform: uppercase`, which Flutter has no equivalent for.
             //
             // **AND IT IS SKIPPED UNDER RTL**, which is `redesign.html:190`:

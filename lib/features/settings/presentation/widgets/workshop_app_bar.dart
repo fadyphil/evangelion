@@ -26,7 +26,10 @@
 /// bar's width, and the title inherits `body`'s `--ui` face (`:22`) at 15px.
 ///
 /// The Phase-9 header drew a 26px display-serif title beside the chevron, which
-/// is the React prototype's `SettingsScreen.tsx:43` and not this one.
+/// is the superseded React prototype's header and **not this one**: the
+/// redesign's title is the centred 15px UI-sans `.ttl`
+/// (`eva/redesign.html:144-145`), and the 26px display-serif beside the chevron
+/// has no counterpart there.
 ///
 /// ## AND THE CHEVRON **MIRRORS FOR FREE**
 ///

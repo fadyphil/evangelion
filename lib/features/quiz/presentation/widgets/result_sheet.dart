@@ -124,7 +124,8 @@ import 'package:flutter/material.dart';
 ///   today's-reading panel and the redesign's own dock. A third is red, and the
 ///   gate also refuses a hand-built `BackdropFilter` in any feature but the
 ///   dock. §13.4 is the rule that states a budget, so it wins — the same
-///   resolution `StatTile`'s own doc records for `ds.tsx`'s 16px blur.
+///   resolution `StatTile`'s own doc records for the superseded prototype's 16px
+///   blur.
 /// * **it would buy nothing visible.** The card is **94% opaque**, so a filter
 ///   behind it is almost entirely hidden by the fill it is supposed to show
 ///   through.
@@ -216,18 +217,31 @@ class ResultSheet extends StatelessWidget {
   /// between siblings".
   static const double outerMargin = EvaSpacing.lg;
 
-  /// The burst's size. `ResultScreen.tsx:6` — `width="100" height="100"`.
+  /// The burst's size. The superseded prototype's `SunBurst` was
+  /// `width="100" height="100"`.
+  ///
+  /// **The redesign has no burst at all** — its celebration is the `.bigring`
+  /// (`:447`), and the class doc records that the ring is not ported — so `100`
+  /// is the prototype's own number and the client keeps it.
   ///
   /// **100 and not [SunBurst]'s own default of 96**, for the same reason
-  /// `reading_geometry_test.dart` records for the drop cap: `ds.tsx` publishes
-  /// one number for one screen, and the widget's default is not a transcription
-  /// of anything.
+  /// `reading_geometry_test.dart` records for the drop cap: the prototype
+  /// published one number for one screen, and the widget's default is not a
+  /// transcription of anything.
   static const double burstSize = 100;
 
-  /// `ResultScreen.tsx:38` — `marginBottom: 22` under the burst.
+  /// The gap under the burst. The superseded prototype's was `marginBottom: 22`.
+  ///
+  /// **The redesign has no counterpart** — its celebration is the unported
+  /// `.bigring`, whose own `margin: 0 auto 18px` (`:447`) belongs to a ring
+  /// this client does not draw — so the client keeps `22`.
   static const double burstGap = 22;
 
-  /// `ResultScreen.tsx:38` — `filter: drop-shadow(0 0 36px rgba(#F5C84C, .55))`.
+  /// The burst's glow: the superseded prototype's `filter: drop-shadow(0 0 36px
+  /// rgba(#F5C84C, .55))`.
+  ///
+  /// **The redesign has no counterpart** — it draws no burst, so there is
+  /// nothing for a glow to fall on.
   ///
   /// **Transcribed, and it belongs to the card rather than the widget** because
   /// `SunBurst`'s own doc says so: it is the svg, the glow is the container's
@@ -235,62 +249,110 @@ class ResultSheet extends StatelessWidget {
   /// prototype does not have.
   static const double burstGlowBlur = 36;
 
-  /// `ResultScreen.tsx:38` — the glow's alpha.
+  /// The glow's alpha: the superseded prototype's `0.55`. **The redesign has no
+  /// counterpart** — it draws no burst.
   static const double burstGlowAlpha = 0.55;
 
-  /// `ResultScreen.tsx:44` — the score's `fontSize: 68`.
+  /// The score's size. The superseded prototype's was `fontSize: 68`.
+  ///
+  /// **The redesign has no counterpart on this surface** — its result figure is
+  /// the unported `.bigring .val` at 34px (`:452`) — so the client keeps `68`.
   static const double scoreFontSize = 68;
 
-  /// `ResultScreen.tsx:44` — `letterSpacing: '-0.02em'`.
+  /// The score's tracking: the superseded prototype's `letterSpacing:
+  /// '-0.02em'`. **The redesign has no counterpart** — the ring's own figure
+  /// (`:452`) declares no tracking.
   ///
   /// Resolved against the score's own 68px, for `StickyCta`'s recorded reason:
   /// CSS `em` tracking is relative to the element's font size, so this is `1.36`
   /// and not `0.02`.
   static const double scoreLetterSpacing = -0.02 * scoreFontSize;
 
-  /// `ResultScreen.tsx:45` — the denominator's `fontSize: 42`. **Not used**: there
-  /// is no denominator, and the field's doc gives the whole argument.
+  /// The denominator's size: the superseded prototype's was `fontSize: 42`.
+  /// **Not used**: there is no denominator, and the field's doc gives the whole
+  /// argument.
   static const double denominatorFontSize = 42;
 
-  /// `ResultScreen.tsx:43` — `marginBottom: 14` under the score.
+  /// The gap under the score. The superseded prototype's was `marginBottom: 14`.
+  ///
+  /// **The redesign has no counterpart** — its result card has no score under a
+  /// celebration, only the unported `.bigring` — and the client's own value is
+  /// the design system's [EvaSpacing.md] (12), not the prototype's 14.
   static const double scoreGap = EvaSpacing.md;
 
-  /// `ResultScreen.tsx:49` — `marginBottom: 24` under the message.
+  /// The gap under the message. The superseded prototype's was `marginBottom:
+  /// 24`. **The redesign has no counterpart** — its own result message (`:722`)
+  /// is followed by the `.recap` row at `margin-top: 16px` (`:453`), which is
+  /// a different structure — so the client keeps `24`.
   static const double messageGap = EvaSpacing.xxl;
 
-  /// `ResultScreen.tsx:49` — `maxWidth: 260`, and the message is centred inside it.
+  /// The message's own maximum width: the superseded prototype's was
+  /// `maxWidth: 260`, and the message is centred inside it.
+  ///
+  /// **The redesign has no counterpart** — its result message (`:722`) declares
+  /// no max-width at all — so the client keeps `260`.
   static const double messageMaxWidth = 260;
 
-  /// `ResultScreen.tsx:65` — the pill's `padding: '8px 18px'`.
+  /// The pill's padding: the superseded prototype's was `padding: '8px 18px'`.
+  ///
+  /// The redesign's own streak chip — `.streak` (`:238`) — is
+  /// `padding:7px 14px 7px 11px`, and **the client keeps the prototype's
+  /// `8 × 18`**.
   static const EdgeInsets pillPadding = EdgeInsets.symmetric(
     horizontal: 18,
     vertical: EvaSpacing.sm,
   );
 
-  /// `ResultScreen.tsx:64` — `gap: 8` between the flame and the label.
+  /// The gap between the flame and the label: the superseded prototype's was
+  /// `gap: 8`. The redesign's own streak chip is `gap:9px` (`:238`), and **the
+  /// client keeps the prototype's `8`**.
   static const double pillGap = EvaSpacing.sm;
 
-  /// `ResultScreen.tsx:56` — the pill's fill is `ember` at `isDark ? .12 : .1`.
+  /// The pill's fill: the superseded prototype's was `ember` at
+  /// `isDark ? .12 : .1`. The redesign's own streak chip is
+  /// `rgba(232,176,75,.06)` (`:239`) — a different hue and a different alpha —
+  /// and **the client keeps the prototype's**.
   static const double darkPillAlpha = 0.12;
   static const double lightPillAlpha = 0.1;
 
-  /// `ResultScreen.tsx:58` — `border: '1px solid rgba(ember, .28)'`.
+  /// The pill's rim: the superseded prototype's was
+  /// `border: '1px solid rgba(ember, .28)'`. The redesign's own streak chip is
+  /// `1px solid rgba(232,176,75,.35)` (`:238`), and **the client keeps the
+  /// prototype's `.28`**.
   static const double pillBorderAlpha = 0.28;
 
-  /// `ResultScreen.tsx:60` — `boxShadow: '0 0 24px rgba(ember, .22)'`.
+  /// The pill's glow: the superseded prototype's was
+  /// `boxShadow: '0 0 24px rgba(ember, .22)'`. **The redesign has no
+  /// counterpart** — its own streak chip (`:238-239`) declares no shadow — so
+  /// the client keeps the prototype's.
   static const double pillGlowBlur = 24;
   static const double pillGlowAlpha = 0.22;
 
-  /// `ResultScreen.tsx:71` — the stat row's `gap: 10`.
+  /// The gap between the two stat tiles: the superseded prototype's stat row
+  /// was `gap: 10`.
+  ///
+  /// **The redesign has no counterpart** — its result card has no stat row at
+  /// all, only the `.recap` row of per-question dots (`:453`) — so the client
+  /// keeps `10`.
   static const double statGap = 10;
 
-  /// `ResultScreen.tsx:71` — `marginBottom: 32` under the stat row.
+  /// The gap under the stat row: the superseded prototype's was
+  /// `marginBottom: 32`. **The redesign has no counterpart** — its result
+  /// card's last row is the button pair (`:724-725`) — so the client keeps
+  /// `32`.
   static const double statGapBottom = 32;
 
-  /// `ResultScreen.tsx:77` — the button column's `gap: 12`.
+  /// The gap between the two buttons: the superseded prototype's column was
+  /// `gap: 12`.
+  ///
+  /// The redesign's own pair is `.rcta` at `margin-top:22px` and `.rghost` at
+  /// `margin-top:10px` (`:458`, `:463`), so its inter-button gap is `10` — and
+  /// **the client keeps the prototype's `12`**.
   static const double buttonGap = EvaSpacing.md;
 
-  /// `ResultScreen.tsx:62` — the pill flame's `width="14" height="18"`.
+  /// The pill flame's box: the superseded prototype's inline `<svg>` was
+  /// `width="14" height="18"`. The redesign's own `.flame` is `13×17` (`:242`),
+  /// and **the client keeps the prototype's `14 × 18`**.
   static const double pillFlameWidth = 14;
   static const double pillFlameHeight = 18;
 
@@ -516,7 +578,9 @@ class ResultSheet extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: burstGap),
           child: DecoratedBox(
-            // `ResultScreen.tsx:38` — the container's `filter: drop-shadow(...)`.
+            // The superseded prototype's container carried
+            // `filter: drop-shadow(...)`. **The redesign has no counterpart** —
+            // it draws no burst.
             // `ImageFilter` rather than `BoxShadow`, because a CSS
             // `drop-shadow` on an element follows the **alpha** of what it is
             // drawn on and a `BoxShadow` is a rectangle; a 96px glow on a
@@ -545,8 +609,10 @@ class ResultSheet extends StatelessWidget {
             readingCompleted: result.readingCompleted,
           ),
           textAlign: TextAlign.center,
-          // `ResultScreen.tsx:49-51` — `F.ui, 16, 400, lineHeight 1.55, T.ink2`,
-          // `maxWidth: 260`.
+          // The superseded prototype's message was
+          // `F.ui, 16, 400, lineHeight 1.55, T.ink2` with `maxWidth: 260`. The
+          // redesign's own result message (`:722`) is `var(--scr)` at 20px with
+          // no max-width — **and the client keeps the prototype's 16 and 1.55**.
           style: arabicAware(
             Theme.of(context).textTheme.bodyLarge!.copyWith(
               fontSize: 16,
@@ -624,12 +690,13 @@ enum ResultSheetAction {
   backHome,
 }
 
-/// The headline figure. `ResultScreen.tsx:43-46`.
+/// The headline figure. The superseded prototype's score block.
 ///
 /// ## THERE IS NO **`/5`** HERE, AND THAT IS THE LARGEST DIVERGENCE ON THIS CARD
 ///
-/// `ResultScreen.tsx:44-45` is a `4` at 68sp beside a `/5` at 42sp. The `5` is a
-/// **hard-coded literal** in a screen with no data layer — there is no endpoint
+/// The superseded prototype's score is a `4` at 68sp beside a `/5` at 42sp. The
+/// `5` is a **hard-coded literal** in a screen with no data layer — there is no
+/// endpoint
 /// in this backend that returns a question count for a session, and §2's route
 /// table gives the result no repository, so a client cannot learn it.
 ///
@@ -651,8 +718,9 @@ class _Score extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: <Widget>[
-      // `ResultScreen.tsx:43` — `lineHeight: 1`, so the figure's box is its own
-      // height and the caption below does not inherit the leading.
+      // The superseded prototype's score block was `lineHeight: 1`, so the
+      // figure's box is its own height and the caption below does not inherit
+      // the leading.
       Text(
         // **`currentTotalPoints`, not `pointsEarned`.** This card reports the
         // reader's standing after the submission; the answer's own score is the
@@ -711,7 +779,8 @@ class _Score extends StatelessWidget {
   );
 }
 
-/// The streak pill. `ResultScreen.tsx:54-66`.
+/// The streak pill. The superseded prototype's pill — a flex row of an inline
+/// flame and the label.
 ///
 /// ## §3.1's DELETION TEST, RUN — AND IT BECAME A PRIVATE WIDGET HERE
 ///
@@ -755,18 +824,25 @@ class _StreakPill extends StatelessWidget {
     return Container(
       padding: ResultSheet.pillPadding,
       decoration: BoxDecoration(
-        // `ResultScreen.tsx:56` — `rgba(ember, isDark ? .12 : .1)`.
+        // The superseded prototype's `rgba(ember, isDark ? .12 : .1)`. The
+        // redesign's own streak chip is `rgba(232,176,75,.06)` (`:239`) — a
+        // different hue and a different alpha — and the client keeps the
+        // prototype's.
         color: colors.ember.withValues(
           alpha: brightness == Brightness.dark
               ? ResultSheet.darkPillAlpha
               : ResultSheet.lightPillAlpha,
         ),
         borderRadius: BorderRadius.circular(999),
-        // `ResultScreen.tsx:58`.
+        // The superseded prototype's `border: '1px solid rgba(ember, .28)'`; the
+        // redesign's own streak chip is `1px solid rgba(232,176,75,.35)` (`:238`),
+        // and the client keeps the prototype's.
         border: Border.all(
           color: colors.ember.withValues(alpha: ResultSheet.pillBorderAlpha),
         ),
-        // `ResultScreen.tsx:60`.
+        // The superseded prototype's `boxShadow: '0 0 24px rgba(ember, .22)'`;
+        // the redesign's own streak chip declares no shadow (`:238-239`), so the
+        // client keeps the prototype's.
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: colors.ember.withValues(alpha: ResultSheet.pillGlowAlpha),
@@ -777,10 +853,12 @@ class _StreakPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          // `ResultScreen.tsx:62-64` is an inline `<svg>` flame **14×18**, which
-          // is NOT the design system's `StreakFlame` — that one is square
+          // The superseded prototype's pill flame is an inline `<svg>` **14×18**,
+          // which is NOT the design system's `StreakFlame` — that one is square
           // (`streak_flame.dart`'s `size` sets width **and** height) and is
-          // transcribed from `ds.tsx:522`, a different site.
+          // transcribed from the prototype's own top bar, a different site.
+          // The redesign's own `.flame` is `13×17` (`:242`) — a third shape, and
+          // a fourth number the client does not use.
           //
           // So the prototype's own shape is a **width/height pair**, and a square
           // icon at 18 would be visibly wider than the prototype's. It is drawn
@@ -821,7 +899,7 @@ class _StreakPill extends StatelessWidget {
   }
 }
 
-/// The two stat tiles. `ResultScreen.tsx:69-73`.
+/// The two stat tiles. The superseded prototype's stat row.
 ///
 /// ## §3.1's DELETION TEST AGAIN, AND IT ALSO BECAME A PRIVATE WIDGET
 ///
@@ -834,9 +912,10 @@ class _StreakPill extends StatelessWidget {
 ///
 /// ## **TWO** TILES, NOT THREE, AND THE THIRD NUMBER WAS A **DUPLICATE**
 ///
-/// `ds.tsx:469-472` and `ResultScreen.tsx:70-72` both write three. This row has
-/// two, and the reason is that a third would have to repeat a number already on
-/// screen:
+/// The superseded prototype's `StatTile` row wrote **three**, and **the redesign
+/// has no counterpart** — its result card's recap is a row of per-question dots
+/// (`:453-457`), not tiles. This row has two, and the reason is that a third
+/// would have to repeat a number already on screen:
 ///
 /// | where | prototype's value | here |
 /// | --- | --- | --- |
@@ -886,9 +965,10 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-    // `ResultScreen.tsx:69` — `display: flex, gap: 10, width: '100%'`.
+    // The superseded prototype's stat row was
+    // `display: flex, gap: 10, width: '100%'`.
     children: <Widget>[
-      // `StatTile` is `flex: 1` in `ds.tsx:465`, so `Expanded` is the
+      // The superseded prototype's `StatTile` was `flex: 1`, so `Expanded` is the
       // transcription and the two tiles share the row evenly.
       // `ResultSheet.statGap` is the prototype's `gap: 10` between them, applied
       // as padding on the first rather than on both, for the reason
@@ -915,7 +995,7 @@ class _StatRow extends StatelessWidget {
   /// `const`-able and therefore cheap enough to rebuild with its parent.
   ///
   /// The labels are the **written** substitutions, and [ResultSheet]'s doc
-  /// tabulates them against `ResultScreen.tsx:70-72`.
+  /// tabulates them against the superseded prototype's three tiles.
   ///
   /// **A named function and not two inline tuples** so the order lives in one
   /// place.

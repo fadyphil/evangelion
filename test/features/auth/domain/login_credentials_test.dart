@@ -6,9 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// ## WHERE THE RULES COME FROM, HONESTLY
 ///
 /// **Both rules are the redesign's, stated in its own JavaScript.** The React
-/// prototype stated a password error and no rule behind it —
-/// `LoginScreen.tsx:52` is a literal with no minimum anywhere in `eva/src` —
-/// which is why the first version of `login_credentials.dart` chose eight. The
+/// prototype stated a password error and no rule behind it — a hard-coded
+/// literal with no minimum anywhere in the prototype, which the redesign has no
+/// counterpart for — and that is why the first version of
+/// `login_credentials.dart` chose eight. The
 /// redesign **states the rule**: `eva/redesign.html:1306` is
 /// `pw.length>=4?'':tr('pwErr')`, so [kMinPasswordLength] is transcribed (4) and
 /// the message it produces is `:976`'s `pwErr` verbatim. The address rule is

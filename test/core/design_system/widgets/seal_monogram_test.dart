@@ -50,7 +50,8 @@ void main() {
 
   group('the decoration is the prototype\'s', () {
     // `eva/redesign.html:392-395` — `.jorb`, the orb this seal is the counterpart
-    // of. `LoginScreen.tsx:17-26` still owns the 60px box and the two shadows.
+    // of. The superseded prototype's 60px box and its two shadows have **no
+    // counterpart in the redesign**, which draws a 74px orb with one shadow.
     testWidgets('a circle with a radial ember wash', (
       WidgetTester tester,
     ) async {
@@ -82,7 +83,7 @@ void main() {
       expect(SealMonogram.sealGlowCenter.y, -0.4);
     });
 
-    test('and the box stays 60, which is LoginScreen.tsx:19 and NOT :392', () {
+    test('and the box stays 60 — the superseded prototype\'s, and NOT :392\'s 74', () {
       // `redesign.html:392` says `width: 74px`. The redesign's `/login`
       // (`:503-511`) draws `.lmark` + `.field` + `.cta` and no orb; the orb is the
       // Journey avatar (`:586`, `<div class="jorb">M</div>`). So 74 is a number
@@ -105,7 +106,7 @@ void main() {
     });
 
     testWidgets('two zero-offset ember glows', (WidgetTester tester) async {
-      // Kept from `LoginScreen.tsx:17-26`. `redesign.html:394` writes ONE
+      // Kept from the superseded prototype. `redesign.html:394` writes ONE
       // `0 0 34px rgba(232,176,75,.5)`, and adopting it would mean deleting a
       // glow pair that no harness reads but every golden does.
       await tester.pumpWidget(_seal());
@@ -162,9 +163,10 @@ void main() {
       expect(glyph.style!.fontSize, closeTo(14.0, 0.05));
     });
 
-    test('and the ratio is `LoginScreen.tsx:25`, not `:394`\'s', () {
+    test('and the ratio is the prototype\'s 28-on-60, not `:394`\'s', () {
       // `:394` is `font-size: 30px` on a **74px** orb — 0.405. This is
-      // `LoginScreen.tsx:25`'s 28 on a 60px seal. Two marks at two sizes have two
+      // the superseded prototype's 28 on a 60px seal. Two marks at two sizes have
+      // two
       // ratios, and the 60 is held by `login_geometry_test.dart` by literal.
       expect(SealMonogram.glyphRatio, closeTo(28 / 60, 1e-4));
       expect(SealMonogram.glyphRatio, isNot(closeTo(30 / 74, 1e-4)));

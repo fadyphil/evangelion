@@ -1,8 +1,9 @@
 /// **Decision 8's harness, re-pointed.** AGENT_CONTEXT §9, decision 8, names this
 /// phase as the owner of "a prototype-comparison harness — a line map plus a test
 /// that renders the prototype and the Flutter widget over the same inputs and
-/// compares geometry". Through Phase 4 that meant parsing `LoginScreen.tsx` and
-/// `ds.tsx`. Phase 5.1 rebuilt the screen against `eva/redesign.html:503-511`,
+/// compares geometry". Through Phase 4 that meant parsing the **superseded**
+/// React prototype's own markup and CSS. Phase 5.1 rebuilt the screen against
+/// `eva/redesign.html:503-511`,
 /// and this file moved with it: **it now parses the redesign's own markup and
 /// CSS**, extracts the declared geometry at test time, and compares that against
 /// what the Flutter page actually rendered.

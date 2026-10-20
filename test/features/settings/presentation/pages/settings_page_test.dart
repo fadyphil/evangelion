@@ -97,7 +97,7 @@ void main() {
         );
 
         // **The geometry**, and the labels are **uppercased** because
-        // `EvaSectionHeader` transcribes `SettingsScreen.tsx:29`'s
+        // `EvaSectionHeader` transcribes `redesign.html:30`'s
         // `textTransform: 'uppercase'` in Dart, which Flutter has no equivalent
         // for.
         final List<double> tops = <double>[

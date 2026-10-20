@@ -65,8 +65,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// 1. **The inter-group gap is the client's.** The redesign says nothing about it:
 ///    the `.sgroup`'s own `margin:20px 0 6px` (`:422`) is the margin **above** a
 ///    label, and `SettingsGroup` already owns that as its `topGap`. The page's own
-///    [groupGap] is the Phase-9 value (`SettingsScreen.tsx:45`'s `gap: 28`), and
-///    the prototype's separation between a group's last row and the next group's
+///    [groupGap] is the Phase-9 value — `gap: 28`, the **superseded React
+///    prototype's** own column gap — and the prototype's separation between a
+///    group's last row and the next group's
 ///    label is therefore `groupGap + SettingsGroup.topGap` where the prototype's
 ///    is 20. **Recorded here** because it is the one number on this screen that
 ///    is the client's rather than the prototype's.

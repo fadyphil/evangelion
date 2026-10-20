@@ -105,7 +105,8 @@ void main() {
       await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
       final Text value = tester.widget<Text>(find.text('14'));
       // `redesign.html:407` — `font-family:var(--mono);font-size:11px`, no
-      // `font-weight`. Was `ds.tsx:474`'s `F.display, 24, 600`.
+      // `font-weight`. The superseded prototype's `F.display, 24, 600` has **no
+      // counterpart in the redesign**, and it is not what is painted.
       expect(value.style!.fontFamily, EvaTypography.monoFamily);
       expect(value.style!.fontFamily, isNot(EvaTypography.displayFamily));
       expect(value.style!.fontSize, 11.0);
@@ -118,27 +119,29 @@ void main() {
       expect(value.style!.letterSpacing, 0.0);
     });
 
-    testWidgets('the panel is still `ds.tsx`\'s — radius 16, padding 14/10', (
-      WidgetTester tester,
-    ) async {
-      // The other half of the split, asserted so it cannot move by accident: the
-      // redesign *replaces* this tile with `.ringbox`'s ring (`redesign.html:
-      // 403-409`, a `CustomPaint`), which has no panel to copy, so the panel
-      // stayed on `ds.tsx:462-478` and only the type was re-pointed.
-      await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
-      expect(StatTile.radius, 16);
-      expect(
-        StatTile.padding,
-        const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      );
-      expect(
-        find.descendant(of: findTile(), matching: find.byType(GlassSurface)),
-        findsOneWidget,
-        reason:
-            'the `ds.tsx` panel survives — Phase 6.2\'s modal keeps it, because '
-            'the redesign\'s ring was never ported',
-      );
-    });
+    testWidgets(
+      'the panel is still the prototype\'s — radius 16, padding 14/10',
+      (WidgetTester tester) async {
+        // The other half of the split, asserted so it cannot move by accident: the
+        // redesign *replaces* this tile with `.ringbox`'s ring (`redesign.html:
+        // 403-409`, a `CustomPaint`), which has no panel to copy, so the panel
+        // stayed on the superseded prototype's — **and the redesign has no
+        // counterpart for it** — and only the type was re-pointed.
+        await pumpAt(tester, const StatTile(value: '14', label: 'Read'));
+        expect(StatTile.radius, 16);
+        expect(
+          StatTile.padding,
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        );
+        expect(
+          find.descendant(of: findTile(), matching: find.byType(GlassSurface)),
+          findsOneWidget,
+          reason:
+              'the prototype\'s panel survives — Phase 6.2\'s modal keeps it, because '
+              'the redesign\'s ring was never ported',
+        );
+      },
+    );
 
     testWidgets('it is a tint, not a blur — §13.4\'s budget', (
       WidgetTester tester,
@@ -148,7 +151,8 @@ void main() {
         find.descendant(of: findTile(), matching: find.byType(BackdropFilter)),
         findsNothing,
         reason:
-            'ds.tsx:469 blurs this tile; §13.4 permits a blur on Home\'s panel '
+            'the superseded prototype blurs this tile; §13.4 permits a blur on '
+            'Home\'s panel '
             'and top bar only, and `/result` is "everything else"',
       );
     });
@@ -218,7 +222,7 @@ void main() {
       );
       expect(SettingsTile.hairlineAlpha, 0.06);
 
-      // `padding: 15px 4px`, replacing `ds.tsx:488`'s `'0 16px'`.
+      // `padding: 15px 4px`, replacing the superseded prototype's `'0 16px'`.
       expect(
         SettingsTile.padding,
         const EdgeInsets.symmetric(horizontal: 4, vertical: 15),
@@ -575,7 +579,13 @@ void main() {
       // is the space under a *label*, which in the redesign a `.srow`'s own
       // `padding:15px 4px` supplies; adding 6 here would open the group with a
       // narrower gap than the 10 it keeps internally.
-      expect(SettingsGroup.rowGap, 10, reason: 'kept from SettingsScreen.tsx');
+      expect(
+        SettingsGroup.rowGap,
+        10,
+        reason:
+            'kept from the superseded prototype — no `redesign.html` line '
+            'replaces it',
+      );
     });
 
     testWidgets('an empty group is a bare label and no gap', (
@@ -958,7 +968,9 @@ void main() {
 
 void _noop() {}
 
-/// The prototype's largest type, `ReadingEnScreen.tsx:37` — `fontSize: 34`.
+/// The prototype's largest type — `fontSize: 34`. The redesign's own 34 is the
+/// result ring's figure (`.bigring .val`, `redesign.html:452`) and not a title,
+/// so the number is the prototype's and is kept as it is.
 ///
 /// The ceiling an `EmptyState` title has to stay under is 34 ÷ 1.22 ≈ 27.9, i.e.
 /// the largest display slot that still survives §14's 1.22× requirement, which is

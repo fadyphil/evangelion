@@ -75,9 +75,9 @@ enum QuizOptionState {
 ///   [MotionMoment.achievement] through [EvaAnimate], and
 /// * the **flecks** on the correct card, from the brief's own rule ("tiny gold
 ///   flecks floating near the correct option — sparse, 3–4 max",
-///   `eva/src/imports/pasted_text/pasted-attachment.txt:97`) and the
-///   superseded prototype's four of them
-///   (`eva/src/screens/QuizScreen.tsx:92-95`).
+///   `eva/brief.txt:97`) and the superseded prototype's four of them — at
+///   `-10/12`, `-15/36`, `356/8` and `362/30`, with delays of
+///   0 / 220 / 110 / 340ms.
 ///
 /// **The redesign's `.opt` paints neither**, and this client's suite used to
 /// assert the flecks' absence. The brief's rule is the authority for the
@@ -159,7 +159,7 @@ class QuizOptionCard extends StatefulWidget {
   /// The card's own box: `eva/redesign.html:339` — `padding: 16px 18px`.
   ///
   /// **No `min-height` any more.** The old card carried `minHeight: 64` from the
-  /// superseded prototype (`ds.tsx:434`); the redesign's `.opt` has none, and its
+  /// superseded prototype's `QuizOption`; the redesign's `.opt` has none, and its
   /// height is the padding plus the text's line box — 53px for one line, which is
   /// above the 44px touch floor, so the floor is met by the card's own content.
   static const EdgeInsets padding = EdgeInsets.symmetric(
@@ -191,7 +191,8 @@ class QuizOptionCard extends StatefulWidget {
   static const double labelFontSize = 15;
 
   /// `eva/redesign.html:341` — `font-weight: 500` — **raised from the old
-  /// transcription's 400**, which read the superseded prototype's `ds.tsx:455`.
+  /// transcription's 400**, which read the superseded prototype's `QuizOption`
+  /// label.
   static const FontWeight labelWeight = FontWeight.w500;
 
   /// `.opt.wrong`'s dimming. `eva/redesign.html:358` — `opacity: .62`, on the
@@ -305,10 +306,9 @@ class QuizOptionCard extends StatefulWidget {
   /// ## THE FLECK OFFSETS, AND WHY THEY ARE **DERIVED** RATHER THAN PASTED
   ///
   /// The brief's own rule is "tiny gold flecks floating near the correct option
-  /// — sparse, 3–4 max"
-  /// (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for
-  /// "gold flecks fade in with 150ms delay"), and the superseded prototype drew
-  /// them at four positions (`eva/src/screens/QuizScreen.tsx:92-95`):
+  /// — sparse, 3–4 max" (`eva/brief.txt:97`, and `:114` for "gold flecks fade
+  /// in with 150ms delay"), and the superseded prototype drew them at four
+  /// positions:
   ///
   /// ```html
   /// <GoldFleck x={-10} y={12}  delay={0}   />
@@ -318,15 +318,15 @@ class QuizOptionCard extends StatefulWidget {
   /// ```
   ///
   /// Those `x` values are measured **from the option card's own box** — the
-  /// wrapper `<div style={{position:'relative'}}>` at `QuizScreen.tsx:88` — and
-  /// two of the four are **screen pixels on a 390px frame**
-  /// (`eva/src/App.tsx:89` — `width: 390`):
+  /// superseded prototype's wrapper was a `<div style={{position:'relative'}}>` —
+  /// and two of the four are **screen pixels on a 390px frame** — the
+  /// prototype's phone frame was `width: 390`:
   ///
   /// * `-10` and `-15` are already card-relative: they are negative, so they
   ///   sit just **outside** the card's left edge, and they do not move when the
   ///   card's width does;
-  /// * `356` and `362` are not. The quiz screen's own padding is
-  ///   `20px 20px 28px` (`QuizScreen.tsx:41`), so the card's box is
+  /// * `356` and `362` are not. The superseded quiz screen's own padding was
+  ///   `20px 20px 28px`, so the card's box is
   ///   `390 - 20 - 20 = 350` wide — and `356` and `362` are therefore **6 and
   ///   12 pixels past the card's right edge**.
   ///
@@ -338,12 +338,12 @@ class QuizOptionCard extends StatefulWidget {
   /// **derived from the card's own width** and the left-hand pair is not.
   ///
   /// **The `y` values are the prototype's own, in pixels from the card's top
-  /// edge**, and they are not scaled by the card's height: the prototype's card
-  /// is 64 tall (`eva/src/components/ds.tsx:433` — `minHeight: 64`) and the
-  /// redesign's `.opt` declares no height at all, so a proportional reading
-  /// would scatter the cluster over a tall card instead of keeping it near the
-  /// top corner where the prototype put it. All four land inside the card,
-  /// whose height is at least the badge's 26 plus the padding's 32.
+  /// edge**, and they are not scaled by the card's height: the superseded
+  /// prototype's card is 64 tall (`minHeight: 64`) and the redesign's `.opt`
+  /// declares no height at all, so a proportional reading would scatter the
+  /// cluster over a tall card instead of keeping it near the top corner where
+  /// the prototype put it. All four land inside the card, whose height is at
+  /// least the badge's 26 plus the padding's 32.
   ///
   /// The four are in the prototype's **order**, because the order is the
   /// stagger: `GoldFlecks` spreads the phases by index, and the prototype's
@@ -578,10 +578,9 @@ class _QuizOptionCardState extends State<QuizOptionCard>
     // ## THE FLECK OVERLAY, AND WHY IT IS AN **OVERLAY**
     //
     // The prototype's flecks are `position: absolute` inside the relative
-    // wrapper around the card (`eva/src/screens/QuizScreen.tsx:15` and `:88`),
-    // and two of the four sit **outside** the card's left edge. So they cannot
-    // be a child in the flow: they are painted over the card and past its edge,
-    // and they contribute nothing to its size.
+    // wrapper around the card, and two of the four sit **outside** the card's
+    // left edge. So they cannot be a child in the flow: they are painted over
+    // the card and past its edge, and they contribute nothing to its size.
     //
     // `StackFit.passthrough` is what keeps the card's own layout untouched —
     // it hands the non-positioned child the **incoming constraints unchanged**,

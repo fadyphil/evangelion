@@ -1,7 +1,10 @@
 /// Which of the two Eva palettes the app renders in.
 ///
-/// `SettingsScreen.tsx:52-61` — `useState<'Light' | 'Dark' | 'System'>('Dark')`
-/// and three `<button>`s. All three are transcribed, and all three ship.
+/// The superseded prototype's theme control was three `<button>`s —
+/// `useState<'Light' | 'Dark' | 'System'>('Dark')` — and **the redesign has no
+/// counterpart for it**: its theme group holds exactly one control, the
+/// Daylight toggle (`eva/redesign.html:650`), and the three-state picker is
+/// gone. All three are transcribed, and all three ship.
 ///
 /// ## WHY THE **DEFAULT** IS [dark] AND NOT [system]
 ///

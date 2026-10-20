@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 ///
 /// | | prototype | re-pointed? |
 /// | --- | --- | --- |
-/// | the panel | `ds.tsx:462-478` — radius 16, padding `14px 10px`, `tint` | **no** |
-/// | the type | `ds.tsx:474-475` → **`redesign.html:407-408`** | **yes** |
+/// | the panel | radius 16, padding `14px 10px`, `tint` | **no** |
+/// | the type | `F.display, 24, 600` and `F.mono, 9, 700, 0.12em` → **`redesign.html:407-408`** | **yes** |
 ///
 /// ## WHY THE PANEL STAYS AND THE TYPE GOES
 ///
@@ -19,8 +19,9 @@ import 'package:flutter/material.dart';
 /// circle with a gap in it.
 ///
 /// So the honest move is to split the widget's provenance rather than pretend the
-/// redesign has an answer for all of it. The **glass panel** stays on
-/// `ds.tsx:462-478` because that is where it still comes from — and nothing ever
+/// redesign has an answer for all of it. The **glass panel** stays on the
+/// prototype's own panel because that is where it still comes from — and nothing
+/// ever
 /// deleted it, because the redesign's ring was **never ported**: a ring needs a
 /// denominator the submit response does not carry (AGENT_CONTEXT decision 93),
 /// so Phase 6.2's modal draws this tile's panel instead. The **type** is
@@ -31,12 +32,13 @@ import 'package:flutter/material.dart';
 /// The result is a tile that is the redesign's lettering inside Phase 2's panel,
 /// and that is stated here rather than left for a reader to infer from the two
 /// citations. `stat_tile_{dark,light}.png` move because of the type alone; the
-/// panel is `ds.tsx`'s to the pixel.
+/// panel is the prototype's to the pixel.
 ///
 /// ## `.tint`, NOT `.blur`, DESPITE THE PROTOTYPE
 ///
-/// `ds.tsx:469` gives this widget `backdropFilter: blur(16px)`, and §13.4 counts
-/// it among the six `ds.tsx` blur sites that must collapse into `GlassSurface`.
+/// The prototype gives this widget `backdropFilter: blur(16px)`, and §13.4
+/// counts
+/// it among the six prototype blur sites that must collapse into `GlassSurface`.
 /// But §13.4's per-screen table then says which screens may actually blur: Home's
 /// today's-reading panel and Home's top bar, and "everything else → `tint`".
 /// `/result` is "everything else", and its stat rows are explicitly the case §13.5
@@ -45,7 +47,7 @@ import 'package:flutter/material.dart';
 /// So the tile is a `GlassSurface` at [GlassTier.tint] and the prototype's blur
 /// is **not** transcribed. Two rules disagree and §13.4 is the one that states a
 /// budget, so it wins. Recorded rather than silently resolved: a reader
-/// comparing against `ds.tsx` will find a missing blur here.
+/// comparing against the prototype will find a missing blur here.
 ///
 /// ## AND BOTH ITS RUNS GO THROUGH `arabicAware`, WHICH PHASE 8 HAD TO ADD HERE
 ///
@@ -80,7 +82,7 @@ class StatTile extends StatelessWidget {
   /// `font-family:var(--mono);font-size:11px;color:var(--ink-0)` and declares no
   /// `font-weight`, so the weight is normal.
   ///
-  /// Was the display serif at 24 w600 (`ds.tsx:474`), which is what
+  /// Was the display serif at 24 w600, which is what
   /// `headlineSmall` gave it. The redesign replaces the whole figure: where the
   /// old tile shouted a number in a 24px serif, `.ringbox` reads it out quietly
   /// in mono next to the arc. See the class doc for why the panel survives this
@@ -89,7 +91,7 @@ class StatTile extends StatelessWidget {
 
   /// The caption under it. **Mono, 8.5px, `.14em`, uppercase** —
   /// `redesign.html:408`'s `.ringbox .rl`. Was `F.mono, 9, 700, 0.12em, T.ink3`
-  /// (`ds.tsx:475`) and, since decision 149, `ink2`.
+  /// and, since decision 149, `ink2`.
   ///
   /// ## THE INK IS `ink2` AND `:408` SAYS `--ink-1`, WHICH IS NOT A TOKEN
   ///
@@ -106,17 +108,17 @@ class StatTile extends StatelessWidget {
   /// hierarchy the redesign is establishing. Recorded, not silently resolved.
   final String label;
 
-  /// The prototype's radius. `ds.tsx:469` — `borderRadius: 16`. Not a token:
+  /// The prototype's radius — `borderRadius: 16`. Not a token:
   /// [EvaRadii] has 14 (button/input), 18 (card/quiz option), 24 and 28, and
   /// inventing an eighteenth step for one widget is worse than naming the number
   /// where it is used.
   ///
   /// **Kept** through Phase 4.2 even though the tile's type was re-pointed: the
-  /// radius belongs to the `ds.tsx` panel half of the split, and the redesign has
+  /// radius belongs to the prototype's panel half of the split, and the redesign has
   /// no radius for a ring.
   static const double radius = 16;
 
-  /// `ds.tsx:470` — `padding: '14px 10px'`.
+  /// The prototype's `padding: '14px 10px'`.
   ///
   /// Neither number is on the 4px scale — 14 is [EvaRadii.input] and 10 is not a
   /// token at all — so the prototype's own pair is transcribed literally rather
@@ -126,9 +128,9 @@ class StatTile extends StatelessWidget {
     vertical: 14,
   );
 
-  /// Gap between the value and the caption. `ds.tsx:471` — `gap: 4`.
+  /// Gap between the value and the caption. The prototype's `gap: 4`.
   ///
-  /// **Kept** from the `ds.tsx` half of the split. `.ringbox` puts `margin-top`
+  /// **Kept** from the prototype's half of the split. `.ringbox` puts `margin-top`
   /// on `.rv` (`:407`) and `.rl` (`:408`) rather than a flex `gap` on a shared
   /// parent — `margin-top:-34px` to pull the value up into the ring, and `16px`
   /// above the label — so there is no one gap token to move and re-deriving one

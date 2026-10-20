@@ -94,8 +94,12 @@ make_scratch() {
   # control would have neither a file to resolve against nor a file to remove.
   mkdir -p "$dir/eva"
   cp "$ROOT/eva/redesign.html" "$dir/eva/redesign.html" 2>/dev/null || true
-  # `eva/src` is tracked and already copied above; the explicit copy is only a
-  # safety net for the same untracked-window case.
+  # **The brief is the second named reference**, and the same reasoning applies:
+  # it is renamed by a `git mv`, so on the branch that introduces the rename it
+  # can be untracked in the scratch copy's window. The citation gate FATALs
+  # without it, and a FATAL is not a FAIL — the two are not the same, and the
+  # control below asserts them separately.
+  cp "$ROOT/eva/brief.txt" "$dir/eva/brief.txt" 2>/dev/null || true
   # Symlink, not copy: a real pub get per gate would dominate the runtime.
   ln -s "$ROOT/.dart_tool" "$dir/.dart_tool" 2>/dev/null || true
   cp "$ROOT/pubspec.lock" "$dir/pubspec.lock" 2>/dev/null || true
@@ -288,8 +292,8 @@ fi
 # and the gate reported a green run over a reference that no longer existed. The
 # check that would have noticed was the one doing the checking.
 d=$(make_scratch citation)
-cite_fired=0; ref_fired=0
-if [[ -f "$d/eva/redesign.html" ]]; then
+cite_fired=0; ref_fired=0; tsx_fired=0
+if [[ -f "$d/eva/redesign.html" && -f "$d/eva/brief.txt" ]]; then
   # A citation past the end of the file: it exists, the line does not.
   printf '// plant: see redesign.html:999999\nconst _ = 0;\n' > "$d/lib/plant_citation.dart"
   ( cd "$d" && python3 tool/gates/citation_check.py >/dev/null 2>&1 )
@@ -303,16 +307,34 @@ if [[ -f "$d/eva/redesign.html" ]]; then
   rc=$?
   mv "$d/eva/redesign.html.removed" "$d/eva/redesign.html"
   [[ $rc -eq 2 ]] && ref_fired=1
+  # **A `.tsx` citation is now a BROKEN citation, and that is the retirement
+  # being ENFORCED.** The React prototype is retired, so a citation that names
+  # one must be reported by name. **The pattern still matches `.tsx` on
+  # purpose** — a pattern that stopped matching would report a clean run over a
+  # surface it no longer examines, which is the ADR-0020 defect this gate
+  # exists to prevent. This control plants one and requires the FAIL.
+  # **The gate's output goes to a FILE and the grep reads the file** — not a
+  # pipe. `set -o pipefail` is on in this harness, so `gate | grep -q` returns
+  # the GATE's exit code (1, because the planted citation is broken) and the
+  # control reads that as "the message was not found". The first version of this
+  # control did exactly that and reported `retired-tsx=0` against a gate that
+  # was firing correctly — **a control that measures the wrong thing is the
+  # same defect as a gate that cannot fail**, and it was caught only because
+  # the summary is read by a human.
+  printf '// plant: see ds.tsx:245\nconst _ = 0;\n' > "$d/lib/plant_tsx_citation.dart"
+  ( cd "$d" && python3 tool/gates/citation_check.py > "$d/gate_output.txt" 2>/dev/null )
+  grep -q 'no such reference file' "$d/gate_output.txt" && tsx_fired=1
+  rm -f "$d/lib/plant_tsx_citation.dart" "$d/gate_output.txt"
 else
-  printf '  %-10s %sno eva/redesign.html in the scratch copy — cannot run this control%s\n' "FAIL" "$R" "$N"
+  printf '  %-10s %sno eva/redesign.html or eva/brief.txt in the scratch copy — cannot run this control%s\n' "FAIL" "$R" "$N"
 fi
-if [[ $cite_fired -eq 1 && $ref_fired -eq 1 ]]; then
+if [[ $cite_fired -eq 1 && $ref_fired -eq 1 && $tsx_fired -eq 1 ]]; then
   record "citation" "fired"
-  printf '  %-10s bad citation -> FAIL(1); reference removed -> FATAL(2). The two are not the same.\n' "$G"
+  printf '  %-10s bad citation -> FAIL(1); reference removed -> FATAL(2); a .tsx citation -> named BROKEN. The three are not the same.\n' "$G"
 else
   record "citation" "COULD-NOT-FAIL"
-  printf '  %-10s %sbad-citation fired=%s missing-reference fired=%s — one is wrong%s\n' \
-    "FAIL" "$R" "$cite_fired" "$ref_fired" "$N"
+  printf '  %-10s %sbad-citation=%s missing-reference=%s retired-tsx=%s — one is wrong%s\n' \
+    "FAIL" "$R" "$cite_fired" "$ref_fired" "$tsx_fired" "$N"
 fi
 
 # --- 9. orphan gate — the tree's reachability, and decision 144 ------------

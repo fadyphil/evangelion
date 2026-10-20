@@ -6,13 +6,16 @@ import '../../../support/design_system_harness.dart';
 
 /// RED-FIRST — the part of `EvaTextField` that is a calculation rather than a
 /// widget: which border, which fill, and how strong the focus glow, for each of
-/// the three states `ds.tsx`'s `Input` fakes.
+/// the three states the superseded prototype's `Input` fakes.
 ///
 /// ## WHY THIS IS THE TDD-ABLE PART OF A DEFECT
 ///
 /// Prototype defect #8 says `Input` is `readOnly` with no `value`/`onChanged`,
-/// and #10 says Login's focus and error are literals (`LoginScreen.tsx:49-52`
-/// hardcodes `focused` on email and an error string on password). Both defects
+/// and #10 says Login's focus and error are literals — the superseded
+/// prototype hardcoded `focused` on email and an
+/// error string on password. The redesign has no counterpart for either
+/// literal: it computes the focus (`redesign.html:378`) and the error
+/// (`redesign.html:1305-1306`). Both defects
 /// are one missing thing: there is no state layer, so the states were never
 /// computed, only typed. Naming the three states and resolving them is what
 /// makes the field real; the widget around them is layout.
@@ -22,7 +25,8 @@ void main() {
       // `redesign.html:376` — `border: 1px solid var(--glass-line)`,
       // `background: rgba(255,255,255,.04)`.
       //
-      // **1px, where this asserted `1.5px` against `ds.tsx:307`** until the
+      // **1px, where this asserted `1.5px` against the superseded prototype's
+      // rim** until the
       // Task 4.2 restyle re-pointed the box. The width is now
       // [kEvaTextFieldRimWidth] rather than a literal, because the widget's
       // `Border.all` cannot spell it — it *is* `Border.all`'s default, so
@@ -68,7 +72,9 @@ void main() {
       // THE ONE PLACE §14 OVERRIDES A TRANSCRIBED VALUE, and it is a real
       // conflict worth naming.
       //
-      // `ds.tsx:307` gives the focused input `1.5px solid ember` — full opacity.
+      // The superseded prototype gave the focused input `1.5px solid ember` —
+      // full opacity, and **the redesign has no counterpart for it**:
+      // `redesign.html:378` writes a `border-color:rgba(232,176,75,.6)`.
       // `09-quality-gates.md` §14 mandates "a 2px `ember` ring at 40% alpha on
       // every interactive widget". Both describe the same 1.5–2px band around the
       // same box, so honouring both is impossible.
@@ -99,7 +105,9 @@ void main() {
     });
 
     test('the focus fill is 6%, the prototype\'s focused value', () {
-      // `ds.tsx:308` — `rgba(#fff | #000, focused ? 0.06 : 0.03)`.
+      // The superseded prototype's `rgba(#fff | #000, focused ? 0.06 : 0.03)` —
+      // **the redesign has no counterpart for it**: `redesign.html:376` gives
+      // one background for every state.
       for (final EvaColors colors in const <EvaColors>[
         EvaColors.dark(),
         EvaColors.light(),
@@ -118,8 +126,10 @@ void main() {
 
     test('keeps the redesign\'s single focus halo', () {
       // `redesign.html:378` — `box-shadow: 0 0 0 3px rgba(232,176,75,.12)`,
-      // one shadow. `ds.tsx:310` wrote **two**: that ring at `.18` and a
-      // `0 0 20px rgba(ember,.12)` fog. The Task 4.2 restyle dropped the fog, so
+      // one shadow. The superseded prototype wrote **two**: that ring at `.18`
+      // and a
+      // `0 0 20px rgba(ember,.12)` fog, and the redesign has no counterpart for
+      // the second. The Task 4.2 restyle dropped the fog, so
       // the **count** is the assertion — "the glow is still there" would have
       // passed with both of them, and it is the second one that made a
       // field's focus strength depend on what was painted behind it.
@@ -145,7 +155,7 @@ void main() {
 
   group('resolveTextFieldStyle — error', () {
     test('the idle rim turns `err`, per the prototype', () {
-      // `ds.tsx:307` — `error ? hex.err : …`. The **hue** is still that
+      // The superseded prototype's `error ? hex.err : …`. The **hue** is still that
       // prototype's, because `redesign.html` declares no error rim at all;
       // the **width** is the redesign's, per `kEvaTextFieldRimWidth`.
       const EvaColors colors = EvaColors.dark();
@@ -239,8 +249,10 @@ void main() {
     test(
       'the prototype field is 52 tall with a 14 radius and 16/44 insets',
       () {
-        // `ds.tsx:306,309` — `height: 52`, `borderRadius: 14`,
-        // `padding: '0 44px 0 16px'`.
+        // The superseded prototype's `height: 52`, `borderRadius: 14`,
+        // `padding: '0 44px 0 16px'`. The redesign has a counterpart for the
+        // radius and for the 16px (`redesign.html:376-377`) and none for the
+        // height or for the 44px right inset.
         expect(kEvaTextFieldHeight, 52.0);
         expect(kEvaTextFieldRadius, EvaRadii.input);
         expect(EvaRadii.input, 14.0);
@@ -251,7 +263,10 @@ void main() {
     );
 
     test('the label/error gap is the prototype\'s 6px', () {
-      // `ds.tsx:296` — `gap: 6` between label, field and error text. 6 is not on
+      // The superseded prototype's `gap: 6` between label, field and error text,
+      // and **the redesign has no counterpart for it** — it draws no label at
+      // all, and its message line is a `margin-top: 5px` rather than a gap.
+      // 6 is not on
       // the 4px spacing scale, so it is a named constant here rather than a
       // round number invented at a call site.
       expect(kEvaTextFieldStackGap, 6.0);

@@ -47,7 +47,8 @@ import 'package:flutter/material.dart';
 ///
 /// This table used to read "the today's-reading panel **and the top bar**", and the
 /// per-screen line in `09-quality-gates.md` §13 rule 4 said the same. **Both were
-/// wrong**, and `ds.tsx:499-530` is the proof: `TopBar` is a `display: flex` `div`
+/// wrong**, and the prototype's `TopBar` is the proof: it is a `display: flex`
+/// `div`
 /// with a `padding` and a `zIndex` and **no `backdropFilter` anywhere in its 32
 /// lines**. The prototype deliberately leaves the bar see-through so the orbs show
 /// behind it.
@@ -55,7 +56,8 @@ import 'package:flutter/material.dart';
 /// So the budget on `/` is **one**, not two, and
 /// `glass_blur_budget_test.dart`'s ceiling for `lib/features/` moved from 2 to 1
 /// with it. The rest of this file's accounting — eight prototype sites, six
-/// surviving in `ds.tsx` after `PassageCard` is cut — was correct and is unchanged.
+/// surviving in the prototype after `PassageCard` is cut — was correct and is
+/// unchanged.
 ///
 /// ## THE COST, STATED
 ///
@@ -95,7 +97,7 @@ enum GlassTier {
   /// Reserved for a surface that sits directly over the animated background and
   /// is expected to let it show through — on `/`, that is **Home's today's-reading
   /// panel and nothing else**. See the enum's doc for why the top bar is not a
-  /// second one; `ds.tsx:499-530` has no `backdropFilter` in it at all.
+  /// second one; the prototype's `TopBar` has no `backdropFilter` in it at all.
   ///
   /// ## WHY THIS TIER CARRIES THE WASH, WHICH IS THE ONE PLACE IT IS NOT OBVIOUS
   ///
@@ -378,25 +380,36 @@ const double kGlassSeamGlowBlur = 14;
 ///
 /// ## THE PROTOTYPE'S EIGHT RADII, CORRECTED, AND THE MEDIAN WAS NEVER 20
 ///
-/// Measured in `eva/src`, site by site:
+/// Measured in the superseded prototype, site by site:
 ///
 /// | prototype site | radius | ships? |
 /// | --- | --- | --- |
-/// | `Input` (`ds.tsx:311`) | 8 | `[EvaTextField]` — tint |
-/// | `QuizOption` (`ds.tsx:439`) | 12 | `/quiz` — tint |
-/// | `SettingsTile` (`ds.tsx:486`) | 12 | `/settings` — tint |
-/// | `StatTile` (`ds.tsx:468`) | 16 | `/result` — tint |
-/// | `SealFAB` dock item (`ds.tsx:550`) | 16 | **cut** with the profile screen |
-/// | `PassageCard` (`ds.tsx:382`) | 20 | **cut** with the library |
-/// | `SealFAB` button (`ds.tsx:561`) | 20 | **cut** with the profile screen |
-/// | Login form (`LoginScreen.tsx:40`) | 24 | `/login` — tint |
-/// | Home panel (`HomeScreen.tsx:39`) | 24 | **`/` — the one site that blurs** |
+/// | `Input` | 8 | `[EvaTextField]` — tint |
+/// | `QuizOption` | 12 | `/quiz` — tint |
+/// | `SettingsTile` | 12 | `/settings` — tint |
+/// | `StatTile` | 16 | `/result` — tint |
+/// | `SealFAB` dock item | 16 | **cut** with the profile screen |
+/// | `PassageCard` | 20 | **cut** with the library |
+/// | `SealFAB` button | 20 | **cut** with the profile screen |
+/// | Login form | 24 | `/login` — tint |
+/// | Home panel | 24 | **`/` — the one site that blurs** |
+///
+/// **The redesign has no counterpart for most of these sites.** It has no
+/// `Input`, no `QuizOption`, no `SettingsTile`, no `StatTile`, no `SealFAB` and
+/// no `PassageCard` — the login field is a bare `.field input` with no filter,
+/// and the journey's numbers are `.ringbox` circles. What the page does blur is
+/// a different set at different radii: `.hcard` (`redesign.html:250`, 12px),
+/// `.selah` (`:261`, 10px), `.opt` (`:338`, 10px), `.pill` (`:193`, 18px),
+/// `.dock` (`:210`, 22px), `.sheet` (`:436`, 24px) and `.rcard` (`:445`,
+/// 24px). So the column above is a **record of what the prototype spent**, and
+/// the budget of one is this client's own.
 ///
 /// **This doc was wrong three ways and all three are corrected here.** It read
 /// "`20` (`PassageCard` and Home's panel), `24` (the FAB button)" — the FAB button is
 /// `20`, Home's panel is `24`, and the two are swapped. It then read "collapsing them
 /// to one widget has to collapse them to one number, and `20` is the median" — and
-/// `20` is not the median of its own list either: sorted, `8, 12, 12, 16, 16, 20, 20,
+/// `20` is not the median of its own list either: the prototype had **NINE** blur
+/// sites, and sorted they measure `8, 12, 12, 16, 16, 20, 20, 24, 24` —
 /// 24`, and the median is **16**. Finally it read "the one `20` that survives **is**
 /// Home's panel" — no `20` site survives at all, since `PassageCard` and `SealFAB`
 /// are both cut with the screens that used them.
@@ -428,7 +441,7 @@ const double kGlassBlurSigma = 24;
 /// The one true surface: a translucent fill, a hairline rim, and optionally a
 /// backdrop blur or the redesign's `.bloom` wash.
 ///
-/// Collapses the eight glass sites in `eva/src/components/ds.tsx` plus two
+/// Collapses the eight glass sites in the superseded prototype plus two
 /// inline ones into one widget (`04-widget-inventory.md` §3). The recipe is the
 /// prototype's, with the numbers resolved through tokens rather than repeated:
 ///
@@ -700,7 +713,8 @@ class GlassSurface extends StatelessWidget {
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: colors.glassShadow,
-            // `ds.tsx:386` — `0 4px 24px`. The offset is non-zero here, which is
+            // The prototype's glass ambient — `0 4px 24px`. The offset is
+            // non-zero here, which is
             // the one shadow in the prototype that is not a zero-offset glow;
             // it is still the glass ambient and not an elevation ramp.
             offset: const Offset(0, 4),

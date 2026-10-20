@@ -129,8 +129,9 @@ void main() {
     });
 
     test('and no OTHER family carries Arabic-Indic DIGITS, the third site', () {
-      // `ReadingArScreen.tsx:49` puts `١`…`٧` in a `<sup>`, and `:87` puts `٥` in a
-      // caption. U+0665 is inside the Arabic block, so the assertion above already
+      // `redesign.html:1362` puts `١`…`٦` in the verse marker, and `:981`'s `N()`
+      // writes `٥` — and every other digit — into a caption. U+0665 is inside the
+      // Arabic block, so the assertion above already
       // covers it — **stated here** so the verse-marker case is not silently resting
       // on the other one.
       //

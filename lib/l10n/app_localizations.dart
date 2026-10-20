@@ -200,7 +200,7 @@ abstract class AppLocalizations {
 
   /// Appended to a control's accessible name while the control is inert — the library's book cards and the selah circle.
   ///
-  /// **Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was `ds.tsx:499-530`, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because **five** features carry this field name and `/quiz`'s differs.
+  /// **Its subject was the avatar's and the avatar is gone.** `redesign.html:513-538` draws no avatar on `/`; the top bar that carried it was the superseded prototype's own, which the redesign replaced with the greeting block. The wording is `authUnavailableSuffix`'s and the reasoning is its own: a screen reader should be told WHY the control cannot be pressed, not only that it cannot. NAMESPACED `home*` because **five** features carry this field name and `/quiz`'s differs.
   ///
   /// In en, this message translates to:
   /// **'unavailable in this build'**
@@ -569,7 +569,7 @@ abstract class AppLocalizations {
   /// **'h'**
   String get leaderboardHourUnit;
 
-  /// `ErrorView.retryLabel`. There is NO prototype error state at all — `eva/src` has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES ("Try again") rather than "Retry".
+  /// `ErrorView.retryLabel`. There is NO prototype error state at all — the superseded prototype has none, because it has no data layer that can fail — so this is WRITTEN, and it says WHAT IT DOES ("Try again") rather than "Retry".
   ///
   /// NAMESPACED `home*`: three features carry this field name (`homeRetry`, `quizRetry`, `readingRetry`).
   ///
@@ -609,9 +609,9 @@ abstract class AppLocalizations {
 
   /// The CTA while a choice is made and not yet graded.
   ///
-  /// TRANSCRIBED FROM `QuizScreen.tsx:127`, AND THE VALUE IS STILL THE ONE IT WROTE. The superseded prototype's switch was `{checked ? 'Next question' : 'Check answer'}`; this is its unchecked arm, unchanged. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.
+  /// TRANSCRIBED FROM THE SUPERSEDED PROTOTYPE, AND THE VALUE IS STILL THE ONE IT WROTE. Its switch was `{checked ? 'Next question' : 'Check answer'}`; this is its unchecked arm, unchanged. The redesign has no such label at all: its grader is one-tap (`redesign.html:1423` — `pick` grades the instant a card is chosen), so `.qnext` only ever appears graded (`:1421` removes it; `:1430` shows it). This client's grade is a `POST` (`POST /readings/:id/submit`, §5 trap 10 — no successful submit may be fired on a mis-tap), so choosing and grading stay two presses and the second press needs a name the prototype never wrote.
   ///
-  /// The citation is kept because the value is kept: the step is the same, so the line that named it still does.
+  /// The value is kept because the step is the same: the prototype's label named the same step the client names, so the label survives even though the line that named it does not.
   ///
   /// In en, this message translates to:
   /// **'Check answer'**
@@ -693,7 +693,7 @@ abstract class AppLocalizations {
 
   /// The back control's accessible name.
   ///
-  /// WRITTEN, NOT TRANSCRIBED: ReadingEnScreen.tsx:14-16 and ReadingArScreen.tsx:26-28 are `<button>`s wrapping an inline `<svg>` chevron with nothing at all — §14's first row, verbatim.
+  /// WRITTEN, NOT TRANSCRIBED: the superseded prototype's two reading screens each drew a `<button>` wrapping an inline `<svg>` chevron with nothing at all — §14's first row, verbatim. The redesign's reader app bar draws the same glyph and no name either (`redesign.html:542`).
   ///
   /// In en, this message translates to:
   /// **'Back'**
@@ -719,7 +719,7 @@ abstract class AppLocalizations {
   ///
   /// WRITTEN HERE AND NOT LEFT IN THE DESIGN SYSTEM AS A LITERAL, which is what it was: `FontSizeStepper` hard-coded 'Decrease font size' and 'Increase font size', so a reader who opened the `Aa` panel on the Arabic arm was told, IN ENGLISH, what the two buttons beside them did. `ErrorView.retryLabel` is the precedent for the alternative — a design-system widget that renders a caller's script takes the caller's string, because a hard-coded English string in `core/` is the half-translated UI this app exists not to ship.
   ///
-  /// AND THE PROTOTYPE HAS NO WORDING TO TRANSCRIBE: SettingsScreen.tsx:66-68 is a bare range input with `-` and `+` and no labels at all.
+  /// AND THE PROTOTYPE HAS NO WORDING TO TRANSCRIBE: the superseded prototype's font-size row is a bare range input with `-` and `+` and no labels at all, and the redesign's Type-size row is a bare native range input too (`redesign.html:693`) with no labels of its own.
   ///
   /// In en, this message translates to:
   /// **'Decrease font size'**
@@ -731,7 +731,7 @@ abstract class AppLocalizations {
   /// **'Increase font size'**
   String get readingIncreaseFontSize;
 
-  /// The bookmark control's accessible name, BEFORE any suffix. The bookmark has no endpoint and no port — ReadingEnScreen.tsx:19-21 draws one with no handler — so it ships INERT and says so via `readingUnavailableSuffix`.
+  /// The bookmark control's accessible name, BEFORE any suffix. The bookmark has no endpoint and no port — the redesign draws one (`redesign.html:544`) and the superseded prototype drew one with no handler at all — so it ships INERT and says so via `readingUnavailableSuffix`.
   ///
   /// In en, this message translates to:
   /// **'Bookmark'**
@@ -761,13 +761,13 @@ abstract class AppLocalizations {
   /// **'Verse'**
   String get readingVerse;
 
-  /// `ErrorView.retryLabel`. The prototype has no error state at all — `eva/src` has no data layer that can fail — so this is written. NAMESPACED `reading*`; see `homeRetry` for the three-way collision.
+  /// `ErrorView.retryLabel`. The prototype has no error state at all — the superseded prototype has no data layer that can fail — so this is written. NAMESPACED `reading*`; see `homeRetry` for the three-way collision.
   ///
   /// In en, this message translates to:
   /// **'Try again'**
   String get readingRetry;
 
-  /// The primary button. Transcribed: ResultScreen.tsx:77.
+  /// The primary button. The superseded React prototype's primary read `Reflect again`, and the value is that label verbatim. The redesign has no such label: its two result CTAs are `read again` and `retry quiz` — one I18N row, `redesign.html:963` — drawn as the `.rcta` at `:724` and the `.rghost` at `:725`. The client keeps the prototype's words, and `result_sheet.dart` records the action mapping.
   ///
   /// In en, this message translates to:
   /// **'Reflect again'**
@@ -775,7 +775,7 @@ abstract class AppLocalizations {
 
   /// The secondary button.
   ///
-  /// WRITTEN, NOT TRANSCRIBED, AND TRANSCRIBING WOULD HAVE BEEN A LIE: the prototype's label is `Back to library` (ResultScreen.tsx:78) and there IS no library — AGENT_CONTEXT §2 decision 1 cut it, and the destination is `/`. The label says where the button actually goes.
+  /// WRITTEN, NOT TRANSCRIBED, AND TRANSCRIBING WOULD HAVE BEEN A LIE: the superseded React prototype's label is `Back to library` and there IS no library — AGENT_CONTEXT §2 decision 1 cut it, and the destination is `/`. The redesign's own `again` row reads `read again` (`redesign.html:963`), which is also not a destination for this client. The label says where the button actually goes.
   ///
   /// In en, this message translates to:
   /// **'Back'**
@@ -795,7 +795,7 @@ abstract class AppLocalizations {
   /// **'Best run'**
   String get resultBestRun;
 
-  /// The streak pill's leading noun. Transcribed: ResultScreen.tsx:65 — `Day 12`.
+  /// The streak pill's leading noun. The superseded prototype's pill read `Day 12`, and the noun is that one verbatim. The redesign's own streak chip (`.streak`, `redesign.html:238`) numbers the reader and calls its unit `days` (`redesign.html:516`) — so it has no `Day` of its own, and the client keeps the prototype's noun.
   ///
   /// DELIBERATELY **NOT** AN ICU PLURAL, and this is the judgement call in this file. The pill renders a LABEL FORM (`Day 12`, `اليوم ١٢`), not a count phrase: English `Day 12` is correct for every count including one, and Arabic `اليوم` with an Arabic-Indic numeral is the conventional label too. Making it a plural would render `Days 12` in English — ALTERING A TRANSCRIBED PROTOTYPE STRING to fix nothing — and would change the pill's visual shape on every screen that shows a streak.
   ///
@@ -805,7 +805,7 @@ abstract class AppLocalizations {
   /// **'Day'**
   String get resultDay;
 
-  /// Appended to the streak label when the reader is at their best. Transcribed: ResultScreen.tsx:65 — the ` — your longest yet` half of `Day 12 — your longest yet`.
+  /// Appended to the streak label when the reader is at their best. The superseded prototype's pill read `Day 12 — your longest yet`, and this is the ` — your longest yet` half of it, verbatim. The redesign's own streak chip calls its unit `days` (`redesign.html:516`) and has no counterpart for this half at all — so the client keeps the prototype's words.
   ///
   /// THE COMPARISON IS THIS CLIENT'S, NOT THE PROTOTYPE'S: the prototype's own sentence sits beside `longest_streak: 6` with `Day 12`, a hard-coded mismatch in the fixture it drew. So the words are transcribed and the `>=` test is not. See `resultStreakLabelFor`'s Dart doc for why it is `>=` and not `==`, and why a streak of `0` never claims it.
   ///
@@ -829,7 +829,7 @@ abstract class AppLocalizations {
 
   /// The headline sentence: the answer was wrong.
   ///
-  /// WRITTEN, NOT TRANSCRIBED. `ResultScreen.tsx:50` ships `So close. One more read and you've got it.`, which is keyed on its own hard-coded `4/5` - and this client has neither number: `SubmitResult` carries `points_earned` and `current_total_points` and **no question count** (AGENT_CONTEXT 2's route table gives `/result` no repository), so a sentence about being 'one read away' would be a claim about a measurement that does not exist. This is decision 45's rejected 'invent a measurement', and it is the largest single divergence on the screen.
+  /// WRITTEN, NOT TRANSCRIBED. The superseded prototype's result screen shipped `So close. One more read and you've got it.`, which is keyed on its own hard-coded `4/5` - and this client has neither number: `SubmitResult` carries `points_earned` and `current_total_points` and **no question count** (AGENT_CONTEXT 2's route table gives `/result` no repository), so a sentence about being 'one read away' would be a claim about a measurement that does not exist. This is decision 45's rejected 'invent a measurement', and it is the largest single divergence on the screen.
   ///
   /// The consolation clause is deliberate and it is the product's, not the prototype's: a wrong answer on a five-question set is one of five, and saying so is true for every count the server can send.
   ///
@@ -853,7 +853,7 @@ abstract class AppLocalizations {
 
   /// The screen's title, in the app bar's centred slot. Transcribed: `eva/redesign.html:641` writes `The Workshop`, and `:949` carries the same pair.
   ///
-  /// **REPLACED THE PHASE-9 VALUE.** The old key said `Settings` and was transcribed from `SettingsScreen.tsx:43`, which is the React prototype this task supersedes. The redesign names the screen, and the name is the title.
+  /// **REPLACED THE PHASE-9 VALUE.** The old key said `Settings` and was transcribed from the superseded React prototype's settings screen, which this task supersedes. The redesign names the screen, and the name is the title.
   ///
   /// In en, this message translates to:
   /// **'The Workshop'**
@@ -1195,7 +1195,7 @@ abstract class AppLocalizations {
 
   /// The Type size row's title. Transcribed: `eva/redesign.html:693` writes `Type size` and `:961` carries the pair.
   ///
-  /// **REPLACED THE PHASE-9 `settingsFontSize`**, which was transcribed from `SettingsScreen.tsx:62`.
+  /// **REPLACED THE PHASE-9 `settingsFontSize`**, which was transcribed from the superseded React prototype's font-size row.
   ///
   /// **THE PROTOTYPE'S SLIDER IS NOT TRANSCRIBED.** `:693` is a 16-26px range input, and the client keeps the 1-5 step model that `docs/superpowers/plans/2026-10-13-lumen-redesign.md:1172-1173` already decided on. The row is the existing `FontSizeStepper` plus the preview line, and the divergence is recorded at the row.
   ///

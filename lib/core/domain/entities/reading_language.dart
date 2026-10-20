@@ -25,11 +25,12 @@
 ///
 /// PURE DART — `core/domain/` is held to no Flutter, Dio or http by Gate 1.
 enum ReadingLanguage {
-  /// NKJV. `ds.tsx` / `ReadingEnScreen.tsx`; `GET /readings/today/en`.
+  /// NKJV. The superseded prototype's English reading screen;
+  /// `GET /readings/today/en`.
   english('en'),
 
-  /// Smith & Van Dyck (فانديك). `ReadingArScreen.tsx`;
-  /// `GET /readings/today/ar`.
+  /// Smith & Van Dyck (فانديك). The superseded prototype's Arabic reading
+  /// screen; `GET /readings/today/ar`.
   arabic('ar');
 
   const ReadingLanguage(this.code);

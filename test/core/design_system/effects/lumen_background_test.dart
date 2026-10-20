@@ -142,7 +142,9 @@ void main() {
     // ## THE FALLBACK IS NOT A DEGRADED AURORA — IT IS THE PROTOTYPE'S OWN
     //
     // `eva/redesign.html:46` gives every screen **one** canvas, and the
-    // prototype's screen root is `background: T.canvas` (`ds.tsx:162`). The old
+    // superseded prototype did the same thing: its screen root was
+    // `background: T.canvas` and the layer above it — the orb container —
+    // declared no background of its own. The old
     // design's per-screen orb groups stood in for that fill and are gone, so
     // what is left when the aurora does not paint is the fill itself — the
     // design, not a consolation prize.

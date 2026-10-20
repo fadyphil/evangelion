@@ -328,7 +328,8 @@ void main() {
         // what caught nothing before.
         //
         // **Was 72, now 58, and the type change is the only reason.** The old
-        // tile drew its figure in the display serif at 24 (`ds.tsx:474`);
+        // tile drew its figure in the display serif at 24 — the superseded
+        // prototype's value, which the redesign has no counterpart for;
         // `redesign.html:407-408` replaced it with mono 11 over a mono 8.5
         // caption, so the content is 14px shorter and the row is 14px shorter.
         // The width above is untouched, which is the part of this test that was
@@ -376,8 +377,9 @@ void main() {
       // **`24`, and it is the prototype's own number for this surface.** It used to
       // be `20`, justified as "the median of the eight prototype radii" — which was
       // false of the list it gave (the median of `8, 12, 12, 16, 16, 20, 20, 24` is
-      // 16) and of the sites it named (Home's panel is `HomeScreen.tsx:39`'s
-      // `blur(24px)`, not `20`). Only one site blurs, so there was never a
+      // 16) and of the sites it named (Home's panel was the superseded
+      // prototype's `blur(24px)`, not `20`). Only one site blurs, so there was
+      // never a
       // compromise to make; `glass_surface.dart`'s doc carries the whole correction.
       await tester.pumpWidget(
         _onSurface(
@@ -1561,30 +1563,46 @@ void main() {
     }
   });
 
-  group('the sigma doc table, against the prototype it transcribes', () {
-    // The rows of `kGlassBlurSigma`'s doc table: name, prototype file, line, radius.
-    // Parsed out of the doc comment itself, so the table is the subject and not a
-    // second copy of it living here.
+  group('the sigma doc, against the reference it names', () {
+    // ## WHAT THIS GROUP CHECKS NOW, AND WHY IT IS NOT THE GROUP THAT WAS HERE
     //
-    // The name is matched as **anything up to the parenthesis**, not as a backticked
-    // token, and that is not looseness for its own sake: four of the nine rows are not
-    // a single backticked name (`` `SealFAB` dock item ``, `` Login form ``), and a
-    // parser that only understood the tidy five would have quietly covered five of
-    // nine — which is the failure this group exists to prevent, one level up. The
-    // first version of this pattern allowed backticks but not a space-separated name
-    // and matched **two** of nine, which is why the anti-vacuity test below asserts a
-    // count and not merely a non-empty list: a parser change is a silent coverage
-    // change otherwise.
-    final List<RegExpMatch> rows =
-        RegExp(
-              r'\|\s*([^|]+?)\s*\(`([^`]+):(\d+)`\)\s*\|\s*(\d+)\s*\|',
-              multiLine: true,
-            )
-            .allMatches(
-              File('lib/core/design_system/widgets/glass_surface.dart')
-                  .readAsStringSync(),
-            )
-            .toList();
+    // It used to parse `kGlassBlurSigma`'s doc **table** — site, prototype file,
+    // line, radius — and then open each prototype file and ask whether the cited
+    // line really said `blur(Npx)`. The table's file-and-line column is gone: the
+    // prototype is retired, so that table is now a **record of what a superseded
+    // file spent**, and there is nothing on disk left to check it against.
+    //
+    // What is still checkable is the other half of the doc: the redesign's own
+    // blur radii, which the doc names in prose with a line each. Those are live
+    // numbers in a file that is still here, and the question is the one this group
+    // has always asked — **does the cited line really say `blur(Npx)`?** — asked
+    // of `eva/redesign.html` now.
+    //
+    // The prototype's table keeps its own two checks, because they are about the
+    // *record* and not about a file: nine rows, and the set of radii that survive
+    // into the shipped app, which is what the sigma's justification rests on.
+    //
+    // The prototype table is located by its **header** rather than by a pattern
+    // over the whole doc, because there are two tables in that doc and the recipe
+    // table above it has three columns and no radius in the middle one. The name
+    // cell is matched as **anything up to the next pipe**, not as a backticked
+    // token: four of the nine rows are not a single backticked name
+    // (`` `SealFAB` dock item ``, `` Login form ``), and a parser that only
+    // understood the tidy five would have quietly covered five of nine — which is
+    // the failure this group exists to prevent, one level up.
+    final String doc = File('lib/core/design_system/widgets/glass_surface.dart')
+        .readAsStringSync();
+
+    final List<RegExpMatch> rows = RegExp(
+      r'\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|',
+    ).allMatches(_rowsUnder(doc, '| prototype site |').join('\n')).toList();
+
+    // The redesign's radii, parsed out of the doc's prose. The citation is
+    // spelled three ways in that prose — `redesign.html:250`, then `:261` — and a
+    // radius can fall on the next `///` line, so the pattern allows for both.
+    final List<RegExpMatch> claims = RegExp(
+      r'`(\.[a-zA-Z-]+)`\s*\(\s*`[^`]*?(\d+)`,\s*(?:///\s*)*(\d+)\s*px\s*\)',
+    ).allMatches(doc).toList();
 
     test('the table is parsed out of the doc, and is not empty', () {
       // Anti-vacuity. Every check below iterates `rows`, so a reformat of the table
@@ -1594,59 +1612,102 @@ void main() {
         rows,
         hasLength(9),
         reason:
-            'the table must list all nine prototype sites — seven in `ds.tsx` plus '
-            'the two inline. Found ${rows.length}. A smaller number means a row was '
-            'dropped or the table was reformatted, and every check below silently '
-            'stopped covering it.',
+            'the table must list all nine prototype sites — seven in the '
+            'superseded prototype\'s component file plus the two inline. Found '
+            '${rows.length}. A smaller number means a row was dropped or the '
+            'table was reformatted, and every check below silently stopped '
+            'covering it.',
       );
     });
 
-    for (final RegExpMatch row in rows) {
-      // Backticks stripped, so `_cutSites` spells a site the way a reader would.
-      final String name = row.group(1)!.replaceAll('`', '').trim();
-      final String file = row.group(2)!;
-      final int line = int.parse(row.group(3)!);
-      final int radius = int.parse(row.group(4)!);
+    test('and the redesign radii are parsed out of the doc too', () {
+      // Anti-vacuity for the other half. Seven sites, and the count is the claim:
+      // a doc that lost one of them would otherwise leave the per-claim test
+      // below covering one fewer line and say nothing.
+      expect(
+        claims,
+        hasLength(7),
+        reason:
+            'the doc must name all seven of the redesign\'s blur sites. Found '
+            '${claims.length}. A smaller number means a radius was dropped from '
+            'the prose, and the per-claim test below silently stopped covering '
+            'it.',
+      );
+    });
 
-      test('$name is really blur(${radius}px) at $file:$line', () {
-        final File source = File('eva/src/${_prototypePath(file)}');
-        expect(source.existsSync(), isTrue, reason: '$file does not exist');
+    for (final RegExpMatch claim in claims) {
+      final String selector = claim.group(1)!;
+      final int line = int.parse(claim.group(2)!);
+      final int radius = int.parse(claim.group(3)!);
+
+      test('$selector is really blur(${radius}px) at redesign.html:$line', () {
+        final File source = File('eva/redesign.html');
+        expect(source.existsSync(), isTrue, reason: 'the reference is gone');
 
         final List<String> lines = source.readAsLinesSync();
         expect(
-          line - 1,
-          lessThan(lines.length),
-          reason: '$file has ${lines.length} lines, so `$line` is past the end',
+          line,
+          inInclusiveRange(1, lines.length),
+          reason:
+              'redesign.html has ${lines.length} lines, so `$line` is past the end',
         );
 
+        // The **rule**, not the line. A CSS rule may wrap, and every one of the
+        // redesign's seven does: the cited line is a declaration inside a rule
+        // that opens above it. The rule is found by scanning back to the
+        // nearest `{` and forward to the nearest `}`, and the check is that the
+        // rule names the selector and declares the radius.
+        final String rule = _cssRuleAt(lines, line);
         expect(
-          lines[line - 1],
+          rule,
+          contains(selector),
+          reason:
+              'the doc says `$selector` blurs, and the rule at '
+              '`redesign.html:$line` does not mention it:\n$rule',
+        );
+        expect(
+          rule,
           contains('blur(${radius}px)'),
           reason:
-              '`glass_surface.dart` says `$name` is `blur(${radius}px)` at '
-              '`$file:$line`, and that line says:\n${lines[line - 1]}\n\n'
-              'A table of another repository numbers is a claim until something '
-              'checks it, and this is what checks it.',
+              'the doc says `$selector` is `blur(${radius}px)` at '
+              '`redesign.html:$line`, and that rule says:\n$rule\n\n'
+              'A table of another repository\'s numbers is a claim until '
+              'something checks it, and this is what checks it.',
         );
       });
     }
 
     test('and the shipped sigma is the radius of the ONE site that blurs', () {
-      // The claim the whole correction rests on: `HomeScreen.tsx:39` writes
-      // `blur(24px)`, Home panel is the only `GlassTier.blur` site, and therefore
-      // the sigma is `24` and not a compromise between eight radii. Read against the
-      // prototype rather than against the constant, so a change that moved the
-      // number and left the argument is red.
-      final List<String> home = File('eva/src/screens/HomeScreen.tsx')
-          .readAsLinesSync();
+      // The claim the whole correction rests on: the table records the home
+      // panel at `24` and marks it as the one site that blurs, so the sigma is
+      // `24` and not a compromise between eight radii. Read against the table
+      // rather than against the constant, so a change that moved the number and
+      // left the argument is red.
+      final List<RegExpMatch> blurring = rows
+          .where(
+            (RegExpMatch row) =>
+                row.group(3)!.contains('the one site that blurs'),
+          )
+          .toList();
 
-      expect(home[38], contains('blur(24px)'));
+      expect(
+        blurring,
+        hasLength(1),
+        reason:
+            'exactly one site is the one that blurs — a second would mean the '
+            'sigma is a compromise between two radii again',
+      );
+      expect(
+        int.parse(blurring.single.group(2)!),
+        24,
+        reason: 'the one site that blurs is 24, and that is the sigma',
+      );
       expect(
         kGlassBlurSigma,
         24.0,
         reason:
-            'only one site blurs, so there is no median to take: the sigma is the '
-            'prototype own radius for that site',
+            'only one site blurs, so there is no median to take: the sigma is '
+            'that site\'s own radius',
       );
     });
 
@@ -1657,7 +1718,7 @@ void main() {
       final Set<int> shipping = <int>{
         for (final RegExpMatch row in rows)
           if (!_cutSites.contains(row.group(1)!.replaceAll('`', '').trim()))
-            int.parse(row.group(4)!),
+            int.parse(row.group(2)!),
       };
 
       expect(
@@ -1679,17 +1740,48 @@ void main() {
   });
 }
 
-/// The prototype file a doc row names, relative to `eva/src`.
-String _prototypePath(String name) => switch (name) {
-  'ds.tsx' => 'components/ds.tsx',
-  'HomeScreen.tsx' => 'screens/HomeScreen.tsx',
-  'LoginScreen.tsx' => 'screens/LoginScreen.tsx',
-  _ => throw StateError(
-    'the sigma doc names a prototype file this test cannot find: $name. Add it to '
-    '_prototypePath rather than skipping the row — an unmapped file means an '
-    'unchecked claim.',
-  ),
-};
+/// The table rows that follow the header containing [header] in [doc].
+///
+/// The rows are the lines that open with a `|` after the header, and the scan
+/// stops at the first line that does not — which is what keeps a **second**
+/// table in the same doc unreachable from this one.
+List<String> _rowsUnder(String doc, String header) {
+  final List<String> lines = doc.split('\n');
+  final int start = lines.indexWhere((String line) => line.contains(header));
+  if (start < 0) {
+    return const <String>[];
+  }
+  final List<String> rows = <String>[];
+  for (int i = start + 1; i < lines.length; i++) {
+    // The doc is a comment, so every line of the table is prefixed `/// `. The
+    // prefix goes before the `|` is looked for — `trim()` alone would leave the
+    // `///` on and the scan would stop on the first line it met.
+    final String line = lines[i].replaceFirst(RegExp(r'^\s*///\s*'), '').trim();
+    if (!line.startsWith('|')) {
+      break;
+    }
+    rows.add(line);
+  }
+  return rows;
+}
+
+/// The CSS rule that [line] belongs to, in [lines].
+///
+/// A citation to a CSS line names the **rule**, and every rule in
+/// `eva/redesign.html` that matters here wraps: the cited line is a
+/// declaration inside a rule that opens above it. The rule is found by scanning
+/// back to the nearest `{` and forward to the nearest `}`.
+String _cssRuleAt(List<String> lines, int line) {
+  int start = line - 1;
+  while (start > 0 && !lines[start].contains('{')) {
+    start--;
+  }
+  int end = line - 1;
+  while (end < lines.length && !lines[end].contains('}')) {
+    end++;
+  }
+  return lines.sublist(start, end + 1).join('\n');
+}
 
 /// The doc-table sites that do **not** ship, and why.
 ///

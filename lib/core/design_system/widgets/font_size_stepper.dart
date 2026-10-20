@@ -1,11 +1,12 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/material.dart';
 
-/// The prototype's slider range. `SettingsScreen.tsx:66` —
-/// `<input type="range" min={1} max={5}>`.
+/// The prototype's slider range — `<input type="range" min={1} max={5}>` — and
+/// **the redesign has no counterpart for it**: its own type-size slider
+/// (`redesign.html:693`) is `min="16" max="26"` in pixels, a different control.
 const int kFontStepMin = 1;
 
-/// The prototype's slider maximum. `SettingsScreen.tsx:66`.
+/// The prototype's slider maximum.
 const int kFontStepMax = 5;
 
 /// Clamps [step] into `kFontStepMin…kFontStepMax`.
@@ -108,9 +109,9 @@ class FontSizeStepperLabels {
 /// | `redesign.html:429` — `input[type=range]`, `height:3px`, `rgba(#fff,.14)` | [trackHeight] + the rule's own colour |
 /// | `redesign.html:430` — `::-webkit-slider-thumb`, 15px, `var(--gold)`, `0 0 10px rgba(232,176,75,.7)` | [thumbSize] + the gold disc and its glow |
 /// | `redesign.html:95` — the same track re-pointed at `rgba(20,22,30,.18)` in light mode | `EvaColors.ink` at 14% |
-/// | `SettingsScreen.tsx:65`,`:67` — the small `A` at `ui 12` and the large one at `ui 17`, both `ink3` | `_ScaleLetter`, `ui` family, `ink2` |
-/// | `SettingsScreen.tsx:66` — `width: 80`, `min={1} max={5}` | [trackWidth], [kFontStepMin], [kFontStepMax] |
-/// | `SettingsScreen.tsx:66` — `accentColor: hex.ember` | **nothing** — see the fill below |
+/// | the prototype's small `A` at `ui 12` and the large one at `ui 17`, both `ink3` | `_ScaleLetter`, `ui` family, `ink2` |
+/// | the prototype's `width: 80`, `min={1} max={5}` | [trackWidth], [kFontStepMin], [kFontStepMax] |
+/// | the prototype's `accentColor: hex.ember` | **nothing** — see the fill below |
 ///
 /// The letters keep `ink2` where the React prototype wrote `T.ink3`: `ink3` is this
 /// design system's *disabled* ink, and `#9B97B8` in light is below any text floor on
@@ -119,7 +120,7 @@ class FontSizeStepperLabels {
 ///
 /// ## THE FILLED PORTION OF THE TRACK IS GONE, DELIBERATELY
 ///
-/// `SettingsScreen.tsx:66`'s `accentColor: hex.ember` is what painted the ember
+/// The prototype's `accentColor: hex.ember` is what painted the ember
 /// bar from the left edge to the thumb, and `redesign.html:429-430` has **no such
 /// thing**: a CSS range input is one uniform rule with one gold thumb on it, and
 /// that is what this now draws. The thumb's position was already the state carrier
@@ -153,7 +154,7 @@ class FontSizeStepper extends StatelessWidget {
   /// Reports the new step, already clamped.
   final ValueChanged<int> onChanged;
 
-  /// The prototype's track width. `SettingsScreen.tsx:66` — `width: 80`.
+  /// The prototype's track width — `width: 80`.
   ///
   /// **Kept at 80 against `redesign.html:429`'s `width:120px`,** and the reason is
   /// the same one keeps the range: the redesign's own slider is a *different
@@ -169,7 +170,7 @@ class FontSizeStepper extends StatelessWidget {
   /// names `border-radius: 3px`, so it is a stadium at both ends.
   ///
   /// Was 4, chosen for "a 4px line with a 14px thumb" when the thumb was
-  /// `SettingsScreen.tsx`'s unspecified native one. The redesign names a 3px rule
+  /// the prototype's unspecified native one. The redesign names a 3px rule
   /// and a 15px thumb, and the ratio between them is the thing that reads.
   static const double trackHeight = 3;
 
@@ -368,7 +369,7 @@ class _Track extends StatelessWidget {
                     shape: BoxShape.circle,
                     // The same line: `box-shadow: 0 0 10px rgba(232,176,75,.7)`.
                     // It replaces the `0 0 8px rgba(ember, .5)` this borrowed from
-                    // `ds.tsx:401`'s passage progress bar — a longer radius and a
+                    // the prototype's passage progress bar — a longer radius and a
                     // higher alpha, because on a 3px rule the thumb is the only
                     // accent on the control and a 50% glow around a 14px disc read
                     // as a smudge.

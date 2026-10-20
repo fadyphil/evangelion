@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 /// "That did not work, and here is the way to try again."
 ///
 /// **The prototype has neither this widget nor [EmptyState]** —
-/// `04-widget-inventory.md` §6 says so, and it is true: `eva/src` contains no
-/// error state at all, because the prototype has no data layer that can fail.
+/// `04-widget-inventory.md` §6 says so, and it is true: the **superseded
+/// prototype** contains no error state at all, because it has no data layer that
+/// can fail.
 /// Every screen renders a hardcoded payload, so there was nothing to design a
 /// failure for.
 ///

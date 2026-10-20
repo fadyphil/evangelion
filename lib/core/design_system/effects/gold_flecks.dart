@@ -30,11 +30,12 @@ import 'package:flutter/material.dart';
 /// ## `dense` HAS NO PROTOTYPE
 ///
 /// The inventory names the flag and the prototype has no dense variant — the
-/// only call sites are `QuizScreen.tsx:92-95`, four sparse flecks with delays of
-/// 0 / 110 / 220 / 340ms. So the flag is given the one meaning it can have
-/// without inventing geometry: a second, larger, dimmer ring around each fleck.
-/// Recorded here so a later phase does not go looking for a prototype that was
-/// never built.
+/// only call sites were the superseded prototype's four sparse flecks, with
+/// delays of 0 / 110 / 220 / 340ms. **The redesign draws no flecks at all**,
+/// so those four are the prototype's and not the redesign's. So the flag is
+/// given the one meaning it can have without inventing geometry: a second,
+/// larger, dimmer ring around each fleck. Recorded here so a later phase does
+/// not go looking for a prototype that was never built.
 ///
 /// ## AND IT IS **PLACED**
 ///
@@ -49,10 +50,9 @@ import 'package:flutter/material.dart';
 /// The call site is `features/quiz/presentation/widgets/quiz_option_card.dart`:
 /// the **correct** option, and only that one, with the offsets derived from
 /// the card's own width — see `QuizOptionCard.goldFleckOffsetsFor` for the
-/// derivation and the prototype lines it comes from. The brief's own rule is
-/// the authority for the ornament ("tiny gold flecks floating near the correct
-/// option — sparse, 3–4 max",
-/// `eva/src/imports/pasted_text/pasted-attachment.txt:97`).
+/// derivation and the values it comes from. The brief's own rule is the
+/// authority for the ornament ("tiny gold flecks floating near the correct
+/// option — sparse, 3–4 max", `eva/brief.txt:97`).
 class GoldFlecks extends StatelessWidget {
   /// Draws one fleck per entry in [offsets].
   const GoldFlecks({required this.offsets, this.dense = false, super.key});
@@ -60,8 +60,8 @@ class GoldFlecks extends StatelessWidget {
   /// Where each fleck sits, in logical px from **this widget's** top-left.
   ///
   /// Caller-supplied because the prototype positions them relative to the option
-  /// card they decorate (`QuizScreen.tsx:92-95` puts two just outside the left
-  /// edge and two just outside the right), which a positioned overlay in the
+  /// card they decorate — the superseded prototype put two just outside the left
+  /// edge and two just outside the right — which a positioned overlay in the
   /// feature knows and a design-system widget cannot.
   final List<Offset> offsets;
 
@@ -87,7 +87,9 @@ class GoldFlecks extends StatelessWidget {
         !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
 
     return IgnorePointer(
-      // `pointerEvents: 'none'` in the prototype (`QuizScreen.tsx:19`).
+      // The superseded prototype's flecks were `pointerEvents: 'none'`, and the
+      // redesign's own decorative overlays are `pointer-events: none` too
+      // (`redesign.html:112` — `.scrim`).
       child: ExcludeSemantics(
         // Purely decorative: the flecks sit on top of an option card whose text
         // already says it is correct, so announcing four dots would add four
@@ -115,16 +117,26 @@ class GoldFlecks extends StatelessWidget {
   }
 }
 
-/// One fleck's radius and glow, `QuizScreen.tsx:15-16`.
+/// One fleck's radius and glow: `2.5` — the prototype's 5px dot — and the
+/// `0 0 10px` reach of its box-shadow.
+///
+/// **The redesign draws no flecks**, so both numbers are the superseded
+/// prototype's; the brief's rule is what puts them on screen.
 const double kFleckRadius = 2.5;
 
 /// The fleck's `box-shadow: 0 0 10px` reach, in logical px.
 const double kFleckGlow = 10;
 
-/// `fleck-float`'s travel, `index.css:87` — `translateY(0) → translateY(-9px)`.
+/// The fleck's travel: `translateY(0) → translateY(-9px)`, the two ends of the
+/// superseded prototype's `fleck-float` keyframes.
+///
+/// **The redesign has no `fleck-float`** — the flecks exist only in the brief
+/// and in the prototype — so the travel is the prototype's own.
 const double kFleckTravel = 9;
 
-/// `fleck-float`'s opacity endpoints, `index.css:86-87` — `0.85 → 0.35`.
+/// The fleck's opacity endpoints: `0.85 → 0.35`, the two ends of the same
+/// keyframes. **The redesign has no `fleck-float`**, so both are the
+/// prototype's own.
 const double kFleckOpacityHigh = 0.85;
 const double kFleckOpacityLow = 0.35;
 
@@ -142,8 +154,10 @@ const double kFleckPhaseSpread = 0.2;
 
 /// The `0 → 1 → 0` triangle of `2s ease-in-out infinite alternate`.
 ///
-/// `index.css:85-88` has two keyframes and `alternate`, i.e. there-and-back. The
-/// float clock is a sawtooth, so the there-and-back is built from it here.
+/// The superseded prototype's `fleck-float` had two keyframes and `alternate`,
+/// i.e. there-and-back. **The redesign has no `fleck-float`** — the flecks
+/// exist only in the brief and in the prototype. The float clock is a sawtooth,
+/// so the there-and-back is built from it here.
 double goldFleckTriangle(double phase) =>
     1 - (2 * (phase % 1.0) - 1).abs().clamp(0.0, 1.0);
 

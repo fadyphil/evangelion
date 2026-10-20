@@ -3,10 +3,21 @@ import 'package:flutter/material.dart';
 
 /// An inline text button, optionally `ember` and optionally with a chevron.
 ///
-/// One surviving shared call site: Login's "Create account"
-/// (`LoginScreen.tsx:70-72`). That button is `ui 14 / 600` in `ember` with no
-/// chevron; `ButtonText` ("Forgot password?") is `ui 15 / 500` in `ink` **with**
-/// the chevron (`ds.tsx:271-286`).
+/// **No call site, and the redesign has no counterpart for the control.** The
+/// superseded prototype wrote Login's "Create account" as a bare `<button>` in
+/// `ui 14 / 600` in `ember` with no chevron, and `ButtonText` ("Forgot
+/// password?") as `ui 15 / 500` in `ink` **with** the chevron — but the
+/// redesign's own `/login` (`redesign.html:506-510`) carries the `.cta`, the
+/// two `.ghosts` pills and a footer line, and **no "create account" line at
+/// all**.
+///
+/// **So the widget is unplaced, and the orphan gate's allowlist says so.** The
+/// reason it is still here is the one the allowlist gives: it is a design-system
+/// primitive kept for a shape the redesign does not currently draw. `docs/DRIFT.md`
+/// §7 records the same case for `EvaChip`, and the repo's precedent there was
+/// **deletion** — so the decision to keep or delete this one is **open**, and
+/// the allowlist's own rule ("place it or delete it — never allowlist") says it
+/// should not sit here indefinitely.
 ///
 /// ## WHY THIS IS SEPARATE FROM `EvaButton.ghost`
 ///
@@ -57,22 +68,23 @@ class TextLink extends StatelessWidget {
   /// What to run on activation. `null` disables it.
   final VoidCallback? onPressed;
 
-  /// The label's colour. `null` resolves to `ink` — `ds.tsx:278`'s
+  /// The label's colour. `null` resolves to `ink` — the prototype's
   /// `color: color ?? T.ink`. `ember` is the call site's choice
-  /// (`LoginScreen.tsx:70`), not a default, because "this link is the primary
+  /// (the login screen's own "create account" button), not a default, because
+  /// "this link is the primary
   /// action" is a per-screen decision.
   final Color? color;
 
   /// Whether to append the prototype's `›`.
   ///
-  /// `ds.tsx:283` appends it only when no explicit `color` was passed — i.e. the
+  /// The prototype appended it only when no explicit `color` was passed — i.e. the
   /// chevron belongs to the neutral variant. Here the flag is explicit for the
   /// same reason the colour is: a rule that fires from a *different* parameter
   /// than the one it controls is a rule nobody can predict.
   ///
   /// ## THE CHEVRON'S COLOUR IS `ember`, NOT THE LINK'S INK
   ///
-  /// `ds.tsx:283` writes `color: hex.ember` on the `›`, and [EvaButton]'s
+  /// The prototype writes `color: hex.ember` on the `›`, and [EvaButton]'s
   /// transcription of the same glyph reads [EvaColors.ember] too. This one read
   /// [ink] — the link's own colour — which is not one of the eight declared
   /// divergences and therefore was simply a transcription error: one prototype
@@ -107,7 +119,7 @@ class TextLink extends StatelessWidget {
                   Directionality.of(context),
                 ).copyWith(
                   color: ink,
-                  // `ds.tsx:277` — `fontWeight: 500`; `LoginScreen.tsx:70` —
+                  // The prototype's `fontWeight: 500`; the login screen's —
                   // `fontWeight: 600`. Six hundred is the call site's emphasis and
                   // 500 is the component's, so 600 is used: a link that is the only
                   // action on a row is emphasised, and the neutral variant at 500 is
@@ -133,7 +145,7 @@ class TextLink extends StatelessWidget {
       enabled: enabled,
       label: label,
       // Disabled links keep their ink. A 45% opacity on a 14sp label is the
-      // prototype's button rule (`ds.tsx:245`) and it fails contrast where the
+      // prototype's button rule (45% opacity) and it fails contrast where the
       // ink is already `ink2`; the semantics flag and the absent ink carry it.
       excludeSemantics: true,
       // Load-bearing, and easy to lose: `excludeSemantics: true` drops the

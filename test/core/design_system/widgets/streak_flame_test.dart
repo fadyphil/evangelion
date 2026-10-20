@@ -198,9 +198,10 @@ void main() {
     });
 
     test('the width follows the prototype\'s 16:20 viewBox', () {
-      // `ds.tsx:513` — `viewBox="0 0 16 20"`. Uniform scaling keeps the path from
-      // being distorted; the prototype's own 14x18 element box differs by 2%,
-      // which is the viewBox's own horizontal padding.
+      // The superseded prototype's `viewBox="0 0 16 20"`, and the redesign has
+      // no counterpart for it — its `.flame` is a CSS shape, not a path. Uniform
+      // scaling keeps the path from being distorted; the prototype's own 14x18
+      // element box differs by 2%, which is the viewBox's own horizontal padding.
       expect(StreakFlame.aspect, 16 / 20);
       expect(const StreakFlame().width, closeTo(14.4, 1e-9));
       expect(const StreakFlame(size: 20).width, closeTo(16.0, 1e-9));
@@ -229,7 +230,8 @@ void main() {
       expect(flamePath.contains(Offset.zero), isFalse);
     });
 
-    // `ds.tsx:514`'s `d`, read back off the object rather than off the screen.
+    // The superseded prototype's `d` (the redesign has no path of its own), read
+    // back off the object rather than off the screen.
     // A pixel measurement says "the ink is 12 columns wide"; this says "the path
     // spans x 2…14 of a 16-wide viewBox", which is the same fact with the
     // numbers the transcription is supposed to have used written into it. The

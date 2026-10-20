@@ -99,8 +99,8 @@ Future<void> pumpLogin(
 TextField textFieldIn(WidgetTester tester, int index) =>
     tester.widgetList<TextField>(find.byType(TextField)).elementAt(index);
 
-/// The email field's [TextField]. `LoginScreen.tsx:49`.
+/// The email field's [TextField]. `redesign.html:506`.
 TextField emailTextField(WidgetTester tester) => textFieldIn(tester, 0);
 
-/// The password field's [TextField]. `LoginScreen.tsx:51`.
+/// The password field's [TextField]. `redesign.html:507`.
 TextField passwordTextField(WidgetTester tester) => textFieldIn(tester, 1);

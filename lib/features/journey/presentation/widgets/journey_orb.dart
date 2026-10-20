@@ -21,8 +21,8 @@ import 'package:flutter/material.dart';
 /// ## THE TWO DIVERGENCES, RECORDED HERE BECAUSE THEY ARE THIS WIDGET'S
 ///
 /// 1. **The glyph's ratio.** `:394` is `font-size: 30px` on a 74px orb — a ratio
-///    of **0.405**. [SealMonogram]'s own ratio is **0.4667** (`LoginScreen.tsx`'s
-///    28 on 60), so the letter here is **34.5px** in a 74px orb rather than
+///    of **0.405**. [SealMonogram]'s own ratio is **0.4667** (the superseded
+///    prototype's 28 on 60), so the letter here is **34.5px** in a 74px orb rather than
 ///    30px. The widget's doc says why the two ratios differ: they are two
 ///    different marks at two different sizes, and the login harness holds the
 ///    seal's box at 60. Changing the ratio here would move the glyph inside a
