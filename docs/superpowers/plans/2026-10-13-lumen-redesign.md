@@ -1630,6 +1630,214 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 >
 > Gate run: 3148 tests, 98.60% coverage (7271/7374).
 
+> **5.7**: `/settings` rebuilt against `:638-700` — **the Workshop**, the
+> redesign's name for the screen, and the seventh group of this phase's screens
+> to be transcribed rather than stubbed. **Thirty-three rows in seven groups**,
+> and the plan's own number for it was the first thing to be wrong.
+>
+> The plan's task table says "28 new controls" (`:1296`) and its step list says
+> "wires **28 fields**" (`:1305-1310`), and **neither number is wrong — they are
+> two different counts, and the step list's word is the imprecise one.** The
+> prototype's `#rSettings` carries **twenty-nine interactive controls**, one
+> action row, one preview line and two static about rows; the twenty-eight is
+> that count less the language segment, which is not new because
+> `UserSettings.language` already exists. **Of those twenty-eight, five bind to
+> fields that already exist** — the Daylight toggle to `themeMode`, Reduce
+> motion to `reducedMotion`, the two communion toggles to `veilWitnesses` and
+> `showPodium` (Task 5.5's), and the Type-size row to `fontStep` — **so the
+> number of NEW fields is twenty-three, and the research report's twenty-five
+> is stale by two**: it was written before Task 5.5 landed the communion
+> fields, and counted them as new.
+>
+> **The key prefixes are four, and the plan names three.** The plan's are
+> `eva.shader.*`, `eva.sky.*` and `eva.ritual.*`; the sky's are
+> `eva.sky.pref.*` — **not** a bare `eva.sky.*`, because `eva.sky.order` and
+> `eva.sky.entries` are the **star-record store's** keys
+> (`sky_local_data_source.dart:266,269`) and a collision with the store's
+> namespace is the kind of thing that is invisible until a reader's preference
+> overwrites their lit verses — and the communion's are `eva.communion.*`, which
+> the plan did not name because Task 5.5 wrote the two keys before this task
+> did. **Neither discrepancy is bent: the plan's own step list says three
+> prefixes, and this block is where the correction is recorded.**
+>
+> **The three enums had to move, and two of them had to move OUT of the design
+> system.** `UserSettings` holds `CurtainShape`, `SkyStarShape` and
+> `SkyStarField`, and `core/domain/` is Flutter-free under Gate 1 — so a
+> `core/domain/` entity **cannot name a type declared beside a Flutter
+> widget**, and `SkyStarShape` and `SkyStarField` were declared inside
+> `witness_sky.dart` until this task. **`CurtainShape` was a collision**: the
+> design system already had one, for the scrim's ramp, and the prototype has
+> **one** attribute with **four** values — `el('screen').dataset.shape`
+> (`:1463`) — read by two rules, the shader's `u_shape` and the `.scrim`
+> overrides (`:114`, `:115`). Two types for one attribute, and a name that
+> collided in every file that imported both the barrel and the entity: the two
+> are now **one**, in `core/domain/entities/curtain_shape.dart`, and the scrim
+> gained a `shafts` arm that paints the base ramp — which is the prototype's
+> own behaviour, because the CSS overrides `bottom` and `sides` only and a
+> `data-shape="shafts"` element falls through to the base rule (`:112-113`).
+>
+> **The shader is DEFERRED, and the ten controls that target it are neither
+> disabled nor hidden.** `LumenProgram`, `UniformSlot`, `LumenUniforms` and the
+> clock are complete and tested, and `LumenCanvas` is mounted **nowhere** in
+> production — the plan deferred exactly this ("**Wiring constraint for whoever
+> mounts the painter (Phase 5)**", `:805-811`). The ten `eva.shader.*`
+> preferences persist real choices, the conversions exist
+> (`spreadFromReach`, `brightnessFromGlow`, `ptrIntensityFromTouch`,
+> `hslToRgb`), and **the screen does not claim the shader is running**: the
+> deferral is recorded at the group and in the group's own ARB description,
+> which is where a promise to a reader is made. The consumer task is named.
+>
+> **The Daylight toggle is TWO states against a THREE-state field, and the
+> consequence is a product regression that is recorded rather than buried.**
+> On means the light palette, off means the dark one, and a stored `system`
+> renders the switch off and is not changed until the reader touches it
+> (`:650`, `:1478-1482`). **The Light/Dark/System picker is gone, so
+> `AppThemeMode.system` — a shipped capability since Phase 0 — becomes
+> unreachable from the UI.** A reader who stored `system` keeps it until they
+> touch the control, and can never select it again. **And `cubit.setThemeMode`
+> lost its last production caller with the picker** — the only way to write
+> `system` is now a method nothing calls.
+>
+> **The restore is the prototype's reset, field for field, and the scope is
+> NARROWER than "every new field".** The prototype's handler (`:1499-1525`)
+> resets twenty-three values and **touches none** of the language, the type
+> size, the reduce motion, the calm motion or the haptics — and the calm motion
+> and the haptics are **new fields**, so "reset every new field" would have
+> been a *superset* of the prototype's behaviour rather than its behaviour. The
+> client's rule is therefore **"reset exactly what the prototype's
+> `resetLight` resets, to the prototype's literals"** — a twenty-three-row
+> table and a six-row table, each row citing its prototype line, which is
+> checkable field by field. **Three deliberate departures:** the prototype DOES
+> reset the daylight to dark (`:1501`) and this client does not, because
+> `themeMode` is a three-state enum the decision protects; and the calm motion
+> and the haptics are left alone because the prototype leaves them alone.
+> **And the hue is the declared default 312, not the current book's** (`:1523`) —
+> the client has no per-book hue, and the substitution is recorded at the field
+> and at the reset.
+>
+> **The toast fires only when the write is CONFIRMED**, which is a departure
+> from the prototype's shape and a consequence of the client's shape: the
+> prototype's reset is synchronous JavaScript and cannot fail (`:1525`), and
+> this client's can. A toast that said "nocturne defaults restored" over a
+> screen that was simultaneously saying "your preferences could not be saved"
+> would be two sentences about one event, and they would contradict each other.
+>
+> **Four departures from the prototype's own DOM, each recorded at its site:**
+> the **language sheet is replaced by the prototype's 2-segment control**
+> (`:646-648`) — and `SegmentedControl` already carried a `labelFamilyOf`
+> parameter whose own doc names `:186` as the reason it exists, with **no
+> caller**; it was a parameter built for a control that had not landed yet. The
+> **three segmented rows put the label above the control**, because the
+> four-segment control's `4 × 44px` floor (`:183`) cannot share a 264px row with
+> a 14.5px label at 320px, and the standing 320×568 viewport matrix is a gate.
+> The **version chip carries the app's real version** rather than the design
+> system's `v1.2` (`:642`). And **Stars-off hides the sky and does not delete
+> the reader's stored verses** (`:1483`) — the prototype's stars are DOM
+> elements and this client's sky is a reader's own record of what they have
+> read.
+>
+> **The group header is SINGLE-SCRIPT per arm, and that is a divergence from
+> the prototype's own bilingual label.** `:949` writes `wsLang:["language ·
+> اللغة","اللغة · language"]` — each arm naming the thing in the reader's script
+> and then in the other one. **That cannot be one ARB value**: the English-arm
+> half of the bilingual contract is absolute ("the English arm holds no Arabic
+> script at all", no exemption list), and a bilingual value breaks it in both
+> directions at once. Each arm keeps the prototype's first half — `language` and
+> `اللغة` — and the pairing is recorded at the group header. **The seven
+> untranslated segment labels are the OTHER side of the same rule**: they are
+> the prototype's own untranslated English (`:673`, `:678`), and they are
+> **widget literals, not ARB keys**, because putting them in the ARB would have
+> forced them into `mustBeIdentical` — the set that catches an untranslated
+> string. Their correctness on the Arabic arm is asserted where they are
+> painted.
+>
+> **The `↺` (U+21BA) is in NO bundled mono or scripture face** — measured
+> against all twenty shipped `.ttf` files, it is absent from `JetBrainsMono`,
+> `EBGaramond` and `Amiri` and present in `Inter` and `IBMPlexSansArabic` — so
+> it is rendered with a **`fontFamilyFallback`**, which falls back PER GLYPH:
+> the mono face draws the letters and Inter draws the arrow. **And it cannot be
+> mirrored by `matchTextDirection`**, because that is an `IconData` property and
+> U+21BA has no `Bidi_Mirrored` property, so the prototype's `:138` mirror is
+> an explicit transform. **The shared Arabic gate was taught the fallback**,
+> because a correctly-rendered glyph is not tofu and the gate was reporting it
+> as tofu.
+>
+> **Three new design-system widgets, and the orphan gate satisfied by
+> PLACEMENT**: a **range slider** (`:429-430` — 3px rule, 120px track, a 15px
+> ember thumb with the prototype's `0 0 10px` glow), a **hue swatch** (`:432` —
+> a 16px circle whose glow is `currentColor`, so the swatch's OWN colour), and
+> a **preview line** (`:431`). Two existing widgets grew a mode: the segmented
+> control gained the prototype's `.segp.wide` (`:188-189`) and the settings tile
+> gained a stacked axis. **The default mode's tree is byte-identical** and no
+> existing golden moved.
+>
+> **AND THE TWO REVIEWS FOUND THIRTY-ONE DISTINCT DEFECTS, MOST OF THEM CLAIMS
+> THAT WERE NOT TRUE** — and the agents found nine more the reviews did not
+> reach, and the gates caught two of this task's own. The `em` letter-spacing rule — the single most likely
+> defect in the task, and the one 5.6 shipped seven times — **held on every one
+> of the four tracked runs**. What the reviews found instead: **four wrong
+> prototype citations** (the preview line's element at `:694` and not `:696`; the
+> constellation's refusal at `:1168` and not `:1172`; `veilOn=false` at `:1065`
+> and not `:1057`; and the `×1000` at `:1292` and not `:1287`), and **the last
+> two of those were in files this task had already rewritten**. **Four wrong
+> numbers**: "twenty switch rows" where the prototype has **sixteen** and the
+> cited list had fifteen; `EvaSpacing.huge` as 48 when it is 40; "four of the
+> seven" ritual controls unread when it is **six**; and the ARB's claim that
+> the prototype's `I18N` table and its markup disagree about the Brightness
+> row — **they do not**: the table's KEY is `glow` and its VALUE is
+> `Brightness`. **And two plan citations that had gone stale** — the Phase 7
+> ritual step had moved to `:1685-1686` — **in the brief as well as the code**,
+> so the implementer copied them faithfully.
+>
+> **THE TWO GATES THIS TASK CHANGED BOTH HAD DEFECTS IN THEMSELVES, and the
+> finding worth keeping is that the instruments were wrong rather than the
+> code.** The **converted-types audit** matched a test declaration **per line**,
+> so a `testWidgets(` whose name is on the next line was never a boundary — and
+> a missed boundary is not a missing site, it is a site attributed to the
+> *previous* test. It also counted the word `identical(` inside a **string
+> literal** — a test's own NAME — as an identity call, so the table carried a
+> row for a test that has never held an identity assertion, with a reason that
+> described something else entirely. **Both are fixed, four rows are re-pointed,
+> and the row that was counting a test's name is GONE rather than re-pointed.**
+> `tool/nct_selftest.sh` discharges the rule with three plants, the third of
+> which runs the **old** scan against the same file to show the string-literal
+> rule is what changed the outcome.
+>
+> **AND THE AGENTS FOUND THE REST.** The **`CurtainShape` collision** — two
+> enums, one name, and the fix was to MERGE them rather than rename one,
+> because the prototype has one attribute. The **seven `SettingsHandle` sky
+> writers with no production caller**: the brief asked for them on the premise
+> that "`/reading` needs to write the sky preferences", and that premise was
+> **wrong** — `/reading` *reads* the seven and writes none of them — so the
+> brief's two halves contradicted each other and the seven are gone, with the
+> screen writing them through the cubit like every other field it owns. The
+> **step rule written twice** — the design system's copy in a Flutter-importing
+> file that a pure-Dart settings domain may not import, which is *why* the
+> second copy existed; it is now one pure function in `core/common/ranges.dart`
+> that both reach. The **pointer→value arithmetic inside a `build` closure**,
+> which the same task had extracted elsewhere in the same commit. The **two
+> published constants with no reader** on the app bar, which the build now
+> uses. The **`↺`'s and the toast's numbers written as literals** while the
+> same screen borrowed 10.5 from a token — so the app has one spelling of it
+> now. And the **two `Text('A')` glyphs** the size stepper announced as "A"
+> twice, which are now excluded from the semantics tree.
+>
+> **AND ONE REVIEW FINDING WAS WRONG IN A WAY THAT WOULD HAVE COST SOMETHING.**
+> The code-quality review reported the segmented control's wide mode as
+> **tracking and upper-casing its labels under RTL**, against `:190` — and it
+> was right. But the Arabic gate, in the same pass, had **recorded the same
+> divergence and deliberately not "fixed" it**, because the fix belonged to the
+> widget rather than to the gate. **Both were right about the same fact, and
+> the fix landed in the widget** — so the Arabic arm now reads `dot` where the
+> prototype writes `dot`, and not `DOT`.
+>
+> Gate run: **3478 tests, 98.62% coverage (7853/7963)**, against the recorded
+> floor of 2507 tests and 98.25% — **and the Linux build gate, which is the
+> first task in this phase whose plan block can say so.** `tool/verify_linux_build.sh`
+> had read a `flutter doctor` log **it never wrote**, so it could not pass on a
+> clean machine; the step now runs the doctor, and the gate reports
+> "PASSED — the Linux bundle is a real build of the current sources".
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
