@@ -58,8 +58,9 @@ import 'package:flutter/material.dart';
 ///
 /// So this client ships the control with its prototype's own word, **inert**, and
 /// the accessible name carries the reason (`ReadingStringsPhrases
-/// .listeningUnavailable`) — the arrangement `/login`'s ghost pills and `/`'s
-/// SealFab items already use. And the wave itself is **not** built: an inert
+/// .listeningUnavailable`) — the arrangement `/login`'s ghost pills already use,
+/// and the one `/`'s deleted `SealFab` items used to use. And the wave itself is
+/// **not** built: an inert
 /// control never reaches `.playing`, so a wave widget would be built, tested and
 /// **never reachable from a page**, which is exactly what
 /// `tool/gates/orphan_widget_check.py` exists to catch. It arrives with audio.

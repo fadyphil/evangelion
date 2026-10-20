@@ -10,7 +10,7 @@ import 'package:evangelion/features/quiz/domain/usecases/start_session.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -319,7 +319,7 @@ Future<void> pumpQuiz(
       //
       // **`rg 'disableAnimations: true' test/` finds a live caller for `pumpHome`
       // (`home_accessibility_test.dart`) and, since this was measured, one for
-      // `pumpResult` (`result_page_test.dart`). None turns it for `/quiz` yet.** That
+      // `pumpResult` (`result_sheet_test.dart`). None turns it for `/quiz` yet.** That
       // is recorded rather than guessed at: `/quiz`'s reduced-motion behaviour is not
       // asserted anywhere yet, and this is the instrument that will assert it.
       //
@@ -358,26 +358,36 @@ Future<void> pumpQuizFrames(WidgetTester tester, int count) async {
   }
 }
 
-/// Mounts [ResultPage] over [result].
+/// Mounts [ResultSheet] over [result].
 ///
-/// [frames] exists for the same reason as [pumpQuiz]'s: `ResultPage` paints a burst
-/// whose glow and five flecks read the same ambient clock.
+/// ## IT IS THE **CARD**, NOT THE MODAL, AND THE DIFFERENCE IS THE POINT
 ///
-/// **[disableAnimations] was added here rather than defended as an inconsistency.**
-/// `pumpResult` was the one member of the `pump*` family without the switch, and this
-/// file's `pumpQuiz` doc used to claim "`pumpReading` and `pumpResult`'s siblings
-/// carry it" — true of `pumpReading`, false of `pumpResult`, and unverified for
-/// either. Measured on the pinned toolchain: mounting this page under
-/// `evaPrimitiveHarness(disableAnimations: true)` puts `true` at both the `ResultPage`
-/// and `NeuralBackground` elements, and `NeuralTiers.resolve` — the exact call
-/// `NeuralBackground.build` makes, with this position's real `MediaQuery` and size —
-/// then returns `NeuralTier.low` where the default call returns `NeuralTier.mid`. So
-/// the wiring works and only the switch was missing, and a uniformity argument that
-/// is only true for two of the three members is not worth making.
+/// The result is a modal over the quiz (Phase 6.2), and the modal is two
+/// things: the card, and the dialog that presents it — the veil, the fade and
+/// the scale-in. This helper mounts **the card**, because that is where the
+/// content lives and every assertion about the content is about the card.
 ///
-/// `result_page_test.dart` is now the live caller, which is the point: §14's
-/// reduced-motion requirement is a standing gate, and `/result` cannot be asked about
-/// it at all without this parameter.
+/// The dialog is exercised where it is assembled: `quiz_result_sheet_test.dart`
+/// drives the real `/quiz` route and asserts that the sheet appears over it,
+/// that dismissing it leaves the quiz alive, and that the two CTAs close the
+/// sheet before they act.
+///
+/// ## [frames] EXISTS FOR THE **SCALE-IN**
+///
+/// The card enters at `.9` and grows to `1` over 500ms (`:444-446`), so a
+/// reader that pumps four frames is looking at a card that has not finished
+/// arriving. The content is unaffected — the scale is a transform and not a
+/// layout — but a test that measures the card's own box wants the animation
+/// over, and it can pump for it.
+///
+/// ## [disableAnimations] IS §14's REDUCED-MOTION SWITCH, AND IT NOW REACHES
+/// SOMETHING
+///
+/// It used to reach the **ambient background**, which the result *page* painted
+/// and the result *card* does not: the card is over the quiz, and the quiz
+/// paints the background. What it reaches now is the card's own scale-in, which
+/// §14 requires to jump straight to the end state — and `ResultSheet` does
+/// exactly that, so the switch is live rather than a knob nothing turns.
 Future<void> pumpResult(
   WidgetTester tester, {
   required SubmitResult result,
@@ -386,6 +396,8 @@ Future<void> pumpResult(
   double textScale = 1.0,
   bool disableAnimations = false,
   int frames = 4,
+  VoidCallback? onReflectAgain,
+  VoidCallback? onBackHome,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -403,7 +415,11 @@ Future<void> pumpResult(
           : TextDirection.ltr,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-      child: ResultPage(result: result),
+      child: ResultSheet(
+        result: result,
+        onReflectAgain: onReflectAgain ?? () {},
+        onBackHome: onBackHome ?? () {},
+      ),
     ),
   );
   await pumpQuizFrames(tester, frames);

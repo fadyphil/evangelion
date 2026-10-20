@@ -53,7 +53,7 @@ import 'package:evangelion/core/domain/entities/user_settings.dart';
 ///   **defaults**, not failures — a reader whose stored preferences are unreadable has
 ///   a working app with default settings, which is a materially different thing from
 ///   an app that cannot read its store. Only the store itself being unreachable is a
-///   [FailureResult], and `AppThemeMode.fromStored`'s doc says why.
+///   [Failure], and `AppThemeMode.fromStored`'s doc says why.
 ///
 /// PURE DART — Gate 1 holds `core/domain/` Flutter-free, so this file names no
 /// `SharedPreferences` and no `Dio`. `features/settings/data/` is the only place the

@@ -714,7 +714,7 @@ void main() {
 ///
 /// **An extension and not a member**, because `Result` deliberately has none: its own
 /// doc says "there is no `value` getter and no `getOrNull`", because either would let a
-/// caller turn a [FailureResult] into a `null` that surfaces three frames later. A
+/// caller turn a [Failure] into a `null` that surfaces three frames later. A
 /// test-local extension keeps the production type's shape unchanged and still cannot
 /// compile against a third arm, because the `switch` is exhaustive.
 extension _SuccessValue on Result<UserSettings> {

@@ -134,7 +134,9 @@ void main() {
       expect(
         find.descendant(of: findTile(), matching: find.byType(GlassSurface)),
         findsOneWidget,
-        reason: 'the `ds.tsx` panel survives until Phase 6.2 builds the ring',
+        reason:
+            'the `ds.tsx` panel survives — Phase 6.2\'s modal keeps it, because '
+            'the redesign\'s ring was never ported',
       );
     });
 

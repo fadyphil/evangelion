@@ -801,8 +801,11 @@ void main() {
           'auth',
           'reading',
           'quiz',
-          'result',
           'settings',
+          // **The dock, and no `result`.** Phase 6 made the result a modal
+          // inside the quiz feature, so the `result` feature directory is gone
+          // and the dock is a feature of its own.
+          'dock',
         ]),
         reason:
             'the walk found ${features.length} feature directories, so the loop below '

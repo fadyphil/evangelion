@@ -80,6 +80,7 @@ import 'package:evangelion/features/auth/domain/usecases/get_current_session.dar
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:evangelion/features/dock/presentation/widgets/lumen_dock.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
@@ -105,10 +106,10 @@ import 'package:evangelion/features/leaderboard/presentation/pages/communion_pag
 import 'package:evangelion/features/leaderboard/presentation/widgets/communion_countdown_line.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
+import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
-import 'package:evangelion/features/result/presentation/result_l10n.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -1981,12 +1982,11 @@ void main() {
       WidgetTester tester,
     ) async {
       await _pumpJourney(tester, locale: const Locale('ar'));
-      final String back = await arabicBackTooltip();
 
       await expectArabicTypography(
         tester,
         screen: '/journey',
-        expectedArabic: _journeyReadyRuns(ar, backTooltip: back),
+        expectedArabic: _journeyReadyRuns(ar),
       );
       // The third arm, and the only one that is language-agnostic: every
       // character on the screen is carried by the family that renders it.
@@ -2018,15 +2018,16 @@ void main() {
       // renders it is `ErrorView`'s own `arabicAware`, and the tofu arm below
       // is what checks the glyphs.
       await _pumpJourney(tester, locale: const Locale('ar'), failed: true);
-      final String back = await arabicBackTooltip();
 
       await expectArabicTypography(
         tester,
         screen: '/journey (failed)',
         expectedArabic: <String>[
-          // The chrome: the app bar's title and its three tooltips.
+          // The chrome: the app bar's title and its two tooltips.
+          //
+          // **And no back control's label** — the journey is a tab and has no
+          // back control. See `_journeyReadyRuns`.
           ar.journeyTitle,
-          back,
           ar.journeyRowBoard,
           ar.journeyRowSettings,
           // The retry control's label, and the only Arabic run this state adds.
@@ -2330,7 +2331,7 @@ void main() {
         );
       });
 
-      testWidgets('and the app bar\'s chevron flips while its pill does not', (
+      testWidgets('and the app bar\'s two pills do not mirror', (
         WidgetTester tester,
       ) async {
         // ## THE OTHER HALF OF TASK 5.5'S LESSON
@@ -2345,14 +2346,21 @@ void main() {
         // x by −1 under RTL, and leaves every other icon alone. So the two
         // halves are two different answers to the same question, and this row
         // asks both.
+        //
+        // **AND THE BARE-GLYPH HALF IS GONE WITH THE CHEVRON.** The journey is
+        // a **tab** now (Phase 6), and a tab has no way back — the prototype's
+        // journey carries a 68px spacer where the chevron would be
+        // (`eva/redesign.html:578`), and so does the client. There is no
+        // `.chev` on this screen to mirror, and a test that asserted one would
+        // be asserting a control that does not exist.
         await _pumpJourney(tester, locale: const Locale('ar'));
 
         expect(
-          _isFlipped(tester, find.byIcon(Icons.arrow_back_ios_new)),
-          isTrue,
+          find.byIcon(Icons.arrow_back_ios_new),
+          findsNothing,
           reason:
-              'the back control is the prototype\'s `.chev` (`:149`), and `:139` '
-              'mirrors it under RTL',
+              'the journey is a tab, so it has no back control at all — the '
+              'prototype\'s own journey carries a spacer, not a chevron',
         );
         expect(
           _isFlipped(tester, find.byIcon(Icons.emoji_events)),
@@ -2478,6 +2486,58 @@ void main() {
               'strip reversing the way `.medals` does (`:410`, `display:flex`)',
         );
       });
+    });
+  });
+
+  group('`/dock` — the five-slot dock', () {
+    // ## THE NINTH SURFACE, AND THE FIRST ONE THAT IS **NOT** A SCREEN
+    //
+    // The dock is the redesign's navigation (`eva/redesign.html:702-708`) and
+    // Phase 6 of the Lumen redesign built it. It is **not** a screen — it is
+    // chrome, drawn by the shell over whichever tab is showing — and that is
+    // exactly why it needs a row here: **the gate's rule is about what a
+    // reader sees, and the dock is on screen for every reader of every tab.**
+    //
+    // ## AND ITS FIVE LABELS ARE THE PROTOTYPE'S OWN i18n ROWS
+    //
+    // `:931-932` — `dockHome`, `dockRead`, `dockToday`, `dockJourney` and
+    // `dockBoard` — so the Arabic arm is the prototype's Arabic, and the gate
+    // is what says the client renders it in a face that carries it.
+    //
+    // **The declared set is compared in BOTH directions** (decision 79), so a
+    // run that silently vanishes is red rather than vacuously true — and a new
+    // run is red by name.
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm draws the five slot labels', (
+      WidgetTester tester,
+    ) async {
+      await _pumpDock(tester, locale: const Locale('ar'));
+
+      await expectArabicTypography(
+        tester,
+        screen: '/dock',
+        expectedArabic: <String>[
+          ar.dockHome,
+          ar.dockRead,
+          ar.dockToday,
+          ar.dockBoard,
+          ar.dockJourney,
+        ],
+      );
+      // The third arm, and the only one that is language-agnostic.
+      await expectNoTofuInAnyRun(tester, screen: '/dock');
+    });
+
+    testWidgets('and in English it renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      // The control, for the same reason every other screen has one: with no
+      // Arabic on screen the Arabic assertions are vacuously true, so this row
+      // catches a dock that stopped honouring the locale.
+      await _pumpDock(tester);
+      await _expectNoArabic(tester, '/dock');
+      await expectNoTofuInAnyRun(tester, screen: '/dock (en)');
     });
   });
 
@@ -3464,18 +3524,21 @@ const Failure _journeyFailure = Failure(
 ///   semantics tree.
 /// * `journeyRetry` is painted on the **failed** arm only, and the failed
 ///   arm's declared set names it.
-List<String> _journeyReadyRuns(
-  AppLocalizations ar, {
-  required String backTooltip,
-}) {
+List<String> _journeyReadyRuns(AppLocalizations ar) {
   final JourneyRings rings = deriveJourneyRings(_journeyHistory);
   final int constellations = countCompletedBooks(_journeyHistory);
 
   return <String>[
-    // The app bar: the title, the back control's own Arabic label from the
-    // framework, and the two buttons' tooltips.
+    // The app bar: the title and the two buttons' tooltips.
+    //
+    // **And NO back control's label**, because there is no back control: the
+    // journey is a **tab** now (Phase 6), and a tab has no way back. The
+    // prototype's journey has a 68px spacer where the chevron would be
+    // (`eva/redesign.html:578`), and the client has the spacer too. The
+    // framework's own Arabic `backButtonTooltip` ("رجوع") therefore **is not
+    // painted on this screen at all** — and a declared set that still named it
+    // would be a list of runs a reader never sees.
     ar.journeyTitle,
-    backTooltip,
     ar.journeyRowBoard,
     ar.journeyRowSettings,
     // The identity block: the role line — with its **baked-in** `٧` — the
@@ -3644,10 +3707,70 @@ Future<void> _pumpJourney(
   }
 }
 
+/// Mounts the **dock**, for the `/dock` group.
+///
+/// The dock is **chrome, not a screen** — the shell draws it over whichever
+/// tab is showing — so this mounts the widget itself. The gate is about what
+/// a reader sees, and the reader sees exactly this widget on every tab.
+Future<void> _pumpDock(
+  WidgetTester tester, {
+  Locale locale = const Locale('en'),
+}) async {
+  tester.view.physicalSize = const Size(800, 844);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    evaPrimitiveHarness(
+      theme: EvaThemeDark.theme,
+      locale: locale,
+      // Derived from [locale] and **not** left to the default, for the same
+      // reason `_pumpJourney` says it: the harness wraps its child in an
+      // explicit `Directionality` that overrides the one Material installs.
+      textDirection: locale.languageCode == 'ar'
+          ? TextDirection.rtl
+          : TextDirection.ltr,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+      child: Builder(
+        builder: (BuildContext context) => LumenDock(
+          items: <LumenDockItem>[
+            LumenDockItem(
+              label: context.l10n.dockHome,
+              glyph: const Icon(Icons.home_outlined, size: 20),
+            ),
+            LumenDockItem(
+              label: context.l10n.dockRead,
+              glyph: const Icon(Icons.auto_stories_outlined, size: 20),
+            ),
+            LumenDockItem(
+              label: context.l10n.dockToday,
+              glyph: const LumenOrb(),
+            ),
+            LumenDockItem(
+              label: context.l10n.dockBoard,
+              glyph: const Icon(Icons.emoji_events_outlined, size: 20),
+            ),
+            LumenDockItem(
+              label: context.l10n.dockJourney,
+              glyph: const Icon(Icons.person_outline, size: 20),
+            ),
+          ],
+          activeIndex: 0,
+          onSelect: (int _) {},
+        ),
+      ),
+    ),
+  );
+  for (int frame = 0; frame < 8; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+}
+
 /// A router whose navigation goes nowhere.
 ///
-/// ## WHY THE GATE NEEDS ONE, AND IT IS NOT COSMETIC
-///
+/// ## WHY THE GATE NEEDS ONE, AND IT IS NOT COSMETIC///
 /// The shared instrument's tooltip probe long-presses every `Tooltip` on the
 /// screen and then **releases the gesture**. `/journey`'s app bar puts its
 /// **rows'** strings on its **tooltips** — `journeyRowBoard` and

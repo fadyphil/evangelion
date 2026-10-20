@@ -1,7 +1,7 @@
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 
-/// The `/result` strings that are **composed** rather than translated.
+/// The result's strings that are **composed** rather than translated.
 ///
 /// Both were methods on `ResultStrings`, and both are here for the same reason:
 /// each is a *decision* about the payload, and the payload is a Dart type rather
@@ -9,11 +9,31 @@ import 'package:evangelion/l10n/l10n.dart';
 ///
 /// ## AND WHY THIS FILE IS NECESSARY AT ALL
 ///
-/// §3's feature independence: `features/result` may not import `features/quiz`, so
-/// `AppLocalizations.quizRetry` is not reachable from here. That is also the whole reason
-/// `/result` **cannot** resolve a bloc — see the class doc of the page. The ARB is
-/// one shared file precisely *because* these collisions are resolved by namespacing
-/// rather than by duplication, but the derivation still cannot be shared.
+/// The derivation cannot be shared: `features/reading` may not import
+/// `features/quiz`, so `AppLocalizations.quizRetry` is not reachable from a
+/// shared extension on `AppLocalizations` in `lib/l10n/`. The ARB is one shared
+/// file precisely *because* these collisions are resolved by namespacing rather
+/// than by duplication, but the derivation still cannot be shared.
+///
+/// ## AND WHY IT LIVES **HERE**, IN THE QUIZ FEATURE
+///
+/// The result is the quiz's outcome, shown **over** the quiz, so it belongs to
+/// the quiz feature — and this file moved with it.
+///
+/// **This paragraph used to give the opposite reason, and the move made it
+/// false.** It said: *"§3's feature independence: `features/result` may not
+/// import `features/quiz`, so `AppLocalizations.quizRetry` is not reachable from
+/// here. That is also the whole reason `/result` **cannot** resolve a bloc."*
+///
+/// That was true while the result was its own feature: the wall ran
+/// `features/result` → `features/quiz`, so the result could neither import the
+/// quiz's strings nor read the quiz's bloc. **Both walls are gone now**, because
+/// the result *is* the quiz feature — `features/quiz/presentation/widgets/
+/// result_sheet.dart` sits beside this file and reads `QuizBloc`'s state
+/// through the page that owns it.
+///
+/// The rule that survives is the one this file exists for: the derived strings
+/// are **composition**, and composition lives with the feature that composes.
 extension ResultStringsPhrases on AppLocalizations {
   /// The headline sentence for the three states.
   ///

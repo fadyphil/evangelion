@@ -8,13 +8,12 @@ import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
-import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,22 +36,6 @@ AppRouter routerFor(
   FakeAuthStatus status, {
   ReevaluateListenable? authChanges,
 }) => AppRouter(status, authChanges ?? _SilentAuthChanges());
-
-/// A graded answer for the router suite.
-///
-/// **A transcription, not a capture** — §5 trap 10 records that no successful submit
-/// has ever been observed against this backend, so `contract_payloads.dart` is where
-/// the shape comes from. The router suite needs *a* `SubmitResult` to push `/result`
-/// with, and this is the one the rest of the phase agrees on.
-const SubmitResult kAContractSubmitResult = SubmitResult(
-  questionId: 'question-group-3',
-  isCorrect: true,
-  pointsEarned: 10,
-  currentTotalPoints: 40,
-  currentStreak: 4,
-  longestStreak: 6,
-  readingCompleted: true,
-);
 
 void main() {
   setUp(resetServiceLocator);
@@ -85,14 +68,14 @@ void main() {
         routes.map((AutoRoute route) => route.path),
         <String>[
           AppRoutes.login,
+          // **The dock shell**, and it owns the root path. Its three children —
+          // home, communion and journey — are the real tabs, and their paths are
+          // *relative* (auto_route rejects a child path that begins with a
+          // slash), so they are asserted separately below.
           AppRoutes.home,
           AppRoutes.reading,
           AppRoutes.quiz,
-          AppRoutes.result,
           AppRoutes.settings,
-          AppRoutes.communion,
-          // **Task 5.6's eighth screen** — the profile ADR-0022 restored.
-          AppRoutes.journey,
           // `*` last, always. Moving it to the front turns every path into `/` —
           // measured at 46 tests when it was tried.
           AppRoutes.fallback,
@@ -103,12 +86,41 @@ void main() {
       );
     });
 
+    test('the shell has exactly three tabs, in the order DockTabs names', () {
+      // The tab order is load-bearing — it is the order the dock's three real
+      // slots switch in — and `DockTabs` is the pure-Dart holder both the shell
+      // and the features read. So the two are pinned against each other here.
+      final AutoRoute shell = routes.firstWhere(
+        (AutoRoute route) => route.path == AppRoutes.home,
+      );
+
+      expect(
+        shell.children!.map((AutoRoute route) => route.page.name),
+        <String>[HomeRoute.name, CommunionRoute.name, JourneyRoute.name],
+        reason: 'home, communion, journey — the redesign\'s three real tabs',
+      );
+      expect(
+        shell.children!.map((AutoRoute route) => route.path),
+        <String>[
+          AppRoutes.homeTab,
+          AppRoutes.communionTab,
+          AppRoutes.journeyTab,
+        ],
+        reason:
+            'the child paths are relative, and they are the absolute ones '
+            'without the root\'s slash',
+      );
+      expect(DockTabs.home, 0);
+      expect(DockTabs.communion, 1);
+      expect(DockTabs.journey, 2);
+    });
+
     test('the wildcard is a redirect to /, not a page', () {
       final RedirectRoute fallback = routes.last as RedirectRoute;
 
       expect(fallback.redirectTo, AppRoutes.home);
       // The wildcard carries auto_route's own "no builder" sentinel rather than a
-      // null page, so the claim is made against the six real page names instead of
+      // null page, so the claim is made against the real page names instead of
       // against `null` — which would have been an assertion about the framework's
       // internals that could change without anything here breaking.
       expect(
@@ -122,13 +134,14 @@ void main() {
         isNot(
           isIn(<String>[
             LoginRoute.name,
-            HomeRoute.name,
+            // The shell, which is the root route now.
+            DockShellRoute.name,
             ReadingRoute.name,
             QuizRoute.name,
-            ResultRoute.name,
             SettingsRoute.name,
+            // And the three tabs, which are the shell's children.
+            HomeRoute.name,
             CommunionRoute.name,
-            // **Task 5.6 added the eighth.**
             JourneyRoute.name,
           ]),
         ),
@@ -145,18 +158,13 @@ void main() {
 
       expect(realRoutes.map((AutoRoute route) => route.page.name), <String>[
         LoginRoute.name,
-        HomeRoute.name,
+        // **The dock shell**, which replaced the home screen as a *root* route.
+        // `/` is still the home tab's URL — the shell's own path — so nothing a
+        // reader can type has changed.
+        DockShellRoute.name,
         ReadingRoute.name,
         QuizRoute.name,
-        ResultRoute.name,
         SettingsRoute.name,
-        // **Phase 5.5 renamed the seventh to CommunionRoute**, and the `sublist`
-        // above is why this line is the only edit: the count was never written down,
-        // precisely so that adding a screen would not mean renumbering a `take`.
-        CommunionRoute.name,
-        // **Task 5.6's eighth screen** — the profile ADR-0022 restored, and
-        // the redesign's third dock tab (`eva/redesign.html:707`).
-        JourneyRoute.name,
       ], reason: 'the locked screens, in route-table order');
     });
 
@@ -172,9 +180,7 @@ void main() {
         AppRoutes.home,
         AppRoutes.reading,
         AppRoutes.quiz,
-        AppRoutes.result,
         AppRoutes.settings,
-        AppRoutes.communion,
       ]) {
         expect(guardCounts[guarded], 1, reason: '$guarded is behind the guard');
       }
@@ -185,6 +191,21 @@ void main() {
             'unguarded on purpose: an unknown path redirects to /, which bounces '
             'through AuthGuard and lands on login when there is no session',
       );
+
+      // **And the three tabs are guarded too**, even though their shell is
+      // guarded as well. A guard removed from a child would leave the deep link
+      // to that child unguarded if the shell's guard were ever moved, and the
+      // cost of the belt is one line.
+      final AutoRoute shell = routes.firstWhere(
+        (AutoRoute route) => route.path == AppRoutes.home,
+      );
+      for (final AutoRoute child in shell.children!) {
+        expect(
+          child.guards.length,
+          1,
+          reason: 'the ${child.path} tab is behind the guard as well',
+        );
+      }
     });
 
     test('every guard reads the one session, not a snapshot of it', () {
@@ -225,7 +246,25 @@ void main() {
     String? resolve(String rawPath) {
       final List<RouteMatch<dynamic>>? matches = router.matcher.match(rawPath);
       expect(matches, isNotNull, reason: 'nothing matched $rawPath at all');
-      return matches!.single.path;
+      return matches!.last.path;
+    }
+
+    /// The **deepest** match for [rawPath] — the route the URL actually names.
+    ///
+    /// A **nested** route is matched as a parent *with children*, not as a flat
+    /// list (`route_matcher.dart:83` — `match.copyWith(children: children)`),
+    /// so `/communion` matches **one** entry — the shell, whose path is `/` — and
+    /// the board's tab is inside it. The shell's own path is therefore the
+    /// wrong thing to assert for a tab, and the **name** of the deepest match
+    /// is the right one.
+    RouteMatch<dynamic> deepest(String rawPath) {
+      final List<RouteMatch<dynamic>>? matches = router.matcher.match(rawPath);
+      expect(matches, isNotNull, reason: 'nothing matched $rawPath at all');
+      RouteMatch<dynamic> match = matches!.last;
+      while (match.children?.isNotEmpty ?? false) {
+        match = match.children!.last;
+      }
+      return match;
     }
 
     // THE MUTATION THIS WHOLE GROUP EXISTS FOR, measured against the full suite:
@@ -237,18 +276,29 @@ void main() {
     // ("nine", which is what the commit message claimed, was wrong in both
     // direction and magnitude; `app_routes.dart` carries the measured number too,
     // so the record is in the repository and not only in git history.)
-    test('each of the six routes resolves to itself, not to /', () {
+    test('each of the real routes resolves to itself, not to /', () {
       expect(resolve(AppRoutes.login), AppRoutes.login);
       expect(resolve(AppRoutes.home), AppRoutes.home);
       expect(resolve(AppRoutes.reading), AppRoutes.reading);
       expect(resolve(AppRoutes.quiz), AppRoutes.quiz);
-      expect(resolve(AppRoutes.result), AppRoutes.result);
       expect(resolve(AppRoutes.settings), AppRoutes.settings);
       //
       // This used to be a second test, "the wildcard does not swallow the six
       // real routes", which iterated the same six paths and made the same six
       // assertions. One of the two was always redundant, and reading them
       // together suggested two independent checks where there is one.
+    });
+
+    test('the two nested tabs resolve to the TAB, not to the shell', () {
+      // **The shell's own path is `/`**, so "does not resolve to `/`" is not the
+      // claim for a tab — the claim is that the URL names **the tab**, so the
+      // board's deep link lands on the board and not on the home tab that
+      // happens to share the shell.
+      expect(deepest(AppRoutes.communion).name, CommunionRoute.name);
+      expect(deepest(AppRoutes.journey).name, JourneyRoute.name);
+      // And the shell's own URL is still the **home** tab, not the shell's
+      // empty-path child.
+      expect(deepest(AppRoutes.home).name, HomeRoute.name);
     });
 
     test('an unknown path resolves to / through the wildcard', () {
@@ -305,7 +355,8 @@ void main() {
   });
 
   group('the global transition', () {
-    test('is RouteType.custom over EvaMotion.fadeSlide and EvaMotion.screen', () {
+    test('is RouteType.custom over EvaMotion.goneSlide and the prototype\'s '
+        '400ms', () {
       final RouteType type = AppRouter(
         FakeAuthStatus(),
         _SilentAuthChanges(),
@@ -313,12 +364,17 @@ void main() {
 
       expect(type, isA<CustomRouteType>());
       final CustomRouteType custom = type as CustomRouteType;
-      expect(custom.transitionsBuilder, same(EvaMotion.fadeSlide));
+      // **The redesign's own builder, and the redesign's own duration.**
+      // `eva/redesign.html:128` — `.route{…transition:transform .4s
+      // var(--e-light),opacity .4s var(--e-light)}` — and the two poses the
+      // builder plays are `gone-left` (`:129`) and `gone-right` (`:130`).
+      expect(custom.transitionsBuilder, same(EvaMotion.goneSlide));
       expect(
         custom.duration,
-        EvaMotion.screen,
+        EvaMotion.routeTransition,
         reason:
-            'not a new `screenDuration` — the existing token IS the duration, and '
+            'the prototype\'s own 400ms (`eva/redesign.html:128`), and not a new '
+            'constant for it — `EvaMotion.routeTransition` IS the duration, and '
             'two constants for one number is two things to keep in step',
       );
       // THE POP DIRECTION, WHICH IS THE ONE USERS FEEL MOST.
@@ -334,10 +390,10 @@ void main() {
       // in a design review is the one that ships.
       expect(
         custom.reverseDuration,
-        EvaMotion.screen,
+        EvaMotion.routeTransition,
         reason:
-            'a back navigation must run the same §5.3 `screen` token as the '
-            'push, not auto_route\'s 300ms fallback',
+            'a back navigation must run the same token as the push, not '
+            'auto_route\'s 300ms fallback',
       );
     });
 
@@ -452,96 +508,25 @@ void main() {
     });
   });
 
-  group('a cold push of /result', () {
-    // Phase 4's second verification line: "a router test that a cold push of
-    // `/result` renders `EmptyState` rather than calling the API".
-    //
-    // **BOTH HALVES OF THAT SENTENCE ARE NOW FALSE, AND BOTH ARE PROGRESS.**
-    //
-    // `/result` is no longer the Phase-0c stub (`Scaffold` + `AppBar` + a `Text`);
-    // `08-build-phases.md` Phase 8 built it, so the `EmptyState` assertion Phase 4
-    // left behind as a tripwire has fired and this is the swap it was watching for.
-    //
-    // And the second half is now false in the more interesting way: there **is** a
-    // client in the graph, and `ResultPage` genuinely cannot call it — it is a pure
-    // function of a `SubmitResult` handed to its constructor. There is no
-    // repository, no use case and no endpoint behind `/result`; the submit response
-    // lives in `QuizBloc.lastResult` and nowhere else.
-    //
-    // ## SO THIS GROUP NO LONGER PUSHES A PATH AT ALL — AND THAT IS THE POINT
-    //
-    // `ResultRoute` takes a required `result`, so `ResultRoute.page` cannot be
-    // built from a bare `/result`. A `pushPath(AppRoutes.result)` therefore does not
-    // reach the screen. This suite **finds that out by accident**: the first version
-    // of this test did `unawaited(router.pushPath(AppRoutes.result))`, the route
-    // silently failed to build, `currentPath` stayed on `/`, and the assertion that
-    // used to say "the stub is on screen" failed with
-    //
-    //     Expected: '/result'
-    //       Actual: '/'
-    //
-    // The three assertions below make that deliberate instead of accidental, and the
-    // second one is the one that matters: **a deep link to `/result` cannot show a
-    // graded answer, because there is no way to fetch one.** Pushed cold, the
-    // screen stays down. The only way in is `QuizPage`'s terminal `finish` arm,
-    // `quiz_page.dart`'s `context.router.push(ResultRoute(result: result))`, and
-    // `quiz_page_test.dart` covers that path with a real `QuizBloc`.
-    testWidgets('a path-only push builds NO screen, because there is nothing to '
-        'show', (WidgetTester tester) async {
-      final AppRouter router = routerFor(FakeAuthStatus());
-      addTearDown(router.dispose);
-
-      await tester.pumpWidget(routerHost(router));
-      await pumpUntilFound(tester, find.byType(HomePage));
-
-      // `await`ed, and the completion value asserted, rather than `unawaited` +
-      // `pumpUntilFound`. `unawaited` is what hid the failure in the first version:
-      // the push rejected, the rejection went nowhere, and the test went on to
-      // assert about a screen it never reached.
-      final bool? reached = await router
-          .pushPath<bool>(AppRoutes.result)
-          .then<bool?>((bool? _) => true, onError: (Object _) => false);
-      await tester.pump();
-      await tester.pump();
-
-      expect(
-        reached,
-        isFalse,
-        reason:
-            '`/result` is pushed with a graded answer, never by path. `ResultRoute` '
-            'requires `result`, so building the page from a bare path has to fail '
-            '— and it must fail here, at the boundary, not render a screen full of '
-            'zeroes',
-      );
-      expect(find.byType(ResultPage), findsNothing);
-      expect(router.currentPath, AppRoutes.home);
-    });
-
-    testWidgets('and the screen that does exist is not a placeholder', (
-      WidgetTester tester,
-    ) async {
-      // The other half of Phase 4's assertion, inverted. Pushed **with** a submit
-      // response, the route builds and the placeholder text is gone.
-      final AppRouter router = routerFor(FakeAuthStatus());
-      addTearDown(router.dispose);
-
-      await tester.pumpWidget(routerHost(router));
-      await pumpUntilFound(tester, find.byType(HomePage));
-
-      unawaited(router.push<void>(ResultRoute(result: kAContractSubmitResult)));
-      await pumpUntilFound(tester, find.byType(ResultPage));
-
-      expect(router.currentPath, AppRoutes.result);
-      expect(find.byType(ResultPage), findsOneWidget);
-      expect(
-        find.text('Placeholder for ${AppRoutes.result}'),
-        findsNothing,
-        reason:
-            'the Phase-0c stub is gone. `ResultPage` renders the submit response; '
-            'this is the assertion Phase 4 wrote to notice the swap, now satisfied',
-      );
-    });
-  });
+  // **THE `/result` GROUP THAT WAS HERE IS GONE, AND ITS REPLACEMENT IS A
+  // COMMENT, NOT A WEAKER TEST.**
+  //
+  // The group asserted that a path-only push of `/result` **fails**, because
+  // `ResultRoute` takes a required `result` and a bare path cannot build the
+  // page. That was a true and useful invariant while `/result` was a route.
+  //
+  // **Phase 6 removed the route.** The result is a modal now
+  // (`eva/redesign.html:718-727`), shown by the quiz over the quiz, and
+  // `/result` is not a path any more — `AppRoutes` does not declare it and the
+  // router's table does not carry it. So the invariant the group pinned is
+  // gone, and so is the group: a test that asserted "pushing `/result` fails"
+  // would now be asserting that a **string literal** fails to match, which is a
+  // fact about a typo rather than about the app.
+  //
+  // What replaced it is the route table above: the expected list of root routes
+  // has no result in it, and a route added to the table without a path of its
+  // own would fail that list. And the *result* itself is covered where it now
+  // lives — `test/features/quiz/presentation/widgets/result_sheet_test.dart`.
 
   group('the route observer `config()` installs', () {
     // ## WHY THIS GROUP IS HERE RATHER THAN A COMMENT ON THE OVERRIDE

@@ -1125,7 +1125,7 @@ void main() {
 /// caller feeds the value back. A test that pumps a fixed `selected` and then
 /// presses an arrow key twice is testing a control that never moves — and the
 /// assertion it fails is about the test, not the widget. This is the smallest
-/// honest stand-in for the Settings cubit that Phase 9 will supply.
+/// honest stand-in for the `SettingsCubit` that the settings feature supplies.
 void _noop() {}
 
 class _Live extends StatefulWidget {

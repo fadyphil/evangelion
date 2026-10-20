@@ -15,7 +15,7 @@ import 'package:evangelion/features/settings/data/datasources/settings_local_dat
 /// doc), so there is nothing here to translate: [load] is the store's `read` and
 /// [save] is its `write` plus the `Result` wrapper the port demands.
 ///
-/// ## AND IT WRAPS **THROWING** INTO A TYPED [FailureResult], WHICH IS THE WHOLE
+/// ## AND IT WRAPS **THROWING** INTO A TYPED [Failure], WHICH IS THE WHOLE
 /// ## OF WHAT IT DOES
 ///
 /// `SettingsRepository`'s LSP row says an implementation "never throws". `Shared

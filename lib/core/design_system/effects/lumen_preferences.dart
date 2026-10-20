@@ -171,7 +171,7 @@ class LumenPreferences {
 ///
 /// `lib/app/app.dart` publishes it beside `SettingsScope` and `SkyScope`,
 /// above `MaterialApp.router`. Every route is therefore inside it, including
-/// the ones Phase 6's `AutoTabsRouter` will add.
+/// the ones Phase 6's `AutoTabsRouter` added.
 ///
 /// ## WHY A MISSING SCOPE MEANS "NO AURORA" AND NOT "DEFAULT AURORA"
 ///

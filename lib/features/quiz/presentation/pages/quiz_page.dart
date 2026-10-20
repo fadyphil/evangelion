@@ -2,15 +2,16 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
-import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -79,10 +80,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 ///
 /// The alternatives, all rejected:
 ///
-/// * **navigate to `/result` anyway** — impossible, and not by policy:
-///   `ResultPage`'s `SubmitResult` is **required**, so the route cannot even be
-///   pushed. A `null` result and an `EmptyState` would be a second kind of result
-///   screen for a case where the reader submitted nothing;
+/// * **show the result anyway** — impossible, and not by policy:
+///   `ResultSheet`'s `SubmitResult` is **required**, so there is no sheet without
+///   a graded answer to show. A `null` result and an `EmptyState` would be a
+///   second kind of result surface for a case where the reader submitted
+///   nothing;
 /// * **hide the button** — §14's disabled row exists precisely so a control is
 ///   *absent* rather than missing, and a button that vanishes on one reader's screen
 ///   and stays on another's is a layout a reader cannot predict;
@@ -615,13 +617,90 @@ class _QuizBodyState extends State<_QuizBody> {
         bloc.add(const QuizAdvanced());
       case QuizCta.seeResults:
         // `eva/redesign.html:1432` — the last graded question's one click opens
-        // the results. `/result` is still a route until Phase 6.2, and its
-        // required parameter is the whole point (decision 81): the guard is not
+        // the results. **The result is a MODAL over this quiz**, not a route
+        // (Phase 6.2), and the response is still a **required** input: there is
+        // no endpoint that can produce one, so the guard below is not
         // decoration, it is the compile-enforced constraint stated again at the
         // one call site that can trip it.
         final SubmitResult? result = state.lastResult;
         if (result == null) return;
-        unawaited(context.router.push(ResultRoute(result: result)));
+        unawaited(_presentResult(result));
+    }
+  }
+
+  /// Shows the result over the quiz, and then does what the reader chose.
+  ///
+  /// ## THE ORDER IS THE WHOLE OF IT
+  ///
+  /// The sheet's two CTAs were **page** actions — `replacePath('/quiz')` and
+  /// `replacePath('/')` — and inside a dialog the same calls would leave the
+  /// reader with a dialog over a replaced route. So the button **closes the
+  /// sheet first** (it pops the dialog with the action) and the action is
+  /// taken **here**, after the dialog's route is out of the navigator's
+  /// history. The reader ends up in exactly one place with no dialog left on
+  /// screen, which is what `quiz_result_sheet_test.dart` proves in both
+  /// directions.
+  ///
+  /// ## "REFLECT AGAIN" IS **THE QUIZ THAT IS STILL THERE**
+  ///
+  /// As a page it was a *new* `/quiz` route. As a modal it is **this** quiz,
+  /// restarted in place — which is [QuizStarted], the same event a fresh quiz
+  /// page dispatched, and the same session the reader was answering.
+  ///
+  /// **A dismissed sheet changes nothing.** `null` is the dismissed case and
+  /// the quiz is exactly where it was, with the reader free to carry on.
+  ///
+  /// ## WHY IT TAKES NO `BuildContext`
+  ///
+  /// It reads [State.context] — this state's own — and the `mounted` check
+  /// below is therefore the check that guards it, which is what
+  /// `use_build_context_synchronously` asks for. A `BuildContext` handed in as
+  /// a parameter would be an *unrelated* context, and the lint is right to
+  /// refuse it: the guard would be about this state and the use would be about
+  /// something else.
+  Future<void> _presentResult(SubmitResult result) async {
+    final ResultSheetAction? action = await ResultSheet.show(
+      context,
+      // **The card is built HERE, and that is load-bearing.**
+      //
+      // `tool/gates/orphan_widget_check.py` finds a widget by looking for its
+      // **constructor call** in a page's file, so a `show` that built the card
+      // inside its own file would leave the card — and the `StatTile` and
+      // `SunBurst` it draws — unreachable from every page. The gate reported
+      // all three as orphans, and the honest repair is to make the placement
+      // **visible** rather than to allowlist a widget that is demonstrably on
+      // the screen.
+      //
+      // **The pops go to the ROOT navigator**, which is where
+      // `showGeneralDialog` put the dialog: `showGeneralDialog` pushes with
+      // `rootNavigator: true`, so the root navigator's top route is the sheet
+      // and popping it is closing the sheet.
+      card: ResultSheet(
+        result: result,
+        onReflectAgain: () => Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(ResultSheetAction.reflectAgain),
+        onBackHome: () => Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(ResultSheetAction.backHome),
+      ),
+    );
+    // The page may have gone while the sheet was up — the reader pressed back
+    // out of the quiz, say — and a `BuildContext` used after its widget is
+    // disposed throws.
+    if (!mounted) return;
+
+    switch (action) {
+      case ResultSheetAction.reflectAgain:
+        context.read<QuizBloc>().add(QuizStarted(_language));
+      case ResultSheetAction.backHome:
+        unawaited(context.router.replacePath(AppRoutes.home));
+      case null:
+        // **Dismissed.** The barrier or the system back button, and the quiz is
+        // still on screen under it.
+        break;
     }
   }
 }

@@ -1,5 +1,5 @@
-/// `/result`'s transcribed geometry — the one claim `result_page.dart` pointed at a
-/// file that did not exist.
+/// The result **card**'s transcribed geometry — the one claim `result_sheet.dart`
+/// pointed at a file that did not exist.
 ///
 /// ## WHY THIS FILE IS SMALL, AND WHAT IT IS **NOT**
 ///
@@ -10,9 +10,9 @@
 /// `quiz_geometry_test.dart`, which carries three claims and says in its own library
 /// doc that it is not that harness either.
 ///
-/// `/result` has **one** geometry claim worth a file, and it is here because the
+/// The card has **one** geometry claim worth a file, and it is here because the
 /// alternative was a doc comment pointing at nothing. It is the most fragile
-/// transcription in the screen:
+/// transcription in the surface:
 ///
 /// > `ResultScreen.tsx:62-64` is an inline `<svg>` flame **14×18**, which is NOT the
 /// > design system's `StreakFlame` — that one is square (`streak_flame.dart`'s
@@ -25,18 +25,34 @@
 /// **The reverse direction, from `reading_geometry_test.dart`'s doc:** a Dart constant
 /// nobody claims is a number with no prototype behind it, which is how
 /// `kSocialButtonGap` survived certification while nothing read it. The other twenty
-/// `ResultPage` constants are not claimed here; claiming them needs the per-arm line
+/// `ResultSheet` constants are not claimed here; claiming them needs the per-arm line
 /// map above, and inventing prototype lines for them would be worse than leaving them.
 library;
 
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/design_system/widgets/streak_flame.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/contract_payloads.dart';
 import '../../../../support/quiz_harness.dart';
+
+/// Pumps until the card has **arrived**.
+///
+/// The card enters at `.9` and grows to `1` over 500ms (`:444-446`), and the
+/// measurement below is of the **painted** box — which walks the ancestor
+/// transforms, so a measurement taken four frames in is of a card that has not
+/// arrived yet.
+///
+/// **The first version measured at four frames** and read `17.03` where the
+/// claim is `18`: the flame was `18 × 0.946`, the scale the entrance was at
+/// that moment. The number was not wrong about the flame — it was wrong about
+/// *when*, and it would have read `17.03` for a reason no reader could see.
+///
+/// Forty frames of 16ms is 640ms, which is past the 500ms entrance.
+Future<void> pumpTheCardAtRest(WidgetTester tester) =>
+    pumpQuizFrames(tester, 40);
 
 void main() {
   group('the streak pill\'s flame is the prototype\'s 14×18, not a square', () {
@@ -45,11 +61,11 @@ void main() {
       // nothing — which is why the divergence is easy to reintroduce: change
       // `pillFlameWidth` to 18 and every constant-comparison test in the repo still
       // passes.
-      expect(ResultPage.pillFlameWidth, 14);
-      expect(ResultPage.pillFlameHeight, 18);
+      expect(ResultSheet.pillFlameWidth, 14);
+      expect(ResultSheet.pillFlameHeight, 18);
       expect(
-        ResultPage.pillFlameWidth,
-        isNot(ResultPage.pillFlameHeight),
+        ResultSheet.pillFlameWidth,
+        isNot(ResultSheet.pillFlameHeight),
         reason:
             'if these ever agree, the file has substituted the design system\'s square '
             '`StreakFlame` for the prototype\'s inline `<svg>`, and the doc\'s stated '
@@ -65,15 +81,15 @@ void main() {
       // constant comparison cannot see — the same defect class the other geometry
       // suites name.
       await pumpResult(tester, result: contractSubmitAnswerFixture);
-      await pumpQuizFrames(tester, 2);
+      await pumpTheCardAtRest(tester);
 
       final Finder sized = find.ancestor(
         of: find.byType(StreakFlame),
         matching: find.byWidgetPredicate(
           (Widget widget) =>
               widget is SizedBox &&
-              widget.width == ResultPage.pillFlameWidth &&
-              widget.height == ResultPage.pillFlameHeight,
+              widget.width == ResultSheet.pillFlameWidth &&
+              widget.height == ResultSheet.pillFlameHeight,
         ),
       );
       expect(
@@ -85,7 +101,7 @@ void main() {
       final Rect rect = tester.getRect(find.byType(StreakFlame));
       expect(
         rect.width,
-        lessThanOrEqualTo(ResultPage.pillFlameWidth + 0.5),
+        lessThanOrEqualTo(ResultSheet.pillFlameWidth + 0.5),
         reason:
             'the square `StreakFlame` is fitted down into the 14-wide box. Without the '
             '`SizedBox` the painted flame is 18 wide and the pill is visibly wider '
@@ -93,7 +109,7 @@ void main() {
       );
       expect(
         rect.height,
-        moreOrLessEquals(ResultPage.pillFlameHeight, epsilon: 0.5),
+        moreOrLessEquals(ResultSheet.pillFlameHeight, epsilon: 0.5),
       );
     });
 
@@ -101,7 +117,7 @@ void main() {
       WidgetTester tester,
     ) async {
       // The consequence the pair exists to avoid, asserted at §14's own surface.
-      // `arabic_typography_test.dart` gates the glyphs and `result_page_test.dart`
+      // `arabic_typography_test.dart` gates the glyphs and `result_sheet_test.dart`
       // gates the texts; neither of them can see a 4px-wide layout error.
       tester.view.physicalSize = kGeometrySurface;
       tester.view.devicePixelRatio = 1.0;
@@ -109,7 +125,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await pumpResult(tester, result: contractSubmitAnswerFixture);
-      await pumpQuizFrames(tester, 2);
+      await pumpTheCardAtRest(tester);
 
       expect(tester.takeException(), isNull);
       expect(find.byType(StreakFlame), findsOneWidget);

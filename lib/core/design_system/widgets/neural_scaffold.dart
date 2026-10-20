@@ -172,9 +172,11 @@ const double curtainSideAlphaLight = 0.9;
 ///   `/settings` the Profile orbs, and *nothing fails*. Adding `language` beside
 ///   `variant` creates the same class of bug with the same invisibility.
 /// - **Nothing in this phase owns the language.** The app's language is a
-///   [UserSettings] value read by Phase 9's cubit. A context read would need an
-///   [InheritedWidget] with no producer until Phase 9, and therefore a silent
-///   fallback — which is a guess wearing an API.
+///   [UserSettings] value, read by the settings cubit. A context read would need an
+///   [InheritedWidget] with no producer, and therefore a silent fallback — which is
+///   a guess wearing an API. **Phase 9 brought the producer** (`SettingsScope`), and
+///   the reason this widget still reads the language from [variant] is the bullet
+///   above: a second source of truth for one fact.
 /// - **The one caller that would want it already switches.** Phase 7's
 ///   `ReadingPage` renders EN and AR scripture from the same language value, so
 ///   it has it in hand and passes `NeuralVariant.readingEn` or
@@ -232,7 +234,12 @@ class NeuralScaffold extends StatelessWidget {
   /// Because the content is inside a [SingleChildScrollView] when [scrollable] is set,
   /// so anything a caller places **in** its column scrolls away with the content. A
   /// floating affordance that scrolls off is not a floating affordance — it is the last
-  /// thing on the page until you scroll back. `SealFab` is the reason this exists.
+  /// thing on the page until you scroll back. `SealFab` was the first thing to want
+  /// it, and the redesign's **dock** is the shape it survives as — a viewport-fixed
+  /// control over a scrolling page. The dock is built by the shell's own `Stack`
+  /// (`lib/app/router/dock_shell_page.dart`) rather than through this slot, but the
+  /// arrangement is the one the slot exists for, and `/login`'s footer and the two
+  /// toast overlays are its callers now.
   ///
   /// The `Stack` here is already the prototype's `position: absolute; inset: 0`
   /// container (`ds.tsx:162`), so an overlay is the shape the prototype actually had

@@ -556,13 +556,14 @@ void main() {
           // **The screen's own width**, because the app bar is the one row the
           // scroll's gutter does not apply to: `:142`'s `.appbar{padding:46px
           // 18px 4px}` insets it by 18 of its own.
+          //
+          // **No back control.** The journey is a dock tab, and the prototype's
+          // journey app bar carries a 68px spacer where a chevron would be
+          // (`:578`) — so the app bar has **two** controls, and the leading
+          // space is a spacer rather than a way out.
           child: const SizedBox(
             width: _screenWidth,
-            child: JourneyAppBar(
-              onBack: _noop,
-              onOpenBoard: _noop,
-              onOpenSettings: _noop,
-            ),
+            child: JourneyAppBar(onOpenBoard: _noop, onOpenSettings: _noop),
           ),
           file: 'journey_app_bar_$label.png',
         );

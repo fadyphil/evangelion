@@ -242,8 +242,8 @@ class _EvangelionAppState extends State<EvangelionApp> {
           // choices. `LumenPreferencesScope` carries the argument.
           //
           // It sits **below** [SettingsScope] and **above** the router, so
-          // every route is inside it — including the ones Phase 6's
-          // `AutoTabsRouter` will add.
+          // every route is inside it — including the three tabs of the dock
+          // shell, which are inside the router and not beside it.
           child: LumenPreferencesScope(
             key: const Key('eva-lumen-preferences-scope'),
             preferences: LumenPreferences.fromSettings(settings),

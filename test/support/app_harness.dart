@@ -107,13 +107,13 @@ Future<void> pumpApp(WidgetTester tester, {Locale? locale}) async {
   if (!getIt.isRegistered<SettingsCubit>()) {
     settingsHarness(loadImmediately: false);
   }
-  // **The sixth registration, and the first one a screen's *interim* chrome made
+  // **The sixth registration, and the first one an *interim* chrome made
   // necessary.** `CommunionPage` resolves its `LeaderboardCubit` from the locator
-  // like every other page, and `/` reaches it through `SealFab`'s interim item —
-  // the redesign's dock (Phase 6) is where the board belongs, and until then this is
-  // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
-  // and the sixth cost of the pattern above was paid by a `StateError` out of
-  // `build` rather than by a red assertion.
+  // like every other page, and `/` used to reach it through `SealFab`'s interim
+  // item — the redesign's dock is where the board belongs, and Phase 6 made it a
+  // **tab** of the shell, so the dock's own slot reaches it now. The sixth cost of
+  // the pattern above was paid by a `StateError` out of `build` rather than by a
+  // red assertion.
   //
   // Task 5.5 renames the route to `/communion` and rebuilds the screen; this
   // registration survives it, because the page keeps resolving from the locator.
@@ -231,13 +231,13 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   if (!getIt.isRegistered<SettingsCubit>()) {
     settingsHarness(loadImmediately: false);
   }
-  // **The sixth registration, and the first one a screen's *interim* chrome made
+  // **The sixth registration, and the first one an *interim* chrome made
   // necessary.** `CommunionPage` resolves its `LeaderboardCubit` from the locator
-  // like every other page, and `/` reaches it through `SealFab`'s interim item —
-  // the redesign's dock (Phase 6) is where the board belongs, and until then this is
-  // the only entry point. So `home_navigation_test.dart`'s second seal arm needs it,
-  // and the sixth cost of the pattern above was paid by a `StateError` out of
-  // `build` rather than by a red assertion.
+  // like every other page, and `/` used to reach it through `SealFab`'s interim
+  // item — the redesign's dock is where the board belongs, and Phase 6 made it a
+  // **tab** of the shell, so the dock's own slot reaches it now. The sixth cost of
+  // the pattern above was paid by a `StateError` out of `build` rather than by a
+  // red assertion.
   //
   // Task 5.5 renames the route to `/communion` and rebuilds the screen; this
   // registration survives it, because the page keeps resolving from the locator.
@@ -258,7 +258,7 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
       theme: EvaThemeLight.theme,
       darkTheme: EvaThemeDark.theme,
       themeMode: ThemeMode.dark,
-      // Phase 6 needs the app's own delegate trio and locale pair, and for the same
+      // Phase 6 needed the app's own delegate trio and locale pair, and for the same
       // reason the theme is installed above: `HomePage` reads
       // `Localizations.localeOf(context)` to resolve the `ReadingLanguage` the
       // reading is requested in, and a `MaterialApp` with no

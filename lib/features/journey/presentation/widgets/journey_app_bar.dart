@@ -16,22 +16,23 @@ import 'package:flutter/material.dart';
 /// </div></div>
 /// ```
 ///
-/// ## THE BACK CHEVRON IS **NOT** IN THE PROTOTYPE, AND THAT IS RECORDED
+/// ## THE BACK CHEVRON IS **NOT** IN THE PROTOTYPE, AND NOW NEITHER IS IT HERE
 ///
 /// The prototype's journey has **no** back control: `:578` is a `<span
 /// style="width:68px">` — a spacer whose only job is to balance the two 30px
 /// `.iconbtn`s and their 8px gap (`:156`) against the empty left of the row.
 ///
 /// **The journey is a dock tab in the prototype** (`.dtab[data-r="journey"]`,
-/// `:707`) and so it never needs a way back. **In this client it is pushed**,
-/// until Phase 6's dock exists — and a pushed screen on desktop has no system
-/// back button, so without a chevron there is **no way out of `/journey` at
-/// all** for a keyboard-only reader. `/communion` has exactly the same
-/// problem and exactly the same answer: the prototype's board is also a dock
-/// tab (`:706`) and it **does** have a chevron (`:614`).
+/// `:707`) and so it never needs a way back. **In this client it was pushed**,
+/// until Phase 6's dock existed — and a pushed screen on desktop has no system
+/// back button, so without a chevron there was **no way out of `/journey` at
+/// all** for a keyboard-only reader.
 ///
-/// So the chevron is here, as a `.chev` (a bare glyph, no box), and the
-/// divergence is this paragraph.
+/// **Phase 6 made the journey a tab, and the chevron went with the reason.**
+/// The spacer is the prototype's own (`:578`), and the divergence this file
+/// carried is discharged. `/communion` keeps its chevron, because the
+/// prototype's board has one (`:614`) — it is reached from the journey as well
+/// as from the dock.
 ///
 /// ## THE TWO BUTTONS ARE THE PROTOTYPE'S TWO **DIFFERENT** GLYPHS
 ///
@@ -73,20 +74,24 @@ import 'package:flutter/material.dart';
 class JourneyAppBar extends StatelessWidget {
   /// Creates the app bar for `/journey`.
   const JourneyAppBar({
-    required this.onBack,
     required this.onOpenBoard,
     required this.onOpenSettings,
     super.key,
   });
-
-  /// Invoked when the back chevron is pressed.
-  final VoidCallback onBack;
 
   /// Invoked when the trophy is pressed — the board.
   final VoidCallback onOpenBoard;
 
   /// Invoked when the gear is pressed — the settings.
   final VoidCallback onOpenSettings;
+
+  /// The empty left of the app-bar row — `eva/redesign.html:578`.
+  ///
+  /// `<span style="width:68px"></span>` — a spacer, and its only job is to
+  /// balance the two 30px `.iconbtn`s and their 8px gap (`:156`) against the
+  /// empty left of the row. **It is where the back chevron used to be**, and the
+  /// class doc says why it is gone.
+  static const double leadingSpacerWidth = 68;
 
   /// The gear's size — `eva/redesign.html:151`'s `.iconbtn{font-size:12px}`.
   ///
@@ -153,15 +158,10 @@ class JourneyAppBar extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                // **The chevron the prototype does not have** — the `.chev` role,
-                // which is a bare glyph with no box (`:149`).
-                IconActionButton(
-                  icon: Icons.arrow_back_ios_new,
-                  iconSize: 16,
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  tooltipFamily: tooltipFamily,
-                  onPressed: onBack,
-                ),
+                // **The prototype's 68px spacer** (`:578`), where the back
+                // chevron used to be. The journey is a tab, and a tab has no way
+                // back — see the class doc.
+                const SizedBox(width: JourneyAppBar.leadingSpacerWidth),
                 // `.abgroup{display:flex;gap:8px}` — `:156`.
                 Row(
                   children: <Widget>[

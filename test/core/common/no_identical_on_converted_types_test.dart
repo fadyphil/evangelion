@@ -674,11 +674,27 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'rebuilt bundle would restart the motion. Design-system type, '
             'untouched.',
       ),
-  'test/app/router/app_router_test.dart#is RouteType.custom over EvaMotion.fadeSlide and EvaMotion.screen':
+  'test/app/router/app_router_test.dart#is RouteType.custom over EvaMotion.goneSlide and the prototype\'s \' \'400ms':
       _Reviewed(
         sites: 1,
         converted: false,
         reason: '`EvaMotion` enum identity on a `CustomRouteType`. Untouched.',
+      ),
+  'test/features/home/presentation/pages/home_navigation_test.dart#a push/pop re-asks, and the screen shows the NEW answer':
+      _Reviewed(
+        sites: 2,
+        converted: true,
+        reason:
+            'Two identity assertions that pin **the re-entry trigger** rather '
+            'than a payload. The first says the home page\'s `Element` is the '
+            '**same object** after the pop — so the re-read was not a rebuild. '
+            'The second says the tabs router\'s route data is **the shell\'s** '
+            'route data — which is what the page subscribes under, and what '
+            'the observer hands `didPopNext` to.\n\n'
+            '**The window names a converted type** — the home bloc\'s '
+            'freezed-converted state — so the flag is `true`. Neither site is '
+            'about that state: they are about framework types (`Element` and '
+            '`RouteData`), and the conversion is not what is being asserted.',
       ),
   'test/core/common/failure_test.dart#a details value with no == override cannot break equality':
       _Reviewed(

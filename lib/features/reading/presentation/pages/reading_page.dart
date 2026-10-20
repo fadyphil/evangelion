@@ -561,10 +561,10 @@ class _ReadingBodyState extends State<_ReadingBody> {
                     if (passage != null && passage.questionCount > 0)
                       ReadingQuizCta(
                         caption: strings.quizCaption(passage.questionCount),
-                        // **The CTA navigates and nothing else**: Phase 6 replaces
+                        // **The CTA navigates and nothing else**: Phase 6 replaced
                         // this with the route's own builder, and `:1404`'s
-                        // `el('qcta').onclick = () => openQuiz()` has no analogue in
-                        // a client that has not built `/quiz` against the redesign.
+                        // `el('qcta').onclick = () => openQuiz()` has its analogue
+                        // in the client that has built `/quiz` against the redesign.
                         onPressed: () =>
                             unawaited(context.router.pushPath(AppRoutes.quiz)),
                       ),

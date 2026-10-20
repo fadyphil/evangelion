@@ -505,16 +505,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRetry => 'Try again';
 
   @override
-  String get sealFabOpen => 'Open menu';
+  String get dockHome => 'Home';
 
   @override
-  String get sealFabClose => 'Close menu';
+  String get dockRead => 'Read';
 
   @override
-  String get sealFabSettings => 'Settings';
+  String get dockToday => 'Today';
 
   @override
-  String get sealFabLeaderboard => 'Communion';
+  String get dockBoard => 'Communion';
+
+  @override
+  String get dockJourney => 'Journey';
 
   @override
   String get readingVerses => 'verses';

@@ -1,10 +1,11 @@
-/// §14: "text scales to 1.22× without overflow at 320px width" — for `/result`.
+/// §14: "text scales to 1.22× without overflow at 320px width" — for the result
+/// **card**.
 ///
 /// ## WHY THIS FILE EXISTS, GIVEN THE REVIEW ALREADY MEASURED IT
 ///
 /// `/login`, `/`, `/reading` and `/quiz` each assert §14's clause for their screen.
-/// `/result` did not, so for this screen the standing requirement was a sentence in a
-/// doc comment. `quiz_text_scale_test.dart` is its sibling and carries the same
+/// The result did not, so for this surface the standing requirement was a sentence in
+/// a doc comment. `quiz_text_scale_test.dart` is its sibling and carries the same
 /// argument; the two are written together because a gate that exists for five of six
 /// screens reads as a gate that exists.
 ///
@@ -15,22 +16,30 @@
 ///
 /// ## AND **ALL FOUR** STATES ARE MOUNTED, WHICH IS THE PART THAT MATTERS HERE
 ///
-/// `/result` takes one `SubmitResult` and derives four screens from it: correct and
+/// The card takes one `SubmitResult` and derives four surfaces from it: correct and
 /// complete, correct and not, wrong, and the zero case. They differ in the **headline
 /// sentence** (`AppLocalizations.messageFor` switches over two booleans) and in **every
 /// number** — the score, the points, the streak, the longest run. A sentence is what
 /// wraps and a two-digit number is what widens, so the four are four layouts.
 ///
-/// `ResultPage`'s doc records the third divergence from the prototype: `ResultScreen.tsx:34`
+/// ## AND THE CARD IS **NARROWER** THAN THE PAGE IT REPLACED
+///
+/// The result used to be a screen with 24px of side padding on each side. It is a
+/// **card** now — 82% wide (`:444`) with 28px of padding inside it (`:444`) — so the
+/// content is 320 × 0.82 − 56 = **206px** wide where it used to be 272px. That is
+/// 66px less for a sentence to wrap in, and it is why the answer here is "no overflow
+/// and it scrolls" and not "it fits".
+///
+/// `ResultSheet`'s doc records the divergence from the prototype: `ResultScreen.tsx:34`
 /// is `minHeight: 844` on a non-scrolling flex column, and that value **cannot** be
-/// honoured at 320×568 — so this column **scrolls**. That is why the answer here is
-/// again "no overflow and it scrolls", and why "no exception" alone would be a weak
-/// assertion: a screen that had dropped its headline would also throw nothing.
+/// honoured at 320×568 — so the card **scrolls**. That is why the answer here is again
+/// "no overflow and it scrolls", and why "no exception" alone would be a weak
+/// assertion: a card that had dropped its headline would also throw nothing.
 library;
 
 import 'package:evangelion/core/design_system/widgets/streak_flame.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
@@ -177,7 +186,7 @@ void main() {
     testWidgets('and the column SCROLLS, because 844 does not fit in 568', (
       WidgetTester tester,
     ) async {
-      // `ResultPage`'s doc: the prototype's `minHeight: 844` is refused, so the column
+      // `ResultSheet`'s doc: the prototype's `minHeight: 844` is refused, so the column
       // scrolls. Asserted so "no overflow" is not read as "it all fit" — at 320×568 it
       // cannot have fit, and the honest claim is that nothing overflowed.
       await pumpResult(
@@ -210,10 +219,11 @@ void _expectNoOverflow(WidgetTester tester, {required String screen}) {
   expect(
     tester.takeException(),
     isNull,
-    reason: '§14 at ${kNarrowSurface.width}px and 1.22x — /result, $screen',
+    reason:
+        '§14 at ${kNarrowSurface.width}px and 1.22x — the result card, $screen',
   );
   expect(
-    find.byType(ResultPage),
+    find.byType(ResultSheet),
     findsOneWidget,
     reason: 'the page rendered, so "no overflow" is not vacuous',
   );

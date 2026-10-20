@@ -9,7 +9,6 @@ import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/widgets/greeting_block.dart';
 import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
-import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
 import 'package:evangelion/features/home/presentation/widgets/selah_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/streak_chip.dart';
 import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
@@ -50,16 +49,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// them against the CSS numbers it parses, which is what keeps the table above from
 /// being a table of intentions.
 ///
-/// ## AND THE DOCK IS **NOT** HERE YET
+/// ## AND THE DOCK IS **NOT** HERE, AND THE SEAL IS GONE
 ///
-/// `redesign.html:702-708` is a five-tab dock and it is Phase 6's, and this screen's
-/// own chrome in the meantime is [SealFab] — the same interim holder `/login`'s
-/// footer used in Task 5.1. It stays because its two destinations
-/// (`/settings`, `/communion`) have no other entry point until Phase 6 builds the
-/// dock and Phase 5.6 builds the journey screen that the redesign reaches settings
-/// through. **The redesign draws no seal on `/` and this is the divergence**, recorded
-/// here rather than left for a reader to find by looking for a float that is not in
-/// the HTML.
+/// `redesign.html:702-708` is a five-slot dock and it is Phase 6's. This screen's
+/// own chrome used to be `SealFab` — the same interim holder `/login`'s footer
+/// used in Task 5.1 — and Phase 6 **deleted it**, because the dock now holds two
+/// of its three destinations (the board and the journey, which are the
+/// redesign's own dock tabs) and the third (`/settings`) is reached the way the
+/// prototype reaches it: from the journey's app-bar gear (`redesign.html:582`)
+/// and its account row (`:606`).
+///
+/// **The redesign draws no seal on `/`** — `:513-538` has no floating control at
+/// all — so the divergence that was recorded here is discharged rather than
+/// carried.
 @RoutePage()
 class HomePage extends StatelessWidget {
   /// The home screen.
@@ -133,12 +135,14 @@ class HomePage extends StatelessWidget {
   static const double kStripGap = 10;
 
   /// What is under the strip: `.carousel`'s own `12px` (`:273`) and `.scroll`'s
-  /// `118px` (`:157`), which is the prototype's clearance for its dock — a dock this
-  /// client does not have yet.
+  /// `118px` (`:157`), which is the prototype's clearance for its dock.
   ///
-  /// **Kept whole rather than re-derived for a dock that does not exist.** Phase 6
-  /// replaces it with the dock's own height, and a number that is already in the
-  /// design is cheaper to swap than to justify now.
+  /// **The dock exists now** — Phase 6 built it, and it is 78px tall
+  /// (`eva/redesign.html:208`) — and the clearance is still **118**, because
+  /// the prototype's number is the prototype's number and it is the *scroll's
+  /// padding*, not the dock's height. The dock is 78 of those 118; the other
+  /// 40 is the space the design leaves between the last card and the dock's
+  /// top edge.
   static const double kBottomClearance = 130;
 
   @override
@@ -160,43 +164,12 @@ class HomePage extends StatelessWidget {
       // where the prototype writes them — [kGreetGutter] on the greeting and
       // [kScrollGutter] on the column below it.
       padding: EdgeInsets.zero,
-      // Interim chrome — see the class doc. Settings, the board and the journey
-      // have no other entry point until Phase 6's dock.
-      overlay: SealFab(
-        items: <SealFabItem>[
-          SealFabItem(
-            label: context.l10n.sealFabSettings,
-            onTap: () => context.router.pushPath(AppRoutes.settings),
-          ),
-          SealFabItem(
-            // **Why this item exists at all.** The dial's other destination — Settings
-            // — has no other entry point either, and Phase 5.5 renames the board to
-            // `/communion`. Kept until then, with `seal_fab_test.dart` asserting
-            // Profile stays absent so a dead route cannot creep back.
-            label: context.l10n.sealFabLeaderboard,
-            onTap: () => context.router.pushPath(AppRoutes.communion),
-          ),
-          SealFabItem(
-            // **The journey, and this is the item that discharges a piece of
-            // recorded debt.** ADR-0001 cut the profile for want of an endpoint and
-            // ADR-0022 restored it; the redesign calls it "Journey"
-            // (`eva/redesign.html:933`) and makes it a **dock tab** (`:707`), so its
-            // real entry is Phase 6's dock.
-            //
-            // **The dial is the interim holder of exactly that kind of destination**
-            // — it already holds the board, the prototype's other dock tab (`:706`),
-            // and Settings, which the redesign's `/` has no other way to reach
-            // either. So the journey goes here rather than nowhere.
-            //
-            // **And the label is "Journey", not "Profile".** The redesign renamed
-            // the screen, and `seal_fab_test.dart`'s "Profile stays absent"
-            // assertion still holds: the profile is here, under the name the
-            // redesign gives it.
-            label: context.l10n.journeyTitle,
-            onTap: () => context.router.pushPath(AppRoutes.journey),
-          ),
-        ],
-      ),
+      // **No `overlay:` slot, and that is Phase 6's doing.** The slot used to hold
+      // the `SealFab`, the interim holder for the destinations the redesign's
+      // dock now owns. The redesign draws no float on `/` (`redesign.html:513-538`)
+      // and the dock is the prototype's own home for the board and the journey
+      // (`:706`, `:707`), so the seal is deleted rather than kept beside a dock
+      // that says the same thing twice.
       child: BlocProvider<HomeBloc>.value(
         value: resolved,
         child: const _HomeBody(),
@@ -354,8 +327,28 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
     }
     _observer?.unsubscribe(this);
     _observer = observer;
-    observer.subscribe(this, context.routeData);
+    observer.subscribe(this, _watchedRouteData);
   }
+
+  /// The route data this page subscribes under.
+  ///
+  /// ## IT IS THE **SHELL'S**, NOT THIS TAB'S, AND THAT IS THE WHOLE POINT
+  ///
+  /// `/` is a **tab** now, inside the dock shell's tabs router, and a tab is
+  /// never popped — so this page's own route data would never produce a
+  /// `didPopNext`, and the re-entry reload (recorded decision 41) would die
+  /// silently. The shell **is** popped, and it is popped exactly when the
+  /// screen pushed over it — the reader, the quiz, the workshop — is popped
+  /// and `/` is showing again. That is the event this page re-loads for, and
+  /// the shell's route data is the one the observer's `didPop` hands
+  /// `didPopNext` to (`auto_route_observer.dart:168` — the **previous**
+  /// route's subscribers).
+  ///
+  /// **A bare tree has no shell**, and there the page's own route data is the
+  /// right answer: it is what it was before the dock existed, and a widget
+  /// test that mounts `/` over a bare `MaterialApp` sees no change.
+  RouteData<dynamic> get _watchedRouteData =>
+      TabsRouterScope.of(context)?.controller.routeData ?? context.routeData;
 
   /// Dispatches `HomeStarted` for the language on screen.
   ///
@@ -390,7 +383,7 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   // | --- | --- | --- |
   // | `didPush` / `didPushNext` | `/` arrived, then was covered | arriving is `didChangeDependencies`'s job and covering is not an event this screen reacts to |
   // | `didPop` | *this* route was popped off | the page is going away; [dispose] runs and the subscription is dropped |
-  // | `didInitTabRoute` / `didChangeTabRoute` | a tab router changed tab | there is no `AutoTabsRouter` in the seven routes |
+  // | `didInitTabRoute` / `didChangeTabRoute` | the tab router changed tab | the subscription is under the **shell's** route data now, so these fire for the shell's lifecycle; a tab change is not an event this screen reacts to — the shell's `didPopNext` is |
   //
   // Written out rather than left unimplemented, because an unimplemented one is a
   // compile error today and a silent no-op the moment auto_route gives it a body —

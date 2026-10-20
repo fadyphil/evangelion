@@ -173,7 +173,7 @@ final class Failure {
           statusCode == other.statusCode;
 
   /// Agrees with `==` on the same three fields, for the same reason
-  /// [FailureResult]'s does: including `runtimeType` keeps the hash of a
+  /// `Result`'s does: including `runtimeType` keeps the hash of a
   /// cross-type pair distinct from the pair `==` already rejects.
   @override
   int get hashCode => Object.hash(kind, message, statusCode);

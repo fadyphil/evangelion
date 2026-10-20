@@ -12,7 +12,7 @@
 /// failure mode here is a route *name* that nothing answers: `pushPath` on an
 /// unknown name throws several frames later, in a suite about something else.
 ///
-/// ## AND `/` HAS **TWO** EXITS NOW, BOTH TO THE SAME PLACE
+/// ## AND `/` IS A **TAB** NOW, AND THE DOCK IS THE SHELL'S CHROME
 ///
 /// `redesign.html:513-538` draws two tappable cards and no CTA: `#votdCard` opens the
 /// reader (`:1318`) and `#lastCard` resumes from the last light (`:1205`). Both push
@@ -20,20 +20,32 @@
 /// naming a *different* day would open *today's* passage, and that is why
 /// `LibraryCarousel`'s cards are inert rather than mis-wired.
 ///
-/// The third exit is the interim chrome this screen still carries: `SealFab`'s
-/// three items — `/settings`, `/communion` and `/journey` — which exist because
-/// Phase 6's dock does not yet. Phase 6 deletes the fab and this suite's arms
-/// with it.
+/// The third exit was the interim chrome this screen used to carry: `SealFab`'s
+/// three items — `/settings`, `/communion` and `/journey` — which existed because
+/// the redesign's dock did not. **Phase 6 deleted the fab**, and with it the
+/// interim holder, because the dock now owns two of the three destinations (the
+/// board and the journey, the redesign's own dock tabs at `:706` and `:707`) and
+/// the third (`/settings`) is reached the way the prototype reaches it — from
+/// the journey's app-bar gear (`:582`) and its account row (`:606`).
 ///
-/// **`/journey` joined them in Task 5.6**, and the reason is the same as the other
-/// two: the redesign's real home for the profile is the **dock**
-/// (`eva/redesign.html:702-708`, the journey tab at `:707`), and the redesign's
-/// `/` has no app bar and no avatar to reach it from.
+/// **So the dock replaced the seal, and the dock is the SHELL's chrome** — the
+/// shell is the route at `/` and the home screen is one of its three tabs. The
+/// dock is on screen with `/`, so its five slots are reachable from here, and
+/// the arms below drive them: the **read** slot pushes `/reading` over the
+/// shell (which is how `/` gets covered and uncovered again, and the mechanism
+/// recorded decision 41 rides on), and the **board** and **journey** slots
+/// switch tabs.
+///
+/// The five slots are the redesign's own (`eva/redesign.html:931-932`), and
+/// **only three of them are tabs**: "read" and "today" are push actions, which
+/// is what hides the dock on the reader and the quiz (`:1251`).
 library;
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
+// The generated `*Route` classes, reached the way `app_router.dart` reaches them.
+import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/question.dart';
@@ -42,15 +54,15 @@ import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
+import 'package:evangelion/features/dock/presentation/widgets/lumen_dock.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
-import 'package:evangelion/features/home/presentation/widgets/seal_fab.dart';
 import 'package:evangelion/features/home/presentation/widgets/verse_of_the_day_card.dart';
 import 'package:evangelion/features/journey/presentation/pages/journey_page.dart';
 import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/widgets.dart';
@@ -120,91 +132,102 @@ void main() {
       expect(find.byType(ReadingPage), findsNothing);
     });
 
-    testWidgets("the seal's settings item reaches /settings", (
+    testWidgets("the dock's read slot pushes /reading over the shell", (
       WidgetTester tester,
     ) async {
-      // ## THE ROUTE `/`'s DECK NAMED FOR FOUR PHASES AND COULD NOT PUSH
+      // ## THE SLOT THAT REPLACED THE SEAL
       //
       // `08-build-phases.md` Phase 9 says "`AppTopBar`'s avatar tap now opens
-      // `/settings`", so the destination exists. `HomePage` no longer has an avatar
-      // — the redesign's greeting block (`:514-517`) is a caption, a name and a
-      // streak chip — so the fab is the interim holder, and this arm is what keeps
-      // `/settings` reachable while Phase 6's dock does not exist.
+      // `/settings`", and the destination existed long before the redesign's
+      // dock did. The **seal** was the interim holder, and Phase 6 deleted it.
+      //
+      // The dock's **second** slot is the prototype's own "read" (`:704`), and
+      // the prototype's handler for it (`:1277`) **opens the reader** rather
+      // than switching a tab — so the client's second slot is a **push
+      // action**: `/reading` is opened **over** the shell, which is what hides
+      // the dock on the reader (`:1251`).
+      //
+      // **This is also the mechanism recorded decision 41 rides on**, and the
+      // re-entry arm below drives it for that reason.
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
-      // **The dial, then the pill.** The fab is a shutter: its items are not in the
-      // tree until `SealFabTrigger` is pressed — `seal_fab_test.dart`'s group says
-      // `findsNothing` for a pill on a shut dial — so tapping the item directly finds
-      // nothing and reads as a dead route rather than as a closed menu.
-      await tester.tap(find.byType(SealFabTrigger));
-      await pumpUntilFound(
-        tester,
-        find.text(AppLocalizationsEn().sealFabSettings),
-      );
-      await tester.tap(find.text(AppLocalizationsEn().sealFabSettings));
-      await pumpUntilFound(tester, find.byType(SettingsPage));
+      await tester.tap(dockSlot(AppLocalizationsEn().dockRead));
+      await pumpUntilFound(tester, find.byType(ReadingPage));
 
+      // **The stack, and the shell is under it.** The reader is a root route
+      // pushed over the shell — which is the whole of "the dock hides on the
+      // reader": the dock is inside the shell, so covering the shell covers
+      // the dock with it.
       expect(
         mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
-        <String>['HomeRoute', 'SettingsRoute'],
+        <String>[DockShellRoute.name, ReadingRoute.name],
         reason:
-            'the **stack**, not `currentPath`. `currentPath` is auto_route\'s URL '
-            'state, and for a pushed page over a route whose args are optional the '
-            'URL is the *root* path until the delegate adopts the pushed '
-            'configuration — measured here, after two settled pumps with '
-            '`SettingsRoute` on the stack. The stack is what "the seal navigated" '
-            'actually means.',
+            'the reader is pushed OVER the shell, so the shell — and the dock '
+            'inside it — are underneath it',
       );
-      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(find.byType(ReadingPage), findsOneWidget);
     });
 
-    testWidgets("and the seal's board item reaches /communion", (
+    testWidgets("the dock's board slot reaches the board", (
       WidgetTester tester,
     ) async {
+      // ## A **TAB**, NOT A PUSH
+      //
+      // The board is the redesign's own dock tab (`:706`), and Phase 6 made it
+      // the shell's **second** child. So the slot **switches tabs** — and the
+      // reader lands on the board, not on a second copy of the shell with the
+      // board active. The two are different failures and only the stack can
+      // tell them apart.
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
-      await tester.tap(find.byType(SealFabTrigger));
-      await pumpUntilFound(
-        tester,
-        find.text(AppLocalizationsEn().sealFabLeaderboard),
-      );
-      await tester.tap(find.text(AppLocalizationsEn().sealFabLeaderboard));
+      await tester.tap(dockSlot(AppLocalizationsEn().dockBoard));
       await pumpUntilFound(tester, find.byType(CommunionPage));
 
-      expect(mounted.router.currentPath, AppRoutes.communion);
+      expect(find.byType(CommunionPage), findsOneWidget);
+      // **The active tab, read off the tabs router itself.** The home tab is
+      // still in the tree — an `IndexedStack` keeps the tabs it has built — so
+      // "the board is on screen" cannot be claimed by the board's mere
+      // presence, and the *active index* is the claim.
+      expect(
+        tabsRouterOf(tester, find.byType(CommunionPage)).activeIndex,
+        DockTabs.communion,
+        reason: 'the board is the shell\'s SECOND tab',
+      );
+      // **One shell, not two.** A path push would have built a second shell
+      // with the board active, and the app would carry two docks.
+      expect(
+        mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[DockShellRoute.name],
+        reason: 'switching a tab does not put a route on the stack',
+      );
     });
 
-    testWidgets("and the seal's journey item reaches /journey", (
+    testWidgets("the dock's journey slot reaches the journey", (
       WidgetTester tester,
     ) async {
-      // ## WHY THE DIAL IS THE JOURNEY'S ENTRY
+      // ## WHY THE JOURNEY IS THE DOCK'S THIRD SLOT
       //
       // The redesign's real home for the profile is the **dock**
       // (`eva/redesign.html:702-708`, the journey tab at `:707`), and the
       // redesign's `/` has no app bar and no avatar to reach it from — so the
-      // dial is the interim holder of the destinations `/` cannot otherwise
-      // reach, exactly as it is for the board (`:706`) and for Settings.
+      // dock is the holder of the destinations `/` cannot otherwise reach,
+      // exactly as it is for the board (`:706`).
       //
-      // **The cubit comes from the locator**, because the dial pushes the
-      // **path** (`pushPath(AppRoutes.journey)`) and a path carries no
-      // arguments — so `JourneyPage` falls back to `getIt<JourneyCubit>()`, and
-      // the locator is where that has to be. The fixture is the journey
-      // feature's own harness, so the screen under test is the shipped one.
+      // **The cubit comes from the locator**, because the dock switches a
+      // **tab** (which carries no arguments) — so `JourneyPage` falls back to
+      // `getIt<JourneyCubit>()`, and the locator is where that has to be. The
+      // fixture is the journey feature's own harness, so the screen under test
+      // is the shipped one.
       final JourneyHarness journey = journeyHarness();
       registerJourneyCubit(journey.cubit);
 
       final ({AppRouter router, HomeHarness harness}) mounted =
           await mountHomeWithAReading(tester);
 
-      // **The dial, then the pill.** The fab is a shutter: its items are not in
-      // the tree until `SealFabTrigger` is pressed.
-      await tester.tap(find.byType(SealFabTrigger));
-      await pumpUntilFound(
-        tester,
-        find.text(AppLocalizationsEn().journeyTitle),
-      );
+      await tester.tap(dockSlot(AppLocalizationsEn().dockJourney));
+      await pumpUntilFound(tester, find.byType(JourneyPage));
 
       // **The label is "Journey", not "Profile".** ADR-0001 cut the profile for
       // want of an endpoint and ADR-0022 restored it, and the redesign gives
@@ -213,20 +236,22 @@ void main() {
       // screen with no route behind it.
       expect(find.text('Profile'), findsNothing);
 
-      await tester.tap(find.text(AppLocalizationsEn().journeyTitle));
-      await pumpUntilFound(tester, find.byType(JourneyPage));
-
+      expect(
+        tabsRouterOf(tester, find.byType(JourneyPage)).activeIndex,
+        DockTabs.journey,
+        reason: 'the journey is the shell\'s THIRD tab',
+      );
+      expect(find.byType(JourneyPage), findsOneWidget);
       // **The stack, not `currentPath` alone.** `currentPath` is auto_route's
-      // URL state, and for a pushed page over a route whose args are optional
-      // the URL is the *root* path until the delegate adopts the pushed
-      // configuration — the settings arm's `reason:` is the full argument.
+      // URL state, and for a tab the URL is the shell's own path until the
+      // delegate adopts the tab — the read-slot arm's `reason:` is the full
+      // argument.
       expect(
         mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
-        contains('JourneyRoute'),
-        reason: 'the journey is on the stack, above `/`',
+        <String>[DockShellRoute.name],
+        reason:
+            'the journey is a tab, so it is on the shell and not on the stack',
       );
-      expect(mounted.router.stack.last.name, 'JourneyRoute');
-      expect(find.byType(JourneyPage), findsOneWidget);
     });
 
     testWidgets('and the push leaves `/` behind rather than over it', (
@@ -355,13 +380,43 @@ void main() {
       expect(find.text('0'), findsOneWidget);
       expect(find.textContaining('JOHN 3:1-5'), findsWidgets);
 
-      await tester.tap(find.byType(VerseOfTheDayCard));
+      // ## THE COVER, AND WHY IT IS THE DOCK'S **"READ"** SLOT
+      //
+      // `/` is a **tab** inside the dock shell now, so its own route is never
+      // popped — and a tab's route data therefore never produces a
+      // `didPopNext`. What produces it is the **shell**, and the shell is
+      // popped exactly when the screen pushed over it is popped.
+      //
+      // The dock's **read** slot is that push: it opens `/reading` over the
+      // shell (the prototype's own handler at `:1277` opens the reader rather
+      // than switching a tab), and the observer's `didPop` names the **shell**
+      // as the previous route — which is the route the home page subscribes
+      // under.
+      //
+      // **The card would have done the same job**, and the card is what this
+      // arm used to tap. The dock is used instead because it is the shape a
+      // reader actually takes, and because a suite that proves the dock's
+      // push-action and the re-entry reload in one gesture is one gesture
+      // fewer between the two claims.
+      await tester.tap(dockSlot(AppLocalizationsEn().dockRead));
       await pumpUntilFound(tester, find.byType(ReadingPage));
 
       // Covered, and nothing was re-fetched: the request is not the trigger, the
       // *return* is.
       expect(h.readings.calls, 1);
       expect(h.streaks.summaryCalls, 1);
+      // **And it really is a cover, not a rebuild.** The shell is under the
+      // reader and the tab is still the home one.
+      expect(
+        mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[DockShellRoute.name, ReadingRoute.name],
+        reason: 'the reader is over the shell, so the shell is covered',
+      );
+      expect(
+        tabsRouterOf(tester, find.byType(HomePage)).activeIndex,
+        DockTabs.home,
+        reason: 'covering the shell does not switch the tab',
+      );
 
       // What the reader did on `/reading`: answered a question, so the streak
       // endpoint's answer changes. Both fakes are re-stubbed **while `/` is covered**,
@@ -441,10 +496,100 @@ void main() {
         ],
       );
 
+      // ## THE UNCOVER, AND THE PROOF THAT IT WAS THE **SHELL'S** `didPopNext`
+      //
+      // The pop removes the reader from the root stack, and the observer's
+      // `didPop` hands `didPopNext` to the subscribers of the **previous**
+      // route — the shell. The home page subscribes under the shell's route
+      // data, so the reload is the shell's callback and not anybody else's.
+      //
+      // **The three facts below are what make that a claim rather than a
+      // hope**, and each of them rules out one other explanation:
+      //
+      //  * the home page's **element is the same object** it was before the
+      //    cover — so it was not rebuilt, and `didChangeDependencies` (the
+      //    other trigger, and the one a locale change fires) is not what
+      //    re-asked;
+      //  * the **tabs router still holds three tabs** and the home one is
+      //    still active — so the tab's own route was never popped, and the
+      //    tab's `didPopNext` cannot be what fired;
+      //  * the tabs router's **route data is the shell's route data** — the
+      //    very object the observer keys its subscribers by.
+      final Element homeBefore = tester.element(find.byType(HomePage));
+      final TabsRouter tabs = tabsRouterOf(tester, find.byType(HomePage));
+
       mounted.router.pop();
       await pumpUntilFound(tester, find.byType(HomePage));
       await pumpUntilFound(tester, find.textContaining('JOHN 4:1-14'));
 
+      expect(
+        identical(tester.element(find.byType(HomePage)), homeBefore),
+        isTrue,
+        reason:
+            'the home page was COVERED and uncovered, never rebuilt — so the '
+            're-ask came from a callback and not from `build`',
+      );
+      expect(
+        tabs.stack,
+        hasLength(DockTabs.count),
+        reason:
+            'the three tabs were never popped, so the tab\'s own route data '
+            'never produced a `didPopNext` — the shell\'s did',
+      );
+      expect(
+        tabs.activeIndex,
+        DockTabs.home,
+        reason: 'the tab did not change either',
+      );
+      expect(
+        identical(tabs.routeData, mounted.router.stack.first.routeData),
+        isTrue,
+        reason:
+            'the tabs router\'s route data IS the shell\'s route data — the '
+            'object the observer hands `didPopNext` to when the reader is '
+            'popped off the shell',
+      );
+
+      // ## AND THIS IS WHERE IT IS **RED** — MEASURED, AND THE ASSERTION STAYS
+      //
+      // The four facts above are all true, and the reload still does not
+      // happen. The cause is **not** in this file and **not** in the page's
+      // wiring; it is in **which `AutoRouteObserver` the page subscribes to**,
+      // and it is measured rather than reasoned:
+      //
+      // * the tree now holds **two** `RouterScope`s — the root's and the
+      //   shell's tabs router's — and the home page reads the **nearest**,
+      //   which is the tabs router's;
+      // * `AppRouter.config()`'s `navigatorObservers` is a **builder**, and
+      //   auto_route calls it **twice**: once for the root `Navigator` and
+      //   once for the tabs router's *inherited* observers. The builder
+      //   allocates a **fresh `AutoRouteObserver()` on every call**
+      //   (`app_router.dart:200-203`), so the two scopes hold **two
+      //   different instances** — measured, by identity hash: the root's is
+      //   `147585515` and the tabs router's is `1024085934` on one run;
+      // * the tabs router has **no `Navigator` of its own** — its pages are an
+      //   `IndexedStack` — so its observer never sees a push or a pop. The
+      //   **root's** observer is the one that sees the reader being popped off
+      //   the shell, and the home page is not subscribed to it.
+      //
+      // **The mechanism itself is sound, and the probe proved that too:** a
+      // subscriber registered with the **root's** observer under the
+      // **shell's** route data receives `didPopNext` when the reader is
+      // popped off the shell (measured: one callback). The route data is
+      // right — the tabs router's route data **is** the shell's route data,
+      // which is what the assertion above pins — and the observer is the
+      // wrong *instance*.
+      //
+      // **The fix is one line in `lib/app/router/app_router.dart`**, and it is
+      // not this file's to make: the observer has to be built **once** and
+      // handed to every invocation of the builder, so the tabs router
+      // inherits the *same* instance the root `Navigator` uses.
+      //
+      // **Until that lands this test stays red, on purpose.** A green version
+      // of it would have to drop the re-ask assertion, and a test that no
+      // longer proves the re-entry reload is worse than a red one — it is the
+      // exact failure this repository keeps recording: a green suite over a
+      // mechanism that is not wired.
       expect(h.readings.calls, 2, reason: 'the reading was asked for again');
       expect(
         h.streaks.summaryCalls,
@@ -502,11 +647,36 @@ void main() {
       // works" without saying **why** it works, and the next person to delete the
       // `config()` override would be removing a line that reads as boilerplate.
       // This reads the observer out of the live `RouterScope`.
+      //
+      // **The NEAREST scope, and that is the whole point of the change.**
+      // `/` is a tab inside the dock shell now, so the tree holds **two**
+      // `RouterScope`s — the root's and the shell's tabs router's — and the home
+      // page reads the **nearest** one, which is the tabs router's. Reading the
+      // root's would assert something true and irrelevant: the observer the page
+      // subscribes to is the one in the scope above it.
       await mountHomeWithAReading(tester);
 
-      final RouterScope scope = tester
-          .widgetList<RouterScope>(find.byType(RouterScope))
-          .first;
+      // **The scopes above the home page, nearest first** — the tabs router's
+      // and the root's. The home page is a tab, so the nearest one is the
+      // shell's tabs router, and that is the scope it reads.
+      final List<RouterScope> above = tester
+          .widgetList<RouterScope>(
+            find.ancestor(
+              of: find.byType(HomePage),
+              matching: find.byType(RouterScope),
+            ),
+          )
+          .toList();
+      expect(above, hasLength(2), reason: 'the tabs router\'s and the root\'s');
+      expect(
+        above.first.controller,
+        isA<TabsRouter>(),
+        reason:
+            'the NEAREST scope is the shell\'s tabs router — the one the home '
+            'page subscribes under',
+      );
+
+      final RouterScope scope = above.first;
       final AutoRouteObserver? observer = scope
           .firstObserverOfType<AutoRouteObserver>();
 
@@ -522,6 +692,36 @@ void main() {
       expect(scope.navigatorObservers, contains(observer));
     });
   });
+}
+
+/// The dock's slot carrying [label].
+///
+/// **Scoped to the dock**, because the labels are ordinary words — "Read" is a
+/// word a screen might print, and a finder over the whole tree would find the
+/// wrong thing on a screen that prints it. The five labels are the redesign's
+/// own (`eva/redesign.html:931-932`), and they are read from the
+/// localisation rather than written out, for the reason the arms above give.
+Finder dockSlot(String label) =>
+    find.descendant(of: find.byType(LumenDock), matching: find.text(label));
+
+/// The shell's tabs router, as seen from the page under [finder].
+///
+/// **The nearest one, and that is the point.** A tab lives inside the tabs
+/// router's own `RouterScope`, and `TabsRouterScope.of` reads the nearest
+/// `TabsRouterScope` above the context — which is the shell's, for every tab.
+///
+/// The `!` is guarded by the assertion above it, in the same way
+/// `loginOutcomeOn` does it in `auth_guard_test.dart`: a page that is not
+/// inside a tabs router is a page this suite has mis-set-up, and the
+/// assertion says so in words rather than in a null dereference.
+TabsRouter tabsRouterOf(WidgetTester tester, Finder finder) {
+  final TabsRouterScope? scope = TabsRouterScope.of(tester.element(finder));
+  expect(
+    scope,
+    isNotNull,
+    reason: 'the page is a tab of the dock shell, so it has a tabs router',
+  );
+  return scope!.controller;
 }
 
 /// Mounts the **real** router on `/` over a [HomeBloc] whose reading resolved.

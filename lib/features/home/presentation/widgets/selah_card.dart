@@ -21,9 +21,11 @@ import 'package:flutter/material.dart';
 /// **genuinely inert**: `Semantics(button: true, enabled: false)` with the
 /// unavailable sentence appended to its name, no tap and no focus stop, at 45%
 /// opacity. That is the same treatment the login's ghost pills and the library's
-/// book cards get (`:509`, `:1312-1318`), and it is the arrangement
-/// `SocialAuthButton`'s doc argues for: "without it this control is a dead route,
-/// and that is what this function fixes" — a control that explains itself.
+/// book cards get (`:509`, `:1312-1318`), and it is the arrangement the old
+/// `SocialAuthButton`'s doc argued for: "without it this control is a dead route,
+/// and that is what this function fixes" — a control that explains itself. The
+/// redesigned `/login` deleted that widget, and the argument it made did not go
+/// with it.
 ///
 /// ## AND THE COUNT IS NOT THE PROTOTYPE'S LITERAL
 ///

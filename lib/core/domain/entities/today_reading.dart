@@ -15,7 +15,7 @@ part 'today_reading.freezed.dart';
 /// answered, whether the reading is finished, and two numbers.
 ///
 /// So this is the narrow shape. The wide one belongs to `features/reading/`,
-/// which Phase 7 needs in full and which already owns the `text_clean` trap
+/// which Phase 7 needed in full and which already owns the `text_clean` trap
 /// (AGENT_CONTEXT §5, trap 2: the key is AR-only and **absent** in English).
 /// Putting the wide shape here would be §3's "nothing enters `core/domain/`
 /// speculatively" run backwards — a shared entity carrying a `Map<String, String>`
@@ -117,7 +117,7 @@ final class TodayReading with _$TodayReading {
   /// `text_clean` is the better text where it exists — and it does not exist in
   /// English. Using it unconditionally is a `null` in the panel for every English
   /// reader, which is the trap restated. So the mapper's rule is `text_clean`
-  /// when the key is present and `text` otherwise, and Phase 7 owns the field
+  /// when the key is present and `text` otherwise, and Phase 7 owned the field
   /// that makes the difference observable in the sanctuary.
   ///
   /// Recorded here rather than only in the mapper because the *consequence* is a

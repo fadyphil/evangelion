@@ -89,17 +89,18 @@ abstract final class EvaElevations {
   /// `0` — a bottom sheet is separated by its rounded top edge and its scrim.
   static const double bottomSheet = 0;
 
-  /// `0` — the FAB dock's buttons are tinted glass; an ember glow (see the
-  /// prototype's `0 0 28px rgba(ember, .35)`) is a *border effect*, not an
-  /// elevation.
+  /// `0` — the prototype's FAB dock's buttons are tinted glass; an ember glow
+  /// (see the prototype's `0 0 28px rgba(ember, .35)`) is a *border effect*, not
+  /// an elevation.
   ///
   /// **This doc used to say the glow is "Phase 3's `SealFab` that draws it", and
-  /// `SealFab` does not exist.** `rg SealFab lib test` finds exactly one hit: this
-  /// line. The nearest real thing is `SunBurst` — a radial `ember` glow —
-  /// committed in **Phase 2** (`81f5034`, "effects — neural background, glass, and
-  /// the decorative tier"), along with `SealMonogram`. Nothing in the app draws a
-  /// FAB yet, so the claim is now only about what this value is for, which is the
-  /// part that does not depend on a widget arriving.
+  /// `SealFab` does not exist** — the dial was deleted in Phase 6, when the
+  /// redesign's five-slot dock took its place, so the mention of it here is a
+  /// historical one. The nearest real thing is `SunBurst` — a radial `ember` glow
+  /// — committed in **Phase 2** (`81f5034`, "effects — neural background, glass,
+  /// and the decorative tier"), along with `SealMonogram`. Nothing in the app
+  /// draws a FAB yet, so the claim is now only about what this value is for,
+  /// which is the part that does not depend on a widget arriving.
   static const double floatingActionButton = 0;
 
   /// `0` — a snack bar is a glass panel like every other raised surface.

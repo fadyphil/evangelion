@@ -513,16 +513,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsRetry => 'حاول مرة أخرى';
 
   @override
-  String get sealFabOpen => 'افتح القائمة';
+  String get dockHome => 'الرئيسية';
 
   @override
-  String get sealFabClose => 'أغلق القائمة';
+  String get dockRead => 'اقرأ';
 
   @override
-  String get sealFabSettings => 'الإعدادات';
+  String get dockToday => 'اليوم';
 
   @override
-  String get sealFabLeaderboard => 'الشركة';
+  String get dockBoard => 'الشركة';
+
+  @override
+  String get dockJourney => 'الرحلة';
 
   @override
   String get readingVerses => 'آيات';

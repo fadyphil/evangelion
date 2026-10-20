@@ -119,7 +119,8 @@ void main() {
 
       // The visible label is `listen`; the name a screen reader announces is the
       // composed one — `reading_l10n.dart`'s `listeningUnavailable`, which is the
-      // arrangement login's ghost pills and `/`'s SealFab items use.
+      // arrangement login's ghost pills use, and `/`'s deleted `SealFab` items
+      // used.
       expect(
         find.bySemanticsLabel(
           RegExp(

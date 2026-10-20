@@ -106,6 +106,12 @@ class AppRouter extends RootStackRouter {
   final AuthStatus _authStatus;
   final ReevaluateListenable _authChanges;
 
+  /// The one [AutoRouteObserver] this router installs.
+  ///
+  /// **One instance, not one per `Navigator`.** See [config]'s doc for what
+  /// happens when it is one per call.
+  final AutoRouteObserver _observer = AutoRouteObserver();
+
   /// The listenable `MaterialApp.router` must be given so a session change
   /// re-evaluates the stack.
   ///
@@ -116,44 +122,39 @@ class AppRouter extends RootStackRouter {
   /// the `AuthBloc` subscription behind it cannot outlive the router.
   ReevaluateListenable get authChanges => _authChanges;
 
-  /// Every screen arrives with the Eva fade and 8px slide.
+  /// Every screen arrives with the redesign's **gone-left / gone-right** slide.
   ///
   /// `RouteType.custom` rather than a per-route `CustomRoute`: this is the one
   /// place the transition is declared, so no screen can be pushed with a
   /// different one by omission.
   ///
-  /// `EvaMotion.screen`, not a new `screenDuration` — `06-navigation.md` §8 names
-  /// `EvaMotion.screenDuration`, which does not exist and must not:
-  /// `EvaMotion.screen` is already 250ms and is §5.3's `screen` token, so a
-  /// second constant would be the same number twice. `EvaMotion.fadeSlide`
-  /// carries the same reasoning for the curve.
+  /// ## THE ONE BUILDER, AND WHY IT COVERS BOTH DIRECTIONS
   ///
-  /// ## WHY `reverseDuration` IS STATED RATHER THAN INHERITED
+  /// The prototype has **two** route poses — `gone-left`
+  /// (`eva/redesign.html:129`, `translateX(-28%) scale(.96)`) and `gone-right`
+  /// (`:130`, `translateX(38%) scale(.98)`) — and uses the first for the route a
+  /// push covers and the second for the route a pop covers. **A single
+  /// transitions builder reproduces both**, because the two poses are the same
+  /// two poses used in opposite directions: the *enter* pose is `gone-right`
+  /// and the *exit* pose is `gone-left`, and a pop runs the same animations
+  /// backwards. `EvaMotion.goneSlide`'s doc says the arithmetic.
   ///
-  /// Leaving it out does not mean "the pop runs at the push's duration". auto_route
-  /// resolves it on the live path for a custom route —
-  /// `reverseTransitionDuration => routeType.reverseDuration ?? const
-  /// Duration(milliseconds: 300)` (`auto_route_page.dart:231`, on
-  /// `_CustomPageRouteTransitionMixin`) — so an unset `reverseDuration` is a
-  /// literal **300ms** that appears in no motion table in `03-design-system.md`
-  /// §5.3. The push would have been the `screen` token and the pop a framework
-  /// default, which is the shape of defect nobody catches in review because the
-  /// direction that was not looked at is the direction nobody performs.
+  /// ## THE DURATION AND THE CURVE ARE THE PROTOTYPE'S
   ///
-  /// Back navigation is also the direction a reader feels most, because it is the
-  /// one they chose rather than the one the app did to them. §5.3 gives `screen`
-  /// as "a screen-level transition", which does not distinguish the two directions,
-  /// so the honest reading is that both run the same token.
+  /// `EvaMotion.routeTransition` is 400ms — `redesign.html:128`'s
+  /// `transition:transform .4s var(--e-light),opacity .4s var(--e-light)` — and
+  /// `--e-light` is `cubic-bezier(.16,1,.3,1)`, which is
+  /// `EvaMotion.interactiveCurve` (`Curves.easeOutExpo`; recorded decision 134
+  /// measured it).
   ///
-  /// `06-navigation.md` §80 — §8 — omits `reverseDuration` too, so this is a plan
-  /// defect faithfully implemented rather than an oversight; the plan is not the
-  /// authority (AGENT_CONTEXT §0), and where the two disagree on a number this
-  /// file follows the motion table.
+  /// **The old `fadeSlide` and its 250ms are gone from this file** — the
+  /// redesign replaced the single fade-and-slide with the horizontal travel, and
+  /// `EvaMotion.fadeSlide` is kept only until every caller has moved.
   @override
   RouteType get defaultRouteType => RouteType.custom(
-    transitionsBuilder: EvaMotion.fadeSlide,
-    duration: EvaMotion.screen,
-    reverseDuration: EvaMotion.screen,
+    transitionsBuilder: EvaMotion.goneSlide,
+    duration: EvaMotion.routeTransition,
+    reverseDuration: EvaMotion.routeTransition,
   );
 
   /// ## THE `AutoRouteObserver` IS NOT OPTIONAL, AND IT WAS MISSING
@@ -185,6 +186,28 @@ class AppRouter extends RootStackRouter {
   /// not substituted — an observer is additive (a `NavigatorObserver` sees events,
   /// it does not own them), so replacing the list would silently un-subscribe
   /// whatever the caller installed.
+  ///
+  /// ## AND THE OBSERVER IS **ONE INSTANCE**, WHICH IT WAS NOT
+  ///
+  /// **`navigatorObservers` is a BUILDER, and auto_route calls it more than
+  /// once.** The root `Navigator` asks for its observers, and the dock shell's
+  /// `AutoTabsRouter` asks for the list it **inherits** — two calls, and the
+  /// builder that used to answer `AutoRouteObserver()` built a **new** observer
+  /// each time.
+  ///
+  /// **That broke recorded decision 41, and it broke it silently.** The observer
+  /// that watches the root navigator is not the observer the pages inside the
+  /// shell subscribe to, so the pop of the screen pushed over the shell never
+  /// reached the page underneath it: the home did not re-read on re-entry, and
+  /// neither did the journey. Two independent suites found it — the home's
+  /// (`home_navigation_test.dart`) and the journey's
+  /// (`journey_reentry_test.dart`) — each with the same measurement, and each
+  /// with the same shape of fix.
+  ///
+  /// The observer is therefore **one object, built once**, and every call to the
+  /// builder hands back that object. The route data a page subscribes under is
+  /// the **shell's** — the shell is the route that is popped — and the observer
+  /// that dispatches `didPopNext` to the shell's subscribers is this one.
   @override
   RouterConfig<UrlState> config({
     DeepLinkTransformer? deepLinkTransformer,
@@ -204,7 +227,7 @@ class AppRouter extends RootStackRouter {
     placeholder: placeholder,
     navigatorObservers: () => <NavigatorObserver>[
       ...?navigatorObservers?.call(),
-      AutoRouteObserver(),
+      _observer,
     ],
     includePrefixMatches: includePrefixMatches,
     neglectWhen: neglectWhen,
@@ -213,13 +236,27 @@ class AppRouter extends RootStackRouter {
     clipBehavior: clipBehavior,
   );
 
-  /// The eight locked routes, then the wildcard.
+  /// The seven locked routes, then the wildcard.
   ///
   /// Paths are [AppRoutes] constants, never re-spelled: `'/login'` written here
   /// and `AppRoutes.login` written there are two names for one route, and the
   /// compiler cannot see the disagreement. `AppRoutes` also documents why [home]
   /// is `'/'` rather than `''`, and why [AppRoutes.fallback] is the bare `'*'`
   /// sentinel with no leading slash.
+  ///
+  /// ## THE DOCK SHELL OWNS THE ROOT, AND THE THREE TABS ARE ITS CHILDREN
+  ///
+  /// The redesign's navigation is a **five-slot dock** (`eva/redesign.html:702-708`)
+  /// and Phase 6's `AutoTabsRouter` is what makes three of those five slots real
+  /// tabs: **home, communion and journey**. The shell is the route at `'/'`, and
+  /// the three tabs are its children, so the absolute URLs are unchanged —
+  /// `/`, `/communion` and `/journey` — and a deep link to any of them lands on
+  /// the right tab.
+  ///
+  /// The other two slots are **push actions**, not tabs: "Read" opens the reader
+  /// and "Today" opens the quiz, and both are root-level routes pushed **over**
+  /// the shell, which is what hides the dock on them (`eva/redesign.html:1251` —
+  /// the dock is visible on `home`, `journey` and `board` only).
   ///
   /// ## WHAT IS AND IS NOT TRUE ABOUT THAT SENTINEL, because both halves were
   /// wrong here once
@@ -235,7 +272,7 @@ class AppRouter extends RootStackRouter {
   /// form auto_route documents and because it leaves exactly one declared path
   /// outside the slash-prefixed set, not because `'/*'` is broken.
   ///
-  /// Of the eight, `/login` is the only unguarded one: it is the app's entry point,
+  /// Of the seven, `/login` is the only unguarded one: it is the app's entry point,
   /// and a gate in front of it would redirect to itself forever. The wildcard is
   /// unguarded too, which is deliberate — an unknown path redirects to `/`, which
   /// bounces through the guard and lands on the login screen when there is no
@@ -243,27 +280,41 @@ class AppRouter extends RootStackRouter {
   @override
   List<AutoRoute> get routes => <AutoRoute>[
     AutoRoute(path: AppRoutes.login, page: LoginRoute.page),
-    AutoRoute(path: AppRoutes.home, page: HomeRoute.page, guards: _guards),
+    // The dock shell. Its own path is the root, and its three children are the
+    // real tabs — the URLs they produce are `/`, `/communion` and `/journey`.
+    AutoRoute(
+      path: AppRoutes.home,
+      page: DockShellRoute.page,
+      guards: _guards,
+      children: <AutoRoute>[
+        AutoRoute(
+          path: AppRoutes.homeTab,
+          page: HomeRoute.page,
+          guards: _guards,
+        ),
+        AutoRoute(
+          path: AppRoutes.communionTab,
+          page: CommunionRoute.page,
+          guards: _guards,
+        ),
+        AutoRoute(
+          path: AppRoutes.journeyTab,
+          page: JourneyRoute.page,
+          guards: _guards,
+        ),
+      ],
+    ),
+    // The two push actions of the dock, and the workshop. All three are root
+    // routes, so pushing one covers the shell — and the dock with it.
     AutoRoute(
       path: AppRoutes.reading,
       page: ReadingRoute.page,
       guards: _guards,
     ),
     AutoRoute(path: AppRoutes.quiz, page: QuizRoute.page, guards: _guards),
-    AutoRoute(path: AppRoutes.result, page: ResultRoute.page, guards: _guards),
     AutoRoute(
       path: AppRoutes.settings,
       page: SettingsRoute.page,
-      guards: _guards,
-    ),
-    AutoRoute(
-      path: AppRoutes.communion,
-      page: CommunionRoute.page,
-      guards: _guards,
-    ),
-    AutoRoute(
-      path: AppRoutes.journey,
-      page: JourneyRoute.page,
       guards: _guards,
     ),
     // `*` stays LAST. auto_route matches in declaration order, so moving the wildcard

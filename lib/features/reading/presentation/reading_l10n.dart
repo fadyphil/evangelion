@@ -118,9 +118,10 @@ extension ReadingStringsPhrases on AppLocalizations {
   /// animating its own height 4→14→4 px on a 0.15 s phase offset).
   ///
   /// So this client ships the control **inert**, with the reason in its
-  /// accessible name, exactly as `/login`'s two ghost pills and `/`'s SealFab
-  /// items do — a reader is told the capability is absent rather than shown an
-  /// animation that lies about audio playing. The visible label stays the
+  /// accessible name, exactly as `/login`'s two ghost pills do and as `/`'s
+  /// deleted `SealFab` items did — a reader is told the capability is absent
+  /// rather than shown an animation that lies about audio playing. The visible
+  /// label stays the
   /// prototype's own `listen` word; only the name a screen reader announces
   /// grows the suffix, so the sighted reader is not told about a build detail
   /// on every visit.

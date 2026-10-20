@@ -5,6 +5,7 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/journey/domain/journey_rings.dart';
 import 'package:evangelion/features/journey/domain/medal.dart';
 import 'package:evangelion/features/journey/domain/medal_repository.dart';
@@ -29,10 +30,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 ///
 /// The **profile**, which ADR-0001 cut for want of an endpoint and ADR-0022
 /// restored; the redesign calls it "Journey" (`eva/redesign.html:933`) and makes
-/// it a **dock tab** (`:707`). The dock is Phase 6's, so until then this screen
-/// is reached from the `SealFab` on `/` — the interim holder of the destinations
-/// Home cannot otherwise reach — and it is **pushed**, not tabbed, which is why
-/// it carries a back chevron the prototype's journey does not have.
+/// it a **dock tab** (`:707`). **Phase 6 built the dock**, so this screen is
+/// **the third tab** — reached from the dock's fifth slot, and from the
+/// journey's own app-bar controls.
 ///
 /// ## TWO DIVERGENCES THE REVIEW ASKED FOR AND THIS PAGE CARRIES
 ///
@@ -120,12 +120,15 @@ class JourneyPage extends StatelessWidget {
 
   /// What is under the column: the medals strip's own `12px` (`:410`) and the
   /// scroll's `118px` (`:157`), which is the prototype's clearance for its
-  /// dock — **a dock this client does not have yet**.
+  /// dock.
   ///
-  /// **Kept whole rather than re-derived for a dock that does not exist.**
-  /// Phase 6 replaces it with the dock's own height, and a number that is
-  /// already in the design is cheaper to swap than to justify now. `/` ships
-  /// the same number for the same reason — `HomePage.kBottomClearance`.
+  /// **The dock exists now** — Phase 6 built it, and it is 78px tall
+  /// (`eva/redesign.html:208`) — and the clearance is still **118**, because
+  /// the prototype's number is the prototype's number: it is the *scroll's
+  /// padding*, not the dock's height. The dock is 78 of those 118; the other
+  /// 40 is the space the design leaves between the last row and the dock's
+  /// top edge. `/` ships the same number for the same reason —
+  /// `HomePage.kBottomClearance`.
   static const double kBottomClearance = 130;
 
   @override
@@ -198,8 +201,21 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
     }
     _observer?.unsubscribe(this);
     _observer = observer;
-    observer.subscribe(this, context.routeData);
+    observer.subscribe(this, _watchedRouteData);
   }
+
+  /// The route data this page subscribes under.
+  ///
+  /// **The SHELL's, not this tab's** — the same rule `/` uses, and for the same
+  /// reason: the journey is a **tab** inside the dock shell, and a tab is never
+  /// popped, so its own route data would never produce a `didPopNext`. The
+  /// shell is popped when the screen pushed over it is popped, and that is the
+  /// re-entry this screen re-reads for.
+  ///
+  /// A bare tree has no shell, and there this page's own route data is the
+  /// right answer.
+  RouteData<dynamic> get _watchedRouteData =>
+      TabsRouterScope.of(context)?.controller.routeData ?? context.routeData;
 
   /// Reads everything the screen draws.
   ///
@@ -208,6 +224,21 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
   /// watches the state and not the future.
   void _load() {
     unawaited(context.read<JourneyCubit>().load());
+  }
+
+  /// Switches to the board tab.
+  ///
+  /// **The tabs router, looked up without throwing.** `TabsRouterScope.of`
+  /// returns `null` when there is no tabs router above — a page mounted bare in
+  /// a widget test — and `AutoTabsRouter.of` **asserts** in that case, which
+  /// would take the whole tree down on a tap. So the nullable lookup is the
+  /// one, and "there is no dock, so there is no board tab" is the honest
+  /// answer rather than a crash.
+  ///
+  /// The board is reachable from the dock in the app in any case (slot 3), so
+  /// this is a convenience entrance rather than the only one.
+  void _openBoard(BuildContext context) {
+    TabsRouterScope.of(context)?.controller.setActiveIndex(DockTabs.communion);
   }
 
   /// The route underneath was popped and this one is showing again.
@@ -294,8 +325,18 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
           child: Column(
             children: <Widget>[
               JourneyAppBar(
-                onBack: () => context.router.maybePop(),
-                onOpenBoard: () => context.router.pushPath(AppRoutes.communion),
+                // **The board is a TAB, so this switches tabs — and it must not
+                // push a path.** The board is the shell's second child, so a
+                // `pushPath('/communion')` would push a **second shell** with
+                // the board tab active, and the app would carry two docks.
+                //
+                // The prototype does the same thing with a different mechanism:
+                // `el('rowBoard').onclick = () => { boardEntry = 'push';
+                // push('board'); }` (`:1284`) pushes the board over the journey
+                // — and its own dock slot does `tab('board')` (`:1280`). The
+                // client has one board and one place to show it, so both
+                // entrances are the tab switch.
+                onOpenBoard: () => _openBoard(context),
                 onOpenSettings: () =>
                     context.router.pushPath(AppRoutes.settings),
               ),
@@ -313,7 +354,7 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
                 child: _content(context, state),
               ),
               // **The bottom clearance, and it is the dock's.** `:157`'s 118px is
-              // the space the redesign's dock occupies, and the dock is Phase 6's.
+              // the space the redesign's dock occupies, and the dock is here.
               // `/` already ships the same deal — `HomePage.kBottomClearance` —
               // and the divergence is recorded there; this is the same number
               // for the same reason. See [JourneyPage.kBottomClearance].
@@ -442,7 +483,9 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
         ),
         const JourneyAccountLabel(),
         JourneyAccountRows(
-          onOpenBoard: () => context.router.pushPath(AppRoutes.communion),
+          // **The board is a tab** — see [JourneyAppBar]'s `onOpenBoard` in the
+          // app bar above, which is the same switch for the same reason.
+          onOpenBoard: () => _openBoard(context),
           onOpenSettings: () => context.router.pushPath(AppRoutes.settings),
         ),
       ],

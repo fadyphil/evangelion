@@ -16,10 +16,10 @@ import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/reading/presentation/widgets/verse_line.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -329,12 +329,25 @@ void main() {
     ]);
 
     // ---------------------------------------------------------------------------
-    matrix('/result', <Mount>[
+    //
+    // ## THE RESULT IS **A MODAL OVER THE QUIZ**, NOT A SCREEN
+    //
+    // `/result` retired to a modal in Phase 6, so there is no longer a result
+    // *screen* to put in the viewport matrix. **The card** is what the matrix
+    // still has a claim about — it is a surface with its own width, its own
+    // padding and its own content, and it is the thing that has to fit.
+    //
+    // The matrix's arm is therefore the card over the surface, which is what
+    // `pumpResult` mounts. **The card's own scale-in is the one animation
+    // here**, and it is a transform rather than a layout, so the box the
+    // matrix measures is the box the card settles into.
+    // ---------------------------------------------------------------------------
+    matrix('the result card', <Mount>[
       (
         state: 'the finished reading',
         pump: (WidgetTester tester) =>
             pumpResult(tester, result: _aResult, size: _currentSurface),
-        landmark: find.byType(ResultPage),
+        landmark: find.byType(ResultSheet),
       ),
       (
         state: 'the ARABIC arm, with Arabic-Indic numerals in every number',
@@ -344,7 +357,7 @@ void main() {
           locale: const Locale('ar'),
           size: _currentSurface,
         ),
-        landmark: find.byType(ResultPage),
+        landmark: find.byType(ResultSheet),
       ),
     ]);
 

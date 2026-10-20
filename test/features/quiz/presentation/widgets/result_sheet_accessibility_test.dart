@@ -1,6 +1,6 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
-import 'package:evangelion/features/result/presentation/result_l10n.dart';
+import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
@@ -10,32 +10,40 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../../support/design_system_harness.dart';
 import '../../../../support/quiz_harness.dart';
 
-/// §14 for `/result`: no unlabeled interactive node, and no state carried by colour alone.
+/// §14 for the result **card**: no unlabeled interactive node, and no state
+/// carried by colour alone.
 ///
 /// ## WHY THIS FILE EXISTS
 ///
 /// `09-quality-gates.md` §14's target is "all 6 pages pass a semantics sweep with no
 /// unlabeled interactive node". `login`, `/`, `/reading` and (as of Phase 10) `/quiz`
 /// have a `*_accessibility_test.dart` whose first group is that sweep over the page's
-/// whole semantics tree. `/result` had **no** such file after Phase 9 — so four of six
+/// whole semantics tree. The result had **no** such file after Phase 9 — so four of six
 /// pages, and the sentence could not be claimed for the app.
 ///
-/// `result_page_test.dart` does assert semantics: that the burst is decorative, that
+/// `result_sheet_test.dart` does assert semantics: that the burst is decorative, that
 /// the flame is not named twice, and that both buttons are live. None of those is the
 /// sweep, and none of them can become it — they each look at one node the test already
 /// knows about, which is the hand-written-list shape `login_accessibility_test.dart`
 /// records as the thing that has to be extended by hand whenever a widget changes.
 ///
-/// ## AND `/result` HAS A PROPERTY THAT MAKES THE SWEEP WORTH HAVING
+/// ## AND THE CARD HAS A PROPERTY THAT MAKES THE SWEEP WORTH HAVING
 ///
-/// It is the **one screen with no state machine**. `SubmitResult` is a required
+/// It is the **one surface with no state machine**. `SubmitResult` is a required
 /// constructor parameter, so there is no loading, no failure, no empty state and no
-/// disabled control to sweep — `ResultPage`'s doc says so and says why. That means the
+/// disabled control to sweep — `ResultSheet`'s doc says so and says why. That means the
 /// whole of §14's surface here is *two buttons and some numbers*, and the sweep's value
 /// is that it will say so the first time a third control appears without a name. The
 /// test below asserts the count as well as the names precisely so that adding a control
 /// is a deliberate act rather than an accident: a fourth `EvaButton` with no label
 /// would still pass "every tappable is named", and fail "there are exactly two".
+///
+/// ## AND IT IS THE **CARD**, NOT A PAGE — SO THE SWEEP IS OVER A DIALOG'S CHILD
+///
+/// The result is a modal over the quiz (Phase 6.2), so this file sweeps the card the
+/// dialog carries. The **barrier** is the dialog's, and the barrier is the one
+/// control the card does not own: it is named by `MaterialLocalizations` and the
+/// quiz's own suite is where the dialog is exercised.
 void main() {
   final AppLocalizations strings = AppLocalizationsEn();
 
@@ -74,7 +82,7 @@ void main() {
         tappable,
         isNotEmpty,
         reason:
-            'the screen has two buttons; an empty list means the walk saw '
+            'the card has two buttons; an empty list means the walk saw '
             'nothing, which would make the loop below vacuously true',
       );
       for (final SemanticsData node in tappable) {
@@ -91,7 +99,7 @@ void main() {
         tappable,
         hasLength(2),
         reason:
-            'and there are exactly **two**. `/result` has no state machine — '
+            'and there are exactly **two**. The card has no state machine — '
             '`SubmitResult` is a required constructor parameter — so every control on '
             'it is one of the two CTAs. A third `EvaButton` with a name would still '
             'pass the sweep above, so this is what makes adding one deliberate.',
@@ -108,7 +116,7 @@ void main() {
 
       expect(find.bySemanticsLabel(strings.resultReflectAgain), findsOneWidget);
       expect(find.bySemanticsLabel(strings.resultBackHome), findsOneWidget);
-      // `result_page_test.dart` records the transcription: the prototype's label was
+      // `result_sheet_test.dart` records the transcription: the prototype's label was
       // `Back to library` and there IS no library (§2 decision 1 cut it), so the
       // label names where the button actually goes. Asserted here as well as there
       // because this is the file that owns "every control on this screen is named".
@@ -198,7 +206,7 @@ void main() {
             'here',
       );
 
-      // The flame is decorative and `result_page_test.dart` holds that; re-asserted
+      // The flame is decorative and `result_sheet_test.dart` holds that; re-asserted
       // here because the sweep is the file that claims nothing on this screen is
       // missed, and a second unlabelled node would be invisible to a name check.
       expect(find.byType(StreakFlame), findsOneWidget);

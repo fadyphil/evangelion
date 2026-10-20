@@ -163,8 +163,8 @@ final class StreakSummary with _$StreakSummary {
   /// **recorded in AGENT_CONTEXT §5** as Phase 8's `StreakPill` input, they are
   /// on this payload today, and discarding them would mean a second request to
   /// draw a pill this object could already carry. The cheaper alternative —
-  /// adding them in Phase 8 — would need a *wider* projection of the same payload
-  /// later, and this one is already the projection of this endpoint.
+  /// adding them in Phase 8 — would have needed a *wider* projection of the same
+  /// payload, and this one is already the projection of this endpoint.
   ///
   /// `/` renders neither. `home_page_test.dart` asserts no milestone text reaches
   /// the screen, so the deferred reader cannot find them already drawn.

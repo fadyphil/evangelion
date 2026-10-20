@@ -418,10 +418,9 @@ JourneyHarness journeyHarness({
 
 /// Registers [cubit] in the locator, so a **routed** page resolves it.
 ///
-/// `/journey` is pushed by path — `home_page.dart`'s dial item and the
-/// journey's own app bar both call `pushPath(AppRoutes.journey)` — and a path
-/// carries no arguments. So the page falls back to `getIt<JourneyCubit>()`, and
-/// the locator is where that has to be.
+/// `/journey` is reached by path — the dock's journey slot and a deep link both
+/// land on it — and a path carries no arguments. So the page falls back to
+/// `getIt<JourneyCubit>()`, and the locator is where that has to be.
 void registerJourneyCubit(JourneyCubit cubit) {
   getIt.registerSingleton<JourneyCubit>(cubit);
   addTearDown(() => getIt.unregister<JourneyCubit>());
@@ -445,25 +444,48 @@ Future<void> settleJourney(WidgetTester tester) async {
 ///
 /// ## WHY THE REAL ROUTER AND NOT A `MaterialApp`
 ///
-/// The page navigates: the two live account rows push `/communion` and
-/// `/settings`, and the back chevron pops. `evaPrimitiveHarness` has no
-/// `Router` in it, so `context.router` inside those callbacks would throw on
-/// the tap — and a suite that could not tap the controls it is about would be
-/// asserting about a screen no reader ever reaches.
+/// The page navigates: the live account rows open the board and the workshop,
+/// and the board is a **tab** of the dock shell, so that row's control is a
+/// **tab switch** rather than a push. `evaPrimitiveHarness` has no `Router` in
+/// it, so `context.router` inside those callbacks would throw on the tap — and
+/// a suite that could not tap the controls it is about would be asserting about
+/// a screen no reader ever reaches.
 ///
 /// **And a mock router would prove nothing about the route names.** The
 /// failure mode this arrangement exists to catch is a route *name* that nothing
 /// answers: `pushPath` on an unknown path throws several frames later, in a
-/// suite about something else. The real `AppRouter` answers `/communion` and
+/// suite about something else. The real `AppRouter` answers `/journey` and
 /// `/settings`, and the assertion is on the **stack** rather than on
 /// `currentPath` — `home_navigation_test.dart` gives the measurement for why.
 ///
-/// ## AND WHY THE STACK STARTS AT `/`
+/// ## AND HOW THE JOURNEY **TAB** IS SELECTED
 ///
-/// The router's initial deep link is `Navigator.defaultRouteName` — `'/'` — so
-/// the stack is `[HomeRoute]` and the journey is **pushed** on top of it. That
-/// matters for the chevron: a screen with nothing underneath it has nothing to
-/// pop back to, and `maybePop()` on a one-route stack does nothing at all.
+/// `/journey` is a **tab** of the dock shell — `DockTabs.journey` is the third
+/// of the shell's three — so the reader is put **on that tab** rather than on a
+/// pushed screen. The journey is no longer pushed over `/` and it has no back
+/// chevron: the prototype's journey is a dock tab too, and its app bar carries
+/// a 68px spacer where the chevron would be (`eva/redesign.html:578`).
+///
+/// **The stack is emptied first, and `/journey` is then the FIRST navigation
+/// onto it.** That order is the only one that works, and the reason is
+/// measured, not reasoned:
+///
+/// * `pushPath('/journey')` onto a stack that already holds the shell pushes a
+///   **second shell** — the board and the journey are the shell's *children*,
+///   so a path push builds a whole new shell — and that second shell's own
+///   tabs router starts on the **home** tab, so the journey is never on
+///   screen and the app carries two docks;
+/// * `replacePath('/journey')` replaces the shell, and the replacement's tabs
+///   router lands on the home tab as well;
+/// * switching the tab on the existing shell does work, but it needs the tabs
+///   router, and the tabs router is only reachable from **inside** the tree.
+///
+/// So the harness pops the shell and then pushes `/journey` onto the empty
+/// stack: the shell is built **once**, with the journey as its initial child,
+/// and the tabs router's pending-children mechanism selects the journey tab.
+/// **This is the arrangement a deep link produces** — auto_route's delegate
+/// answers a deep link with `navigatePath`, and a `/journey` deep link lands on
+/// the journey tab of a single shell, measured the same way.
 Future<AppRouter> pumpJourney(
   WidgetTester tester,
   JourneyHarness harness, {
@@ -482,6 +504,13 @@ Future<AppRouter> pumpJourney(
 
   await tester.pumpWidget(routerHost(router, locale: locale));
   await pumpUntilFound(tester, find.byType(HomePage));
+
+  // **The stack is emptied, and this is the step that makes the push below
+  // mean what it says.** The router's initial deep link is
+  // `Navigator.defaultRouteName` — `'/'` — so the stack holds the shell, and
+  // the shell's home tab is on screen.
+  router.pop();
+  await pumpUntilGone(tester, find.byType(HomePage));
 
   // **Not awaited.** `pushPath` returns the pushed route's *result* — a future
   // that completes when the route is **popped** — so awaiting it here would

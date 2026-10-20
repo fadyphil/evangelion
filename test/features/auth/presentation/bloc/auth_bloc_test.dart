@@ -576,8 +576,9 @@ void main() {
     // there is no session.
     //
     // Reachable today only through the bloc, because `AuthSignedOut` is dispatched
-    // nowhere in `lib/` — the event exists for the sign-out control Phase 9 adds. So
-    // this is pinned now, while the answer is cheap, rather than discovered then.
+    // nowhere in `lib/` — the event exists for the sign-out control that **still
+    // has not landed**. So this is pinned now, while the answer is cheap, rather
+    // than discovered then.
     //
     // Without the fix, measured: `signOut` runs **once**, the bloc emits
     // `signedOut`, and then the pending sign-in resolves and overwrites it with

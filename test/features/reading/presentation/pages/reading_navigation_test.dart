@@ -72,8 +72,10 @@ void main() {
 
     expect(
       mounted.router.stack.last.name,
-      'HomeRoute',
-      reason: 'the reader is gone and `/` is on top',
+      'DockShellRoute',
+      reason:
+          'the reader is gone and `/` is on top — **and `/` is the dock shell '
+          'now**, with the home tab inside it, so the stack names the shell',
     );
   });
 

@@ -149,21 +149,25 @@
   "@leaderboardRowSemantics": {
     "description": "Placeholder types are declared in the EN file only; gen-l10n reads them from there for both locales. This entry exists so the ARB pair stays symmetrical."
   },
-  "sealFabOpen": "افتح القائمة",
-  "@sealFabOpen": {
-    "description": "`ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is."
+  "dockHome": "الرئيسية",
+  "@dockHome": {
+    "description": "`eva/redesign.html:931` — `dockHome:[\"Home\",\"الرئيسية\"]`, the first of the five slots of the redesign's dock (`:702-708`). It is the label under the house glyph, and the slot is the **first tab**: `/` is the shell's own path and the home tab is its first child."
   },
-  "sealFabClose": "أغلق القائمة",
-  "@sealFabClose": {
-    "description": "The same trigger while the dial is open. A toggling button needs two names, or the announcement describes the current state and not the action — which is the defect `SegmentedControl` shipped with."
+  "dockRead": "اقرأ",
+  "@dockRead": {
+    "description": "`eva/redesign.html:931` — `dockRead:[\"Read\",\"اقرأ\"]`, the second slot of the redesign's dock (`:704`). **It is not a tab**: the prototype's own click handler (`:1277`) opens the reader rather than switching, and the client's second slot is a push action that opens `/reading` over the shell."
   },
-  "sealFabSettings": "الإعدادات",
-  "@sealFabSettings": {
-    "description": "A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away."
+  "dockToday": "اليوم",
+  "@dockToday": {
+    "description": "`eva/redesign.html:931` — `dockToday:[\"Today\",\"اليوم\"]`, the third slot of the redesign's dock (`:705`). **It is not a tab either**: the handler (`:1278`) pops the orb and opens the quiz, and the client's third slot is a push action that opens `/quiz` over the shell. The slot's glyph is the prototype's `✦` orb."
   },
-  "sealFabLeaderboard": "الشركة",
-  "@sealFabLeaderboard": {
-    "description": "A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and `/leaderboard` is the only prototype destination with no other entry point on `/`."
+  "dockBoard": "الشركة",
+  "@dockBoard": {
+    "description": "`eva/redesign.html:932` — `dockBoard:[\"Communion\",\"الشركة\"]`, the **fourth** slot of the redesign's dock (`:706`) and the **second** of the client's three real tabs. The word is the redesign's own, and it is the same word as the screen's title (`:615`'s `boardT`); the prototype's journey calls the same screen \"The Communion\" at `:939`'s `rowBoard`."
+  },
+  "dockJourney": "الرحلة",
+  "@dockJourney": {
+    "description": "`eva/redesign.html:931` — `dockJourney:[\"Journey\",\"الرحلة\"]`, the **fifth** slot of the redesign's dock (`:707`) and the **third** of the client's real tabs. **The prototype carries the same word twice** — `journey:[\"Journey\",\"الرحلة\"]` at `:933` is the screen's own title — and the client keeps both keys for the same reason: the dock's slot and the screen's heading are two different surfaces."
   },
   "readingVerses": "آيات",
   "@readingVerses": {

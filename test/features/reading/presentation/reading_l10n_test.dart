@@ -314,7 +314,7 @@ void main() {
       // whole of the prototype's listen behaviour and `speechSynthesis`,
       // `AudioContext`, `new Audio` and `.play()` appear **zero** times in the
       // file. So the name a screen reader hears carries the reason, exactly as
-      // `/login`'s two ghost pills and `/`'s SealFab items do.
+      // `/login`'s two ghost pills do, and `/`'s deleted `SealFab` items did.
       expect(
         en.listeningUnavailable(en.readingUnavailableSuffix),
         'listen — unavailable in this build',

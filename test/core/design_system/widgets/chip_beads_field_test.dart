@@ -8,7 +8,7 @@ import '../../../support/design_system_harness.dart';
 /// [EvaTextField] — the two whose TDD-able logic already has its own group in
 /// `progress_beads_test.dart` / `eva_text_field_test.dart`.
 ///
-/// The filename keeps "chip" from when this file also covered [EvaChip]. That
+/// The filename keeps "chip" from when this file also covered `EvaChip`. That
 /// widget was deleted: its only two call sites in the prototype were the passage
 /// library, cut by AGENT_CONTEXT section 2 decision 1, and the other three pill
 /// styles were marked "do not port" by defect #12. The name is left alone rather

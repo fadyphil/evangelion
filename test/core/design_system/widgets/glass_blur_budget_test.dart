@@ -5,7 +5,7 @@
 /// actually blur. Every one of the eight is a `saveLayer` plus a full read-back
 /// of everything painted behind it, **per frame**.
 ///
-/// ## THE CEILING FOR `lib/features/` MOVED FROM 2 TO 1 IN PHASE 6
+/// ## THE CEILING FOR `lib/features/` IS **TWO**, AND THE SECOND IS THE DOCK
 ///
 /// §13 rule 4's per-screen line said "`/`: `.blur` on the today's-reading panel
 /// **and the top bar**", and this file's doc repeated it. **Both were wrong.**
@@ -13,13 +13,32 @@
 /// the prototype's top bar is a transparent `div` over the animated background, and
 /// that is deliberate.
 ///
-/// So the shipped budget on `/` is one site, and a ceiling of 2 would have let a
-/// second blur through with nothing red. Home now spends exactly 1 and this gate
-/// fails at 2, which is the whole of what a ceiling is for.
+/// So the shipped budget on `/` is one site, and the ceiling was 1 — which is
+/// what caught a second blur with nothing red. **Phase 6 of the Lumen
+/// redesign raised it to two, and the second site is named: the redesign's own
+/// dock** (`eva/redesign.html:210` — `backdrop-filter:blur(22px)`).
+///
+/// **The dock is ONE `BackdropFilter` for three tabs**, because the shell that
+/// hosts them is one widget — not three, which is what a per-tab dock would
+/// have cost.
 ///
 /// The inventory it is derived from did **not** change: eight prototype sites, of
 /// which six survive in `ds.tsx` after `PassageCard` is cut with the library, plus
 /// two inline (the Login form and Home's panel) = 8.
+///
+/// ## THE COUNT IS OF **SITES**, NOT OF LINES, AND THAT IS NOT A DETAIL
+///
+/// A blur site has **two spellings** — `GlassTier.blur`, the design system's own
+/// way of asking for one, and a hand-built `BackdropFilter` — and the redesign's
+/// dock is the second, because `GlassSurface` paints a *panel* and the dock is a
+/// full-width bar. A count that read only the enum would have been **blind to
+/// it**, and a count of *lines* would have read the dock's one site as two
+/// (`BackdropFilter(` on one line, `ImageFilter.blur(` on the next) and charged
+/// the budget for a blur that does not exist.
+///
+/// So the count is of sites, of both spellings, and **the dock's site is charged
+/// to the budget like any other** — the exception is about the *shape*, not
+/// about escaping the count.
 ///
 /// ## WHY A SOURCE SCAN AND NOT A RUNTIME COUNT
 ///
@@ -35,14 +54,17 @@
 /// true and is also the thing that is not a gate: a reviewer has to notice,
 /// count, and remember the number. This walks the files instead.
 ///
-/// ## THE ONE ALLOWED SITE
+/// ## THE TWO ALLOWED SITES
 ///
 /// | site | why |
 /// | --- | --- |
 /// | `/` (Home) — today's-reading panel | it sits directly over the animated background and is expected to let it show through |
+/// | the **dock** — the redesign's five-slot bar | the prototype's own `backdrop-filter:blur(22px)` (`:210`), and **one** filter for three tabs |
 ///
-/// It is `GlassSurface(tier: GlassTier.blur)` and it exists. The count is 1 and the
-/// ceiling is 1, so the second is red — which is the point.
+/// The first is `GlassSurface(tier: GlassTier.blur)`. The second builds its own
+/// filter, because `GlassSurface` paints a *panel* and the dock is a bar — see
+/// the third test below for the exception and what it does **not** buy. The
+/// count is 2 and the ceiling is 2, so the third is red — which is the point.
 ///
 /// Everything else is `GlassTier.tint`: a translucent fill, a hairline rim and the
 /// ambient shadow, with no `saveLayer` at all.
@@ -182,7 +204,8 @@ List<File> _dartFilesUnder(String root) {
   return files;
 }
 
-/// Every executable line in [files] mentioning [marker], as `file:line: text`.
+/// Every executable line in [files] mentioning any of [markers], as
+/// `file:line: text`.
 ///
 /// Comments are skipped: a doc comment naming the enum is where a reader learns
 /// the budget, not a call site spending it. `readAsLinesSync` throws on an
@@ -202,12 +225,45 @@ List<String> _sitesMentioning(List<File> files, String marker) {
   return hits;
 }
 
+/// Every **blur site** in [files], counted as sites and not as lines.
+///
+/// A site is a `GlassTier.blur` — the design system's own way of asking for a
+/// blur — **or** a `BackdropFilter(`, which is the widget that spends it. The
+/// count is of **sites**, and that is not a detail: the redesign's dock spells
+/// its one site over two lines (`BackdropFilter(` on one, `ImageFilter.blur(`
+/// on the next), and a count of *lines* would read that one site as two and
+/// charge the budget for a blur that does not exist.
+///
+/// **The count is of occurrences, not of lines**, and that is the second half
+/// of the same point: a line that mentions the enum twice is still one line
+/// but could be two sites, and the budget is about sites.
+List<String> _blurSites(List<File> files) {
+  final List<String> hits = <String>[];
+  for (final File file in files) {
+    final List<String> lines = file.readAsLinesSync();
+    for (int i = 0; i < lines.length; i++) {
+      final String trimmed = lines[i].trimLeft();
+      if (trimmed.startsWith('///') || trimmed.startsWith('//')) continue;
+      final int onThisLine = _sitePattern.allMatches(lines[i]).length;
+      for (int n = 0; n < onThisLine; n++) {
+        hits.add('${packageRelative(file.uri)}:${i + 1}: ${lines[i].trim()}');
+      }
+    }
+  }
+  return hits;
+}
+
+/// The two spellings of "this line spends a blur".
+///
+/// `ImageFilter.blur` alone is **not** one: a filter that is built and never
+/// applied costs nothing, and the redesign's dock's `ImageFilter.blur(` sits
+/// under the `BackdropFilter(` that applies it.
+final RegExp _sitePattern = RegExp(r'GlassTier\.blur\b|BackdropFilter\s*\(');
+
 void main() {
-  test('at most ONE screen site blurs — §13.4 spends one of eight', () {
-    final List<String> features = _sitesMentioning(
-      _dartFilesUnder(_features),
-      'GlassTier.blur',
-    );
+  test('at most TWO screen sites blur — §13.4 spends one of eight, and the '
+      'redesign\'s dock is the second', () {
+    final List<String> features = _blurSites(_dartFilesUnder(_features));
     // **The owner is excluded, and the rest of the directory is at ZERO.** While
     // GlassSurface decided the blur in one line, a directory count of 1 was a
     // proxy for "no primitive decides"; Phase 5.2 gave the budgeted site its wash
@@ -215,22 +271,24 @@ void main() {
     // owner legitimately holds two internal comparisons and the proxy broke.
     // Excluding `glass_surface.dart` and requiring zero elsewhere is *stronger*
     // for every primitive than the count it replaces.
-    final List<String> widgets = _sitesMentioning(
+    final List<String> widgets = _blurSites(
       _dartFilesUnder(_widgets)
           .where((File file) => !file.uri.path.endsWith('glass_surface.dart'))
           .toList(),
-      'GlassTier.blur',
     );
 
     expect(
       features,
-      hasLength(lessThanOrEqualTo(1)),
+      hasLength(lessThanOrEqualTo(2)),
       reason:
           "§13.4 budgets ONE blur site across the six screens — Home's "
-          "today's-reading panel, and nothing else — and lists eight prototype "
-          'sites that would each be a per-frame saveLayer. The top bar is NOT the '
-          'second: `ds.tsx:499-530` has no `backdropFilter` in it. The over-budget '
-          'sites:\n${features.join('\n')}',
+          "today's-reading panel — and lists eight prototype sites that would "
+          'each be a per-frame saveLayer. The top bar is NOT the second: '
+          '`ds.tsx:499-530` has no `backdropFilter` in it. **Phase 6 added the '
+          "second**: the redesign's own dock blurs (`eva/redesign.html:210` — "
+          '`backdrop-filter:blur(22px)`), and it is **one** `BackdropFilter` for '
+          'three tabs rather than three. The over-budget sites:\n'
+          '${features.join('\n')}',
     );
     expect(
       widgets,
@@ -240,20 +298,22 @@ void main() {
           'it: `GlassSurface` is the widget that owns the blur, and its own two '
           'comparisons (the blur decision and, since Phase 5.2, the bloom '
           'decision) are its implementation rather than spendings. Any OTHER file '
-          'under `lib/core/design_system/widgets/` naming `GlassTier.blur` is a '
-          'primitive deciding for itself:\n${widgets.join('\n')}',
+          'under `lib/core/design_system/widgets/` naming `GlassTier.blur` — or '
+          'building a `BackdropFilter` by hand — is a primitive deciding for '
+          'itself:\n${widgets.join('\n')}',
     );
     // The ceiling the rule states, over both directories together. Two separate
     // per-directory bounds would let a third site through by arithmetic, so the
     // global figure is asserted as well as the two that make it up — and it is
-    // 1 + 0 now, because the owner's comparisons are not budget spenders.
+    // 2 + 0 now, because the owner's comparisons are not budget spenders.
     expect(
       features.length + widgets.length,
-      lessThanOrEqualTo(1 + 0),
+      lessThanOrEqualTo(2 + 0),
       reason:
-          '§13.4 budgets ONE screen site. The design-system occurrences are '
-          "GlassSurface's own decisions, not sites, and the two together are the "
-          'whole of what exists:\n${[...features, ...widgets].join('\n')}',
+          '§13.4 budgets ONE screen site and the redesign\'s dock is the second. '
+          "The design-system occurrences are GlassSurface's own decisions, not "
+          'sites, and the two together are the whole of what exists:\n'
+          '${[...features, ...widgets].join('\n')}',
     );
   });
 
@@ -262,18 +322,25 @@ void main() {
     // the reason it was widened cannot be quietly forgotten: `StatTile` is a
     // primitive, `tier: GlassTier.blur` is the exact line that would have gone
     // unnoticed, and it is in `lib/core/design_system/widgets/`.
-    final List<String> hits = _sitesMentioning(
-      _dartFilesUnder(_widgets),
-      'tier: GlassTier.blur',
+    //
+    // **And a hand-built `BackdropFilter` is the same blind spot with the other
+    // spelling** — which is how the redesign's dock found it. A primitive that
+    // builds its own filter spends the budget without the enum ever appearing.
+    final List<String> hits = _blurSites(
+      _dartFilesUnder(_widgets)
+          .where((File file) => !file.uri.path.endsWith('glass_surface.dart'))
+          .toList(),
     );
     expect(
       hits,
       isEmpty,
       reason:
           '§13.4 — a `GlassTier.blur` in the design system is a per-frame '
-          "saveLayer with no screen behind it to justify the budget. Only Home's "
-          "today's-reading panel may blur — the top bar is NOT a second one, "
-          "because `ds.tsx:499-530` has no `backdropFilter` in it:\n${hits.join('\n')}",
+          'saveLayer with no screen behind it to justify the budget, and a '
+          'hand-built `BackdropFilter` is the same spend with a different '
+          "spelling. Only Home's today's-reading panel and the redesign's dock "
+          'may blur — the top bar is NOT a second one, because `ds.tsx:499-530` '
+          "has no `backdropFilter` in it:\n${hits.join('\n')}",
     );
   });
 
@@ -281,19 +348,48 @@ void main() {
     // The obvious way to defeat the scan above is to stop naming the enum and
     // build a `BackdropFilter` directly. `GlassSurface` owns the widget, so a
     // feature that needs a blur goes through the enum; this asserts the second
-    // spelling is absent too, so the scan has to be honoured rather than worked
-    // around. A hand-built `BackdropFilter` is the same per-frame `saveLayer`
-    // with no budget attached to it.
+    // spelling is accounted for too, so the scan has to be honoured rather than
+    // worked around. A hand-built `BackdropFilter` is the same per-frame
+    // `saveLayer` with no budget attached to it.
+    //
+    // **AND THE REDESIGN'S DOCK IS THE ONE NAMED EXCEPTION — and the exception
+    // is about the SHAPE, not about the budget.** `GlassSurface` paints a
+    // *panel*: a fill, a rim and a shadow, with one radius on all four corners.
+    // The dock is a full-width **bar** with its own alpha (0.86 dark, 0.74
+    // light), a hairline on its **top** edge only, a radius on its **top** two
+    // corners only, and the prototype's own 22px blur radius — none of which
+    // `GlassSurface` can express. So the dock builds its own filter.
+    //
+    // **What the exception does NOT do is escape the budget.** The count above
+    // is of **sites** and it counts *both* spellings, so the dock's one site is
+    // charged to the budget like any other, and a third site is still red. The
+    // rule this test states is therefore the one that is actually true: **every
+    // blur a feature spends is visible to the budget, and exactly one feature
+    // spends one outside the enum.**
     final List<String> featureDirect = <String>[
       ..._sitesMentioning(_dartFilesUnder(_features), 'BackdropFilter'),
       ..._sitesMentioning(_dartFilesUnder(_features), 'ImageFilter.blur'),
     ]..sort();
     expect(
       featureDirect,
-      isEmpty,
+      isNotEmpty,
       reason:
-          'a feature must reach the blur through GlassTier.blur, which is what '
-          'the budget above counts:\n${featureDirect.join('\n')}',
+          "the redesign's dock builds its own filter — `GlassSurface` paints a "
+          'panel and the dock is a full-width bar. If this is empty the dock has '
+          'been restructured and this allowance needs rewriting rather than '
+          'passing silently',
+    );
+    expect(
+      featureDirect.every(
+        (String hit) =>
+            hit.startsWith('lib/features/dock/presentation/widgets/'),
+      ),
+      isTrue,
+      reason:
+          '**exactly one** feature may build a direct filter, and it is the '
+          "redesign's dock. Every other feature must reach the blur through "
+          'GlassTier.blur, which is what the budget above counts:\n'
+          '${featureDirect.join('\n')}',
     );
 
     // And in the design system, the one `BackdropFilter` in the tree is inside

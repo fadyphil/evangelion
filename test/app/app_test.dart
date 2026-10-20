@@ -21,7 +21,7 @@ MaterialApp _materialAppIn(WidgetTester tester) =>
 ///
 /// ANCHORED ON THE `Navigator`, AND THAT IS LOAD-BEARING. It was anchored on
 /// `LoginPage` until this revision, which made six localisation assertions
-/// depend on `home:` staying `LoginPage`. Phase 4 replaces `home:` with the
+/// depend on `home:` staying `LoginPage`. Phase 4 replaced `home:` with the
 /// router — the whole point of that phase — and the failure would not have been
 /// `Expected: rtl / Actual: ltr`. It would have been
 ///
@@ -299,12 +299,12 @@ void main() {
       WidgetTester tester,
     ) async {
       // Not `ThemeMode.system`. This design is dark by identity, and the reader's
-      // persisted setting — Phase 9's `settings_repository` — is what replaces
-      // this, so the assertion is on the current decision. Note the phase number is
+      // persisted setting — Phase 9's `settings_repository` — **replaced** this, so
+      // the assertion is on the current decision. Note the phase number is
       // **9**, not 5: an earlier draft of this comment credited Phase 5, which
       // delivered `core/network` and the `auth` feature and left the setting
-      // alone. The decision is right and the attribution was not; `app.dart` sets
-      // `ThemeMode.dark` explicitly and still does.
+      // alone. The decision is right and the attribution was not; `app.dart` reads
+      // the stored `themeMode` now, and the stored default is dark.
       await pumpApp(tester);
 
       expect(_materialAppIn(tester).themeMode, ThemeMode.dark);

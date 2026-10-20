@@ -10,8 +10,10 @@ part 'question.freezed.dart';
 /// names `ScriptureText` in a **signature**, and Dart has no way to return a type a
 /// file does not import — so the entity a port returns is a file the port reaches.
 /// §3's placement test puts a type used by one feature in that feature's `domain/`,
-/// and this file is one feature's `domain/` right now: only `/reading` reads a
-/// question, and Phase 8's `quiz` will be the second consumer that promotes it.
+/// and at the time of writing this file was one feature's `domain/`: only
+/// `/reading` read a question. **Phase 8's `quiz` is the second consumer, and it
+/// is what promoted the type** — so the entity is shared rather than owned, and it
+/// lives here.
 ///
 /// The alternative was measured rather than argued: keeping `Question` in
 /// `features/reading/domain/` and having the port return it makes
@@ -92,16 +94,20 @@ final class Question with _$Question {
   /// ## A STRING, NOT AN ENUM, AND THE REASON IS SCOPE
   ///
   /// §4 asks for exhaustive `switch` **expressions** over enums, and an enum here
-  /// would be one member with no reader: nothing in Phase 7 branches on it, and
-  /// Phase 8 is what renders a question by type. Declaring `enum QuestionType { mcq }`
-  /// today would be §3's "nothing enters speculatively" with an extra step, and the
-  /// server sending a second value would map as a **serialization failure** —
-  /// turning "a quiz type this client cannot draw" into "the reader cannot open
-  /// today's passage", which is decision 40's exact mistake.
+  /// would be one member with no reader: nothing branches on it, and the quiz
+  /// renders a question by its **options map** rather than by its type. Declaring
+  /// `enum QuestionType { mcq }` today would be §3's "nothing enters speculatively"
+  /// with an extra step, and the server sending a second value would map as a
+  /// **serialization failure** — turning "a quiz type this client cannot draw" into
+  /// "the reader cannot open today's passage", which is decision 40's exact
+  /// mistake.
   ///
   /// So the wire value is carried verbatim and the mapper accepts any `String`.
-  /// Phase 8 adds the enumeration **at the point of rendering**, where an unknown
-  /// value can become a message about the question rather than about the reading.
+  /// **The enumeration is still not rendered**: the prediction that Phase 8 would
+  /// add it "at the point of rendering" was not kept, because the redesign's quiz
+  /// draws the options map and never asks what kind of question it is. The value
+  /// is carried and unread, and the unknown-type message it was to become has
+  /// nowhere to be shown.
   final String type;
 
   /// `prompt` — the question text. Never rendered on `/reading`; see the class doc.
@@ -115,7 +121,7 @@ final class Question with _$Question {
   /// Because the wire is a map, and a list would be a re-declaration of it with
   /// the keys moved into a field of their own — so a phase that reads the options
   /// has to decide what an unexpected key means, and a phase that has not yet read
-  /// them has no business making that decision. Phase 8 owns the ordering question
+  /// them has no business making that decision. Phase 8 owned the ordering question
   /// (`sort_order` on the *options* is not in the payload at all, so the map's own
   /// insertion order is the only ordering the server states).
   final Map<String, String> options;

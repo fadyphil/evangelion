@@ -331,10 +331,11 @@ EvaButtonStyle resolveButtonStyle({
 /// [EvaRadii.button] stays at `14`. That is not timidity: `login_geometry_test`
 /// asserts `EvaRadii.button == 14` as a transcription claim against
 /// `ds.tsx:240`, and a widget that stopped being 14 without the token moving
-/// would make that harness green and false. `SocialAuthButton` draws its own box
-/// at `EvaRadii.button` and is still `login_geometry_test`'s live assertion that
-/// the token means something — so the two widgets disagreeing is a fact the
-/// harness can still see, which is the point.
+/// would make that harness green and false. The old `SocialAuthButton` drew its
+/// own box at `EvaRadii.button` and was `login_geometry_test`'s live assertion
+/// that the token means something — and the redesign's `/login` deleted that
+/// widget, so the token's live assertion is `eva_radii_test.dart`'s now. The two
+/// widgets disagreeing was a fact the harness could see, which is the point.
 const double kEvaButtonRadius = EvaRadii.chip;
 
 /// `.qnext`'s rim alpha. `redesign.html:363` — `1px solid rgba(232,176,75,.55)`.

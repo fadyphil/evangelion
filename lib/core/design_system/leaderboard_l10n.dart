@@ -15,7 +15,7 @@ import 'package:evangelion/l10n/l10n.dart';
 /// plural selects on, `digits` is what the reader sees. Spelling that out at a call
 /// site makes keeping them together the caller's job, which is the exact defect a
 /// helper exists to prevent — `reading_l10n.dart` gives the argument for `reading`.
-/// So [LeaderboardRowAnnouncement] takes the row and derives both.
+/// So the deleted `LeaderboardRowAnnouncement` took the row and derived both.
 ///
 /// ## WHY `isReader` CROSSES AS THE STRING `'$isReader'`
 ///

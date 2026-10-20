@@ -16,7 +16,8 @@
 ///    as the presence of a widget, because a suite that only asserted "there is
 ///    a rings row" would pass with every ring wrong;
 /// 3. **what the controls do** — the two live rows go where they say, the two
-///    dead ones do not go anywhere and say why, and the chevron leaves.
+///    dead ones do not go anywhere and say why, and the journey is a **tab**,
+///    so it has no chevron and the board is a tab switch rather than a push.
 ///
 /// ## THE FIXTURE IS CHOSEN, NOT INHERITED
 ///
@@ -29,17 +30,24 @@
 ///
 /// ## AND THE FINDERS ARE SCOPED
 ///
-/// The page is pushed over `/`, so the screen underneath is still in the tree.
-/// Every finder that could also match it is scoped to [JourneyPage], or the
-/// assertion would be about two screens at once.
+/// The journey is a **tab** of the dock shell, and the shell's own chrome — the
+/// five-slot dock, with its labels — stands beside it in the tree. So every
+/// finder that could also match the shell is scoped to [JourneyPage], or the
+/// assertion would be about the screen and the dock at once: the app bar's
+/// title and the dock's journey slot are the same word.
 library;
 
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/router/app_router.dart';
+// The generated `*Route` names, reached the same way `app_router.dart` reaches
+// them: through the generated library.
+import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/journey/presentation/pages/journey_page.dart';
 import 'package:evangelion/features/journey/presentation/widgets/journey_account_rows.dart';
 import 'package:evangelion/features/journey/presentation/widgets/journey_app_bar.dart';
@@ -80,11 +88,29 @@ List<String> _ringTexts(WidgetTester tester) => tester
 
 /// The journey's own subtree.
 ///
-/// **Scoped on purpose.** The page is pushed over `/`, and the home screen
-/// underneath is still in the tree with its own spinner, its own error view and
-/// its own "Try again". An unscoped finder would be about two screens at once.
+/// **Scoped on purpose.** The journey is a tab of the dock shell, and the
+/// shell's chrome stands beside it — the dock's five labels, and the app bar's
+/// title, which is the same word as the dock's journey slot. An unscoped
+/// finder would be about the screen and the shell at once.
 Finder _onJourney(Finder matching) =>
     find.descendant(of: find.byType(JourneyPage), matching: matching);
+
+/// The dock shell's **active tab**, read from the tree.
+///
+/// **The index, and not the presence of a page.** The tabs router keeps every
+/// tab's page in the tree — the inactive ones inside the `IndexedStack`'s
+/// offstage children — so "the board is on screen" is not "a `CommunionPage`
+/// exists": the journey's own page is still there after the reader moves to
+/// the board. The index is the only thing that says which screen is in front.
+///
+/// **`skipOffstage: false`, and it is load-bearing.** An inactive tab's page
+/// is offstage, and `find.byType` skips offstage widgets by default — so the
+/// default finder would find **nothing** exactly when the reader has left the
+/// journey, and the helper would throw on the very tab switch it exists to
+/// measure.
+int _activeTab(WidgetTester tester) => TabsRouterScope.of(
+  tester.element(find.byType(JourneyPage, skipOffstage: false)),
+)!.controller.activeIndex;
 
 void main() {
   group('the loading arm', () {
@@ -341,18 +367,38 @@ void main() {
   });
 
   group('the account rows', () {
-    testWidgets('the Communion row reaches /communion', (
+    testWidgets('the Communion row switches to the board tab', (
       WidgetTester tester,
     ) async {
       final AppRouter router = await pumpJourney(tester, journeyHarness());
 
       // `:605` — the row the prototype wires at `:1284`
       // (`el('rowBoard').onclick = () => { boardEntry = 'push'; push('board'); }`).
+      //
+      // ## AND THE CLIENT **SWITCHES A TAB** INSTEAD OF PUSHING A PATH
+      //
+      // The board is the shell's **second child**, so a `pushPath('/communion')`
+      // would push a **second shell** with the board tab active — and the app
+      // would carry two docks. The prototype pushes because its board is a DOM
+      // route (`push('board')`); the client has one board and one place to
+      // show it, so **both** of the client's entrances — the dock's slot 3 and
+      // this row — are the same tab switch. That is a recorded decision, not a
+      // weakening of the claim.
       await _tapRow(tester, 'The Communion');
       await pumpUntilFound(tester, find.byType(CommunionPage));
 
-      expect(router.stack.last.name, 'CommunionRoute');
+      // **The tab, and not the stack.** A tab switch does not grow the root
+      // stack — the shell is still the one route on it — so the stack would
+      // say nothing about which screen the reader is on.
+      expect(_activeTab(tester), DockTabs.communion);
       expect(find.byType(CommunionPage), findsOneWidget);
+      expect(
+        router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[DockShellRoute.name],
+        reason:
+            'one shell, and no second one: the board is a tab of it, not a '
+            'pushed route',
+      );
     });
 
     testWidgets('the Settings row reaches /settings', (
@@ -362,6 +408,10 @@ void main() {
 
       // `:606` — the row the prototype wires at `:1453`
       // (`el('rowSettings').onclick = () => push('settings')`).
+      //
+      // **A push, and not a tab.** The workshop is a root route pushed **over**
+      // the shell, which is what hides the dock on it
+      // (`eva/redesign.html:1251`).
       await _tapRow(tester, 'Settings');
       await pumpUntilFound(tester, find.byType(SettingsPage));
 
@@ -381,12 +431,12 @@ void main() {
       await _tapRow(tester, 'Share progress');
       await settleJourney(tester);
       expect(router.stack.length, before);
-      expect(router.stack.last.name, 'JourneyRoute');
+      expect(_activeTab(tester), DockTabs.journey);
 
       await _tapRow(tester, 'Reading plans');
       await settleJourney(tester);
       expect(router.stack.length, before);
-      expect(router.stack.last.name, 'JourneyRoute');
+      expect(_activeTab(tester), DockTabs.journey);
 
       // ## AND THE CONTROL, SO THE TWO ASSERTIONS ABOVE ARE NOT VACUOUS
       //
@@ -394,10 +444,14 @@ void main() {
       // "the stack did not change" would then be a statement about a tap that
       // went nowhere. So the same helper, the same scroll and the same screen
       // are used on a row that **does** navigate — and it does.
+      //
+      // **And the board is a tab, so "it navigates" is a tab switch.** The
+      // stack does not grow; the tab index moves. Asserting the index is what
+      // makes this a control rather than a second copy of the assertion above.
       await _tapRow(tester, 'The Communion');
       await pumpUntilFound(tester, find.byType(CommunionPage));
-      expect(router.stack.length, before + 1);
-      expect(router.stack.last.name, 'CommunionRoute');
+      expect(router.stack.length, before, reason: 'a tab switch, not a push');
+      expect(_activeTab(tester), DockTabs.communion);
     });
 
     testWidgets('the two dead rows say why they cannot be pressed', (
@@ -520,37 +574,52 @@ void main() {
     });
   });
 
-  group('the back chevron', () {
-    testWidgets('the chevron pops the journey', (WidgetTester tester) async {
+  group('the leading space', () {
+    testWidgets('the journey has no way back, and does not need one', (
+      WidgetTester tester,
+    ) async {
       final AppRouter router = await pumpJourney(tester, journeyHarness());
-      final int before = router.stack.length;
-      expect(router.stack.last.name, 'JourneyRoute');
 
-      // **The chevron the prototype does not have.** `:576-583` is the
-      // prototype's app bar and `:577` is a 68px spacer — the journey is a
-      // dock tab there and never needs a way back. This client **pushes** it,
-      // and a pushed screen on desktop has no system back button, so without
-      // this control there is no way out of `/journey` at all.
-      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
-      await pumpUntilGone(tester, find.byType(JourneyPage));
+      // ## THE CHEVRON IS GONE, AND THE PROTOTYPE NEVER HAD ONE
+      //
+      // `:576-583` is the prototype's app bar and `:577` is a 68px spacer — the
+      // journey is a dock tab there (`:707`) and never needed a way back. This
+      // client drew a chevron only while the journey was **pushed**, because a
+      // pushed screen on desktop has no system back button. **The journey is a
+      // tab now**, so the reason went with the control, and the prototype's
+      // spacer (`:578`) is in its place.
+      expect(
+        find.descendant(
+          of: find.byType(JourneyAppBar),
+          matching: find.byIcon(Icons.arrow_back_ios_new),
+        ),
+        findsNothing,
+      );
 
-      expect(router.stack.length, before - 1);
-      expect(find.byType(JourneyPage), findsNothing);
+      // **And the reader is on the journey TAB of the one shell** — so the tab
+      // they came from is still there, one dock slot away, and the root stack
+      // holds the shell rather than a pushed journey route.
+      expect(_activeTab(tester), DockTabs.journey);
+      expect(
+        router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[DockShellRoute.name],
+        reason:
+            'the journey is a tab of the shell, so the root stack carries the '
+            'shell and not a journey route pushed over it',
+      );
     });
   });
 
   group('the app bar', () {
-    testWidgets('names its three controls', (WidgetTester tester) async {
+    testWidgets('names its two controls, and there is no back control', (
+      WidgetTester tester,
+    ) async {
       await pumpJourney(tester, journeyHarness());
 
       final Finder bar = find.byType(JourneyAppBar);
-      // The back control, the trophy (the board) and the gear (settings).
-      expect(
-        find.descendant(of: bar, matching: find.bySemanticsLabel('Back')),
-        findsOneWidget,
-      );
-      // The two buttons carry the **rows'** strings, so a tooltip and its row
-      // cannot drift apart.
+      // The trophy (the board) and the gear (settings). **No back control** —
+      // the journey is a tab, and the prototype's journey has a 68px spacer
+      // where a chevron would be (`eva/redesign.html:578`).
       expect(
         find.descendant(
           of: bar,
@@ -562,6 +631,10 @@ void main() {
         find.descendant(of: bar, matching: find.bySemanticsLabel('Settings')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(of: bar, matching: find.bySemanticsLabel('Back')),
+        findsNothing,
+      );
       // **And the title.** `:578` — the absolutely centred `.ttl`.
       expect(_onJourney(find.text('Journey')), findsOneWidget);
     });
@@ -571,19 +644,14 @@ void main() {
     ) async {
       await pumpJourney(tester, journeyHarness());
 
-      for (final String label in <String>[
-        'Back',
-        'The Communion',
-        'Settings',
-      ]) {
+      for (final String label in <String>['The Communion', 'Settings']) {
         final Finder target = find.descendant(
           of: find.byType(JourneyAppBar),
           matching: find.bySemanticsLabel(label),
         );
-        // **A generous tab budget, and the reason is the screen underneath.**
-        // The page is pushed over `/`, and the home screen is still in the
-        // focus tree ahead of it — so the app bar's controls are not the first
-        // ones Tab reaches.
+        // **A generous tab budget, and the reason is the shell.** The shell's
+        // own chrome — the dock's five slots — is in the focus tree ahead of
+        // the app bar's controls, so they are not the first ones Tab reaches.
         await tabUntilFocused(tester, target, maxTabs: 40);
         expect(
           renderedBorders(tester, target),

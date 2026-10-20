@@ -166,14 +166,14 @@ void main() {
     });
   });
 
-  group('the fields Phase 8 will read', () {
-    test('nextMilestone and daysToMilestone are carried, unused by Phase 6', () {
+  group('the fields Phase 8 was to read', () {
+    test('nextMilestone and daysToMilestone are carried, and still unread', () {
       // These are the two values `/result`'s `StreakPill` needs. They are on the
       // entity **now**, before a consumer exists, which is §3's "nothing enters
       // `core/domain/` speculatively" pushed the other way — and the reason is
       // recorded rather than the rule being bent quietly: the raw values are
       // measured (§5) and dropping them would mean re-fetching to draw a pill
-      // this phase could already have carried. Phase 6 reads neither, and
+      // this phase could already have carried. **Nothing reads them yet**, and
       // `home_page_test.dart` asserts the panel shows no milestone, so a future
       // phase cannot find them already on screen.
       expect(live.nextMilestone, 3);

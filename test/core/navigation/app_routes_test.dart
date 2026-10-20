@@ -35,7 +35,7 @@ void main() {
   final Map<String, String> inventory = declaredRouteValues(source);
   final List<String> declared = declaredRouteNames(source);
 
-  group('the eight locked routes', () {
+  group('the seven locked routes', () {
     test('login is /login', () {
       expect(AppRoutes.login, '/login');
     });
@@ -50,10 +50,6 @@ void main() {
 
     test('quiz is /quiz', () {
       expect(AppRoutes.quiz, '/quiz');
-    });
-
-    test('result is /result', () {
-      expect(AppRoutes.result, '/result');
     });
 
     test('settings is /settings', () {
@@ -71,7 +67,7 @@ void main() {
       // not fix, so it follows `communion` rather than arriving with the seven.
       // Its value row is
       // here for the same reason as that one's: a reader who opens this file has
-      // just been told there are nine paths, and this is where each one is named.
+      // just been told there are eight paths, and this is where each one is named.
       //
       // `/servant` is **declared but not routed** — no `AutoRoute` in
       // `app_router.dart` names it, so a push to it falls through the `'*'`
@@ -106,13 +102,16 @@ void main() {
       );
     });
 
-    test('the inventory is exactly the ten declared route names', () {
+    test('the inventory is exactly the nine declared route names', () {
       expect(declared, <String>[
         'login',
         'home',
         'reading',
         'quiz',
-        'result',
+        // **No `result`.** Phase 6 turned the result into a modal
+        // (`eva/redesign.html:718-727`) and dropped its route, so the path
+        // `/result` no longer exists — the screen is reached from the quiz and
+        // from nowhere else.
         'settings',
         // Phase 1's seventh screen, **renamed in Task 5.5** from `leaderboard` to
         // `communion` — the redesign calls the board "The Communion"
@@ -122,11 +121,14 @@ void main() {
         // rather than comparing against `AppRoutes`' own members — the parser
         // exists so a **deleted** constant fails, and an inventory cannot be
         // written that avoids both halves of that trade.
+        //
+        // **And it is a TAB now** (Phase 6), not a pushed screen.
         'communion',
         // Task 5.6's eighth locked screen: the profile ADR-0001 cut and ADR-0022
         // restored, which the redesign calls "Journey" (`eva/redesign.html:933`).
-        // It is pushed rather than tabbed because the redesign's dock — the real
-        // home of the journey tab (`:707`) — is Phase 6's.
+        //
+        // **And it is a TAB now** (Phase 6), not a pushed screen — the redesign's
+        // dock (`:707`) is the real home of the journey tab.
         'journey',
         // The role mechanism's ninth, added with `core/navigation/landing_route.dart`
         // and **before** `fallback` so the wildcard stays last. This test is what
@@ -136,14 +138,29 @@ void main() {
         'servant',
         'fallback',
       ]);
-      expect(inventory, hasLength(10));
+      expect(inventory, hasLength(9));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
-      // all ten entries were real strings. It could not fail: `inventory` is a
+      // all nine entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
-      // `whereType<String>()` is the identity — it returned all ten elements
+      // `whereType<String>()` is the identity — it returned all nine elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(10)` above already implies ten strings.
+      // state, and `hasLength(9)` above already implies nine strings.
+    });
+
+    test('the three tab paths are derived, and are the relative halves', () {
+      // The three tab paths are **getters**, not `static const String`
+      // declarations, so they are not in the inventory above — and that is the
+      // point: the inventory is a list of absolute URLs, and a relative child
+      // path is not one. What is worth holding is that each one is exactly the
+      // absolute path without the root's slash, because a tab's child path is
+      // relative (auto_route rejects a child path that starts with a slash).
+      expect(AppRoutes.homeTab, AppRoutes.home.substring(1));
+      expect(AppRoutes.communionTab, AppRoutes.communion.substring(1));
+      expect(AppRoutes.journeyTab, AppRoutes.journey.substring(1));
+      expect(AppRoutes.homeTab, isEmpty);
+      expect(AppRoutes.communionTab, 'communion');
+      expect(AppRoutes.journeyTab, 'journey');
     });
   });
 

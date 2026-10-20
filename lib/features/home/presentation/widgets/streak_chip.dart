@@ -213,7 +213,7 @@ class StreakChip extends StatelessWidget {
     final String? message = failureMessage;
     if (message != null) {
       // An icon control rather than a pill with a dash in it, for
-      // [StreakFlameRow]'s reason: the message is the backend's sentence and the
+      // the deleted `StreakFlameRow`'s reason: the message is the backend's sentence and the
       // pill's job is to hold a count.
       return IconActionButton(
         icon: Icons.sync_problem_outlined,

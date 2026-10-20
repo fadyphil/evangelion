@@ -1,7 +1,7 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
-import 'package:evangelion/features/result/presentation/result_l10n.dart';
+import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
+import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
@@ -11,9 +11,18 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../../support/contract_payloads.dart';
 import '../../../../support/quiz_harness.dart';
 
-/// `/result` — and the extension of recorded decision 22 this screen is.
+/// The result **card** — and the extension of recorded decision 22 it is.
 ///
-/// ## THE STREAK ON THIS SCREEN IS **THE SUBMIT RESPONSE'S**, AND THESE TESTS ARE
+/// ## IT IS A **CARD OVER THE QUIZ**, NOT A SCREEN
+///
+/// `/result` retired to a modal in Phase 6 (the redesign's card over a veil,
+/// `eva/redesign.html:718-727`), so there is no result *page* any more. The
+/// screen's content is the client's own and it is all still here: the score,
+/// the caption, the three messages, the streak pill, the two stat tiles and the
+/// two CTAs. **What changed is the surface**, and these tests are about the
+/// content, so they moved with it.
+///
+/// ## THE STREAK ON THIS CARD IS **THE SUBMIT RESPONSE'S**, AND THESE TESTS ARE
 /// ## THE WHOLE OF THE EXTENSION
 ///
 /// §5 trap 8 measures `current_streak` appearing in **two** places and disagreeing
@@ -21,7 +30,7 @@ import '../../../../support/quiz_harness.dart';
 /// reader on the same day. Recorded decision 22 resolved that by never reconciling
 /// them — each field comes from the endpoint whose job it is.
 ///
-/// Phase 8 adds a **third** copy, on `SubmitResult`, and this screen draws it. The
+/// Phase 8 adds a **third** copy, on `SubmitResult`, and this card draws it. The
 /// reason is §5 trap 4: the streak fields only move when `reading_completed` is
 /// true, so this number was written **by the submission the reader just made**,
 /// while `/`'s two were written by a read. It is an **extension** of decision 22 and
@@ -32,12 +41,12 @@ import '../../../../support/quiz_harness.dart';
 ///
 /// The live `SubmitResult` transcription carries `current_streak: 4`, which is also
 /// `readings/today`'s value. A test asserting `find.text('4')` would therefore pass
-/// against a page reading the **wrong** field, because the two agree — the same shape
-/// recorded decision 33 found for `AppTopBar`'s wordmark, where the prototype's
-/// literal and the shipped value were the same string.
+/// against a card reading the **wrong** field, because the two agree — the same
+/// shape recorded decision 33 found for `AppTopBar`'s wordmark, where the
+/// prototype's literal and the shipped value were the same string.
 ///
-/// So the fixture is built with `77`, which is **neither** `4` nor `0`, and the tests
-/// assert the sentinel is on screen and **both** live values are not.
+/// So the fixture is built with `77`, which is **neither** `4` nor `0`, and the
+/// tests assert the sentinel is on screen and **both** live values are not.
 /// A graded answer whose numbers are **sentinels**: nothing else in this
 /// repository is `1234`, `77` or `90`.
 ///
@@ -307,8 +316,9 @@ void main() {
     });
 
     testWidgets('and both are enabled', (WidgetTester tester) async {
-      // The dead-CTA problem `/quiz` has is **not** `/result`'s: this screen is
-      // reachable only with a graded answer in hand, so there is nothing to disable.
+      // The dead-CTA problem `/quiz` has is **not** the card's: the card is
+      // built only with a graded answer in hand, so there is nothing to
+      // disable.
       await pumpResult(tester, result: aSentinelResult);
       for (final EvaButton button in tester.widgetList<EvaButton>(
         find.byType(EvaButton),
@@ -398,7 +408,7 @@ void main() {
         locale: const Locale('ar'),
       );
       expect(
-        Directionality.of(tester.element(find.byType(ResultPage))),
+        Directionality.of(tester.element(find.byType(ResultSheet))),
         TextDirection.rtl,
         reason:
             'the harness installs the direction from the locale, so a screen '
@@ -407,84 +417,78 @@ void main() {
     });
   });
 
-  group('REDUCED MOTION, WHICH `/result` COULD NOT BE ASKED ABOUT AT ALL', () {
-    // ## WHY THIS GROUP EXISTS RATHER THAN A LINE IN THE HARNESS'S DOC
+  group('REDUCED MOTION, AND THE CARD IS **OVER** THE QUIZ', () {
+    // ## WHAT CHANGED, AND WHY THE GROUP IS STILL HERE
     //
-    // `pumpResult` had no `disableAnimations` parameter, so §14's reduced-motion
-    // requirement — a standing gate on **every** screen — was unaskable here. The
-    // harness doc claimed the `pump*` family carried it uniformly and it did not.
-    // Adding the parameter is the fix; this is the test that makes it a *live*
-    // parameter rather than a second unturned knob, which is the shape §7's "a knob
-    // nothing turns" actually warns about.
-    testWidgets('the ambient background stops at the LOW tier, measured where it '
-        'is resolved', (WidgetTester tester) async {
-      // ## THE TIER IS RESOLVED WITH THIS POSITION'S OWN `MediaQuery` AND SIZE
-      //
-      // Not `NeuralTiers.resolve(size: …, animationsEnabled: false)` called with a
-      // literal — that would assert the pure function against itself and pass even if
-      // `NeuralBackground` stopped reading the `MediaQuery`. The arguments are read
-      // off the mounted tree at the `NeuralBackground` element, so this fails if the
-      // flag stops reaching the widget that uses it.
-      await pumpResult(
-        tester,
-        result: aSentinelResult,
-        disableAnimations: true,
-      );
+    // The old group asked whether the result *page*'s ambient background stopped
+    // at the LOW tier. **The result is a card over the quiz now**, and the card
+    // paints no background of its own — the quiz underneath does, and the quiz
+    // has its own suite. So that half of the question moved with the surface.
+    //
+    // **What is left for this card is its own motion**: the scale-in from `.9`
+    // to `1` over 500ms (`:444-446`). §14's rule is that a reader who asked for
+    // less motion gets the **end state**, not a shorter animation.
+    //
+    // The switch is therefore still live, and this is the test that makes it a
+    // *live* parameter rather than a second unturned knob — which is the shape
+    // §7's "a knob nothing turns" actually warns about.
+    testWidgets('the card paints no ambient background of its own', (
+      WidgetTester tester,
+    ) async {
+      // **A fact about the surface, and the reason the old group's question
+      // moved.** The result is a card; the quiz under it is the screen. A
+      // background here would be a second one painted under the first.
+      await pumpResult(tester, result: aSentinelResult);
 
-      final Finder background = find.byType(NeuralBackground);
-      expect(background, findsOneWidget);
-
-      final BuildContext context = tester.element(background);
       expect(
-        MediaQuery.maybeDisableAnimationsOf(context),
-        isTrue,
+        find.byType(NeuralBackground),
+        findsNothing,
         reason:
-            'the harness flag reaches the `MediaQuery` above the background',
-      );
-      expect(
-        // `override` is left at its `null` default, which is the claim: the
-        // background passes no override, and a call that merely omitted it
-        // would say nothing.
-        NeuralTiers.resolve(
-          size: MediaQuery.sizeOf(context),
-          animationsEnabled:
-              !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
-        ),
-        NeuralTier.low,
-        reason:
-            'reduced motion is not a tie-break: `low` wins over the size rule, so '
-            'the ambient background cannot drift for a reader who asked it not to',
+            'the result is a card over the quiz, and the background belongs to '
+            'the quiz',
       );
     });
 
     testWidgets(
-      'and it is `mid` on the default call, so the assertion above is '
+      'and the scale-in JUMPS to the end state when motion is reduced',
+      (WidgetTester tester) async {
+        await pumpResult(
+          tester,
+          result: aSentinelResult,
+          disableAnimations: true,
+        );
+
+        // **The burst's PAINTED box**, which is the card's scale applied to a
+        // known 100px square. `getRect` walks the ancestor transforms, so this
+        // reads the **scale** and not the layout — which is the claim.
+        final Rect burst = tester.getRect(find.byType(SunBurst));
+        expect(
+          burst.width,
+          moreOrLessEquals(ResultSheet.burstSize, epsilon: 0.5),
+          reason:
+              'the card is at full size, so the burst is its own '
+              '${ResultSheet.burstSize}px square',
+        );
+      },
+    );
+
+    testWidgets(
+      'and it is MID-SCALE on the default call, so the assertion above is '
       'not vacuous',
       (WidgetTester tester) async {
-        // The negative control the previous test cannot supply for itself. Without
-        // this, "the tier is `low`" would also be satisfied by a screen whose tier
-        // collapsed to `low` for an unrelated reason.
+        // The negative control the previous test cannot supply for itself.
+        // Without it, "the card is at full size" would also be satisfied by a
+        // card that never animated at all.
         await pumpResult(tester, result: aSentinelResult);
 
-        final BuildContext context = tester.element(
-          find.byType(NeuralBackground),
-        );
+        final Rect burst = tester.getRect(find.byType(SunBurst));
         expect(
-          MediaQuery.maybeDisableAnimationsOf(context),
-          isFalse,
-          reason: 'the default call does not disable animations',
-        );
-        expect(
-          // `override` is left at its `null` default, which is the claim: the
-          // background passes no override, and a call that merely omitted it
-          // would say nothing.
-          NeuralTiers.resolve(
-            size: MediaQuery.sizeOf(context),
-            animationsEnabled:
-                !(MediaQuery.maybeDisableAnimationsOf(context) ?? false),
-          ),
-          NeuralTier.mid,
-          reason: '430×932 is a `mid` viewport, so the flag is what changed it',
+          burst.width,
+          lessThan(ResultSheet.burstSize),
+          reason:
+              'the card enters at .9 and grows to 1 over 500ms, so four frames '
+              'in it has not arrived yet — and this is what makes the '
+              'reduced-motion assertion above mean something',
         );
       },
     );

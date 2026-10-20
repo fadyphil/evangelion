@@ -16,7 +16,7 @@ import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.da
 ///   segment are one fact about the wire and two copies of a string is how they
 ///   drift;
 /// * the **exception → [Failure]** translation is `ApiErrorMapper`'s, and it is
-///   shared with the streak repository and every port Phase 7–8 adds;
+///   shared with the streak repository and every port Phase 7–8 added;
 /// * the **body → entity** translation is the mapper's — [TodayReadingMapper]'s
 ///   for the read and [SubmitResultMapper]'s for the write, which is why the
 ///   second one lives beside the first rather than inside a `quiz/data/` that

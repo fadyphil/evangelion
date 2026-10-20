@@ -50,7 +50,7 @@ part 'submit_result.freezed.dart';
 /// response to the action the screen is reporting. `reading_completed` is the
 /// reason that is safe: §5 trap 4 says the streak fields only move when it is
 /// `true`, so this number is the one written *by the submission the reader just
-/// made*, while `/`'s two were written by a read. `result_page_test.dart` asserts
+/// made*, while `/`'s two were written by a read. `result_sheet_test.dart` asserts
 /// the number on screen is this field's and not either other endpoint's, in the
 /// failing direction.
 ///
@@ -59,7 +59,7 @@ part 'submit_result.freezed.dart';
 /// §5 trap 4 again: a single correct answer does **not** advance the streak.
 /// `ResultPage` shows a streak, so a screen that drew it without reading this flag
 /// would be drawing a number the backend did not change. It is carried for exactly
-/// that reason, and `result_page_test.dart` pins both arms.
+/// that reason, and `result_sheet_test.dart` pins both arms.
 @freezed
 final class SubmitResult with _$SubmitResult {
   /// A graded answer, as the backend's own interface declares it.

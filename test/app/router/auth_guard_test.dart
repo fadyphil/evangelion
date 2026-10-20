@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+// `getIt` — the locator the settings cubit is resolved from, and the reason
+// `routerHost` registers a settings harness at all.
+import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 // The generated `*Route` classes, reached the way `app_router.dart` reaches them.
 import 'package:evangelion/app/router/app_router.gr.dart';
@@ -8,7 +11,6 @@ import 'package:evangelion/app/router/auth_guard.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
-import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
@@ -16,7 +18,7 @@ import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
-import 'package:evangelion/features/result/presentation/pages/result_page.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -104,23 +106,29 @@ LoginResultCallback loginOutcomeOn(WidgetTester tester) {
 void completeLogin(WidgetTester tester, {required LoginOutcome outcome}) =>
     loginOutcomeOn(tester)(outcome);
 
-/// A graded answer for the router suites.
+/// The workshop's route, carrying the cubit the page renders from.
 ///
-/// **A transcription, not a capture** — §5 trap 10 records that no successful submit
-/// has ever been observed against this backend, so `contract_payloads.dart` is where
-/// the shape comes from. `/result` cannot be pushed without one, so every suite that
-/// mounts it needs this, and `app_router_test.dart` declares the identical constant
-/// rather than sharing it: that file is the router suite's own inventory and a suite
-/// that reads its fixture from another suite stops failing when the other changes.
-const SubmitResult kAContractSubmitResult = SubmitResult(
-  questionId: 'question-group-3',
-  isCorrect: true,
-  pointsEarned: 10,
-  currentTotalPoints: 40,
-  currentStreak: 4,
-  longestStreak: 6,
-  readingCompleted: true,
-);
+/// ## WHY `/settings` STANDS IN FOR THE REMOVED `/result`
+///
+/// **`/result` retired to a modal in Phase 6.** It is no longer a route, so
+/// `ResultRoute` is gone from the generated router and `AppRoutes.result` no
+/// longer exists. This suite pushed it for one reason only: it was a **guarded
+/// root route with a real constructor argument**, so a `pushAll` of two routes
+/// crossed the guard with **two different argument shapes** — the quiz takes
+/// nothing, the result took a graded answer.
+///
+/// `/settings` is the same shape. It is a guarded **root** route (the workshop
+/// is pushed *over* the dock shell, not a tab inside it), and it takes a
+/// constructor argument — its `SettingsCubit` — which the quiz does not. The
+/// argument is handed over **explicitly** rather than left to the page's own
+/// locator lookup, because the shape of the push is half of what these two
+/// tests are about: a pushAll whose two routes do not look alike.
+///
+/// **The cubit comes from the locator**, and `routerHost` is what put it there
+/// — it registers the settings harness for exactly this reason (the workshop
+/// resolves its cubit from the graph, and a router suite that lands on
+/// `/settings` without one throws a `StateError` out of `build`).
+SettingsRoute workshopRoute() => SettingsRoute(cubit: getIt<SettingsCubit>());
 
 void main() {
   setUp(resetServiceLocator);
@@ -181,41 +189,43 @@ void main() {
     // `06-navigation.md` §8's own verification for this phase, executed: push `/`
     // unauthenticated, assert it redirects to `/login`, then resume on
     // `onResult(true)` and land back on `/`.
-    testWidgets(
-      'push / unauthenticated, redirect, then onResult(true) resumes',
-      (WidgetTester tester) async {
-        final AuthHarness harness = AuthHarness.starting();
-        addTearDown(harness.release);
+    testWidgets('push / unauthenticated, redirect, then onResult(true) resumes', (
+      WidgetTester tester,
+    ) async {
+      final AuthHarness harness = AuthHarness.starting();
+      addTearDown(harness.release);
 
-        await tester.pumpWidget(routerHost(harness.router));
-        await pumpUntilFound(tester, find.byType(LoginPage));
+      await tester.pumpWidget(routerHost(harness.router));
+      await pumpUntilFound(tester, find.byType(LoginPage));
 
-        // 1. The interrupted navigation: `/` never reached, `/login` did.
-        expect(find.byType(LoginPage), findsOneWidget);
-        expect(find.byType(HomePage), findsNothing);
-        expect(harness.router.currentPath, AppRoutes.login);
+      // 1. The interrupted navigation: `/` never reached, `/login` did.
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(HomePage), findsNothing);
+      expect(harness.router.currentPath, AppRoutes.login);
 
-        // 2. The user signs in. The page reports the outcome and navigates nothing
-        //    itself — the guard resumes, which is what makes the flow re-entrant.
-        harness.status.authenticated = true;
-        completeLogin(tester, outcome: LoginOutcome.signedIn);
+      // 2. The user signs in. The page reports the outcome and navigates nothing
+      //    itself — the guard resumes, which is what makes the flow re-entrant.
+      harness.status.authenticated = true;
+      completeLogin(tester, outcome: LoginOutcome.signedIn);
 
-        await pumpUntilFound(tester, find.byType(HomePage));
-        await pumpUntilGone(tester, find.byType(LoginPage));
+      await pumpUntilFound(tester, find.byType(HomePage));
+      await pumpUntilGone(tester, find.byType(LoginPage));
 
-        // 3. The interrupted navigation completed, and the login route is gone
-        //    rather than merely covered.
-        expect(find.byType(HomePage), findsOneWidget);
-        expect(find.byType(LoginPage), findsNothing);
-        expect(harness.router.currentPath, AppRoutes.home);
-        expect(
-          harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
-          <String>[HomeRoute.name],
-          reason:
-              'the login route was removed from the stack, not left beneath',
-        );
-      },
-    );
+      // 3. The interrupted navigation completed, and the login route is gone
+      //    rather than merely covered.
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.byType(LoginPage), findsNothing);
+      expect(harness.router.currentPath, AppRoutes.home);
+      expect(
+        harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[DockShellRoute.name],
+        reason:
+            'the login route was removed from the stack, not left beneath. '
+            '**The shell**, not the home tab: `/` is the dock shell now, and '
+            'the home screen is one of its three children — the home tab is a '
+            'page inside the shell\'s own navigator, not a route of this stack',
+      );
+    });
 
     testWidgets('onResult(false) abandons the navigation and does not resume', (
       WidgetTester tester,
@@ -334,20 +344,24 @@ void main() {
       await pumpUntilFound(tester, find.byType(LoginPage));
 
       unawaited(
-        // **Both arms changed in Phase 8, for two different reasons.**
+        // **The two arms, and what each one is for.**
         //
-        // `ResultRoute` now takes its submit response, and this suite is what caught
-        // that: `const ResultRoute()` could no longer be called, so `/result` became
-        // unpushable without a graded answer — enforced by the compiler rather than
-        // by a runtime guard.
+        // `QuizRoute()` takes nothing, and `QuizRoute` cannot be `const` for an
+        // unrelated reason: auto_route generates a parameter for every argument of
+        // the page's constructor, and `QuizPage` takes `bloc`, so the generated
+        // constructor takes `QuizRouteArgs`. Nothing about `QuizPage` changed; the
+        // generator's output did.
         //
-        // `QuizRoute()` lost `const` for an unrelated reason: auto_route generates a
-        // parameter for every argument of the page's constructor, and `QuizPage`
-        // takes `bloc`, so the generated constructor takes `QuizRouteArgs` and cannot
-        // be `const`. Nothing about `QuizPage` changed; the generator's output did.
+        // The second route used to be `ResultRoute(result: kAContractSubmitResult)`
+        // — a graded answer, handed over because `/result` cannot be built without
+        // one. **`/result` retired to a modal in Phase 6**, so the route is gone and
+        // `/settings` stands in: a guarded **root** route with a **real constructor
+        // argument** of its own. The subject of this test is the guard's `pushAll`
+        // behaviour, not the result — the point is **two** routes with **different**
+        // argument shapes, and that is preserved.
         harness.router.pushAll(<PageRouteInfo<void>>[
           QuizRoute(),
-          ResultRoute(result: kAContractSubmitResult),
+          workshopRoute(),
         ]),
       );
       for (int frame = 0; frame < 12; frame++) {
@@ -375,14 +389,14 @@ void main() {
 
       expect(
         harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
-        <String>[LoginRoute.name, QuizRoute.name, ResultRoute.name],
+        <String>[LoginRoute.name, QuizRoute.name, SettingsRoute.name],
         reason:
             'BOTH pushed routes land — completing the first resolver does complete '
             'the navigation it belonged to. What is left over is the second login '
             'redirect, underneath them',
       );
-      expect(find.byType(ResultPage), findsOneWidget);
-      expect(harness.router.currentPath, AppRoutes.result);
+      expect(find.byType(SettingsPage), findsOneWidget);
+      expect(harness.router.currentPath, AppRoutes.settings);
       // The stranded redirect is a route with no page: nothing on screen, and no
       // callback in the tree that could ever resume it.
       expect(
@@ -415,20 +429,12 @@ void main() {
       await pumpUntilFound(tester, find.byType(LoginPage));
 
       unawaited(
-        // **Both arms changed in Phase 8, for two different reasons.**
-        //
-        // `ResultRoute` now takes its submit response, and this suite is what caught
-        // that: `const ResultRoute()` could no longer be called, so `/result` became
-        // unpushable without a graded answer — enforced by the compiler rather than
-        // by a runtime guard.
-        //
-        // `QuizRoute()` lost `const` for an unrelated reason: auto_route generates a
-        // parameter for every argument of the page's constructor, and `QuizPage`
-        // takes `bloc`, so the generated constructor takes `QuizRouteArgs` and cannot
-        // be `const`. Nothing about `QuizPage` changed; the generator's output did.
+        // **The same two arms as the test above, and for the same reasons** — the
+        // quiz takes nothing, and the workshop is the guarded root route that
+        // stands in for the removed `/result`. See [workshopRoute].
         harness.router.pushAll(<PageRouteInfo<void>>[
           QuizRoute(),
-          ResultRoute(result: kAContractSubmitResult),
+          workshopRoute(),
         ]),
       );
       for (int frame = 0; frame < 12; frame++) {
@@ -446,9 +452,9 @@ void main() {
         <String>[LoginRoute.name, QuizRoute.name, LoginRoute.name],
         reason:
             'the quiz route resumed, and then bounced off the guard once more — so '
-            'the stack grew by a redirect instead of by the result page',
+            'the stack grew by a redirect instead of by the workshop',
       );
-      expect(find.byType(ResultPage), findsNothing);
+      expect(find.byType(SettingsPage), findsNothing);
       expect(harness.router.currentPath, AppRoutes.login);
       expect(tester.takeException(), isNull);
     });
@@ -456,14 +462,30 @@ void main() {
     testWidgets('every guarded route redirects, not just the initial one', (
       WidgetTester tester,
     ) async {
-      // The guard is attached to five routes; a test that only ever exercises the
-      // initial navigation proves nothing about the other four, because the initial
-      // one is also the one with the most attention.
+      // ## THE GUARD IS ON **SEVEN** ROUTE ENTRIES NOW, AND THIS LIST NAMES FIVE
+      //
+      // The dock shell replaced `/` as a root route, and the shell carries three
+      // children — home, communion and journey — so the guard is on the shell,
+      // on each of its three tabs, and on the three root routes the dock's push
+      // actions and the workshop use. **The initial navigation covers the shell
+      // alone**, and it is also the one with the most attention, so a test that
+      // only ever exercises it proves nothing about the other five a deep link
+      // can reach.
+      //
+      // **`/communion` and `/journey` are in this list for a reason that is new.**
+      // They are *children* of the shell, and the shell is guarded too, so a deep
+      // link to either crosses **two** guarded routes. The list asserts that the
+      // reader still lands on the login **once** — the shell's guard answers
+      // first and the navigation never reaches the child, so there is exactly one
+      // redirect and no stranded route. That is the measurement, and it is the
+      // finding: the nested guard is a belt and a pair of braces, and it costs
+      // one redirect rather than two.
       for (final String path in <String>[
         AppRoutes.reading,
         AppRoutes.quiz,
-        AppRoutes.result,
         AppRoutes.settings,
+        AppRoutes.communion,
+        AppRoutes.journey,
       ]) {
         final AuthHarness harness = AuthHarness.starting();
         await tester.pumpWidget(routerHost(harness.router));
@@ -481,6 +503,15 @@ void main() {
           find.byType(HomePage),
           findsNothing,
           reason: '$path never got as far as being mounted',
+        );
+        // **Exactly one redirect.** The stack holds the login route the initial
+        // navigation left, plus the one this push produced — and no more. A
+        // nested route that ran its parent's guard *and* its own would leave a
+        // third login route here, and the reader would have to dismiss two.
+        expect(
+          harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+          <String>[LoginRoute.name, LoginRoute.name],
+          reason: '$path produced ONE redirect, not two',
         );
 
         harness.release();
@@ -560,36 +591,34 @@ void main() {
 
       await tester.pumpWidget(routerHost(harness.router));
       await pumpUntilFound(tester, find.byType(HomePage));
-      // **Both routes are pushed, not path-pushed**, and Phase 8 is why.
+      // **Both routes are pushed, not path-pushed**, and the reason is the same
+      // for each of them.
       //
-      // `pushPath('/result')` can no longer build the page: `ResultRoute` requires
-      // `result`. `app_router_test.dart` pins that failure deliberately; this suite
-      // needs the route **mounted**, because the claim under test is that a
-      // re-evaluation tears down every guarded route in the stack and not only the
-      // top one, and a route that never built would have proved nothing.
-      //
-      // `QuizPage` needed the same treatment for a further reason. The Phase-0c
-      // stub read nothing, so a path push mounted it; the real page resolves
-      // `QuizBloc` from the locator, and `AuthHarness` deliberately builds **only** a
-      // router — no `configureNavigation()`, no graph — so the push failed with
+      // `QuizPage` resolves its `QuizBloc` from the locator, and `AuthHarness`
+      // deliberately builds **only** a router — no `configureNavigation()`, no graph
+      // — so a path push failed with
       //
       //     Bad state: GetIt: Object/factory with type QuizBloc is not registered
       //
       // `QuizRoute` takes an optional `bloc` exactly so a caller can supply one.
       // A guarded-route test is about the *guard*, so it hands the page the one thing
       // the guard does not care about.
+      //
+      // The workshop is pushed the same way, and for the same kind of reason: it
+      // resolves its `SettingsCubit` from the locator, and `routerHost` is what
+      // puts one there. **`/result` used to be the third route here** and it is
+      // gone — it retired to a modal in Phase 6 — so the workshop is the guarded
+      // root route that stands in for it. See [workshopRoute].
       final QuizBloc quiz = quizBloc(
         const Right<Failure, ScriptureText>(liveArabicQuizPassage),
       );
       unawaited(harness.router.push<void>(QuizRoute(bloc: quiz)));
       await pumpUntilFound(tester, find.byType(QuizPage));
-      unawaited(
-        harness.router.push<void>(ResultRoute(result: kAContractSubmitResult)),
-      );
-      await pumpUntilFound(tester, find.byType(ResultPage));
+      unawaited(harness.router.push<void>(workshopRoute()));
+      await pumpUntilFound(tester, find.byType(SettingsPage));
 
       expect(find.byType(QuizPage), findsOneWidget);
-      expect(find.byType(ResultPage), findsOneWidget);
+      expect(find.byType(SettingsPage), findsOneWidget);
 
       final List<String?> depthBefore = harness.router.stack
           .map((AutoRoutePage<Object?> page) => page.name)
@@ -599,13 +628,13 @@ void main() {
       harness.status.authenticated = false;
       harness.announce();
       await pumpUntilFound(tester, find.byType(LoginPage));
-      await pumpUntilGone(tester, find.byType(ResultPage));
+      await pumpUntilGone(tester, find.byType(SettingsPage));
       await pumpUntilGone(tester, find.byType(QuizPage));
       await pumpUntilGone(tester, find.byType(HomePage));
 
       expect(find.byType(LoginPage), findsOneWidget);
       expect(find.byType(QuizPage), findsNothing);
-      expect(find.byType(ResultPage), findsNothing);
+      expect(find.byType(SettingsPage), findsNothing);
       expect(find.byType(HomePage), findsNothing);
       expect(
         harness.router.stack.map((AutoRoutePage<Object?> page) => page.name),

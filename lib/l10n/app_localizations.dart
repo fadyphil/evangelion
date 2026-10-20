@@ -903,7 +903,11 @@ abstract class AppLocalizations {
 
   /// The Curtain shape row's title. Transcribed: `eva/redesign.html:653` writes `Curtain shape` and `:952` carries the pair.
   ///
-  /// **The row's control is the redesign's `.segp.wide`, not the plain `.segp` the prototype uses at `:654`.** The four segments cannot share a row with a 14.5px label at 320px — the standing 320×568 viewport matrix is a gate — and the prototype's own `min-width:44px` (`:183`) is a tap-target floor the client does not shrink. The label therefore goes above the control, and that is a recorded divergence.
+  /// **TWO DIVERGENCES FROM THE PROTOTYPE'S OWN ROW, and the second one was nearly missed.**
+  ///
+  /// **THE LABEL GOES ABOVE THE CONTROL.** The four-segment control cannot share a row with a 14.5px label at 320px — the standing 320×568 viewport matrix is a gate, and the prototype's own `min-width:44px` (`:183`) is a tap-target floor this client does not shrink. Recorded at the row and at `SettingsTile.stacked`.
+  ///
+  /// **AND THE CONTROL'S GEOMETRY IS THE WIDE ONE, WHERE THE PROTOTYPE'S IS THE PLAIN ONE.** The prototype's `:654` is a plain `.segp` — `:183`'s `10px` label and `8px 10px` padding — and the client's is the wide geometry of `:188-189`: `:189`'s `11px` label and `12px 0` padding, with equal quarters. The **only** `.segp.wide` in the prototype is the language control at `:646`, and the client uses the wide geometry here because it is the geometry that fits a full-width row.
   ///
   /// In en, this message translates to:
   /// **'Curtain shape'**
@@ -949,7 +953,7 @@ abstract class AppLocalizations {
 
   /// The Brightness row's title. Transcribed: `eva/redesign.html:659` writes `Brightness` and `:953` carries the pair.
   ///
-  /// **The prototype's own label is `glow` in its `I18N` table** (`:953`) and `Brightness` in its markup (`:659`); the markup is the one a reader sees, so the markup is the one transcribed. The slider runs 40-130 with a default of 100.
+  /// **THE TABLE'S KEY IS `glow` AND ITS VALUE IS `Brightness`**, which is the same word the markup carries — so there is nothing to resolve between the two, and the row is transcribed from the markup.
   ///
   /// **NOT A UNIFORM.** The prototype folds it into the ambient target (`:891`) and never sends it to the GPU.
   ///
@@ -1049,6 +1053,8 @@ abstract class AppLocalizations {
   ///
   /// **THE SEGMENT'S FOUR LABELS ARE THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH** — `dot`, `star`, `cross`, `gem` at `:673` — and they are kept as they are, because they are widget literals and not ARB keys. Putting them in this file would force them into `app_localizations_test.dart`'s `mustBeIdentical` set, and that set is the gate that catches an untranslated string. The Arabic typography gate declares the runs as they render.
   ///
+  /// **AND THE ROW HAS THE SAME TWO DIVERGENCES AS THE CURTAIN SHAPE'S** — the label above the control, and the wide geometry where the prototype's `:672` is a plain `.segp`. See `settingsCurtainShape` for both.
+  ///
   /// In en, this message translates to:
   /// **'Star shape'**
   String get settingsStarShape;
@@ -1056,6 +1062,8 @@ abstract class AppLocalizations {
   /// The Star field row's title. Transcribed: `eva/redesign.html:676` writes `Star field` and `:957` carries the pair.
   ///
   /// **THE SEGMENT'S THREE LABELS ARE THE PROTOTYPE'S OWN UNTRANSLATED ENGLISH** — `crown`, `high`, `full` at `:678` — and they are kept as they are, for `settingsStarShape`'s reason.
+  ///
+  /// **AND THE ROW HAS THE SAME TWO DIVERGENCES AS THE CURTAIN SHAPE'S** — the label above the control, and the wide geometry where the prototype's `:677` is a plain `.segp`. See `settingsCurtainShape` for both.
   ///
   /// In en, this message translates to:
   /// **'Star field'**
@@ -1071,7 +1079,9 @@ abstract class AppLocalizations {
 
   /// The focus & ritual group's header. Transcribed: `eva/redesign.html:682` writes `focus & ritual` and `:958` carries the pair.
   ///
-  /// **Four of the seven controls under it persist and are read by nothing yet** — the selah timer, the focus mode, the breath guide and the vespers auto-dim are Phase 7's (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1340-1345`).
+  /// **SIX OF THE SEVEN CONTROLS UNDER IT PERSIST AND ARE READ BY NOTHING YET** — the selah timer, the focus mode, the breath guide, the vespers auto-dim, the calm motion and the haptics are all Phase 7's (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1685-1686`). Only **Reduce motion** is read today, by `app.dart` and `/reading`.
+  ///
+  /// **AND THE SIX INCLUDE THE TWO THE RESTORE DELIBERATELY LEAVES ALONE** — the calm motion and the haptics — which the prototype's own reset (`:1499-1525`) also leaves alone, because they are comfort choices rather than light settings.
   ///
   /// In en, this message translates to:
   /// **'focus & ritual'**
@@ -1079,7 +1089,7 @@ abstract class AppLocalizations {
 
   /// The Focus delay row's title. Transcribed: `eva/redesign.html:683` writes `Focus delay` and `:958` carries the pair.
   ///
-  /// The slider runs 2-15 with a default of 4, and the unit is **seconds** — the prototype multiplies it by 1000 at `:1287`.
+  /// The slider runs 2-15 with a default of 4, and the unit is **seconds** — the prototype multiplies it by 1000 at `:1292`, and `:1287` is where the value is declared.
   ///
   /// In en, this message translates to:
   /// **'Focus delay'**
@@ -1279,31 +1289,35 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get settingsRetry;
 
-  /// `ds.tsx:559-564`'s 56px circle carries only the text `E`, so it has no accessible name of its own and a screen reader reaches an unnamed button. This is the trigger's shut name, and it says what activating does rather than what the control is.
+  /// `eva/redesign.html:931` — `dockHome:["Home","الرئيسية"]`, the first of the five slots of the redesign's dock (`:702-708`). It is the label under the house glyph, and the slot is the **first tab**: `/` is the shell's own path and the home tab is its first child.
   ///
   /// In en, this message translates to:
-  /// **'Open menu'**
-  String get sealFabOpen;
+  /// **'Home'**
+  String get dockHome;
 
-  /// The same trigger while the dial is open. A toggling button needs two names, or the announcement describes the current state and not the action — which is the defect `SegmentedControl` shipped with.
+  /// `eva/redesign.html:931` — `dockRead:["Read","اقرأ"]`, the second slot of the redesign's dock (`:704`). **It is not a tab**: the prototype's own click handler (`:1277`) opens the reader rather than switching, and the client's second slot is a push action that opens `/reading` over the shell.
   ///
   /// In en, this message translates to:
-  /// **'Close menu'**
-  String get sealFabClose;
+  /// **'Read'**
+  String get dockRead;
 
-  /// A `SealFab` destination. `ds.tsx:538` offers `Settings`; rejected was dropping it, since the avatar on `/` is a 32px target in a top bar and this is a labelled destination one tap away.
+  /// `eva/redesign.html:931` — `dockToday:["Today","اليوم"]`, the third slot of the redesign's dock (`:705`). **It is not a tab either**: the handler (`:1278`) pops the orb and opens the quiz, and the client's third slot is a push action that opens `/quiz` over the shell. The slot's glyph is the prototype's `✦` orb.
   ///
   /// In en, this message translates to:
-  /// **'Settings'**
-  String get sealFabSettings;
+  /// **'Today'**
+  String get dockToday;
 
-  /// A `SealFab` destination, and the reason this control exists. It occupies the prototype's `Profile` slot (`ds.tsx:537`): Profile is a cut screen with no endpoint, and the board is the only prototype destination with no other entry point on `/`.
-  ///
-  /// **The word is "Communion", and it is the redesign's own** — `eva/redesign.html:932`'s `dockBoard` row, the same word as the screen's title (`:615`'s `boardT`). It was "Leaderboard" until Task 5.5 renamed the route, and the Arabic arm had already moved to "الشركة" — so for a while the two arms of this one key named two different things.
+  /// `eva/redesign.html:932` — `dockBoard:["Communion","الشركة"]`, the **fourth** slot of the redesign's dock (`:706`) and the **second** of the client's three real tabs. The word is the redesign's own, and it is the same word as the screen's title (`:615`'s `boardT`); the prototype's journey calls the same screen "The Communion" at `:939`'s `rowBoard`.
   ///
   /// In en, this message translates to:
   /// **'Communion'**
-  String get sealFabLeaderboard;
+  String get dockBoard;
+
+  /// `eva/redesign.html:931` — `dockJourney:["Journey","الرحلة"]`, the **fifth** slot of the redesign's dock (`:707`) and the **third** of the client's real tabs. **The prototype carries the same word twice** — `journey:["Journey","الرحلة"]` at `:933` is the screen's own title — and the client keeps both keys for the same reason: the dock's slot and the screen's heading are two different surfaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Journey'**
+  String get dockJourney;
 
   /// `:966` — `verses:["verses","آيات"]`. The unit the crumb counts with (`${N(b.en.length)} ${tr('verses')}`, `:1346`); home owns the same word under `homeVerses` because the two screens compose different sentences.
   ///

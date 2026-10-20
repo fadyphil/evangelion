@@ -150,12 +150,20 @@ void main() {
     // hand-written mirror of another file is the same second-source-of-truth
     // shape this file's own doc argues against, and a tenth constant would have
     // landed in the gap unnoticed.
+    //
+    // **AND THE NINE IS NINE AGAIN.** `/result` retired to a **modal** in
+    // Phase 6, so `AppRoutes.result` no longer exists and the mirror does not
+    // name it — which is what puts this set back on the number the prose above
+    // has always claimed. The mirror is a mirror of the **declaration site**,
+    // and the completeness test below is what holds it to that: a constant
+    // added to `app_routes.dart` without being added here fails, and a
+    // constant removed from there without being removed here fails the other
+    // way round.
     const Set<String> declared = <String>{
       AppRoutes.login,
       AppRoutes.home,
       AppRoutes.reading,
       AppRoutes.quiz,
-      AppRoutes.result,
       AppRoutes.settings,
       AppRoutes.communion,
       // **Task 5.6 added the journey**, and the comment above's point is

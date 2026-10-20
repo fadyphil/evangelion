@@ -32,29 +32,32 @@ enum ReadingStatus {
 /// ## WHAT IS **NOT** IN HERE, AND BOTH OMISSIONS ARE DECISIONS
 ///
 /// The plan says the cubit owns "font scale and verse numbers, which come from
-/// `SettingsRepository`". Phase 7 delivers the font step and **does not** have a
-/// verse-number field, and both omissions are recorded rather than quietly
-/// absorbed:
+/// `SettingsRepository`". **Neither of them is here**, and both omissions are
+/// recorded rather than quietly absorbed:
 ///
-/// * **No `SettingsRepository` in Phase 7.** `07-file-map.md:212` puts the
-///   implementation in `settings/data/`, which is Phase 9, so declaring the port
-///   here would be a port with **no adapter** — the exact class this repository has
-///   shipped and fixed three times (Phase 5's unread `@Named('apiBaseUrl')`, its
-///   dead `isValidUserId` branch, and recorded decision 22's "requiredness is not
-///   use"). A promise with no payer. So [fontStep] is cubit state for the life of
-///   the cubit, the `Aa` control genuinely works **within a visit**, and Phase 9
-///   introduces the port and makes it durable.
+/// * **No `SettingsRepository`.** `07-file-map.md:212` puts the implementation in
+///   `settings/data/`, so declaring the port here would be a port with **no
+///   adapter** — the exact class this repository has shipped and fixed three times
+///   (Phase 5's unread `@Named('apiBaseUrl')`, its dead `isValidUserId` branch, and
+///   recorded decision 22's "requiredness is not use"). A promise with no payer.
+///   **And the font scale did not come back to the cubit when the adapter
+///   landed.** It is `UserSettings.fontStep`, persisted and installed app-wide at
+///   `MaterialApp.builder`; `ReadingCubit.setFontStep` and `ReadingState.fontStep`
+///   are **deleted**, because a cubit holding a second copy of a preference is the
+///   "two sources of truth for one fact" defect, and it would have disagreed with
+///   `app.dart` for the one window between the reader's gesture and the store's
+///   write. `reading_cubit_test.dart` asserts that they are gone.
 /// * **No verse-number flag.** The prototype draws a `<sup>` on every verse of
 ///   both arms and draws **no control** for turning it off. A `bool` with no writer
 ///   is the dead-branch defect twice over, so `ScriptureBlock` always renders the
 ///   marker.
 ///
-/// **THE COST, IN PLAIN WORDS: a reader's font size does not survive leaving
-/// `/reading`.** They set it, they open the quiz, they come back, and the default is
-/// back. That is the whole of what this phase does not do, and no copy, doc or test
-/// in this repository claims otherwise — `reading_page_test.dart` asserts the
-/// `Aa` control *changes* the rendered size and asserts nothing about surviving a
-/// navigation, because there is nothing to assert.
+/// **THE COST, IN PLAIN WORDS, AND WHAT IT IS NOW.** A reader's font size did not
+/// survive leaving `/reading` — that was the cost of the omission, and it was the
+/// cost for as long as the step lived in this cubit. They set it, they opened the
+/// quiz, they came back, and the default was back. The step is durable now, so
+/// they set it, they open the quiz, they come back, and it is still set: the
+/// durable store is the app's, and this cubit never had a second copy of it.
 ///
 /// ## [ReadingState.copyWith] IS GENERATED AND IT NOW HAS **FOUR** FIELDS
 ///
@@ -74,9 +77,10 @@ enum ReadingStatus {
 /// `HomeBloc` is a `Bloc` because it has four event types and `home_bloc_test.dart`
 /// spends real effort on their equality — including recorded decision 48's account
 /// of an uncovered `HomeEvent` equality getter. This cubit has **no events**:
-/// `load` and `setFontStep` are method parameters, and `bloc.add` is not reachable
-/// from it. The mistake recorded decision 48 names — every event equal, so
-/// `bloc.add` swallows a duplicate — cannot happen to a type with no events.
+/// `load`, `retry` and `toggleTextSizePanel` are called directly, and `bloc.add`
+/// is not reachable from it. The mistake recorded decision 48 names — every event
+/// equal, so `bloc.add` swallows a duplicate — cannot happen to a type with no
+/// events.
 ///
 /// ## AND THERE IS **ONE** `load`, NOT A `LOAD` AND A `RETRY`
 ///
@@ -95,9 +99,9 @@ enum ReadingStatus {
 /// `scripture ?? this.scripture`, so `null` meant "leave it alone" and the two
 /// nullable fields could never be cleared through it — a hazard its own doc
 /// recorded as unfixable. freezed gives every nullable field a sentinel default,
-/// so `copyWith(scripture: null)` clears and omitting the argument keeps. The two
-/// call sites below pass only [fontStep] and [textSizePanelOpen], so behaviour at
-/// every existing call site is unchanged. See AGENT_CONTEXT §2.1.
+/// so `copyWith(scripture: null)` clears and omitting the argument keeps. The one
+/// call site below passes only [textSizePanelOpen], so behaviour at every
+/// existing call site is unchanged. See AGENT_CONTEXT §2.1.
 ///
 /// **`toString` is generated here**, where `Equatable`'s default used to print
 /// every prop. That is harmless on this class — none of its fields is a secret —
@@ -159,7 +163,7 @@ final class ReadingState with _$ReadingState {
 /// this project promote — the third time that wall has been hit, after the router
 /// and `AuthBloc`.
 class ReadingCubit extends Cubit<ReadingState> {
-  /// Drives `/reading` through [load] and [setFontStep].
+  /// Drives `/reading` through [load], [retry] and [toggleTextSizePanel].
   ReadingCubit({required this.loadScripture}) : super(const ReadingState());
 
   /// The seam. See the class doc.
@@ -170,8 +174,8 @@ class ReadingCubit extends Cubit<ReadingState> {
   /// [language] is a parameter and **not** a constructor argument, for
   /// `HomeStarted`'s reason: the cubit is registered once for the process, so a
   /// language fixed at construction would be the language at *launch* for the rest
-  /// of the run — and `/reading` is the screen Phase 9's language switch will
-  /// rebuild under.
+  /// of the run — and `/reading` is the screen Phase 9's language switch rebuilds
+  /// under.
   ///
   /// **It empties first, and that is measured rather than cautious.** Phase 6 found
   /// the alternative on `/`: leaving the previous reading on screen while the next

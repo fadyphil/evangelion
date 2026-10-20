@@ -71,8 +71,8 @@ class QuizHeader extends StatelessWidget {
   /// The bilingual strings.
   final AppLocalizations strings;
 
-  /// What the back control runs. `null` renders it disabled, as [SocialAuthButton]
-  /// does.
+  /// What the back control runs. `null` renders it disabled, as the deleted
+  /// `SocialAuthButton` did.
   final VoidCallback? onExit;
 
   /// The appbar's own box: `eva/redesign.html:142` — `padding: 46px 18px 4px`.

@@ -297,14 +297,69 @@ void main() {
   });
 
   group('the app bar', () {
-    testWidgets('names its three controls', (WidgetTester tester) async {
+    testWidgets('names its two controls, and there is no back control', (
+      WidgetTester tester,
+    ) async {
       await _pump(tester, _appBar());
 
       // The two buttons carry the **rows'** strings, so a tooltip and its row
       // cannot drift apart.
       expect(find.bySemanticsLabel('The Communion'), findsOneWidget);
       expect(find.bySemanticsLabel('Settings'), findsOneWidget);
-      expect(find.bySemanticsLabel('Back'), findsOneWidget);
+
+      // ## AND NO BACK CONTROL
+      //
+      // The journey is a **dock tab** (`DockTabs.journey` is the third of the
+      // shell's three), and the prototype's journey is a tab too
+      // (`eva/redesign.html:707`) — so it never needed a way back, and its app
+      // bar carries a **68px spacer** where the chevron would be (`:578`).
+      //
+      // This client drew the chevron only while the journey was **pushed**,
+      // because a pushed screen on desktop has no system back button. The
+      // reason went with the control, so the control went too.
+      expect(
+        find.bySemanticsLabel('Back'),
+        findsNothing,
+        reason:
+            'a tab has no way back, and the prototype\'s journey has no '
+            'chevron',
+      );
+      expect(find.byIcon(Icons.arrow_back_ios_new), findsNothing);
+    });
+
+    testWidgets('the leading spacer is the prototype\'s 68 pixels', (
+      WidgetTester tester,
+    ) async {
+      await _pump(tester, _appBar());
+
+      // `:578` — `<span style="width:68px"></span>`, and the number is the
+      // widget's own constant rather than a literal re-spelled here.
+      expect(JourneyAppBar.leadingSpacerWidth, 68);
+
+      final Finder spacer = find.descendant(
+        of: find.byType(JourneyAppBar),
+        matching: find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is SizedBox &&
+              widget.width == JourneyAppBar.leadingSpacerWidth,
+        ),
+      );
+      expect(
+        spacer,
+        findsOneWidget,
+        reason:
+            'the spacer is what the chevron became, and a bar that carried '
+            'neither would leave the two buttons unbalanced against nothing',
+      );
+      expect(tester.getSize(spacer).width, JourneyAppBar.leadingSpacerWidth);
+
+      // **And it is the LEADING space**, not a gap in the middle: the
+      // prototype's span is the first child of the row, and the two 30px
+      // `.iconbtn`s and their 8px gap (`:156`) are balanced against it.
+      expect(
+        tester.getRect(spacer).left,
+        lessThan(tester.getRect(find.byIcon(Icons.emoji_events)).left),
+      );
     });
 
     testWidgets('every control is reachable by keyboard and rings', (
@@ -312,11 +367,7 @@ void main() {
     ) async {
       await _pump(tester, _appBar());
 
-      for (final String label in <String>[
-        'Back',
-        'The Communion',
-        'Settings',
-      ]) {
+      for (final String label in <String>['The Communion', 'Settings']) {
         final Finder target = find.bySemanticsLabel(label);
         await tabUntilFocused(tester, target);
         expect(
@@ -458,11 +509,11 @@ Widget _medal(MedalEmblem emblem, [MedalBloom bloom = MedalBloom.cream]) =>
     JourneyMedalTile(label: 'first light', emblem: emblem, bloom: bloom);
 
 /// The app bar, with every control live.
-Widget _appBar() => const JourneyAppBar(
-  onBack: _noop,
-  onOpenBoard: _noop,
-  onOpenSettings: _noop,
-);
+///
+/// **Two controls, and not three.** The journey is a dock tab, so the back
+/// chevron is gone and the prototype's 68px spacer (`:578`) is in its place.
+Widget _appBar() =>
+    const JourneyAppBar(onOpenBoard: _noop, onOpenSettings: _noop);
 
 /// The four account rows.
 Widget _rows() =>

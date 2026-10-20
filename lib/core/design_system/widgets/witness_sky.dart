@@ -882,8 +882,8 @@ class _WitnessSkyState extends State<WitnessSky>
                 // file's suite would have to become a golden — and this suite is
                 // currently the only thing that can see a star at all (the B1
                 // shape regression was invisible in every other assertion).
-                // Phase 5 mounts the reader and is the phase that would pay for
-                // it. The measurement is recorded; the redesign is not.
+                // Phase 5 mounted the reader and did not pay for it. The
+                // measurement is recorded; the redesign is not.
                 //
                 // **Two cheap-looking changes, both measured as not worth it.**
                 // Hoisting the `Stack` out of the `ListenableBuilder` does

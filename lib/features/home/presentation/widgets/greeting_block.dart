@@ -17,7 +17,9 @@ import 'package:flutter/material.dart';
 /// `:236-237` and a constant nobody outside the file can name is not a constant a
 /// test can read. The greeting was a private `_Greeting` inside `home_page.dart`
 /// for Phase 5.2's first hour, and the geometry harness is what made that
-/// untenable — the same reason `SocialAuthButton` and `SealFab` are public.
+/// untenable — the same reason the other home widgets are public, and the reason
+/// `SocialAuthButton` and `SealFab` were before the redesign deleted both of
+/// them.
 ///
 /// ## THE CAPTION IS **MONO** AND THE GREETING IS **SERIF**
 ///

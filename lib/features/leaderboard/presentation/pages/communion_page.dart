@@ -6,6 +6,7 @@ import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/leaderboard/domain/leaderboard_ranking.dart';
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart';
 import 'package:evangelion/features/leaderboard/presentation/widgets/communion_app_bar.dart';
@@ -86,6 +87,35 @@ class _CommunionBodyState extends State<_CommunionBody> {
     cubit.load(_requested!);
   }
 
+  /// The chevron: back to the tab the reader came from.
+  ///
+  /// **The board is a TAB**, so there is nothing to pop — the board's own
+  /// route is never popped, and the root stack holds only the shell. What the
+  /// chevron means is "the tab I was on before this one", which is the tabs
+  /// router's own [TabsRouter.previousIndex].
+  ///
+  /// The prototype does the same thing with two branches
+  /// (`eva/redesign.html:1282`): `boardEntry==='push' ? pop('journey') :
+  /// tab('home')` — pushed from the journey, it returns to the journey; reached
+  /// from the dock, it returns home. **The client's previous-tab rule is the
+  /// one-branch form of that**, because the reader's previous tab *is* the
+  /// journey when they came from the journey.
+  ///
+  /// **And home is the floor**, because the previous index is `null` before
+  /// the first tab change.
+  void _goBack(BuildContext context) {
+    final TabsRouter? tabs = TabsRouterScope.of(context)?.controller;
+    if (tabs == null) {
+      return;
+    }
+    final int? previous = tabs.previousIndex;
+    tabs.setActiveIndex(
+      previous != null && previous >= 0 && previous < DockTabs.count
+          ? previous
+          : DockTabs.home,
+    );
+  }
+
   void _showCheerToast(String message) {
     _toastTimer?.cancel();
     setState(() => _toastMessage = message);
@@ -126,7 +156,7 @@ class _CommunionBodyState extends State<_CommunionBody> {
                     handle.setVeilWitnesses(veiled: !settings.veilWitnesses),
                   );
                 },
-                onBack: () => context.router.maybePop(),
+                onBack: () => _goBack(context),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(

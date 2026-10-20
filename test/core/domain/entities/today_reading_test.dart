@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// and how many are answered**, whether the reading is finished, and two numbers.
 ///
 /// So this entity is that list and nothing more. The wide shape belongs to
-/// `features/reading/`, which Phase 7 needs in full and which already owns the
+/// `features/reading/`, which Phase 7 needed in full and which already owns the
 /// `text_clean` trap AGENT_CONTEXT §5 documents. Putting the wide shape here
 /// would be §3's "nothing enters `core/domain/` speculatively" in reverse: a
 /// domain object carrying a `Map<String, String>` of quiz options that no
@@ -21,7 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// **The cost is stated rather than discovered later:** the reading section's
 /// panel and Phase 7's sanctuary read the same endpoint through two
-/// projections. Phase 7 therefore **widens** `ReadingRepository` rather than
+/// projections. Phase 7 therefore **widened** `ReadingRepository` rather than
 /// creating a second adapter — see `features/reading/data/repositories/`.
 void main() {
   // The live English payload, projected.

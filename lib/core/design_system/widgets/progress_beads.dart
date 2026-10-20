@@ -301,8 +301,11 @@ double progressBeadPulseOpacityAt(double elapsedSeconds) {
 /// formula written out a second time in a test.
 ///
 /// [semanticLabel] exists because this widget is otherwise a hard-coded English
-/// string in a bilingual app. There is no string table yet (`docs/plans/07-file-map.md`
-/// defers it), so the default is a placeholder and Phase 9 wires the real one.
+/// string in a bilingual app. **The default is still a placeholder, and Phase 9
+/// did not wire the real one**: the string table arrived, but this widget has no
+/// call site in the tree to pass one from, and it is one of the four on the §3.1
+/// watch list (`eva_section_header.dart` names it). It stays a placeholder until
+/// a caller has something to say.
 class ProgressBeads extends StatelessWidget {
   /// A row of [total] beads, the first [completed] filled, [current] pill-shaped.
   const ProgressBeads({

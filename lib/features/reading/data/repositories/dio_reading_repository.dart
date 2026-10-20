@@ -26,8 +26,8 @@ import 'package:evangelion/features/reading/data/mappers/today_reading_mapper.da
 /// (an inventory gap — there are three adapters, not the two it lists), while
 /// Phase 7 claims it owns "the remote data source (`GET /readings/today/{lang}`)
 /// and its mapper". Both cannot be true of the same file, so the data sources,
-/// mappers and adapters are created **now** for the narrow projection and Phase 7
-/// **widens** them. `07-file-map.md` is not edited — AGENT_CONTEXT §8.6 gives
+/// mappers and adapters are created **for the narrow projection** and Phase 7
+/// **widened** them. `07-file-map.md` is not edited — AGENT_CONTEXT §8.6 gives
 /// `docs/plans/` a dedicated owner.
 ///
 /// ## THE BODY IS TWO ARMS, AND THAT IS THE WHOLE OF THE CONTRACT

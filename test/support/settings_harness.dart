@@ -317,7 +317,7 @@ final class FailingSettingsRepository implements SettingsRepository {
 /// ## WHY IT LIVES HERE AND NOT IN `settings_page_test.dart`
 ///
 /// `settings_page_test.dart` has held a **private** `pumpSettings` since Phase 9,
-/// written before this screen had a second suite. Phase 10 adds two more — the
+/// written before this screen had a second suite. Phase 10 added two more — the
 /// §14 accessibility sweep and the 1.22×/320px text-scale gate — and a private
 /// copy per suite is how the three drift apart on the two parameters that matter
 /// most here: the `MediaQuery` the page reads its font step from, and whether

@@ -345,7 +345,7 @@ void main() {
   });
 
   group('"is this verse usable?" — the question decision 40 deliberately did not '
-      'answer, and Phase 8 owns', () {
+      'answer, and Phase 8 answered', () {
     // ## WHY THIS GROUP EXISTS, AND WHAT IT IS NOT
     //
     // `text: ''` above **maps**, and the reason is decision 40: an empty paragraph

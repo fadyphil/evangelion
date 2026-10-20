@@ -91,7 +91,7 @@ void main() {
         // The measured shape: a single correct answer does **not** advance the streak.
         // The payload cannot be produced against this backend today, so it is a
         // transcription rather than a capture — but it is the case `/result` has to
-        // get right, and `result_page_test.dart` reads it.
+        // get right, and `result_sheet_test.dart` reads it.
         final SubmitResult result = entityOf(
           mapper.map(
             contractWithKey(
@@ -253,7 +253,7 @@ void main() {
     test('a very large streak is PASSED THROUGH — no bound is invented', () {
       // Decision 45's other rejection: this client has seen no upper bound, and a
       // bound is a claim about a payload it has not seen. What keeps that honest is
-      // layout, and `result_page_test.dart` renders a twelve-digit streak at 320px
+      // layout, and `result_sheet_test.dart` renders a twelve-digit streak at 320px
       // and asserts no overflow — the same witness `home_page_test.dart` gives.
       final SubmitResult result = entityOf(
         mapper.map(

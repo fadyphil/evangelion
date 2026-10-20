@@ -343,7 +343,7 @@ void main() {
         'free_text',
         reason:
             'an unknown type must construct, not fail the whole reading — '
-            'Phase 8 owns the enumeration',
+            'no screen enumerates the type yet',
       );
     });
 

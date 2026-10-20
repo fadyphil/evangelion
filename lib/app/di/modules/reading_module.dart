@@ -30,7 +30,7 @@ import 'package:injectable/injectable.dart';
 /// walk part of the contract. A `@module` here is therefore reachable from that
 /// walk, and so is anything it names.
 ///
-/// Phase Phase 7 will break that, because {@code ReadingCubit} is a Flutter type in
+/// Phase 7 broke that, because {@code ReadingCubit} is a Flutter type in
 /// practice — `flutter_bloc` re-exports the framework's widget layer alongside
 /// the bloc, and `bloc` itself is a transitive dependency this project may not
 /// promote to a direct one. The fix is the one already taken for the router:

@@ -1,13 +1,20 @@
-import 'package:evangelion/features/result/presentation/result_l10n.dart';
+import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The `/result` derived strings — `messageFor` and `streakLabelFor`.
+/// The result's derived strings — `messageFor` and `streakLabelFor`.
 ///
 /// Both were methods on `ResultStrings`. The keys are asserted by
 /// `test/l10n/app_localizations_test.dart`; what is here is the composition, and both
 /// are **decisions about the payload** — which is a Dart type, not a translation.
+///
+/// **The extension moved with the feature.** It was
+/// `features/result/presentation/result_l10n.dart` and it is now
+/// `features/quiz/presentation/result_l10n.dart`, because the result is the
+/// quiz's outcome and it lives in the quiz feature (Phase 6.2). The extension's
+/// name, its two members' names and their behaviour are **unchanged** — the
+/// move was a path, not a rewrite.
 void main() {
   final AppLocalizationsEn en = AppLocalizationsEn();
   final AppLocalizationsAr ar = AppLocalizationsAr();

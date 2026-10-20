@@ -104,7 +104,7 @@ void main() {
     test('the change signal fires for a real state change, and nothing else', () async {
       // Phase 4 asserted this over a **placeholder** that could not fire, and the
       // property it was really pinning was the shape: a signal that announces
-      // nothing until something happens. Phase 5 replaces the placeholder with
+      // nothing until something happens. Phase 5 replaced the placeholder with
       // `ReevaluateListenable.stream(authBloc.stream)`, so the same property now
       // has a source and can be checked in both directions — silent while the
       // session does not change, loud when it does.
@@ -238,7 +238,7 @@ void main() {
       final ManualAuthChanges changes = ManualAuthChanges();
       final AppRouter router = AppRouter(status, changes);
       addTearDown(router.dispose);
-      // Phase 5 adds a fourth thing this hand-built graph must supply: `LoginPage`
+      // Phase 5 added a fourth thing this hand-built graph must supply: `LoginPage`
       // resolves its `AuthBloc` from the locator, and `/login` is where every one of
       // these navigations lands. Without it the redirect throws inside
       // `NeuralScaffold.build`. The **session** is still the substituted
@@ -706,10 +706,12 @@ void main() {
       // answer.
       expect(
         router.stack.map((AutoRoutePage<Object?> page) => page.name),
-        <String>[HomeRoute.name],
+        <String>[DockShellRoute.name],
         reason:
             'the guard resumed the interrupted navigation and every other route came '
-            'off the stack, so there is no way back to the form',
+            'off the stack, so there is no way back to the form. **The root route is '
+            'the dock shell**, and the home tab is inside it — so the stack names the '
+            'shell and the tree carries the home page.',
       );
     });
   });

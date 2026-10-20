@@ -12,8 +12,8 @@
 /// **preview only**.
 ///
 /// That is the same defect class one screen over, so the fix is not "fix `/login`
-/// and `/`". It is **generalise the instrument**, so the next screen Phase 8 or
-/// Phase 9 writes is gated on its first commit rather than on its third review.
+/// and `/`". It is **generalise the instrument**, so the next screen a phase
+/// writes is gated on its first commit rather than on its third review.
 ///
 /// One copy, therefore. A gate with six copies is six gates, and they drift — which
 /// is what happened before this file existed.

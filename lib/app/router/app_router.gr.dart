@@ -11,19 +11,19 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:auto_route/auto_route.dart' as _i9;
-import 'package:evangelion/core/domain/entities/submit_result.dart' as _i17;
+import 'package:evangelion/app/router/dock_shell_page.dart' as _i2;
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart'
     as _i14;
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart'
-    as _i4;
+    as _i5;
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart'
     as _i12;
 import 'package:evangelion/features/home/presentation/pages/home_page.dart'
-    as _i2;
+    as _i3;
 import 'package:evangelion/features/journey/presentation/bloc/journey_cubit.dart'
     as _i13;
 import 'package:evangelion/features/journey/presentation/pages/journey_page.dart'
-    as _i3;
+    as _i4;
 import 'package:evangelion/features/leaderboard/presentation/bloc/leaderboard_cubit.dart'
     as _i11;
 import 'package:evangelion/features/leaderboard/presentation/pages/communion_page.dart'
@@ -31,15 +31,13 @@ import 'package:evangelion/features/leaderboard/presentation/pages/communion_pag
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart'
     as _i15;
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart'
-    as _i5;
+    as _i6;
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart'
     as _i16;
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart'
-    as _i6;
-import 'package:evangelion/features/result/presentation/pages/result_page.dart'
     as _i7;
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart'
-    as _i18;
+    as _i17;
 import 'package:evangelion/features/settings/presentation/pages/settings_page.dart'
     as _i8;
 import 'package:flutter/material.dart' as _i10;
@@ -94,7 +92,23 @@ class CommunionRouteArgs {
 }
 
 /// generated route for
-/// [_i2.HomePage]
+/// [_i2.DockShellPage]
+class DockShellRoute extends _i9.PageRouteInfo<void> {
+  const DockShellRoute({List<_i9.PageRouteInfo>? children})
+    : super(DockShellRoute.name, initialChildren: children);
+
+  static const String name = 'DockShellRoute';
+
+  static _i9.PageInfo page = _i9.PageInfo(
+    name,
+    builder: (data) {
+      return const _i2.DockShellPage();
+    },
+  );
+}
+
+/// generated route for
+/// [_i3.HomePage]
 class HomeRoute extends _i9.PageRouteInfo<HomeRouteArgs> {
   HomeRoute({
     _i10.Key? key,
@@ -114,7 +128,7 @@ class HomeRoute extends _i9.PageRouteInfo<HomeRouteArgs> {
       final args = data.argsAs<HomeRouteArgs>(
         orElse: () => const HomeRouteArgs(),
       );
-      return _i2.HomePage(key: args.key, bloc: args.bloc);
+      return _i3.HomePage(key: args.key, bloc: args.bloc);
     },
   );
 }
@@ -143,7 +157,7 @@ class HomeRouteArgs {
 }
 
 /// generated route for
-/// [_i3.JourneyPage]
+/// [_i4.JourneyPage]
 class JourneyRoute extends _i9.PageRouteInfo<JourneyRouteArgs> {
   JourneyRoute({
     _i10.Key? key,
@@ -163,7 +177,7 @@ class JourneyRoute extends _i9.PageRouteInfo<JourneyRouteArgs> {
       final args = data.argsAs<JourneyRouteArgs>(
         orElse: () => const JourneyRouteArgs(),
       );
-      return _i3.JourneyPage(key: args.key, cubit: args.cubit);
+      return _i4.JourneyPage(key: args.key, cubit: args.cubit);
     },
   );
 }
@@ -192,11 +206,11 @@ class JourneyRouteArgs {
 }
 
 /// generated route for
-/// [_i4.LoginPage]
+/// [_i5.LoginPage]
 class LoginRoute extends _i9.PageRouteInfo<LoginRouteArgs> {
   LoginRoute({
     _i10.Key? key,
-    _i4.LoginResultCallback? onResult,
+    _i5.LoginResultCallback? onResult,
     _i14.AuthBloc? bloc,
     List<_i9.PageRouteInfo>? children,
   }) : super(
@@ -213,7 +227,7 @@ class LoginRoute extends _i9.PageRouteInfo<LoginRouteArgs> {
       final args = data.argsAs<LoginRouteArgs>(
         orElse: () => const LoginRouteArgs(),
       );
-      return _i4.LoginPage(
+      return _i5.LoginPage(
         key: args.key,
         onResult: args.onResult,
         bloc: args.bloc,
@@ -227,7 +241,7 @@ class LoginRouteArgs {
 
   final _i10.Key? key;
 
-  final _i4.LoginResultCallback? onResult;
+  final _i5.LoginResultCallback? onResult;
 
   final _i14.AuthBloc? bloc;
 
@@ -248,7 +262,7 @@ class LoginRouteArgs {
 }
 
 /// generated route for
-/// [_i5.QuizPage]
+/// [_i6.QuizPage]
 class QuizRoute extends _i9.PageRouteInfo<QuizRouteArgs> {
   QuizRoute({
     _i10.Key? key,
@@ -268,7 +282,7 @@ class QuizRoute extends _i9.PageRouteInfo<QuizRouteArgs> {
       final args = data.argsAs<QuizRouteArgs>(
         orElse: () => const QuizRouteArgs(),
       );
-      return _i5.QuizPage(key: args.key, bloc: args.bloc);
+      return _i6.QuizPage(key: args.key, bloc: args.bloc);
     },
   );
 }
@@ -297,7 +311,7 @@ class QuizRouteArgs {
 }
 
 /// generated route for
-/// [_i6.ReadingPage]
+/// [_i7.ReadingPage]
 class ReadingRoute extends _i9.PageRouteInfo<ReadingRouteArgs> {
   ReadingRoute({
     _i10.Key? key,
@@ -317,7 +331,7 @@ class ReadingRoute extends _i9.PageRouteInfo<ReadingRouteArgs> {
       final args = data.argsAs<ReadingRouteArgs>(
         orElse: () => const ReadingRouteArgs(),
       );
-      return _i6.ReadingPage(key: args.key, cubit: args.cubit);
+      return _i7.ReadingPage(key: args.key, cubit: args.cubit);
     },
   );
 }
@@ -346,58 +360,11 @@ class ReadingRouteArgs {
 }
 
 /// generated route for
-/// [_i7.ResultPage]
-class ResultRoute extends _i9.PageRouteInfo<ResultRouteArgs> {
-  ResultRoute({
-    required _i17.SubmitResult result,
-    _i10.Key? key,
-    List<_i9.PageRouteInfo>? children,
-  }) : super(
-         ResultRoute.name,
-         args: ResultRouteArgs(result: result, key: key),
-         initialChildren: children,
-       );
-
-  static const String name = 'ResultRoute';
-
-  static _i9.PageInfo page = _i9.PageInfo(
-    name,
-    builder: (data) {
-      final args = data.argsAs<ResultRouteArgs>();
-      return _i7.ResultPage(result: args.result, key: args.key);
-    },
-  );
-}
-
-class ResultRouteArgs {
-  const ResultRouteArgs({required this.result, this.key});
-
-  final _i17.SubmitResult result;
-
-  final _i10.Key? key;
-
-  @override
-  String toString() {
-    return 'ResultRouteArgs{result: $result, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! ResultRouteArgs) return false;
-    return result == other.result && key == other.key;
-  }
-
-  @override
-  int get hashCode => result.hashCode ^ key.hashCode;
-}
-
-/// generated route for
 /// [_i8.SettingsPage]
 class SettingsRoute extends _i9.PageRouteInfo<SettingsRouteArgs> {
   SettingsRoute({
     _i10.Key? key,
-    _i18.SettingsCubit? cubit,
+    _i17.SettingsCubit? cubit,
     List<_i9.PageRouteInfo>? children,
   }) : super(
          SettingsRoute.name,
@@ -423,7 +390,7 @@ class SettingsRouteArgs {
 
   final _i10.Key? key;
 
-  final _i18.SettingsCubit? cubit;
+  final _i17.SettingsCubit? cubit;
 
   @override
   String toString() {

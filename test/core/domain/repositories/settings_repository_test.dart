@@ -41,7 +41,7 @@ SettingsLocalDataSource unreachableStore() {
 ///
 /// **`Result` has no throwing accessor, deliberately** — its own doc says "there is no
 /// `value` getter and no `getOrNull`", because either would let a caller turn a
-/// [FailureResult] into a `null` that surfaces three frames later in a widget build.
+/// [Failure] into a `null` that surfaces three frames later in a widget build.
 /// `valueOrElse` exists but takes a **value**, so the honest spelling is this
 /// exhaustive `switch` over the sealed type: a third arm would not compile.
 UserSettings unwrap(Result<UserSettings> result) => switch (result) {

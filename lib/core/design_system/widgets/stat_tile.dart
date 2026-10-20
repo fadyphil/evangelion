@@ -14,17 +14,19 @@ import 'package:flutter/material.dart';
 ///
 /// The redesign does not restyle this tile — it **replaces** it. `.ringbox`
 /// (`redesign.html:403-409`) is a `CustomPaint` ring with a stroked arc, a value
-/// and a label, and Phase 6.2 is when `/result` becomes a modal built on it.
+/// and a label, and Phase 6.2 is when `/result` **became** a modal.
 /// There is no `.ringbox` panel to transcribe because there is no panel: it is a
 /// circle with a gap in it.
 ///
 /// So the honest move is to split the widget's provenance rather than pretend the
 /// redesign has an answer for all of it. The **glass panel** stays on
-/// `ds.tsx:462-478` because that is where it still comes from and the redesign
-/// says nothing about it until Phase 6.2 deletes it. The **type** is re-pointed
-/// to `redesign.html:407-408`, because that is where the redesign *does* state a
-/// value for the same two lines of text — same words, smaller, mono, quieter —
-/// and a prototype number that exists is a prototype number.
+/// `ds.tsx:462-478` because that is where it still comes from — and nothing ever
+/// deleted it, because the redesign's ring was **never ported**: a ring needs a
+/// denominator the submit response does not carry (AGENT_CONTEXT decision 93),
+/// so Phase 6.2's modal draws this tile's panel instead. The **type** is
+/// re-pointed to `redesign.html:407-408`, because that is where the redesign
+/// *does* state a value for the same two lines of text — same words, smaller,
+/// mono, quieter — and a prototype number that exists is a prototype number.
 ///
 /// The result is a tile that is the redesign's lettering inside Phase 2's panel,
 /// and that is stated here rather than left for a reader to infer from the two

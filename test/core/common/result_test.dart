@@ -29,7 +29,7 @@ Failure _builtFailure(FailureKind kind, String message, {int? statusCode}) =>
 /// how the generic-parameter check would have been written by accident.
 Right<Failure, T> _builtSuccess<T>(T value) => Right<Failure, T>(value);
 
-/// [FailureResult] via a parameter, for the same reason as [_builtFailure], and
+/// `Left` via a parameter, for the same reason as [_builtFailure], and
 /// generic in [T] for the same reason as [_builtSuccess].
 Left<Failure, T> _builtFailureResult<T>(Failure failure) =>
     Left<Failure, T>(failure);

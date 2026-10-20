@@ -95,6 +95,26 @@ def strip_comments(text: str) -> str:
     # because this only ever errs toward reporting MORE, never fewer.
     return text
 
+
+# The annotation that says "this file is a route page".
+#
+# auto_route_generator finds its pages by this annotation, so it is the same
+# definition the framework itself uses — and the check's root set should agree
+# with the generator's, or the two disagree about what a page is.
+_ROUTE_PAGE = re.compile(r"^[ \t]*@RoutePage[ \t]*\(", re.M)
+
+
+def _declares_route_page(text: str) -> bool:
+    """Whether [text] declares a route page.
+
+    Matched against the **stripped** text, so a doc comment that merely mentions
+    `@RoutePage()` — and this repository mentions it in prose in several places
+    — does not make the file a root. A file that only *talks* about pages is not
+    one.
+    """
+    return _ROUTE_PAGE.search(strip_comments(text)) is not None
+
+
 # Classes that are legitimately not placed on a page, each with the reason. An
 # entry here is a PRODUCT decision, not a convenience — the same rule
 # `text_contrast_gate_test.dart` applies to `knownSubstandard`: the list cannot
@@ -235,7 +255,26 @@ def main() -> int:
         return re.search(rf"\b{re.escape(name)}\s*(?:<[^;{{}}]*>)?\s*\(", code) is not None
 
     # The root set: page files name what is on a screen directly.
-    pages = [p for p in files if "/presentation/pages/" in p.as_posix()]
+    #
+    # **AND THE FILES THAT DECLARE THEMSELVES ROUTE PAGES**, which is what
+    # Phase 6's dock shell is. `lib/app/router/dock_shell_page.dart` is a page
+    # and it is deliberately NOT under a `presentation/pages/` directory,
+    # because it belongs to the composition root and not to a feature — it
+    # names three features' routes and only `lib/app/` may do that (AGENT_CONTEXT
+    # §3). The path heuristic is a *proxy* for "is a page"; the annotation is
+    # the thing itself, and a file that says `@RoutePage()` is one.
+    #
+    # **The comment stripping matters here.** A doc comment that *mentions*
+    # `@RoutePage()` — and plenty of them do, because this repository explains
+    # itself in prose — must not make a file a root, or a widget that no page
+    # places would be reported as placed by a sentence. The annotation is
+    # matched against the stripped text, so only a real annotation counts.
+    pages = [
+        p
+        for p in files
+        if "/presentation/pages/" in p.as_posix()
+        or _declares_route_page(texts[p])
+    ]
     if not pages:
         print("FATAL: no page files found — nothing is 'placed' by definition", file=sys.stderr)
         return 2

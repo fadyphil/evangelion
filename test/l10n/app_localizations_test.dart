@@ -145,12 +145,23 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        178,
+        179,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**178 → 179 in Phase 6 of the Lumen redesign**, for the **dock**: '
+            '**five** keys arrived (`dockHome`, `dockRead`, `dockToday`, `dockBoard` '
+            'and `dockJourney` — the redesign\'s own i18n rows, `:931-932`) and '
+            '**four** died (`sealFabOpen`, `sealFabClose`, `sealFabSettings` and '
+            '`sealFabLeaderboard` — the `SealFab`\'s own, and the dial is gone).\n\n'
+            '**`sealFabLeaderboard` BECAME `dockBoard` rather than being replaced '
+            'by a new key**, and the value did not change: it was already '
+            '"Communion" / "الشركة" — the redesign\'s own word, and its '
+            'description already cited `redesign.html:932`\'s `dockBoard` row. '
+            'The key was renamed to the name of the thing it now labels, which '
+            'is the same string with a different owner.\n\n'
             '**147 → 180 → 178 in Task 5.7**, for the Workshop: **forty-two** new '
             'keys and **eleven** dead ones. The dead nine are the Phase-9 keys whose '
             'strings the redesign does not draw — the Appearance and Reading group '
@@ -251,12 +262,13 @@ void main() {
             'third destination would be Language, but `showLanguageSheet` lives in '
             '`features/settings/` and Gate 2 forbids one feature importing another, so a '
             '`sealFabLanguage` getter with no call site would be a string in the '
-            'bilingual surface that no reader can reach. `seal_fab_test.dart` asserts '
-            'Language is absent from the dial for the same reason.\n\n'
+            'bilingual surface that no reader can reach. The deleted '
+            '`seal_fab_test.dart` asserted Language is absent from the dial for the '
+            'same reason.\n\n'
             '`sealFabLeaderboard` occupies the prototype\'s `Profile` slot: Profile is a '
             'cut screen with no endpoint, and a dial offering a dead route is why the '
-            'component was cut. `seal_fab_test.dart` asserts Profile is absent so it '
-            'cannot creep back.\n\n'
+            'component was cut. The deleted `seal_fab_test.dart` asserted Profile is '
+            'absent so it could not creep back.\n\n'
             '**111 → 102 in Phase 5.1**, for the redesigned login — '
             '`eva/redesign.html:503-511`: twelve keys died with the screen\'s '
             'dropped elements (the seal, the sign-in label it replaced, forgot/'
@@ -955,7 +967,7 @@ void main() {
 
     test('the score caption selects a NOUN and carries no numeral of its own', () {
       // `resultTotalCaption` is a plural used for **selection only**. The score is
-      // drawn by `result_page.dart` in `displayLarge` one line above, so folding the
+      // drawn by `result_sheet.dart` in `displayLarge` one line above, so folding the
       // numeral into this key would print it twice. What must agree with the number
       // is the noun.
       //
@@ -998,7 +1010,7 @@ void main() {
       // ## WHAT EACH MEMBER IS, AND WHY THERE ARE TWO
       //
       // * `resultTotalCaption` — a **score's noun**, for `/result`. The score itself
-      //   is drawn by `result_page.dart` in `displayLarge` one line above, so this
+      //   is drawn by `result_sheet.dart` in `displayLarge` one line above, so this
       //   key selects agreement and carries no numeral.
       // * `leaderboardRowSemantics` — a **whole row's spoken text**, added in
       //   Phase 1. A board row is four numbers, and a screen reader announcing them
