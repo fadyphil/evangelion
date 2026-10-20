@@ -671,6 +671,67 @@ void main() {
     });
   });
 
+  group('FixedLumenUniforms — the fixed source', () {
+    testWidgets('it answers the table with the rect and the clock', (
+      WidgetTester tester,
+    ) async {
+      final FixedLumenUniforms source = FixedLumenUniforms(
+        fixture(),
+        LumenClock.fixed(3.7),
+      );
+      final LumenUniforms table = source.tableAt(kSurface);
+      expect(table.resX, 400);
+      expect(table.resY, 800);
+      expect(table.time, 3.7);
+    });
+
+    testWidgets('its listeners ARE the clock\'s', (WidgetTester tester) async {
+      // The painter's `repaint` is the source, and the source forwards to the
+      // clock — so a fixed source's notification is the clock's, exactly as it
+      // was before the seam existed.
+      final LumenClock clock = LumenClock.fixed(1);
+      final FixedLumenUniforms source = FixedLumenUniforms(fixture(), clock);
+      int fired = 0;
+      void listener() => fired++;
+      source.addListener(listener);
+      expect(fired, 0, reason: 'a frozen clock never notifies');
+      source.removeListener(listener);
+      expect(fired, 0);
+    });
+
+    testWidgets(
+      'two sources are the same when they hold the same table and clock',
+      (WidgetTester tester) async {
+        // This is what makes `LumenCanvas.shouldRepaint` answer "an identical
+        // table is not a change" for two separately constructed painters.
+        final LumenClock clock = LumenClock.fixed(3.7);
+        expect(
+          FixedLumenUniforms(fixture(), clock),
+          FixedLumenUniforms(fixture(), clock),
+        );
+        expect(
+          FixedLumenUniforms(fixture(shape: 1), clock),
+          isNot(FixedLumenUniforms(fixture(), clock)),
+        );
+        expect(
+          FixedLumenUniforms(fixture(), clock).hashCode,
+          FixedLumenUniforms(fixture(), clock).hashCode,
+        );
+      },
+    );
+
+    testWidgets('and it names the table it holds', (WidgetTester tester) async {
+      final FixedLumenUniforms source = FixedLumenUniforms(
+        fixture(),
+        LumenClock.fixed(3.7),
+      );
+      expect(
+        source.toString(),
+        startsWith('FixedLumenUniforms(LumenUniforms('),
+      );
+    });
+  });
+
   group('LumenCanvas.paint — one shader, however many frames', () {
     testWidgets('the FragmentShader is allocated once, on the first paint', (
       WidgetTester tester,

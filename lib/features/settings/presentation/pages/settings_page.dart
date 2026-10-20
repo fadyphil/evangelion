@@ -69,12 +69,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 ///    label is therefore `groupGap + SettingsGroup.topGap` where the prototype's
 ///    is 20. **Recorded here** because it is the one number on this screen that
 ///    is the client's rather than the prototype's.
-/// 2. **The ten light-workshop controls persist choices the client does not
-///    render.** The aurora shader is not mounted, and the deferral — with the task
-///    that discharges it — is recorded at the group and in the ARB description of
-///    the group's own label. **The controls are neither disabled nor hidden**: a
-///    row that says "Aurora engine" and whose switch does nothing visible is
-///    honest only if the screen says so, and the group's label does.
+/// 2. **The ten light-workshop controls drive the aurora.** The shader is
+///    mounted (Task 5.8) and the ten `eva.shader.*` preferences are its
+///    inputs — `LumenPreferences.fromSettings` is the projection and
+///    `LumenScene` is what turns them into the shader's sixteen uniforms.
+///    **The controls are neither disabled nor hidden**, and the switch beside
+///    "Aurora engine" now turns the aurora off, exactly as the prototype's
+///    does (`eva/redesign.html:1468`).
 ///
 /// ## AND THE BACK TARGET
 ///
@@ -450,19 +451,20 @@ class _SettingsBodyState extends State<_SettingsBody> {
 
         // --- 3. the light workshop (`:651-665`) ---------------------------
         //
-        // ## THE TEN CONTROLS BELOW PERSIST REAL CHOICES AND THE CLIENT RENDERS
-        // ## NONE OF THEM
+        // ## THE TEN CONTROLS BELOW DRIVE THE AURORA
         //
-        // `LumenCanvas` is mounted nowhere in production, and the ten
-        // `eva.shader.*` preferences target uniforms nothing reads. The plan
-        // deferred exactly this — "Wiring constraint for whoever mounts the
-        // painter (Phase 5) … Hoist one `LumenCanvas` above the rebuild boundary"
-        // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`).
+        // Task 5.8 mounted `LumenCanvas` in the screen root, and these ten
+        // preferences are its inputs: `LumenPreferences.fromSettings` is the
+        // projection, and `LumenScene` is what turns them into the shader's
+        // sixteen uniforms. The plan's deferral ("Wiring constraint for
+        // whoever mounts the painter (Phase 5) … Hoist one `LumenCanvas`
+        // above the rebuild boundary",
+        // `docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`) is
+        // discharged.
         //
-        // **The controls are neither disabled nor hidden.** A row that says
-        // "Aurora engine" and whose switch does nothing visible is honest only if
-        // the screen says so — and the group's own ARB label says so, because a
-        // reader's own string is where a promise is made.
+        // **So the switch beside "Aurora engine" now turns the aurora off**
+        // — the prototype's `cvs.style.display='none'` (`:1468`) — and the
+        // screen falls back to the legacy background while it is off.
         SettingsGroup(
           label: strings.settingsWsLight,
           children: <Widget>[
@@ -771,8 +773,9 @@ class _SettingsBodyState extends State<_SettingsBody> {
           children: <Widget>[
             // The prototype's **own** literals, and they name the **design
             // system's** versions rather than this client's — the client's shader
-            // program is `kLumenShaderAsset` and it is not mounted. **Recorded as
-            // such at the row.**
+            // program is `kLumenShaderAsset` and it **is** mounted (Task 5.8).
+            // **The row still reports the prototype's version, because that is
+            // what the row transcribes. Recorded as such at the row.**
             WorkshopValueRow(
               title: strings.settingsShaders,
               value: kShadersVersion,

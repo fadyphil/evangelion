@@ -1,6 +1,7 @@
 import 'package:evangelion/app/app.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
+import 'package:evangelion/core/design_system/effects/lumen_program.dart';
 import 'package:evangelion/core/design_system/motion/eva_animate.dart';
 import 'package:flutter/widgets.dart';
 
@@ -65,7 +66,15 @@ import 'package:flutter/widgets.dart';
 /// `configureNavigation` is async, and `unawaited_futures` exists to make the day
 /// something *does* become async a compile error rather than a dropped future —
 /// the same reasoning `injection.dart` records for `getIt.init()`.
-Future<void> bootstrapApp({required void Function(Widget) run}) async {
+///
+/// [loadLumen] is the seam for the shader load, for the same reason `run` is:
+/// the failure path is the one nobody can reach otherwise, because the asset
+/// is either there or the build is broken. `main_bootstrap_test.dart` hands it
+/// a loader that throws and proves the app still launches.
+Future<void> bootstrapApp({
+  required void Function(Widget) run,
+  Future<LumenProgram> Function()? loadLumen,
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
   // Before DI, before the router, before any widget exists — because this rewrites
   // `flutter_animate`'s **mutable statics**, and their only job is to be the value a
@@ -77,5 +86,36 @@ Future<void> bootstrapApp({required void Function(Widget) run}) async {
   installPackageDefaults();
   await configureDependencies();
   configureNavigation();
+  await _loadLumenProgram(loadLumen ?? LumenProgram.load);
   run(const EvangelionApp());
+}
+
+/// Loads the LUMEN shader, before the first frame.
+///
+/// ## WHY IT IS HERE AND NOT IN THE BACKGROUND WIDGET
+///
+/// Because `LumenProgram.load()` is **async**, and a background that has to
+/// await before it can paint shows the **fallback** for a frame or two and
+/// then swaps — a visible flash of the old design at every launch.
+///
+/// `LumenProgram.loaded()` is a synchronous read of the same memo, so a
+/// program loaded here is available to the very first frame.
+///
+/// ## WHY A FAILURE DOES NOT STOP THE LAUNCH
+///
+/// Because the ambient has a fallback: the legacy `NeuralBackground`, which is
+/// a thing the design already has. A missing or unloadable shader asset
+/// should cost the reader the aurora, not the app.
+///
+/// The failure is **not** silent in the way that matters — the screen shows
+/// the other background, every frame, which is more visible than a log line.
+Future<void> _loadLumenProgram(Future<LumenProgram> Function() load) async {
+  try {
+    await load();
+  } on Object catch (error) {
+    debugPrint(
+      'the LUMEN shader did not load; the ambient falls back to the legacy '
+      'background: $error',
+    );
+  }
 }

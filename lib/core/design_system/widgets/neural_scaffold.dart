@@ -1,5 +1,6 @@
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/curtain_shape.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -262,6 +263,22 @@ class NeuralScaffold extends StatelessWidget {
   /// `.80`. See [curtain] and `kNeuralCurtain` for the whole of it.
   final bool bottomFade;
 
+  /// Puts the pointer where the shader expects it.
+  ///
+  /// `eva/redesign.html:918-919` — the shader's own normalisation, and not
+  /// the orb parallax one. See `lumenPointerFor`.
+  void _trackPointer(BuildContext context, Size size, Offset local) {
+    NeuralMotionScope.of(context).lumenScene.pointer.value = lumenPointerFor(
+      size: size,
+      local: local,
+    );
+  }
+
+  /// Puts the pointer back where the shader expects it when there is none.
+  void _resetPointer(BuildContext context) {
+    NeuralMotionScope.of(context).lumenScene.pointer.value = kLumenNoPointer;
+  }
+
   /// Which way [bottomFade]'s scrim closes — `eva/redesign.html:112-115`.
   ///
   /// **The shape, never the extent.** [kNeuralScaffoldFadeHeight] still decides
@@ -316,57 +333,100 @@ class NeuralScaffold extends StatelessWidget {
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
         child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) => Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              // Behind everything, and full-bleed: the prototype's background
-              // container is `position: absolute; inset: 0`
-              // (`ds.tsx:162`) and the screens above it rely on that to be
-              // immersive. The [SafeArea] is applied to the *content*, not to the
-              // stack, so the canvas and the orbs reach under the status bar.
-              NeuralBackground(variant: variant, tier: tier),
-              SafeArea(
-                // Bottom included: the sticky CTA's scrim has to clear the home
-                // indicator, or the button sits under it.
-                child: Padding(
-                  padding: padding,
-                  child: scrollable
-                      ? SingleChildScrollView(
-                          // The prototype's `overflowY: 'auto'` is
-                          // `ReadingEnScreen.tsx:11`, on the **root** — so a
-                          // bouncing scroll is the faithful choice, not the
-                          // platform's clamping one.
-                          physics: const BouncingScrollPhysics(),
-                          child: child,
-                        )
-                      : child,
+          builder: (BuildContext context, BoxConstraints constraints) => Listener(
+            // ## THE POINTER IS TRACKED **HERE**, AND NOT IN THE BACKGROUND
+            //
+            // Because the prototype tracks it on `#screen` — the **root**
+            // (`eva/redesign.html:916`, `el0('screen').addEventListener('pointermove',…)`)
+            // — and a listener in the background layer would only see the
+            // moves the content above it does not absorb. The prototype's
+            // canvas is behind everything and still follows the pointer
+            // across the whole screen; a listener behind the content follows
+            // it only over the gaps.
+            //
+            // `onPointerHover` as well as `onPointerMove`, for the reason
+            // `neural_background.dart` records: Flutter routes an un-pressed
+            // mouse move to `PointerHoverEvent`, which `onPointerMove` never
+            // sees — so a desktop build would have a dead touch glow.
+            onPointerHover: (PointerEvent event) => _trackPointer(
+              context,
+              constraints.biggest,
+              event.localPosition,
+            ),
+            onPointerMove: (PointerEvent event) => _trackPointer(
+              context,
+              constraints.biggest,
+              event.localPosition,
+            ),
+            // The prototype's `pointerleave` (`eva/redesign.html:921`) puts
+            // the pointer back at `(-10, -10)` — ten screen-widths away, so
+            // the glow is nowhere near the band. Flutter's route out of a box
+            // is `onPointerExit`, which `Listener` does not have; the
+            // **touch** case is the one that matters, and a finger lifting is
+            // an `onPointerUp`.
+            onPointerUp: (PointerEvent event) {
+              if (event.kind == PointerDeviceKind.touch) {
+                _resetPointer(context);
+              }
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                // Behind everything, and full-bleed: the prototype's background
+                // container is `position: absolute; inset: 0`
+                // (`ds.tsx:162`) and the screens above it rely on that to be
+                // immersive. The [SafeArea] is applied to the *content*, not to the
+                // stack, so the canvas and the orbs reach under the status bar.
+                //
+                // `LumenBackground` is the redesign's ambient: the aurora
+                // (`eva/redesign.html:46`, `.screen canvas`) when the reader's
+                // choices and the tier allow it, and the legacy
+                // `NeuralBackground` otherwise. See its doc for the table.
+                LumenBackground(variant: variant, tier: tier),
+                SafeArea(
+                  // Bottom included: the sticky CTA's scrim has to clear the home
+                  // indicator, or the button sits under it.
+                  child: Padding(
+                    padding: padding,
+                    child: scrollable
+                        ? SingleChildScrollView(
+                            // The prototype's `overflowY: 'auto'` is
+                            // `ReadingEnScreen.tsx:11`, on the **root** — so a
+                            // bouncing scroll is the faithful choice, not the
+                            // platform's clamping one.
+                            physics: const BouncingScrollPhysics(),
+                            child: child,
+                          )
+                        : child,
+                  ),
                 ),
-              ),
-              if (overlay case final Widget over) Positioned.fill(child: over),
-              if (bottomFade)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  // `LayoutBuilder`'s only job. The scrim is the CTA's height, and
-                  // the CTA's height is the content's bottom padding — which is a
-                  // function of the viewport, and there is nothing else here that
-                  // would read it.
-                  height: kNeuralScaffoldFadeHeight(constraints),
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        // `eva/redesign.html:112-115` — see [kNeuralCurtain], which
-                        // is where the ramps live and where the substitution is
-                        // named. The three shapes are three different
-                        // `background` declarations in the prototype, not one
-                        // gradient with three directions.
-                        gradient: kNeuralCurtain(curtain, colors, brightness),
+                if (overlay case final Widget over)
+                  Positioned.fill(child: over),
+                if (bottomFade)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    // `LayoutBuilder`'s only job. The scrim is the CTA's height, and
+                    // the CTA's height is the content's bottom padding — which is a
+                    // function of the viewport, and there is nothing else here that
+                    // would read it.
+                    height: kNeuralScaffoldFadeHeight(constraints),
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          // `eva/redesign.html:112-115` — see [kNeuralCurtain], which
+                          // is where the ramps live and where the substitution is
+                          // named. The three shapes are three different
+                          // `background` declarations in the prototype, not one
+                          // gradient with three directions.
+                          gradient: kNeuralCurtain(curtain, colors, brightness),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

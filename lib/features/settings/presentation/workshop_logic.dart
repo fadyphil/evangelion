@@ -188,9 +188,9 @@ const Duration kRestoreToastDuration = Duration(milliseconds: 1800);
 ///
 /// **The prototype's own literal, and it names the design system's shader asset
 /// rather than this client's.** The client's shader program is `kLumenShaderAsset`
-/// (`lumen_program.dart`) and it is **not mounted** (the ten light-workshop
-/// controls persist their choices and the client renders none of them), so the row
-/// reports the prototype's version and the screen's own group header says so.
+/// (`lumen_program.dart`) and it **is** mounted (Task 5.8) — but the row
+/// reports the *prototype's* version, because the prototype's version is what
+/// the row is a transcription of. **Recorded as such at the row.**
 const String kShadersVersion = 'aurora.frag v8';
 
 /// The Tokens row's value. `eva/redesign.html:698` — `lumen v1.2`.

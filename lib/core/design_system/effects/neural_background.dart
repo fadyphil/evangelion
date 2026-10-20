@@ -91,9 +91,10 @@ const double kWideViewport = 640;
 /// Resolved by [NeuralTiers.resolveShader] from the same two inputs as
 /// [NeuralTier] — the viewport size and the reader's animation preference — so
 /// everything said there about the override seam and about reduced motion
-/// holds here too. This is the *decision*; wiring a painter to it belongs to
-/// whoever mounts the shader (Phase 5), not to this file. Nothing here is
-/// mounted anywhere.
+/// holds here too. This is the *decision*; the painter it decides for is
+/// `LumenBackground`, which resolves it and paints the shader or the
+/// fallback. **The decision layer is not changed by that wiring** — only
+/// connected.
 ///
 /// ## THE TABLE
 ///
@@ -132,8 +133,8 @@ enum LumenShaderTier {
   ///
   /// The caller's shape choice is clamped to this set when this resolves: a
   /// stored `shafts` preference paints as `sides` (shape 2) rather than being
-  /// forgotten, so toggling back under budget restores it. The clamping itself
-  /// lives with whoever mounts the shader, not here.
+  /// forgotten, so toggling back under budget restores it. The clamping lives
+  /// with the painter — `LumenScene`'s `_shapeIndex` — not here.
   noShafts,
 
   /// The shader paints all four shapes, shafts included.

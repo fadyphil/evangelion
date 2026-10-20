@@ -1,4 +1,5 @@
 import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
+import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
@@ -84,7 +85,7 @@ class EvaNeuralMotion extends ChangeNotifier {
     required this.aurora,
     required this.pointer,
     required this.lumen,
-  }) {
+  }) : lumenScene = LumenScene(clock: lumen) {
     _sources = Listenable.merge(<Listenable>[
       float,
       hue,
@@ -174,6 +175,27 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// `lumen_clock.dart` for why it is monotonic by construction.
   final TickedLumenClock lumen;
 
+  /// The aurora's **animated state** — the prototype's render loop, ported.
+  ///
+  /// ## WHY IT LIVES HERE AND NOT IN THE BACKGROUND WIDGET
+  ///
+  /// Because the state is **app-global** and the painter is per-screen.
+  ///
+  /// The prototype's eased values (the hue, the ambient intensity, the spike)
+  /// live in one JS closure behind one canvas (`eva/redesign.html:881-912`),
+  /// so they survive a screen change: leaving `/settings` and coming back
+  /// does not restart the aurora's transition.
+  ///
+  /// And because Phase 6's `AutoTabsRouter` keeps three tab screens alive at
+  /// once. Per-screen state would put the three tabs at three different
+  /// phases of the same aurora, and the tab swap would visibly jump. One
+  /// scene, one phase.
+  ///
+  /// The scene is created here because it ticks from [lumen] — the clock that
+  /// is already in this bundle — and a second ticker would be a second way
+  /// for the app to burn frames.
+  final LumenScene lumenScene;
+
   /// The listenable that fires whenever any of the four clocks advances or the
   /// pointer moves.
   ///
@@ -259,6 +281,10 @@ class EvaNeuralMotion extends ChangeNotifier {
     _disposed = true;
     _sources.removeListener(_onSourceChanged);
     pointer.dispose();
+    // The scene first: it holds a listener on `lumen`, and `lumen.dispose()`
+    // clears the clock's listeners — so the scene has to let go before the
+    // clock does.
+    lumenScene.dispose();
     // Before its ticker, or the clock's own `dispose` would remove a listener
     // from a controller that is already gone.
     lumen.dispose();

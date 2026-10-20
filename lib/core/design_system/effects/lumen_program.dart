@@ -107,6 +107,26 @@ class LumenProgram {
     return loaded;
   }
 
+  /// The already-loaded program for [asset], or null when it is not loaded.
+  ///
+  /// ## WHY A **SYNCHRONOUS** PEEK AND NOT JUST `await load()`
+  ///
+  /// Because a background that has to `await` before it can paint shows the
+  /// **fallback** for a frame or two and then swaps — a visible flash of the
+  /// old design at every launch, and a golden that captured whichever of the
+  /// two it happened to catch.
+  ///
+  /// The app loads the program during bootstrap (`lib/app/bootstrap.dart`), so
+  /// by the time the first frame is built the memo is populated and this
+  /// returns the program with no await and no flash. A caller that gets null
+  /// has a program still in flight, and the fallback is the honest thing to
+  /// paint until it arrives.
+  ///
+  /// **It returns the same instance [load] would.** The memo is the same map,
+  /// so there is one program in the process and this is a read of it.
+  static LumenProgram? loaded({String asset = kLumenShaderAsset}) =>
+      _memoised[asset];
+
   /// A **fresh** `FragmentShader` with a zero-filled uniform buffer.
   ///
   /// "Fresh" is the point and the cost: every call allocates a new uniform

@@ -815,6 +815,40 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'per-frame allocator passes every pixel test in the file. '
             '`FragmentShader` defines no `==`.',
       ),
+  'test/core/design_system/effects/lumen_background_test.dart#the shader is allocated once, however many frames paint':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'The mounted aurora must hold ONE `FragmentShader` across frames. '
+            'Identical pixels cannot tell one uniform buffer from twenty, so '
+            'instance identity is the only witness that the plan\'s hard rule 2 '
+            'holds in the spirit and not only in the letter — a per-frame '
+            'allocator passes every pixel assertion in the file. '
+            '`FragmentShader` defines no `==`, and neither does `LumenCanvas`.',
+      ),
+  'test/core/design_system/effects/lumen_background_test.dart#and the painter instance itself does not change':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'The painter itself is long-lived, not only its shader: the widget '
+            'holds one `LumenCanvas` and hands the same instance to the '
+            '`CustomPaint` on every rebuild, because a rebuilt painter is a new '
+            'shader. `LumenCanvas` defines no `==`, so `==` could not stand in '
+            'for the claim.',
+      ),
+  'test/core/design_system/effects/lumen_background_test.dart#two mounted backgrounds share one scene':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'The scene is **app-global** — the prototype\'s eased state lives '
+            'in one closure behind one canvas (`eva/redesign.html:881-912`) — '
+            'so two mounted backgrounds must read the SAME scene, or Phase 6\'s '
+            'three live tabs would show three phases of one aurora. '
+            '`LumenScene` is a plain class and defines no `==`.',
+      ),
   'test/core/design_system/effects/neural_background_test.dart#NeuralBackground.build does not re-run across 60 frames':
       _Reviewed(
         sites: 1,

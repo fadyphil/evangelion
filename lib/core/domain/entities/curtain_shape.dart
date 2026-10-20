@@ -75,10 +75,11 @@ enum CurtainShape {
   ///
   /// **The one shape the prototype gates.** `NeuralTier` disables it above
   /// about 2 Mpx (`neural_background.dart:113-162`), because the shafts
-  /// measure **5.04 ns/px** against the bands' 2.98. The client does not
-  /// mount the shader at all (Task 5.7's recorded deferral), so the gate has
-  /// nothing to act on here — but the preference is stored and the gate will
-  /// apply to whichever task mounts the painter.
+  /// measure **5.04 ns/px** against the bands' 2.98. **The client mounts the
+  /// shader** (Task 5.8), so the gate acts: a stored `shafts` paints as
+  /// `sides` above the budget, and as `shafts` under it. See
+  /// `LumenScene`'s `_shapeIndex` — the clamp, and the reader's stored
+  /// choice is untouched.
   ///
   /// **AND THE SCRIM PAINTS IT THE WAY `top` IS PAINTED**, which is the
   /// prototype's own behaviour rather than a choice: the CSS has overrides for

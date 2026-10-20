@@ -284,10 +284,14 @@ final class UserSettings with _$UserSettings {
   /// Whether the aurora shader is on. `eva/redesign.html:652` — the Aurora
   /// engine switch, `checked`.
   ///
-  /// **The shader is not mounted.** The ten `eva.shader.*` preferences persist
-  /// real choices and the client does not yet render them; the deferral and
-  /// the task that discharges it are recorded in the Task 5.7 plan block,
-  /// citing `docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`.
+  /// **The shader is mounted.** Task 5.8 put `LumenCanvas` in the screen
+  /// root, and this switch is the reader's half of it: the prototype's
+  /// `cvs.style.display='none'` (`eva/redesign.html:1468`), which is the
+  /// canvas hidden and the ambient's fallback in its place.
+  ///
+  /// The other nine `eva.shader.*` preferences are read by the same mount —
+  /// see `LumenPreferences.fromSettings`, which is the projection of these
+  /// ten fields onto the shader's uniforms.
   final bool shaderEnabled;
 
   /// The shape the aurora curtain takes. `eva/redesign.html:654-655` — the

@@ -887,7 +887,7 @@ abstract class AppLocalizations {
 
   /// The light workshop group's header. Transcribed: `eva/redesign.html:651` writes `the light workshop` and `:949` carries the pair.
   ///
-  /// **The ten controls under it persist real choices and the client does not yet render them.** The aurora shader is not mounted, and the deferral — with the task that discharges it — is recorded in the Task 5.7 plan block, citing `docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811`.
+  /// **The ten controls under it drive the aurora.** Task 5.8 mounted `LumenCanvas` in the screen root: `LumenPreferences.fromSettings` is the projection of the ten `eva.shader.*` preferences onto the shader's uniforms, and `LumenScene` is what turns them into the sixteen the shader reads. The deferral — citing `docs/superpowers/plans/2026-10-13-lumen-redesign.md:805-811` — is discharged.
   ///
   /// In en, this message translates to:
   /// **'the light workshop'**
@@ -895,7 +895,7 @@ abstract class AppLocalizations {
 
   /// The Aurora engine row's title. Transcribed: `eva/redesign.html:652` writes `Aurora engine` and `:951` carries the pair.
   ///
-  /// **The switch persists the choice and nothing reads it yet.** The shader is not mounted; see `settingsWsLight`.
+  /// **The switch turns the aurora off.** The prototype hides its canvas (`eva/redesign.html:1468`), and the client's ambient falls back to the legacy background while it is hidden.
   ///
   /// In en, this message translates to:
   /// **'Aurora engine'**
@@ -1223,7 +1223,7 @@ abstract class AppLocalizations {
 
   /// The Shaders row's title. Transcribed: `eva/redesign.html:697` writes `Shaders` and `:962` carries the pair.
   ///
-  /// **The value beside it is the prototype's own literal** — `aurora.frag v8` — and it names the *design system's* shader asset, not this client's. The client does not mount a shader at all; see `settingsWsLight`.
+  /// **The value beside it is the prototype's own literal** — `aurora.frag v8` — and it names the *design system's* shader asset, not this client's. The client's own aurora is `shaders/lumen.frag`; see `settingsWsLight`.
   ///
   /// In en, this message translates to:
   /// **'Shaders'**

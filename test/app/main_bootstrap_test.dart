@@ -96,6 +96,21 @@ void main() {
       );
     });
 
+    test('a shader that will not load does not stop the launch', () async {
+      // The ambient has a fallback — the legacy `NeuralBackground` — so a
+      // missing or unloadable shader asset must cost the reader the aurora
+      // and not the app. The failure path is unreachable otherwise, because
+      // the asset is either there or the build is broken.
+      bool ran = false;
+      await bootstrapApp(
+        run: (Widget _) {
+          ran = true;
+        },
+        loadLumen: () async => throw StateError('no shader here'),
+      );
+      expect(ran, isTrue, reason: 'the app launches; the ambient falls back');
+    });
+
     test('run() sees a built object graph, not an empty locator', () async {
       // The other half of the same ordering claim, and the half that does not
       // need an exception to observe: the locator's state is sampled *at the

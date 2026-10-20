@@ -574,8 +574,29 @@ void main() {
     ) async {
       await pumpAt(tester, scaffold());
       final Stack stack = tester.widget<Stack>(find.byType(Stack).first);
-      expect(stack.children.first, isA<NeuralBackground>());
+      // **The redesign's ambient**, not the legacy background: the aurora is
+      // mounted in the screen root (`eva/redesign.html:46`, `.screen canvas`),
+      // and `LumenBackground` is what decides between it and the fallback.
+      expect(stack.children.first, isA<LumenBackground>());
       expect(stack.fit, StackFit.expand);
+
+      // And the **fallback** is what this harness paints, because it
+      // publishes no `LumenPreferencesScope` — an ambient with no choices
+      // published has no choices to paint with. The legacy painter is still
+      // there, still first in the tree, and still behind the content.
+      expect(find.byType(NeuralBackground), findsOneWidget);
+    });
+
+    testWidgets('the fallback fills the page, and it is the first thing', (
+      WidgetTester tester,
+    ) async {
+      await pumpAt(tester, scaffold());
+      // The background's own box is the page's box. The legacy painter is a
+      // bare `CustomPaint` and sizes itself to nothing, so the *scaffold's*
+      // stack is what gives it a box — and the assertion is on the painted
+      // result, not on a widget's declared size.
+      final Size painted = tester.getSize(find.byType(NeuralBackground));
+      expect(painted, const Size(390, 844));
     });
 
     testWidgets('reduced motion drops the ambient tier', (

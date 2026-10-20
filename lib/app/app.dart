@@ -235,108 +235,121 @@ class _EvangelionAppState extends State<EvangelionApp> {
         child: SettingsScope(
           key: const Key('eva-settings-scope'),
           handle: _handle,
-          child: MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            title: 'Evangelion',
+          // **The aurora's inputs, published at the app root** — beside the
+          // settings' and the sky's scopes, and for the same reason: the
+          // ambient layer lives in `core/design_system/`, which may not reach
+          // into a feature, and it needs the reader's ten light-workshop
+          // choices. `LumenPreferencesScope` carries the argument.
+          //
+          // It sits **below** [SettingsScope] and **above** the router, so
+          // every route is inside it — including the ones Phase 6's
+          // `AutoTabsRouter` will add.
+          child: LumenPreferencesScope(
+            key: const Key('eva-lumen-preferences-scope'),
+            preferences: LumenPreferences.fromSettings(settings),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              title: 'Evangelion',
 
-            // RTL-ready, not RTL-later. The reading sanctuary serves Arabic scripture
-            // (Smith & Van Dyck) alongside English NKJV, and the Arabic arm has to lay
-            // out right-to-left with Arabic date, time and number formats. Without
-            // these delegates `MaterialApp` installs no localisations at all, so an
-            // `ar` locale renders with English-only Material widgets and nothing
-            // throws — the failure mode is a silently half-translated app.
-            //
-            // `AppLocalizations.localizationsDelegates` is `gen_l10n`'s own generated
-            // list: this app's `AppLocalizations.delegate` FIRST, then the
-            // `GlobalMaterialLocalizations.delegate` + Cupertino + Widgets trio it used
-            // to be. Order matters only in that the app's own strings must resolve; the
-            // trio is what supplies Arabic date, time and number formats to Material
-            // widgets, so it stays.
-            //
-            // `supportedLocales` lists only en and ar because those are the only two
-            // languages this app ships (AGENT_CONTEXT §1) — adding a third is a product
-            // decision, not a plumbing one. It is written out rather than taken from
-            // `AppLocalizations.supportedLocales` so the two-locale promise stays a
-            // claim in the composition root, where `app_test.dart` can read it.
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-            // See the class doc: the test's override wins, then the reader's stored
-            // choice, then **null** — and null is what follows the platform, which is
-            // why `UserSettings.language` is nullable.
-            locale:
-                widget.locale ??
-                (settings.language == null
-                    ? null
-                    : Locale(settings.language!.code)),
+              // RTL-ready, not RTL-later. The reading sanctuary serves Arabic scripture
+              // (Smith & Van Dyck) alongside English NKJV, and the Arabic arm has to lay
+              // out right-to-left with Arabic date, time and number formats. Without
+              // these delegates `MaterialApp` installs no localisations at all, so an
+              // `ar` locale renders with English-only Material widgets and nothing
+              // throws — the failure mode is a silently half-translated app.
+              //
+              // `AppLocalizations.localizationsDelegates` is `gen_l10n`'s own generated
+              // list: this app's `AppLocalizations.delegate` FIRST, then the
+              // `GlobalMaterialLocalizations.delegate` + Cupertino + Widgets trio it used
+              // to be. Order matters only in that the app's own strings must resolve; the
+              // trio is what supplies Arabic date, time and number formats to Material
+              // widgets, so it stays.
+              //
+              // `supportedLocales` lists only en and ar because those are the only two
+              // languages this app ships (AGENT_CONTEXT §1) — adding a third is a product
+              // decision, not a plumbing one. It is written out rather than taken from
+              // `AppLocalizations.supportedLocales` so the two-locale promise stays a
+              // claim in the composition root, where `app_test.dart` can read it.
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+              // See the class doc: the test's override wins, then the reader's stored
+              // choice, then **null** — and null is what follows the platform, which is
+              // why `UserSettings.language` is nullable.
+              locale:
+                  widget.locale ??
+                  (settings.language == null
+                      ? null
+                      : Locale(settings.language!.code)),
 
-            // The Eva design system (AGENT_CONTEXT §2, decision 6 — a dark
-            // glassmorphic system, `docs/plans/03-design-system.md` §5).
-            theme: EvaThemeLight.theme,
-            darkTheme: EvaThemeDark.theme,
+              // The Eva design system (AGENT_CONTEXT §2, decision 6 — a dark
+              // glassmorphic system, `docs/plans/03-design-system.md` §5).
+              theme: EvaThemeLight.theme,
+              darkTheme: EvaThemeDark.theme,
 
-            // ## THE ONE LINE THAT MAKES A PALETTE CHANGE **APP-WIDE**
-            //
-            // It was a hard-coded `ThemeMode.dark` for eight phases, with a measured
-            // reason recorded in place — dark by identity, and "follow the OS" first
-            // would open the app light on every light-mode machine for no reason. The
-            // default it was protecting is now `UserSettings.themeMode`'s default, which
-            // is `AppThemeMode.dark`, so **the behaviour of a fresh install is
-            // unchanged** and the sentence is still true; what changed is that the
-            // reader can now change it.
-            //
-            // **An exhaustive `switch` and not a map lookup**, so a fourth
-            // `AppThemeMode` is a compile error *here* — at the composition root —
-            // rather than a screen that keeps the previous palette. `app_theme_mode.dart`
-            // says why the `ThemeMode` mapping is here and not beside the enum.
-            themeMode: switch (settings.themeMode) {
-              AppThemeMode.light => ThemeMode.light,
-              AppThemeMode.dark => ThemeMode.dark,
-              AppThemeMode.system => ThemeMode.system,
-            },
+              // ## THE ONE LINE THAT MAKES A PALETTE CHANGE **APP-WIDE**
+              //
+              // It was a hard-coded `ThemeMode.dark` for eight phases, with a measured
+              // reason recorded in place — dark by identity, and "follow the OS" first
+              // would open the app light on every light-mode machine for no reason. The
+              // default it was protecting is now `UserSettings.themeMode`'s default, which
+              // is `AppThemeMode.dark`, so **the behaviour of a fresh install is
+              // unchanged** and the sentence is still true; what changed is that the
+              // reader can now change it.
+              //
+              // **An exhaustive `switch` and not a map lookup**, so a fourth
+              // `AppThemeMode` is a compile error *here* — at the composition root —
+              // rather than a screen that keeps the previous palette. `app_theme_mode.dart`
+              // says why the `ThemeMode` mapping is here and not beside the enum.
+              themeMode: switch (settings.themeMode) {
+                AppThemeMode.light => ThemeMode.light,
+                AppThemeMode.dark => ThemeMode.dark,
+                AppThemeMode.system => ThemeMode.system,
+              },
 
-            // ## THE TEXT SCALE IS INSTALLED **HERE**, AND IT IS NOW **ONE INPUT**
-            //
-            // `eva_typography.dart` recorded for eight phases that this scaler was
-            // "exported and tested but uninstalled, because its `step` argument belongs
-            // to Phase 9's `settings_repository`". This is that line.
-            //
-            // `builder` is the only site that can install it, because it is the only
-            // place **above every route** and **below `Localizations`** — which matters
-            // for `Directionality`, since `ReadingPage`'s Arabic band and
-            // `ReadingControls`' mirrored back button both read the ambient direction.
-            //
-            // **There is no composition here and there never will be again.** The
-            // recorded dead zone — steps 3, 4 and 5 all rendering at 1.22× once the
-            // platform was above 1.109 — was the price of multiplying the reader's step
-            // by the platform's scaler and capping the product at §5.2's top row. With a
-            // single persisted preference there is one input, one `MediaQuery` and one
-            // scale, so the five positions are five distinct sizes on every device and
-            // there is no threshold above which the control's top half goes inert.
-            //
-            // **What the reader's OS font-size setting now does here is nothing**, and
-            // that is a deliberate reversal of `eva_typography.dart`'s recorded
-            // rejection of "wrapping the platform's scaler in a way that ignores it".
-            // Its reason was per-screen — "the one screen where reading is hardest is
-            // the one screen that ignores their accessibility setting" — and **that
-            /// reason dies when the control is app-wide**, because there is no second
-            /// screen to disagree with. What survives is the trade itself: this app has
-            /// one font-size control, it is reachable from `/settings` in the reader's
-            /// own language, and it is the only one the app offers. §14's requirement
-            /// (survive 1.22× without overflow at 320px) is what bounds the table, and
-            /// it is satisfied by construction.
-            builder: (BuildContext context, Widget? child) {
-              final Widget body = child ?? const SizedBox.shrink();
-              return MediaQuery(
-                data: MediaQuery.of(context)
-                    .copyWith(textScaler: evaScalerFor(settings.fontStep)),
-                child: body,
-              );
-            },
+              // ## THE TEXT SCALE IS INSTALLED **HERE**, AND IT IS NOW **ONE INPUT**
+              //
+              // `eva_typography.dart` recorded for eight phases that this scaler was
+              // "exported and tested but uninstalled, because its `step` argument belongs
+              // to Phase 9's `settings_repository`". This is that line.
+              //
+              // `builder` is the only site that can install it, because it is the only
+              // place **above every route** and **below `Localizations`** — which matters
+              // for `Directionality`, since `ReadingPage`'s Arabic band and
+              // `ReadingControls`' mirrored back button both read the ambient direction.
+              //
+              // **There is no composition here and there never will be again.** The
+              // recorded dead zone — steps 3, 4 and 5 all rendering at 1.22× once the
+              // platform was above 1.109 — was the price of multiplying the reader's step
+              // by the platform's scaler and capping the product at §5.2's top row. With a
+              // single persisted preference there is one input, one `MediaQuery` and one
+              // scale, so the five positions are five distinct sizes on every device and
+              // there is no threshold above which the control's top half goes inert.
+              //
+              // **What the reader's OS font-size setting now does here is nothing**, and
+              // that is a deliberate reversal of `eva_typography.dart`'s recorded
+              // rejection of "wrapping the platform's scaler in a way that ignores it".
+              // Its reason was per-screen — "the one screen where reading is hardest is
+              // the one screen that ignores their accessibility setting" — and **that
+              /// reason dies when the control is app-wide**, because there is no second
+              /// screen to disagree with. What survives is the trade itself: this app has
+              /// one font-size control, it is reachable from `/settings` in the reader's
+              /// own language, and it is the only one the app offers. §14's requirement
+              /// (survive 1.22× without overflow at 320px) is what bounds the table, and
+              /// it is satisfied by construction.
+              builder: (BuildContext context, Widget? child) {
+                final Widget body = child ?? const SizedBox.shrink();
+                return MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: evaScalerFor(settings.fontStep)),
+                  child: body,
+                );
+              },
 
-            // The one place the router enters the widget tree. See the class doc for
-            // why it is resolved from the locator and never constructed here, and for
-            // why the configuration it produced is memoised.
-            routerConfig: _configFor(router),
+              // The one place the router enters the widget tree. See the class doc for
+              // why it is resolved from the locator and never constructed here, and for
+              // why the configuration it produced is memoised.
+              routerConfig: _configFor(router),
+            ),
           ),
         ),
       ),
