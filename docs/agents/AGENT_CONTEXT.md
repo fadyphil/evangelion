@@ -499,17 +499,24 @@ today_completed, next_milestone, days_to_milestone, … }`.
     passages through `englishPassageWith` rather than transcribing the block per
     fixture, so the date lives in exactly one place.
 
-    This is also why `/result` has **no repository, no use case and no endpoint**:
-    the submit response is the only artifact it renders, and that response exists
-    only as the POST's reply. There is nothing to re-fetch it from, which is what
-    makes `QuizBloc.lastResult` the only holder and `ResultPage({required
-    SubmitResult})` a required parameter rather than a resolved dependency.
+    This is also why the result has **no repository, no use case and no
+    endpoint**: the submit response is the only artifact it renders, and that
+    response exists only as the POST's reply. There is nothing to re-fetch it
+    from, which is what makes `QuizBloc.lastResult` the only holder and
+    `ResultSheet({required SubmitResult})` a required parameter rather than a
+    resolved dependency.
 
-    **A consequence with a cost, recorded so nobody re-derives it:** `/result` is
-    therefore **not deep-linkable**. `ResultRoute` requires its `result`, so
-    `pushPath('/result')` cannot build the page. `app_router_test.dart` asserts the
-    failure deliberately rather than working around it. The only way in is
-    `QuizPage`'s terminal `finish` arm.
+    **A consequence with a cost, recorded so nobody re-derives it: the result
+    is NOT DEEP-LINKABLE — and as of Phase 6 it is not a route at all.** It was
+    a route whose `ResultRoute` required its `result`, so `pushPath('/result')`
+    could not build the page; recorded decision 81 recorded that cost and
+    `app_router_test.dart` asserted the failure deliberately. **Phase 6 retired
+    the route**: the result is a **modal** over the quiz
+    (`eva/redesign.html:718-727`), presented by `QuizPage`'s terminal `finish`
+    arm, and `AppRoutes.result` no longer exists. The invariant the old test
+    pinned is **gone because the route is gone**, and the test was **deleted
+    rather than weakened** — a test asserting that a path literal fails to
+    match would be a test about a typo, not about the app.
 
 ---
 
@@ -2347,6 +2354,17 @@ with a bare `\u0301`, which the corpus does not produce. The refusal also has th
 shape as the thing it would override is not a fix.
 
 ### Recorded decisions — Phase 8 review
+
+> **AMENDED BY PHASE 6 OF THE LUMEN REDESIGN — the decision HOLDS, the mechanism
+> died with the route.** The result is a **modal** now
+> (`eva/redesign.html:718-727`), `AppRoutes.result` no longer exists, and
+> `features/result/` has moved into `features/quiz/`. So `ResultPage` is
+> `ResultSheet`, the required constructor parameter is unchanged, and the
+> "`/result` is not deep-linkable" cost is now "the result is **not a route**".
+> The reasoning below — the response has to survive the reader leaving `/quiz`,
+> and Gate 2 forbids the two directions of the import — is **exactly** why the
+> result lives in `features/quiz/` now, and it is why it is presented by the
+> quiz rather than fetched. What changed is the delivery, not the constraint.
 
 **81. `/result` TAKES ITS SUBMIT RESPONSE AS A **REQUIRED CONSTRUCTOR PARAMETER**, AND
 THE PRICE IS THAT THE ROUTE IS **NOT DEEP-LINKABLE**.
