@@ -1838,6 +1838,213 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > clean machine; the step now runs the doctor, and the gate reports
 > "PASSED — the Linux bundle is a real build of the current sources".
 
+### Task 5.8: The aurora, mounted
+
+> **The shader has been built and tested since Phase 1 and mounted nowhere.**
+> `lumen.frag`, `LumenUniforms`, `UniformSlot`, `LumenClock`, `LumenProgram`
+> and `LumenCanvas` are all complete — and `LumenCanvas` had **no production
+> call site**, so the ten `eva.shader.*` preferences Task 5.7 landed were
+> real, persisted and clamped, and **read by nothing**. The plan deferred
+> exactly this to "whoever mounts the painter (Phase 5)" (`:805-811`), and
+> Task 5.7 recorded the deferral at the group and in the group's own ARB
+> description. **This task discharges it.**
+>
+> **WHERE IT IS MOUNTED, AND WHY THAT IS NOT A CHOICE.** `eva/redesign.html:46`
+> is `.screen canvas{position:absolute;inset:0;…;z-index:0}` — the canvas is
+> a **child of `.screen`**, and `.screen` is the prototype's screen root
+> (`:45`). There is **one** canvas, and it is the screen's own background
+> layer: not a decoration, and not one per screen-variant. The client's
+> screen root is `NeuralScaffold`, whose stack already carried the ambient as
+> its first child, so **the mount is that layer** and the legacy
+> `NeuralBackground` becomes the **fallback** rather than the ambient.
+>
+> **THE REDESIGN HAS ONE AMBIENT AND THE CLIENT HAD EIGHT, and that is
+> recorded rather than hidden.** `NeuralVariant` has eight values and eight
+> orb groups; the redesign has one canvas for every screen. So
+> **`NeuralVariant` no longer selects the ambient — it selects the
+> *fallback's* orb group**, which is the only thing that still varies by
+> screen. It is not deleted, because the plan never retired it and the
+> fallback is a thing the design has.
+>
+> **THE SCENE IS THE PROTOTYPE'S RENDER LOOP, AND IT IS APP-GLOBAL.** The
+> prototype's eased state — the hue, the ambient intensity, the spike — lives
+> in one JS closure behind one canvas (`:881-912`), and it **survives a screen
+> change**. So the *state* is app-global (in `EvaNeuralMotion`, beside the
+> four clocks it already owns) and the *painter* is per mounted screen,
+> because a `CustomPainter` belongs to the widget that paints it. **And
+> because Phase 6's `AutoTabsRouter` keeps three tab screens alive at once**:
+> per-screen state would put the three tabs at three phases of one aurora and
+> the tab swap would visibly jump. One scene, one phase.
+>
+> **THE FOUR STEPS OF `:887-912` THAT ARE NOT THE SHADER'S OWN ARITHMETIC**,
+> each with the prototype's number:
+>
+> | line | what | how fast |
+> | --- | --- | --- |
+> | `:891-892` | the ambient intensity eases toward its target | 6% a frame |
+> | `:893` | the melt drifts the hue | 8° a second |
+> | `:894-896` | the hue eases toward its target, **the short way round** | 4.5% a frame |
+> | `:900` | the spike decays | ×0.92 a frame |
+>
+> **AND THE MELT IS NOT ONLY A FLAG.** `:893` cycles `autoH` at 8° a second
+> while the melt is on, and the Workshop's slider follows it (`:1457`
+> `syncHueUI`) — so the melt is a second animation, and the client's swatch
+> does **not** follow the drift. That is a divergence, recorded here.
+>
+> **THE TEN CONTROLS ARE THE AURORA'S INPUTS, ONE FOR ONE**, and the
+> prototype's own conversions were transcribed rather than re-derived:
+> `reach`→`u_spread` (`:1469`), `touchGlow`→`u_ptrI` (`:1471`),
+> `hue`→`u_hue`/`u_hue2`/`u_hue3` (`:1472`), `multichromeMelt`→`u_melt`
+> (`:1473-1474`), `rayCombing`→`u_str` (`:1475`), `whiteCores`→`u_white`
+> (`:1476`), `dotVeil`→`u_dots` (`:1477`), `curtainShape`→`u_shape`
+> (`:1462-1463`), `glow`→**not a uniform** (`:1470` folds it into the
+> ambient target, `:891`), and `shaderEnabled`→**the canvas is hidden**
+> (`:1468`).
+>
+> **THE HUE'S SATURATION AND LIGHTNESS ARE `70` AND `62`, NOT THE BOOT
+> STATE'S `90` AND `66`.** `:1472` posts `{h:autoH,s:70,l:62}`; `curH` starts
+> at `{h:258,s:90,l:66}` (`:881`) and *eases* to the target. A port that took
+> the target's s/l from the boot state would be a different colour at the end
+> of the transition and the same colour at the start.
+>
+> **AND THE CLIENT'S HUE OPENS AT THE READER'S CHOICE, NOT AT 258.** The
+> prototype opens at 258 because its slider starts out of sync with `autoH`;
+> the client's slider and its aurora agree from the first frame, which is the
+> divergence Task 5.7 already recorded for the swatch. The **ambient
+> intensity still opens at the prototype's `0.15`** (`:884`) and fades in.
+>
+> **`u_light` IS THE APP'S THEME, NOT A WORKSHOP CONTROL.** The prototype's
+> daylight toggle (`:1478-1482`) writes **two** things: `dataset.mode='light'`
+> (the whole app's palette) and `uniform1f(V.uni.light,…)` (the shader). So
+> the client's `u_light` is read from `Theme.of(context).brightness`, and the
+> prototype's `.4` spike on a daylight change rides on it.
+>
+> **THE HARDEST PART WAS HARD RULE 2, AND IT IS WHY `LumenCanvas` CHANGED.**
+> The plan's rule is one `FragmentShader`, mutated per frame — and the
+> prototype's uniforms change **every frame** (the hue, the ambient, the
+> spike). A table held in a constructor field cannot do that: the painter
+> would be **rebuilt** every frame, and a rebuilt painter is a new instance,
+> and a new instance allocates a new `FragmentShader` — the per-frame uniform
+> buffer the rule exists to remove, back through the front door. So
+> **`LumenCanvas` gained a `LumenUniformSource`**: a source that is both the
+> table and the **repaint signal**, read at paint time. The ordinary
+> constructor is kept and behaves **exactly** as it did — a fixed table, the
+> clock as the repaint — so every one of Task 1.3's frame tests stayed green
+> and the change is **additive**.
+>
+> **AND THE SOURCE IS THE SIGNAL RATHER THAN THE CLOCK, and that is not an
+> afterthought.** The source advances its table and *then* notifies; a paint
+> triggered by that notification reads the frame it just computed. If the
+> clock were the signal, the paint would race the advance and the winner
+> would depend on the order the listeners happened to be registered in.
+>
+> **THE FALLBACK IS TODAY'S BACKGROUND, AND THE TIER DECIDES.**
+> `NeuralTiers.resolveShader` already decided `off`/`noShafts`/`full` and
+> already treated reduced motion as the last word; its own doc said *"wiring a
+> painter to it belongs to whoever mounts the shader (Phase 5), not to this
+> file. Nothing here is mounted anywhere."* — **this task is that wiring, and
+> the decision layer is not changed, only connected.** `noShafts` clamps a
+> stored `shafts` to `sides` (shape 2) rather than forgetting it, exactly as
+> that enum's doc assigns to the mounter.
+>
+> **THE PREFERENCES REACH THE DESIGN SYSTEM THROUGH A SCOPE THE APP ROOT
+> PUBLISHES**, because `lib/core/` may not reach into a feature and the
+> ambient lives in `lib/core/design_system/`. `LumenPreferences` is a **narrow**
+> type — ten of `UserSettings`' thirty fields — because the scope sits above
+> every screen and a notification rebuilds all of them, so the reader changing
+> their **font size** must not rebuild one. A subtree with no scope paints the
+> fallback: an ambient with no choices published has no choices to paint
+> with.
+>
+> **THE PROGRAM IS LOADED BEFORE THE FIRST FRAME.** `LumenProgram.load()` is
+> async, and a background that must await before it can paint shows the
+> fallback for a frame or two and then swaps — a visible flash of the old
+> design at every launch. `bootstrapApp` loads it, `LumenProgram.loaded()`
+> reads the same memo synchronously, and **a failure does not stop the
+> launch**: the ambient has a fallback, so a missing asset costs the reader
+> the aurora and not the app.
+>
+> **THE POINTER IS TRACKED ON THE **SCREEN ROOT**, AND THAT IS A CHANGE OF
+> PLACE.** The prototype listens on `#screen` — the **root**
+> (`:916`, `el0('screen').addEventListener('pointermove',…)`) — so its canvas
+> follows the pointer across the whole screen. A listener in the background
+> layer would only see the moves the content above it does not absorb, and
+> the "Touch glow" control would be largely inert. So the listener is on
+> `NeuralScaffold`, and the background reads the pointer from the scene.
+> The prototype's `pointerleave` (`:921`) is a `PointerExitEvent`, which
+> `Listener` does not have on this SDK; the **touch** case — a finger
+> lifting — is an `onPointerUp`, and that is what the client resets on. A
+> **mouse** leaving the *window* leaves the glow where it was.
+>
+> **AND THE DAYLIGHT MODE MULTIPLIES, AND WITHOUT IT THE LIGHT SCREEN IS A
+> WHITE SHEET.** `eva/redesign.html:60` is
+> `.screen[data-mode=light] canvas{mix-blend-mode:multiply}` — and it has to
+> be: the shader's daylight arm is
+> `col=mix(emit, vec3(1.0)-0.55*em, u_light)` (`shaders/lumen.frag:116`),
+> and with `u_light=1` and no band (`emit=0`) that is **`vec3(1.0)`** —
+> white, at alpha 1. Painted over the canvas it erases it, and every
+> light-mode card that distinguishes `canvas` from `surface` loses the
+> ground it stands on. **The client's aurora is multiplied by the canvas
+> colour**, which is what the prototype's `multiply` amounts to — the
+> backdrop under an opaque canvas is the canvas. **And it is a
+> `ColorFilter`, not a `BlendMode`**: a blend mode would multiply against
+> the *destination*, and the destination inside the `RepaintBoundary` is
+> transparent, which would paint the ambient **black**. The filter
+> multiplies the aurora's own pixels, so the boundary cannot break it.
+> **Measured:** the bottom of the light screen read **255** (opaque white)
+> before the fix and reads the canvas's **240** after it.
+>
+> **FIVE DIVERGENCES, RECORDED RATHER THAN BURIED.** (1) `u_time` is the
+> clock's real elapsed seconds, where the prototype's is a `dt`-capped
+> accumulator (`:888`) — the two agree at any frame rate at or above 20fps
+> and diverge below it, and a second accumulator inside the scene would be a
+> second source of truth for time, which `lumen_clock.dart` exists to
+> prevent. (2) `vesp` and `focusDim` are `1` and `false` — they are the
+> vespers auto-dim and the focus-mode dimming, and they are **Phase 7's**.
+> (3) The reduced-motion `0.15` scale on `u_time` (`:888`) is Phase 7's
+> ("a shader clock frozen at `t = 0`"); the client freezes the clock
+> instead, which is a different answer to the same question and is recorded
+> here rather than claimed as the port. (4) The prototype's loop **stops**
+> while the aurora is hidden (`:889` returns before `:891-896`), so its state
+> freezes; the client's scene keeps easing, so the aurora is **converged**
+> when it comes back rather than mid-transition. (5) The **"Curtain shape"
+> control drives one of the prototype's two rules**: `:1463` sets
+> `u_shape` **and** `dataset.shape` — the full-screen `.scrim` — and the
+> client has no full-screen scrim (`NeuralScaffold.curtain` is the CTA's
+> bottom fade). The shader's half is wired; the scrim's half is Phase 6's
+> or nobody's, and it is named here so it is not lost.
+>
+> **AND THE PAINTER IS PER MOUNT, SO THE UNIFORM BUFFER IS TOO.** The plan's
+> hard rule 2 is one `FragmentShader` per painter and not one per frame —
+> which holds, and the suite pins it. But a painter is per **mounted
+> screen**, so a route change builds a new one and Phase 6's three live tabs
+> would hold three. Identical pixels, three uniform buffers, and a new one
+> per navigation. Recorded rather than hidden.
+>
+> **AND THE REVIEW FOUND FOUR THINGS THIS BLOCK WOULD OTHERWISE HAVE
+> SHIPPED.** (1) **The daylight mode painted an opaque white sheet** — the
+> prototype's `mix-blend-mode:multiply` (`:60`) was not ported, and the
+> shader's daylight arm is white where there is no band. **Measured** before
+> and after: the bottom of the light screen read **255** and reads the
+> canvas's **240**. (2) **The pointer was tracked in the background layer**,
+> where the content above it absorbs the moves — the prototype tracks it on
+> `#screen` (`:916`), and the "Touch glow" control was largely inert. (3)
+> **The hue slider did nothing while the melt was on**, because the prototype's
+> slider writes `autoH` (`:1472`) and the melt follows it (`:893`) — the melt
+> follows the slider, not the other way round. (4) **The aurora switch's
+> spike was raised in both directions** and the prototype raises it only when
+> the aurora is turned **on** (`:1468`'s guard is `shaderOn`). And **five
+> stale claims** — "the shader is not mounted", in `curtain_shape.dart`,
+> `neural_background.dart`, `workshop_logic.dart` and twice in
+> `settings_page.dart` — were false the moment the mount landed, and are now
+> true statements about what is mounted.
+>
+> Gate run: **3544 tests, 98.69% coverage (8109/8217)**, against the recorded
+> floor of 2507 tests and 98.25% — **and the Linux build gate**, which
+> reports "PASSED — the Linux bundle is a real build of the current sources".
+> The coverage is **up** on Task 5.7's 98.62%, and the test count is up by
+> sixty-six.
+
 | Task | Screen | Prototype | Source of its data |
 | --- | --- | --- | --- |
 | 5.1 | `/login` | `:503-511` | `FakeAuthRepository` (unchanged) |
@@ -1847,6 +2054,7 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 | 5.5 | `/communion` | `:612-636` | `GET /leaderboard?window=` |
 | 5.6 | `/journey` | `:576-610` | streak real · rings derived · medals **stubbed** |
 | 5.7 | `/settings` | `:638-700` | local · 28 new controls |
+| 5.8 | — (the ambient) | `:46`, `:881-912` | the reader's ten `eva.shader.*` preferences |
 
 - [ ] **Step 5.5 details.** `window=weekly|monthly|all_time` maps exactly onto
   the redesign's week/month/all. Rows already carry `full_name` and
