@@ -29,6 +29,13 @@
 #                                                     verify_all.sh greps its output
 #   test      one trivially failing assertion       flutter test reports it
 #   baseline  a floor above the real coverage       the comparison cannot pass
+#   citation  a broken citation, a missing reference   FAIL(1) and FATAL(2) — not the same
+#   orphan    a bogus page, a renamed router, a missing router, an orphan
+#             outside `*/widgets/`                   FAIL(1) and FATAL(2), and the
+#                                                     GREEN direction is asserted too
+#   blur      a block comment, a real site, a hand-built filter
+#                                                     a comment is not a site, a site
+#                                                     is, and the two halves agree
 #
 # ## THE SCRATCH COPY
 #
@@ -307,6 +314,298 @@ else
   printf '  %-10s %sbad-citation fired=%s missing-reference fired=%s — one is wrong%s\n' \
     "FAIL" "$R" "$cite_fired" "$ref_fired" "$N"
 fi
+
+# --- 9. orphan gate — the tree's reachability, and decision 144 ------------
+# The orphan gate answers "does any screen's tree contain this widget", and
+# AGENT_CONTEXT decision 144 is the defect it exists to make impossible. It
+# had NO negative control until now, which is the gap this section fills.
+#
+# **A MINIMAL TREE, not a copy of the real one**, and that is deliberate. The
+# real tree is RED right now — three widgets are built, tested and not yet
+# placed — so a control that said "the gate must be green" would be a
+# statement about the tree rather than about the gate. A three-file tree with
+# one router, one app root and one page makes every expectation exact, and it
+# makes them independent of whatever else is in flight.
+#
+# Six controls, and they are the six directions the gate can be wrong in:
+#
+#   green        a real page is reachable            (the gate CAN pass)
+#   bogus        `@RoutePage()` on a plain class     -> FAIL(1)
+#   unregistered `@RoutePage()` on an orphan page   -> FAIL(1)
+#   renamed      the router file is RENAMED         -> still green (derived)
+#   missing      the router file is GONE            -> FATAL(2), never a pass
+#   orphan       a widget outside `*/widgets/`       -> FAIL(1), and named
+#
+# The last two are the two halves of "the gate must not be able to pass
+# vacuously", and the middle two are the two halves of "a bogus annotation is
+# a failure, not a diagnostic".
+make_mini_scratch() {
+  local dir="$SCRATCH/mini"
+  rm -rf "$dir"
+  mkdir -p "$dir/tool/gates" \
+           "$dir/lib/app/router" \
+           "$dir/lib/app" \
+           "$dir/lib/features/home/presentation/pages"
+  cp "$ROOT/tool/gates/orphan_widget_check.py" "$dir/tool/gates/"
+
+  cat > "$dir/lib/app/router/app_router.dart" <<'EOF'
+// A minimal router: one route, one page.
+import 'package:auto_route/auto_route.dart';
+
+@AutoRouterConfig()
+class AppRouter extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => <AutoRoute>[
+        AutoRoute(path: '/', page: HomeRoute.page),
+      ];
+}
+EOF
+
+  cat > "$dir/lib/app/app.dart" <<'EOF'
+// A minimal app root: it installs the tree.
+import 'package:flutter/material.dart';
+
+class EvangelionApp extends StatelessWidget {
+  const EvangelionApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => const MaterialApp.router();
+}
+EOF
+
+  cat > "$dir/lib/features/home/presentation/pages/home_page.dart" <<'EOF'
+// A minimal page: the annotation is on a widget, and the route is registered.
+import 'package:auto_route/auto_route.dart';
+import 'package:flutter/material.dart';
+
+@RoutePage()
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+EOF
+  printf '%s' "$dir"
+}
+
+mini=$(make_mini_scratch)
+mini_run() { ( cd "$mini" && python3 tool/gates/orphan_widget_check.py 2>&1 ); }
+
+# 9a. green — a real page is reachable and the gate passes.
+out=$(mini_run); rc=$?
+green_ok=0
+if [[ $rc -eq 0 ]] && printf '%s' "$out" | grep -qF 'PASSED'; then
+  green_ok=1
+fi
+if [[ $green_ok -eq 1 ]]; then
+  record "orphan (green)" "fired"
+  printf '  %-10s a real page -> green (exit 0, PASSED). The gate CAN pass.\n' "$G"
+else
+  record "orphan (green)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa real page -> exit %d; the gate cannot pass at all\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+
+# 9b. a bogus `@RoutePage()` — on a plain class, which is not a page widget.
+cat > "$mini/lib/features/probe_holder.dart" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: the annotation on a plain class.
+import 'package:auto_route/auto_route.dart';
+
+/// Not a widget, and its route is not registered.
+@RoutePage()
+class ProbeHolder {
+  const ProbeHolder();
+}
+EOF
+out=$(mini_run); rc=$?
+if [[ $rc -eq 1 ]] && printf '%s' "$out" | grep -qF 'NOT A ROOT'; then
+  record "orphan (bogus page)" "fired"
+  printf '  %-10s a bogus @RoutePage() -> FAIL(1) with the NOT A ROOT diagnostic\n' "$G"
+else
+  record "orphan (bogus page)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa bogus @RoutePage() -> exit %d; the diagnostic is not a failure\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+rm -f "$mini/lib/features/probe_holder.dart"
+
+# 9c. a `@RoutePage()` on a widget whose route the router never registers.
+cat > "$mini/lib/features/probe_page.dart" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a page nobody can navigate to.
+import 'package:auto_route/auto_route.dart';
+import 'package:flutter/material.dart';
+
+/// A page the router does not register.
+@RoutePage()
+class ProbePage extends StatelessWidget {
+  const ProbePage({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+EOF
+out=$(mini_run); rc=$?
+if [[ $rc -eq 1 ]] && printf '%s' "$out" | grep -qF 'NOT A ROOT'; then
+  record "orphan (unregistered)" "fired"
+  printf '  %-10s an unregistered @RoutePage() -> FAIL(1) with the NOT A ROOT diagnostic\n' "$G"
+else
+  record "orphan (unregistered)" "COULD-NOT-FAIL"
+  printf '  %-10s %san unregistered @RoutePage() -> exit %d; the diagnostic is not a failure\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+rm -f "$mini/lib/features/probe_page.dart"
+
+# 9d. the router file is RENAMED — the router is DERIVED, so the gate still
+# works. A literal path would have made this tree have no route table at all.
+mv "$mini/lib/app/router/app_router.dart" "$mini/lib/app/router/the_router.dart"
+out=$(mini_run); rc=$?
+if [[ $rc -eq 0 ]] && printf '%s' "$out" | grep -qF 'PASSED'; then
+  record "orphan (renamed router)" "fired"
+  printf '  %-10s the router RENAMED -> still green. The router is derived, not named.\n' "$G"
+else
+  record "orphan (renamed router)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe router RENAMED -> exit %d; the gate depends on a file NAME\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+
+# 9e. the router file is GONE — FATAL(2), never a silent pass. This is the
+# failure mode the literal path had: "no route is registered anywhere" reads
+# as a clean tree and answers the registration clause for every page.
+mv "$mini/lib/app/router/the_router.dart" "$mini/lib/app/router/the_router.dart.gone"
+out=$(mini_run); rc=$?
+if [[ $rc -eq 2 ]] && printf '%s' "$out" | grep -qi 'fatal'; then
+  record "orphan (no router)" "fired"
+  printf '  %-10s the router GONE -> FATAL(2). The gate cannot pass without it.\n' "$G"
+else
+  record "orphan (no router)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe router GONE -> exit %d; a missing surface must be FATAL\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+mv "$mini/lib/app/router/the_router.dart.gone" "$mini/lib/app/router/app_router.dart"
+
+# 9f. a real orphan OUTSIDE `*/widgets/` — the widened inventory. Before the
+# widening this file was invisible to the gate, which is the whole of
+# decision 144's shape. It goes in `effects/`, which is where the three
+# widgets the real tree was missing live.
+mkdir -p "$mini/lib/core/design_system/effects"
+cat > "$mini/lib/core/design_system/effects/planted_orphan.dart" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a widget nothing constructs.
+import 'package:flutter/material.dart';
+
+/// Built, and on no screen.
+class PlantedOrphan extends StatelessWidget {
+  const PlantedOrphan({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+EOF
+out=$(mini_run); rc=$?
+if [[ $rc -eq 1 ]] && printf '%s' "$out" | grep -qF 'PlantedOrphan'; then
+  record "orphan (widened)" "fired"
+  printf '  %-10s an orphan outside */widgets/ -> FAIL(1) and named. The inventory is all of lib/.\n' "$G"
+else
+  record "orphan (widened)" "COULD-NOT-FAIL"
+  printf '  %-10s %san orphan outside */widgets/ -> exit %d; the inventory is still narrow\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+rm -f "$mini/lib/core/design_system/effects/planted_orphan.dart"
+
+# --- 10. blur budget gate ---------------------------------------------------
+# The blur gate bounds §13.4's budget of per-frame `saveLayer`s. It is a Dart
+# test, so its negative control is a file planted in a scratch copy of the
+# tree — and the assertions are about the PLANTED PATH, not about the tree's
+# other state, so they hold whatever else is in flight.
+#
+#   comment    `/* GlassTier.blur */` in a feature -> NOT reported (a comment
+#              is not a site; the old scan counted block comments)
+#   real site  a `GlassTier.blur` in a feature     -> reported
+#   both halves a hand-built `ImageFiltered(ImageFilter.blur(…))` -> reported by
+#              the COUNT **and** by the direct check. The two halves used to
+#              have two definitions of "a site", so the count could say the
+#              tree was within budget while the gate was red.
+d=$(make_scratch blur)
+blur_target="$d/lib/features/reading/presentation/widgets/planted_blur.dart"
+blur_run() { ( cd "$d" && flutter test test/core/design_system/widgets/glass_blur_budget_test.dart 2>&1 ); }
+
+# 10a. a block comment naming the enum is not a site.
+cat > "$blur_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a comment, not a call site.
+/* GlassTier.blur */
+class PlantedComment {
+  const PlantedComment();
+}
+EOF
+out=$(blur_run); rc=$?
+if printf '%s' "$out" | grep -qF 'planted_blur.dart'; then
+  record "blur (block comment)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa /* GlassTier.blur */ comment was counted as a site\n' \
+    "FAIL" "$R" "$N"
+else
+  record "blur (block comment)" "fired"
+  printf '  %-10s a /* GlassTier.blur */ comment -> not reported. A comment is not a site.\n' "$G"
+fi
+rm -f "$blur_target"
+
+# 10b. a REAL site in a feature is reported — the gate can fail.
+cat > "$blur_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a real site.
+import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:flutter/material.dart';
+
+/// Spends a blur.
+class PlantedSite extends StatelessWidget {
+  const PlantedSite({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const GlassSurface(tier: GlassTier.blur, child: SizedBox.shrink());
+}
+EOF
+out=$(blur_run); rc=$?
+if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'planted_blur.dart'; then
+  record "blur (real site)" "fired"
+  printf '  %-10s a real GlassTier.blur -> reported and the gate is red\n' "$G"
+else
+  record "blur (real site)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa real GlassTier.blur -> exit %d and not reported\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+rm -f "$blur_target"
+
+# 10c. the two halves must AGREE: a hand-built filter is reported by the
+# count as well as by the direct check.
+cat > "$blur_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a filter the old count could not see.
+import 'dart:ui' show ImageFilter;
+import 'package:flutter/material.dart';
+
+/// Spends a blur without naming the enum.
+class PlantedDirect extends StatelessWidget {
+  const PlantedDirect({super.key});
+
+  @override
+  Widget build(BuildContext context) => ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: const SizedBox.shrink(),
+      );
+}
+EOF
+out=$(blur_run); rc=$?
+count_fired=0
+direct_fired=0
+printf '%s' "$out" | grep -qF 'The over-budget sites' && count_fired=1
+printf '%s' "$out" | grep -qF 'which is what the budget above counts' && direct_fired=1
+if [[ $rc -ne 0 && $count_fired -eq 1 && $direct_fired -eq 1 ]] \
+   && printf '%s' "$out" | grep -qF 'planted_blur.dart'; then
+  record "blur (one definition)" "fired"
+  printf '  %-10s a hand-built filter -> the COUNT and the direct check BOTH report it\n' "$G"
+else
+  record "blur (one definition)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa hand-built filter -> exit %d count-fired=%s direct-fired=%s; the halves disagree\n' \
+    "FAIL" "$R" "$rc" "$count_fired" "$direct_fired" "$N"
+fi
+rm -f "$blur_target"
 
 # --- summary -----------------------------------------------------------------
 echo

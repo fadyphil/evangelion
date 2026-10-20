@@ -40,6 +40,38 @@ Only classes extending `StatelessWidget` or `StatefulWidget` from
 widget or an enum is not a widget for this purpose — `EvaFocusRingScope` is one and
 is correctly invisible here.
 
+## THE INVENTORY IS **ALL OF `lib/`**, AND THAT IS THE STRUCTURAL FIX
+
+**The first version of this gate built its inventory out of the files under
+`*/widgets/` and nothing else.** The filter was one line:
+
+```python
+    if "/widgets/" not in p.as_posix():
+        continue
+```
+
+and it is the exact shape of decision 144. `GoldFlecks` lives in
+`lib/core/design_system/effects/`, `EvaAnimate` in `lib/core/design_system/motion/`
+and `EvaTypeScale` in `lib/core/design_system/tokens/` — **none of them under a
+`widgets/` directory** — and all three were built, exported, fully tested and
+placed on **no screen at all**. The gate could not see them, because the gate was
+not looking where they were. A path filter is a proxy for "is a widget", and the
+proxy was wrong for a third of the design system.
+
+**The inventory is now every `.dart` file under `lib/`**, generated files excluded
+(`.gr.dart`, `.freezed.dart`, `.config.dart` — the last two are not widgets and the
+first is auto_route's own output). The `DECL` pattern still excludes everything
+that is not a widget: a plain value class, a painter, an enum and an
+`InheritedWidget` are all invisible here, which is correct.
+
+**What the widening costs, and it is not nothing:** a page's own private widgets
+are not in the inventory either, because `DECL` requires a public name — and that
+is the right answer rather than a gap. A private widget cannot be constructed from
+another file, so the only thing that can place it is the file it lives in, and a
+file that declares a private widget and never constructs it is a class with no
+caller, which the analyzer and review are for. **A public widget is in the
+inventory whether or not anybody wanted it there**, and that is the point.
+
 ## WHAT COUNTS AS A ROOT, AND WHY THE PATH IS NOT IT
 
 A root is a **page the app can actually navigate to**, and the check now says
@@ -47,9 +79,9 @@ that in two mechanical halves:
 
 1. the file declares `@RoutePage()` **on a widget** — a class in that file
    that extends `StatelessWidget` or `StatefulWidget`; and
-2. the route that declaration produces is **registered** in
-   `lib/app/router/app_router.dart`'s route table — the generated route
-   class's name appears there as `page: <Name>Route.page`.
+2. the route that declaration produces is **registered** in the app's route
+   table — the generated route class's name appears there as
+   `page: <Name>Route.page`.
 
 Both halves are mechanical, and both are in this file's vocabulary already: the
 first is the `DECL` pattern that builds the inventory below, and the second is
@@ -87,6 +119,71 @@ found — and the report is what it was. The difference is that the set is now
 **derived** rather than **guessed**: a page that stops being registered stops
 being a root, which is the correct answer and the old proxy could not give it.
 
+## A BOGUS `@RoutePage()` IS A **FAILURE**, NOT A DIAGNOSTIC
+
+**This is the second half of the clause above, and it used to exit 0.**
+
+A file that carries `@RoutePage()` on something that is not a registered page
+widget printed `NOT A ROOT` and the gate **passed**. The reasoning was "the
+gate's subject is widgets that are built and never placed, and an annotation
+nobody routes to places nothing". That reasoning is about the wrong question.
+The annotation says "this is a screen the app can navigate to", and if the app
+cannot navigate to it, then either the annotation is decoration (a mistake) or
+the route registration was forgotten (a bigger mistake). **Both are defects,
+and a gate that prints a diagnostic and exits 0 is a gate that cannot fail** —
+the tree can be wrong and the gate says nothing.
+
+So it is a **failure**, exit **1**, with the diagnostic text kept. The text is
+kept because it is the receipt: it says *which* file, *which* class and *why*
+it is not a page, and that is the difference between "the gate is red" and
+"the gate is red and here is the thing to fix".
+
+## THE ROUTER IS **DERIVED**, NOT NAMED, AND ITS ABSENCE IS **FATAL**
+
+The registration half above needs the app's route table, and the first version
+of this file reached for it by path:
+
+```python
+ROUTER = ROOT / "lib" / "app" / "router" / "app_router.dart"
+```
+
+**A rename or a move of that file silently turned the registration clause into
+"no route is registered anywhere".** That is *safe* in direction — it reports
+less rather than more — and it is **useless**: the clause's entire content is
+"is this page's route in the router's table", and with the router unfindable
+the answer is always no, so the clause cannot tell "this page is not
+registered" from "the router moved". A clause that cannot tell those two apart
+is not a clause.
+
+**So the router is found by content**: the unique file under `lib/` that
+declares `@AutoRouterConfig()` — auto_route's own marker for "this class is
+the app's router", so the gate agrees with the framework about what a router
+is rather than with a file name. A rename cannot break it and a move cannot
+break it.
+
+**And not finding it is FATAL (exit 2), never a silent pass.** Zero matches
+means there is no route table to ask about; more than one means the gate would
+have to guess which router is the app's, and a guess that happens to be wrong
+turns every page into an orphan. Both are "the check could not run", which is
+what exit 2 means, and both are reported with the file names.
+
+## THE APP ROOT IS A ROOT TOO, AND IT IS **DERIVED** AS WELL
+
+The widened inventory reaches the classes that are **above** the pages:
+`EvangelionApp` (the app's root widget), `NeuralMotionScope` and
+`SettingsScope` (the scopes `MaterialApp` sits inside). **No page constructs
+any of them** — they are above the router, not below it — so without a second
+root the widening would report three orphans that are on every single screen.
+
+**The app root is the widget class that installs the app's tree**, and it is
+found by content for the same reason the router is: `MaterialApp.router` is the
+one place auto_route's `RouterConfig` enters the tree, so the widget class
+enclosing that installation is the root of everything the reader sees.
+
+Zero installations or more than one is **FATAL**, for the same reason the
+router's is: without it there is no tree, and a gate that reports "nothing is
+placed" over a tree it could not find is the worst outcome available.
+
 ## WHAT IT DOES NOT CHECK
 
 Whether the placed widget renders *the right data*, or appears in the right order,
@@ -101,7 +198,8 @@ claims to be one and the router **has** the route; what the route does when it
 is pushed is auto_route's business and `app_router_test.dart`'s.
 
 Exit:  0 every widget is placed (or is allowlisted with a written reason)
-       1 at least one widget is built, tested and never placed
+       1 at least one widget is built, tested and never placed — OR an
+         annotation claims a page the app does not have
        2 the check could not run
 """
 
@@ -264,23 +362,104 @@ def _annotated_classes(text: str) -> list[tuple[str, str, str]]:
     return found
 
 
-# The router's own route table. **The composition root's**, because that is
-# where the app's routes are registered — AGENT_CONTEXT §3 puts the wiring
-# there and nowhere else.
-ROUTER = ROOT / "lib" / "app" / "router" / "app_router.dart"
+# The app's router, found by CONTENT.
+#
+# auto_route's own marker for "this class is the app's router" is
+# `@AutoRouterConfig()`, so finding the file that declares it agrees with the
+# framework rather than with a file name. **A rename cannot break this and a
+# move cannot break it**, which is the whole reason it replaced the literal
+# `lib/app/router/app_router.dart`.
+#
+# **Comments are stripped before the search**, so a doc comment that merely
+# mentions the annotation does not make a file the router.
+_ROUTER_ANNOTATION = re.compile(r"@AutoRouterConfig\b")
 
 
-def _router_table() -> str | None:
-    """The router's source with its comments stripped, or None if unreadable.
+def _find_router(files: list[Path], stripped: dict[Path, str]) -> tuple[Path | None, str]:
+    """The file that declares the app's route table, and why not if there is none.
 
-    **Comments are stripped for the same reason the page files are.** The
-    router explains itself in prose, and a doc comment naming a route class
-    must not register a route that was never registered.
+    **Derived, never named.** The literal this replaced made a renamed router
+    read as "no route is registered anywhere", which is safe in direction and
+    useless in content: the clause could no longer tell "this page is not
+    registered" from "the router moved".
+
+    Zero matches and more than one match are both **FATAL** at the call site:
+    a gate that cannot find the table it asks questions of must not answer
+    them, and a gate that has two tables must not choose between them.
     """
-    if not ROUTER.is_file():
-        print(f"FATAL: no router at {ROUTER}", file=sys.stderr)
-        return None
-    return strip_comments(ROUTER.read_text(encoding="utf-8", errors="ignore"))
+    hits = [p for p in files if _ROUTER_ANNOTATION.search(stripped[p])]
+    if not hits:
+        return None, (
+            "no file under lib/ declares `@AutoRouterConfig()` — the app's route "
+            "table could not be found, so 'is this page registered?' has no "
+            "answer, and answering it 'no' for every page would be a false green"
+        )
+    if len(hits) > 1:
+        names = ", ".join(sorted(p.relative_to(ROOT).as_posix() for p in hits))
+        return None, (
+            f"{len(hits)} files under lib/ declare `@AutoRouterConfig()` ({names}) "
+            "— the gate does not guess which one is the app's router"
+        )
+    return hits[0], ""
+
+
+# The app's widget tree, and where it is installed.
+#
+# `MaterialApp.router` is the ONE place auto_route's `RouterConfig` enters the
+# tree, so the widget class that encloses that installation is the app's root
+# widget: the one the process installs, and the one every screen lives under.
+#
+# It is found by content for the same reason the router is, and it exists
+# because the widened inventory reaches the classes that are ABOVE the pages —
+# `EvangelionApp`, `NeuralMotionScope`, `SettingsScope` — which no page
+# constructs and every screen contains.
+_APP_INSTALL = re.compile(r"\bMaterialApp\s*\.\s*router\s*\(")
+
+
+def _find_app_root(
+    files: list[Path], stripped: dict[Path, str], declared: dict[str, Path]
+) -> tuple[str | None, str]:
+    """The widget class the app's tree is installed in, and why not if none is.
+
+    **The nearest enclosing widget class wins.** The installation is written
+    inside a `State`'s `build`, and the `State` is not a widget — so the
+    enclosing *widget* is the one the state belongs to.
+
+    Zero installations and more than one are both **FATAL**: without the root
+    there is no tree, and a gate that reports "nothing is placed" over a tree
+    it could not find is the worst outcome available.
+    """
+    hits: list[tuple[Path, int]] = []
+    for p in files:
+        for m in _APP_INSTALL.finditer(stripped[p]):
+            hits.append((p, m.start()))
+    if not hits:
+        return None, (
+            "no file under lib/ installs `MaterialApp.router(` — the app's widget "
+            "tree could not be found, so 'is this widget on a screen?' has no "
+            "answer, and answering it 'no' for every widget would be a false "
+            "green"
+        )
+    if len(hits) > 1:
+        places = ", ".join(
+            sorted(f"{p.relative_to(ROOT).as_posix()}" for p, _ in hits)
+        )
+        return None, (
+            f"{len(hits)} files under lib/ install `MaterialApp.router(` ({places}) "
+            "— the gate does not guess which one is the app's root"
+        )
+    path, offset = hits[0]
+    name = None
+    for m in DECL.finditer(stripped[path]):
+        if m.start() < offset:
+            name = m.group("name")
+    if name is None or name not in declared:
+        return None, (
+            f"the app's tree is installed in {path.relative_to(ROOT).as_posix()}, "
+            "but no widget class encloses the installation — the app's root "
+            "widget could not be identified"
+        )
+    return name, ""
 
 
 def _is_registered(route_class: str, table: str) -> bool:
@@ -401,12 +580,16 @@ def main() -> int:
     texts: dict[Path, str] = {}
     for p in files:
         texts[p] = p.read_text(encoding="utf-8", errors="ignore")
+    stripped: dict[Path, str] = {p: strip_comments(t) for p, t in texts.items()}
 
-    # name -> declaring file, and name -> set of names that construct it
+    # name -> declaring file, and name -> set of names that construct it.
+    #
+    # **The inventory is ALL of `lib/`**, not the files under a `widgets/`
+    # directory. The old filter hid `effects/`, `motion/` and `tokens/` — and
+    # three widgets that were built, tested and placed on no screen at all
+    # lived there. The file header has the receipt.
     declared: dict[str, Path] = {}
-    for p, t in texts.items():
-        if "/widgets/" not in p.as_posix():
-            continue
+    for p, t in stripped.items():
         for m in DECL.finditer(t):
             declared.setdefault(m.group("name"), p)
 
@@ -446,9 +629,10 @@ def main() -> int:
         # it is on `/settings` today.
         return re.search(rf"\b{re.escape(name)}\s*(?:<[^;{{}}]*>)?\s*\(", code) is not None
 
-    # The root set: **the pages the app can actually navigate to.**
+    # The root set: **the pages the app can actually navigate to**, plus the
+    # app's own root widget.
     #
-    # A file is a root when it declares `@RoutePage()` **on a widget** and the
+    # A file is a page when it declares `@RoutePage()` **on a widget** and the
     # route that declaration produces is **registered in the router's table**.
     # Both halves are mechanical, and both are in this file's vocabulary
     # already: the first is [DECL] and the second is a plain source file.
@@ -464,42 +648,63 @@ def main() -> int:
     # that *mentions* `@RoutePage()` — and plenty of them do, because this
     # repository explains itself in prose — must not make a file a root, or a
     # widget that no page places would be reported as placed by a sentence.
-    router_table = _router_table()
-    if router_table is None:
+    router, why = _find_router(files, stripped)
+    if router is None:
+        print(f"FATAL: {why}", file=sys.stderr)
         return 2
+    router_table = stripped[router]
 
-    pages: list[Path] = []
+    pages: list[str] = []
+    page_files: dict[str, Path] = {}
     not_a_root: list[str] = []
     for p in files:
-        for _, route_class, reason in _annotated_classes(texts[p]):
+        for name, route_class, reason in _annotated_classes(texts[p]):
             if not reason:
                 if _is_registered(route_class, router_table):
-                    pages.append(p)
-                    break
+                    pages.append(name)
+                    page_files[name] = p
+                    continue
                 reason = (
                     f"{route_class} is not registered in "
-                    "lib/app/router/app_router.dart's route table"
+                    f"{router.relative_to(ROOT).as_posix()}'s route table"
                 )
             not_a_root.append(f"{p.relative_to(ROOT).as_posix()}: {reason}")
     if not pages:
-        print("FATAL: no page files found — nothing is 'placed' by definition", file=sys.stderr)
+        print(
+            "FATAL: no page files found — the app has no navigable screen, so "
+            "'placed' has no meaning",
+            file=sys.stderr,
+        )
         return 2
 
-    placed: set[str] = set()
-    for p in pages:
-        t = texts[p]
-        for name, owner in declared.items():
-            if constructs(t, name, "<page> " + p.name):
-                placed.add(name)
+    # The app's root widget: the tree every screen lives under. See the header.
+    app_root, why = _find_app_root(files, stripped, declared)
+    if app_root is None:
+        print(f"FATAL: {why}", file=sys.stderr)
+        return 2
+
+    # A page is placed by definition — the app can navigate to it — and so is
+    # the app's root widget, which is what the process installs.
+    placed: set[str] = set(pages)
+    placed.add(app_root)
 
     # Transitive closure: a placed widget places what it constructs.
+    #
+    # **A page is scanned in its OWN file**, not in whichever file `declared`
+    # happens to name for it. The two are the same today — no two files under
+    # `lib/` declare the same widget class name, measured — but `declared` keeps
+    # the FIRST file it sees for a name, so a duplicate would have made the
+    # page's own constructions invisible and the page's widgets would have
+    # looked unplaced. The failure direction is loud, and this removes it.
     changed = True
     while changed:
         changed = False
         for name in list(placed):
-            owner = declared[name]
+            owner = page_files.get(name) or declared.get(name)
+            if owner is None:
+                continue
             t = texts[owner]
-            for other, other_owner in declared.items():
+            for other in declared:
                 if other in placed:
                     continue
                 if constructs(t, other, name):
@@ -510,58 +715,75 @@ def main() -> int:
 
     # An allowlisted entry must actually be unplaced — otherwise the exemption has
     # rotted and is hiding nothing.
-    stale = sorted(n for n in ALLOWLIST if n in placed)
-    for n in stale:
-        print(f"  STALE    {n} is allowlisted but IS placed — remove the entry")
-    stale_allow = [n for n in stale if n in ALLOWLIST]
+    stale_allow = sorted(n for n in ALLOWLIST if n in placed)
 
     allowed_orphans = [n for n in orphans if n in ALLOWLIST]
     real_orphans = [n for n in orphans if n not in ALLOWLIST]
 
-    print(f"widget classes declared under */widgets/ : {len(declared)}")
+    print(f"widget classes declared under lib/       : {len(declared)}")
     print(f"root pages (@RoutePage() on a widget)    : {len(pages)}")
-    print(f"reachable from a page                   : {len(placed)}")
+    print(f"app root (installs MaterialApp.router)   : {app_root}")
+    print(f"reachable from a root                    : {len(placed)}")
     print(f"not placed                              : {len(orphans)}"
           f"  (allowlisted {len(allowed_orphans)}, real {len(real_orphans)})")
 
     # A file that declares the annotation on something that is not a registered
-    # page widget is **not** a root — and it is worth saying out loud, because
-    # "this file is not a root" and "this file's annotation is decoration" are
-    # different answers, and the difference is what this gate is for.
+    # page widget is **not** a root — and it is a **FAILURE**, not a note.
     #
-    # **It is a diagnostic and not a failure.** The gate's subject is widgets
-    # that are built and never placed, and an annotation nobody routes to
-    # places nothing. What it must not do is *hide*: the clause that used to
-    # make such a file a root is what let a widget be reported as placed while
-    # it was on no screen at all, and that is the failure this gate exists to
-    # make impossible.
+    # It used to print `NOT A ROOT` and exit 0, and the reasoning was "the
+    # gate's subject is widgets that are built and never placed, and an
+    # annotation nobody routes to places nothing". That is the wrong question:
+    # the annotation claims "this is a screen the app can navigate to", and if
+    # the app cannot navigate to it then either the annotation is decoration or
+    # the registration was forgotten. **Both are defects**, and a gate that
+    # prints a diagnostic and exits 0 cannot fail.
     if not_a_root:
         print()
         for line in not_a_root:
             print(f"  NOT A ROOT  {line}")
         print()
+        print("Each line above is an `@RoutePage()` that names either a class")
+        print("that is not a page widget, or a route the router does not")
+        print("register. Register the route, or take the annotation off.")
+        print()
 
     if stale_allow:
         print()
         for n in stale_allow:
-            print(f"  STALE ALLOWLIST  {n}")
+            print(f"  STALE ALLOWLIST  {n}  is allowlisted but IS placed — "
+                  "remove the entry")
         print()
-        print(f"FAILED — {len(stale_allow)} allowlist entr(ies) are stale.")
-        return 1
 
     if real_orphans:
         print()
         for n in real_orphans:
             print(f"  ORPHAN  {n}  ({declared[n].relative_to(ROOT).as_posix()})")
         print()
-        print(f"FAILED — {len(real_orphans)} widget(s) are built and never placed.")
         print("Decision 144: a widget with a full test suite and no page that")
         print("instantiates it is invisible to every assertion that does not look")
         print("for it on the screen. Place it, delete it, or allowlist it WITH a")
         print("written reason — never suppress the failure.")
+        print()
+
+    # **Every failure is named in the one line that says the gate is red.**
+    # Three sections can each be red at once, and a reader who has to guess
+    # which one the exit code was about is reading the output wrong.
+    failures: list[str] = []
+    if not_a_root:
+        failures.append(
+            f"{len(not_a_root)} file(s) claim a page the app does not have"
+        )
+    if stale_allow:
+        failures.append(f"{len(stale_allow)} allowlist entr(ies) are stale")
+    if real_orphans:
+        failures.append(
+            f"{len(real_orphans)} widget(s) are built and never placed"
+        )
+    if failures:
+        print(f"FAILED — {', and '.join(failures)}.")
         return 1
 
-    print("PASSED — every widget is reachable from a page.")
+    print("PASSED — every widget is reachable from a root.")
     return 0
 
 

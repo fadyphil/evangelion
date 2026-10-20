@@ -28,17 +28,76 @@
 ///
 /// ## THE COUNT IS OF **SITES**, NOT OF LINES, AND THAT IS NOT A DETAIL
 ///
-/// A blur site has **two spellings** — `GlassTier.blur`, the design system's own
-/// way of asking for one, and a hand-built `BackdropFilter` — and the redesign's
-/// dock is the second, because `GlassSurface` paints a *panel* and the dock is a
-/// full-width bar. A count that read only the enum would have been **blind to
-/// it**, and a count of *lines* would have read the dock's one site as two
-/// (`BackdropFilter(` on one line, `ImageFilter.blur(` on the next) and charged
-/// the budget for a blur that does not exist.
+/// A blur site has **more than one spelling** — `GlassTier.blur`, the design
+/// system's own way of asking for one, and a hand-built filter — and the
+/// redesign's dock is the second kind, because `GlassSurface` paints a *panel*
+/// and the dock is a full-width bar. A count that read only the enum would have
+/// been **blind to it**, and a count of *lines* would have read the dock's one
+/// site as two (`BackdropFilter(` on one line, `ImageFilter.blur(` on the next)
+/// and charged the budget for a blur that does not exist.
 ///
-/// So the count is of sites, of both spellings, and **the dock's site is charged
+/// So the count is of sites, of every spelling, and **the dock's site is charged
 /// to the budget like any other** — the exception is about the *shape*, not
-/// about escaping the count.
+/// about escaping the count. **What counts as a spelling is the next section,
+/// and there is exactly one answer to it.**
+///
+/// ## ONE DEFINITION OF A SITE, USED BY BOTH HALVES, AND THE TWO HALVES USED
+/// TWO
+///
+/// **This is the repair, and it is a definition rather than a number.** The
+/// gate has two halves — a COUNT ("how many blur sites are there?") and a
+/// DIRECT-SPELLING CHECK ("does anything outside the dock build its own
+/// filter?") — and until now they had **two different ideas of what a site
+/// is**:
+///
+/// | half | what it looked for |
+/// | --- | --- |
+/// | the count | `GlassTier.blur` or `BackdropFilter(` |
+/// | the direct check | any line mentioning `BackdropFilter` or `ImageFilter.blur` |
+///
+/// **The gap was not academic.** `ImageFiltered(ImageFilter.blur(10))` in a
+/// feature is caught by the direct check — the words are there — and is **not
+/// counted** by the count, which knows neither spelling. So the gate was red
+/// and the count said the tree was within budget **at the same time**, and the
+/// two halves could not both be right. A reader handed "2 of 2 blur sites" and
+/// a red gate has been handed two true sentences about two different questions.
+///
+/// **So there is ONE list of sites now, and both halves read it.** The count is
+/// the length of the list; the direct check is the subset of that same list
+/// whose spelling is a hand-built filter. There is no second spelling list to
+/// drift, and "is the tree over budget" has exactly one answer.
+///
+/// ### THE FOUR SPELLINGS, AND THE ONE THAT IS NOT A SITE ON ITS OWN
+///
+/// | spelling | a site? |
+/// | --- | --- |
+/// | `GlassTier.blur` | yes — the tier asking for a blur |
+/// | `BackdropFilter(` | yes — a widget that applies a backdrop filter |
+/// | `ImageFiltered(` | yes — a widget that applies an image filter |
+/// | `ImageFilter.blur(` | **only when no application above it owns it** |
+///
+/// The fourth needs a rule, and the rule is the dock's own shape:
+/// `BackdropFilter(filter: ImageFilter.blur(…))` is **ONE** site, not two —
+/// the filter is the argument of the application that applies it, and counting
+/// it twice charged the budget for a blur that does not exist. A bare
+/// `ImageFilter.blur(…)` **is** a site, and the text above used to say the
+/// opposite: "a filter that is built and never applied costs nothing". That is
+/// true of the RUNTIME and false of the RULE. The budget is a source-level
+/// rule, and a filter nobody applies today is a filter somebody applies
+/// tomorrow without the budget noticing.
+///
+/// ### COMMENTS ARE NOT SITES, AND **BOTH** KINDS OF COMMENT
+///
+/// A doc comment naming the enum is where a reader learns the budget; it is
+/// not a call site spending it. The old scan skipped a line that *began* with
+/// `//` — and so a `/* GlassTier.blur */` inside a **block** comment counted
+/// as a site, which is the same defect in the opposite direction: a comment
+/// spending the budget.
+///
+/// The scan now strips comments properly — `/* … */` and `// …` — using the
+/// **same** routine `tool/gates/orphan_widget_check.py` uses, ported rather
+/// than reinvented, and the strip **preserves the line structure**, so a
+/// reported `file:line` still points at the line the reader needs.
 ///
 /// ## WHY A SOURCE SCAN AND NOT A RUNTIME COUNT
 ///
@@ -317,75 +376,205 @@ List<File> _ownerFiles() =>
         .where((File file) => packageRelative(file.uri) == _ownerPath)
         .toList();
 
-/// Every executable line in [files] mentioning any of [markers], as
-/// `file:line: text`.
+/// One source file, as the scanner sees it.
 ///
-/// Comments are skipped: a doc comment naming the enum is where a reader learns
-/// the budget, not a call site spending it. `readAsLinesSync` throws on an
-/// unreadable file and that throw fails the test naming it.
-List<String> _sitesMentioning(List<File> files, String marker) {
-  final List<String> hits = <String>[];
-  for (final File file in files) {
-    final List<String> lines = file.readAsLinesSync();
-    for (int i = 0; i < lines.length; i++) {
-      final String trimmed = lines[i].trimLeft();
-      if (trimmed.startsWith('///') || trimmed.startsWith('//')) continue;
-      if (lines[i].contains(marker)) {
-        hits.add('${packageRelative(file.uri)}:${i + 1}: ${lines[i].trim()}');
+/// The path is the package-relative one, so a reported site is
+/// `file:line: text` and a reader can open it.
+typedef _Source = ({String path, String text});
+
+/// Which spelling of a site this is.
+///
+/// **The kind is an attribute of a site, not a second definition of one.** The
+/// count and the direct check read the SAME list of sites; the direct check is
+/// the subset whose kind is [direct].
+enum _SiteKind {
+  /// `GlassTier.blur` — the design system's own way of asking for a blur.
+  tier,
+
+  /// A hand-built filter: `BackdropFilter(`, `ImageFiltered(`, or an
+  /// `ImageFilter.blur(` that no application above it owns.
+  direct,
+}
+
+/// One blur site, and where it is.
+class _Site {
+  const _Site(this.path, this.line, this.text, this.kind);
+
+  /// The package-relative path of the file the site is in.
+  final String path;
+
+  /// The 1-based line the site is on.
+  final int line;
+
+  /// Which spelling this is.
+  final _SiteKind kind;
+
+  /// The source line, trimmed.
+  final String text;
+
+  /// `path:line` — the location a matcher can compare against.
+  String get location => '$path:$line';
+
+  /// `file:line: text` — the form a failure message quotes.
+  @override
+  String toString() => '$path:$line: $text';
+}
+
+/// The ONE definition of a blur site.
+///
+/// Four spellings, in one pattern, plus the two bracket tokens the ownership
+/// rule needs. **One pattern, because two patterns are two definitions** — see
+/// the file header for the disagreement that produced.
+///
+/// The bracket tokens are there so the scanner can tell an `ImageFilter.blur(`
+/// that an application above it owns from one that stands alone: every `(`
+/// opens a frame and every `)` closes one, and only a frame opened by
+/// `BackdropFilter(` or `ImageFiltered(` owns a filter.
+final RegExp _siteToken = RegExp(
+  r'(?<tier>GlassTier\s*\.\s*blur\b)'
+  r'|(?<filter>ImageFilter\s*\.\s*blur\s*\()'
+  r'|(?<backdrop>BackdropFilter\s*\()'
+  r'|(?<image>ImageFiltered\s*\()'
+  r'|(?<open>\()'
+  r'|(?<close>\))',
+);
+
+/// Removes `/* */` and `//` comments, preserving line structure.
+///
+/// **Ported from `tool/gates/orphan_widget_check.py`'s `strip_comments`, not
+/// reinvented.** Two gates that strip comments have to strip them the same
+/// way, and this one is the gate that had it right: it removes a block comment
+/// by replacing it with the same number of newlines, so the line count — and
+/// therefore every reported `file:line` — is unchanged, and it removes a line
+/// comment by removing the rest of the line.
+///
+/// The consequence for this gate is the point of the port: **a `/* … */`
+/// comment no longer spends the budget**, where the old line-by-line scan
+/// skipped only the lines that *began* with `//`.
+final RegExp _blockComment = RegExp(r'/\*[\s\S]*?\*/');
+final RegExp _lineComment = RegExp(r'//[^\n]*');
+
+String stripComments(String text) {
+  final String withoutBlocks = text.replaceAllMapped(_blockComment, (Match m) {
+    final int newlines = '\n'.allMatches(m.group(0)!).length;
+    return List<String>.filled(newlines, '\n').join();
+  });
+  return withoutBlocks.replaceAll(_lineComment, '');
+}
+
+/// The 1-based line [offset] falls on, in [text].
+int _lineOf(String text, int offset) {
+  int line = 1;
+  for (int i = 0; i < offset && i < text.length; i++) {
+    if (text.codeUnitAt(i) == 0x0A) line++;
+  }
+  return line;
+}
+
+/// Every blur site in [sources], under the ONE definition.
+///
+/// Comments are stripped first, so a mention inside `/* … */` or `// …` is not
+/// a site. The reported line text comes from the **original** source and the
+/// line number from the stripped source — the strip preserves the line
+/// structure, so the two agree and the quoted line is the line the reader
+/// needs.
+///
+/// ## THE OWNERSHIP RULE, AND WHY IT IS A BRACKET STACK
+///
+/// An `ImageFilter.blur(` is a site **unless an application above it owns
+/// it** — the dock's `BackdropFilter(filter: ImageFilter.blur(…))` is one
+/// site, and a bare `ImageFilter.blur(…)` is a site of its own.
+///
+/// "Above it" is decided by the bracket stack: every `(` opens a frame, every
+/// `)` closes one, and a filter is owned when the frame it sits in was opened
+/// by `BackdropFilter(` or `ImageFiltered(`. **The innermost frame wins**, so
+/// `BackdropFilter(child: Foo(ImageFilter.blur(1)))` counts the inner filter
+/// separately — `Foo` applies it, not the backdrop.
+///
+/// The stack is exact on this tree, and that is measured rather than assumed:
+/// of the 243 files under `lib/` (generated output excluded), **none** has
+/// unbalanced parentheses once string literals are set aside, the 71 string
+/// literals that contain a parenthesis contain them in balanced pairs, and
+/// **no** string literal contains `//` — so the comment strip cannot truncate
+/// one and unbalance the rest. The measurement is a claim about the tree as it
+/// stands, and a future string with a lone `(` would be the one thing that
+/// could shift the stack; the failure direction is a mis-owned filter, which
+/// is reported rather than hidden.
+List<_Site> _sitesIn(List<_Source> sources) {
+  final List<_Site> sites = <_Site>[];
+  for (final _Source source in sources) {
+    final String code = stripComments(source.text);
+    final List<String> rawLines = source.text.split('\n');
+    // One entry per open bracket; `true` when the bracket opened an
+    // application, which is what makes it the owner of a filter.
+    final List<bool> frames = <bool>[];
+    for (final RegExpMatch match in _siteToken.allMatches(code)) {
+      final int line = _lineOf(code, match.start);
+      final String text = (line - 1 < rawLines.length ? rawLines[line - 1] : '')
+          .trim();
+      if (match.namedGroup('tier') != null) {
+        sites.add(_Site(source.path, line, text, _SiteKind.tier));
+        continue;
+      }
+      if (match.namedGroup('backdrop') != null ||
+          match.namedGroup('image') != null) {
+        frames.add(true);
+        sites.add(_Site(source.path, line, text, _SiteKind.direct));
+        continue;
+      }
+      if (match.namedGroup('filter') != null) {
+        final bool owned = frames.isNotEmpty && frames.last;
+        if (!owned) {
+          sites.add(_Site(source.path, line, text, _SiteKind.direct));
+        }
+        frames.add(false);
+        continue;
+      }
+      if (match.namedGroup('open') != null) {
+        frames.add(false);
+        continue;
+      }
+      if (match.namedGroup('close') != null && frames.isNotEmpty) {
+        frames.removeLast();
       }
     }
   }
-  return hits;
+  return sites;
 }
 
-/// Every **blur site** in [files], counted as sites and not as lines.
+/// Every blur site in [files], under the ONE definition.
 ///
-/// A site is a `GlassTier.blur` — the design system's own way of asking for a
-/// blur — **or** a `BackdropFilter(`, which is the widget that spends it. The
-/// count is of **sites**, and that is not a detail: the redesign's dock spells
-/// its one site over two lines (`BackdropFilter(` on one, `ImageFilter.blur(`
-/// on the next), and a count of *lines* would read that one site as two and
-/// charge the budget for a blur that does not exist.
-///
-/// **The count is of occurrences, not of lines**, and that is the second half
-/// of the same point: a line that mentions the enum twice is still one line
-/// but could be two sites, and the budget is about sites.
-List<String> _blurSites(List<File> files) {
-  final List<String> hits = <String>[];
-  for (final File file in files) {
-    final List<String> lines = file.readAsLinesSync();
-    for (int i = 0; i < lines.length; i++) {
-      final String trimmed = lines[i].trimLeft();
-      if (trimmed.startsWith('///') || trimmed.startsWith('//')) continue;
-      final int onThisLine = _sitePattern.allMatches(lines[i]).length;
-      for (int n = 0; n < onThisLine; n++) {
-        hits.add('${packageRelative(file.uri)}:${i + 1}: ${lines[i].trim()}');
-      }
-    }
-  }
-  return hits;
-}
+/// `readAsStringSync` throws on an unreadable file and that throw fails the
+/// test naming it.
+List<_Site> _blurSites(List<File> files) => _sitesIn(<_Source>[
+  for (final File file in files)
+    (path: packageRelative(file.uri), text: file.readAsStringSync()),
+]);
 
-/// The two spellings of "this line spends a blur".
+/// The sites in [files] that were built by hand rather than asked for through
+/// the tier — **the subset of the one list**, not a second scan.
 ///
-/// `ImageFilter.blur` alone is **not** one: a filter that is built and never
-/// applied costs nothing, and the redesign's dock's `ImageFilter.blur(` sits
-/// under the `BackdropFilter(` that applies it.
-final RegExp _sitePattern = RegExp(r'GlassTier\.blur\b|BackdropFilter\s*\(');
+/// This is the direct-spelling check's whole input, and it is a *filter* over
+/// [_blurSites] rather than a scan of its own: a second scan is a second
+/// definition, and two definitions is the defect this file's header records.
+List<_Site> _directSites(List<File> files) => <_Site>[
+  for (final _Site site in _blurSites(files))
+    if (site.kind == _SiteKind.direct) site,
+];
 
 void main() {
   test('at most TWO screen sites blur — §13.4 spends one of eight, and the '
       'redesign\'s dock is the second', () {
     final _Buckets walk = _walk();
     // The screens, where §13.4's two allowed sites are.
-    final List<String> features = _blurSites(walk.features);
+    final List<_Site> features = _blurSites(walk.features);
     // The primitives, which may not spend one at all.
-    final List<String> designSystem = _blurSites(walk.designSystem);
+    final List<_Site> designSystem = _blurSites(walk.designSystem);
     // **And everything else in `lib/`** — the bucket the two-directory walk
     // never had, and the one that let a `BackdropFilter` live in
     // `lib/core/design_system/effects/` and in `lib/app/` while this gate
     // stayed green.
-    final List<String> elsewhere = _blurSites(walk.elsewhere);
+    final List<_Site> elsewhere = _blurSites(walk.elsewhere);
 
     expect(
       features,
@@ -453,7 +642,7 @@ void main() {
     // included. The two-directory walk named `lib/core/design_system/widgets/`
     // and left `lib/core/design_system/effects/` unwalked, and a real
     // `BackdropFilter` planted there left this gate green.
-    final List<String> hits = _blurSites(_walk().designSystem);
+    final List<_Site> hits = _blurSites(_walk().designSystem);
     expect(
       hits,
       isEmpty,
@@ -490,10 +679,10 @@ void main() {
     // blur a feature spends is visible to the budget, and exactly one feature
     // spends one outside the enum.**
     final _Buckets walk = _walk();
-    final List<String> featureDirect = <String>[
-      ..._sitesMentioning(walk.features, 'BackdropFilter'),
-      ..._sitesMentioning(walk.features, 'ImageFilter.blur'),
-    ]..sort();
+    // **The direct check is a FILTER over the one list of sites**, not a scan
+    // of its own: a second scan is a second definition, and two definitions is
+    // the defect this file's header records.
+    final List<_Site> featureDirect = _directSites(walk.features);
     expect(
       featureDirect,
       isNotEmpty,
@@ -505,8 +694,8 @@ void main() {
     );
     expect(
       featureDirect.every(
-        (String hit) =>
-            hit.startsWith('lib/features/dock/presentation/widgets/'),
+        (_Site site) =>
+            site.path.startsWith('lib/features/dock/presentation/widgets/'),
       ),
       isTrue,
       reason:
@@ -532,10 +721,7 @@ void main() {
           'rule with no owner is a rule with no referent: find the file, or '
           'rewrite the rule rather than passing silently',
     );
-    final List<String> ownerDirect = <String>[
-      ..._sitesMentioning(owner, 'BackdropFilter'),
-      ..._sitesMentioning(owner, 'ImageFilter.blur'),
-    ]..sort();
+    final List<_Site> ownerDirect = _directSites(owner);
     expect(
       ownerDirect,
       isNotEmpty,
@@ -550,12 +736,9 @@ void main() {
     // widened form of the check that used to read the design system alone:
     // `lib/core/design_system/effects/` and `lib/app/` were outside it, and a
     // `BackdropFilter` in either was invisible to it.
-    final List<String> everyDirect = <String>[
-      ..._sitesMentioning(_dartFilesUnder(_libRoot), 'BackdropFilter'),
-      ..._sitesMentioning(_dartFilesUnder(_libRoot), 'ImageFilter.blur'),
-    ]..sort();
+    final List<_Site> everyDirect = _directSites(_dartFilesUnder(_libRoot));
     expect(
-      everyDirect,
+      everyDirect.map((_Site site) => site.location),
       everyElement(
         anyOf(
           startsWith('$_ownerPath:'),
@@ -567,6 +750,140 @@ void main() {
           'dock is the one named exception. Every other file in `$_libRoot` must '
           'go through the tier, which is what carries the budget:\n'
           '${everyDirect.join('\n')}',
+    );
+  });
+
+  test('and ONE definition of a site, which both halves above read', () {
+    // The two halves of this gate used to have two definitions of "a site",
+    // and the disagreement was observable: a feature that wrote
+    // `ImageFiltered(ImageFilter.blur(10))` was caught by the direct check and
+    // was NOT counted, so the gate was red while the count said the tree was
+    // within budget. **These assertions are the definition**, and they are
+    // asserted here rather than left to the two halves above to agree by
+    // accident.
+    //
+    // They are cheap, they are about the scanner itself rather than about the
+    // tree, and they are the reason the scanner is one function.
+
+    // **A comment is not a site — and BOTH kinds of comment.** The old scan
+    // skipped the lines that began with `//` and nothing else, so a
+    // `/* GlassTier.blur */` spent the budget. A comment is where a reader
+    // learns the rule; it is not a call site.
+    expect(
+      _sitesIn(const <_Source>[
+        (path: 'lib/features/x/y.dart', text: '/* GlassTier.blur */\n'),
+        (path: 'lib/features/x/y.dart', text: '// GlassTier.blur\n'),
+        (path: 'lib/features/x/y.dart', text: '/// GlassTier.blur\n'),
+        (path: 'lib/features/x/y.dart', text: '/*\n * BackdropFilter(\n */\n'),
+      ]),
+      isEmpty,
+      reason:
+          'a comment does not spend the budget, and a BLOCK comment is as much a '
+          'comment as a line one. The scan strips both, and the strip keeps the '
+          'line structure so a reported `file:line` still points at the line',
+    );
+
+    // **The tier is a site.**
+    expect(
+      _sitesIn(const <_Source>[
+        (path: 'lib/features/x/y.dart', text: '      tier: GlassTier.blur,\n'),
+      ]),
+      hasLength(1),
+      reason: '`GlassTier.blur` is the design system\'s own spelling of a site',
+    );
+
+    // **The dock's one site is ONE site, not two.** `BackdropFilter(` and the
+    // `ImageFilter.blur(` it applies are the same blur, and a count of two
+    // charged the budget for a blur that does not exist.
+    expect(
+      _sitesIn(const <_Source>[
+        (
+          path: 'lib/features/dock/presentation/widgets/lumen_dock.dart',
+          text:
+              'child: BackdropFilter(\n'
+              '  filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),\n'
+              '),\n',
+        ),
+      ]),
+      hasLength(1),
+      reason:
+          'the filter is the ARGUMENT of the application that applies it, so the '
+          'two spellings are one site',
+    );
+
+    // **And `ImageFiltered(ImageFilter.blur(10))` — the spelling the old count
+    // could not see — is ONE site.** This is the case the two definitions
+    // disagreed about, and the count and the direct check now answer the
+    // same way about it.
+    expect(
+      _sitesIn(const <_Source>[
+        (
+          path: 'lib/features/x/y.dart',
+          text:
+              'ImageFiltered(\n'
+              '  imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),\n'
+              '  child: child,\n'
+              '),\n',
+        ),
+      ]),
+      hasLength(1),
+      reason:
+          '`ImageFiltered(` applies an image filter, so it is a site — and the '
+          'filter it applies is not a second one',
+    );
+
+    // **And a bare `ImageFilter.blur(…)` is a site of its own.** The old text
+    // claimed a filter nobody applies costs nothing; that is true of the
+    // runtime and false of a source-level budget, and the direct check used to
+    // catch it while the count did not.
+    expect(
+      _sitesIn(const <_Source>[
+        (
+          path: 'lib/features/x/y.dart',
+          text:
+              'final ImageFilter f = ImageFilter.blur(\n'
+              '  sigmaX: 10,\n'
+              '  sigmaY: 10,\n'
+              ');\n',
+        ),
+      ]),
+      hasLength(1),
+      reason:
+          'a hand-built filter is the budget being moved out of the enum, which '
+          'is exactly what the direct check exists to catch',
+    );
+
+    // **The two halves read the SAME list.** The count is the length; the
+    // direct check is the subset whose kind is `direct`. There is no second
+    // list, and this asserts the arithmetic that makes that true.
+    final List<_Site> sites = _sitesIn(const <_Source>[
+      (
+        path: 'lib/features/x/y.dart',
+        text:
+            'tier: GlassTier.blur,\n'
+            'child: BackdropFilter(\n'
+            '  filter: ImageFilter.blur(1),\n'
+            '),\n',
+      ),
+    ]);
+    expect(
+      sites.where((_Site site) => site.kind == _SiteKind.tier),
+      hasLength(1),
+      reason: 'one tier site',
+    );
+    expect(
+      sites.where((_Site site) => site.kind == _SiteKind.direct),
+      hasLength(1),
+      reason:
+          'one hand-built site — the `ImageFilter.blur(` belongs to the '
+          '`BackdropFilter(` above it',
+    );
+    expect(
+      sites,
+      hasLength(2),
+      reason:
+          'the count and the direct check are two views of ONE list, so their '
+          'lengths add up. This is the assertion the old gate could not make',
     );
   });
 }
