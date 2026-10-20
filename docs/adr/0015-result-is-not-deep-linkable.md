@@ -1,10 +1,32 @@
 # ADR-0015: Accept that `/result` cannot be deep-linked
 
-- **Status:** accepted
+- **Status:** accepted · **amended 2026-10-20** (the mechanism changed; the
+  decision did not)
 - **Date decided:** 2026-10-04
 - **Recorded:** 2026-10-11
 - **Deciders:** the project owner, with AI implementers and reviewers
 - **Authority:** `AGENT_CONTEXT.md` §5 trap 11, recorded decisions 81, 85
+
+> **AMENDED 2026-10-20, AND THE AMENDMENT IS ABOUT THE MECHANISM ONLY.**
+>
+> `/result` **retired to a modal** in Phase 6.2 of the Lumen redesign
+> (`eva/redesign.html:718-727`), so there is no route, no `ResultRoute`, no
+> `AppRoutes.result` and no `features/result/` directory any more. The result is
+> a card over a veil, presented over the quiz.
+>
+> **The decision below still holds, and it holds more strongly.** The submit
+> response is the only artifact the result renders and there is nothing to
+> re-fetch it from, so the result **cannot be a destination** — a deep link, a
+> URL, a notification or a shortcut cannot reach it. A modal is not addressable,
+> so the property is now structural rather than enforced by a required route
+> parameter.
+>
+> **What died with the route** is the *enforcement*: `app_router_test.dart`'s
+> group that asserted `pushPath('/result')` fails was **deleted, not weakened**,
+> because the invariant it pinned no longer has a subject. The body below is
+> otherwise unchanged and still describes the codebase as it stood until
+> 2026-10-20; where it names `ResultPage`, `ResultRoute` or
+> `features/result/`, read `ResultSheet` and the quiz feature.
 
 ## Context
 

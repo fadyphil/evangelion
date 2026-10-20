@@ -2077,17 +2077,262 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 # Phase 6 — Navigation
 
-- [ ] **Step 6.1: `AutoTabsRouter`.** Home / Communion / Journey are real tabs;
+- [x] **Step 6.1: `AutoTabsRouter`.** Home / Communion / Journey are real tabs;
   Read / Today are push actions. The dock hides on reader/quiz/workshop.
-- [ ] **Step 6.2: `/result` stops being a route.** It becomes a modal
+- [x] **Step 6.2: `/result` stops being a route.** It becomes a modal
   (`:718-727`). `app_router_test.dart`'s assertion that `pushPath('/result')`
   **fails** (decision 81) **must be deleted, not weakened** — the invariant it
   pinned is gone because the route is gone.
-- [ ] **Step 6.3: `AppRoutes.fallback` (`*`) stays last.** Moving it first turns
+- [x] **Step 6.3: `AppRoutes.fallback` (`*`) stays last.** Moving it first turns
   **46 tests** red.
-- [ ] **Step 6.4: Replace the single `fadeSlide`** with the redesign's
+- [x] **Step 6.4: Replace the single `fadeSlide`** with the redesign's
   `gone-left` / `gone-right` / tab-swap transitions via
   `RouteType.custom`.
+
+> ### THE DOCK IS A **FEATURE**, AND THE SHELL IS THE **COMPOSITION ROOT'S** — and
+> the two are different directories for a reason that is not tidiness.
+>
+> The plan's file map names one new file,
+> `lib/features/dock/presentation/widgets/lumen_dock.dart`, and that is exactly
+> what landed: the dock is **presentational** — five slots, an active index and
+> a tap callback — and it knows nothing about routing, features or the locator.
+>
+> **The shell is a different thing and it does not live in the feature.** It
+> hosts the three tabs, so it must name all three of their routes, and
+> `HomeRoute` / `CommunionRoute` / `JourneyRoute` are three different features'
+> routes. AGENT_CONTEXT §3 forbids a feature importing another feature **with no
+> exceptions**, so a shell inside `features/dock/` would have made the dock
+> feature depend on the home, the board and the journey.
+>
+> The alternative considered and rejected: `AutoTabsRouter(routes: null)`, which
+> derives the children from the router's route collection
+> (`routing_controller.dart:837` — `routeCollection.routes.map((e) =>
+> PageRouteInfo(e.name))`). It works, and it is **not** used, because the
+> derived list is built from *names* in *declaration order* with no way to say
+> which route is which, and the tab order is load-bearing: it is the order the
+> dock's three real slots switch in. An explicit list says it, and
+> `app_router_test.dart` reads the live `routes` getter and pins it.
+>
+> `lib/app/` is the one directory Gate 2 exempts, because reaching into
+> features to wire them up is the composition root's whole job. The shell is
+> composition.
+
+> ### THREE TABS, FIVE SLOTS, AND THE TWO NUMBERING SCHEMES ARE **NOT** THE SAME.
+>
+> The prototype's dock has **five** slots (`eva/redesign.html:702-708`) and its
+> `TABMAP` (`:1248`) maps them onto screens. **Read that map**: `home→'home'`,
+> `reader→'read'`, `quiz→'today'`, `journey→'journey'`, `board→'board'` — and
+> the click handler (`:1277-1279`) shows that `read` and `today` are **push
+> actions**: they open the reader and the quiz rather than switching a tab.
+>
+> So the client has **three** tabs and **two** push actions, and the dock
+> carries all five slots. **The active marker therefore maps a tab index onto a
+> slot index** — the board is **tab 1** and **slot 3** — and that mapping is
+> written down in the shell rather than left to arithmetic. The prototype's own
+> `TABMAP` is the evidence that the two schemes differ; a reader who assumed
+> they were the same would light the wrong slot.
+>
+> **AND THE DOCK HIDES ON THE READER, THE QUIZ AND THE WORKSHOP BY GEOMETRY,
+> NOT BY A RULE.** The prototype does it with a class (`:1251` — the dock is
+> visible on `home`, `journey` and `board` only) and slides the dock away
+> (`.dock.hide`, `:215`). The client's dock lives inside the shell, and the
+> reader, the quiz and the workshop are **root routes pushed over the shell** —
+> so pushing one covers the shell, and the dock with it. The same observable
+> outcome, a different mechanism, and the divergence is recorded here rather
+> than left for a reader to find by looking for a slide that is not there.
+
+> ### THE THREE TAB PATHS ARE **RELATIVE**, AND THEY ARE **DERIVED**.
+>
+> auto_route rejects a child path that begins with a slash
+> (`RouteCollection.fromList` — `Sub-paths can not start with a "/"`), so the
+> shell's children are `''`, `communion` and `journey` while the URLs they
+> produce are `/`, `/communion` and `/journey`. **Nothing a reader can type has
+> changed.**
+>
+> The relative path is **derived from the absolute one**
+> (`AppRoutes.communionTab => communion.substring(1)`) rather than written a
+> second time. A second literal would be two sources of truth for one value, and
+> this repository has removed three of those on purpose (AGENT_CONTEXT decision
+> 5, decision 68). They are **getters** rather than `static const String`
+> declarations on purpose: `tool/route_check.dart` enumerates the declared
+> constants of `app_routes.dart`, and the inventory it produces is a list of
+> **absolute URLs** — a relative child path is not one of them, and it is
+> covered because the constant it derives from is.
+
+> ### A TAB SWITCH IS `setActiveIndex`, AND A PATH PUSH WOULD HAVE PUSHED A
+> **SECOND SHELL**.
+>
+> The journey's "open the board" control used to be
+> `context.router.pushPath(AppRoutes.communion)`. With the board as the shell's
+> **second child**, that path matches the shell **and** the child, so pushing
+> it would put a **second shell** on the root stack with the board's tab
+> active — two docks, two sets of tab state, and a `currentPath` that says
+> `/communion` while the stack says otherwise.
+>
+> So the control switches tabs: `TabsRouterScope.of(context)?.controller
+> .setActiveIndex(DockTabs.communion)`. **The nullable lookup is the one**, and
+> the reason is mechanical: `AutoTabsRouter.of` **asserts** when there is no
+> tabs router above, which would take the tree down on a tap in a widget test
+> that mounts the page bare, while `TabsRouterScope.of` returns `null`.
+>
+> **The same applies to the board's chevron**, which used to `maybePop()`: the
+> board is a tab, so there is nothing to pop, and the chevron now returns to the
+> **previous tab** — the one-branch form of the prototype's own two branches
+> (`:1282` — `boardEntry==='push' ? pop('journey') : tab('home')`), because the
+> reader's previous tab *is* the journey when they came from the journey.
+
+> ### THE RE-ENTRY TRIGGER MOVED TO THE **SHELL'S** ROUTE DATA, AND THAT IS A
+> **CORRECTNESS** FIX, NOT A REFACTOR.
+>
+> Recorded decision 41 fixed "`/` re-loads on re-entry" by subscribing to the
+> route's `didPopNext`. **A tab is never popped**, so the home's own route data
+> would never produce a `didPopNext` again and the reload would have died
+> silently — the reader would have come back from a reflection and seen the
+> streak they had **before** it.
+>
+> The shell **is** popped, and it is popped exactly when the screen pushed over
+> it — the reader, the quiz, the workshop — is popped and the tab underneath is
+> showing again. And auto_route's observer hands `didPopNext` to the
+> **previous** route's subscribers (`auto_route_observer.dart:168`), so the
+> **shell's** route data is the one to subscribe under. The home and the
+> journey now subscribe to `TabsRouterScope.of(context)?.controller.routeData`,
+> with the page's own route data as the **bare-tree** fallback — a page mounted
+> over a bare `MaterialApp` has no shell, and there the old behaviour is right.
+
+> ### `/result` IS A MODAL, AND THE **FEATURE** MOVED INTO `features/quiz/`.
+>
+> Step 6.2 says the result "becomes a modal". The screen's **presentation**
+> became the prototype's — a centred card over a veil, 82% wide, radius 28,
+> padding 34 × 28, a 24px backdrop blur, and the card's scale .9 → 1 over
+> 500ms (`:442-446`, `:433-434`).
+>
+> **The content did not, and the reason is the backend.** The prototype's
+> modal draws a ring with `score/qEff` in the middle (`:721`), and
+> **the submit response carries no question count** — AGENT_CONTEXT decision 93
+> records exactly this, and it is why the client's `/result` had no denominator
+> either. So the ring is **not** ported; the client keeps its score, its
+> message, its streak pill and its two stat tiles. A ring with an invented
+> denominator would be a number the server never sent.
+>
+> **And the feature is gone, because Gate 2 forbids the alternative.** The
+> result had no `domain/` and no `data/` — it was presentation-only, and
+> `result_module.dart` registered nothing. But the quiz has to *show* it, and
+> `features/quiz/` importing `features/result/` is a feature importing a
+> feature. The alternatives were a port (the port's method cannot take a
+> `BuildContext` in a pure-Dart directory, so the seam would have had to be a
+> `Widget`-returning factory, which is not pure Dart either), a locator read
+> (a feature reaching into the composition root), and a design-system screen
+> (a whole product surface in the primitives). **The move into
+> `features/quiz/` is the cheap one**: the result is the quiz's outcome, shown
+> over the quiz, and the two are one feature.
+>
+> The ARB keys keep the `result` prefix, and that is a **recorded divergence**:
+> the prefix names the *surface*, and decision 101's stated purpose — every key
+> being findable, and no two keys colliding — is served either way.
+
+> ### THE `SealFab` IS DELETED, AND THE DOCK IS WHAT REPLACED IT.
+>
+> `/`'s speed dial was, in its own doc, "the interim holder of the destinations
+> Home cannot otherwise reach **until Phase 6's dock**". The dock now holds two
+> of its three destinations — the board and the journey, which are the
+> redesign's own dock tabs (`:706`, `:707`) — and the third, the workshop, is
+> reached the way the prototype reaches it: from the journey's app-bar gear
+> (`:582`) and its account row (`:606`).
+>
+> **And the redesign's home draws no float at all** (`:513-538`), so keeping
+> the dial would have put a control on the screen that the design does not have
+> and that says the same thing as two of the dock's five slots.
+
+> ### THE JOURNEY'S BACK CHEVRON IS GONE, AND THE REASON WENT WITH IT.
+>
+> The chevron was there because the journey was **pushed**: a pushed screen on
+> desktop has no system back button, so the chevron was the way out. The
+> prototype's journey is only ever a tab (`:576-583` — no chevron, a 68px
+> spacer instead) and never needed one. **The journey is a tab now, and the
+> spacer is the prototype's own** (`:578`).
+
+> ### ONE TRANSITIONS BUILDER, TWO POSES, AND BOTH DIRECTIONS.
+>
+> The prototype has **two** route poses — `gone-left` (`:129` —
+> `translateX(-28%) scale(.96)`) and `gone-right` (`:130` —
+> `translateX(38%) scale(.98)`) — and uses the first for the route a push
+> covers and the second for the route a pop covers.
+>
+> **A single builder reproduces both**, because the two poses are the same two
+> poses used in opposite directions: the *enter* pose is `gone-right` and the
+> *exit* pose is `gone-left`, and a pop runs the same animations backwards. The
+> builder applies the enter pose to `animation` and the exit pose to
+> `secondaryAnimation`, and **the two must be combined into one transform** —
+> two stacked `SlideTransition`s would each write the transform and the last one
+> would win.
+>
+> The duration and the curve are the prototype's: 400ms (`:128`'s `.4s`) and
+> `--e-light` = `cubic-bezier(.16,1,.3,1)` = `Curves.easeOutExpo`, which the
+> repository already had as `EvaMotion.interactiveCurve` (decision 134 measured
+> it).
+>
+> **AND THE FRACTION IS OF THE ROUTE'S WIDTH, NOT OF THE PAGE'S.** The
+> prototype's `translateX(-28%)` is a percentage of the route, and a page that
+> does not fill its route would be measured against its own width by mistake.
+> The builder reads `constraints.maxWidth` through a `LayoutBuilder`, and the
+> test discriminates the two readings with a 100px page inside a 400px route —
+> 38% of the route is 152px of travel and 38% of the page is 38px, four times
+> apart.
+
+> ### TWO GATES LEARNED SOMETHING, AND BOTH WERE PROVEN IN BOTH DIRECTIONS.
+>
+> **The blur budget moved from one site to two, and it learned a second
+> spelling.** The redesign's own dock blurs (`:210` —
+> `backdrop-filter:blur(22px)`), so `lib/features/` now spends **two**: Home's
+> card and the dock, and the dock is **one** `BackdropFilter` for three tabs
+> rather than three. The gate counted `GlassTier.blur` only, so a **hand-built
+> `BackdropFilter`** — which is what a full-width bar over the page has to be,
+> because `GlassSurface` paints a *panel* — was **invisible to it**.
+>
+> **And the count became a count of SITES rather than of lines**, because the
+> dock spells its one site over two lines (`BackdropFilter(` on one,
+> `ImageFilter.blur(` on the next) and a line count would have charged the
+> budget for a blur that does not exist. The dock's site is charged to the
+> budget like any other — the exception is about the **shape**, not about
+> escaping the count.
+>
+> **The orphan gate's root set learned `@RoutePage()`.** Its root set was
+> "files under `/presentation/pages/`", which is a *proxy* for "is a page", and
+> the shell is a page that is deliberately **not** under one — it belongs to
+> the composition root. The gate now takes a file as a root when it **declares**
+> `@RoutePage()`, matched against the **comment-stripped** text, so a doc
+> comment that merely mentions the annotation does not make a file a root. Both
+> halves were proved in a scratch copy: a file that only *mentions* the
+> annotation leaves its widget an **orphan** (exit 1), and the same file with a
+> real annotation places it (exit 0).
+
+> ### THE FINDING: **ONE OBSERVER, NOT ONE PER NAVIGATOR** — and it killed
+> recorded decision 41 in silence.
+>
+> `AppRouter.config()`'s `navigatorObservers` is a **builder**, and auto_route
+> calls it **more than once**: the root `Navigator` asks for its observers, and
+> the dock shell's `AutoTabsRouter` asks for the list it **inherits**. The
+> builder that used to answer `AutoRouteObserver()` built a **new observer each
+> time**, so the observer watching the root navigator was **not** the observer
+> the pages inside the shell subscribed to.
+>
+> **And a tab is never popped, so the pages' own route data would not have
+> helped either** — the home and the journey had to move to the **shell's**
+> route data (the shell is the route that is popped), which is the right
+> mechanism, and it still did not fire, because the **instance** was wrong.
+>
+> Two independent suites found it, each with the same measurement and each
+> leaving the test **red on purpose** rather than weakening the assertion:
+> `home_navigation_test.dart` (the home's re-read, decision 41) and
+> `journey_reentry_test.dart` (the journey's). The fix is **one line** — the
+> observer is one object, built once, and every call to the builder hands back
+> that object.
+>
+> **The lesson is decision 41's own, one level up.** Decision 41 fixed a
+> trigger that was **not wired**; this phase wired it and broke it again with a
+> different kind of not-wired. Nothing was red for the two phases the re-read
+> was broken, because the test that proves it had been rewritten to assert the
+> trigger's *presence* rather than its *effect*.
 
 ---
 

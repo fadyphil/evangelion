@@ -153,36 +153,57 @@ decision 111 and marked here.)*
   `build` methods → `context.l10n`), and `didPopNext` is untouched and still gated —
   decision 106.
 
-### The eight routes
+### The seven routes, and the shell that holds the tabs
 
 | Route | Screen | Data source |
 | --- | --- | --- |
 | `/login` | Onboarding + login (email, password, social buttons) | `FakeAuthRepository` |
-| `/` | Home — greeting, streak flame, today's-reading panel | **API** |
+| `/` | **The dock shell** — the three real tabs live inside it | **API** |
 | `/reading` | Reading sanctuary, EN and AR, zero chrome | **API** |
 | `/quiz` | Quiz with instant per-question feedback | **API** |
-| `/result` | Result — score, streak, stat tiles | **API** (submit response) |
 | `/settings` | The Workshop — language, theme, light, sky, ritual, communion | local |
 | `/communion` | The cohort's board | **API** |
 | `/journey` | The reader's journey — orb, streak, rings, medals, account | **API** (streak) · local (medals stub) |
+
+**`/result` IS GONE, AND `/` IS A SHELL.** Phase 6 turned the result into a
+**modal** (`eva/redesign.html:718-727`), so it is no longer a route and
+`AppRoutes.result` no longer exists; the screen is reached from the quiz and
+from nowhere else. And the redesign's navigation is a **five-slot dock**
+(`eva/redesign.html:702-708`), so `/` is now the **shell** that hosts the three
+real tabs — **home** (`/`), **communion** (`/communion`) and **journey**
+(`/journey`) — while **Read** and **Today** are *push actions* that open
+`/reading` and `/quiz` over the shell, which is what hides the dock on them
+(`eva/redesign.html:1251` — the dock is visible on `home`, `journey` and `board`
+only).
+
+**THE THREE TAB PATHS ARE RELATIVE AND DERIVED.** auto_route rejects a child
+path that begins with a slash, so the shell's children are `''`, `communion`
+and `journey` — and `AppRoutes.homeTab` / `communionTab` / `journeyTab` derive
+them from the absolute paths, so the URLs are unchanged and there is one source
+of truth for each.
 
 Routes carry **no `:passageId` parameter**. There is no library to browse, so the passage
 is always *today's*. The quiz re-fetches to obtain fresh `already_answered` flags, because
 the backend has **no `GET /readings/:id`** endpoint.
 
-**Pending implementation.** The table above is what `lib/app/router/app_router.dart:244-268` registers **today** and it is deliberately not written to a future state; a route named here that is not registered is the failure mode `docs/DRIFT.md` §1 records. `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes and retires one, and each lands with the code that registers it: `/communion` arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/journey`** (the profile) arrives in **Phase 5.6**; **`/result`** is retired to the modal `eva/redesign.html:718` already draws, in **Phase 6**. The library carousel returns to `/` in **Phase 5** as a surface rather than a route. Until each of those commits lands, this table is the truth and the ADR is the plan.
+**Pending implementation.** The table above is what `lib/app/router/app_router.dart`
+registers **today** and it is deliberately not written to a future state; a route
+named here that is not registered is the failure mode `docs/DRIFT.md` §1 records.
+`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` adds **two** routes
+and retires one, and each lands with the code that registers it: `/communion`
+arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/journey`** (the
+profile) arrived in **Phase 5.6**; **`/result`** retired to the modal in
+**Phase 6**. The library carousel returned to `/` in **Phase 5** as a surface
+rather than a route. Until each of those commits lands, this table is the truth
+and the ADR is the plan.
 
-**`/journey` IS PUSHED, NOT A TAB, AND THAT IS A RECORDED DIFFERENCE.** The
-redesign's own entry for the journey is the five-tab dock (`eva/redesign.html:702-708`,
-the journey tab at `:707`), and the dock is Phase 6's. Until then the `SealFab` on
-`/` is the interim holder of the destinations Home cannot otherwise reach, and the
-journey is one of them — beside the board, which is the prototype's other dock tab
-(`:706`). The consequence is that a **pushed** journey needs a back chevron the
-prototype's journey does not have: the prototype's is only ever a tab
-(`eva/redesign.html:576-583` — no chevron, a 68px spacer instead) and never needed
-a way back, while a pushed screen on desktop has no system back button. The
-prototype's own board is also a dock tab and it **does** have a chevron (`:614`) for
-the same reason.
+**`/journey` AND `/communion` ARE TABS NOW, AND THAT IS A RECORDED CHANGE.**
+The paragraph below used to say the journey was *pushed* and needed a back
+chevron the prototype's journey does not have. **Phase 6 made both of them
+tabs**, so the journey's chevron is **gone** (the prototype's journey has a 68px
+spacer instead, `eva/redesign.html:578`) and the board's chevron returns to the
+**previous tab** (`eva/redesign.html:1282` — `boardEntry==='push' ?
+pop('journey') : tab('home')`).
 
 ---
 

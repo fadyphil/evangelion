@@ -288,10 +288,11 @@ no spelling of "register this bloc" that keeps Flutter out of the closure.
 
 The cost of that is five registrations written by hand instead of generated,
 and the file says so plainly at line 58 rather than leaving it to be
-discovered. There are **8** `@module` files in `lib/app/di/modules/`, not six as
-AGENT_CONTEXT states; `result_module.dart` is deliberately empty and emits no
-registration, and the record of what the graph actually contains is the
-committed `injection.config.dart`, not the file names.
+discovered. There are **9** `@module` files in `lib/app/di/modules/`, not six as
+AGENT_CONTEXT states, and the record of what the graph actually contains is the
+committed `injection.config.dart`, not the file names. **`result_module.dart` is
+gone**: the result is a modal over the quiz, so it belongs to the `quiz` feature
+and contributes no type to the graph at all.
 
 ### The lifetime rule, and why it is not taste
 
@@ -301,11 +302,11 @@ committed `injection.config.dart`, not the file names.
 A factory or lazy singleton whose construction re-ran would hand out a
 *second* bloc with its own state. That sounds like a small problem until you
 look at `QuizState.lastResult`: it is the only holder of the submit response,
-because `features/result/` cannot import `QuizBloc` across the feature boundary.
-A second `QuizBloc` would have a `null` `lastResult` for ever, and a reader who
-answered three questions and pressed "See results" would land on `/result`,
-which cannot be built without a graded answer. The failure is not a wrong score;
-it is a screen that never appears, with nothing in the log.
+because the result renders the response and nothing can re-fetch it. A second
+`QuizBloc` would have a `null` `lastResult` for ever, and a reader who
+answered three questions and pressed "See results" would open a result card
+with nothing in it. The failure is not a wrong score; it is a card that never
+appears, with nothing in the log.
 
 `AppRouter` is the mirror-image case. A factory guarantees a second router with
 its own `navigatorKey` and no `Navigator` behind it, and nothing about either
@@ -343,16 +344,48 @@ blank frame — left green.
 
 ## Routing
 
-Navigation is `auto_route`, and `AppRouter` declares **8 entries**: seven
-`AutoRoute`s (`/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`,
-`/communion`, `/journey`) and a `RedirectRoute` for `*`, at `app_router.dart:244-272`.
-`app_routes.dart` declares **9** route constants — the seven, plus `/servant`,
-which is deliberately declared but not routed, plus the `*` fallback. Gate 4
+Navigation is `auto_route`, and `AppRouter` declares the shell, the screens and
+a `RedirectRoute` for `*`. **`/result` is not one of them**: the result is a
+modal over the quiz, so it is presented with `showGeneralDialog` and never
+appears in the route table. `app_routes.dart` declares **9** route constants —
+the seven screens, plus `/servant`, which is deliberately declared but not
+routed, plus the `*` fallback. Gate 4
 verifies all nine are plain string literals, which is what makes the invariants
 in `app_routes_test.dart` assert anything at all.
 
 The wildcard must be listed **last**. `auto_route` matches in declaration order,
 so a `*` at the front swallows every real route; moving it turns 46 tests red.
+
+### `/` is a SHELL, and three of the screens are its tabs
+
+The redesign's navigation is a **five-slot dock**
+(`eva/redesign.html:702-708`), and `AppRouter` registers it as an
+`AutoTabsRouter`: the route at `/` is `DockShellPage`, and its **children** are
+the three real tabs — home (`''`), communion (`'communion'`) and journey
+(`'journey'`). The other two dock slots are **push actions**, not tabs: "Read"
+opens `/reading` and "Today" opens `/quiz`, and both are root routes pushed
+**over** the shell, which is what hides the dock on them.
+
+The child paths are **relative** — auto_route rejects a child path that begins
+with a slash — and they are **derived** from the absolute ones
+(`AppRoutes.communionTab => communion.substring(1)`), so `/communion` is still
+the URL and there is one source of truth for it.
+
+**The shell lives in `lib/app/`, not in a feature.** It names three features'
+routes, and AGENT_CONTEXT §3 forbids a feature importing another; `lib/app/` is
+the one directory the architecture exempts, because wiring features together is
+the composition root's whole job. The **dock widget** is a feature of its own
+(`features/dock/`) and knows nothing about routing.
+
+### The observer is ONE instance, and it has to be
+
+`AppRouter.config()`'s `navigatorObservers` is a **builder**, and auto_route
+calls it once for the root `Navigator` and again for the list the dock shell's
+tabs router **inherits**. A builder that answers `AutoRouteObserver()` builds a
+*new* observer per call, and then the observer watching the root navigator is
+not the one the pages inside the shell subscribe to — which silently kills
+every "re-read when the screen above me is popped" trigger. The observer is
+therefore built **once**, on the router, and every call hands back that object.
 
 ### The guard depends on a one-member interface, not a bloc
 
@@ -375,14 +408,21 @@ them (`auth_status.dart:33-40`). The guard protects navigation flow and nothing
 else, which is why failing closed *silently* would buy no security and would
 cost diagnosability.
 
-### `/result` is not deep-linkable, on purpose
+### The result is a modal, and it is not deep-linkable
 
-`ResultRoute` takes its `result` as a required constructor parameter, so
-`pushPath('/result')` cannot build the page. This is correct rather than
-accidental: the submit response is the only artifact the screen renders and
-there is nothing to re-fetch it from. `test/app/router/app_router_test.dart:442`
-asserts the failure deliberately, in the failing direction, so the property
-cannot rot silently.
+`/result` **is not a route**. It is a card over a veil, presented over the quiz
+(`eva/redesign.html:718-727`), and `AppRoutes.result` no longer exists. The
+submit response is the only artifact the card renders and there is nothing to
+re-fetch it from, so the card cannot be a destination at all — which is the
+same property ADR-0015 recorded for the route, with the route gone.
+
+The card is built by `QuizPage` and presented by
+`ResultSheet.show`, and the response reaches it as a required constructor
+parameter: `ResultSheet(result: …)`. There is no `ResultRoute`, so there is
+nothing for `pushPath` to fail on, and the failure ADR-0015's
+`app_router_test.dart` group asserted has nothing left to assert — the
+invariant it pinned died with the route, and the group was deleted rather than
+weakened.
 
 ### The router overrides `config()`
 
@@ -479,9 +519,9 @@ lib/
       injection.dart               @InjectableInit; stays Flutter-free
       injection.config.dart        GENERATED, committed — 30 registrations
       navigation_injection.dart    hand-written Flutter half — 10 regs
-      modules/                     8 @module files (result is empty)
+      modules/                     9 @module files
     router/
-      app_router.dart              7 AutoRoutes + 1 RedirectRoute
+      app_router.dart              AutoRoutes + 1 RedirectRoute
       app_router.gr.dart           GENERATED
       auth_guard.dart              depends on AuthStatus, not AuthBloc
   core/
@@ -493,8 +533,8 @@ lib/
       usecase/                     UseCase<In, Out>, NoParamsUseCase<Out>
     navigation/                    AppRoutes, AuthStatus, landing/role access
     network/                       Dio client, error mapper, interceptors/
-  features/                        auth, home, leaderboard, quiz, reading,
-                                   result, settings — 7 features
+  features/                        auth, dock, home, journey, leaderboard, quiz,
+                                   reading, settings, sky — 9 features
     <f>/domain/                    6 features have one; pure Dart, use cases only
     <f>/data/                      4 features have one: auth, leaderboard,
                                    reading, settings

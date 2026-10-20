@@ -202,10 +202,11 @@ bloc builds it **in the test body**, with `addTearDown(…close)`.
 
 `lib/app/router/app_router.dart` · `auth_guard.dart`
 
-**9 entries in `AppRouter.routes`**: 8 `AutoRoute`s (`/login`, `/`, `/reading`, `/quiz`,
-`/result`, `/settings`, `/communion`, `/journey`) and a `RedirectRoute` for `*`.
-**10 constants** exist in `app_routes.dart`; `/servant` is declared deliberately
-unrouted.
+**9 entries in `AppRouter.routes`**: the guarded dock shell at `/` with its three tab
+children, `/login`, `/reading`, `/quiz`, `/settings`, and a `RedirectRoute` for `*`.
+**`/result` is not one of them** — it is a modal over the quiz, not a route.
+**9 constants** exist in `app_routes.dart` (the seven screens, `/servant`, and the `*`
+fallback); `/servant` is declared deliberately unrouted.
 
 **The counts are three tasks old.** `/leaderboard` was renamed `/communion` in Task
 5.5 and `/journey` was added in Task 5.6, and this paragraph kept the old numbers —
@@ -236,10 +237,11 @@ so the whole re-entry mechanism was a **silent no-op** and `/` never re-loaded o
 return. Overridden rather than passed at the two call sites, "because the whole defect
 was a default nobody overrode."
 
-**`/result` is not deep-linkable.** `ResultRoute` requires its `result`, so
-`pushPath('/result')` cannot build the page. That is correct — the submit response is
-the only artifact the screen renders, and there is nothing to re-fetch it from.
-`app_router_test.dart` asserts the failure deliberately.
+**The result is not in this table, because it is not a route.** `/result` retired to
+a modal over the quiz (`eva/redesign.html:718-727`) in Phase 6.2, so `AppRoutes.result`
+does not exist, `ResultRoute` is not generated, and the result is presented with
+`showGeneralDialog` from `QuizPage` — the submit response is the only artifact the
+card renders, there is nothing to re-fetch it from, and a modal is not a destination.
 
 ---
 
