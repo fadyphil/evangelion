@@ -67,6 +67,18 @@ echo "== 1. flutter doctor =="
 # `\u2717` — three bytes of UTF-8 — so `.` matches one BYTE under the C locale and the
 # bracket-anchored pattern silently never matches. That is exactly the class of bug this
 # script exists to catch, committed inside the script that catches it.
+#
+# **AND IT RUNS IT.** This step used to *read* `/tmp/eva_doctor.log` and never wrote
+# it — so the gate could not pass on a clean machine, and the log it read was
+# whatever an earlier, unrecorded run had left in `/tmp`. It failed loudly rather
+# than falsely, which is the safe direction, but it means **the one gate that
+# checks the real build has not been able to run** since the day it was written
+# to replace a gate that could not fail.
+#
+# `|| true` because `flutter doctor` exits non-zero when **anything** is wrong,
+# and this step wants to read the report rather than abort on it — the toolchain
+# line below is the question, and it is answered by the report.
+flutter doctor > /tmp/eva_doctor.log 2>&1 || true
 toolchain_line="$(grep -m1 'Linux toolchain' /tmp/eva_doctor.log || true)"
 if [[ -z "$toolchain_line" ]]; then
   echo "FAIL: flutter doctor did not report a Linux toolchain line at all." >&2
