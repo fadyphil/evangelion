@@ -31,22 +31,34 @@ per screen and not looked up per orb**. Eight screens × 4 orbs × 2 animations 
 
 ### The blur budget, and a correction worth recording because it was wrong against its own inventory
 
-§13.4's per-screen line said `/` blurs on the panel **and the top bar**. `ds.tsx:499-530`
-is `TopBar`: a flex `div` with a `padding` and a `zIndex` and **no `backdropFilter` in
-its 32 lines** — the prototype deliberately leaves the bar see-through so the orbs show
-behind it. **One** blur ships, on the panel. A `BackdropFilter` is a `saveLayer` plus a
-full read-back of everything behind it, per frame, and adding one to a surface the
-prototype deliberately leaves see-through is exactly the "improve the design" this
-project forbids. `glass_blur_budget_test.dart`'s ceiling for `lib/features/` moved
-from **2 to 1** so a second site is red.
+§13.4's per-screen line said `/` blurs on the panel **and the top bar**. The
+prototype's `TopBar` was a flex `div` with a `padding` and a `zIndex` and **no
+`backdropFilter` in its 32 lines** — the prototype deliberately leaves the bar
+see-through so the orbs show behind it, and the redesign's own app bar is the same
+shape (`.appbar` and `.abrow`, `redesign.html:142-143`: a padded flex row with no
+backdrop filter; the redesign's home carries no app bar at all). **One** blur ships, on the
+panel. A `BackdropFilter` is a `saveLayer` plus a full read-back of everything behind
+it, per frame, and adding one to a surface the prototype deliberately leaves
+see-through is exactly the "improve the design" this project forbids.
+`glass_blur_budget_test.dart`'s ceiling for `lib/features/` moved from **2 to 1** so a
+second site is red.
 
 **`kGlassBlurSigma` is `24`** (`glass_surface.dart:131`, asserted at
-`glass_surface_test.dart:209`) — `HomeScreen.tsx:39`'s own `blur(24px)`. The earlier
-justification was wrong on all three counts: the two radii were swapped (the panel is
-`24`, the FAB button is `ds.tsx:561`'s `20`); **`20` was never the median** — the eight
-prototype radii measure `8, 12, 12, 16, 16, 20, 24, 24`, and the median is **16**; and
-**no `20` site survives at all**, because `PassageCard` and `SealFAB` were cut with the
-screens that used them. **Only one site blurs, so there is nothing to compromise.**
+`glass_surface_test.dart:209`) — the superseded prototype's own `blur(24px)` on Home's
+hero panel. The earlier justification was wrong on all three counts: the two radii were
+swapped (the panel is `24`, the prototype's FAB button was `20`); **`20` was never the
+median** — the prototype had **nine** blur sites, measuring
+`8, 12, 12, 16, 16, 20, 20, 24, 24`, and the
+median is **16**; and **no `20` site survives at all**, because `PassageCard` and
+`SealFAB` were cut with the screens that used them. **Only one site blurs, so there is
+nothing to compromise.**
+
+**And the design reference's own home card blurs `12`, not `24`** — `.hcard`'s
+`backdrop-filter:blur(12px)` (`redesign.html:250`). The two sides differ, and **the
+client is on the prototype's side**: `24` is the number this ADR decided, and the
+reference says something else. The prototype's `20` on its dial button has **no
+counterpart at all** — the redesign draws no dial — which is the second half of why no
+`20` site survives.
 Rejected as well: keeping `20` as a "recorded divergence", since the only two arguments
 available were the median and the surviving-`20`, and both are false; and an upper bound
 for performance, since a `BackdropFilter` costs one `saveLayer` whatever the sigma and
@@ -163,6 +175,10 @@ effects; the two are matched on overshoot so they feel like one family.
 - `lib/app/bootstrap.dart:75-77` (`installPackageDefaults`, before DI)
 - `test/core/design_system/widgets/glass_surface_test.dart:187,209`,
   `test/core/design_system/widgets/glass_blur_budget_test.dart:101-123`
-- `eva/src/screens/HomeScreen.tsx:39`, `eva/src/components/ds.tsx:499-530,561`
+- the superseded prototype's home hero panel (`blur(24px)`), its `TopBar` and its FAB
+  button — the three receipts this ADR's blur correction was measured against. The
+  design reference's own counterparts are the home card's
+  `backdrop-filter:blur(12px)` (`redesign.html:250`) and the app bar's padded flex row
+  (`.appbar` / `.abrow`, `redesign.html:142-143`); it draws no dial.
 - ADR-0011 (why the pin is exact, and the two costs of the package),
   ADR-0016 (the system these mitigate)

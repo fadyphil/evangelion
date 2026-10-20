@@ -780,14 +780,20 @@ discovered in Phase 9.
 A golden captures **whatever the widget currently renders**. Every transcription
 claim in Phase 3 is therefore checked against the *token* (`EvaColors.ember`,
 `kEvaButtonHeight = 52`, `EvaSpacing.sm`) and against the *assertion in the widget's
-doc comment* (`ds.tsx:240`, `SettingsScreen.tsx:39`) — never against `eva/` itself.
+doc comment* (the prototype's `ButtonPrimary` — `borderRadius: 14`, `height: 52` — and
+its `44`×`44` settings back button, **neither of which the redesign carries**: its
+`.cta` is a pill at `border-radius: 999px` with no declared height
+(`redesign.html:381`), and its back control is a bare `.chev` with no size at all
+(`redesign.html:149`)) — never against `eva/` itself.
 So a systematic transcription error present in **both** the widget and its golden is
 invisible to this suite by construction: the golden ratifies the mistake, the token
 assertion confirms the mistake was applied consistently, and the doc comment quoting
 the prototype is prose rather than a test input. Phase 3's review found one instance
-of the adjacent failure — `TextLink`'s chevron inked `ink` where `ds.tsx:283` writes
-`hex.ember` and `EvaButton` inked it `ember`, one prototype glyph in two colours — by
-reading the prototype, not by any test failing.
+of the adjacent failure — `TextLink`'s chevron inked `ink` where the prototype's own
+`ButtonText` writes `color: hex.ember` on its `›` and `EvaButton` inked it `ember`,
+one prototype glyph in two colours — by reading the prototype, not by any test
+failing. **The redesign has no counterpart for that widget**: it draws one chevron,
+`.chev` (`redesign.html:149`), inked `--ink-1`.
 
 `test/golden_pairs_test.dart` closes the *narrower* half of this: a `*_dark.png` /
 `*_light.png` pair that is byte-identical cannot detect a theming regression, which
@@ -802,8 +808,8 @@ prototype-comparison harness — a `ds.tsx` line map plus a test that renders th
 React component and the Flutter widget over the same inputs and compares geometry
 — or records here again why not. Until then, **every transcription claim in this
 repository is a claim a human verified by reading `eva/`, not a claim a test
-enforces.** A reviewer reading a `ds.tsx:NNN` citation should treat it as an
-unverified assertion unless a test names it.
+enforces.** A reviewer reading a `file:line` citation into a design reference should
+treat it as an unverified assertion unless a test names it.
 
 **Phase 5 built the harness, for `LoginPage`, and it found two of its own
 citations wrong on its first run.** `test/features/auth/presentation/pages/login_geometry_test.dart`
@@ -824,10 +830,14 @@ rather than copied into a table.
 
 Two findings, both of which are the decision-8 failure class:
 
-* **Three of this phase's own citations were wrong.** The social button's height
-  and `borderRadius` are on `LoginScreen.tsx:91`, not `:92`, and its `gap` on `:92`,
-  not `:93`. The line map failed on its first run, three times, before the table was
-  corrected. A doc comment quoting `ds.tsx:NNN` is exactly the unverified assertion
+* **Three of this phase's own citations were wrong.** The prototype's social button's
+  height (`50`) and `borderRadius` (`14`) and the row's `gap` (`10`) were each
+  attributed to the wrong line, and the line map failed on its first run, three times,
+  before the table was corrected. **The prototype's line numbering has no counterpart
+  to check it against, so the numbers are what a reader has** — and the redesign draws
+  that row in two rules: the row's `gap: 10px` (`redesign.html:387`) and the pill's
+  `border-radius: 999px` with no declared height (`redesign.html:388`). A doc comment
+  quoting a prototype `file:line` is exactly the unverified assertion
   this decision describes; from this phase forward, on this screen, it is not.
 * **A `symbol`-less line map proves nothing about the widget.** The first version
   checked only that the *prototype* still said `72`. Changing
@@ -1270,9 +1280,13 @@ the language at *launch* for the rest of the run. A private nullable field with 
 be empty.
 
 **25. THE `home` FEATURE REUSES `AuthRepository` TO GET A NAME, AND THEREFORE
-DECLARES ITS OWN `GetReaderSession`.** `HomeScreen.tsx:27` renders `Miriam` and
-`ds.tsx:516` renders `MK`; there is no user endpoint and the profile screen is cut,
-so those two literals are the prototype's only "who is this". `AuthSession` already
+DECLARES ITS OWN `GetReaderSession`.** The prototype's home greeted `Miriam` — the
+redesign greets `peace, Mariam` (`redesign.html:515`, and `redesign.html:993` sets
+it per language) — and the prototype's top bar rendered the monogram `MK` on an
+avatar the redesign does not draw at all: its journey carries a `M` orb
+(`redesign.html:586`) and the name `Mariam Hanna` (`redesign.html:587`). There is no
+user endpoint and the profile screen is cut, so those two literals were the
+prototype's only "who is this". `AuthSession` already
 carries `displayName: 'David Mina'` and `initials: 'DM'`, and `/` reads them through
 the **port** — which is legal precisely because the port lives in `core/domain/`.
 
@@ -1297,9 +1311,12 @@ an unreachable branch can be reached from — and "no test reaches it" is not th
 claim as "nothing reaches it".
 
 **27. THE PROGRESS BEADS COUNT QUESTIONS, AND THE CLAMP IS CURRENTLY
-UNOBSERVABLE — both stated rather than one.** `HomeScreen.tsx:65` is
+UNOBSERVABLE — both stated rather than one.** The prototype's bead row was
 `<ProgressBeads total={5} completed={2} current={2} />`, which describes *passage*
-progress across the four-card library grid §2 decision 1 cut. The live reading
+progress across the four-card library grid §2 decision 1 cut — and **the redesign has
+no counterpart for it**: its dot row is the **quiz's** (`.dots`,
+`redesign.html:328`, drawn at `redesign.html:568`) and counts quiz questions. The
+live reading
 carries **one** reflection question, so the row counts
 `TodayReading.questionCount` / `answeredQuestionCount`, and `current` is
 `firstUnansweredQuestionIndex(answered, total)`.
@@ -1327,14 +1344,17 @@ have had, so the row's absence always has a reason. `home_page_test.dart` assert
 it in the failing direction.
 
 **29. THE DROP CAP IS LATIN-ONLY, AND PHASE 7 INHERITS THE RULE.**
-`HomeScreen.tsx:55-58` splits a literal `I` off `"n the beginning…"` with a 76px
-ember `I`. The Arabic first verse begins `كَانَ`, and enlarging a joined,
-right-to-left Arabic letter to 76px breaks its connection to the word it belongs to
-and puts an accent glyph where ink should be. That is a defect rather than a
-rendering of the design, and it is the same class as defect #2 ("Arabic never uses
-the mono family"), which Phase 7 owns in the sanctuary. So `PassageDropCap` is used
-for the Latin arm only and the Arabic preview is rendered whole — the rule is
-recorded next to the use so Phase 7 does not re-derive it from the prototype.
+The prototype split a literal `I` off `"n the beginning…"` with a 76px ember `I`;
+the redesign does the same thing with a `::first-letter` rule at **56px** in gold
+(`redesign.html:172`) — and applies it **only in the English arm**
+(`redesign.html:1360`: `i===0&&lang==='en'?' drop':''`). The Arabic first verse
+begins `كَانَ`, and enlarging a joined, right-to-left Arabic letter breaks its
+connection to the word it belongs to and puts an accent glyph where ink should be.
+That is a defect rather than a rendering of the design, and it is the same class as
+defect #2 ("Arabic never uses the mono family"), which Phase 7 owns in the
+sanctuary. So `PassageDropCap` is used for the Latin arm only and the Arabic preview
+is rendered whole — the rule is recorded next to the use so Phase 7 does not
+re-derive it from the prototype.
 
 The branch is on `TodayReading.language` and **not** on "does the text look Latin":
 the corpus is the decision (NKJV is Latin, Smith & Van Dyck is Arabic) and the
@@ -1364,7 +1384,8 @@ that decision with the fact.
 looking for them will not find them, and that is the drift this note is for.
 
 **31. THE AVATAR IS 32 PAINTED INSIDE A 44 BOX, AND THAT IS THE ONE DELIBERATE §14
-DIVERGENCE FROM THE PROTOTYPE.** `ds.tsx:517` is `width: 32, height: 32`. The painted
+DIVERGENCE FROM THE PROTOTYPE.** The prototype's avatar button declared `width: 32,
+height: 32`. The painted
 circle is exactly that; the **tap and focus box** around it is 44, because
 `IconActionButton`'s default and `iOSTapTargetGuideline`'s minimum are both 44 and a
 32px target is below what a finger reliably hits. The extra 12 pixels are a
@@ -1373,8 +1394,8 @@ bar's row is 44 tall rather than 32**, because a row is as tall as its tallest
 child, and that one number is the whole divergence.
 
 **The avatar's gradient is NOT the prototype's, and that is a recorded
-substitution.** `ds.tsx:517-521` fills it with `rgba('#14B8A6', .5)` →
-`rgba('#3B5BDB', .5)` and rims it with the same teal. **Neither hue is a token** —
+substitution.** The prototype's avatar filled it with `rgba('#14B8A6', .5)` →
+`rgba('#3B5BDB', .5)` and rimmed it with the same teal. **Neither hue is a token** —
 `03-design-system.md` §5.1 publishes fourteen — and `no_colour_literals_test.dart`
 refuses every colour in `lib/` that does not resolve through `EvaColors`. So the
 badge is the **ink** ramp at two alphas with a `canvas` monogram, which is the
@@ -1396,8 +1417,10 @@ This is **visible product debt** and it is stated as such: `/` ships one permane
 inert control, and the fix is one argument at one call site.
 
 **33. `AppTopBar` HAS NO DEFAULTS AT ALL — AND REQUIREDNESS IS **NOT** THE
-WHOLE OF DEFECT #11.** `ds.tsx:508,525,516` hard-code `Evangelion`, `MK` and `12`.
-Every value is a **required named parameter** — including the wordmark, which is a
+WHOLE OF DEFECT #11.** The prototype's top bar hard-coded `Evangelion`, `MK` and
+`12` — **the redesign draws no app bar and no avatar at all**, so none of the three
+has a counterpart there. Every value is a **required named parameter** — including
+the wordmark, which is a
 product name, because a hard-coded value and a passed-in value are identical in a
 diff and only one of them can be wrong. Three more parameters exist because §14
 requires them and a feature widget cannot invent them: `streakSemanticLabel`,
@@ -1426,11 +1449,16 @@ whose two spellings happened to coincide.
 **34. ONE BLUR SITE ON `/`, NOT TWO. §13 RULE 4'S PER-SCREEN LINE WAS WRONG, AND IT
 WAS WRONG AGAINST ITS OWN INVENTORY.** The rule counts eight prototype sites and its
 per-screen line said "`/`: `.blur` on the today's-reading panel **and the top bar**".
-`ds.tsx:499-530` is `TopBar`: a `display: flex` `div` with a `padding` and a
-`zIndex` and **no `backdropFilter` in its 32 lines**. The prototype deliberately
-leaves the bar see-through so the orbs show behind it.
+The prototype's `TopBar` was a `display: flex` `div` with a `padding` and a
+`zIndex` and **no `backdropFilter` in its 32 lines** — and the redesign's own app bar
+is the same shape (`.appbar` and `.abrow`, `redesign.html:142-143`: a padded flex row
+with no backdrop filter; the redesign's home carries no app bar at all). The prototype
+deliberately leaves the bar see-through so the orbs show behind it.
 
-**One** blur ships, on the panel (`HomeScreen.tsx:39`, `blur(24px)`). `AppTopBar`
+**One** blur ships, on the panel — the client's `24` is the prototype's own
+`blur(24px)` on its hero panel, and **the redesign's home card blurs `12`, not
+`24`** (`.hcard`, `redesign.html:250`), so the two sides differ and the client is on
+the prototype's. `AppTopBar`
 stays transparent. A `BackdropFilter` is a `saveLayer` plus a full read-back of
 everything behind it, per frame, and adding one to a surface the prototype
 deliberately leaves see-through is exactly the "improve the design" this project
@@ -1443,10 +1471,11 @@ had". **All three clauses were wrong**, and the whole of `glass_surface.dart`'s 
 repeated them:
 
 * the radii were misattributed — it named Home's panel as a `20` and the FAB button as
-  a `24`. Measured: the panel is `HomeScreen.tsx:39`'s `blur(24px)` and the FAB button
-  is `ds.tsx:561`'s `blur(20px)`. The two are swapped, and **no `20` site survives at
+  a `24`. Measured: the panel is the prototype's own `blur(24px)` and the FAB button
+  is its `blur(20px)`. The two are swapped, and **no `20` site survives at
   all** (`PassageCard` and `SealFAB` are both cut with the screens that used them);
-* `20` is not the median of its own list. The eight are `8, 12, 12, 16, 16, 20, 20,
+* `20` is not the median of its own list. The prototype had **NINE** blur sites, and
+  they measure `8, 12, 12, 16, 16, 20, 20, 24, 24` —
   24`; sorted, the median is **16**;
 * so "the blur that ships is the blur Home's panel had" was false: the sigma was `20`
   against the panel's `24`.
@@ -1881,10 +1910,14 @@ reading duration is rendered: the live payload's is `null` and §5 records that,
 number would be invented.
 
 **54. THE ARABIC ARM IS ALL AMIRI, AT NINE SITES, AND THE DEFECT WAS UNDER-COUNTED.**
-`01-source-analysis.md` §2 row 2 said two; the source says **nine** — `ReadingArScreen.tsx:35`
-(metadata), `:86` (CTA caption) and `:49,51,56,58,63,68,70` (the seven `<sup>` verse
-markers). The row has been corrected. `ds.tsx:298,341` are the two **English-only** sites
-and stay in Space Mono, which is the point of the split. `reading_glyph_test.dart` parses
+`01-source-analysis.md` §2 row 2 said two; the source says **nine** — in the
+prototype's Arabic reading screen: the metadata row, the CTA caption and the **seven
+`<sup>` verse markers**. The row has been corrected. The two **English-only** sites —
+the prototype's input label and its category-chip label, both `Space Mono` — stay in
+Space Mono, which is the point of the split; **the redesign writes the same split
+itself**, with the verse marker in the mono family (`redesign.html:170`) against the
+Arabic arm's Amiri (`redesign.html:140`), and the metadata row the same way
+(`redesign.html:146` against `redesign.html:148`). `reading_glyph_test.dart` parses
 the five bundled TTFs and asserts every character on the screen is carried by the family
 that renders it — so a future font swap that drops a codepoint fails here rather than
 shipping as tofu.
@@ -1903,7 +1936,9 @@ it lives in `ReadingCubit` for the life of the cubit. `reading_text_scale.dart`'
 in prose that the choice does not survive leaving `/reading`, which is the honest
 alternative to silently implying persistence. Two alternatives were rejected: a
 `shared_preferences` call now (a dependency added in a phase that does not own it), and
-dropping the control (it is in the prototype and `SettingsScreen.tsx:66`).
+dropping the control (it is in the prototype **and** in the redesign — where the
+type-size row is a `16`–`26` px range input (`redesign.html:693`), a **different
+model** from the prototype's `1`–`5` stepper, and the client keeps the prototype's).
 
 **57. NO VERSE-NUMBER FLAG.** The `Ss`/`١٢` toggle exists in the prototype. Nothing in the
 live payload or the six screens needs it, and it would be a state flag with no consumer.
@@ -1939,8 +1974,11 @@ supplies the direction and there is no `Directionality` anywhere under `lib/`.
 
 **62. THE CTA IS A BARE `Container` INSIDE A `Stack`, NOT GLASS, AND THE `Stack` PUTS IT
 ABOVE THE `Scaffold`.** `04-widget-inventory.md` line 54 already says the prototype's CTA is
-not glass; `ReadingEnScreen.tsx:88-92` draws `rgba(15,17,26,0.96)` at `4px 24px 32px` blur
-`20px` over the scrolling page, which is a scrim, not a `GlassSurface`. A `GlassSurface`
+not glass: the prototype's sticky CTA was a plain
+`linear-gradient(to bottom, transparent, rgba('#05081A', 0.95) 40%)` over the scrolling
+page with **no backdrop filter at all** — a scrim, not a `GlassSurface`. (The prototype
+carried no `4px 24px 32px` blur behind that CTA; the gradient was the whole of it, and
+it is the value `neural_scaffold.dart`'s `bottomFade` cites.) A `GlassSurface`
 there would be a second backdrop on screen and `reading_geometry_test.dart` measures the
 padding and the radius against the prototype. The `Stack` ordering is asserted by
 `reading_geometry_test.dart`: the CTA is a sibling **after** `Scaffold` and the bottom fade,
@@ -2124,8 +2162,10 @@ Phase-7 note both said the gate asserts "**every character on the screen**". It 
 the difference was **thirty tofu boxes**.
 
 The prototype's nine Arabic sites were the **floor, not the ceiling**. Its four top controls
-are bare `<button>`s with an inline `<svg>` and **no label at all**
-(`ReadingEnScreen.tsx:14-16`, `ReadingArScreen.tsx:21-29`), so §14's requirement for an
+were bare `<button>`s with an inline `<svg>` and **no label at all** — the reader's back
+button and its `Aa` and bookmark controls, on both arms — and **the redesign still leaves
+two of them glyph-only** (the reader app bar's `‹` and `✦`, `redesign.html:542` and
+`redesign.html:544`), so §14's requirement for an
 accessible name forced three Arabic strings into this client that the prototype never
 wrote — and they render through `IconActionButton`'s `Tooltip`, whose
 `Tooltip(message: …)` carried **no `textStyle`**, so Flutter resolved `null` to
@@ -2597,8 +2637,11 @@ something that is not true.
 
 It is a **disabled `EvaButton` whose visible label is still the prototype's** and whose
 *accessible* name carries the reason as a suffix — the same shape as `LoginPage`'s disabled
-field, and decision 18's rule applied twice. The split is deliberate: the label is transcribed
-(`QuizScreen.tsx:127`) and the reason is written, and the reader who cannot see the button is the
+field, and decision 18's rule applied twice. The split is deliberate: the label is
+transcribed — the prototype's own `Check answer`, the unchecked arm of its
+`{checked ? 'Next question' : 'Check answer'}` switch, which the redesign has no
+label for at all (its grader is one-tap, `redesign.html:1423`) — and the reason is
+written, and the reader who cannot see the button is the
 one who needs the reason.
 
 **What this cost, and it is worth stating because the test found it rather than the code.** The
@@ -2709,7 +2752,11 @@ the date lives in exactly one place and a fixture can only vary in the one thing
 
 **92. `/result` HAS **TWO** STAT TILES, NOT THREE, AND THE HEADLINE IS THE SCORE.**
 
-`ResultScreen.tsx:69-73` is a three-tile row, and the plan transcribes three. The first draft
+The prototype's result screen had a three-tile row (`14 Read` / `9 Reflected` /
+`5/5 Best`) and the plan transcribes three. **The redesign draws no tiles at all** —
+its result card is a ring (`.bigring`, `redesign.html:447`) and a recap dot row
+(`redesign.html:453`) — so the two tiles this screen ships are the client's own count
+and not a transcription. The first draft
 built three, and the third duplicated `currentTotalPoints` — which is already the headline, in
 Arabic-Indic digits, one line above. Two tiles is the honest count: *this answer* and *your
 longest run*. There is no `/N` anywhere either, because the submit response carries no total
@@ -2955,7 +3002,9 @@ AND NAMED.** Genuinely plural-dependent: the **question count**
 with the reason each: **streak days** (`resultDay`, and `homeStreakLabel`) — a *label
 form*, `Day 12` / `اليوم ١٢`, correct for every count in both arms; a plural would
 render `Days 12` in English, altering a transcribed prototype string
-(`ResultScreen.tsx:65`) to fix nothing. **verse counts** (`readingVerse`) — the marker
+(`Day 12 — your longest yet` — and **the redesign has no counterpart**: its streak
+chip shows the number `12` and the label `days`, `redesign.html:516` and
+`redesign.html:248`) to fix nothing. **verse counts** (`readingVerse`) — the marker
 names an index, it does not count a set; a plural there would select an `other` branch
 identical to its `one` branch, a test that cannot fail. **quiz progress**
 (`questionProgress`) — no noun agrees with either number; `of` / `من` is invariant.
@@ -3023,8 +3072,9 @@ written where none did, and the alternatives rejected. `gen_l10n` discards
 `@key` descriptions after using them for tooling, so the descriptions are not
 documentation — they are the record, and ARB is the only place it can live. Two gates
 hold it: every key needs a description over 40 characters, and 17 keys are pinned to the
-exact `file:line` they must still name. Proven by mutation: removing `HomeScreen.tsx:30`
-from one description fails 1 test by name.
+exact `file:line` they must still name. Proven by mutation: removing one description's
+citation — the prototype's streak line, `Your streak is glowing. Keep it alive.` —
+fails 1 test by name.
 
 **111. §2.1's COUNTS WERE WRONG, AND THE CORRECTION IS RECORDED RATHER THAN QUIETLY
 REUSED.** There were **five** tables, not six — `LoginStrings`, `HomeStrings`,
@@ -3131,8 +3181,9 @@ why.
 Three further reasons, all recorded in `_SettingsFailureNotice`'s doc:
 
 * `ErrorView` **fills** its box (`Center` → `SingleChildScrollView`) and `/settings`' root
-  already scrolls (`SettingsScreen.tsx:36`'s `overflowY: 'auto'`), so dropping it above
-  three groups either nests two scroll views or eats the form.
+  already scrolls — the prototype's settings root carried `overflowY: 'auto'`, and the
+  redesign's own scroll container is `.scroll` (`redesign.html:157`) — so dropping it
+  above three groups either nests two scroll views or eats the form.
 * `ErrorView.message` is required and its contract is `ApiErrorMapper`'s — true of `/`,
   `/reading` and `/quiz`. `/settings` is the first **non-network** failure surface, and
   `SettingsRepositoryImpl._unreachable` builds
@@ -3292,9 +3343,9 @@ gate 4 in `CONTRIBUTING.md`'s table, and §7 is *"the commands that must pass
 before you report work done"* — so a list that omits two of the gates is a list
 a sub-agent can satisfy while breaking the tree. What they check:
 
-* **`citation_check.py`** — every `*.tsx:NNN` / `redesign.html:NNN` claim in the
-  source resolves to a **real prototype line**. It checks **existence and range
-  only** — *not* that the line still says what the comment claims — so a
+* **`citation_check.py`** — every `redesign.html:NNN` claim in the
+  source resolves to a **real line of the design reference**. It checks **existence
+  and range only** — *not* that the line still says what the comment claims — so a
   citation that points at the right line for the wrong reason is green, and
   the per-widget re-pointing is on the writer.
 * **`orphan_widget_check.py`** — **a widget anywhere under `lib/` is built,
@@ -3601,10 +3652,15 @@ which nothing in this app uses — the price of the package, not a request for i
 **134. "ALL CURVES ARE EASE-OUT" WAS WRONG ABOUT THE PROTOTYPE, AND THE SPRING PATH I FIRST PROPOSED DOES NOT WORK.**
 
 §5.3's *"All curves are ease-out. No bounce, no spring"* was implemented literally and is
-now **partly superseded**. "No bounce, no spring" is **still true** — `grep -ri spring
-eva/src` returns nothing. What was wrong is the implication that every curve is a plain
-`easeOut`: the prototype's own `QuizOption` (`ds.tsx:438`), the most-tapped element in the
-app, uses `all 250ms cubic-bezier(0.16,1,0.3,1)`, which is `Curves.easeOutExpo`.
+now **partly superseded**. "No bounce, no spring" was **true of the superseded
+prototype** — and **it is the CLIENT'S OWN rule now**: the tokens this app ships
+carry no spring and no bounce, and `EvaMotion.achievementSpring` is a
+`SpringDescription` for achievement moments only, which is a different thing from a
+spring *curve*. What was wrong is the implication that every curve is a plain
+`easeOut`: the prototype's own `QuizOption`, the most-tapped element in the
+app, used `all 250ms cubic-bezier(0.16,1,0.3,1)`, which is `Curves.easeOutExpo` —
+and **the redesign keeps the same curve as a token**, `--e-light:
+cubic-bezier(.16,1,.3,1)` (`redesign.html:18`).
 
 *Rejected: adopting a spring wholesale.* A spring on **every** tap says nothing; a spring
 on *your streak went up* says the thing happened. One curve cannot distinguish those, so
@@ -4017,9 +4073,10 @@ belong to the user.
 
 An external craft floor asks that elevation be declared once, calling a 1px border under
 a wide soft shadow a "ghost card". `GlassSurface` does both, and that is not the defect
-the phrase describes — `ds.tsx:380-387` writes the rim (`1px solid rgba(…, 0.08)`) **and**
-the shadow (`0 4px 24px rgba(0,0,0,0.35)`) **and** `backdropFilter: blur(20px)` on the
-same element. In a glass idiom the rim is what makes the surface legible against a busy
+the phrase describes — the prototype's passage card wrote the rim (`1px solid rgba(…,
+0.08)`) **and** the shadow (`0 4px 24px rgba(0,0,0,0.35)`) **and** `backdropFilter:
+blur(20px)` on the same element. In a glass idiom the rim is what makes the surface
+legible against a busy
 background and the shadow is what lifts it off the canvas; they are not two competing
 elevations. A committed world overrides a category default, so this stays.
 
@@ -4230,9 +4287,9 @@ the mechanical check found the next three.
 **155. `SealFab` COMES BACK TO `/` — TWO ITEMS, THEN THREE, AND FOUR GATES ARGUED
 ABOUT IT.**
 
-`ds.tsx:533-573` defines a 56×56 glass circle carrying the display-serif `E`, outlined in
-ember, expanding into pill destinations. `ds.tsx:541` places it `bottom: 28, right: 20`, on
-`HomeScreen.tsx:100` and **nowhere else**. It was cut, and the reason was sound: its menu
+The prototype's `SealFAB` defined a 56×56 glass circle carrying the display-serif `E`,
+outlined in ember, expanding into pill destinations, and placed it `bottom: 28,
+right: 20` on the home screen and **nowhere else**. It was cut, and the reason was sound: its menu
 was Profile, Settings and Language, and by then Profile had no endpoint, Settings was
 already the avatar's job on `/`, and Language was already a row inside `/settings`.
 
@@ -4284,7 +4341,8 @@ another live route. Both are the user's.
 SAFE.** The content is inside a `SingleChildScrollView` on five of six screens, so a
 caller placing a floating control in its own column produces one that **scrolls away** —
 which is not a floating control. The `Stack` this widget already owns is the prototype's
-`position: absolute; inset: 0` container (`ds.tsx:162`), so the overlay is the shape the
+`position: absolute; inset: 0` container — and the redesign's own canvas layer has
+exactly that shape (`redesign.html:46`) — so the overlay is the shape the
 prototype had rather than a mechanism invented for Flutter. It sits **after** the content
 and **before** `bottomFade`'s scrim, so a scrolling screen's CTA gradient still covers a
 bottom-right overlay. `null` on the five screens that have none.
@@ -4299,7 +4357,7 @@ translucent fill, the prototype's hairline rim, the ember bloom — and costs no
 **Raising the budget to three was available and not taken:** a floating affordance is a
 poor reason to spend it on.
 
-**THE PROTOTYPE'S 40ms STAGGER IS NOT REPRODUCED.** `ds.tsx:548` writes
+**THE PROTOTYPE'S 40ms STAGGER IS NOT REPRODUCED.** The prototype's dial wrote
 `screen-in 200ms ease-out ${i * 40}ms both`. Reproducing it needs a **delay**, and
 `EvaAnimate` has none by design — its doc says timings are the enum's job and "there is no
 `duration` or `curve` argument anywhere below, so a literal cannot reach an effect even by
@@ -4504,7 +4562,7 @@ is what keeps them from coming back."* That was a **drift and not a decision**:
   after checking"*. The flecks were **required**, and the Lumen redesign dropped them
   without recording that it was dropping them.
 * the brief's own rule — "the ONLY sacred cues are: gold flecks (tiny, sparse,
-  decorative)" (`eva/src/imports/pasted_text/pasted-attachment.txt:51`).
+  decorative)" (`eva/brief.txt:51`).
 
 They are now on the quiz's correct option, as a `Positioned.fill` overlay inside a
 `Stack(clipBehavior: Clip.none, fit: StackFit.passthrough)` — `Clip.none` because two
@@ -4652,7 +4710,8 @@ and what was already there was the **old design's per-screen orb groups**, which
 this redesign replaced with **one canvas for every screen**
 (`eva/redesign.html:46`). The prototype's own answer for "no aurora" is the
 canvas fill: the screen root is `background: T.canvas` with a transparent
-background layer above it (`ds.tsx:162`).
+background layer above it — and the redesign's own canvas layer is exactly that
+shape, `position: absolute; inset: 0` over the screen root (`redesign.html:46`).
 
 **So the fallback is now a `ColoredBox(color: colors.canvas)`**, and the rules a
 reader needs:
@@ -4745,3 +4804,53 @@ regression, because it had none for the design that ships. It is a **hole that
 was always there**, and it is the next thing to close: the shader's own
 goldens, with the capture harness re-checked against the plan's recorded risk
 (`flutter test` ≠ Impeller — the tests run Skia software).
+
+**169. THE REACT PROTOTYPE IS **RETIRED**, AND EVERY CITATION INTO IT WAS
+REWRITTEN **BY HAND**.**
+
+`eva/src/` — the React prototype this redesign replaces — is gone, and so is the
+Figma Make scaffolding around it. **What remains in `eva/` is the two things the
+design is transcribed from**: `redesign.html` (the design source of truth) and
+`brief.txt` (the original brief, and the source of the design *language*).
+
+**THE PROTOTYPE WAS NOT DEAD — IT WAS A 554-CITATION RECEIPT, AND 327 OF THOSE
+CITATIONS WERE LIVE, IN `lib/`, IN CLAIMS THE SHIPPED CODE MAKES.** They said
+*"the redesign's `.opt` has no counterpart, and the superseded prototype's
+option card had one"*. **And a line number in a file that does not exist is a
+fiction**, so every one of them was rewritten: **237 distinct targets across 554
+sites**, each re-pointed at `redesign.html` where the redesign has the same thing,
+rewritten as a **divergence note carrying the value and the fact** where it does
+not, or dropped where the citation was decoration.
+
+**AND THE GATE IS WHAT ENFORCES IT.** `tool/gates/citation_check.py`'s pattern
+**still matches `.tsx`**, on purpose: a `.tsx` citation is now a **broken**
+citation, named by the gate. A pattern that stopped matching would report a clean
+run over a surface it no longer examines — the ADR-0020 shape, and the third time
+this repository has met it. **The retirement is enforced by the gate, not by a
+convention**, and `tool/verify_gates_selftest.sh` plants a `.tsx` citation and
+requires the failure.
+
+**AND THE GATE NOW SCANS THE LIVE DOCUMENTS.** The authority document, the ADRs,
+the plan, the drift catalogue and the seams map are where the client's claims
+live, and **113 of them had never been checked by anything**. `docs/plans/` is
+the one exception, and it is deliberate: it is a historical record of analyses
+made against the prototype, it is owned by somebody else (AGENTS.md: "Do not
+rewrite `docs/plans/`"), and about fifty of its citations point at a prototype
+that has since been retired. **A document that records a past analysis is allowed
+to point at the past.**
+
+**AND THE BRIEF'S LINES ARE NOW CHECKED, WHICH THEY WERE NOT.** Its filename had
+a **hyphen** in it and the pattern matched `[A-Za-z0-9_]+`, so
+`pasted-attachment.txt:97` **never matched** and its eight line citations were
+**verified by nothing at all** — and they are the ones that say *"the ONLY sacred
+cues are: gold flecks, the verse marker, and beautiful typography"*, the rule the
+gold flecks' return rests on. Moving it to `brief.txt` closed that hole, and the
+brief is now the gate's **second named reference**.
+
+**THE RULE THAT DECIDED EVERY CASE IS THE PLAN'S OWN.** The Lumen plan's Task
+4.2 Step 4: *"Re-point citations per widget … **only for widgets that actually
+changed**. A citation that still describes a surviving widget is not wrong;
+moving it would be churn."* So the surviving `ds.tsx` citations were
+**deliberate** — they are where the redesign has no counterpart and the old
+number is the receipt of the difference — and what they needed was not a new
+line but a **sentence that stands on its own**.

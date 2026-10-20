@@ -137,8 +137,10 @@ the check, not the exit code.**
   for a reason invisible in the pattern. It now matches `Linux toolchain` and compares
   the glyph as an explicit `printf '\xe2\x9c\x93'` / `\xe2\x9c\x97'` byte pair.
 - **Two more gates were added after §7, and they are two *instruments* rather than two
-  more commands.** `citation_check.py` holds "every `X.tsx:NNN` claim resolves to a real
-  prototype line"; `orphan_widget_check.py` holds "every widget is reachable from a
+  more commands.** `citation_check.py` holds "every `file:line` claim resolves to a real
+  prototype line" — **and that contract has since narrowed, because the React prototype
+  is retired: the instrument resolves only `redesign.html` now**;
+  `orphan_widget_check.py` holds "every widget is reachable from a
   page" — recorded decision 144's finding that `LeaderboardCard` was built, DI-wired,
   given a five-surface overflow matrix and a 21-test suite, **and no page instantiated
   it**, with every §7 gate green throughout.

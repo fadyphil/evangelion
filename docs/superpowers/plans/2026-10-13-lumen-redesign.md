@@ -144,12 +144,12 @@ plan — including the table above — can be verified until this phase lands.
 > Three steps below were wrong about the world, and a future implementer should
 > not be misled by them:
 >
-> - **Step 6's `sed` was a no-op.** `lib/main.dart` contains no
->   `eva/src/App.tsx:1` citation, so the planted violation changed nothing. The
+> - **Step 6's `sed` was a no-op.** `lib/main.dart` contains no citation into the
+>   prototype's `App.tsx` at all, so the planted violation changed nothing. The
 >   gate was still proved fallible at a *real* citation site instead:
->   `lib/core/design_system/widgets/neural_scaffold.dart:28` → `App.tsx:99999`,
->   which yields `947 resolved, 1 broken`, `exit=1`. All three exit codes (0 / 1 /
->   2) are now demonstrated.
+>   `lib/core/design_system/widgets/neural_scaffold.dart:28` → the prototype's
+>   `App.tsx` at line `99999`, which yields `947 resolved, 1 broken`, `exit=1`. All
+>   three exit codes (0 / 1 / 2) are now demonstrated.
 > - **"38 files return" is 36.** HEAD genuinely tracks 36 files under `eva/`.
 > - **Step 8's commit was unnecessary.** The deletions were unstaged
 >   working-tree-only and were never committed (`git cat-file -t
@@ -225,13 +225,22 @@ precisely the failure ADR-0020 exists to name.
 - [ ] **Step 6: Plant a violation and prove the gate fires**
 
 Per ADR-0020, a gate that cannot fail is worse than no gate. In a **scratch
-copy outside the repository**, point one citation past end-of-file:
+copy outside the repository**, point one citation past end-of-file. **The
+reference is `eva/redesign.html`** — the superseded React prototype is retired,
+so a citation naming it resolves to nothing at all and is a *stronger* violation
+than an out-of-range line:
 
 ```bash
 cp -r /home/fady/Projects/evangelion /tmp/opencode/gate-probe
-sed -i 's/eva\/src\/App.tsx:1\b/eva\/src\/App.tsx:99999/' /tmp/opencode/gate-probe/lib/main.dart
-cd /tmp/opencode/gate-probe && python3 tool/gates/citation_check.py; echo "exit=$?"
+cd /tmp/opencode/gate-probe
+OUT_OF_RANGE=99999
+sed -i "s/redesign\.html:[0-9][0-9]*/redesign.html:${OUT_OF_RANGE}/" lib/core/design_system/widgets/neural_scaffold.dart
+python3 tool/gates/citation_check.py; echo "exit=$?"
 ```
+
+The out-of-range number is held in a variable rather than written inline, so that
+**this plan's own text is not itself a broken citation** — the same rule the gate
+enforces on every other file.
 
 Expected: a broken-citation report and `exit=1`. Delete the scratch copy.
 
@@ -1162,21 +1171,30 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
   the redesign, `hairline_divider`'s call sites still describe it, and
   `sun_burst` is superseded by `.bigring` (`:447-452`) only when `/result`
   becomes a modal in **Phase 6.2**.
-- [ ] **Step 4: Re-point citations per widget.** Move `eva/src/X.tsx:NNN` →
-  `redesign.html:NNN` **only for widgets that actually changed**. A citation
-  that still describes a surviving widget is not wrong; moving it would be
-  churn. **Eight widgets are partially frozen** — change the redesign-backed
-  half, keep the rest: `eva_section_header` (re-point `section` to `:422`, keep
-  `ProfileScreen.tsx:53` for `title`), `eva_text_field` (field box → `:376-379`,
-  keep `ds.tsx:297-300` for the label — `.field` is bare),
-  `font_size_stepper` (track/thumb → `:429-430`, keep `SettingsScreen.tsx:66`
-  for the range — the redesign's own slider is 16–26, a different model),
-  `settings_group` (label → `:422`, keep the `rowGap = 10` citation),
-  `stat_tile` (type → `:407-408`, keep `ds.tsx:462-478` for the panel),
-  `seal_monogram` (treatment → `:392-395`, keep `LoginScreen.tsx:19` for
-  `defaultSize = 60`), `neural_scaffold` (scrim → `:112-115`, keep all eight
-  `*.tsx` root citations), `eva_button` (radius/ripple → `:381-390`, keep the
-  height citation — `login_geometry_test` reads `kEvaButtonHeight == 52`).
+- [ ] **Step 4: Re-point citations per widget.** Move a citation into the
+  superseded prototype → `redesign.html:NNN` **only for widgets that actually
+  changed**. A citation that still describes a surviving widget is not wrong;
+  moving it would be churn. **Eight widgets are partially frozen** — change the
+  redesign-backed half, keep the rest, and **keep the prototype's own value
+  wherever the redesign has no counterpart**: `eva_section_header` (re-point
+  `section` to `:422`, keep the prototype's `title` — its role is the profile
+  screen's own heading, which the prototype expressed as `F.ui, 16, 700`; the
+  redesign has no screen-title role at all), `eva_text_field` (field box →
+  `:376-379`, keep the prototype's label
+  — `F.mono, 10, 700, 0.12em, uppercase` — because the redesign's `.field` is
+  bare and declares no label), `font_size_stepper` (track/thumb → `:429-430`,
+  keep the prototype's range — `<input type="range" min={1} max={5}>`, `width: 80`
+  — the redesign's own slider is 16–26, a different model),
+  `settings_group` (label → `:422`, keep the `rowGap = 10` citation, which is the
+  prototype's `gap: 10`), `stat_tile` (type → `:407-408`, keep the prototype's
+  panel — `flex: 1`, `borderRadius: 16`, `padding: '14px 10px'`),
+  `seal_monogram` (treatment → `:392-395`, keep the prototype's
+  `defaultSize = 60` — `width: 60, height: 60` — where the redesign's own orb is
+  74×74), `neural_scaffold` (scrim → `:112-115`, keep all eight root citations —
+  the prototype's `position: absolute; inset: 0` container, and the redesign's own
+  `.screen canvas` at `:46` is the same shape), `eva_button` (radius/ripple →
+  `:381-390`, keep the height citation — the prototype's `52`, which
+  `login_geometry_test` reads as `kEvaButtonHeight == 52`).
   **Never** let a restyle edit a number a harness asserts: `kEvaTextFieldHeight`
   52, `EvaRadii.input` 14, `EvaSpacing.lg` 16, `kEvaButtonHeight` 52,
   `SealMonogram` 60, `StreakFlame` 14×18, `IconActionButton` 44.
@@ -1510,9 +1528,12 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > **The orbs were waiting for this screen.** `OrbGroup.profile` has sat in the design
 > system since Phase 2 — cut-and-kept-for-index-alignment, because the profile was cut
 > then — and the journey **is** the profile, so `NeuralVariant.journey` takes the
-> profile's own group. It is the **one group whose first orb cycles backwards**
-> (`ds.tsx:106`), so the orb test's "every variant opens forward" became an exception
-> with a named reason rather than a rule that quietly stopped being true.
+> profile's own group. It is the **one group whose first orb cycles backwards** (the
+> profile group's first orb carried the prototype's `hue-cycle-rev`), so the orb test's
+> "every variant opens forward" became an exception with a named reason rather than a
+> rule that quietly stopped being true. **The group is gone with the rest of the
+> orbs** — the redesign draws one canvas for every screen (`redesign.html:46`) — so
+> the exception is now a record rather than a rule.
 >
 > Keys 126 -> 146, and then **146 -> 147 in the review pass**: the journey's **own**
 > `journeyRetry`, because the screen was borrowing the **board's** retry string, and
@@ -1618,15 +1639,17 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 >
 > **And one review finding was wrong, and checking it was worth as much as the
 > fixes.** The code-quality review reported the profile orb group's two hue
-> directions transposed against `ds.tsx:104-107` and recommended swapping them.
-> The code does hold `[reverse, forward]` — and so does the prototype:
-> `ds.tsx:106` is the profile's **first** orb and its `hueDir` is
+> directions transposed against the prototype's own group and recommended
+> swapping them. The code does hold `[reverse, forward]` — and so did the
+> prototype: the profile's **first** orb was the one whose `hueDir` was
 > `hue-cycle-rev`. The review had read the values and miscounted the lines.
 > Applying the recommendation would have introduced a real bug, and the doc would
 > then have said the opposite of the truth. **A finding is a claim, and this
 > repository's rule is that a claim about a specific thing is checked against the
 > specific thing** — which cuts both ways: it is why fourteen findings were real
-> and why the fifteenth was not.
+> and why the fifteenth was not. The group itself is retired with the orbs (one
+> canvas for every screen, `redesign.html:46`), so this is now a record of a
+> review rather than a checkable rule.
 >
 > Gate run: 3148 tests, 98.60% coverage (7271/7374).
 
@@ -2614,15 +2637,15 @@ tool/verify_all.sh --with-build
 >
 > | widget | where it went | why there |
 > | --- | --- | --- |
-> | `GoldFlecks` | the quiz's **correct** option card, as a `Positioned.fill` overlay inside a `Stack(clipBehavior: Clip.none, fit: StackFit.passthrough)` | the brief's own rule — "tiny gold flecks floating near the correct option — sparse, 3–4 max" (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for "gold flecks fade in with 150ms delay") — and the superseded prototype's four of them (`eva/src/screens/QuizScreen.tsx:92-95`) |
+> | `GoldFlecks` | the quiz's **correct** option card, as a `Positioned.fill` overlay inside a `Stack(clipBehavior: Clip.none, fit: StackFit.passthrough)` | the brief's own rule — "tiny gold flecks floating near the correct option — sparse, 3–4 max" (`eva/brief.txt:97`, and `:114` for "gold flecks fade in with 150ms delay") — and the superseded prototype's four of them, positioned relative to the option card's own box. **The redesign draws none**: its `.opt.correct` carries a gold rim and a `::after` seam (`redesign.html:348-351`) instead, so the flecks are the brief's rule and not a transcription |
 > | `EvaTypeScale` | `MaterialApp.router.builder` in `lib/app/app.dart` | **the site its own doc always named.** The install used to be spelled out by hand as a `MediaQuery` with a `copyWith(textScaler: …)`, which was the **third** spelling of the same rule — `/reading`'s §14 overflow suite and `/settings`'s stepper were the other two — and "a bare `MediaQuery` spelled three times is three rules" is `barrel.dart`'s own argument for one import surface |
 > | `EvaAnimate` | the option card's **entrance** — `:340`'s `opacity:0; transform:translateY(16px)` and `:341`'s `.opt.in{opacity:1; transform:none}` | the redesign specifies the motion and the client did not perform it, and the site is the one place where **both** of this widget's hazards are visible in the shipped tree |
 >
 > **The offsets are DERIVED, and the right-hand pair is derived from the card's
 > own width.** The prototype's flecks are positioned relative to the option
-> card's box (`eva/src/screens/QuizScreen.tsx:88`), and two of its four `x`
-> values are **screen pixels on a 390px frame** (`eva/src/App.tsx:89`): the
-> quiz screen's own padding is `20px 20px 28px` (`QuizScreen.tsx:41`), so the
+> card's box, and two of its four `x` values are **screen pixels on a 390px
+> frame** — the prototype's own phone frame was `390` wide, and the quiz
+> screen's own padding was `20px 20px 28px`, so the
 > card's box was `390 - 20 - 20 = 350` wide and `356` / `362` are therefore
 > **6 and 12 pixels past the card's right edge**. The redesign's `.opt` is
 > `width:100%` (`eva/redesign.html:337`) in a body padded `0 26px` (`:333`), so
@@ -2655,7 +2678,7 @@ tool/verify_all.sh --with-build
 >   a redesign that changes a screen does not silently change the inventory.
 > * **the brief's own rule** — "the ONLY sacred cues are: gold flecks (tiny,
 >   sparse, decorative), the verse marker, and beautiful typography"
->   (`eva/src/imports/pasted_text/pasted-attachment.txt:51`), and "the reward
+>   (`eva/brief.txt:51`), and "the reward
 >   is the gold flecks + color shift + satisfying copy" (`:98`).
 >
 > **The test was rewritten, not deleted**, and the reasoning it used to carry
@@ -2910,7 +2933,9 @@ there"* — and what was already there was the **old design's per-screen orb
 groups**, which the redesign replaced with **one canvas for every screen**
 (`eva/redesign.html:46`). The prototype's own answer for "no aurora" is the
 canvas fill: the screen root is `background: T.canvas` with a transparent
-background layer above it (`ds.tsx:162`), and the old painter already drew
+background layer above it — and the redesign's own canvas layer is exactly that
+shape, `position: absolute; inset: 0` over the screen root
+(`eva/redesign.html:46`) — and the old painter already drew
 that fill **first**, before the orbs.
 
 So the fallback is now a `ColoredBox(color: colors.canvas)` — the prototype's
@@ -3070,6 +3095,91 @@ that ships. It is a **hole that was always there**, and it is the next thing
 to close: the shader's own goldens, with the capture harness re-checked
 against the plan's recorded risk (`flutter test` ≠ Impeller — tests run Skia
 software).
+
+---
+
+# The React prototype retired — and every one of its citations rewritten by hand
+
+**This is not a phase; it is a decision about the plan's own inputs, and it
+belongs here because the plan is where the Lumen redesign's decisions live.**
+
+## WHAT WAS RETIRED
+
+`eva/src/` — the React prototype this redesign replaces — is gone, and so is the
+Figma Make scaffolding around it. What remains in `eva/` is the two things the
+design is transcribed from: **`redesign.html`** (the design source of truth,
+2,462 citations) and **`brief.txt`** (the original brief, the source of the
+design *language*).
+
+**The React prototype was not dead — it was a 554-citation receipt.** 327 of
+those citations were **live**, in `lib/`, in claims the shipped code makes
+about what it borrowed from the design it replaced: *"the redesign's `.opt` has
+no counterpart, and the superseded prototype's option card had one"*.
+
+**And every one of them was rewritten BY HAND**, because a line number in a
+file that does not exist is a fiction. **237 distinct targets across 554
+sites**, and three outcomes for each:
+
+* **re-pointed** at `redesign.html` where the redesign has the same thing;
+* **rewritten** as a divergence note — the **value** and the **fact that the
+  redesign has no counterpart** — where it does not;
+* **dropped** where the citation was decoration.
+
+**AND THE RULE THAT DECIDED IT IS THE PLAN'S OWN.** Task 4.2 Step 4 said:
+*"Re-point citations per widget … **only for widgets that actually changed**.
+A citation that still describes a surviving widget is not wrong; moving it
+would be churn."* So the surviving `ds.tsx` citations were **deliberate** —
+they are where the redesign has no counterpart and the old number is the
+receipt of the difference — and what they needed was not a new line but a
+**sentence that stands on its own**.
+
+## AND THE GATE IS WHAT ENFORCES IT
+
+`tool/gates/citation_check.py`'s pattern **still matches `.tsx`**, on purpose.
+A `.tsx` citation is now a **broken** citation, named by the gate, because no
+`.tsx` file is a reference any more.
+
+**A pattern that stopped matching `.tsx` would report a clean run over a
+surface it no longer examines** — the ADR-0020 shape, and the third time this
+repository has met it: a gate that cannot fail, an inventory that hid a third
+of the design system, and now a pattern that would have hidden a whole design.
+**The retirement is enforced by the gate, not by a convention**, and the
+negative control is in `tool/verify_gates_selftest.sh` — a planted `.tsx`
+citation must be reported, or the control fails.
+
+## AND THE BRIEF'S LINES ARE NOW **CHECKED**, WHICH THEY WERE NOT
+
+The brief's filename had a **hyphen** in it, and the gate's pattern matches
+`[A-Za-z0-9_]+` — so `pasted-attachment.txt:97` **never matched**, and its
+**eight line citations were verified by nothing at all**. They were the only
+citations in the repository no gate could see, and they were pointing at the
+one document that says *"the ONLY sacred cues are: gold flecks, the verse
+marker, and beautiful typography"* — the rule the gold flecks' return rests
+on.
+
+Moving it to `brief.txt` and adding `txt` to the pattern closes that hole, and
+the brief becomes the gate's **second named reference** — and a named one, for
+the reason `redesign.html` is named: `eva/` is a directory of reference
+material, and a reference that is **named** cannot acquire a sibling by
+accident.
+
+## AND THE ONE EXCEPTION, WHICH IS **NOT** MINE TO CLOSE
+
+**`docs/plans/` still carries about fifty `.tsx` citations**, and they are
+**left**. AGENTS.md says: *"Do not rewrite `docs/plans/`. That directory has a
+dedicated owner. If a plan document is wrong, report it rather than editing
+it."*
+
+And they are the right ones to leave: `docs/plans/01-source-analysis.md` and
+`docs/plans/archive/widget-plan.original.md` are **analyses of the React
+prototype** — a record of a past analysis, made against a prototype that has
+since been retired. **A document that records a past is allowed to point at the
+past.** The *live* claims — the code, the tests, this plan, the authority
+document and the ADRs — are all rewritten, and the gate scans them all.
+
+**The gate does not scan `docs/`**, and that is now a stated decision rather
+than an omission: the live claims are scanned, and the historical ones belong
+to somebody else.
 
 ## Risks
 

@@ -549,7 +549,7 @@ tool/
   verify_linux_build.sh            opt-in: proves the app really builds
   verify_gates_selftest.sh         plants violations to prove gates fire
   fix_named_fold.py                the one-off Result migration fixup
-  gates/citation_check.py          every *.tsx:NNN claim resolves
+  gates/citation_check.py          every reference claim resolves
   gates/orphan_widget_check.py     every design-system widget is reachable
   baseline/gates.txt               the recorded coverage/test floor
 
@@ -599,7 +599,7 @@ architecture gates). Run `tool/verify_all.sh` for the seven fast ones and
 | 1 | `lib`, `test`, `tool` are `dart format`-clean | `dart format --output=none --set-exit-if-changed` | Nothing else is meaningful until this passes. |
 | 2 | Types, lints and deprecated APIs | `dart analyze --fatal-infos --fatal-warnings` | One command enforces all three. It is the real gate for the forbidden-API table, which is only a seed. |
 | 3 | Purity, feature independence, generated files, route inventory | `tool/verify_purity.sh` | One of four named gates failed; each prints its own scope. |
-| 4 | Prototype citations resolve; widgets are reachable | `tool/gates/citation_check.py`, `orphan_widget_check.py` | A `*.tsx:NNN` claim points at a line that changed, or a widget is built and tested but no page instantiates it. |
+| 4 | Prototype citations resolve; widgets are reachable | `tool/gates/citation_check.py`, `orphan_widget_check.py` | A claim points at a line of the design reference that changed, or a widget is built and tested but no page instantiates it. |
 | 5 | No deprecated or lint-fixable API remains | `dart fix --dry-run` | **Read the output, not the exit code.** This command exits `0` even when it has work to do. |
 | 6 | Behaviour unchanged | `flutter test` | A behaviour changed, or a test is flaky. Use `flutter test`, never `dart test` — the plain Dart VM has no `dart:ui`. |
 | 7 | Coverage and test count meet the recorded floor | `flutter test --coverage` vs `tool/baseline/gates.txt` | Coverage or test count fell below a floor that is only ever written by `--update-baseline`, so one bad run cannot permanently lower the bar. |

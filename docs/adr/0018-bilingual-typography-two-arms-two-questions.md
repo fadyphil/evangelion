@@ -10,20 +10,27 @@
 
 **The defect was under-counted.** `docs/plans/01-source-analysis.md` §2 row 2 said
 **two** Arabic sites needed the non-mono family. The source says **nine** (recorded
-decision 54): `ReadingArScreen.tsx:35` (metadata), `:86` (CTA caption) and
-`:49,51,56,58,63,68,70` — the seven `<sup>` verse markers. `ds.tsx:298,341` are the
-two **English-only** sites and stay in Space Mono, which is the point of the split.
+decision 54): in the prototype's Arabic reading screen, the metadata row, the CTA
+caption and **seven `<sup>` verse markers**. The two **English-only** sites — the
+prototype's input label and its category-chip label, both `Space Mono` — stay in Space
+Mono, which is the point of the split. **The redesign writes the same split itself**:
+the verse marker is in the mono family on the English arm (`redesign.html:170`) and
+the Arabic arm is Amiri (`redesign.html:140`), and the metadata row is the same way
+(`redesign.html:146` against `redesign.html:148`).
 
 **And the nine were the floor, not the ceiling** (recorded decision 71). §14 requires
 an accessible name for every icon-only control, and the prototype's four top controls
-are bare `<button>`s with **no label at all** (`ReadingEnScreen.tsx:14-16`,
-`ReadingArScreen.tsx:21-29`). So §14 forced **three more Arabic strings** into this
-client that the prototype never wrote, and they rendered through `IconActionButton`'s
-`Tooltip`, whose `Tooltip(message: …)` carried **no `textStyle`** — Flutter resolved
-`null` to `bodyMedium`, measured **`DMSans`**, which carries no Arabic glyph at all.
-Measured on the shipped `ReadingPage` at `Locale('ar')` with the long press held:
-`رجوع` produced **4** tofu boxes, `حجم الخط` **7**, and `إشارة مرجعية — غير متاح في
-هذه النسخة` **19** — while every other Arabic run on the screen was Amiri.
+were bare `<button>`s with **no label at all** — the reader's back button and its `Aa`
+and bookmark controls, on both arms. **The redesign still leaves two of them
+glyph-only** (the reader app bar's `‹` and `✦`, `redesign.html:542` and
+`redesign.html:544`), so §14's requirement for an accessible name forced **three more
+Arabic strings** into this client that the prototype never wrote, and they rendered
+through `IconActionButton`'s `Tooltip`, whose `Tooltip(message: …)` carried **no
+`textStyle`** — Flutter resolved `null` to `bodyMedium`, measured **`DMSans`**, which
+carries no Arabic glyph at all. Measured on the shipped `ReadingPage` at `Locale('ar')`
+with the long press held: `رجوع` produced **4** tofu boxes, `حجم الخط` **7**, and
+`إشارة مرجعية — غير متاح في هذه النسخة` **19** — while every other Arabic run on the
+screen was Amiri.
 
 ## Decision
 
@@ -157,5 +164,8 @@ string".
 - `lib/app/app.dart:255` (`supportedLocales`)
 - `test/arabic_typography_test.dart:143-144,311` and
   `test/support/arabic_typography_gate.dart:290-341`
-- `eva/src/screens/ReadingArScreen.tsx:35,49,51,56,58,63,68,70,86` — the nine sites
+- the prototype's Arabic reading screen — its metadata row, its CTA caption and its
+  seven `<sup>` verse markers: **the nine sites**. The redesign's own split is at
+  `redesign.html:170` (the verse marker, in the mono family) against
+  `redesign.html:140` (the Arabic arm's Amiri)
 - ADR-0016 (Amiri is the only bundled family that renders Arabic)

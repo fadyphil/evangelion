@@ -34,8 +34,10 @@ limitations:
 - **Routes carry no `:passageId`.** `readings/today/{en,ar}` is the only reading
   endpoint, so the passage is always *today's*.
 - **The progress-bead row counts questions, not passages.**
-  `HomeScreen.tsx:65` writes `<ProgressBeads total={5} completed={2} current={2} />`,
-  which describes passage progress across the grid that was cut;
+  The prototype wrote `<ProgressBeads total={5} completed={2} current={2} />`,
+  which describes passage progress across the grid that was cut. The redesign has
+  **no passage-progress row at all** — its dot row is the **quiz's** (`.dots`,
+  `redesign.html:328`, drawn at `redesign.html:568`) and counts quiz questions — so
   `firstUnansweredQuestionIndex` (`lib/features/home/domain/question_progress.dart:45`)
   is fed `TodayReading.questionCount` / `answeredQuestionCount` instead.
 - **The avatar on `/` has no profile destination.**

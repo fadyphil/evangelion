@@ -635,3 +635,60 @@ The same shape as §1's "six screens" and §10's sixteen goldens: **a green
 check over a surface that was never examined.** §5 examined the local backend
 thoroughly. It did not examine **the backend**, because at the time there was
 one, and it was the fallback.
+
+---
+
+## 11. THE CITATION GATE NEVER CHECKED THE AUTHORITY DOCUMENT — AND THE
+## PROTOTYPE IT CHECKED AGAINST WAS A DESIGN THE CLIENT HAD SUPERSEDED
+
+`tool/gates/citation_check.py` resolves every `X.tsx:NNN` and
+`redesign.html:NNN` claim in the tree. Its `ROOTS` were `("lib", "test", "tool")` —
+**so it never looked at `docs/` at all**, and the authority document, the ADRs,
+the plan, the drift catalogue and the seams map — **where the client's claims
+actually live** — were checked by nothing.
+
+**And 113 citations sat in those documents, unchecked, for the whole life of the
+gate.**
+
+### The other half: the reference it was checking against was **superseded**
+
+`eva/src/` was the React prototype the Lumen redesign **replaces**. The gate
+checked 554 citations into it, and **327 of them were live in `lib/`** — in claims
+the shipped code makes about what it borrowed from the design it replaced. Those
+were not stale: they were **divergence receipts**, and the plan's own Task 4.2
+Step 4 says so — *"A citation that still describes a surviving widget is not
+wrong; moving it would be churn."*
+
+**But a line number in a file that does not exist is a fiction**, and the
+prototype is gone. So the receipts had to be **rewritten by hand** — 237 distinct
+targets across 554 sites — and the gate's pattern **still matches `.tsx`** on
+purpose, so that a citation into the retired prototype is now a **broken**
+citation, named.
+
+### RESOLVED — the prototype is retired, the receipts are rewritten, and the gate
+### watches the LIVE documents
+
+`eva/` now holds **two** files: `redesign.html` and `brief.txt`. The gate
+resolves against both, and its `ROOTS` now include the live documents.
+
+**AND A GATE THAT WATCHES MORE SURFACES IS A STRONGER GATE, WHICH IS ALSO HOW
+THIS REPOSITORY KEEPS BREAKING ITS OWN GATES.** The same shape, for the fourth
+time: a gate that cannot fail; an inventory that hid a third of the design
+system; a pattern that would have hidden a whole design; and now a scope that
+never looked at the documents the claims are written in.
+
+### The one hole this found: the brief's citations were checked by **nothing**
+
+The brief's filename had a **hyphen** in it, and the gate's pattern matches
+`[A-Za-z0-9_]+` — so `pasted-attachment.txt:97` **never matched the pattern at
+all**, and its **eight line citations** were verified by nothing whatsoever.
+
+**And they are the ones that matter most**: *"the ONLY sacred cues are: gold
+flecks, the verse marker, and beautiful typography"* — the rule the gold flecks'
+return rests on, and the reason the quiz's correct option has four tiny gold
+dots on it today.
+
+Moving the brief to `brief.txt` and matching the **named references** (rather
+than a generic `.txt` extension, which turned every `CMakeLists.txt:25` in the
+tree into a broken citation) closed the hole. **The brief is now the gate's
+second reference, and its lines are checked.**

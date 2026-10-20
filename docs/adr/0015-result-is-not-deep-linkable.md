@@ -107,11 +107,16 @@ the empty case, which is a seventh screen and §2 forbids.
   whose every question is already answered reaches the last question with nothing to
   submit — so there is no `SubmitResult`, so per this ADR there is no result screen.
   Decision 85 makes `QuizCta.none` a real arm rendered as a **disabled `EvaButton`**
-  whose visible label is still the prototype's transcribed string
-  (`docs/plans/03-design-system.md` → `QuizScreen.tsx:127`) and whose *accessible*
-  name carries the reason as a suffix. Hiding the button would make a missing
-  feature indistinguishable from a missing control; leaving it enabled and letting
-  the tap do nothing is §14's forbidden state.
+  whose visible label is still the prototype's transcribed string — the prototype's
+  own `Check answer`, the unchecked arm of its
+  `{checked ? 'Next question' : 'Check answer'}` switch, and the value
+  `app_en.arb`'s `quizCheckAnswer` still carries verbatim. The redesign has no such
+  label: its grader is one-tap (`redesign.html:1423`, `pick` grades the instant a
+  card is chosen), so its own pair is `next ▸` / `see results ✦`
+  (`redesign.html:967`) and its button only ever appears graded. The button's
+  *accessible* name carries the reason as a suffix. Hiding the button would make a
+  missing feature indistinguishable from a missing control; leaving it enabled and
+  letting the tap do nothing is §14's forbidden state.
 
 ### Neutral / noted
 

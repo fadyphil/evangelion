@@ -259,9 +259,13 @@ Five mandatory mitigations. The two that bite hardest:
   becomes 3.
 
 **§13.4's blur budget: one site per screen, and `/` has spent it.** A `BackdropFilter`
-is a `saveLayer` per frame. `kGlassBlurSigma` is **24** — `HomeScreen.tsx:39`'s own
-number, because only one site blurs and there is nothing to compromise between eight
-hand-written radii.
+is a `saveLayer` per frame. `kGlassBlurSigma` is **24** — the superseded prototype's own
+number for Home's hero panel (`blur(24px)`), because only one site blurs and there is
+nothing to compromise between eight hand-written radii. **The redesign draws a
+counterpart and its number is `12`, not `24`**: the home card's
+`backdrop-filter:blur(12px)` (`redesign.html:250`). The client keeps the prototype's
+`24`, so the two sides differ, and the difference is stated here rather than left for
+a reader to discover against a line that says something else.
 
 **Every animation must check `MediaQuery.disableAnimationsOf(context)`.** This is why
 `EvaAnimate` exists rather than using `flutter_animate` directly: the package reads no

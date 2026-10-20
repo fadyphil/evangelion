@@ -88,19 +88,22 @@ not — Phases 2 through 6 of
 | [`0019`](docs/adr/0019-performance-budget.md) | `superseded by ADR-0022` | "one blur site per screen" is a budget for a design that blurs; the redesign blurs the whole viewport with a shader and a 14-control workshop |
 | [`0018`](docs/adr/0018-bilingual-typography-two-arms-two-questions.md) | **still `accepted — under review`** | the redesign is bilingual in the same way and does not touch the two-arms-two-questions resolution, so there is nothing in ADR-0022 to re-examine it against |
 
-### What a prototype swap breaks
+### What a prototype swap breaks — and what this one cost
 
 `eva/` is not a folder of reference images. It is load-bearing in the test
 suite, and the dependency is measured rather than asserted. Replacing it is a
 checklist, not a visual refresh.
 
-| Surface | Measured today | What a swap does to it |
+**THE SWAP IS DONE**, and the table's "measured today" column is now the
+**before** column, with the cost beside it.
+
+| Surface | Before the swap | What the swap cost |
 | --- | --- | --- |
-| Dart files carrying `X.tsx:NNN` citations | 119 (63 in `lib/`, 56 in `test/`) | every claim must be re-derived or deleted |
-| Individual citations | 948, all resolving | each one is a line-number assertion |
-| Prototype files cited | 12 `.tsx` under `eva/src` | the new source must supply equivalents |
-| Geometry harnesses parsing the prototype at test time | 5 | they read files that will not exist |
-| Golden PNGs | 148 | all invalidated by any visual change |
+| Dart files carrying `X.tsx:NNN` citations | 119 (63 in `lib/`, 56 in `test/`) | **0** — every one rewritten by hand, each either re-pointed at `redesign.html` or turned into a divergence note carrying the value |
+| Individual citations | 948, all resolving | **2,450**, all resolving — the count went **up** because the gate now watches the documents, where 113 claims had never been checked by anything |
+| Prototype files cited | 12 `.tsx` under `eva/src` | **0** — `eva/src/` is retired, and the gate's pattern still matches `.tsx` so that a citation into it is **reported** rather than ignored |
+| Geometry harnesses parsing the prototype at test time | 5 | **0** — the last one, the blur-radii group, was re-pointed at the redesign's own seven blur sites |
+| Golden PNGs | 148 | **0 invalidated** — the orbs' sixteen goldens went with the orbs, and four scope goldens were re-recorded because the layer behind them changed |
 | Token gates re-baselined | 5 | see below |
 
 Run the citation gate yourself to confirm the table's first four rows:
@@ -109,8 +112,16 @@ Run the citation gate yourself to confirm the table's first four rows:
 python3 tool/gates/citation_check.py
 ```
 
-It reports the prototype file count, the citation count, and how many resolve.
-At the time of writing it reports **948 found, 948 resolved, 0 broken**.
+It reports the reference file count, the citation count, and how many resolve.
+It now reports **2,450 found, 2,450 resolved, 0 broken** against **two**
+references — `eva/redesign.html` and `eva/brief.txt`.
+
+**AND THE BRIEF'S LINES ARE CHECKED FOR THE FIRST TIME.** Its filename had a
+hyphen in it, and the gate's pattern matched `[A-Za-z0-9_]+`, so
+`pasted-attachment.txt:97` **never matched** and its eight line citations were
+verified by nothing. The pattern now matches the **named references** rather
+than a generic extension — a generic `.txt` arm turned every `CMakeLists.txt:25`
+in the tree into a broken citation.
 
 Two properties of that gate matter more than the count, and both cut in
 opposite directions.

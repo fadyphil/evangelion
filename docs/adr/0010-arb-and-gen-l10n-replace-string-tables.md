@@ -102,8 +102,9 @@ own. Neither figure is load-bearing; the rule is about prefixing, not counting.
 - **Every key carries its reasoning and its citations, because `gen_l10n` discards
   `@key` descriptions after using them for tooling** (decision 110). Two gates hold
   it: every key needs a description over 40 characters, and 17 keys are pinned to
-  the exact `file:line` they must still name. Proven by mutation — removing
-  `HomeScreen.tsx:30` from one description fails one test by name.
+  the exact `file:line` they must still name. Proven by mutation — removing one
+  description's citation (the prototype's streak line, `Your streak is glowing. Keep
+  it alive.`) fails one test by name.
 - **Known debt, recorded and not fixed:** `progress_beads.dart:146` composes
   `': N of M complete'` in English inside `core/`, so that semantics label reaches
   a screen reader in English on the Arabic arm.
