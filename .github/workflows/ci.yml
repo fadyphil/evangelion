@@ -1,11 +1,19 @@
-# CI — gates 1-7 of tool/verify_all.sh, on every push and every pull request.
+# CI — the eight gates of `tool/verify_all.sh`, on every push and every pull request.
 #
 # Badge: https://github.com/fadyphil/evangelion/actions/workflows/ci.yml/badge.svg
 #
-# This runs the SAME script a contributor runs locally. It does not re-implement
-# a single gate in YAML, because a gate implemented twice is a gate that can
-# disagree with itself, and the only question a reader has about CI is whether
-# it is the thing CONTRIBUTING.md tells them to run.
+# ## THE THREE JOBS, AND WHY THERE ARE THREE
+#
+# | Job | What it runs | Why it is separate |
+# | --- | --- | --- |
+# | `gates` | gates 1-7, through `tool/verify_all.sh` | the authoritative run |
+# | `gate-self-test` | `tool/verify_gates_selftest.sh` | proves the gates CAN fail |
+# | `linux-build` | gate 8, `tool/verify_linux_build.sh` | the app REALLY builds |
+#
+# **The gates are not re-implemented in YAML.** This workflow runs the SAME script
+# a contributor runs locally, because a gate implemented twice is a gate that can
+# disagree with itself, and the only question a reader has about CI is whether it
+# is the thing CONTRIBUTING.md tells them to run.
 #
 # ## THE EXIT-CODE CONTRACT IS LOAD-BEARING. DO NOT "SIMPLIFY" IT.
 #
@@ -26,6 +34,25 @@
 # this with a bare `run: tool/verify_all.sh`. That is not a shorter equivalent;
 # it deletes the only place the difference between "found a problem" and
 # "checked nothing" is still visible.
+#
+# ## WHY THE RUNNER IMAGE IS PINNED
+#
+# `ubuntu-latest` is a **moving target**: GitHub migrated it to Ubuntu 26 on
+# 2026-10-19, and the runner image is the base every gate is measured against —
+# the analyzer's output, the golden PNGs and the coverage numbers are all
+# produced by it. A gate whose answer changes because the operating system
+# underneath it changed is not a gate. `ubuntu-24.04` is pinned, and changing it
+# is a deliberate, reviewed decision like changing the Flutter version.
+#
+# ## WHY THE ACTIONS ARE PINNED TO COMMIT SHAs
+#
+# `uses: owner/repo@v2` resolves a MOVING TAG, so the code that runs is not the
+# code this file names. Every action below is pinned to the commit its version
+# comment names, and `.github/dependabot.yml` is what keeps them current.
+# **Without dependabot the pins are where the Node.js 20 deprecation came
+# from**: the workflow sat on `actions/checkout@v4` and friends for months
+# while GitHub announced that Node 20 is deprecated and the actions were being
+# force-run on Node 24 anyway.
 
 name: CI
 
@@ -40,6 +67,9 @@ on:
       - 'build/**'
       - 'docs/**'
   pull_request:
+  # A maintainer can re-run any job on demand. The workflow writes nothing back
+  # to the repository, so this is safe to leave open.
+  workflow_dispatch:
 
 # Least privilege. This workflow reads the repository and writes nothing back.
 permissions:
@@ -50,127 +80,98 @@ permissions:
 # pull request, so each PR gets its own group.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
+  # `github.event_name` — the `concurrency` block's available contexts are
+  # `github`, `inputs` and `vars`, so a bare `event_name` is not resolvable
+  # here and the workflow would be rejected at validation.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The one version every gate is measured against. Not a range: the analyzer
+  # and the golden PNGs are both version-sensitive.
+  FLUTTER_VERSION: '3.47.4'
 
 jobs:
   gates:
     name: Gates 1-7
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
-    # `runner` is a STEP-level context only. This line was `${{ runner.tool_cache
-    # }}` and GitHub rejected the entire workflow at validation with
-    #   Unrecognized named-value: 'runner'. Located at position 1
-    # before a single job was created — 0s run, no log, no check runs.
-    #
-    # The comment that stood here previously claimed moving this from a top-level
-    # `env` to a job-level `env` was the fix. It is not: neither exposes `runner`,
-    # and moving it is what made the wrong claim survive a second reading. The
-    # valid job-level contexts are `github`, `needs`, `strategy`, `matrix`,
-    # `vars`, `secrets` and `inputs`; `runner` joins them only at step level.
-    #
-    # Declared once here and read back by the two steps below through `env`, so
-    # flutter-action's cache and this cache cannot drift onto different paths.
-    env:
-      PUB_CACHE: ${{ github.workspace }}/.pub-cache
-    # Gates 6 and 7 each run the whole suite, and Flutter's first run on a cold
-    # runner is slow. This is generous; it exists to catch a hang, not to fail.
-    timeout-minutes: 45
+    # Gates 6 and 7 each run the whole suite, and Flutter's first run on a
+    # cold runner is slow. This is generous — it exists to catch a hang, not to
+    # fail. The run step also carries its own, tighter `timeout`, so a hung
+    # suite is reported as a TIMEOUT rather than as a mystery.
+    timeout-minutes: 30
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The architecture gates are ripgrep patterns. Without rg every scan
-      # returns empty and the gate passes vacuously, which is exactly the shape
-      # of false green ADR-0020 describes. ubuntu-latest ships rg, but it is
-      # installed explicitly so this does not depend on the runner image, and
-      # so a change to the base image is visible in this file rather than
-      # inferred from a green run.
-      - name: Install ripgrep
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes ripgrep
-          rg --version
-
-      # Two of the gates under tool/gates/ are Python. verify_all.sh reports
-      # FATAL, not FAIL, if python3 is absent — which is the right answer, and
-      # one this workflow surfaces rather than swallows.
-      - name: Check Python 3
-        run: python3 --version
-
-      # 3.47.4 exactly, and that is not a default. The analyzer's behaviour and
-      # the golden PNGs are both version-sensitive, so "close enough" here is a
-      # moving baseline that nobody agreed to. The project pins Flutter 3.47.4 /
-      # Dart 3.13.3 and records it in tool/baseline/gates.txt.
-      #
-      # cache: true caches the Flutter SDK download. The pub cache is a separate
-      # path and is cached by the next step.
-      - name: Set up Flutter 3.47.4
-        uses: subosito/flutter-action@v2
+      - name: Set up the toolchain
+        uses: ./.github/actions/toolchain
         with:
-          flutter-version: '3.47.4'
-          channel: stable
-          cache: true
-          cache-key: flutter-3.47.4-linux
-          pub-cache-path: ${{ env.PUB_CACHE }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
 
-      - name: Cache pub packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PUB_CACHE }}
-          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            pub-${{ runner.os }}-
-
-      - name: Report the toolchain
-        run: |
-          flutter --version
-          dart --version
-
-      # verify_all.sh does not resolve dependencies itself. The generated
-      # freezed / auto_route / injectable outputs are committed, so no
-      # build_runner step is needed — and running one would be a gate input
-      # quietly mutating under the run.
-      - name: Resolve packages
-        run: flutter pub get
-
-      # --with-build is deliberately NOT passed, and the omission is a decision
-      # rather than an oversight.
-      #
-      # Gate 8, tool/verify_linux_build.sh, needs a GUI Linux desktop toolchain
-      # (GTK 3 development headers, clang, cmake, ninja, pkg-config), takes
-      # minutes, and WIPES build/linux/x64/{debug,release} before rebuilding. It
-      # is the slowest gate and the only one that mutates the tree instead of
-      # reading it, so it belongs on the contributor's machine, not in a hosted
-      # runner. CONTRIBUTING.md asks for `tool/verify_all.sh --with-build`
-      # locally before opening a pull request; this workflow checks the other
-      # seven, and a missing gate 8 here does not mean a passing one.
-      #
       # PIPESTATUS[0] is the script's own exit code. Without it the tee would be
       # the thing measured, and tee always succeeds.
+      #
+      # `timeout` is here so a HUNG test suite is reported as a timeout and not
+      # as a 30-minute mystery: 124 is the coreutils code for "timed out", and
+      # the summary step below says so in words rather than passing it through
+      # as an unknown code.
       - name: Run gates 1-7
         id: gates
         run: |
           set +e
-          tool/verify_all.sh 2>&1 | tee "$RUNNER_TEMP/gates.log"
+          timeout --signal=TERM --kill-after=60s 1500 tool/verify_all.sh 2>&1 | tee "$RUNNER_TEMP/gates.log"
           code=${PIPESTATUS[0]}
           set -e
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
-      # Evidence for a red run. lcov.info is what gate 7 compares against the
-      # recorded floor in tool/baseline/gates.txt, so a coverage failure cannot
-      # be diagnosed without it. The gate log carries the per-gate detail that
-      # the step summary trims.
-      - name: Upload failure evidence
-        if: ${{ always() && steps.gates.outputs.exit_code != '0' }}
-        uses: actions/upload-artifact@v4
+      # The gate log is the evidence for a red run, and it is the ONLY record
+      # of what the gates actually did — the step summary below trims it. It is
+      # uploaded on success too: a green run nobody can read afterwards is a
+      # green run that cannot be audited.
+      #
+      # `if-no-files-found: error` rather than `warn`: the tee above writes this
+      # file unconditionally, so its absence means the run step did not reach
+      # it, and a run that produced no log produced no evidence. That is a
+      # failure, not a shrug.
+      - name: Upload the gate log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: gate-failure-evidence
-          path: |
-            coverage/lcov.info
-            ${{ runner.temp }}/gates.log
+          name: gate-log
+          path: ${{ runner.temp }}/gates.log
+          if-no-files-found: error
+          retention-days: 14
+
+      # lcov.info is what gate 7 compares against the recorded floor in
+      # tool/baseline/gates.txt, so a coverage failure cannot be diagnosed
+      # without it. It is `warn` rather than `error` because a failure in
+      # gate 1 never produces a coverage file, and that is not a broken
+      # upload — it is an honest one.
+      - name: Upload the coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: coverage/lcov.info
           if-no-files-found: warn
+          retention-days: 14
+
+      # **A golden failure is a PICTURE, and the picture was being thrown
+      # away.** `flutter test` writes the rendered image, the isolated diff and
+      # the masked diff into `failures/` next to the test — and those are the
+      # only things that let anybody see WHAT changed. Without them a golden
+      # failure is "expected: X actual: Y", which is a starting point and not
+      # an answer.
+      - name: Upload the golden failure images
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-failures
+          path: test/**/failures/
+          if-no-files-found: ignore
           retention-days: 14
 
       # Re-raises whatever the run step recorded. `always()` so a FATAL still
@@ -191,7 +192,21 @@ jobs:
             echo '## Gates'
             echo
             if [[ -f "$log" ]]; then
-              sed -n '/^Summary/,$p' "$log"
+              # The coverage line is the one number gate 7 produced, and it is
+              # the one a reader wants first. It sits above the table because
+              # the table does not contain it.
+              coverage_line="$(grep -m1 'coverage [0-9]' "$log" || true)"
+              if [[ -n "$coverage_line" ]]; then
+                echo '```'
+                echo "${coverage_line#"${coverage_line%%[![:space:]]*}"}"
+                echo '```'
+                echo
+              fi
+              echo '| Gate | Result |'
+              echo '| --- | --- |'
+              sed -n '/^Summary/,$p' "$log" \
+                | grep -E '^  (ok|FAIL|FATAL)[[:space:]]' \
+                | sed -E 's/^  (ok|FAIL|FATAL)[[:space:]]+(.*)$/| \1 | \2 |/'
             else
               echo 'The gate log was missing; the run step did not reach it.'
             fi
@@ -214,8 +229,83 @@ jobs:
               echo '::error::A gate COULD NOT RUN, so it checked nothing. This is not a pass. See the summary above.'
               exit 1
               ;;
+            124)
+              echo '::error::The gate run TIMED OUT after 25 minutes. Nothing is known about the gates that did not finish.'
+              exit 1
+              ;;
             *)
               echo "::error::tool/verify_all.sh exited $code, which is not a code it documents. Treat this run as unknown."
               exit 1
               ;;
           esac
+
+  gate-self-test:
+    name: The gates can fail
+    runs-on: ubuntu-24.04
+
+    # ADR-0020's subject, run as a gate rather than asserted in a document. A
+    # gate that cannot fail is worse than no gate, because it is believed — and
+    # this repository has shipped several of them. `verify_gates_selftest.sh`
+    # plants one violation per gate in a scratch copy OUTSIDE the working tree
+    # and requires each gate to exit non-zero.
+    #
+    # **This job is the reason the other two can be believed.** Without it, a
+    # green CI run is indistinguishable from a green run over a surface the
+    # gates never examined.
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/toolchain
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Prove every gate can fail
+        run: tool/verify_gates_selftest.sh
+
+  linux-build:
+    name: Gate 8 — the app really builds
+    runs-on: ubuntu-24.04
+
+    # Gate 8 was excluded from CI with the reason that it "wipes
+    # build/linux/x64/{debug,release} before rebuilding, so it belongs on the
+    # contributor's machine, not in a hosted runner". **The reason does not
+    # apply to a runner**: the tree on a runner is disposable, and wiping a
+    # directory nobody will ever look at is free. What the exclusion actually
+    # meant was that the ONE gate which proves the app really builds was the
+    # one gate CI never ran — and `flutter build linux --release` reporting
+    # `✓ Built` for three commits while the toolchain was missing entirely is
+    # recorded decision 142.
+    #
+    # So it runs here, as its own job, with the toolchain installed.
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up the toolchain
+        uses: ./.github/actions/toolchain
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          linux-toolchain: 'true'
+
+      # `verify_linux_build.sh` runs `flutter doctor` first, clears the native
+      # build state so CMake must regenerate, builds release, and asserts the
+      # bundle is not older than the newest `lib/**.dart`. The last assertion
+      # is the one that catches a build which relinked nothing.
+      - name: Build the Linux bundle
+        run: tool/verify_linux_build.sh
+
+      # The bundle is the artifact a release would ship, so it is worth having
+      # even on a green run.
+      - name: Upload the Linux bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-bundle
+          path: build/linux/x64/release/bundle
+          if-no-files-found: error
+          retention-days: 7

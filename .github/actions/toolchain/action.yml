@@ -1,0 +1,136 @@
+# The toolchain every job in this workflow runs.
+#
+# ## WHY THIS IS AN ACTION AND NOT A COPY IN EACH JOB
+#
+# Three jobs need the same setup, and a step written twice is a step that can
+# disagree with itself. That is the same argument `.github/workflows/ci.yml`
+# makes about the gates — it runs `tool/verify_all.sh` rather than
+# re-implementing seven gates in YAML — and it applies to the toolchain too.
+# One definition, three consumers.
+#
+# ## WHY EVERY ACTION IS PINNED TO A COMMIT SHA
+#
+# `uses: owner/repo@v2` resolves a **moving tag**. A tag is a name somebody can
+# re-point at any commit, so the code that runs is not the code the workflow
+# file names, and "the version I audited" is not a thing the file can say.
+# GitHub's own hardening guidance asks for a full commit SHA, with the version
+# in a comment so a reader can still see it.
+#
+# The SHAs below are the release commits of the tags named in the comments.
+# `.github/dependabot.yml` is what keeps them current — **without it these
+# pins are where the Node.js 20 deprecation came from**, because nothing in
+# this repository was watching the action versions.
+#
+# ## WHY THE FLUTTER VERSION IS A PIN AND NOT A RANGE
+#
+# 3.47.4 exactly, and that is not a default. The analyzer's behaviour and the
+# golden PNGs are both version-sensitive, so "close enough" here is a moving
+# baseline that nobody agreed to. The project pins Flutter 3.47.4 / Dart
+# 3.13.3 and records it in `tool/baseline/gates.txt`.
+name: 'Toolchain'
+description: 'ripgrep, Python 3, Flutter 3.47.4 and the resolved packages — the toolchain the gates need.'
+
+inputs:
+  flutter-version:
+    description: 'The exact Flutter version. Not a range: the analyzer and the golden PNGs are both version-sensitive.'
+    required: false
+    default: '3.47.4'
+  linux-toolchain:
+    description: 'Also install the Linux desktop BUILD toolchain (GTK 3 headers, clang, cmake, ninja, pkg-config). Gate 8 only.'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # The architecture gates are ripgrep patterns. Without rg every scan
+    # returns empty and the gate passes vacuously, which is exactly the shape
+    # of false green ADR-0020 describes. ubuntu-latest ships rg, but it is
+    # installed explicitly so this does not depend on the runner image, and so
+    # a change to the base image is visible in this file rather than inferred
+    # from a green run.
+    - name: Install ripgrep
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes ripgrep
+        rg --version
+
+    # Two of the gates under tool/gates/ are Python. verify_all.sh reports
+    # FATAL, not FAIL, if python3 is absent — which is the right answer, and
+    # one this workflow surfaces rather than swallows.
+    - name: Check Python 3
+      shell: bash
+      run: python3 --version
+
+    # The pub cache lives INSIDE the workspace, and that is deliberate: it is
+    # the one path this action and the cache step below must agree on, and two
+    # spellings of it is two chances to disagree. It is written into
+    # $GITHUB_ENV so every later step in the job inherits it.
+    - name: Point PUB_CACHE at the workspace
+      shell: bash
+      run: echo "PUB_CACHE=${{ github.workspace }}/.pub-cache" >> "$GITHUB_ENV"
+
+    # cache: true caches the Flutter SDK download. The pub cache is a separate
+    # path and is cached by the next step.
+    - name: Set up Flutter ${{ inputs.flutter-version }}
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        channel: stable
+        cache: true
+        cache-key: flutter-${{ inputs.flutter-version }}-linux
+        pub-cache-path: ${{ github.workspace }}/.pub-cache
+
+    - name: Cache pub packages
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ github.workspace }}/.pub-cache
+        key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+        restore-keys: |
+          pub-${{ runner.os }}-
+
+    - name: Report the toolchain
+      shell: bash
+      run: |
+        flutter --version
+        dart --version
+
+    # **THE PIN IS CHECKED, NOT ASSUMED.** A workflow that asks for 3.47.4 and
+    # gets whatever the tag resolved to is a workflow that says 3.47.4 and
+    # means something else — and the analyzer's output and the golden PNGs are
+    # both version-sensitive, so "the version drifted" and "the code is wrong"
+    # would be indistinguishable afterwards.
+    - name: Assert the Flutter version is the pinned one
+      shell: bash
+      run: |
+        expected="${{ inputs.flutter-version }}"
+        actual="$(flutter --version --machine | python3 -c 'import json,sys; print(json.load(sys.stdin)["frameworkVersion"])')"
+        if [[ "$actual" != "$expected" ]]; then
+          echo "::error::This workflow pins Flutter $expected and the runner has $actual. The gates would be measured against a different toolchain than the one this file names."
+          exit 1
+        fi
+        echo "Flutter $actual, as pinned."
+
+    # verify_all.sh does not resolve dependencies itself. The generated
+    # freezed / auto_route / injectable outputs are committed, so no
+    # build_runner step is needed — and running one would be a gate input
+    # quietly mutating under the run.
+    - name: Resolve packages
+      shell: bash
+      run: flutter pub get
+
+    # The packages `flutter build linux` needs, and the ones `flutter doctor`
+    # names when they are missing. `verify_linux_build.sh` calls `flutter
+    # doctor` first, and the toolchain line is the one command that says
+    # "the Linux toolchain is broken" in a single line — so the gate that
+    # proves the app really builds needs them installed to say anything.
+    - name: Install the Linux desktop build toolchain
+      if: ${{ inputs.linux-toolchain == 'true' }}
+      shell: bash
+      run: |
+        sudo apt-get install --yes clang cmake ninja-build pkg-config libgtk-3-dev
+        clang --version
+        cmake --version
+        ninja --version
+        pkg-config --version

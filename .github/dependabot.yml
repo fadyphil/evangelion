@@ -1,0 +1,45 @@
+# ## WHY THIS FILE EXISTS
+#
+# The workflow pins every action to a commit SHA, and **a pin with nothing
+# watching it is a pin that silently rots**. `actions/checkout@v4`,
+# `actions/cache@v4` and `actions/upload-artifact@v4` sat in the workflow for
+# months while GitHub announced that Node.js 20 is deprecated and that those
+# actions were being force-run on Node 24 anyway — the deprecation notice
+# appeared as an annotation on every single run, and nothing in the repository
+# was watching.
+#
+# So the pins are kept current by a bot that opens a pull request, and the
+# pull request is reviewed like any other: the SHA in the comment beside each
+# `uses:` line has to be updated in the same commit, and the node runtime the
+# new version targets has to be read off the release before it is merged.
+#
+# **THIS DOES NOT ADD A DEPENDENCY.** A dependabot pull request proposes a
+# change; it does not merge one. The approved dependency set is
+# `pubspec.yaml`'s `dependencies` plus `freezed`, `freezed_annotation` and
+# Flutter's own `flutter_localizations`, and that set is unchanged by this
+# file.
+version: 2
+updates:
+  # The action SHAs in .github/workflows/ci.yml and
+  # .github/actions/toolchain/action.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - build
+
+  # The Dart dependencies. `flutter_animate` is pinned EXACTLY rather than
+  # with a caret, deliberately, so dependabot proposing a bump there is the
+  # point rather than a problem — it is the same proposal a human would have
+  # to make anyway.
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - build
