@@ -291,9 +291,11 @@ final class QuizState with _$QuizState {
   ///
   /// The fourth row is the redesign's own terminal rule: `eva/redesign.html:1431`
   /// labels the last graded question `seeRes` and its one click opens the results
-  /// (`:1432`). `/result` is still a route (until Phase 6.2) and [lastResult] is
-  /// what the page pushes, so decision 81's required-parameter mechanism is
-  /// unchanged — only the number of presses changed.
+  /// (`:1432`). **`/result` is no longer a route** — it retired to a **modal** in
+  /// the Lumen redesign's Phase 6, so [lastResult] is what the modal is built
+  /// from and decision 81's required-parameter mechanism is unchanged: the
+  /// result cannot exist without a `SubmitResult`. **Only the number of presses
+  /// changed**, and the number of presses was the redesign's rule.
   ///
   /// The dead end is real and is stated in `QuizPage`'s doc rather than papered
   /// over: §5's 2026-10-03 capture has one question with `already_answered: true`,

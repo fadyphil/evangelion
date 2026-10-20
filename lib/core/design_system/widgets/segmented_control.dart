@@ -36,7 +36,7 @@ import 'package:flutter/services.dart';
 ///   than expressed as a step), and it is the only step the tests cover — the
 ///   function is a model for this widget's keyboard, not a general list-stepper.
 /// - any other `T` works. The widget is `SegmentedControl<T>` precisely so
-///   `AppThemeMode` and `ScriptureLanguage` share it.
+///   `AppThemeMode` and `ReadingLanguage` share it.
 T? nextSelection<T>({
   required List<T> values,
   required T selected,

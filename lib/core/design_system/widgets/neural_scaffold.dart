@@ -163,7 +163,7 @@ const double curtainSideAlphaLight = 0.9;
 /// (`ds.tsx:83-86`), Arabic opens violet and pairs it with cyan (`ds.tsx:88-91`).
 ///
 /// The decision this widget makes is: **the language is already in `variant`, and
-/// nothing here re-derives it.** The alternative — a `ScriptureLanguage` field,
+/// nothing here re-derives it.** The alternative — a `ReadingLanguage` field,
 /// or an [InheritedWidget] to read one from — was rejected for three reasons:
 ///
 /// - **A second source of truth for one fact is the exact hazard Phase 2 already

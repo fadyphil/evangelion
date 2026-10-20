@@ -93,9 +93,19 @@ enum GuardDecision {
 /// makes a second call harmless rather than making the orphan reachable.
 /// `reevaluateNext: false` versus `true` changes nothing here; both were measured.
 ///
-/// Nothing in this phase calls `pushAll` across the guard, so this is a note for
-/// the phase that first does (Phase 6 or 7, when home/reading/quiz start chaining
-/// pushes) rather than a fix invented here.
+/// Nothing here calls `pushAll` across the guard, and **that note no longer
+/// points at a future phase.** It used to read "this is a note for the phase
+/// that first does (Phase 6 or 7, when home/reading/quiz start chaining
+/// pushes)". Phase 6 built the dock and the app **does** chain pushes across
+/// the guard now — `/` pushes `/reading` (`features/home/presentation/pages/home_page.dart:480`)
+/// and `/reading` pushes `/quiz` (`features/reading/presentation/pages/reading_page.dart:634`).
+///
+/// **But every one of them is a single-route push**, and the hazard this note
+/// is about is `pushAll`'s specifically: one pending redirect **per route** in
+/// the list. A chain of single pushes leaves one pending redirect, which is the
+/// case the latch in [_redirectToLogin] already handles. So the note is closed
+/// as a measurement rather than left as a warning about a phase that has
+/// already shipped.
 class AuthGuard extends AutoRouteGuard {
   /// Gates navigation on the current [AuthStatus].
   const AuthGuard(this._status);

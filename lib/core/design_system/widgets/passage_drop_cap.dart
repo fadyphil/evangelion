@@ -117,12 +117,13 @@ class PassageDropCap extends StatelessWidget {
 
   /// The reading direction of the paragraph this cap opens.
   ///
-  /// **A [TextDirection], not the `ScriptureLanguage` the inventory names.** That
-  /// enum does not exist yet — it is Phase 7's, in `core/domain/entities/`, and a
-  /// design-system widget taking a domain enum would put `core/domain` in the
-  /// design system's public surface for one switch. What the widget actually
-  /// needs is the direction, and Phase 7 maps `ScriptureLanguage.ar →
-  /// TextDirection.rtl` at the call site where the entity is already in hand.
+  /// **A [TextDirection], not the `ReadingLanguage` the inventory names.** The
+  /// inventory's `ScriptureLanguage` was never built under that name: the entity
+  /// that exists is `ReadingLanguage` (`core/domain/entities/reading_language.dart`),
+  /// and it is **pure Dart** — a `Locale` would put `dart:ui` in the shared
+  /// kernel. What the widget actually needs is the **direction**, and taking the
+  /// entity instead would put `core/domain` in the design system's public
+  /// surface for one switch.
   ///
   /// Defaults to [TextDirection.ltr], which is the inventory's
   /// `language = ScriptureLanguage.en`.

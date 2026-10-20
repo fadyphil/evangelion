@@ -58,7 +58,7 @@ enum SettingsStatus {
 /// a settled decision. `/settings` drew nothing for [SettingsStatus.failed] through
 /// Phase 9, which was the one genuinely unwired async page of the six — `/`, `/reading`
 /// and `/quiz` each had an `ErrorView`, `/login` has no failure status at all, and
-/// `/result` cannot exist without a result.
+/// `/result`'s modal cannot exist without a result.
 ///
 /// [SettingsPage] now renders `_SettingsFailureNotice` above its groups when
 /// [status] is [SettingsStatus.failed], and that widget's doc gives the three measured

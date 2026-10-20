@@ -649,11 +649,29 @@ class _SettingsBodyState extends State<_SettingsBody> {
 
         // --- 5. focus & ritual (`:682-689`) --------------------------------
         //
-        // **SIX of the seven persist and are read by nothing yet** — the selah
-        // timer, the focus mode, the breath guide, the vespers auto-dim, the
-        // calm motion and the haptics are Phase 7's
-        // (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1685-1686`).
-        // Only **Reduce motion** is read today, by `app.dart` and `/reading`.
+        // **SIX of the seven are read today, and this comment used to say the
+        // opposite.** It read "SIX of the seven persist and are read by nothing
+        // yet", naming the selah timer, the focus mode, the breath guide, the
+        // vespers auto-dim, the calm motion and the haptics as "Phase 7's" —
+        // and the Lumen redesign's Phase 7 has since shipped all but one of
+        // them. The claim was **stale in the direction that flatters the tree**:
+        // it said six controls were inert when five of them are live.
+        //
+        // | control | read by |
+        // | --- | --- |
+        // | Focus delay | `features/reading/presentation/pages/reading_page.dart` — the focus dim's idle observer |
+        // | Selah length | `features/home/presentation/widgets/selah_card.dart` — the silence's length |
+        // | Breath guide | `features/reading/presentation/pages/reading_page.dart:782` — the anchor it draws under |
+        // | Vespers auto-dim | `core/design_system/effects/lumen_preferences.dart:82` → `lumen_scene.dart:287` — the ambient's `0.78` factor |
+        // | Reduce motion | `app.dart` and `/reading` |
+        // | Haptics | `core/design_system/effects/ritual_haptics.dart` — nine call sites |
+        // | **Calm motion** | **nothing.** It persists and nothing reads it. |
+        //
+        // **So the count is ONE, and it is `calmMotion`.** The prototype's own
+        // `CALM` flag (`eva/redesign.html:913`) is never read by its `loop`
+        // either, and its Workshop deliberately preserves it across a restore
+        // (`settings_cubit.dart`'s own table says so) — so this is the
+        // prototype's behaviour, transcribed, rather than a gap.
         SettingsGroup(
           label: strings.settingsRitualGroup,
           children: <Widget>[

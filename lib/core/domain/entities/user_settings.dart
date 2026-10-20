@@ -418,9 +418,21 @@ final class UserSettings with _$UserSettings {
   /// Whether the app answers with a haptic. `eva/redesign.html:689` — the
   /// Haptics switch, `checked`.
   ///
-  /// **Persisted and not yet answered.** The client has no haptics until
-  /// Phase 7 (`docs/superpowers/plans/2026-10-13-lumen-redesign.md:1685-1686`),
-  /// so the Workshop is mute against the prototype, which answers every toggle
-  /// with a haptic (`eva/redesign.html:1482`, `:1498`).
+  /// **Persisted AND answered — and the second half arrived in Phase 7, which
+  /// is why this doc used to say "not yet answered".**
+  ///
+  /// The client had no haptics until the Lumen redesign's Phase 7, so the
+  /// Workshop was mute against the prototype, which answers every toggle with
+  /// a haptic (`eva/redesign.html:1482`, `:1498`). The vocabulary is
+  /// `core/domain/entities/ritual_haptic.dart`'s and the platform call is
+  /// `core/design_system/effects/ritual_haptics.dart`'s — the only file that
+  /// calls `HapticFeedback`, because `core/domain/` is Flutter-free.
+  ///
+  /// **And the switch is answered by the switch itself**, which is the one
+  /// moment a reader most wants to know it worked: the tap that turns haptics
+  /// **on** fires `RitualHaptic.hapticsEnabled` with `enabled: on` — the
+  /// *new* value, not the old one. A client that read the stored value would
+  /// stay silent on that very tap, because the stored value is `false`, and
+  /// the reader would be left not knowing whether the switch did anything.
   final bool haptics;
 }
