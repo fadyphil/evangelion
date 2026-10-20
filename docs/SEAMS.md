@@ -208,11 +208,12 @@ children, `/login`, `/reading`, `/quiz`, `/settings`, and a `RedirectRoute` for 
 **9 constants** exist in `app_routes.dart` (the seven screens, `/servant`, and the `*`
 fallback); `/servant` is declared deliberately unrouted.
 
-**The counts are three tasks old.** `/leaderboard` was renamed `/communion` in Task
-5.5 and `/journey` was added in Task 5.6, and this paragraph kept the old numbers —
-which is the drift `docs/DRIFT.md` catalogues, and the reason the **route inventory
-test** spells its list out instead of counting: a count in a paragraph is a claim
-about a number that nobody checks, while a count in a test is a claim that fails.
+**And the count in a paragraph is a claim that nobody checks, while a count in a
+test is a claim that fails.** The two paragraphs above were three tasks out of
+date once — `/leaderboard` was renamed `/communion` in Task 5.5 and `/journey` was
+added in Task 5.6 — and nothing caught it, which is the drift `docs/DRIFT.md`
+catalogues. The **route inventory test** spells its list out instead of counting
+for exactly that reason.
 
 **The guard.** `AuthGuard` depends on `AuthStatus` — one member, `bool get
 isAuthenticated` — not on `AuthBloc`, which did not exist when it was designed.

@@ -1,7 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/library_book.dart';
@@ -327,10 +329,16 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
     }
     _observer?.unsubscribe(this);
     _observer = observer;
-    observer.subscribe(this, _watchedRouteData);
+    // **No shell, no re-entry trigger to wire.** See [_watchedRouteData].
+    final RouteData<dynamic>? watched = _watchedRouteData;
+    if (watched == null) {
+      return;
+    }
+    observer.subscribe(this, watched);
   }
 
-  /// The route data this page subscribes under.
+  /// The route data this page subscribes under — the **SHELL's**, not this
+  /// tab's.
   ///
   /// ## IT IS THE **SHELL'S**, NOT THIS TAB'S, AND THAT IS THE WHOLE POINT
   ///
@@ -344,11 +352,13 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   /// `didPopNext` to (`auto_route_observer.dart:168` — the **previous**
   /// route's subscribers).
   ///
-  /// **A bare tree has no shell**, and there the page's own route data is the
-  /// right answer: it is what it was before the dock existed, and a widget
-  /// test that mounts `/` over a bare `MaterialApp` sees no change.
-  RouteData<dynamic> get _watchedRouteData =>
-      TabsRouterScope.of(context)?.controller.routeData ?? context.routeData;
+  /// **`null` when there is no shell above this page** — a page mounted bare in
+  /// a widget test, or under a router that is not the dock shell. And that is
+  /// the honest answer rather than a fallback: `context.routeData` **throws**
+  /// without a `RouteDataScope`, and a tree with no shell has no re-entry
+  /// trigger to wire anyway.
+  RouteData<dynamic>? get _watchedRouteData =>
+      TabsRouterScope.of(context)?.controller.routeData;
 
   /// Dispatches `HomeStarted` for the language on screen.
   ///
@@ -408,6 +418,17 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
+    // ## THE READER'S RITUAL PREFERENCES, READ **ONCE** AND WATCHED
+    //
+    // `SettingsScope.of` is a **dependent** lookup, so this registers the
+    // page's dependency on the settings scope: when the reader changes the
+    // selah's length in the Workshop, the scope announces, this page rebuilds,
+    // and the card counts the silence they asked for.
+    //
+    // **A page pumped bare would not rebuild** — `SettingsScope.of`'s locator
+    // fallback is not watched — so the home harness installs the scope. See
+    // `home_harness.dart`'s `pumpHome`.
+    final UserSettings settings = SettingsScope.of(context).settings;
 
     return BlocBuilder<HomeBloc, HomeState>(
       builder: (BuildContext context, HomeState state) {
@@ -478,8 +499,19 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
                       horizontal: HomePage.kCardGutter,
                     ),
                     child: SelahCard(
-                      seconds: SelahCard.defaultSeconds,
-                      unavailableReason: strings.homeUnavailableSuffix,
+                      // ## THE READER'S **OWN** CHOICES, AND NOT CONSTANTS
+                      //
+                      // The silence's length is the Workshop's
+                      // `selahLengthSec` (`:684` — a 15…120 second range,
+                      // stepped by 5) and the haptics are the Workshop's own
+                      // switch (`:689`). **A card that carried a literal would
+                      // ignore both**, and the Workshop's ritual group would be
+                      // six switches that do nothing.
+                      seconds: settings.selahLengthSec,
+                      hapticsEnabled: settings.haptics,
+                      beginLabel: strings.homeSelahBegin,
+                      endLabel: strings.homeSelahEnd,
+                      amenLabel: strings.homeSelahAmen,
                     ),
                   ),
                   const SizedBox(height: HomePage.kLabelGap),

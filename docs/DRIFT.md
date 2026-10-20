@@ -335,7 +335,20 @@ success while looking at nothing:
    type-parameter clause, so every generic widget was silently skipped — which is
    how `SegmentedControl` was first reported as an orphan when it is on
    `/settings` today.
+4. **A file that *mentioned* `@RoutePage()` became a root.** Phase 6 widened the
+   root set from "files under `/presentation/pages/`" to that **or** "files that
+   declare `@RoutePage()`", and the clause only asked whether the file *mentioned*
+   the annotation. A plain class carrying it — not a widget, and its route the
+   router had never heard of — made its file a root, and a widget merely **named**
+   in that file was then reported as **placed**. Measured: a plain class with
+   `@RoutePage()` on it, mentioning a widget, made the gate exit **0** with that
+   widget on **no screen at all**. The clause now asks two mechanical questions
+   instead — is the annotation on a **widget**, and is the route it declares
+   **registered** in `lib/app/router/app_router.dart` — and the path heuristic is
+   gone, because the root set is now derived rather than guessed.
 
 The third was the dangerous one. A gate that quietly skips a class of declarations
 is the same defect as one that cannot fail: both report a clean run over a surface
-they never examined.
+they never examined. The fourth was the same defect wearing a costume: the gate
+reported a clean run over a surface — *is this file really a page?* — it never
+examined, and the proof that was written down for it was the fool.

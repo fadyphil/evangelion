@@ -550,46 +550,27 @@ void main() {
             'popped off the shell',
       );
 
-      // ## AND THIS IS WHERE IT IS **RED** — MEASURED, AND THE ASSERTION STAYS
+      // ## AND THE OBSERVER IS **ONE INSTANCE** — WHICH IS WHAT MAKES THIS GREEN
       //
-      // The four facts above are all true, and the reload still does not
-      // happen. The cause is **not** in this file and **not** in the page's
-      // wiring; it is in **which `AutoRouteObserver` the page subscribes to**,
-      // and it is measured rather than reasoned:
+      // The four facts above are all true, and the reload only happens because
+      // of a fifth: `AppRouter.config()`'s `navigatorObservers` is a
+      // **builder**, and auto_route calls it **twice** — once for the root
+      // `Navigator` and once for the tabs router's *inherited* observers. A
+      // builder that answered `AutoRouteObserver()` would build a **fresh**
+      // observer per call, so the root navigator would watch one instance and
+      // the shell's children another, and the home page — which reads the
+      // **nearest** scope, the tabs router's — would be subscribed to the one
+      // that never sees the reader being popped.
       //
-      // * the tree now holds **two** `RouterScope`s — the root's and the
-      //   shell's tabs router's — and the home page reads the **nearest**,
-      //   which is the tabs router's;
-      // * `AppRouter.config()`'s `navigatorObservers` is a **builder**, and
-      //   auto_route calls it **twice**: once for the root `Navigator` and
-      //   once for the tabs router's *inherited* observers. The builder
-      //   allocates a **fresh `AutoRouteObserver()` on every call**
-      //   (`app_router.dart:200-203`), so the two scopes hold **two
-      //   different instances** — measured, by identity hash: the root's is
-      //   `147585515` and the tabs router's is `1024085934` on one run;
-      // * the tabs router has **no `Navigator` of its own** — its pages are an
-      //   `IndexedStack` — so its observer never sees a push or a pop. The
-      //   **root's** observer is the one that sees the reader being popped off
-      //   the shell, and the home page is not subscribed to it.
+      // **So the observer is one object, built once, on the router** — and the
+      // page subscribes under the **shell's** route data, which is the route
+      // that is popped.
       //
-      // **The mechanism itself is sound, and the probe proved that too:** a
-      // subscriber registered with the **root's** observer under the
-      // **shell's** route data receives `didPopNext` when the reader is
-      // popped off the shell (measured: one callback). The route data is
-      // right — the tabs router's route data **is** the shell's route data,
-      // which is what the assertion above pins — and the observer is the
-      // wrong *instance*.
-      //
-      // **The fix is one line in `lib/app/router/app_router.dart`**, and it is
-      // not this file's to make: the observer has to be built **once** and
-      // handed to every invocation of the builder, so the tabs router
-      // inherits the *same* instance the root `Navigator` uses.
-      //
-      // **Until that lands this test stays red, on purpose.** A green version
-      // of it would have to drop the re-ask assertion, and a test that no
-      // longer proves the re-entry reload is worse than a red one — it is the
-      // exact failure this repository keeps recording: a green suite over a
-      // mechanism that is not wired.
+      // **The history of the defect belongs here, and the assertion belongs
+      // below.** A `reason:` string is what a developer reads when the test
+      // fails, and a string that says "this is red on purpose" while the test
+      // is green sends them hunting for a defect that was fixed in the same
+      // phase.
       expect(h.readings.calls, 2, reason: 'the reading was asked for again');
       expect(
         h.streaks.summaryCalls,

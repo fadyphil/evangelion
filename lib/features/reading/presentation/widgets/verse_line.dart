@@ -49,10 +49,12 @@ import 'package:flutter/material.dart';
 /// read-back **per verse**, six of them, for a 320 ms reveal.
 ///
 /// `glass_blur_budget_test.dart` is the enforcement and it is unambiguous: no
-/// `BackdropFilter` and no `ImageFilter.blur` anywhere in `lib/features/`, and
-/// the only one in the design system is inside `glass_surface.dart`, "the widget
-/// that owns it". §13.4 budgets **one** blurred site in the whole app and `/`
-/// spends it on the day's card (`eva/redesign.html:250`).
+/// `BackdropFilter` and no `ImageFilter.blur` anywhere in `lib/features/` —
+/// **except the redesign's own dock**, which is a full-width bar over the page
+/// and the one named exception — and the only one in the design system is
+/// inside `glass_surface.dart`, "the widget that owns it". §13.4 budgets
+/// **two** blurred sites in the whole app: `/` spends one on the day's card
+/// (`eva/redesign.html:250`) and the dock spends the other (`:210`).
 ///
 /// So the reveal is **opacity and offset only**. The blur's *reading* — a line
 /// arriving out of focus and sharpening — is carried by the opacity ramp from

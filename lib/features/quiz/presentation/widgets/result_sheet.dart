@@ -1,4 +1,6 @@
+import 'package:evangelion/app/settings_handle.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
@@ -357,6 +359,21 @@ class ResultSheet extends StatelessWidget {
     required ResultSheet card,
   }) {
     final bool reduced = MediaQuery.disableAnimationsOf(context);
+    // ## THE RESULT'S HAPTIC
+    //
+    // `eva/redesign.html:1445` — the last line of `showResults` is
+    // `haptic([30,40,30])`, and the results are the app's own good news: the
+    // reader finished the day's reading.
+    //
+    // **The reader's own switch, read without a dependency**, because `show`
+    // is called from an **event handler** — the quiz's `_presentResult` — and
+    // `SettingsScope.of` is a *dependent* lookup, which Flutter refuses
+    // outside a build. `ritualHapticsEnabled` is the app's own answer for
+    // exactly that case, and it answers `false` when no handle is registered.
+    fireRitualHaptic(
+      RitualHaptic.resultsShown,
+      enabled: ritualHapticsEnabled(),
+    );
     return showGeneralDialog<ResultSheetAction>(
       context: context,
       barrierColor: veilTint(context),

@@ -83,9 +83,11 @@ ports and every entity consumed by two or more features. `core/domain/` and ever
 `package:http`. **No feature may import another feature.** If two features need the same
 type, it belongs in `core/domain/`.
 
-The **eight** screens are `/login`, `/`, `/reading`, `/quiz`, `/result`, `/settings`,
-`/communion` (the cohort's board, renamed from `/leaderboard` in Task 5.5) and
-`/journey` (the profile, added in Task 5.6).
+The **seven** routes are `/login`, `/` (the **dock shell** — home, communion and
+journey are its three tabs), `/reading`, `/quiz`, `/settings`, `/communion` (the
+cohort's board, renamed from `/leaderboard` in Task 5.5) and `/journey` (the
+profile, added in Task 5.6). `/result` retired to a **modal** in Phase 6 and is
+not a route.
 
 The Library and Profile screens were **cut** under ADR-0001 and are **back** under
 ADR-0022: the library carousel returned to `/` as a surface, and the profile is

@@ -13,7 +13,7 @@
 /// mock. A `MockStackRouter` would record the call and prove nothing about
 /// whether the route name is real.
 ///
-/// ## WHAT IS BEING CLAIMED, AND IT IS THREE CLAIMS
+/// ## WHAT IS BEING CLAIMED, AND IT IS FOUR CLAIMS
 ///
 /// 1. **The terminal arm opens the sheet.** `QuizCta.seeResults` is the last
 ///    graded question's one press (`eva/redesign.html:1431-1432`), and the
@@ -26,15 +26,25 @@
 ///    modal changed: as a page, the CTAs were `replacePath('/quiz')` and
 ///    `replacePath('/')`, and inside a dialog the same calls would leave a
 ///    dialog over a replaced route.
+/// 4. **"Back home" REPLACES the stack; it does not push a second shell.**
+///    `/` is the dock shell and the shell is **already** on the root stack
+///    under the quiz, so a `replacePath('/')` removed the quiz and pushed a
+///    **fresh match** of `/` — a second shell, a second dock, and a back press
+///    that revealed the same home screen again. The stack is the assertion
+///    surface, because a path cannot say how many shells are on it.
 library;
 
 import 'dart:async';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
+import 'package:evangelion/features/dock/presentation/widgets/lumen_dock.dart';
+import 'package:evangelion/features/home/presentation/pages/home_page.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/pages/quiz_page.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart';
@@ -195,7 +205,104 @@ void main() {
       expect(find.byType(QuizPage), findsNothing);
     });
   });
+
+  group('"Back home" REPLACES the stack, it does not push a second shell', () {
+    testWidgets(
+      'the reader lands on ONE shell, on the home tab, and a back press does '
+      'not bring the same screen back',
+      (WidgetTester tester) async {
+        final ({AppRouter router, QuizBloc bloc}) mounted = await mountAQuiz(
+          tester,
+        );
+
+        await tester.tap(find.text(en.quizSeeResults));
+        await pumpUntilFound(tester, find.byType(ResultSheet));
+
+        await tapTheSheetCta(tester, en.resultBackHome);
+        await pumpUntilGone(tester, find.byType(ResultSheet));
+        await pumpUntilFound(tester, find.byType(LumenDock));
+
+        // ## **ONE ROUTE ON THE ROOT STACK, AND IT IS THE SHELL.**
+        //
+        // `/` is the **dock shell**, and the shell was **already** on the root
+        // stack — under the quiz. So the CTA has to *replace* the stack, not
+        // push a fresh match of `/` on top of it.
+        //
+        // The old code did the latter, and the stack became
+        // `[DockShellRoute, DockShellRoute]`: **two shells**, and a back press
+        // that popped the top one and left the reader looking at **the same
+        // home screen again**, with the path still `/`.
+        expect(
+          mounted.router.stack.map((AutoRoutePage<Object?> page) => page.name),
+          <String>[DockShellRoute.name],
+          reason:
+              'the shell was already on the stack under the quiz, so "back '
+              'home" has to leave ONE shell — a second one is a second dock, '
+              'and a back press away from showing the same home screen twice',
+        );
+
+        // ## **AND ONE DOCK ON SCREEN.**
+        //
+        // The reader-visible half of the claim above. **The stack is where two
+        // shells show up**, because the `Navigator` only builds the topmost
+        // opaque page — so the dock count is one either way, and it is the
+        // stack that says there was a second shell underneath.
+        expect(find.byType(LumenDock), findsOneWidget);
+
+        // ## **AND THE READER IS ON THE HOME TAB.**
+        //
+        // The label says "back home", so the tab index has to be the home one
+        // — and it is read off the **tabs router**, because a tab is not a
+        // route and the root stack cannot say which tab is in front.
+        expect(_activeTab(tester), DockTabs.home);
+
+        // ## **AND A BACK PRESS DOES NOT REVEAL THE SAME SCREEN AGAIN.**
+        //
+        // The old symptom, measured: the stack was
+        // `[DockShellRoute, DockShellRoute]`, so the back press popped the top
+        // one and left the reader looking at **the same home screen again** —
+        // the path was still `/` and the screen had not changed.
+        //
+        // So the claim is that a back press from here pops **nothing**: there
+        // is one shell, and the home tab is the floor.
+        final int before = mounted.router.stack.length;
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(
+          mounted.router.stack.length,
+          before,
+          reason:
+              'a back press popped a route, so what it revealed was the SAME '
+              'home screen again — the old defect. One shell on the home tab '
+              'is the floor, and a back press from the floor pops nothing.',
+        );
+        // **And the reader is still on the one home screen**, with the path
+        // still `/` — the same screen, not a second copy of it.
+        expect(find.byType(HomePage), findsOneWidget);
+        expect(mounted.router.currentPath, AppRoutes.home);
+      },
+    );
+  });
 }
+
+/// The dock shell's **active tab**, read from the tree.
+///
+/// **The index, and not the presence of a page.** The tabs router keeps every
+/// tab's page in the tree — the inactive ones inside the `IndexedStack`'s
+/// offstage children — so "the home screen is there" is not "the reader is on
+/// the home tab".
+///
+/// **`skipOffstage: false`, and it is load-bearing.** An inactive tab's page is
+/// offstage, and `find.byType` skips offstage widgets by default — so the
+/// default finder would find **nothing** exactly when the reader has left the
+/// home tab, and the helper would throw on the very tab switch it exists to
+/// measure. The home tab is the one the shell is built on, and it stays in the
+/// tree after the reader leaves it.
+int _activeTab(WidgetTester tester) => TabsRouterScope.of(
+  tester.element(find.byType(HomePage, skipOffstage: false)),
+)!.controller.activeIndex;
 
 /// Taps the sheet's CTA, **scrolling the card to it first**.
 ///

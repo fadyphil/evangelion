@@ -45,6 +45,18 @@ class CommunionPage extends StatelessWidget {
   /// The cubit to render, or null to resolve from DI.
   final LeaderboardCubit? cubit;
 
+  /// What is under the column: the dock's clearance.
+  ///
+  /// **The board is a TAB of the dock shell** (Phase 6), so the 78px dock is
+  /// drawn over its bottom edge, and a shorter spacer left the last witness
+  /// **behind the dock** — measured at 320×568, the final row's rect is
+  /// 493–544 and the dock's band is 490–568.
+  ///
+  /// The number is the other two tabs' — `HomePage.kBottomClearance` and
+  /// `JourneyPage.kBottomClearance` — and the reasoning is theirs: the
+  /// prototype's clearance is the prototype's clearance.
+  static const double kBottomClearance = 130;
+
   @override
   Widget build(BuildContext context) {
     final LeaderboardCubit? passed = cubit;
@@ -192,7 +204,18 @@ class _CommunionBodyState extends State<_CommunionBody> {
                   ],
                 ),
               ),
-              const SizedBox(height: EvaSpacing.xxl),
+              // **The dock's clearance, and it is the dock's.** The board is a
+              // **tab** of the dock shell (Phase 6), so the 78px dock is drawn
+              // over its bottom — and a 24px spacer left the **last witness
+              // behind the dock**: measured at 320×568, the final row's rect is
+              // 493–544 and the dock's band is 490–568, so the row was painted
+              // **inside** the dock.
+              //
+              // The number is the other two tabs' (130 = the prototype's `.scroll`
+              // clearance of 118 plus the carousel's 12 on `/`; see
+              // `HomePage.kBottomClearance`), and the reasoning is the same: the
+              // prototype's number is the prototype's number.
+              const SizedBox(height: CommunionPage.kBottomClearance),
             ],
           ),
         );

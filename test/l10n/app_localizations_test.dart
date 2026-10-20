@@ -145,12 +145,21 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        179,
+        182,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**179 → 182 in Phase 7 of the Lumen redesign**, for the **ritual**: '
+            '**three** keys arrived (`homeSelahBegin`, `homeSelahEnd` and '
+            '`homeSelahAmen`). The last is the prototype\'s own I18N row '
+            '(`redesign.html:970`\'s `amen`), and the first two are **written** — '
+            'the prototype\'s selah button carries `title="selah"` '
+            '(`redesign.html:533`), which names the thing rather than the action, '
+            'and this client names the action because the control starts and '
+            'stops a silence and a name that never changes would tell a '
+            'screen-reader user to "begin" a silence that is already running.\n\n'
             '**178 → 179 in Phase 6 of the Lumen redesign**, for the **dock**: '
             '**five** keys arrived (`dockHome`, `dockRead`, `dockToday`, `dockBoard` '
             'and `dockJourney` — the redesign\'s own i18n rows, `:931-932`) and '
@@ -532,6 +541,12 @@ void main() {
         'homeCategoryApocalypse': 'redesign.html:1036',
         'homeSelah': 'redesign.html:970',
         'homeSecondsOfSilence': 'redesign.html:970',
+        // Phase 7's ritual. The amen is the prototype's own I18N row (`:970`);
+        // the two button names are **written**, and their descriptions say so
+        // while still naming the prototype line they work around (`:533`).
+        'homeSelahAmen': 'redesign.html:970',
+        'homeSelahBegin': 'redesign.html:533',
+        'homeSelahEnd': 'redesign.html:533',
         'homeSealed': 'redesign.html:972',
         'homeVerses': 'redesign.html:966',
         'homeDays': 'redesign.html:925',
@@ -756,6 +771,7 @@ void main() {
         'homeLastLight',
         'homeNoLight',
         'homeRetry',
+        'homeSelahAmen',
         'readingVerses',
         'readingQuiz',
         'readingQuestions',

@@ -14,11 +14,13 @@ import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
+import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_harness.dart';
+import '../../support/settings_harness.dart';
 
 /// A signal nothing ever writes to.
 ///
@@ -643,6 +645,15 @@ Widget _hostWithObservers(AppRouter router, List<NavigatorObserver> observers) {
   }
   if (!getIt.isRegistered<HomeBloc>()) {
     registerTestHomeBloc();
+  }
+  // **The settings registration, for `routerHost`'s reason.** Phase 7's ritual
+  // put the reader's preferences on `/` — the selah's length and the haptics
+  // switch — and `HomePage` reads them through `SettingsScope.of`, whose
+  // locator fallback throws a `StateError` out of `build` when no handle is
+  // registered. This host is a **sibling** of `routerHost` and not the host
+  // itself, so it needs the registration of its own.
+  if (!getIt.isRegistered<SettingsCubit>()) {
+    settingsHarness(loadImmediately: false);
   }
   return NeuralMotionScope(
     child: MaterialApp.router(

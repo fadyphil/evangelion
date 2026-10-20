@@ -58,6 +58,18 @@ Widget evaAmbientHarness({
   Locale locale = const Locale('en'),
 }) => NeuralMotionScope(
   animationsEnabled: animationsEnabled,
+  // ## THE FIXED HOUR, AND WHY IT IS **FIXED**
+  //
+  // The ambient's target carries the vespers factor
+  // (`eva/redesign.html:890` — `const vesp=vespersOn&&isNight()?0.78:1;`), so
+  // a scene built on the real wall clock would paint a **different aurora at
+  // 22:00** than at 09:00 — and the background's sixteen goldens are captured
+  // through this harness. The hour they were captured at is now a fact about
+  // the harness and not about the night the suite ran.
+  //
+  // **09:30 is outside the vespers window**, so the goldens are captured at
+  // the prototype's plain ambient.
+  now: () => DateTime(2026, 10, 3, 9, 30),
   child: MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: theme ?? EvaThemeDark.theme,
@@ -328,6 +340,10 @@ Widget evaPrimitiveHarness({
   Iterable<LocalizationsDelegate<dynamic>>? localizationsDelegates,
   List<Locale>? supportedLocales,
 }) => NeuralMotionScope(
+  // **The fixed hour**, for [evaAmbientHarness]'s reason: the ambient's target
+  // carries the vespers factor and a golden must not depend on the night it
+  // was captured on.
+  now: () => DateTime(2026, 10, 3, 9, 30),
   // OFF by default, and that is not a shortcut. A primitive test never paints a
   // [NeuralBackground], so the three shared clocks tick forever over nothing —
   // and a forever-ticking ticker makes `pumpAndSettle` time out, which silently

@@ -3,18 +3,32 @@ import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:flutter/widgets.dart';
 
-/// The reader's ten light-workshop choices, as the aurora's inputs.
+/// The reader's choices that reach the aurora — the ten light-workshop
+/// preferences and the ritual's vespers auto-dim.
 ///
 /// ## WHY THIS IS A **NARROW** TYPE AND NOT A `UserSettings`
 ///
-/// `UserSettings` has thirty fields; ten of them are the aurora's. The scope
-/// that publishes these ([LumenPreferencesScope]) sits above every screen, so
-/// what it publishes decides whether every screen rebuilds. Publishing the
-/// whole aggregate would rebuild all of them when the reader changes their
-/// font size — a change the aurora does not care about.
+/// `UserSettings` has thirty-one fields; eleven of them are the aurora's. The
+/// scope that publishes these ([LumenPreferencesScope]) sits above every
+/// screen, so what it publishes decides whether every screen rebuilds.
+/// Publishing the whole aggregate would rebuild all of them when the reader
+/// changes their font size — a change the aurora does not care about.
 ///
-/// Ten fields, compared over ten fields, means the scope notifies only when
-/// the aurora's own inputs change.
+/// Eleven fields, compared over eleven fields, means the scope notifies only
+/// when the aurora's own inputs change.
+///
+/// ## AND WHY THE VESPERS SWITCH IS AMONG THEM
+///
+/// It is not a light-workshop preference — it is in the **ritual** group
+/// (`eva/redesign.html:686`) — but it is an **aurora input**, because the
+/// prototype's vespers dim multiplies the ambient intensity
+/// (`eva/redesign.html:890` — `const vesp=vespersOn&&isNight()?0.78:1;`) and
+/// the ambient intensity is the aurora's `u_int`.
+///
+/// So the question this class answers is "what does the aurora read?", and the
+/// answer is eleven fields and not ten. A second scope for the eleventh would
+/// be a second notification path for one boolean, and the scope's whole purpose
+/// is to notify **once**, when the aurora's inputs change.
 ///
 /// ## WHY IT LIVES BESIDE THE LUMEN FILES AND NOT IN `core/domain/`
 ///
@@ -27,7 +41,7 @@ import 'package:flutter/widgets.dart';
 /// The one thing this file reaches *outward* for is `UserSettings`, and that
 /// is inward: the design system may read the domain, never the reverse.
 class LumenPreferences {
-  /// The ten choices, each defaulting to the prototype's own default.
+  /// The eleven choices, each defaulting to the prototype's own default.
   ///
   /// The defaults are the prototype's control defaults at
   /// `eva/redesign.html:658-665` — the same values `UserSettings` carries, and
@@ -45,9 +59,10 @@ class LumenPreferences {
     this.rayCombing = true,
     this.whiteCores = true,
     this.dotVeil = false,
+    this.vespersAutoDim = true,
   });
 
-  /// The ten choices, read out of [settings].
+  /// The eleven choices, read out of [settings].
   ///
   /// The projection is by hand rather than by reflection, because Dart has no
   /// reflection and a generated projection would be a second place to forget a
@@ -64,6 +79,7 @@ class LumenPreferences {
         rayCombing: settings.rayCombing,
         whiteCores: settings.whiteCores,
         dotVeil: settings.dotVeil,
+        vespersAutoDim: settings.vespersAutoDim,
       );
 
   /// Whether the aurora paints at all — `eva/redesign.html:1468`.
@@ -111,7 +127,14 @@ class LumenPreferences {
   /// Whether the 6px scanline veil is on — `:665`, `:1477`.
   final bool dotVeil;
 
-  /// All ten fields decide equality.
+  /// Whether the ambient dims by itself between 21:00 and 05:00 — `:686`.
+  ///
+  /// **A ritual preference and not a light-workshop one**, and it is here
+  /// because it multiplies the aurora's ambient intensity (`:890`). The
+  /// hour test and the 0.78 factor are `core/domain/entities/vespers.dart`'s.
+  final bool vespersAutoDim;
+
+  /// All eleven fields decide equality.
   ///
   /// Hand-written for the reason `LumenUniforms`' is: `equatable` is gone from
   /// this package (AGENT_CONTEXT decision 131) and `==` over a `List` payload
@@ -130,7 +153,8 @@ class LumenPreferences {
           melt == other.melt &&
           rayCombing == other.rayCombing &&
           whiteCores == other.whiteCores &&
-          dotVeil == other.dotVeil;
+          dotVeil == other.dotVeil &&
+          vespersAutoDim == other.vespersAutoDim;
 
   @override
   int get hashCode => Object.hash(
@@ -144,6 +168,7 @@ class LumenPreferences {
     rayCombing,
     whiteCores,
     dotVeil,
+    vespersAutoDim,
   );
 
   @override
@@ -151,7 +176,7 @@ class LumenPreferences {
       'LumenPreferences(enabled: $enabled, shape: ${shape.storedValue}, '
       'reach: $reach, glow: $glow, touchGlow: $touchGlow, hue: $hue, '
       'melt: $melt, rayCombing: $rayCombing, whiteCores: $whiteCores, '
-      'dotVeil: $dotVeil)';
+      'dotVeil: $dotVeil, vespersAutoDim: $vespersAutoDim)';
 }
 
 /// Publishes the reader's light-workshop choices to the subtree.

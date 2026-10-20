@@ -82,6 +82,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeSecondsOfSilence => 'ثانية من الصمت';
 
   @override
+  String get homeSelahBegin => 'ابدأ السِّلاه';
+
+  @override
+  String get homeSelahEnd => 'أنهِ السِّلاه';
+
+  @override
+  String get homeSelahAmen => 'سِلاه · آمين';
+
+  @override
   String get homeTheLibrary => 'المكتبة';
 
   @override

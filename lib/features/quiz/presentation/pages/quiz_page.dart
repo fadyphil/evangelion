@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
-import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
@@ -696,7 +696,24 @@ class _QuizBodyState extends State<_QuizBody> {
       case ResultSheetAction.reflectAgain:
         context.read<QuizBloc>().add(QuizStarted(_language));
       case ResultSheetAction.backHome:
-        unawaited(context.router.replacePath(AppRoutes.home));
+        // **AND THE STACK IS REPLACED, NOT PUSHED.**
+        //
+        // `/` is the **dock shell**, and the shell is **already on the root
+        // stack** under the quiz. `replacePath('/')` removes the quiz and
+        // *pushes a fresh match* of `/` — which is a **second shell**, and the
+        // app would carry two docks. Measured: the stack after the call is
+        // `[DockShellRoute, DockShellRoute]`, and one back press then pops the
+        // top one and leaves the reader looking at **the same home screen
+        // again**, with the path still `/`.
+        //
+        // `replaceAll` puts **one** shell on the stack — and
+        // `updateExistingRoutes: false` makes it a **fresh** one, which starts
+        // on the **home tab**, which is what the label says.
+        unawaited(
+          context.router.replaceAll(<PageRouteInfo>[
+            const DockShellRoute(),
+          ], updateExistingRoutes: false),
+        );
       case null:
         // **Dismissed.** The barrier or the system back button, and the quiz is
         // still on screen under it.

@@ -46,7 +46,16 @@ void main() {
 
   setUp(() {
     clock = _ManualClock();
-    scene = LumenScene(clock: clock);
+    // **A fixed wall clock, and it is the point of the injection.** The
+    // scene's ambient target now carries the vespers factor, which reads the
+    // hour of the day — so a scene built on `DateTime.now()` would assert
+    // 0.9 at 09:00 and 0.9 × 0.78 at 22:00, and this suite would fail
+    // every night between 21:00 and 05:00.
+    //
+    // 09:30 is deliberately **outside** the vespers window, so the ambient
+    // assertions below read the prototype's plain 0.9 and the vespers rows
+    // build their own scene with an hour inside the window.
+    scene = LumenScene(clock: clock, now: () => DateTime(2026, 10, 3, 9, 30));
   });
 
   /// Retargets the scene and returns it, so a test can chain.
@@ -104,6 +113,77 @@ void main() {
       expect(scene.ambientTarget, closeTo(0.9 * 1.3, 1e-12));
       // The current value has not moved: it eases, and no frame has passed.
       expect(scene.ambient, 0.15);
+    });
+  });
+
+  group('the vespers dim — `redesign.html:886` and `:890`', () {
+    /// A scene whose wall clock reads [hour].
+    LumenScene at(int hour) => LumenScene(
+      clock: _ManualClock(),
+      now: () => DateTime(2026, 10, 3, hour),
+    );
+
+    test('between 21:00 and 05:00 the ambient is 22% down', () {
+      // `:890` — `const vesp=vespersOn&&isNight()?0.78:1;`.
+      expect(at(22).ambientTarget, closeTo(0.9 * 0.78, 1e-12));
+      expect(at(3).ambientTarget, closeTo(0.9 * 0.78, 1e-12));
+    });
+
+    test('and outside it the ambient is untouched', () {
+      expect(at(12).ambientTarget, closeTo(0.9, 1e-12));
+      expect(at(20).ambientTarget, closeTo(0.9, 1e-12));
+    });
+
+    test('the reader\'s own switch wins over the hour', () {
+      // `:686` — the Vespers auto-dim switch, and a reader who has turned it
+      // off gets no dim at three in the morning.
+      final LumenScene off = LumenScene(
+        clock: _ManualClock(),
+        preferences: const LumenPreferences(vespersAutoDim: false),
+        now: () => DateTime(2026, 10, 3, 22),
+      );
+      expect(off.ambientTarget, closeTo(0.9, 1e-12));
+    });
+  });
+
+  group('the focus dim — `redesign.html:891`', () {
+    test('the ambient is 45% down while the screen is dimmed', () {
+      // `:891` — `base=ambBase*bright*vesp*(focusDim?0.45:1)`.
+      expect(scene.ambientTarget, closeTo(0.9, 1e-12));
+      scene.dimFocus();
+      expect(scene.ambientTarget, closeTo(0.9 * 0.45, 1e-12));
+      scene.undimFocus();
+      expect(scene.ambientTarget, closeTo(0.9, 1e-12));
+    });
+
+    test('two holders are two dim requests, and the first release does not '
+        'switch it off', () {
+      // The selah and `/reading`'s idle timer can both be dimming at once, and
+      // the dock keeps three tabs alive, so the flag is a count.
+      scene.dimFocus();
+      scene.dimFocus();
+      expect(scene.focusDimmed, isTrue);
+      scene.undimFocus();
+      expect(scene.focusDimmed, isTrue);
+      scene.undimFocus();
+      expect(scene.focusDimmed, isFalse);
+    });
+
+    test('releasing a dim nobody asked for is a no-op', () {
+      scene.undimFocus();
+      scene.undimFocus();
+      expect(scene.focusDimmed, isFalse);
+      expect(scene.ambientTarget, closeTo(0.9, 1e-12));
+    });
+
+    test('the dim and the vespers multiply, as the prototype\'s expression '
+        'does', () {
+      final LumenScene both = LumenScene(
+        clock: _ManualClock(),
+        now: () => DateTime(2026, 10, 3, 22),
+      );
+      both.dimFocus();
+      expect(both.ambientTarget, closeTo(0.9 * 0.78 * 0.45, 1e-12));
     });
   });
 

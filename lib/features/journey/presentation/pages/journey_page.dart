@@ -199,23 +199,35 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
     if (observer == null || identical(observer, _observer)) {
       return;
     }
+    // **No shell, no re-entry trigger to wire.** See [_watchedRouteData].
+    final RouteData<dynamic>? watched = _watchedRouteData;
+    if (watched == null) {
+      return;
+    }
     _observer?.unsubscribe(this);
     _observer = observer;
-    observer.subscribe(this, _watchedRouteData);
+    observer.subscribe(this, watched);
   }
 
-  /// The route data this page subscribes under.
+  /// The route data this page subscribes under — the **SHELL's**, not this
+  /// tab's.
   ///
-  /// **The SHELL's, not this tab's** — the same rule `/` uses, and for the same
-  /// reason: the journey is a **tab** inside the dock shell, and a tab is never
-  /// popped, so its own route data would never produce a `didPopNext`. The
-  /// shell is popped when the screen pushed over it is popped, and that is the
-  /// re-entry this screen re-reads for.
+  /// **A tab is never popped**, so this tab's own route data would never
+  /// produce a `didPopNext` — and the re-read (this screen's own re-entry
+  /// trigger) would die silently. The shell **is** popped, and it is popped
+  /// exactly when the screen pushed over it is popped and the tab underneath is
+  /// showing again. And auto_route's observer hands `didPopNext` to the
+  /// **previous** route's subscribers
+  /// (`auto_route_observer.dart:168`), so the **shell's** route data is the one
+  /// to subscribe under.
   ///
-  /// A bare tree has no shell, and there this page's own route data is the
-  /// right answer.
-  RouteData<dynamic> get _watchedRouteData =>
-      TabsRouterScope.of(context)?.controller.routeData ?? context.routeData;
+  /// **`null` when there is no shell above this page** — a page mounted bare in
+  /// a widget test, or under a router that is not the dock shell. And that is
+  /// the honest answer rather than a fallback: `context.routeData` **throws**
+  /// without a `RouteDataScope`, and a tree with no shell has no re-entry
+  /// trigger to wire anyway.
+  RouteData<dynamic>? get _watchedRouteData =>
+      TabsRouterScope.of(context)?.controller.routeData;
 
   /// Reads everything the screen draws.
   ///

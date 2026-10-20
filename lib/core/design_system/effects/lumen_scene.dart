@@ -5,6 +5,7 @@ import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
 import 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
 import 'package:evangelion/core/domain/entities/curtain_shape.dart';
+import 'package:evangelion/core/domain/entities/vespers.dart';
 import 'package:flutter/widgets.dart';
 
 /// The prototype's opening ambient intensity — `eva/redesign.html:884`.
@@ -18,6 +19,14 @@ const double kLumenAmbientOpen = 0.15;
 /// `let ambBase=0.9`. The brightness slider multiplies this; it is not itself
 /// a uniform.
 const double kLumenAmbientBase = 0.9;
+
+/// The factor the ambient is multiplied by while the screen is dimmed —
+/// `eva/redesign.html:891`.
+///
+/// `const base=ambBase*bright*vesp*(focusDim?0.45:1);` — the `0.45` is the
+/// focus mode's half, and it is the **focus** dim and not the vespers one
+/// (`:890`'s `0.78`).
+const double kLumenFocusDimFactor = 0.45;
 
 /// The ambient intensity's ease, per frame — `eva/redesign.html:892`.
 ///
@@ -151,6 +160,7 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
   LumenScene({
     required LumenClock clock,
     LumenPreferences preferences = const LumenPreferences(),
+    DateTime Function()? now,
   }) : _clock = clock,
        _preferences = preferences,
        _currentHue = preferences.hue.toDouble(),
@@ -158,13 +168,34 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
        _currentLightness = kLumenHueLightness,
        _ambient = kLumenAmbientOpen,
        _autoHue = preferences.hue.toDouble(),
-       _lastTickSeconds = clock.seconds {
+       _lastTickSeconds = clock.seconds,
+       _now = now ?? DateTime.now {
     _clock.addListener(_onTick);
     pointer.addListener(_onPointerMoved);
   }
 
   /// The clock `u_time` is read from, and the frame signal.
   final LumenClock _clock;
+
+  /// The wall clock the vespers test reads.
+  ///
+  /// ## WHY A SEPARATE CLOCK AND NOT [LumenClock]
+  ///
+  /// [LumenClock] is the shader's `u_time` — **elapsed seconds since the
+  /// scene started**, and deliberately monotonic. The vespers test needs the
+  /// **hour of the day**, which is neither: it is a wall-clock reading that
+  /// jumps backwards at midnight and repeats every twenty-four hours.
+  ///
+  /// ## AND WHY IT IS INJECTED
+  ///
+  /// Because a scene that read `DateTime.now()` directly would make its own
+  /// ambient **time-dependent**, and the suite's ambient assertions would
+  /// pass at 09:00 and fail at 22:00. A test injects a fixed hour and the
+  /// assertion is the same at every hour of the day.
+  final DateTime Function() _now;
+
+  /// The wall clock the vespers test reads.
+  DateTime Function() get now => _now;
 
   @override
   LumenClock get clock => _clock;
@@ -243,13 +274,69 @@ final class LumenScene extends ChangeNotifier implements LumenUniformSource {
   ///
   /// `base=ambBase*bright*vesp*(focusDim?0.45:1)`.
   ///
-  /// **`vesp` is `1` and `focusDim` is `false`.** They are the vespers
-  /// auto-dim (21:00–05:00) and the focus-mode dimming, and neither exists
-  /// in this client yet — they are Phase 7's. The multiplication is written
-  /// out anyway, so that the day the two arrive it is a constant that becomes
-  /// a factor rather than a rewrite.
+  /// **All four factors are the prototype's, and the two that were missing
+  /// are here now.** `vesp` is the vespers auto-dim
+  /// (`core/domain/entities/vespers.dart`'s `vespersFactor`, and the
+  /// reader's own switch is `LumenPreferences.vespersAutoDim`), and
+  /// `focusDim` is the focus mode's half — which is **runtime state and not a
+  /// preference**, so it lives on this scene and is written by whoever is
+  /// dimming: `/reading`'s idle timer and the selah.
   double get ambientTarget =>
-      kLumenAmbientBase * brightnessFromGlow(_preferences.glow.toDouble());
+      kLumenAmbientBase *
+      brightnessFromGlow(_preferences.glow.toDouble()) *
+      vespersFactor(enabled: _preferences.vespersAutoDim, hour: _now().hour) *
+      (focusDimmed ? kLumenFocusDimFactor : 1);
+
+  /// How many holders are asking for the screen to be dimmed.
+  ///
+  /// ## WHY A **COUNT** AND NOT A BOOLEAN
+  ///
+  /// Because two different things dim the app and they can overlap: `/reading`'s
+  /// idle timer and the selah's silence. The prototype has one global
+  /// `focusDim` flag (`eva/redesign.html:884`) and sets it from both
+  /// (`:1292` and `:1338`), so the prototype's version has the same collision
+  /// — but the prototype's reader is on one route at a time, and this client's
+  /// dock keeps three tabs alive at once.
+  ///
+  /// A boolean would let the first holder to leave switch the dim off while
+  /// the second is still asking for it. A count cannot: the dim is on while
+  /// anybody holds it.
+  ///
+  /// **And [undimFocus] without a matching [dimFocus] is a no-op**, so a
+  /// widget that disposes twice cannot drive the count negative and switch
+  /// the dim on for everybody else.
+  int _focusDimHolders = 0;
+
+  /// Whether the screen is currently dimmed.
+  bool get focusDimmed => _focusDimHolders > 0;
+
+  /// Asks for the screen to be dimmed.
+  void dimFocus() {
+    _focusDimHolders++;
+    notifyListeners();
+  }
+
+  /// Releases one request for the dim.
+  void undimFocus() {
+    if (_focusDimHolders <= 0) return;
+    _focusDimHolders--;
+    notifyListeners();
+  }
+
+  /// Raises the transient kick the shader adds to `u_int`.
+  ///
+  /// `eva/redesign.html:1330` — `if(V)V.spike=.5;`, the selah's end.
+  /// `eva/redesign.html:1428` — `if(V)V.spike=1.0;`, a correct answer.
+  ///
+  /// **The prototype ASSIGNS the spike, and so does this** — a caller that
+  /// raises the spike while another is decaying it replaces it rather than
+  /// adding to it, which is the prototype's own arithmetic (`:900`'s
+  /// `V.spike*=0.92` decays whatever is there).
+  void raiseSpike(double value) {
+    if (_disposed) return;
+    _spike = value;
+    notifyListeners();
+  }
 
   /// Sets the reader's choices, and raises the spikes the prototype raises.
   ///

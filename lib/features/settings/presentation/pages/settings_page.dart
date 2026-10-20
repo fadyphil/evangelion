@@ -6,6 +6,7 @@ import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/domain/entities/sky_star_field.dart';
 import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 // The star count's RANGE and its clamp live in the shared kernel, because the
@@ -442,8 +443,16 @@ class _SettingsBodyState extends State<_SettingsBody> {
               // **unreachable from the UI**. The cubit's own doc carries that
               // half of the record; this is the control's half.
               value: daylightOnFor(state.settings.themeMode),
-              onChanged: (bool daylight) =>
-                  unawaited(cubit.setDaylight(daylight: daylight)),
+              onChanged: (bool daylight) {
+                // `eva/redesign.html:1482` — `el('setDaylight').onchange=e=>{…
+                // if(V)V.spike=.4; haptic(15); }`. The tick is on the change,
+                // and it is the **reader's own** switch being answered.
+                fireRitualHaptic(
+                  RitualHaptic.daylightToggled,
+                  enabled: state.settings.haptics,
+                );
+                unawaited(cubit.setDaylight(daylight: daylight));
+              },
             ),
           ],
         ),
@@ -693,10 +702,31 @@ class _SettingsBodyState extends State<_SettingsBody> {
             WorkshopToggleRow(
               title: strings.settingsHaptics,
               value: state.settings.haptics,
-              // **The Workshop is mute against the prototype.** The prototype
-              // answers every toggle with a haptic (`:1482`, `:1498`) and this
-              // client has no haptics until Phase 7.
-              onChanged: (bool on) => unawaited(cubit.setHaptics(on: on)),
+              // `eva/redesign.html:1498` — `el('setHap').onchange=e=>{
+              // HAPTICS=e.target.checked; if(HAPTICS)haptic(15); }`.
+              //
+              // **The tick is on the way UP only** — the prototype's own `if`
+              // says so, and it is the only sensible reading: a reader who has
+              // just turned haptics **off** must not be answered with one.
+              onChanged: (bool on) {
+                if (on) {
+                  // ## THE TICK IS GATED ON THE **NEW** VALUE
+                  //
+                  // The prototype's handler sets `HAPTICS` **first** and then
+                  // asks (`:1498` — `HAPTICS=e.target.checked; if(HAPTICS)
+                  // haptic(15);`), so the tick is the answer to the switch
+                  // being **on** — not to the value it held before the tap.
+                  //
+                  // That matters for the one moment a reader most wants to
+                  // know it worked: **the tap that turns haptics on**. A
+                  // client that read the old value would stay silent on that
+                  // very tap, because the old value is `false` — and the
+                  // reader would be left not knowing whether the switch did
+                  // anything.
+                  fireRitualHaptic(RitualHaptic.hapticsEnabled, enabled: on);
+                }
+                unawaited(cubit.setHaptics(on: on));
+              },
             ),
           ],
         ),

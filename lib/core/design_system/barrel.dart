@@ -82,6 +82,7 @@ export 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
 export 'package:evangelion/core/design_system/effects/neural_background.dart';
 export 'package:evangelion/core/design_system/effects/neural_motion.dart';
 export 'package:evangelion/core/design_system/effects/neural_orbs.dart';
+export 'package:evangelion/core/design_system/effects/ritual_haptics.dart';
 export 'package:evangelion/core/design_system/motion/eva_animate.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme_dark.dart';

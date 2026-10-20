@@ -85,7 +85,8 @@ class EvaNeuralMotion extends ChangeNotifier {
     required this.aurora,
     required this.pointer,
     required this.lumen,
-  }) : lumenScene = LumenScene(clock: lumen) {
+    DateTime Function()? now,
+  }) : lumenScene = LumenScene(clock: lumen, now: now) {
     _sources = Listenable.merge(<Listenable>[
       float,
       hue,
@@ -310,6 +311,7 @@ class NeuralMotionScope extends StatefulWidget {
   const NeuralMotionScope({
     required this.child,
     this.animationsEnabled,
+    this.now,
     super.key,
   });
 
@@ -357,6 +359,21 @@ class NeuralMotionScope extends StatefulWidget {
   /// [didChangeAccessibilityFeatures] both stop or restart the clocks rather
   /// than leaving a running ticker under a stopped background.
   final bool? animationsEnabled;
+
+  /// The wall clock the **vespers auto-dim** reads.
+  ///
+  /// `null` — the default — is the real wall clock. **A test injects a fixed
+  /// one**, because the ambient's target carries the vespers factor
+  /// (`eva/redesign.html:890` — `const vesp=vespersOn&&isNight()?0.78:1;`) and
+  /// a golden captured at 09:00 would be a different frame at 22:00. The
+  /// background's sixteen goldens are captured through this harness, so the
+  /// hour they were captured at is now a **fact about the harness** rather
+  /// than a fact about the night the suite ran.
+  ///
+  /// **The reader's switch is not involved.** `LumenPreferences.vespersAutoDim`
+  /// carries it, and the harness's fixed hour is only *which* hour the factor
+  /// is computed for.
+  final DateTime Function()? now;
 
   /// The motion bundle published to [context]'s descendants.
   ///
@@ -436,6 +453,7 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       aurora: aurora,
       pointer: ValueNotifier<Offset>(Offset.zero),
       lumen: TickedLumenClock(ticker: lumenTicker),
+      now: widget.now,
     );
     if (_enabled) {
       motion.setAnimationsEnabled(enabled: true);

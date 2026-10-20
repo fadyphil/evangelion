@@ -86,8 +86,8 @@
 /// `GlassTier.tint` to `GlassTier.blur` — which §13.4 forbids by name — left this
 /// gate **green**, because the count went from 0 to 1 and 1 ≤ 2.
 ///
-/// The counter-evidence is that the mistake is caught elsewhere, and the reason the
-/// gate is still worth running is that it catches the *third*. Per-screen
+/// The counter-evidence is that the mistake is caught elsewhere, and the reason
+/// the gate is still worth running is that it catches the *third*. Per-screen
 /// attribution now exists where the screen is: `login_geometry_test.dart` asserts
 /// `/login`'s form is `GlassTier.tint`, and Phase 6 owns Home's two.
 ///
@@ -95,7 +95,7 @@
 /// hand-built `BackdropFilter`; it does not tell you which screen spent the budget.
 /// A reader must not treat a green run as "every screen used its tint".**
 ///
-/// ## TWO DIRECTORIES, TWO ALLOWANCES, ONE CEILING
+/// ## ONE ROOT, ONE EXCLUSION, ONE CEILING — AND THE SECOND BLIND SPOT
 ///
 /// The first version walked `lib/features/` only. That was a **structural blind
 /// spot**, and Phase 3 is what opened it: three of the eight prototype blur sites
@@ -105,13 +105,23 @@
 /// adding a third `saveLayer` over content, so the gate's own doc claim ("fails
 /// above two occurrences") was only half-delivered.
 ///
-/// So the walk covers both directories, each with its own allowance, and the
-/// **global** ceiling is what the rule actually says:
+/// The repair added a **second** root, `lib/core/design_system/widgets/`, and it
+/// worked — and **it left the same defect one directory over.** The walk named
+/// two directories, and `lib/` has five more, and **two of them were never
+/// walked at all**: `lib/core/design_system/effects/` and `lib/app/`. A real
+/// `BackdropFilter` planted in either leaves this gate **green**, and `lib/app/`
+/// is exactly where Phase 6 put the new navigation chrome — the dock shell,
+/// which is the one piece of the app that sits over everything.
 ///
-/// | directory | `GlassTier.blur` allowance | direct `BackdropFilter` allowance |
+/// **So the walk is now `lib/` as a whole, and the only exclusion is
+/// `glass_surface.dart`.** One root, one exclusion, and the rule is the one the
+/// table below states:
+///
+/// | where | `GlassTier.blur` | direct `BackdropFilter` |
 /// | --- | --- | --- |
-/// | `lib/features/` | **1** — Home's today's-reading panel | 0 |
-/// | `lib/core/design_system/widgets/`, `glass_surface.dart` **excluded** | **0** | 0 outside `glass_surface.dart` |
+/// | `lib/features/` | **1** — Home's today's-reading panel | **1** — the redesign's dock, and only the dock |
+/// | `lib/core/design_system/`, `glass_surface.dart` **excluded** | **0** | **0** |
+/// | everywhere else in `lib/` — `lib/app/`, `lib/core/common/`, `lib/l10n/`, … | **0** | **0** |
 ///
 /// The design-system row **excludes the owner**, and Phase 5.2 is what moved it
 /// from "1, counted" to "0, elsewhere". While `GlassSurface` decided the blur in
@@ -124,11 +134,14 @@
 /// Counting the directory would put that gate at 2 and read as a violation, when
 /// both sites are the same file deciding for itself.
 ///
-/// So the rule is now stated in the only form that survives the owner growing:
-/// **no file other than `glass_surface.dart` may mention `GlassTier.blur` at
-/// all** — a primitive cannot spend the budget, and cannot even compare against
-/// it — while the global ceiling drops to match, because the owner's sites are
-/// its own implementation and not budget spenders.
+/// **AND THE SENTENCE THIS SECTION USED TO END WITH WAS TOO STRONG, AND IT IS
+/// CORRECTED HERE RATHER THAN LEFT.** It read "no file other than
+/// `glass_surface.dart` may mention `GlassTier.blur` at all", which the tree has
+/// never obeyed: `lib/features/home/…/verse_of_the_day_card.dart` names the
+/// enum, and it is the one budgeted site the table grants it to. The table is
+/// the rule; the sentence was shorthand for the design-system row, and a gate
+/// whose own doc states a rule the tree breaks is a doc problem as much as a gate
+/// problem.
 ///
 /// ## FAIL-CLOSED, DELIBERATELY
 ///
@@ -140,6 +153,12 @@
 ///   must not read as "no violations found".
 /// - an empty walk → **fail**. A directory with no `.dart` files under it is a walk
 ///   that found nothing, and a count of zero over nothing is not a pass.
+///
+/// **AND THE EMPTY-WALK RULE NOW HAS THREE BUCKETS TO KEEP.** The walk's root is
+/// `lib/` as a whole, so "the walk found something" is no longer enough on its
+/// own: a bucket with no `.dart` file in it is a walk that proved nothing *about
+/// that bucket*, and a budget over nothing is not a pass. All three are asserted.
+///
 /// ## THE **STRINGS** WERE WRONG TOO, AND A STRING IS WHAT A DEVELOPER READS
 ///
 /// Phase 6's correction reached the assertion (`<= 1`) and the first failure
@@ -165,11 +184,42 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/project_import_graph.dart';
 
-/// The screens, where §13.4's two allowed sites will be.
-const String _features = 'lib/features/';
+/// The whole of `lib/`. **One root**, and the only exclusion is [_ownerPath].
+///
+/// The two-directory walk this replaced named `lib/features/` and
+/// `lib/core/design_system/widgets/` and left `lib/core/design_system/effects/`
+/// and `lib/app/` unwalked — and a real `BackdropFilter` in either left the gate
+/// green. See the doc above.
+const String _libRoot = 'lib/';
 
-/// The primitives, which may pass a tier through but never spend one.
-const String _widgets = 'lib/core/design_system/widgets/';
+/// The screens, where §13.4's two allowed sites are. A **path prefix**, not a
+/// walk root any more: the walk is over `lib/` and this is one of the three
+/// buckets it splits into.
+const String _featuresPath = 'lib/features/';
+
+/// The primitives, which may pass a tier through but never spend one. A path
+/// prefix, and the whole design system — `effects/` and `tokens/` included,
+/// which the two-directory walk never reached.
+const String _designSystemPath = 'lib/core/design_system/';
+
+/// The one file in the whole of `lib/` that may own a blur site.
+///
+/// **The exact path, not the file name.** A name-matched exclusion would also
+/// forgive a *second* `glass_surface.dart` anywhere else in `lib/`, and "the
+/// owner" is one file rather than one name — the same reason the walk's
+/// exclusion is the only one it has.
+///
+/// The owner's sites are its own implementation — the blur decision, and since
+/// Phase 5.2 the bloom decision — rather than budget spendings, so they are
+/// not counted against anybody.
+const String _ownerPath = 'lib/core/design_system/widgets/glass_surface.dart';
+
+/// The three buckets the walk splits `lib/` into.
+typedef _Buckets = ({
+  List<File> features,
+  List<File> designSystem,
+  List<File> elsewhere,
+});
 
 /// Every `.dart` file under [root], failing closed.
 List<File> _dartFilesUnder(String root) {
@@ -203,6 +253,69 @@ List<File> _dartFilesUnder(String root) {
   );
   return files;
 }
+
+/// The walked files, split into the three buckets the rule talks about.
+///
+/// `features` — the screens, where §13.4's two allowed sites are.
+/// `designSystem` — the primitives, the whole of `lib/core/design_system/`,
+/// `effects/` and `tokens/` included.
+/// `elsewhere` — **everything else in `lib/`**, and the bucket the two-directory
+/// walk never had: `lib/app/`, `lib/core/common/`, `lib/core/domain/`,
+/// `lib/l10n/`, `lib/main.dart` and the rest of the tree.
+///
+/// **The owner is excluded from all three**, and it is the only exclusion.
+_Buckets _walk() {
+  final List<File> features = <File>[];
+  final List<File> designSystem = <File>[];
+  final List<File> elsewhere = <File>[];
+  for (final File file in _dartFilesUnder(_libRoot)) {
+    if (packageRelative(file.uri) == _ownerPath) continue;
+    final String path = packageRelative(file.uri);
+    if (path.startsWith(_featuresPath)) {
+      features.add(file);
+    } else if (path.startsWith(_designSystemPath)) {
+      designSystem.add(file);
+    } else {
+      elsewhere.add(file);
+    }
+  }
+
+  // **Fail closed, per bucket.** The root is `lib/` as a whole now, so "the
+  // walk found something" says nothing about any one bucket. An empty bucket is
+  // a walk that proved nothing *about that bucket*, and a budget over nothing
+  // is not a pass.
+  expect(
+    features,
+    isNotEmpty,
+    reason:
+        'no .dart file under $_featuresPath. The walk of the whole of '
+        '$_libRoot found nothing to spend the budget over, which is not a '
+        'clean tree.',
+  );
+  expect(
+    designSystem,
+    isNotEmpty,
+    reason:
+        'no .dart file under $_designSystemPath. The walk of the whole of '
+        '$_libRoot found no primitive to rule on, which is not a clean tree.',
+  );
+  expect(
+    elsewhere,
+    isNotEmpty,
+    reason:
+        'no .dart file outside $_featuresPath and $_designSystemPath. The walk '
+        'of the whole of $_libRoot found nothing else, which is not a clean '
+        'tree.',
+  );
+
+  return (features: features, designSystem: designSystem, elsewhere: elsewhere);
+}
+
+/// The owner itself — the one file in `lib/` that may build a filter.
+List<File> _ownerFiles() =>
+    _dartFilesUnder(_libRoot)
+        .where((File file) => packageRelative(file.uri) == _ownerPath)
+        .toList();
 
 /// Every executable line in [files] mentioning any of [markers], as
 /// `file:line: text`.
@@ -263,19 +376,16 @@ final RegExp _sitePattern = RegExp(r'GlassTier\.blur\b|BackdropFilter\s*\(');
 void main() {
   test('at most TWO screen sites blur — §13.4 spends one of eight, and the '
       'redesign\'s dock is the second', () {
-    final List<String> features = _blurSites(_dartFilesUnder(_features));
-    // **The owner is excluded, and the rest of the directory is at ZERO.** While
-    // GlassSurface decided the blur in one line, a directory count of 1 was a
-    // proxy for "no primitive decides"; Phase 5.2 gave the budgeted site its wash
-    // too (`redesign.html:250` — blur, `.bloom` and `.hor` together), so the
-    // owner legitimately holds two internal comparisons and the proxy broke.
-    // Excluding `glass_surface.dart` and requiring zero elsewhere is *stronger*
-    // for every primitive than the count it replaces.
-    final List<String> widgets = _blurSites(
-      _dartFilesUnder(_widgets)
-          .where((File file) => !file.uri.path.endsWith('glass_surface.dart'))
-          .toList(),
-    );
+    final _Buckets walk = _walk();
+    // The screens, where §13.4's two allowed sites are.
+    final List<String> features = _blurSites(walk.features);
+    // The primitives, which may not spend one at all.
+    final List<String> designSystem = _blurSites(walk.designSystem);
+    // **And everything else in `lib/`** — the bucket the two-directory walk
+    // never had, and the one that let a `BackdropFilter` live in
+    // `lib/core/design_system/effects/` and in `lib/app/` while this gate
+    // stayed green.
+    final List<String> elsewhere = _blurSites(walk.elsewhere);
 
     expect(
       features,
@@ -291,46 +401,59 @@ void main() {
           '${features.join('\n')}',
     );
     expect(
-      widgets,
+      designSystem,
       isEmpty,
       reason:
           'a design-system primitive cannot spend the budget OR compare against '
           'it: `GlassSurface` is the widget that owns the blur, and its own two '
           'comparisons (the blur decision and, since Phase 5.2, the bloom '
           'decision) are its implementation rather than spendings. Any OTHER file '
-          'under `lib/core/design_system/widgets/` naming `GlassTier.blur` — or '
-          'building a `BackdropFilter` by hand — is a primitive deciding for '
-          'itself:\n${widgets.join('\n')}',
+          'under `$_designSystemPath` naming `GlassTier.blur` — or building a '
+          '`BackdropFilter` by hand — is a primitive deciding for itself:\n'
+          '${designSystem.join('\n')}',
     );
-    // The ceiling the rule states, over both directories together. Two separate
-    // per-directory bounds would let a third site through by arithmetic, so the
-    // global figure is asserted as well as the two that make it up — and it is
-    // 2 + 0 now, because the owner's comparisons are not budget spenders.
     expect(
-      features.length + widgets.length,
-      lessThanOrEqualTo(2 + 0),
+      elsewhere,
+      isEmpty,
+      reason:
+          'a blur may be spent in `$_featuresPath` and nowhere else, and '
+          '`$_designSystemPath` is not the only other place there is. The walk '
+          'covers the whole of `$_libRoot` — `lib/app/` included, which is where '
+          'Phase 6 put the navigation chrome — so a filter built outside the '
+          'features is found rather than merely unwalked:\n'
+          '${elsewhere.join('\n')}',
+    );
+    // The ceiling the rule states, over the whole of `lib/` together. Two
+    // separate per-directory bounds would let a third site through by
+    // arithmetic, so the global figure is asserted as well as the three that
+    // make it up — and it is 2 + 0 + 0 now, because the owner's comparisons
+    // are not budget spenders.
+    expect(
+      features.length + designSystem.length + elsewhere.length,
+      lessThanOrEqualTo(2 + 0 + 0),
       reason:
           '§13.4 budgets ONE screen site and the redesign\'s dock is the second. '
           "The design-system occurrences are GlassSurface's own decisions, not "
           'sites, and the two together are the whole of what exists:\n'
-          '${[...features, ...widgets].join('\n')}',
+          '${[...features, ...designSystem, ...elsewhere].join('\n')}',
     );
   });
 
   test('a primitive cannot become a blur site', () {
-    // The blind spot the two-directory walk exists to close, asserted directly so
-    // the reason it was widened cannot be quietly forgotten: `StatTile` is a
+    // The blind spot the design-system walk exists to close, asserted directly
+    // so the reason it was widened cannot be quietly forgotten: `StatTile` is a
     // primitive, `tier: GlassTier.blur` is the exact line that would have gone
     // unnoticed, and it is in `lib/core/design_system/widgets/`.
     //
     // **And a hand-built `BackdropFilter` is the same blind spot with the other
     // spelling** — which is how the redesign's dock found it. A primitive that
     // builds its own filter spends the budget without the enum ever appearing.
-    final List<String> hits = _blurSites(
-      _dartFilesUnder(_widgets)
-          .where((File file) => !file.uri.path.endsWith('glass_surface.dart'))
-          .toList(),
-    );
+    //
+    // **The design system is the WHOLE of it now**, `effects/` and `tokens/`
+    // included. The two-directory walk named `lib/core/design_system/widgets/`
+    // and left `lib/core/design_system/effects/` unwalked, and a real
+    // `BackdropFilter` planted there left this gate green.
+    final List<String> hits = _blurSites(_walk().designSystem);
     expect(
       hits,
       isEmpty,
@@ -366,9 +489,10 @@ void main() {
     // rule this test states is therefore the one that is actually true: **every
     // blur a feature spends is visible to the budget, and exactly one feature
     // spends one outside the enum.**
+    final _Buckets walk = _walk();
     final List<String> featureDirect = <String>[
-      ..._sitesMentioning(_dartFilesUnder(_features), 'BackdropFilter'),
-      ..._sitesMentioning(_dartFilesUnder(_features), 'ImageFilter.blur'),
+      ..._sitesMentioning(walk.features, 'BackdropFilter'),
+      ..._sitesMentioning(walk.features, 'ImageFilter.blur'),
     ]..sort();
     expect(
       featureDirect,
@@ -392,31 +516,57 @@ void main() {
           '${featureDirect.join('\n')}',
     );
 
-    // And in the design system, the one `BackdropFilter` in the tree is inside
-    // `glass_surface.dart` — the widget that owns it. Named rather than counted,
-    // so a second `BackdropFilter` in a *different* primitive is an offender even
-    // though the total would still be two.
-    final List<String> widgetDirect = <String>[
-      ..._sitesMentioning(_dartFilesUnder(_widgets), 'BackdropFilter'),
-      ..._sitesMentioning(_dartFilesUnder(_widgets), 'ImageFilter.blur'),
+    // And the owner still builds its own — **named rather than counted**, so a
+    // second `BackdropFilter` in a *different* primitive is an offender even
+    // though the total would still be two. The owner is also the only
+    // exclusion the walk has, so an owner that stopped existing would make
+    // every allowance below vacuous: the gate says so rather than passing
+    // quietly.
+    final List<File> owner = _ownerFiles();
+    expect(
+      owner,
+      hasLength(1),
+      reason:
+          'the owner of the blur — `$_ownerPath` — is the walk\'s ONLY exclusion, '
+          'and it is gone. Every allowance below is stated against it, and a '
+          'rule with no owner is a rule with no referent: find the file, or '
+          'rewrite the rule rather than passing silently',
+    );
+    final List<String> ownerDirect = <String>[
+      ..._sitesMentioning(owner, 'BackdropFilter'),
+      ..._sitesMentioning(owner, 'ImageFilter.blur'),
     ]..sort();
     expect(
-      widgetDirect,
+      ownerDirect,
       isNotEmpty,
       reason:
           'glass_surface.dart still builds its own BackdropFilter; if this is '
           'empty the widget has been restructured and this allowance needs '
           'rewriting rather than passing silently',
     );
+
+    // **And over the WHOLE of `lib/` — the owner, the features and everything
+    // else — a direct filter is only allowed in two places.** This is the
+    // widened form of the check that used to read the design system alone:
+    // `lib/core/design_system/effects/` and `lib/app/` were outside it, and a
+    // `BackdropFilter` in either was invisible to it.
+    final List<String> everyDirect = <String>[
+      ..._sitesMentioning(_dartFilesUnder(_libRoot), 'BackdropFilter'),
+      ..._sitesMentioning(_dartFilesUnder(_libRoot), 'ImageFilter.blur'),
+    ]..sort();
     expect(
-      widgetDirect,
+      everyDirect,
       everyElement(
-        startsWith('lib/core/design_system/widgets/glass_surface.dart:'),
+        anyOf(
+          startsWith('$_ownerPath:'),
+          startsWith('lib/features/dock/presentation/widgets/'),
+        ),
       ),
       reason:
-          'only GlassSurface may build a BackdropFilter. Every other primitive '
-          'must go through the tier, which is what carries the budget:\n'
-          '${widgetDirect.join('\n')}',
+          'only GlassSurface may build a BackdropFilter, and the redesign\'s '
+          'dock is the one named exception. Every other file in `$_libRoot` must '
+          'go through the tier, which is what carries the budget:\n'
+          '${everyDirect.join('\n')}',
     );
   });
 }

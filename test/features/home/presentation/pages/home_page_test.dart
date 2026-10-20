@@ -404,7 +404,7 @@ void main() {
       expect(SelahCard.glyph, '✦');
     });
 
-    testWidgets('the circle announces that it cannot be pressed, and why', (
+    testWidgets('the circle is a live button, named with the action', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
@@ -415,16 +415,48 @@ void main() {
       // accessibility suites read the collection and compare a `Tristate`, because
       // `isEnabled` is three-valued and `hasFlag` collapsed it to a bool that
       // could not tell "explicitly false" from "not a button".
-      final SemanticsData node = _semanticsOf(
-        tester,
-        '${en.homeSelah} — ${en.homeUnavailableSuffix}',
-      );
+      //
+      // ## AND IT IS **LIVE** NOW
+      //
+      // This node used to be **disabled**, and the assertion said so: Phase 5.2
+      // shipped the selah card as an inert placeholder and recorded that
+      // "Phase 7 Step 3 owns all of it". **This is Phase 7 Step 3**, so the
+      // control is a button that begins a silence, and the name says which.
+      final SemanticsData node = _semanticsOf(tester, en.homeSelahBegin);
       expect(node.flagsCollection.isButton, isTrue);
-      // **Disabled, not absent**: a screen-reader user is told the control exists
-      // and that it is inert, which is `SocialAuthButton`'s rule and the login
-      // ghosts' too.
-      expect(node.flagsCollection.isEnabled, Tristate.isFalse);
-      expect(node.actions, isNot(contains(SemanticsAction.tap)));
+      expect(node.flagsCollection.isEnabled, Tristate.isTrue);
+      expect(node.hasAction(SemanticsAction.tap), isTrue);
+      handle.dispose();
+    });
+
+    testWidgets('and the name changes while the silence runs', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final HomeHarness h = harness();
+      await pumpHome(tester, bloc: h.bloc);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SelahCard),
+          matching: find.byType(FourPointedStar),
+        ),
+      );
+      await tester.pump();
+
+      // **A control whose action changes needs a name that changes with it**,
+      // or a screen-reader user is told to "begin" a silence that is already
+      // running.
+      final SemanticsData node = _semanticsOf(tester, en.homeSelahEnd);
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.hasAction(SemanticsAction.tap), isTrue);
+      // **And the old name is gone**, not merely superseded: two nodes
+      // claiming to be the same control is one too many.
+      expect(
+        semanticsTree(tester)
+            .where((SemanticsData data) => data.label == en.homeSelahBegin),
+        isEmpty,
+      );
       handle.dispose();
     });
   });

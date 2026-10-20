@@ -301,7 +301,7 @@ void main() {
   });
 
   group('the inert controls say why', () {
-    testWidgets('the selah circle is a disabled button, named with the reason', (
+    testWidgets('the selah circle is a live button, named with the action', (
       WidgetTester tester,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
@@ -309,20 +309,24 @@ void main() {
       final HomeHarness h = harness();
       await pumpHome(tester, bloc: h.bloc);
 
-      final SemanticsData circle = _named(
-        tester,
-        '${en.homeSelah} — ${en.homeUnavailableSuffix}',
-      );
+      // ## IT IS **LIVE**, AND THE NAME SAYS WHAT IT DOES
+      //
+      // This node was a **disabled** button named with the reason it could
+      // not be pressed — Phase 5.2's deliberate placeholder, whose own doc
+      // said "Phase 7 Step 3 owns all of it". **This is Phase 7 Step 3.**
+      //
+      // The old name was `'${en.homeSelah} — ${en.homeUnavailableSuffix}'` and
+      // the old assertions were "disabled" and "offers no tap". Both are gone
+      // because the behaviour they described is gone — and the **reason** the
+      // old card carried ("unavailable in this build") is no longer true of
+      // the ritual.
+      final SemanticsData circle = _named(tester, en.homeSelahBegin);
       expect(circle.flagsCollection.isButton, isTrue);
-      // **Disabled, not absent**: a screen-reader user is told the control exists
-      // and that it is inert. `SocialAuthButton`'s rule, and the login ghosts'.
-      expect(circle.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(circle.flagsCollection.isEnabled, Tristate.isTrue);
       expect(
         circle.hasAction(SemanticsAction.tap),
-        isFalse,
-        reason:
-            'and it offers no tap, because there is nothing behind one until Phase 7 '
-            'brings the timer',
+        isTrue,
+        reason: 'the control begins a silence, and it says so',
       );
       handle.dispose();
     });

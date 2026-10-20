@@ -284,6 +284,24 @@ abstract class AppLocalizations {
   /// **'seconds of silence'**
   String get homeSecondsOfSilence;
 
+  /// Written, not transcribed: `redesign.html:533` gives the selah's button a `title="selah"`, which names the thing rather than the action, and this client names the action because AGENT_CONTEXT §14 asks for a control whose accessible name says what it does. The button starts a silence of the reader's own length — `UserSettings.selahLengthSec`, the Workshop's own 15…120 second range at `redesign.html:684` — and the prototype's own tooltip never said how long. The alternative rejected was a bare "Selah", which is the prototype's spelling and answers "what is this?" rather than "what does pressing it do?".
+  ///
+  /// In en, this message translates to:
+  /// **'Begin the selah'**
+  String get homeSelahBegin;
+
+  /// Written, not transcribed: the selah's button changes what it does while the silence runs — `redesign.html:1334` stops the countdown on a second press — and a control whose action changes needs a name that changes with it, or a screen-reader user is told to "begin" a silence that is already running. The prototype has no string for this: its `title="selah"` at `redesign.html:533` never changes. The alternative rejected was naming the button "Selah" in both states, which leaves the second press with the same instruction as the first.
+  ///
+  /// In en, this message translates to:
+  /// **'End the selah'**
+  String get homeSelahEnd;
+
+  /// Transcribed: `redesign.html:970` — `amen:["selah · amen","سِلاه · آمين"]`, the prototype's own I18N row for the toast the finished silence raises at `redesign.html:1330` (`if(done){ toast(tr('amen')); … }`). The middle dot is U+00B7, the prototype's own separator, and the Arabic keeps the tashkeel the prototype's value carries. The English is Latin on the Arabic arm's screen too, which is the prototype's arrangement and not an oversight here.
+  ///
+  /// In en, this message translates to:
+  /// **'selah · amen'**
+  String get homeSelahAmen;
+
   /// The carousel's left-hand label. Transcribed: `redesign.html:930` — `lib:["the library","المكتبة"]`, written into `.car-label` at `:535`.
   ///
   /// In en, this message translates to:

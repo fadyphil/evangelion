@@ -527,7 +527,7 @@ lib/
   core/
     common/                        Result<T>, Failure (12 kinds), AppConfig, ranges
     design_system/                 23 widgets, effects, motion, theme, tokens/
-    domain/                        THE SHARED KERNEL — 30 files, pure Dart
+    domain/                        THE SHARED KERNEL — 42 files, pure Dart
       entities/                    15 hand-written + 9 generated .freezed.dart
       repositories/                5 ports, 5 abstract interface classes
       usecase/                     UseCase<In, Out>, NoParamsUseCase<Out>
@@ -535,11 +535,11 @@ lib/
     network/                       Dio client, error mapper, interceptors/
   features/                        auth, dock, home, journey, leaderboard, quiz,
                                    reading, settings, sky — 9 features
-    <f>/domain/                    6 features have one; pure Dart, use cases only
-    <f>/data/                      4 features have one: auth, leaderboard,
-                                   reading, settings
+    <f>/domain/                    8 features have one; pure Dart, use cases only
+    <f>/data/                      7 features have one: auth, home, journey,
+                                   leaderboard, reading, settings, sky
     <f>/presentation/              bloc/cubit, pages, widgets
-  l10n/                            ARB + generated AppLocalizations (111 keys)
+  l10n/                            ARB + generated AppLocalizations (179 keys)
 
 tool/
   verify_all.sh                    gates 1-7 in cost order (+ --with-build)

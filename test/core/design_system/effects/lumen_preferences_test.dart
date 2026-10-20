@@ -4,8 +4,8 @@ import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The aurora's inputs — the ten light-workshop choices, and the scope that
-/// publishes them.
+/// The aurora's inputs — the ten light-workshop choices, the ritual's vespers
+/// auto-dim, and the scope that publishes them.
 void main() {
   group('the projection from `UserSettings`', () {
     test('every field is read, and none is invented', () {
@@ -20,6 +20,7 @@ void main() {
         rayCombing: false,
         whiteCores: false,
         dotVeil: true,
+        vespersAutoDim: false,
       );
       final LumenPreferences preferences = LumenPreferences.fromSettings(
         settings,
@@ -34,6 +35,7 @@ void main() {
       expect(preferences.rayCombing, isFalse);
       expect(preferences.whiteCores, isFalse);
       expect(preferences.dotVeil, isTrue);
+      expect(preferences.vespersAutoDim, isFalse);
     });
 
     test('the defaults agree with `UserSettings`\'s, field by field', () {
@@ -61,16 +63,22 @@ void main() {
       expect(preferences.rayCombing, isTrue);
       expect(preferences.whiteCores, isTrue);
       expect(preferences.dotVeil, isFalse);
+      // `:686` — the Vespers auto-dim switch, `checked`.
+      expect(preferences.vespersAutoDim, isTrue);
     });
   });
 
   group('equality', () {
-    test('all ten fields decide it', () {
+    test('all eleven fields decide it', () {
       expect(const LumenPreferences(), const LumenPreferences());
       expect(const LumenPreferences(), isNot(const LumenPreferences(hue: 313)));
       expect(
         const LumenPreferences(),
         isNot(const LumenPreferences(enabled: false)),
+      );
+      expect(
+        const LumenPreferences(),
+        isNot(const LumenPreferences(vespersAutoDim: false)),
       );
     });
 
@@ -81,7 +89,7 @@ void main() {
         const LumenPreferences().toString(),
         'LumenPreferences(enabled: true, shape: top, reach: 42, glow: 100, '
         'touchGlow: 55, hue: 312, melt: false, rayCombing: true, '
-        'whiteCores: true, dotVeil: false)',
+        'whiteCores: true, dotVeil: false, vespersAutoDim: true)',
       );
     });
 
@@ -140,7 +148,7 @@ void main() {
       expect(seen, 42);
     });
 
-    test('and it is told ONLY when one of the ten changed', () {
+    test('and it is told ONLY when one of the eleven changed', () {
       // The contract the framework calls, asserted directly — because
       // `pumpWidget` rebuilds the whole tree and so cannot distinguish "the
       // scope notified" from "everything was rebuilt anyway".
@@ -163,7 +171,7 @@ void main() {
       expect(
         scope.updateShouldNotify(scopeWith(base)),
         isFalse,
-        reason: 'the same ten values are not a change',
+        reason: 'the same eleven values are not a change',
       );
       expect(
         scope.updateShouldNotify(scopeWith(const LumenPreferences(hue: 42))),

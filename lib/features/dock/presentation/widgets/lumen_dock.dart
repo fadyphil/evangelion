@@ -58,16 +58,20 @@
 /// [BackdropFilter] and the sigma is the prototype's own 22 — **not** the
 /// design system's `kGlassBlurSigma` (24), which is Home's panel's radius.
 ///
-/// **This is a second blur site under `lib/features/`, and the budget that
-/// counts them says there may be one.**
-/// `test/core/design_system/widgets/glass_blur_budget_test.dart` walks
-/// `lib/features/` and fails above **one** `GlassTier.blur`, and it also
-/// refuses a hand-built [BackdropFilter] in a feature outright. The dock is
-/// that second site: the prototype's own `backdrop-filter` on `.dock` is
-/// unavoidable — the dock is glass over the page, which is the one thing a
-/// `GlassSurface` cannot express, because `GlassSurface` paints a *panel* and
-/// this is a full-width bar. **The ceiling is being re-recorded separately;
-/// this file's job was to write the widget and to say so here.**
+/// **This is the SECOND blur site under `lib/features/`, and it is charged to
+/// the budget like any other.** `test/core/design_system/widgets/glass_blur_budget_test.dart`
+/// walks `lib/` and allows **two** sites: Home's today's-reading panel and
+/// this one. The gate counts **sites**, of **both spellings** — the enum and a
+/// hand-built [BackdropFilter] — because a count that read only the enum would
+/// have been **blind to the dock**, and a count of lines would have read the
+/// dock's one site (spelled over two lines) as two.
+///
+/// **And the exception is about the SHAPE, not about escaping the count.**
+/// `GlassSurface` paints a *panel* — a fill, a rim and a shadow, with one
+/// radius on all four corners — and the dock is a full-width **bar** with its
+/// own alpha (0.86 dark, 0.74 light), a hairline on its **top** edge only and
+/// a radius on its **top** two corners only. A third site anywhere else is
+/// still red.
 ///
 /// ## THE ANIMATION, AND §14
 ///
@@ -479,7 +483,30 @@ class _LumenDockSlotState extends State<_LumenDockSlot>
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
-    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final bool reduceMotion = MediaQuery.disableAnimationsOf(context);
+    // §14 — the reader can turn reduced motion OFF again, and the controller
+    // was **frozen** while it was on. A frozen controller holds whatever value
+    // it had, and that value can be the **opposite** of the slot's current
+    // state: a slot that became active while motion was reduced was frozen at
+    // 0.0, so the moment motion comes back the marker would be **inverted** —
+    // the active slot in the inactive ink and the other way round.
+    //
+    // So the flip **resynchronises** the controller and then animates it: the
+    // end state is the current one, and the reader sees the beam grow rather
+    // than a jump.
+    if (reduceMotion != _reduceMotion) {
+      if (reduceMotion) {
+        _controller.stop();
+      } else {
+        _controller.value = widget.active ? 0.0 : 1.0;
+        if (widget.active) {
+          _controller.forward();
+        } else {
+          _controller.reverse();
+        }
+      }
+    }
+    _reduceMotion = reduceMotion;
     if (_reduceMotion && _controller.isAnimating) {
       // The reader asked for reduced motion while the beam was growing. The
       // rendered value already ignores the controller, so stopping it here is

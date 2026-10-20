@@ -1079,10 +1079,24 @@ void main() {
           .first;
       expect(star, findsOneWidget);
       expect(tester.getSize(star), const Size.square(SelahCard.glyphSize));
-      final Rect circle = tester.getRect(
-        find.ancestor(of: star, matching: find.byType(Container)).first,
-      );
-      expect(circle.size, const Size(44, 44));
+      // ## THE **LAYOUT** SIZE, AND NOT THE PAINTED ONE
+      //
+      // `getSize` reads the render object's `size` — the box the engine laid
+      // out — and `getRect` reads `localToGlobal`, which **includes the paint
+      // transform**.
+      //
+      // The difference is the ring: `eva/redesign.html:270`'s `breatheRing`
+      // scales the circle between `.92` and `1.06`, and Phase 7 gave the client
+      // that animation. The prototype's circle is the same: `:267` gives it
+      // `width:44px;height:44px` — the **layout** box — and the keyframes
+      // scale the painting of it.
+      //
+      // So the layout box is 44 and the painted box breathes, and asserting
+      // the painted one would be asserting one frame of an animation.
+      final Finder circle = find
+          .ancestor(of: star, matching: find.byType(Container))
+          .first;
+      expect(tester.getSize(circle), const Size(44, 44));
       expect(
         tester.getRect(star).height,
         lessThan(44),

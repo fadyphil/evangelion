@@ -78,6 +78,7 @@ library;
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
+import 'package:get_it/get_it.dart';
 
 final class SettingsHandle {
   /// A handle over whatever holds the settings.
@@ -247,4 +248,33 @@ final class SettingsHandle {
   /// guards for. Two files dropping listeners quietly beats one throwing inside a
   /// framework assertion the reader has to decode.
   void dispose() => _listeners.clear();
+}
+
+/// Whether the reader has asked for haptics, read **without** registering a
+/// dependency.
+///
+/// ## WHY NOT `SettingsScope.of`
+///
+/// `SettingsScope.of` is a **dependent** lookup, and the call sites that need
+/// this are **event handlers** — the dock's tab tap, the result's arrival.
+/// Flutter refuses a dependent lookup outside a build, and `SettingsScope`'s
+/// locator fallback is only reached when there is no scope above the context,
+/// which is exactly the case where the dependent lookup has already thrown.
+///
+/// ## AND WHY THE **LOCATOR** IS NOT A SECOND SOURCE OF TRUTH
+///
+/// `GetIt.instance` is the same locator `lib/app/di/injection.dart` names
+/// `getIt`, and the handle it holds is the **same** [SettingsHandle] the scope
+/// publishes — `app.dart` registers one and `SettingsScope` publishes it. The
+/// difference is only that this read is **not watched**, and nothing here
+/// needs it to be: a haptic is asked for at the moment it is needed.
+///
+/// ## AND NO REGISTERED HANDLE MEANS **NO HAPTICS**
+///
+/// "No handle" means no settings were ever loaded — a bare-mounted widget
+/// test, or an app that has not finished booting. A reader in that state has
+/// asked for nothing, and silence is the honest answer.
+bool ritualHapticsEnabled() {
+  if (!GetIt.instance.isRegistered<SettingsHandle>()) return false;
+  return GetIt.instance<SettingsHandle>().settings.haptics;
 }

@@ -6,12 +6,14 @@ import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/features/reading/domain/reading_focus.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
+import 'package:evangelion/features/reading/presentation/widgets/breath_guide_line.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_app_bar.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_quiz_cta.dart';
@@ -214,9 +216,25 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// anyway: with the stars on.
   UserSettings _skySettings = const UserSettings();
 
+  /// The reader's focus delay, as of the last build.
+  ///
+  /// **A field for [_skySettings]'s reason**: the idle timer is armed from a
+  /// pointer callback and from a post-frame callback, and neither may register
+  /// a dependency.
+  Duration _focusDelay = const Duration(seconds: 4);
+
+  /// The aurora's scene, cached for the focus dim.
+  ///
+  /// **A field and not a lookup at the point of use**, because
+  /// `NeuralMotionScope.of` is a *dependent* lookup and the idle timer is
+  /// armed from a pointer callback — where registering a dependency is not
+  /// allowed.
+  LumenScene? _scene;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _scene = NeuralMotionScope.of(context).lumenScene;
     if (_requested != _language) _load();
   }
 
@@ -252,6 +270,16 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // a disposed object.
     _idle?.cancel();
     _stagger?.cancel();
+    // ## AND THE **FOCUS DIM** IS RELEASED
+    //
+    // The aurora's dim is a count (`LumenScene.dimFocus`), and a reader who
+    // leaves the sanctuary inside the idle window would otherwise leave the
+    // whole app dimmed. The prototype's `focusDim` is a global flag with the
+    // same problem — and the same answer, which is that the next `poke()`
+    // clears it — except that this client's reader may never come back.
+    if (_focusDim) {
+      _scene?.undimFocus();
+    }
     super.dispose();
   }
 
@@ -319,12 +347,43 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// anywhere in the file** — an unwired intent — so this port takes the value the
   /// prototype actually runs. Task 5.7 wires the range and [focusIdleDelay] is
   /// where the wired value lands.
+  ///
+  /// ## AND THE DELAY IS NOW **THE READER'S CHOICE**
+  ///
+  /// Phase 7 wired it: `_focusDelay` carries
+  /// `UserSettings.focusDelaySec`, the Workshop's own 2…15 second range
+  /// (`:683`), and a reader who asks for fifteen seconds gets fifteen. The
+  /// constant below is the **default** the range starts at and not the delay
+  /// the screen uses.
   void _poke() {
     _idle?.cancel();
-    if (_focusDim && mounted) setState(() => _focusDim = false);
-    _idle = Timer(focusIdleDelay, () {
-      if (mounted) setState(() => _focusDim = true);
+    _setFocusDim(false);
+    _idle = Timer(_focusDelay, () {
+      if (!mounted) return;
+      setState(() => _focusDim = true);
+      // ## THE **AMBIENT** DIMS TOO, AND NOT ONLY THE CHROME
+      //
+      // `eva/redesign.html:891` — `base=ambBase*bright*vesp*(focusDim?0.45:1)`
+      // — the focus mode's half of the aurora's intensity. The chrome's dim
+      // (`:176`) and the aurora's dim are the **same flag** in the prototype
+      // (`focusDim`, `:884`), and this client keeps them as one.
+      _scene?.dimFocus();
     });
+  }
+
+  /// Whether the screen is dimmed, and whether the aurora is told about it.
+  ///
+  /// **One flag and one call**, because the prototype has one flag
+  /// (`eva/redesign.html:884`) and two consequences for it: the chrome's
+  /// opacity (`:176`) and the aurora's intensity (`:891`).
+  void _setFocusDim(bool dimmed) {
+    if (_focusDim == dimmed) return;
+    if (mounted) setState(() => _focusDim = dimmed);
+    if (dimmed) {
+      _scene?.dimFocus();
+    } else {
+      _scene?.undimFocus();
+    }
   }
 
   /// The scroll callback behind `:1211-1219`, and the line that **places
@@ -440,6 +499,10 @@ class _ReadingBodyState extends State<_ReadingBody> {
   /// Gate 2 fails on the line. `lib/app/settings_scope.dart` is the
   /// composition-root seam that exists for exactly this case.
   void _onFontStepChanged(int step) {
+    // `eva/redesign.html:1396-1397` — `el('fPlus').onclick=()=>{…;haptic(10)};`
+    // and `el('fMinus')` likewise. The tick is on the **press**, so it is
+    // fired here rather than after the write.
+    fireRitualHaptic(RitualHaptic.fontStep, enabled: _skySettings.haptics);
     // `unawaited` because §4 forbids dropping a `Future` as a bare expression
     // statement, and the write is fire-and-forget from here: the optimistic emit
     // in `SettingsCubit.apply` has already moved the app's scale by the time the
@@ -465,6 +528,8 @@ class _ReadingBodyState extends State<_ReadingBody> {
     // an inherited widget mid-layout: see [_skySettings].
     final UserSettings settings = SettingsScope.of(context).settings;
     _skySettings = settings;
+    // **The reader's own focus delay**, read with the rest of the settings.
+    _focusDelay = Duration(seconds: settings.focusDelaySec);
 
     return BlocBuilder<ReadingCubit, ReadingState>(
       builder: (BuildContext context, ReadingState state) {
@@ -646,7 +711,15 @@ class _ReadingBodyState extends State<_ReadingBody> {
           litStars: _sky.litCount,
         ),
         onBack: () => unawaited(context.router.maybePop()),
-        onBookmarkToggled: () => setState(() => _bookmarked = !_bookmarked),
+        onBookmarkToggled: () {
+          // `eva/redesign.html:1394` — `el('bmBtn').onclick=function(){
+          // this.classList.toggle('lit'); haptic(12); … }`.
+          fireRitualHaptic(
+            RitualHaptic.bookmark,
+            enabled: _skySettings.haptics,
+          );
+          setState(() => _bookmarked = !_bookmarked);
+        },
         bookmarked: _bookmarked,
       ),
     );
@@ -694,60 +767,84 @@ class _ReadingBodyState extends State<_ReadingBody> {
   };
 
   /// The verses themselves, each measured by the observer above.
-  Widget _verseList(
-    BuildContext context,
-    ScriptureText passage,
-  ) => NotificationListener<ScrollNotification>(
-    onNotification: _onScroll,
-    child: ListView.builder(
-      // `:159` — `padding: 14px 26px 12px`. **14 and 26 are not spacing
-      // tokens**, for the reason `VerseLine.verseGap` records.
-      padding: const EdgeInsets.fromLTRB(26, 14, 26, 12),
-      itemCount: passage.verses.length,
-      itemBuilder: (BuildContext context, int index) {
-        final Verse verse = passage.verses[index];
-        final GlobalKey key = _verseKeys.putIfAbsent(
-          verse.number,
-          GlobalKey.new,
-        );
-        return GestureDetector(
-          // `:1385-1386` — tapping a verse makes it the selected one and
-          // removes `.hot` from every other. **The sheet itself is not built**:
-          // `openSheet` opens a bottom sheet the redesign's reader route does
-          // not contain a trigger for beyond the verse itself, and Phase 7's
-          // ritual step is where it belongs. What this port keeps is the
-          // selection, which is the state a sheet would read.
-          onTap: () => setState(() => _hot = verse.number),
-          behavior: HitTestBehavior.opaque,
-          child: VerseLine(
-            key: key,
-            number: verse.number,
-            // **`Verse.text`, NOT `displayText`** — recorded decision 51, and
-            // the Arabic arm's typography gate is what caught this page getting
-            // it wrong: `displayText` is the *preview* projection
-            // (`textClean ?? text`), so the sanctuary was rendering every verse
-            // with its diacritics stripped, and the gate reported the fixture's
-            // diacritised `text` as a declared-but-unrendered run while the tree
-            // held the cleaned one. The reading screen shows scripture whole.
-            text: verse.text,
-            paint: versePaintFor(
-              // The **stagger's** answer, not the observer's. The prototype's
-              // `.in` class is what the schedule adds (`:1383`), so "revealed"
-              // is a question about the schedule and not about the scroll
-              // position — the observer's visibility answer is spent on
-              // *stars* (`_onScroll`), never on paint.
-              visibility: index < _revealed
-                  ? VerseVisibility.inView
-                  : VerseVisibility.outOfView,
-              hot: _hot == verse.number,
-              entranceComplete: index < _revealed,
+  Widget _verseList(BuildContext context, ScriptureText passage) {
+    // ## THE BREATH GUIDE'S ANCHOR
+    //
+    // `eva/redesign.html:1372-1376` — `setBreathUnder(p)` removes every
+    // existing `.breath` and puts a new one **after** the verse `p`. The
+    // prototype calls it from `openSheet` (the verse the reader selected) and
+    // from `enterReader`'s `finish()` (the one they left off at), so the guide
+    // belongs to **one** verse: the selected one, or the resumed one when
+    // nothing is selected.
+    //
+    // **And the reader's own switch decides whether there is one at all** —
+    // `UserSettings.breathGuide`, the Workshop's `:685`.
+    final int? anchor = _skySettings.breathGuide ? (_hot ?? _resume) : null;
+    final int anchorIndex = anchor == null
+        ? -1
+        : passage.verses.indexWhere((Verse v) => v.number == anchor);
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: ListView.builder(
+        // `:159` — `padding: 14px 26px 12px`. **14 and 26 are not spacing
+        // tokens**, for the reason `VerseLine.verseGap` records.
+        padding: const EdgeInsets.fromLTRB(26, 14, 26, 12),
+        // **One extra row, and it is the guide.** A `Column` around each verse
+        // would have changed **every** verse's layout to accommodate one
+        // verse's guide, and the reading harness measures those verses.
+        itemCount: passage.verses.length + (anchorIndex >= 0 ? 1 : 0),
+        itemBuilder: (BuildContext context, int index) {
+          if (anchorIndex >= 0 && index == anchorIndex + 1) {
+            return const BreathGuideLine();
+          }
+          final int verseIndex = anchorIndex >= 0 && index > anchorIndex
+              ? index - 1
+              : index;
+          final Verse verse = passage.verses[verseIndex];
+          final GlobalKey key = _verseKeys.putIfAbsent(
+            verse.number,
+            GlobalKey.new,
+          );
+          return GestureDetector(
+            // `:1385-1386` — tapping a verse makes it the selected one and
+            // removes `.hot` from every other. **The sheet itself is not built**:
+            // `openSheet` opens a bottom sheet the redesign's reader route does
+            // not contain a trigger for beyond the verse itself, and Phase 7's
+            // ritual step is where it belongs. What this port keeps is the
+            // selection, which is the state a sheet would read.
+            onTap: () => setState(() => _hot = verse.number),
+            behavior: HitTestBehavior.opaque,
+            child: VerseLine(
+              key: key,
+              number: verse.number,
+              // **`Verse.text`, NOT `displayText`** — recorded decision 51, and
+              // the Arabic arm's typography gate is what caught this page getting
+              // it wrong: `displayText` is the *preview* projection
+              // (`textClean ?? text`), so the sanctuary was rendering every verse
+              // with its diacritics stripped, and the gate reported the fixture's
+              // diacritised `text` as a declared-but-unrendered run while the tree
+              // held the cleaned one. The reading screen shows scripture whole.
+              text: verse.text,
+              paint: versePaintFor(
+                // The **stagger's** answer, not the observer's. The prototype's
+                // `.in` class is what the schedule adds (`:1383`), so "revealed"
+                // is a question about the schedule and not about the scroll
+                // position — the observer's visibility answer is spent on
+                // *stars* (`_onScroll`), never on paint.
+                visibility: index < _revealed
+                    ? VerseVisibility.inView
+                    : VerseVisibility.outOfView,
+                hot: _hot == verse.number,
+                entranceComplete: index < _revealed,
+              ),
+              resume: _resume == verse.number,
             ),
-            resume: _resume == verse.number,
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
+  }
 }
 
 /// `eva/redesign.html:1287`'s `focusDelay = 4`, in seconds.

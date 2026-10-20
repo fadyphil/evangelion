@@ -82,6 +82,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSecondsOfSilence => 'seconds of silence';
 
   @override
+  String get homeSelahBegin => 'Begin the selah';
+
+  @override
+  String get homeSelahEnd => 'End the selah';
+
+  @override
+  String get homeSelahAmen => 'selah · amen';
+
+  @override
   String get homeTheLibrary => 'the library';
 
   @override

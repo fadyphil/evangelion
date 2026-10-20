@@ -41,46 +41,34 @@
 /// happened to be scheduled at the same moment: the fake is re-stubbed in the
 /// gap, so the screen can only show the new number if it asked again.
 ///
-/// ## AND THE RE-READ IS **NOT** HAPPENING — AND THE REASON IS IN `lib/`
+/// ## AND THE RE-READ **DOES** HAPPEN — AND IT TOOK **ONE LINE** TO MAKE IT
 ///
-/// **The two tests in this file are RED, and they are red on purpose.** The
-/// journey's own trigger is right — it subscribes under the **shell's** route
-/// data, and the shell is what the observer hands `didPopNext` to when the
-/// screen pushed over it is popped — but the **observer it subscribes to is
-/// not the observer on the navigator**.
+/// **The two tests in this file are GREEN, and the reason they are green is
+/// worth recording, because the defect was invisible.** The journey's own
+/// trigger is right — it subscribes under the **shell's** route data, and the
+/// shell is what the observer hands `didPopNext` to when the screen pushed
+/// over it is popped.
 ///
-/// `AppRouter.config()`'s `navigatorObservers` builder is
-/// `() => [...?navigatorObservers?.call(), AutoRouteObserver()]`, and it is
-/// called **twice**: once by `AutoRouterDelegate` for the root navigator, and
-/// once by the dock shell's `AutoTabsRouter` for the list it **inherits**. Each
-/// call builds a **new** `AutoRouteObserver`, so the root navigator watches
-/// one instance and the shell's children watch another — and a page inside the
-/// shell subscribes to the shell's.
+/// **The observer it subscribed to was the WRONG ONE.** `AppRouter.config()`'s
+/// `navigatorObservers` builder is a **builder**, and auto_route calls it
+/// **twice**: once by `AutoRouterDelegate` for the root navigator, and once by
+/// the dock shell's `AutoTabsRouter` for the list it **inherits**. Each call
+/// built a **new** `AutoRouteObserver`, so the root navigator watched one
+/// instance and the shell's children watched another — and a page inside the
+/// shell subscribed to the shell's.
 ///
-/// **How to see it, in five lines.** Read the two `RouterScope`s out of the
-/// tree and compare their observers:
+/// **So the root navigator's pop never reached the page underneath it, and
+/// nothing was red.** The fix is one line in `lib/app/router/app_router.dart`:
+/// the observer is **one object, built once**, and every call to the builder
+/// hands back that object. `home_page.dart` had the same defect, and the
+/// home's own re-read — recorded decision 41, and the reason
+/// `home_navigation_test.dart` has a whole group for it — was inert for the
+/// same reason.
 ///
-/// ```dart
-/// final List<RouterScope> scopes =
-///     tester.widgetList<RouterScope>(find.byType(RouterScope)).toList();
-/// final AutoRouteObserver? root = scopes.first.firstObserverOfType<AutoRouteObserver>();
-/// final AutoRouteObserver? shell = scopes[1].firstObserverOfType<AutoRouteObserver>();
-/// expect(identical(root, shell), isTrue); // ← false today
-/// ```
-///
-/// **And the shape of the fix, measured.** Installing **one** shared observer
-/// into the router's own `navigatorObservers` — so the same instance is in the
-/// root navigator's list and in the list the shell inherits — makes the
-/// re-read happen on the next pop, with no change to the journey.
-///
-/// **The fix is in `lib/app/router/app_router.dart` and not here.** The
-/// observer has to be one instance shared by the navigator and the children it
-/// hands one to, and that is the composition root's file.
-///
-/// **AND `/` HAS THE SAME DEFECT.** `home_page.dart` subscribes under the
-/// shell's route data in the same way, so the home screen's own re-read —
-/// recorded decision 41, and the reason `home_navigation_test.dart` has a
-/// whole group for it — is inert for the same reason.
+/// **The history of the defect belongs here, and the assertion belongs in the
+/// test below.** A `reason:` string is what a developer reads when the test
+/// fails, and a string that says "this does not happen" while the test is
+/// green sends them hunting for a defect that was fixed a phase ago.
 library;
 
 import 'dart:async';
@@ -172,9 +160,10 @@ void main() {
       harness.streaks.summaryCalls,
       2,
       reason:
-          'the journey re-reads when the reader comes back to it — and it does '
-          'NOT, because the observer the shell\'s children inherit is a second '
-          'instance of the one the navigator watches. See the file doc.',
+          'the journey re-reads when the reader comes back to it — the shell\'s '
+          'route data is what the observer hands `didPopNext` to, and the '
+          'observer is ONE instance shared by the root navigator and the shell. '
+          'See the file doc.',
     );
     expect(harness.streaks.historyCalls, 2);
     expect(harness.sky.countCalls, 2);
@@ -225,8 +214,8 @@ void main() {
       harness.streaks.summaryCalls,
       2,
       reason:
-          'and the re-read went to the cubit this page holds — and it does NOT, '
-          'for the reason the file doc gives',
+          'and the re-read went to the cubit this page holds — the one the '
+          'journey is bound to, and not a second journey',
     );
   });
 }

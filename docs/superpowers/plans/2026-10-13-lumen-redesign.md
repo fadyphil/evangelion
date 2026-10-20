@@ -2279,7 +2279,7 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > 38% of the route is 152px of travel and 38% of the page is 38px, four times
 > apart.
 
-> ### TWO GATES LEARNED SOMETHING, AND BOTH WERE PROVEN IN BOTH DIRECTIONS.
+> ### TWO GATES LEARNED SOMETHING — AND ONE OF THE TWO PROOFS WAS NOT A PROOF
 >
 > **The blur budget moved from one site to two, and it learned a second
 > spelling.** The redesign's own dock blurs (`:210` —
@@ -2296,15 +2296,58 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > budget like any other — the exception is about the **shape**, not about
 > escaping the count.
 >
+> **AND THE WALK WAS TWO DIRECTORIES, WHICH WAS THE SAME BLIND SPOT ONE
+> DIRECTORY OVER.** The gate walked `lib/features/` and
+> `lib/core/design_system/widgets/`, and `lib/` has more directories than that:
+> `lib/core/design_system/effects/` and `lib/app/` were **never walked at all**,
+> and `lib/app/` is exactly where this phase put the navigation chrome. A real
+> `BackdropFilter` planted in either left the gate **green**. So the walk is
+> now **`lib/` as a whole**, and the **only** exclusion is `glass_surface.dart`
+> — one root, one exclusion, and the rule the file's own doc already stated.
+> Proved in a scratch copy, in both directions: a planted `BackdropFilter` in
+> `lib/core/design_system/effects/` and in `lib/app/router/` is **red** now, a
+> planted one under `lib/features/` is still red, and the clean tree is still
+> **green** — with the dock still counting as **one** site, because the count
+> is of sites and widening the walk did not change that.
+>
 > **The orphan gate's root set learned `@RoutePage()`.** Its root set was
 > "files under `/presentation/pages/`", which is a *proxy* for "is a page", and
 > the shell is a page that is deliberately **not** under one — it belongs to
 > the composition root. The gate now takes a file as a root when it **declares**
 > `@RoutePage()`, matched against the **comment-stripped** text, so a doc
-> comment that merely mentions the annotation does not make a file a root. Both
-> halves were proved in a scratch copy: a file that only *mentions* the
-> annotation leaves its widget an **orphan** (exit 1), and the same file with a
-> real annotation places it (exit 0).
+> comment that merely mentions the annotation does not make a file a root.
+>
+> **AND THE PROOF THAT WAS RECORDED HERE WAS THE FOOL, PRESENTED AS THE
+> EVIDENCE.** It read: "Both halves were proved in a scratch copy: a file that
+> only *mentions* the annotation leaves its widget an **orphan** (exit 1), and
+> the same file with a real annotation places it (exit 0)." The first half was
+> true — the comment-stripping half of the clause worked, and still does. The
+> second half was **false**, and false in the direction that matters: a file
+> that mentions the annotation in a **doc comment** is not a root, but a file
+> that carries a **real annotation on a plain class** **was** a root, because
+> nothing checked that the annotation was on a widget at all, and nothing
+> checked that the route it declared was registered anywhere. Measured: a plain
+> class with `@RoutePage()` on it, mentioning a widget, made the gate exit
+> **0** with that widget on **no screen at all**.
+>
+> **So the clause is now two mechanical halves.** A file is a root only when it
+> declares `@RoutePage()` **on a class that extends `StatelessWidget` or
+> `StatefulWidget`**, **and** the route that declaration generates is
+> **registered in `lib/app/router/app_router.dart`'s route table** — the
+> generated route class's name appears there as `page: <Name>Route.page`. The
+> path heuristic is gone: the root set is *derived* rather than guessed, and it
+> is the **same eight files** the proxy found, so the report did not change.
+> The difference is that a page which stops being registered now stops being a
+> root, which is the correct answer and the old proxy could not give it.
+>
+> **Proved in a scratch copy, in both directions, and this time the fool is
+> red.** A plain class carrying the annotation is **red** (exit 1 — the widget
+> it named is an orphan again, and the gate says which class and why); the
+> annotation only in a doc comment is still **red**; a **real** page — the
+> annotation on a widget the router registers — is **green** and places its
+> widget; and the same real page with its route **removed from the router** is
+> **red**, which is what makes the second half load-bearing rather than
+> decorative.
 
 > ### THE FINDING: **ONE OBSERVER, NOT ONE PER NAVIGATOR** — and it killed
 > recorded decision 41 in silence.

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
-import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/app/settings_handle.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/dock/presentation/widgets/lumen_dock.dart';
@@ -159,6 +161,15 @@ class DockShellPage extends StatelessWidget {
   /// is what hides the dock (the prototype's `read` and `today` slots, `:1277`
   /// and `:1278`, push the reader and the quiz rather than switching).
   void _select(BuildContext context, TabsRouter tabs, int slot) {
+    // `eva/redesign.html:1275` — `document.querySelectorAll('.dtab').forEach(t
+    // =>t.onclick=()=>{ haptic(10); … })`. The tick is **first**, before the
+    // routing, so it lands on the press rather than after the navigation.
+    //
+    // **The reader's own switch is read here and not in the build**, because
+    // `SettingsScope.of` is a *dependent* lookup and this is an event handler
+    // — where Flutter refuses one. `ritualHapticsEnabled` is the app's own
+    // answer for exactly that case.
+    fireRitualHaptic(RitualHaptic.dockTap, enabled: ritualHapticsEnabled());
     // **A switch expression, not a statement.** The arms are side effects with
     // two different shapes — a tab switch and a route push — so the expression
     // produces the action and the statement performs it.

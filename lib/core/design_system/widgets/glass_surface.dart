@@ -458,6 +458,8 @@ class GlassSurface extends StatelessWidget {
     this.radius = EvaRadii.card,
     this.padding = const EdgeInsets.all(EvaSpacing.card),
     this.border = true,
+    this.fill,
+    this.borderColor,
     this.seamAlignment,
     this.seamWidthFactor,
     this.seamTint,
@@ -486,6 +488,28 @@ class GlassSurface extends StatelessWidget {
   /// Whether to draw the 1px [EvaColors.glassBorder] rim. Off is for surfaces
   /// that sit on a background of their own and would double the edge.
   final bool border;
+
+  /// The surface's fill, or `null` for [EvaColors.glassFill].
+  ///
+  /// ## WHY IT EXISTS, AND WHY IT IS **NOT** A TIER
+  ///
+  /// `eva/redesign.html:263` — `.selah.active{border-color:rgba(232,176,75,.5);
+  /// background:rgba(232,176,75,.06)}` — is a **state** of the selah card: the
+  /// same surface, tinted, while the silence runs. It is not a different kind
+  /// of surface, and a tier member called `active` would be a value whose only
+  /// meaning is "the glass, but gold" — the same objection `GlassTier`'s doc
+  /// raises about a `sealed` member.
+  ///
+  /// So the tint is a **parameter**, and `null` means "the token", which is
+  /// what every other caller gets. **The default renders byte-identically to
+  /// the version that had no such parameter**, which is why the goldens did
+  /// not move when it landed.
+  final Color? fill;
+
+  /// The rim's colour, or `null` for [EvaColors.glassBorder].
+  ///
+  /// The other half of [fill] — `:263`'s `border-color:rgba(232,176,75,.5)`.
+  final Color? borderColor;
 
   /// Where the [GlassTier.bloom] seam sits vertically. `null` is [kGlassSeamAlignment]
   /// — `redesign.html:256`'s `bottom:20%` — and is what `.hor` draws.
@@ -668,9 +692,11 @@ class GlassSurface extends StatelessWidget {
 
     final DecoratedBox surface = DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.glassFill,
+        color: fill ?? colors.glassFill,
         borderRadius: borderRadius,
-        border: border ? Border.all(color: colors.glassBorder) : null,
+        border: border
+            ? Border.all(color: borderColor ?? colors.glassBorder)
+            : null,
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: colors.glassShadow,

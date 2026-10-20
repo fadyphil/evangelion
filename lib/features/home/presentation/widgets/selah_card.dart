@@ -1,4 +1,9 @@
+import 'dart:async';
+
+import 'package:evangelion/core/common/cycle_phase.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
+import 'package:evangelion/core/domain/entities/selah_countdown.dart';
 import 'package:evangelion/features/home/presentation/home_l10n.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
@@ -8,49 +13,87 @@ import 'package:flutter/material.dart';
 ///
 /// `redesign.html:530-533` — `.selah`, its two lines, and the `.breathing` circle.
 ///
-/// ## AND THE BUTTON IS **INERT**, WHICH IS A PHASE BOUNDARY AND NOT AN OMISSION
+/// ## AND NOW THE BUTTON **DOES** SOMETHING
 ///
-/// `:1330-1342` is the prototype's timer: a 60-second countdown, a live region in
-/// the card's corner, `.selah.active` swapping the button to a filled gold, and
-/// `focusDim = true` dimming the screen around the reader. **Phase 7 Step 3 owns
-/// all of it** ("Ritual. Selah timer · focus mode · vespers auto-dim · breath
-/// guide · haptics"), and Task 5.2's range is `:513-538` — the markup and the
-/// styling, not the behaviour.
+/// `:1330-1342` is the prototype's timer: a 60-second countdown, a live number
+/// in the card's corner, `.selah.active` swapping the button to a filled gold,
+/// and `focusDim = true` dimming the screen around the reader. Phase 7 Step 3
+/// owns all of it ("Ritual. Selah timer · focus mode · vespers auto-dim ·
+/// breath guide · haptics"), and this file is that step's timer.
 ///
-/// So the circle renders, it is 44×44 with the prototype's rim and fill, and it is
-/// **genuinely inert**: `Semantics(button: true, enabled: false)` with the
-/// unavailable sentence appended to its name, no tap and no focus stop, at 45%
-/// opacity. That is the same treatment the login's ghost pills and the library's
-/// book cards get (`:509`, `:1312-1318`), and it is the arrangement the old
-/// `SocialAuthButton`'s doc argued for: "without it this control is a dead route,
-/// and that is what this function fixes" — a control that explains itself. The
-/// redesigned `/login` deleted that widget, and the argument it made did not go
-/// with it.
+/// The **counting** is `core/domain/entities/selah_countdown.dart`'s — the
+/// arithmetic is a domain fact and the clock is a widget's — and the **haptic
+/// vocabulary** is `core/domain/entities/ritual_haptic.dart`'s.
 ///
-/// ## AND THE COUNT IS NOT THE PROTOTYPE'S LITERAL
+/// ## THE COUNT IS THE **READER'S** CHOICE
 ///
-/// `:531` writes `60 seconds of silence` and `applyLang` rewrites it from
-/// `selahDur = 60` with `N()` (`:990`), which is this arm's numerals. So the line is
-/// a **composed** string with the duration as a placeholder, and [seconds] is the
-/// one number this widget invents a home for. It comes from [defaultSeconds] and
-/// not from a setting: `eva.ritual.*` is Task 5.7's key namespace and the reader
-/// chooses it there.
-class SelahCard extends StatelessWidget {
-  /// The card: the word, the duration, and the inert circle.
+/// `UserSettings.selahLengthSec` is the length the reader picked in the
+/// Workshop (`eva/redesign.html:684` — a 15…120 second range, stepped by 5),
+/// and it is what [seconds] carries. The prototype's `selahDur` is the same
+/// fact in the same place: `:1324` declares it and `:1518` restores it.
+///
+/// ## AND THE PROTOYPE'S THREE-PART RHYTHM BECOMES **ONE** BUZZ
+///
+/// `:1330` asks for `haptic([30,40,30])` — two buzzes with a pause — and
+/// `HapticFeedback` has no pattern API. `ritual_haptic.dart` records that
+/// loss: the rhythm becomes its strongest element, a heavy impact.
+class SelahCard extends StatefulWidget {
+  /// The card: the word, the duration, and the control that starts the silence.
   const SelahCard({
     required this.seconds,
-    required this.unavailableReason,
+    required this.beginLabel,
+    required this.endLabel,
+    required this.amenLabel,
+    required this.hapticsEnabled,
+    this.onCompleted,
     super.key,
   });
 
-  /// How long the silence is, in seconds. `redesign.html:1323` — `selahDur = 60`.
+  /// How long the silence is, in seconds. `redesign.html:1324` —
+  /// `selahDur = 60` — and the reader's own choice in the Workshop.
   final int seconds;
 
-  /// Appended to the circle's accessible name, never to what is painted.
+  /// The control's accessible name while the silence is **not** running.
   ///
-  /// A parameter and not a constant here, for `AppTopBar`'s reason: a second copy
-  /// of one ARB string inside a widget is a second place to translate one sentence.
-  final String unavailableReason;
+  /// **Written, and not transcribed**: the prototype's button carries
+  /// `title="selah"` (`:533`), which names the thing rather than the action,
+  /// and this client names the action because §14 asks for a control whose
+  /// name says what it does.
+  final String beginLabel;
+
+  /// The control's accessible name while the silence **is** running.
+  ///
+  /// Written for the same reason as [beginLabel].
+  final String endLabel;
+
+  /// The message the finished silence shows.
+  ///
+  /// `eva/redesign.html:970` — `amen:["selah · amen","سِلاه · آمين"]`.
+  ///
+  /// ## AND WHY IT IS DRAWN **IN THE CARD** AND NOT AS A TOAST
+  ///
+  /// The prototype raises it as a **toast** — `:1330`'s
+  /// `toast(tr('amen'))` — and a toast is anchored to the screen root
+  /// (`:466`). This client has no app-level toast surface: the communion page
+  /// builds its own, and `/` has none.
+  ///
+  /// So the message takes the place of the **count** — the same corner, the
+  /// same gold, the same 16px — and the divergence is recorded here rather
+  /// than hidden. The alternative rejected was a second toast implementation
+  /// in a second feature, which is the duplication this repository refuses
+  /// wherever it finds it.
+  final String amenLabel;
+
+  /// Whether the reader has asked for haptics.
+  ///
+  /// `UserSettings.haptics` — the Workshop's own switch (`:689`).
+  final bool hapticsEnabled;
+
+  /// Runs when the silence has run its course.
+  ///
+  /// The page's half of the prototype's `toast(tr('amen'))` (`:1330`) — the
+  /// toast is anchored to the screen root and the screen owns it.
+  final VoidCallback? onCompleted;
 
   /// The silence's length. `redesign.html:1323` — `let selahDur = 60`.
   static const int defaultSeconds = 60;
@@ -133,10 +176,154 @@ class SelahCard extends StatelessWidget {
   static const String glyph = '✦';
 
   @override
+  State<SelahCard> createState() => _SelahCardState();
+}
+
+class _SelahCardState extends State<SelahCard> {
+  /// The countdown, or `null` while the silence is not running.
+  SelahCountdown? _countdown;
+
+  /// The clock behind the countdown.
+  ///
+  /// **Cancelled in [dispose], and that is not tidiness.** `flutter_test` fails
+  /// a test on a pending timer, and a reader who leaves `/` inside a silence
+  /// would otherwise be counted down by a timer whose widget is gone.
+  Timer? _timer;
+
+  /// Whether this card is holding the app's focus dim.
+  ///
+  /// The scene's dim is a **count** (see `LumenScene.dimFocus`), so a card
+  /// that is disposed while it is dimming has to give its hold back — and the
+  /// flag is what says whether it has one.
+  bool _dimming = false;
+
+  /// Whether the finished silence is still showing its message.
+  bool _amen = false;
+
+  /// The clock behind the amen message.
+  ///
+  /// **Cancelled in [dispose]**, for the same reason the countdown's is: a
+  /// pending timer fails a `flutter_test` case, and a reader who leaves `/`
+  /// inside the amen's 1800 ms would otherwise be held by a timer whose widget
+  /// is gone.
+  Timer? _amenTimer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    _amenTimer?.cancel();
+    _amenTimer = null;
+    if (_dimming) {
+      _scene?.undimFocus();
+      _dimming = false;
+    }
+    super.dispose();
+  }
+
+  /// The aurora's scene, or `null` before the first dependency read.
+  ///
+  /// **A field and not a lookup at the point of use**, because
+  /// `NeuralMotionScope.of` is a *dependent* lookup and Flutter forbids one in
+  /// [dispose] — which is exactly where the dim has to be given back.
+  LumenScene? _scene;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scene = NeuralMotionScope.of(context).lumenScene;
+  }
+
+  /// Begins the silence.
+  void _begin() {
+    // A silence of no seconds is not a state the reader can reach — the
+    // Workshop's range is 15…120 (`:684`) — and a countdown that finished
+    // before it began would toast an amen nobody waited for. So the card
+    // refuses it at its own boundary rather than letting the domain throw
+    // inside a tap handler.
+    final int total = widget.seconds > 0
+        ? widget.seconds
+        : SelahCard.defaultSeconds;
+    _timer?.cancel();
+    setState(() {
+      _countdown = SelahCountdown.start(total);
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
+    // `:1338` — `focusDim=true; haptic(20);`
+    _scene?.dimFocus();
+    _dimming = true;
+    fireRitualHaptic(RitualHaptic.selahStarted, enabled: widget.hapticsEnabled);
+  }
+
+  /// Ends the silence early — the prototype's `selahStop(false)`.
+  void _stop() {
+    _timer?.cancel();
+    _timer = null;
+    setState(() {
+      _countdown = null;
+    });
+    _releaseDim();
+  }
+
+  /// One second of the silence.
+  void _onTick(Timer timer) {
+    final SelahCountdown? current = _countdown;
+    if (current == null) return;
+    final SelahCountdown next = current.tick();
+    if (next.isComplete) {
+      _complete();
+      return;
+    }
+    setState(() {
+      _countdown = next;
+    });
+  }
+
+  /// The silence has run its course — the prototype's `selahStop(true)`.
+  void _complete() {
+    _timer?.cancel();
+    _timer = null;
+    setState(() {
+      _countdown = null;
+    });
+    _releaseDim();
+    // `:1330` — `if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5;
+    // haptic([30,40,30]); }`
+    _scene?.raiseSpike(kSelahCompletionSpike);
+    fireRitualHaptic(
+      RitualHaptic.selahCompleted,
+      enabled: widget.hapticsEnabled,
+    );
+    // The amen, in the count's corner, for the prototype's toast duration —
+    // `:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`.
+    _amenTimer?.cancel();
+    setState(() {
+      _amen = true;
+    });
+    _amenTimer = Timer(kSelahAmenDuration, () {
+      if (!mounted) return;
+      setState(() {
+        _amen = false;
+      });
+    });
+    widget.onCompleted?.call();
+  }
+
+  /// Gives the app's focus dim back, if this card was holding it.
+  void _releaseDim() {
+    if (!_dimming) return;
+    _dimming = false;
+    _scene?.undimFocus();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
     final EvaColors colors = context.colors;
     final TextDirection direction = Directionality.of(context);
+    final SelahCountdown? countdown = _countdown;
+    final bool running = countdown != null;
+    final bool amen = _amen;
 
     return GlassSurface(
       // `tint`, and not `bloom`: `.selah` (`:261-262`) carries no `.bloom` child.
@@ -144,8 +331,23 @@ class SelahCard extends StatelessWidget {
       // and is refused by §13.4's one-per-app budget — spent, once, on the day's
       // own card. `tint` is also the default, so the line is the comment's — recorded
       // here rather than left for a reader to find in the CSS.
-      radius: radius,
-      padding: padding,
+      radius: SelahCard.radius,
+      padding: SelahCard.padding,
+      // `:263` — `.selah.active{border-color:rgba(232,176,75,.5);
+      // background:rgba(232,176,75,.06)}`. The card turns gold while the silence
+      // runs, and `GlassSurface`'s two overrides are how it says so.
+      //
+      // **The prototype TRANSITIONS them** (`:262` — `transition:.3s
+      // var(--e-spring)`) and this client does not: the glass surface's
+      // decoration is not animated, and animating it would mean a second
+      // decoration model in the design system. The change snaps, which is also
+      // what §14 asks for under reduced motion.
+      fill: running
+          ? colors.ember.withValues(alpha: kSelahActiveFillAlpha)
+          : null,
+      borderColor: running
+          ? colors.ember.withValues(alpha: kSelahActiveBorderAlpha)
+          : null,
       child: Row(
         children: <Widget>[
           Expanded(
@@ -161,19 +363,19 @@ class SelahCard extends StatelessWidget {
                   // pair at `:970` is `["Selah","سِلاه"]`, tashkeel and all.
                   style: arabicAware(
                     Theme.of(context).textTheme.titleMedium!.copyWith(
-                      fontSize: titleSize,
+                      fontSize: SelahCard.titleSize,
                       fontWeight: FontWeight.w600,
                       color: colors.ink,
                     ),
                     direction,
                   ),
                 ),
-                const SizedBox(height: subtitleGap),
+                const SizedBox(height: SelahCard.subtitleGap),
                 Text(
                   // **Uppercased under LTR**, like every `.mono` run: `.ds` at `:265`
                   // declares `text-transform: uppercase` and `[dir=rtl] .mono` (`:136`)
                   // removes it on the Arabic arm only.
-                  monoCapsText(strings.selahSeconds(seconds), direction),
+                  monoCapsText(strings.selahSeconds(widget.seconds), direction),
                   // `.ds{font-family: var(--mono); font-size:9px;
                   // letter-spacing:.14em; text-transform:uppercase; color:var(--ink-2)}`
                   // — `:265`, and `[dir=rtl] .selah .ds` at `:266` swaps the
@@ -189,11 +391,11 @@ class SelahCard extends StatelessWidget {
                   style: arabicAware(
                     EvaTypography.monoCaps(colors).copyWith(
                       fontSize: direction == TextDirection.rtl
-                          ? subtitleSizeArabic
-                          : subtitleSize,
+                          ? SelahCard.subtitleSizeArabic
+                          : SelahCard.subtitleSize,
                       letterSpacing: direction == TextDirection.rtl
                           ? 0
-                          : subtitleTracking,
+                          : SelahCard.subtitleTracking,
                       color: colors.ink2,
                     ),
                     direction,
@@ -202,68 +404,284 @@ class SelahCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: gap),
-          _BreathingButton(label: strings.homeSelah, reason: unavailableReason),
+          // ## THE COUNT, AND WHERE IT IS DRAWN
+          //
+          // `:532` — `<span class="mono" id="selahCount" style="color:var(--gold);
+          // font-size:16px;display:none">60</span>`. It sits **between** the word
+          // block and the button, it is **hidden** until the silence starts, and
+          // the prototype's `N()` renders the number in this arm's numerals.
+          //
+          // The gap is the card's own `gap: 14px` (`:262`), and a hidden element
+          // creates no gap in CSS — so the count's `SizedBox` is here rather
+          // than a constant gap before the button.
+          if (running || amen) ...<Widget>[
+            const SizedBox(width: SelahCard.gap),
+            Text(
+              amen ? widget.amenLabel : strings.digits(countdown!.remaining),
+              style: EvaTypography.monoCaps(colors).copyWith(
+                fontSize: kSelahCountSize,
+                letterSpacing: 0,
+                color: colors.ember,
+              ),
+            ),
+          ],
+          const SizedBox(width: SelahCard.gap),
+          _BreathingButton(
+            active: running,
+            label: running ? widget.endLabel : widget.beginLabel,
+            onPressed: running ? _stop : _begin,
+          ),
         ],
       ),
     );
   }
 }
 
-/// The 44px circle with the `✦` in it, inert.
+/// The 44px circle with the `✦` in it, and the ring that breathes.
 ///
-/// `redesign.html:267-269`. Private, so the only way to draw one is through
+/// `redesign.html:267-271`. Private, so the only way to draw one is through
 /// [SelahCard] — the same arrangement `AppTopBar`'s `_Avatar` used, and the
-/// reason this class's inertness cannot be bypassed by a call site that forgets
-/// the reason string.
-class _BreathingButton extends StatelessWidget {
-  const _BreathingButton({required this.label, required this.reason});
+/// reason this class's behaviour cannot be bypassed by a call site that forgets
+/// to pass a label.
+///
+/// ## AND THE **RING** IS THE PROTOTYPE'S `breatheRing`
+///
+/// `:269-270` — `animation:breatheRing 8s ease-in-out infinite`, and `:271` —
+/// `.selah.active .breathing{animation-duration:2s;…}` — the same animation at
+/// four times the speed while the silence runs.
+///
+/// **The period is the prototype's and the curve is CSS's `ease-in-out`** —
+/// which is byte-for-byte Flutter's `Curves.easeInOut` (`Cubic(0.42, 0, 0.58,
+/// 1)`), so the client applies the prototype's own curve and not an
+/// approximation of it.
+class _BreathingButton extends StatefulWidget {
+  const _BreathingButton({
+    required this.active,
+    required this.label,
+    required this.onPressed,
+  });
 
+  /// Whether the silence is running.
+  final bool active;
+
+  /// The control's accessible name.
   final String label;
-  final String reason;
+
+  /// Runs when the control is pressed.
+  final VoidCallback onPressed;
+
+  @override
+  State<_BreathingButton> createState() => _BreathingButtonState();
+}
+
+class _BreathingButtonState extends State<_BreathingButton>
+    with SingleTickerProviderStateMixin {
+  /// The ring's clock.
+  ///
+  /// **A controller of its own, and the §13.2 budget is not engaged.** §13.2's
+  /// collapse is about the **ambient** — the prototype's sixty-four orb
+  /// animations — and the dock's own beam and ink already own a controller
+  /// (`lumen_dock.dart`). A control's own pulse is not an ambient orb.
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _period,
+  );
+
+  /// Whether the ring is currently running.
+  ///
+  /// **A flag and not the controller's state**, because the controller is
+  /// *stopped* under reduced motion and *running* otherwise, and the two are
+  /// the same answer asked twice.
+  bool _running = false;
+
+  /// The ring's period.
+  ///
+  /// `:269` — `8s` — and `:271` — `2s` while the silence runs.
+  Duration get _period =>
+      widget.active ? kSelahActiveRingPeriod : kSelahRingPeriod;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // **Not in [initState]**, because `MediaQuery.disableAnimationsOf` is an
+    // inherited-widget lookup and Flutter forbids one before
+    // `initState` completes. The ring therefore starts on the first
+    // dependency pass, which is the framework's own answer to "read an
+    // inherited widget".
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(_BreathingButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active == widget.active) return;
+    // `:271` — the running pulse is the same animation at four times the
+    // speed. The phase **restarts**, which is not what CSS does (a changed
+    // `animation-duration` keeps the elapsed time and recomputes the
+    // progress) — and the restart is the better picture: the silence's
+    // faster pulse begins with the silence.
+    _controller.duration = _period;
+    _controller.repeat();
+    _running = true;
+  }
+
+  /// Runs the ring, or holds it still under reduced motion.
+  void _sync() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      // §14: "jump straight to the end state". The ring's end state is its
+      // **0%/100% keyframe** — `scale(.92)` and no glow — which is the state it
+      // rests at, and not the 50% peak.
+      _controller.value = 0;
+      _controller.stop(canceled: false);
+      _running = false;
+      return;
+    }
+    if (_running) return;
+    _controller.repeat();
+    _running = true;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
 
-    final Widget circle = Container(
-      width: SelahCard.diameter,
-      height: SelahCard.diameter,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: colors.ember.withValues(alpha: SelahCard.fillAlpha),
-        border: Border.all(
-          color: colors.ember.withValues(alpha: SelahCard.rimAlpha),
-          width: SelahCard.rimWidth,
-        ),
-      ),
-      child: FourPointedStar(
-        size: SelahCard.glyphSize,
-        // `colors.ember` passed rather than baked into the star: `:267-268`'s
-        // `rgba(232,176,75,.6)` rim and `rgba(232,176,75,.08)` fill are the
-        // *circle's*, and the glyph inside it is the prototype's `--gold` at
-        // full strength — which on this palette is `ember`, not the 60%-alpha rim
-        // a reader would otherwise expect from a 44px ring. See
-        // `four_pointed_star.dart`'s `color` for why the widget takes it.
-        color: colors.ember,
-      ),
-    );
-
-    // **No `breatheRing` animation.** `redesign.html:269-270` is
-    // `animation: breatheRing 8s ease-in-out infinite`, and `:48-50` kills it under
-    // `.rm`. Phase 7 Step 3 owns the breath guide ("breath guide" is its own item)
-    // and §13.2 collapses the app's ambient motion to four shared clocks, so a
-    // second controller here would be spending budget on a decoration whose *active*
-    // form — the filled gold circle at 2s — belongs to the timer this card cannot
-    // run yet. The resting circle is painted; the pulse is not, and the doc above
-    // says which phase owns it.
     return Semantics(
       button: true,
-      enabled: false,
-      label: '$label — $reason',
-      excludeSemantics: true,
-      child: Opacity(opacity: 0.45, child: circle),
+      // **Explicitly enabled**, because a node that offers a tap and does not
+      // say whether it is enabled reads as `Tristate.none` — and a screen
+      // reader is then left to guess. The old inert circle said
+      // `enabled: false`; this one says `true`, and the change is the
+      // behaviour change.
+      enabled: true,
+      label: widget.label,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (BuildContext context, Widget? child) {
+            // The ring's own keyframes — `:270`:
+            // `@keyframes breatheRing{0%,100%{transform:scale(.92);
+            // box-shadow:0 0 0 0 rgba(232,176,75,.25)}
+            // 50%{transform:scale(1.06);box-shadow:0 0 22px 4px rgba(232,176,75,.28)}}`
+            //
+            // The triangle is `core/common/cycle_phase.dart`'s, and the curve is
+            // CSS's `ease-in-out` — which is `Curves.easeInOut` exactly.
+            final double half = halfCycleProgress(_controller.value);
+            final double eased = Curves.easeInOut.transform(half);
+            final double scale =
+                kSelahRingScaleMin +
+                (kSelahRingScaleMax - kSelahRingScaleMin) * eased;
+            final double glow =
+                kSelahRingGlowMin +
+                (kSelahRingGlowMax - kSelahRingGlowMin) * eased;
+
+            return Transform.scale(
+              scale: scale,
+              child: Container(
+                width: SelahCard.diameter,
+                height: SelahCard.diameter,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.active
+                      // `:271` — `.selah.active .breathing{…color:#1c1608;
+                      // background:var(--gold)}`. The button fills gold and the
+                      // glyph goes to the ink on it.
+                      ? colors.ember
+                      : colors.ember.withValues(alpha: SelahCard.fillAlpha),
+                  border: Border.all(
+                    color: widget.active
+                        ? colors.ember
+                        : colors.ember.withValues(alpha: SelahCard.rimAlpha),
+                    width: SelahCard.rimWidth,
+                  ),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: colors.ember.withValues(alpha: glow),
+                      blurRadius: glow,
+                      spreadRadius: kSelahRingGlowSpread,
+                    ),
+                  ],
+                ),
+                child: FourPointedStar(
+                  size: SelahCard.glyphSize,
+                  // `colors.ember` passed rather than baked into the star:
+                  // `:267-268`'s `rgba(232,176,75,.6)` rim and
+                  // `rgba(232,176,75,.08)` fill are the *circle's*, and the glyph
+                  // inside it is the prototype's `--gold` at full strength —
+                  // which on this palette is `ember`, not the 60%-alpha rim a
+                  // reader would otherwise expect from a 44px ring. See
+                  // `four_pointed_star.dart`'s `color` for why the widget takes
+                  // it.
+                  //
+                  // **And the ink flips when the circle fills** — `:271`'s
+                  // `color:#1c1608`, which is the prototype's ink on its gold.
+                  color: widget.active ? colors.onEmber : colors.ember,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }
+
+/// The ring's period while the silence is **not** running.
+///
+/// `eva/redesign.html:269` — `animation:breatheRing 8s ease-in-out infinite`.
+const Duration kSelahRingPeriod = Duration(seconds: 8);
+
+/// The ring's period while the silence **is** running.
+///
+/// `eva/redesign.html:271` — `.selah.active .breathing{animation-duration:2s;…}`.
+const Duration kSelahActiveRingPeriod = Duration(seconds: 2);
+
+/// The ring's smallest scale. `eva/redesign.html:270` — `0%,100%{transform:
+/// scale(.92);…}`.
+const double kSelahRingScaleMin = 0.92;
+
+/// The ring's largest scale. `eva/redesign.html:270` — `50%{transform:
+/// scale(1.06);…}`.
+const double kSelahRingScaleMax = 1.06;
+
+/// The ring's smallest glow. `eva/redesign.html:270` — `0 0 0 0`.
+const double kSelahRingGlowMin = 0;
+
+/// The ring's largest glow. `eva/redesign.html:270` — `0 0 22px 4px`.
+const double kSelahRingGlowMax = 22;
+
+/// The ring's glow's spread. `eva/redesign.html:270` — the `4px` of
+/// `0 0 22px 4px`.
+const double kSelahRingGlowSpread = 4;
+
+/// The card's gold wash while the silence runs.
+///
+/// `eva/redesign.html:263` — `background:rgba(232,176,75,.06)`.
+const double kSelahActiveFillAlpha = 0.06;
+
+/// The card's gold rim while the silence runs.
+///
+/// `eva/redesign.html:263` — `border-color:rgba(232,176,75,.5)`.
+const double kSelahActiveBorderAlpha = 0.5;
+
+/// The count's size. `eva/redesign.html:532` — `font-size:16px`.
+const double kSelahCountSize = 16;
+
+/// How long the finished silence's message stays up.
+///
+/// `eva/redesign.html:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`
+/// — the prototype's own toast duration.
+const Duration kSelahAmenDuration = Duration(milliseconds: 1800);
+
+/// The spike the aurora takes when the silence ends.
+///
+/// `eva/redesign.html:1330` — `if(V)V.spike=.5;`.
+const double kSelahCompletionSpike = 0.5;

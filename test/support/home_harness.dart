@@ -1,3 +1,4 @@
+import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -9,6 +10,7 @@ import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -28,6 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
 import 'design_system_harness.dart';
+import 'settings_harness.dart';
 
 /// The shared fixture for every `/` widget test.
 ///
@@ -665,6 +668,21 @@ HomeHarness harness({
 /// reached and left inside one frame, while the *failed* state has to be reached and
 /// then re-read — and a suite that hard-codes a number here fails in whichever of
 /// those it did not think about.
+///
+/// ## AND THE **SETTINGS SCOPE** IS INSTALLED, BECAUSE `/` READS THE READER'S
+/// CHOICES
+///
+/// Phase 7's ritual put the selah's length and the haptics switch on this
+/// screen, and both live in `UserSettings`. `SettingsScope.of` falls back to
+/// the locator when no scope is above the context — and the fallback is
+/// **not watched**, so a page pumped bare would not rebuild when a setting
+/// changes.
+///
+/// **The scope is installed WITHOUT the `EvaTypeScale`** that
+/// `settings_harness.dart`'s own `settingsScope` installs, and that is
+/// deliberate: the type scale would override the harness's own `textScale`
+/// with the step's own 1.0, and `home_text_scale_test.dart` exists to prove
+/// that a 1.22× surface survives.
 Future<void> pumpHome(
   WidgetTester tester, {
   required HomeBloc bloc,
@@ -673,11 +691,18 @@ Future<void> pumpHome(
   double textScale = 1.0,
   bool disableAnimations = false,
   int frames = 6,
+  UserSettings? settings,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+
+  // The reader's own preferences, over the **real** store — the same fixture
+  // `/settings` uses, so a test that says "the reader chose a 30-second
+  // selah" is asserting against a persisted choice rather than against a
+  // value the test handed the widget.
+  final SettingsHarness harness = settingsHarness(initial: settings);
 
   await tester.pumpWidget(
     evaPrimitiveHarness(
@@ -695,7 +720,11 @@ Future<void> pumpHome(
           : TextDirection.ltr,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
-      child: HomePage(bloc: bloc),
+      child: SettingsScope(
+        key: const Key('test-settings-scope'),
+        handle: harness.handle,
+        child: HomePage(bloc: bloc),
+      ),
     ),
   );
   await pumpFrames(tester, frames);

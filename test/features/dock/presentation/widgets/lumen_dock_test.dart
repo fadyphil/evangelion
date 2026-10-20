@@ -410,6 +410,69 @@ void main() {
     });
   });
 
+  group('the dock and §14\'s reduced motion', () {
+    testWidgets(
+      'the active marker is NOT inverted when reduced motion is turned back '
+      'off',
+      (WidgetTester tester) async {
+        // ## THE STATE THE READER IS IN
+        //
+        // **Reduced motion ON, and the READ slot is the active one.** The slot
+        // owns one `AnimationController`, and under reduced motion the
+        // rendered value ignores it — so the controller is **frozen** at
+        // whatever it had, and the freeze is what the next half is about.
+        await pumpPrimitive(tester, _dockAt(1), disableAnimations: true);
+
+        final EvaColors colors = _colorsOf(tester, find.byType(LumenDock));
+        List<Text> labels = tester.widgetList<Text>(find.byType(Text)).toList();
+        expect(
+          labels[1].style?.color,
+          colors.ember,
+          reason: 'the read slot is the active one under reduced motion',
+        );
+        expect(labels[0].style?.color, colors.ink2);
+
+        // ## AND THEN THE READER TURNS IT OFF
+        //
+        // **The same tree**, so the slots' `State` — and their frozen
+        // controllers — survive: the second pump is the same widget types in
+        // the same places, so nothing is rebuilt from scratch. And the HOME
+        // slot is the active one now, so the two slots have **swapped**.
+        await pumpPrimitive(tester, _dockAt(0));
+
+        // **And the beam's own 450ms runs.** The flip resynchronises the
+        // controller and then animates it, so the ink is only at its end
+        // state once the transition is over.
+        await tester.pump(const Duration(milliseconds: 600));
+
+        // ## THE MARKER, READ OFF THE RENDERED INK
+        //
+        // **The painted colour, and not a flag.** The old defect was a
+        // *rendering* defect — the active slot in the inactive ink and the
+        // other way round — and a boolean about the slot's state would have
+        // been green throughout it.
+        labels = tester.widgetList<Text>(find.byType(Text)).toList();
+        final Color? home = labels[0].style?.color;
+        final Color? read = labels[1].style?.color;
+
+        expect(
+          home,
+          colors.ember,
+          reason:
+              'the home slot is the active one now, so it is painted in the '
+              'gold — it is painted in $home and the read slot in $read',
+        );
+        expect(
+          read,
+          colors.ink2,
+          reason:
+              'the read slot is the inactive one now, so it is painted in the '
+              'quiet ink — it is painted in $read and the home slot in $home',
+        );
+      },
+    );
+  });
+
   group('the orb', () {
     testWidgets('is 30 by 30', (WidgetTester tester) async {
       // **In a loose parent**, for the reason the dock's own fixture records:
@@ -501,6 +564,20 @@ final Key _orbKey = UniqueKey();
 
 /// The five slots, in the prototype's order (`eva/redesign.html:703-707`).
 ///
+/// **One copy, and not a list written out twice.** [_dock] and [_dockAt] both
+/// build the same five slots, and two copies of a fixture are two things that
+/// can drift apart — which is the failure this repository's own
+/// `project_import_graph.dart` records.
+const List<LumenDockItem> _prototypeSlots = <LumenDockItem>[
+  LumenDockItem(label: 'Home', glyph: Icon(Icons.home)),
+  LumenDockItem(label: 'Read', glyph: Icon(Icons.menu_book)),
+  LumenDockItem(label: 'Today', glyph: LumenOrb()),
+  LumenDockItem(label: 'Communion', glyph: Icon(Icons.emoji_events)),
+  LumenDockItem(label: 'Journey', glyph: Icon(Icons.person)),
+];
+
+/// The five slots, in the prototype's order (`eva/redesign.html:703-707`).
+///
 /// **Anchored to the bottom of the surface**, which is where the prototype
 /// puts it (`:208` — `position:absolute;left:0;right:0;bottom:0`) and which
 /// is also what gives the dock the *loose* height constraint it needs: a
@@ -513,15 +590,25 @@ Widget _dock({int activeIndex = 0, void Function(int index)? onSelect}) =>
       child: LumenDock(
         activeIndex: activeIndex,
         onSelect: onSelect ?? (int _) {},
-        items: const <LumenDockItem>[
-          LumenDockItem(label: 'Home', glyph: Icon(Icons.home)),
-          LumenDockItem(label: 'Read', glyph: Icon(Icons.menu_book)),
-          LumenDockItem(label: 'Today', glyph: LumenOrb()),
-          LumenDockItem(label: 'Communion', glyph: Icon(Icons.emoji_events)),
-          LumenDockItem(label: 'Journey', glyph: Icon(Icons.person)),
-        ],
+        items: _prototypeSlots,
       ),
     );
+
+/// The same dock, with the active slot **always named**.
+///
+/// **A separate helper, and not [_dock] with a different argument.** [_dock]'s
+/// default is slot 0, and saying "slot 0" through it is a **redundant
+/// argument** the analyzer rejects — and a test whose whole subject is "slot 0
+/// is the active one now" cannot be written through a helper whose default
+/// already says so.
+Widget _dockAt(int activeIndex) => Align(
+  alignment: Alignment.bottomCenter,
+  child: LumenDock(
+    activeIndex: activeIndex,
+    onSelect: (int _) {},
+    items: _prototypeSlots,
+  ),
+);
 
 /// The palette the tree under [finder] was pumped with.
 EvaColors _colorsOf(WidgetTester tester, Finder finder) =>
