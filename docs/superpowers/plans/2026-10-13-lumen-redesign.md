@@ -2004,7 +2004,11 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > (3) The reduced-motion `0.15` scale on `u_time` (`:888`) is Phase 7's
 > ("a shader clock frozen at `t = 0`"); the client freezes the clock
 > instead, which is a different answer to the same question and is recorded
-> here rather than claimed as the port. (4) The prototype's loop **stops**
+> here rather than claimed as the port. **RESOLVED in Phase 7: the freeze is
+> at ZERO** — not at "wherever it had reached" — so the aurora is the same
+> still image for every reader and every session, and turning reduced motion
+> off restores the phase the aurora had reached rather than restarting it.
+> The Phase 7 section carries the full argument. (4) The prototype's loop **stops**
 > while the aurora is hidden (`:889` returns before `:891-896`), so its state
 > freezes; the client's scene keeps easing, so the aurora is **converged**
 > when it comes back rather than mid-transition. (5) The **"Curtain shape"
@@ -2381,26 +2385,37 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 
 # Phase 7 — Ritual, locale, close
 
-- [ ] **Step 1: Port ~90 `I18N` keys** (`eva/redesign.html:924-977`) into
+- [x] **Step 1: Port ~90 `I18N` keys** (`eva/redesign.html:924-977`) into
   `lib/l10n/app_*.arb`, including the Arabic-Indic digit transform at `:981`.
-  **In flight.**
-- [ ] **Step 2: `flutter gen-l10n`, then hand-format.** Raw output is **not**
+  **Done — and the estimate was stale.** The prototype's table holds **128**
+  rows; **103** are carried verbatim, **13** under another name or as a live
+  composition, and **12** are excluded with a reason each. **No key was added**,
+  and the twenty-five are now **measured at test time** — see the decision
+  below.
+- [x] **Step 2: `flutter gen-l10n`, then hand-format.** Raw output is **not**
   `dart format`-clean and the three committed files are hand-formatted.
-  Re-running the generator re-breaks gate 1. **In flight.**
+  Re-running the generator re-breaks gate 1. **Done — and nothing needed
+  regenerating**: the committed `lib/l10n/app_localizations*.dart` are
+  **byte-identical** to the generator's output after `dart format lib/l10n/`, so
+  the pair is in sync.
 - [x] **Step 3: Ritual.** Selah timer · focus mode (idle → dim) · vespers
   auto-dim (21:00–05:00) · breath guide · haptics via `HapticFeedback`
-  (`services` — no new dependency). **Shipped** — `feat(ritual)`, `25a6798`.
-- [ ] **Step 4: Reduce motion.** The prototype's `.rm` class kills 11 selectors
+  (`services` — no new dependency). **Shipped** — `feat(ritual)`, `25a6798`, and
+  **the three gaps closed** in this phase's second pass: the quiz's answer
+  haptics, the amen's toast, and the selah's flare (recorded, not ported).
+- [x] **Step 4: Reduce motion.** The prototype's `.rm` class kills 11 selectors
   at once (`:48-54`). The Flutter equivalent is `NeuralMotionScope` +
-  `EvaAnimate` + a shader clock frozen at `t = 0`. **In flight** — the
-  `.rm`-equivalent half is done; the shader clock's freeze is not.
+  `EvaAnimate` + a shader clock frozen at `t = 0`. **Done** — and the clock is
+  frozen at **zero**, not at "wherever it had reached", and the OS's own switch
+  is honoured **mid-session**, which it was not.
 - [x] **Step 5: Re-run every gate**, including the two `python3` checks:
 
 ```bash
 tool/verify_all.sh --with-build
 ```
 
-  **Green**, including the Linux build — `25a6798`.
+  **Green**, including the Linux build — `25a6798`, and green again after
+  this phase's second pass.
 - [x] **Step 6: Compare against the Phase 0 baseline.** Test count and coverage
   must not drop. If they do, `--update-baseline` is a deliberate reviewed
   decision with the diff explained — never a way to turn a red run green.
@@ -2492,13 +2507,14 @@ tool/verify_all.sh --with-build
 >    survives; the rhythm does not**, because the platform API this client may
 >    use (§8.4 forbids a dependency) cannot carry it.
 >    (`core/domain/entities/ritual_haptic.dart`.)
-> 2. **The amen is a card label and not a toast.** The prototype raises it as
->    a **toast** anchored to the screen root (`:1330`, `:466-468`, `:1393`),
->    and this client drew it in the card's count corner because "this client
->    has no app-level toast surface". **Being closed in this phase's second
->    pass** — the toast becomes a **shared design-system widget** rather than a
->    second implementation in a second feature, and the home page — the screen
->    — owns it, as the prototype's does.
+> 2. **The amen was a card label and not a toast — and is a toast now.** The
+>    prototype raises it as a **toast** anchored to the screen root (`:1330`,
+>    `:466-468`, `:1393`), and the client first drew it in the card's count
+>    corner because "this client has no app-level toast surface". **That was
+>    true and is now false**: the toast is a **shared design-system widget**
+>    (`core/design_system/widgets/eva_toast.dart`), the home page owns it — the
+>    screen owns it, as the prototype's does — and the card's half is the
+>    moment the silence ran its course.
 > 3. **The card's gold snaps instead of transitioning.** The prototype
 >    transitions the card's border and fill over `.3s var(--e-spring)`
 >    (`:262`); this client does not, because the glass surface's decoration
@@ -2523,8 +2539,10 @@ tool/verify_all.sh --with-build
 >    animation's widest keyframe**, which is `scaleX(1)` at `opacity:.6`.
 >    (`features/reading/presentation/widgets/breath_guide_line.dart`.)
 >
-> **And the sixth is not a divergence but an unwiring, and it is the one that
-> is still open.** The prototype's selah completion is one line (`:1330`):
+> **And the sixth is not a divergence but an unwiring, and it is CLOSED AS A
+> RECORDED DIVERGENCE rather than ported.**
+>
+> The prototype's selah completion is one line (`:1330`):
 >
 > ```js
 > if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5; haptic([30,40,30]); }
@@ -2535,7 +2553,325 @@ tool/verify_all.sh --with-build
 > `/reading` lights one star per verse as it crosses the scroll threshold
 > (`:1219`). **A selah lights no verse.** There is no honest key for it, and
 > the fiction table in ADR-0022 is the authority on what may be invented.
-> Recorded as an open question rather than answered with a made-up verse.
+>
+> **Two independent reasons, and the second one alone is decisive.** (1) The
+> entity cannot express a flare with no verse: `SkyEntry` carries a required
+> `chapter` and a required `verse`, and `0` is not a verse of any book. (2)
+> **The sky is not even on the screen the selah runs on** — the client's
+> `WitnessSky` is constructed in exactly one place, `/reading`, while the
+> prototype's is a **global background layer** (`:500` — `<div id="sky">` is a
+> direct child of `.screen`; `:116` — `position:absolute;inset:0;z-index:2`)
+> and so is over *every* route. A star lit on `/` would be invisible where the
+> selah ended.
+>
+> **And the house's answer for a celebration that has one already is the
+> cheer's**: a **row-local, transient** flare
+> (`core/design_system/widgets/leaderboard_row_tile.dart`), not a sky entry.
+> That is the ready-made shape for whoever owns the sky — and the prototype's
+> other two `addStar(true)` sites (`:1123` the cheer, `:1428` a correct answer)
+> are unwired for the same reason.
+
+> ### THREE WIDGETS WERE BUILT, EXPORTED, FULLY TESTED AND **PLACED ON NOTHING** —
+> ### AND THE GATE THAT EXISTS FOR THAT DEFECT **COULD NOT SEE THEM**
+>
+> `GoldFlecks` (`core/design_system/effects/`), `EvaAnimate`
+> (`core/design_system/motion/`) and `EvaTypeScale`
+> (`core/design_system/tokens/`) each had a full test suite and **no call site
+> anywhere in `lib/`**. That is recorded decision 144's exact shape — "a
+> component that is built, tested and never placed is invisible to every
+> assertion that does not look for it on the screen" — and every §7 gate was
+> green throughout.
+>
+> **And the orphan gate could not see them.** Its inventory is built from the
+> files under `*/widgets/` only:
+>
+> ```python
+> if "/widgets/" not in p.as_posix():
+>     continue
+> ```
+>
+> so a widget under `effects/`, `motion/` or `tokens/` is **invisible to the
+> gate** — not reported and passed over, but *not in the set the gate reasons
+> about at all*. A gate that quietly skips a class of declarations is the same
+> defect as one that cannot fail, and this is the **second** time this
+> repository has met it: `docs/DRIFT.md` §7 records `EvaChip`, and §7's fourth
+> bullet is the same shape again. The inventory is now **all of `lib/`**, and
+> the gate's notion of "placed" had to grow a meaning for the classes that
+> come with it — the **pages**, which are roots and therefore placed by
+> definition, and the non-widget helper classes, which the `DECL` pattern
+> already excludes.
+>
+> **The three placements, and the reason each one is where it is:**
+>
+> | widget | where it went | why there |
+> | --- | --- | --- |
+> | `GoldFlecks` | the quiz's **correct** option card, as a `Positioned.fill` overlay inside a `Stack(clipBehavior: Clip.none, fit: StackFit.passthrough)` | the brief's own rule — "tiny gold flecks floating near the correct option — sparse, 3–4 max" (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for "gold flecks fade in with 150ms delay") — and the superseded prototype's four of them (`eva/src/screens/QuizScreen.tsx:92-95`) |
+> | `EvaTypeScale` | `MaterialApp.router.builder` in `lib/app/app.dart` | **the site its own doc always named.** The install used to be spelled out by hand as a `MediaQuery` with a `copyWith(textScaler: …)`, which was the **third** spelling of the same rule — `/reading`'s §14 overflow suite and `/settings`'s stepper were the other two — and "a bare `MediaQuery` spelled three times is three rules" is `barrel.dart`'s own argument for one import surface |
+> | `EvaAnimate` | the option card's **entrance** — `:340`'s `opacity:0; transform:translateY(16px)` and `:341`'s `.opt.in{opacity:1; transform:none}` | the redesign specifies the motion and the client did not perform it, and the site is the one place where **both** of this widget's hazards are visible in the shipped tree |
+>
+> **The offsets are DERIVED, and the right-hand pair is derived from the card's
+> own width.** The prototype's flecks are positioned relative to the option
+> card's box (`eva/src/screens/QuizScreen.tsx:88`), and two of its four `x`
+> values are **screen pixels on a 390px frame** (`eva/src/App.tsx:89`): the
+> quiz screen's own padding is `20px 20px 28px` (`QuizScreen.tsx:41`), so the
+> card's box was `390 - 20 - 20 = 350` wide and `356` / `362` are therefore
+> **6 and 12 pixels past the card's right edge**. The redesign's `.opt` is
+> `width:100%` (`eva/redesign.html:337`) in a body padded `0 26px` (`:333`), so
+> pasting `356` would put the pair in the wrong place on every screen but a
+> 390px one and off the edge entirely on a narrower one. The **left** pair
+> (`-10`, `-15`) is already card-relative and does not move.
+>
+> **And the `Semantics` sits ABOVE the animation**, because
+> `RenderAnimatedOpacityMixin.visitChildrenForSemantics` skips the child while
+> the alpha is 0 — a fade *enclosing* the card's `Semantics` would leave an
+> interactive control with **no accessible name** for the length of the
+> entrance. That is the same defect the `SealFab` test found by hand-counting
+> pumps, and it is why the animation is *inside* the semantics and not around
+> it.
+
+> ### THE FLECKS CAME BACK, AND THE REASON IS THE **ORIGINAL PLAN'S VERIFY LINE** —
+> ### NOT A PREFERENCE FOR AN ORNAMENT
+>
+> The redesign's `.opt` paints border, fill and badge and nothing else, and
+> the client's suite used to assert the flecks' **absence**: *"the flecks died
+> with the prototype that drew them, and the sweep above is what keeps them
+> from coming back."* That was a **drift and not a decision**, and there are
+> two records that say so:
+>
+> * **`docs/plans/08-build-phases.md:112`** — the original build plan's Phase 8
+>   verify line reads: *"a widget test that `QuizOptionCard` shows `correct` +
+>   `GoldFlecks` after checking"*. **The flecks were required**, and the Lumen
+>   redesign dropped them without recording that it was dropping them. The
+>   original plan is the authority on what the design system owes the app, and
+>   a redesign that changes a screen does not silently change the inventory.
+> * **the brief's own rule** — "the ONLY sacred cues are: gold flecks (tiny,
+>   sparse, decorative), the verse marker, and beautiful typography"
+>   (`eva/src/imports/pasted_text/pasted-attachment.txt:51`), and "the reward
+>   is the gold flecks + color shift + satisfying copy" (`:98`).
+>
+> **The test was rewritten, not deleted**, and the reasoning it used to carry
+> is now the reasoning it carries the other way round. A reversal that
+> leaves no trace is a reversal nobody can audit.
+
+> ### THE `MediaQuery` WAS SPELLED THREE TIMES, AND THE THIRD WAS **IN THE
+> ### COMPOSITION ROOT**
+>
+> `EvaTypeScale` exists because "a bare `MediaQuery` spelled three times is
+> three rules" (`barrel.dart`'s own argument for one import surface), and the
+> three were `/reading`'s §14 overflow suite, `/settings`'s stepper, and
+> `MaterialApp.router.builder`. **The third was the one that mattered** — it is
+> the only site **above every route**, and so the only one whose scope is the
+> whole app.
+>
+> **The widget CLAMPS and the hand-written install did not**, and the clamp
+> changes nothing a reader can reach: `clampFontStep` is the identity on every
+> step in `kFontStepMin`…`kFontStepMax` (1…5), and `SettingsCubit` is the
+> authoritative boundary — it clamps on `load` and on every write. **The two
+> agree**, so the rendered scale is byte-identical for every step the reader
+> can persist, and the one input the clamp changes is the one neither the
+> stepper nor the cubit can produce. Defence in depth, and the assertion that
+> says so is in the suite.
+
+> ### THE SHADER CLOCK IS HELD AT **ZERO**, AND NOT AT "WHEREVER IT HAD REACHED"
+>
+> The plan's own wording is *"a shader clock frozen at `t = 0`"*, and the
+> prototype's own answer is different: `:888` scales the accumulator —
+> `timeAcc += dt*(reduceMotion?0.15:1)` — so the aurora keeps drifting, slowly.
+> **The client freezes instead**, which the divergence list at `:2004-2007`
+> already recorded, and the freeze is at **zero**.
+>
+> **Why zero and not "wherever it had reached".** A freeze at the value it had
+> is a function of **how long the app had been running** and of **when the
+> reader toggled the setting** — so two readers with the same settings would
+> see two different auroras, and a reduced-motion golden would be a fact about
+> the session that captured it. **At zero it is a function of the setting
+> alone**: the aurora is the same still image for every reader and every
+> session, and the reduced-motion frame is recordable. That is the same
+> discipline the vespers' injectable hour came from, one level up.
+>
+> **And the hold is a REPORTING rule, not a destruction of history.** The
+> accumulator keeps the elapsed time; turning reduced motion **off** restores
+> the aurora to the phase it had reached — same hue, same brightness, same
+> shader phase — rather than restarting it at zero. The alternative, resetting
+> the accumulator, would hand back a state the app has never been in: the old
+> colour at a brand-new shader phase. **The visible cost is stated rather than
+> smoothed over**: the shader's phase snaps from 0 back to the accumulated `t`
+> in one frame when motion comes back, which is the same jump in reverse that
+> turning it on caused. **The other three clocks are untouched and still stop
+> wherever they stood.**
+>
+> **The three tests whose expectations changed, by name**: the `toString` test
+> (a held clock and a never-started clock both print `seconds: 0.0`, so the
+> string now names `reducedMotion:`), the "stopping and restarting does NOT
+> rewind it" test, and the "freezing stops it" test. **They were updated, not
+> weakened** — the offset arithmetic they pin is unchanged and still asserted,
+> and the resume still lands on **6.0 s** and not on 1.0 s.
+
+> ### AND THE OS'S OWN SWITCH WAS **NOT HONOURED MID-SESSION**, AND TWO DOC
+> ### COMMENTS IN ONE FILE DISAGREED ABOUT IT
+>
+> The reader's own switch and the platform's switch both worked **at launch**,
+> and only the platform's worked **mid-session** — and it did not work at all.
+>
+> `NeuralMotionScope.didChangeAccessibilityFeatures` acts only
+> `if (widget.animationsEnabled == null)`, and `app.dart` **always** passes an
+> explicit value, because the answer it holds is the **combined** one. So the
+> scope's observer was **dead code**, and a reader who turned the OS's "reduce
+> motion" on while the app was open got it for the per-widget
+> `MediaQuery.disableAnimationsOf` checks — the framework updates that
+> `MediaQuery` — but **not** for the four shared clocks.
+>
+> **The defect survived because the file argued with itself.** `app.dart`'s
+> class doc said the signal was "honoured again if the reader toggles it
+> mid-session (`NeuralMotionScope` registers a `WidgetsBindingObserver`)" and
+> the helper's own doc, three paragraphs below, said the opposite: "passing an
+> explicit `false` here is what suppresses its observer". **Both were in the
+> same file**, and a reader who trusted the class doc was misled.
+>
+> **The fix is in the composition root**, because the scope cannot recompute a
+> value that combines the platform's signal with a **stored** preference it
+> does not know: `app.dart` observes the platform and rebuilds, and
+> `NeuralMotionScope.didUpdateWidget` — which already had the mechanism — does
+> the rest. The test is `test/app/app_settings_wiring_test.dart`'s *"the OS's
+> own switch, FLIPPED MID-SESSION"*, and it was **red before the fix**:
+> `Expected: <0> Actual: <2.5>`.
+>
+> **The generalisable form: a file that documents the same mechanism twice is a
+> file with two claims, and only one of them is checked.**
+
+> ### THE PROTOTYPE'S `.rm` KILLS ELEVEN SELECTORS AND **TWO OF THEM ARE DEAD**
+>
+> `:48-50` is one rule with eleven selectors. The client's coverage of it:
+>
+> | # | prototype selector | the client's equivalent | honoured |
+> | --- | --- | --- | --- |
+> | 1 | `.orbmini::after` (`:230`) | the dock's mini-orb ring, not painted (`lumen_dock.dart:827`) | yes |
+> | 2 | `.rcta::after` (`:462`) | the result CTA's ring, not painted (`eva_button.dart:693`) | yes |
+> | 3 | `.breathing` (`:267`) | the breath guide (`breath_guide_line.dart`) | yes |
+> | 4 | `.flame` (`:244`) | the streak flame's ambient `flick`, never ported (paint-only scope) | yes, vacuously |
+> | 5 | `.bar i::after` | **the prototype has no `.bar` element** | **dead selector** |
+> | 6 | `.dot.cur` (`:330`) | the quiz's current dot's pulse, not painted (`progress_beads.dart:472`) | yes |
+> | 7 | `.jorb::after` (`:395`) | the journey orb's rim ripple, not drawn (`journey_orb.dart:30`) | yes, vacuously |
+> | 8 | `.dcard .mini::after` | **the prototype has no `.dcard` or `.mini` element** | **dead selector** |
+> | 9 | `.star` (`:119`) | the witness sky's twinkle (`witness_sky.dart:832`) | yes |
+> | 10 | `.wave i` (`:198`) | the reading wave's bars — "THE `.wave` IS **NOT** BUILT" | yes, vacuously |
+> | 11 | `.selah.active .breathing` (`:271`) | the selah's active ring (`selah_card.dart`) | yes |
+>
+> **NINE live selectors, all honoured, and TWO that the prototype's own markup
+> does not contain.** That is a fact about `eva/redesign.html` and it is the
+> kind that rots silently: a reader will assume all eleven are live.
+>
+> The **four extra** `.rm` rules at `:51-54` — the star's resting opacity, the
+> verse line's filter, the two transition durations, and the three hover
+> transforms — are all honoured as well, and the client is **stricter** in two
+> places the prototype's class does not reach: the ambient orbs are dropped
+> entirely (`neural_background.dart:216`) and the route transition is
+> substituted (`eva_motion.dart:511`).
+
+> ### THE RITUAL'S THREE REMAINING GAPS, AND **TWO OF THEM ARE NOW WIRES**
+>
+> * **the quiz's correct/wrong haptics — WIRED.** `:1428`'s `haptic(30)` and
+>   `:1429`'s `haptic([40,60,40])` are now the prototype's firm bump and buzz.
+>   The mapping is a **pure domain function**
+>   (`features/quiz/domain/answer_haptic.dart`), because "domain logic must not
+>   be buried inside a widget", and the haptic fires on the **edge** —
+>   ungraded → graded — not from `build`. A `build`-time call fires per
+>   rebuild, and **a rebuild is not a check**. `null` means "no verdict, so
+>   nothing to announce": a chosen-but-unchecked answer and a failed submit
+>   both land there, and a haptic would announce a verdict the server never
+>   sent.
+> * **the amen's toast — WIRED**, and it is a **shared** design-system widget
+>   rather than a second implementation in a second feature. §3's rule that no
+>   feature may import another feature is what made the shared copy the only
+>   possible home, and the **page owns the clock** — the prototype's `toast(m)`
+>   is a `setTimeout` at the screen root, and the screen knows when the event
+>   happened and when it is disposed.
+> * **the selah's flare — RECORDED, NOT PORTED.** Two independent reasons are
+>   in the divergence list above, and the second is decisive: **the sky is not
+>   on the screen the selah runs on.**
+>
+> **And one more thing was found on the way: the toast's label was DOUBLED.**
+> A `Semantics(label: message)` over a `Text(message)` announces the message
+> **twice**. The first version of the shared toast's test **pinned the
+> doubling** and said it was not fixed here, because the two implementations it
+> replaced had that announcement as their behaviour. **The constraint expired**
+> when those implementations became this widget, and the fix is
+> `excludeSemantics: true` — the reader is told the sentence once, and the
+> **appearance is untouched** because semantics are not painted.
+
+> ### THE PROTOTYPE'S I18N TABLE IS **MEASURED**, AND **NO KEY WAS ADDED**
+>
+> The plan's Step 1 said *"~90 keys"*, and the estimate was **stale by a factor
+> of three**: it was made before Tasks 5.1–5.7 landed, and those tasks ported
+> most of the table.
+>
+> Measured against the ARB pair **by English value**, parsing the prototype's own
+> `I18N` literal rather than quoting it: the table holds **128 rows**,
+> **103** are carried **verbatim**, **13** are carried **under another name** or
+> as a **live composition** (`libCount` → `homeScrolls` + `homeOpenBooks` +
+> `digits`; `medalsCount` → the medals port's own count), and **12** are
+> **excluded with a reason each** — two of them because **the plan cuts them**
+> ("Share and notes are cut"; `share_plus` is forbidden by §8.4, and
+> ADR-0022's fiction table records them as cut), and the rest because the
+> client does not draw that surface.
+>
+> **No key was added, and that is the correct outcome**: a row the client does
+> not draw gets **no key**, because "a key nobody reads is a key a translator
+> will translate for a screen that does not exist" — which is why
+> `settingsMotionOn` / `settingsMotionOff` were deleted and why there is no
+> `sealFabLanguage`.
+>
+> **And the measurement is now a GATE.** `test/l10n/app_localizations_test.dart`
+> holds a map of the prototype's **128 rows** to their fate — verbatim, renamed,
+> composed or excluded with a reason and the row's **real** line — and asserts
+> that the map is **exactly** the tail, that no row is missing, that no entry
+> is stale, and that the verbatim count is **103**. So a row cannot be
+> **silently dropped** from the table, and the plan's "~90" can never be
+> measured against anything again.
+
+> ### FIVE GATE EDGES, AND THE ONE THAT WAS **THE SAME DEFECT A SECOND TIME**
+>
+> All four of the original edges were safe-direction — they over-reported rather
+> than passed silently — which is why they sat last. They are closed, and each
+> carries a **negative control** in `tool/verify_gates_selftest.sh`, which now
+> runs **seventeen** of them and reports *"every gate is proven able to fail"*.
+>
+> 1. **The blur gate did not strip `/* */` block comments**, so a
+>    `/* GlassTier.blur */` in a comment counted as a site and **spent the
+>    budget**. It now strips them the way `orphan_widget_check.py` already
+>    did — the two gates that strip comments have to strip them the same way.
+> 2. **The blur gate's count and its direct-spelling check used two different
+>    definitions of "a site"**, so an `ImageFiltered(ImageFilter.blur(10))` in a
+>    feature was caught by one half and **invisible to the other** — the gate
+>    red while the count said "2 of 2, within budget". There is **one**
+>    scanner now, and the direct check is a *filter* over it by kind.
+> 3. **A bogus `@RoutePage()` was a DIAGNOSTIC rather than a failure** — the
+>    gate printed `NOT A ROOT` and **exited 0**. A gate that prints a
+>    diagnostic and exits 0 cannot fail, which is the defect this repository's
+>    own rule names. It exits 1 now, and the text is kept, because the text is
+>    the receipt.
+> 4. **The orphan gate's registration half read ONE hard-coded router path**, so
+>    a rename turned the clause into "no route is registered anywhere" — safe in
+>    direction, useless in content, because the clause could no longer tell
+>    "this page is not registered" from "the router moved". The router is now
+>    **derived** from auto_route's own marker (`@AutoRouterConfig()`), and
+>    **zero matches or more than one is FATAL (exit 2)**.
+> 5. **And the inventory was the same defect for the second time.** The
+>    `*/widgets/` filter is gone, and the gate's roots are the **registered
+>    pages plus the app root** — the widget that installs
+>    `MaterialApp.router`, derived by content like the router, because the
+>    classes *above* the pages (`EvangelionApp`, `NeuralMotionScope`,
+>    `SettingsScope`) are constructed by no page and would otherwise read as
+>    orphans. **Measured: 71 → 87 widget classes**, and the three the old
+>    inventory could not see were `GoldFlecks`, `EvaAnimate` and
+>    `EvaTypeScale` — the three that were built, tested and on no screen at
+>    all.
+>
+> **Nothing was allowlisted.** The plan's risk table says "place it or delete
+> it — never allowlist", and the three new orphans were **placed**. The two
+> remaining allowlist rows (`HairlineDivider`, `TextLink`) are the pre-existing
+> ones, and the gate's own STALE check confirms they are still genuinely
+> unplaced.
 
 ---
 
@@ -2548,7 +2884,7 @@ tool/verify_all.sh --with-build
 | 240 goldens churn | palette + shader invalidate all of them | Task 1.3's injectable clock keeps them byte-stable |
 | Citations rot silently | `citation_check.py` checks **existence and range only** — *not* that line NNN says what the comment claims | per-widget re-pointing; plant a violation in every harness |
 | Fabricated data reads as real | no medals / profile / cheer endpoints | the ADR-0022 fiction table; stub ports swappable later |
-| `orphan_widget_check.py` has an **empty** allowlist | every new widget must be reachable | place it or delete it — never allowlist |
+| `orphan_widget_check.py` has a **two-row** allowlist (`HairlineDivider`, `TextLink`) — *the row said "empty" and that was stale* | every new widget must be reachable | place it or delete it — never allowlist. **Honoured**: the three orphans the widened inventory found were **placed**, not allowlisted, and the gate's own STALE check proves the two remaining rows are still genuinely unplaced |
 | Uniform slot layout silently moves on an engine bump | it is compiler output, ordered by SPIR-V location, not by hand | generate from `--reflection-json`; gate fails on change and names the commit |
 | `flutter test` ≠ Impeller | tests run Skia software (`flutter_tester_device.dart:113`) | **measured equivalent** for `FlutterFragCoord` — but re-check whenever the capture harness is touched |
 | `verify_purity.sh` Gate 1 does **not** scan `lib/core/design_system/` | it covers only `core/domain`, `core/common`, `core/navigation`, `features/*/domain` (`tool/verify_purity.sh:178`) | `lumen_uniforms.dart`'s Flutter-freedom is by construction (`dart:math` only) and review, **not** by instrument. Extending Gate 1 to the design system is a separate change. |

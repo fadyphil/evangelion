@@ -414,3 +414,108 @@ The estimate was made before Tasks 5.1–5.7 landed, and it was never revised as
 did. **A plan's scope number is a claim like any other**, and this one had quietly
 stopped being true — in the direction that makes a plan look like there is four times
 more work than there is.
+
+---
+
+## 9. THE ORPHAN GATE COULD NOT SEE A THIRD OF THE DESIGN SYSTEM
+
+`tool/gates/orphan_widget_check.py` is the gate decision 144 built, and its
+module doc says what it is for:
+
+> "The question this answers is not 'is this widget tested' — it is **'does any
+> page's tree contain it'**, which is the only question none of those suites
+> asked."
+
+**And the gate's own inventory meant it could not ask it about a third of the
+design system.** The inventory was built like this:
+
+```python
+for p in files:
+    if "/widgets/" not in p.as_posix():
+        continue
+```
+
+so a widget under `core/design_system/effects/`, `.../motion/` or
+`.../tokens/` was **not in the set the gate reasoned about at all** — not
+reported and passed over, but *invisible*. And the design system has three
+directories outside `*/widgets/`:
+
+| widget | directory | exported | test suite | call site in `lib/` |
+| --- | --- | --- | --- | --- |
+| `GoldFlecks` | `core/design_system/effects/` | yes | full | **none** |
+| `EvaAnimate` | `core/design_system/motion/` | yes | full | **none** |
+| `EvaTypeScale` | `core/design_system/tokens/` | yes | full | **none** |
+
+**That is decision 144's exact shape, and the gate could not see it.** Three
+widgets, built, exported, fully tested, and on **no screen at all** — while
+every §7 gate stayed green, because the gate that existed for that defect was
+looking in the wrong place.
+
+### THE SAME DEFECT, FOR THE SECOND TIME
+
+`docs/DRIFT.md` §7 records `EvaChip`, and §7's fourth bullet records the
+`@RoutePage()` fool. This is the third instance of one shape, and the shape is
+the repository's own:
+
+> **A gate that quietly skips a class of declarations is the same defect as one
+> that cannot fail.**
+
+The failure is *quieter* than a broken pattern, which is what makes it
+survive: a pattern that stops matching reports **zero** matches, and zero
+matches is the **good** outcome of a scan. A path filter that excludes a
+directory reports the same zero, and nobody asks which directory.
+
+### RESOLVED — THE INVENTORY IS ALL OF `lib/`, AND THE GATE'S ROOTS GREW
+
+The inventory is now **every widget class under `lib/`** (generated files still
+excluded), and the `DECL` pattern still excludes value classes, painters and
+enums. The measurement: **71 → 87 widget classes**.
+
+**Widening the inventory needed a second answer, and that is the part worth
+recording.** The roots used to be the registered pages, and the widening
+reaches the classes **above** them — `EvangelionApp`, `NeuralMotionScope`,
+`SettingsScope` — which **no page constructs** and which would therefore read
+as orphans. The answer is structural rather than an exemption: **the app root
+is a second root**, derived by content the way the router is derived, and a
+root is placed by definition.
+
+**The router's path was a literal, and it is now derived.** auto_route's own
+marker for "this is the app's router" is `@AutoRouterConfig()`, so the router
+is the unique file under `lib/` that declares it, and a rename cannot break
+the clause. **Zero matches and more than one are both FATAL (exit 2)** — never
+a silent pass — because "this page is not registered" and "the router moved"
+must not be the same answer.
+
+**And a bogus `@RoutePage()` is now a FAILURE.** It used to print `NOT A ROOT`
+and **exit 0**, which is a gate that reports a defect and cannot fail. It
+exits 1 now, and the diagnostic text is kept, because the text is the receipt.
+
+### AND THE THREE ORPHANS WERE **PLACED**, NOT ALLOWLISTED
+
+The plan's risk table says *"place it or delete it — never allowlist"*, and
+that is what happened:
+
+* `GoldFlecks` → the quiz's **correct** option card;
+* `EvaAnimate` → the option card's **entrance**;
+* `EvaTypeScale` → `MaterialApp.router.builder` — the site its own doc always
+  named.
+
+**The allowlist still holds two rows** (`HairlineDivider`, `TextLink`), both
+with written reasons, and the gate's own STALE check proves they are still
+genuinely unplaced. The risk table's *"has an empty allowlist"* was stale in
+its fact and is corrected.
+
+### The other four edges, and the negative controls
+
+The blur budget did not strip `/* */` block comments — so a `/* GlassTier.blur */`
+in a comment **spent the budget** — and its count and its direct-spelling check
+used **two different definitions of "a site"**, so a hand-built
+`ImageFiltered(ImageFilter.blur(10))` was caught by one and invisible to the
+other. There is **one** definition now, and both halves read it.
+
+`tool/verify_gates_selftest.sh` now runs **seventeen** negative controls and
+reports *"every gate is proven able to fail"* — six for the orphan gate (a
+green tree, a bogus page, an unregistered page, a renamed router, a missing
+router, and an orphan outside `*/widgets/`) and three for the blur budget
+(a block comment, a real site, and the one-definition case). **The blur budget
+had none at all before**, which is the same defect in a different place.

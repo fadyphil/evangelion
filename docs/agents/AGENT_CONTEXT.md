@@ -42,7 +42,7 @@ agent does not re-propose what was rejected, or re-litigate what was accepted.
 | --- | --- | --- |
 | 7 | **`Result<T>` = `Either<Failure, T>`.** `fp_dart` **adopted**; `dartz` still rejected. | `lib/core/common/result.dart` is now a typedef plus two extension accessors. See the `SUPERSEDED` block below for what that costs. |
 | 8a | **Adopt `freezed`** for bloc/cubit states, events and domain entities. | **Shipped** on `refactor/freezed-states`: 34 types converted (17 classes, 14 events, 3 sealed event bases) — see "Recorded decisions — the `freezed` migration" below, decisions 96–100. The `equatable ^3.0.0` removal was deferred at that point because `Failure` and `Result<T>` were deliberately kept hand-written (hazard 2, and decision 7). **Now done — decision 131:** both kept hand-written equality and dropped the base class, so `equatable` is **no longer a direct dependency and no longer in `pubspec.lock` at all**. |
-| 8b | **Adopt ARB + `gen_l10n`.** | **Shipped** on `refactor/gen-l10n`: the **five** hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/app_en.arb` + `app_ar.arb` (72 keys). Decisions 101–111 below. Three of §2.1's own claims were corrected **by measurement** during that task and are marked there: the table and field counts, "compile-time key checking" (a missing key is a codegen *warning*, not a build error), and the locale re-dispatch (it is a corpus re-fetch and it **stays**). |
+| 8b | **Adopt ARB + `gen_l10n`.** | **Shipped** on `refactor/gen-l10n`: the **five** hand-rolled `*Strings` tables are deleted in favour of `lib/l10n/app_en.arb` + `app_ar.arb` (72 keys **then** — the pair now holds **182**). Decisions 101–111 below. Three of §2.1's own claims were corrected **by measurement** during that task and are marked there: the table and field counts, "compile-time key checking" (a missing key is a codegen *warning*, not a build error), and the locale re-dispatch (it is a corpus re-fetch and it **stays**). |
 | 8c | **Do not add `bloc`, `json_serializable`, `flutter_svg` or `package:analyzer`** to do any of this. | A source scan over `lib/` is the sanctioned technique. `package:analyzer` especially stays out — it is a far larger dependency than the problem it would solve. |
 
 **SUPERSEDED — `fp_dart` was ADOPTED. The original rejection was partly wrong; corrected
@@ -131,7 +131,7 @@ does not exist in this codebase at all.
 decision 111 and marked here.)*
 
 * ~~69 distinct string fields across the six tables~~ — **five** tables, **73** string
-  fields, **67** distinct bare names, **72** ARB keys. Three collide and were
+  fields, **67** distinct bare names, **72** ARB keys **then** (**182** now). Three collide and were
   namespaced: `retry` (`home`/`quiz`/`reading`), `unavailableSuffix`
   (`auth`/`home`/`quiz`/`reading`), `wordmark` (`auth`/`home`).
 * **ICU plurals**, which the hand-rolled tables do not have. Arabic has
@@ -2787,7 +2787,7 @@ planted in a `core/domain` part makes Gate 1 exit 1).
 
 Shipped on `refactor/gen-l10n`. Five `*Strings` tables deleted; `lib/l10n/app_en.arb`
 
-* `app_ar.arb` (72 keys) and the three generated `app_localizations*.dart` files
+* `app_ar.arb` (72 keys **then** — the pair now holds **182**) and the three generated `app_localizations*.dart` files
 replace them. No new dependency — `flutter_localizations` and `intl` were already
 present — and `pubspec.yaml` changed by exactly one line, `generate: true`.
 
@@ -2909,8 +2909,10 @@ REUSED.** There were **five** tables, not six — `LoginStrings`, `HomeStrings`,
 `QuizStrings`, `ReadingStrings`, `ResultStrings`; the sixth feature, `/settings`, has
 never had a table. They carried **73** string fields, of which **67** were distinct
 bare names before namespacing (the three collisions account for the other 6), and they
-are **72** ARB keys after `questionSingular`/`questionPlural` merge into one plural and
-`resultTotalCaption` becomes one. §2.1's "69 distinct string fields across the six
+are **72** ARB keys — **at the time** — after `questionSingular`/`questionPlural` merge into one plural and
+`resultTotalCaption` becomes one. **The pair holds 182 today**, and the count is a
+**gate**: `test/l10n/app_localizations_test.dart` asserts it exactly, so a key cannot
+be dropped without the number moving. §2.1's "69 distinct string fields across the six
 tables" matches none of those three numbers.
 
 ### Recorded decisions — Phase 10 review
@@ -3159,7 +3161,32 @@ tool/verify_purity.sh                                      # architecture gates
 dart fix --dry-run                                         # Nothing to fix!
 flutter test --coverage                                    # must not drop
 tool/verify_linux_build.sh                                 # the app REALLY builds
+python3 tool/gates/citation_check.py                       # every citation resolves
+python3 tool/gates/orphan_widget_check.py                  # every widget is placed
 ```
+
+**THE TWO `python3` GATES BELONG IN THIS LIST, AND THEY WERE MISSING.** They are
+gate 4 in `CONTRIBUTING.md`'s table, and §7 is *"the commands that must pass
+before you report work done"* — so a list that omits two of the gates is a list
+a sub-agent can satisfy while breaking the tree. What they check:
+
+* **`citation_check.py`** — every `*.tsx:NNN` / `redesign.html:NNN` claim in the
+  source resolves to a **real prototype line**. It checks **existence and range
+  only** — *not* that the line still says what the comment claims — so a
+  citation that points at the right line for the wrong reason is green, and
+  the per-widget re-pointing is on the writer.
+* **`orphan_widget_check.py`** — **a widget anywhere under `lib/` is built,
+  tested, and no screen's tree contains it.** The inventory is **all of
+  `lib/`** — *not* the `*/widgets/` directories, which is what let three
+  widgets sit on no screen at all — and the roots are the **registered pages
+  PLUS THE APP ROOT** (the widget that installs `MaterialApp.router`, derived
+  by content the way the router is derived). The **router is derived** from
+  auto_route's own `@AutoRouterConfig()` marker rather than named by path, and
+  **zero matches or more than one is FATAL (exit 2)** — because "this page is
+  not registered" and "the router moved" must not be the same answer. **A bogus
+  `@RoutePage()` is a FAILURE (exit 1), not a diagnostic**: the annotation
+  claims "this is a screen the app can navigate to", and if it cannot, either
+  the annotation is decoration or the registration was forgotten.
 
 **`flutter build linux --release` WAS A GATE THAT COULD NOT FAIL, AND WAS REPLACED.**
 See recorded decision 142. `tool/verify_linux_build.sh` runs `flutter doctor`, clears
@@ -4311,3 +4338,185 @@ would carry it. **A per-call-site table is forbidden**: it would be a second tab
 same thirteen moments, and the two would drift. `RitualHaptic` is the vocabulary and
 `hapticImpactFor` is the single mapping — a new haptic is an **enum member**, never a
 literal at a call site.
+
+**160. THE ORPHAN GATE'S INVENTORY IS **ALL OF `lib/`**, AND THE REASON IS A GATE THAT
+COULD NOT SEE A THIRD OF THE DESIGN SYSTEM.**
+
+`tool/gates/orphan_widget_check.py` built its inventory from the files under
+`*/widgets/` only:
+
+```python
+if "/widgets/" not in p.as_posix():
+    continue
+```
+
+so a widget under `core/design_system/effects/`, `.../motion/` or `.../tokens/`
+was **not in the set the gate reasoned about at all** — not reported and passed over,
+but *invisible*. Three widgets were built, exported, fully tested and placed on
+**nothing**: `GoldFlecks`, `EvaAnimate` and `EvaTypeScale`. Decision 144's exact
+shape, with every §7 gate green throughout.
+
+**A gate that quietly skips a class of declarations is the same defect as one that
+cannot fail** — `docs/DRIFT.md` §7 records `EvaChip`, and §7's fourth bullet is the
+same shape again. The inventory is now **all of `lib/`** (generated files still
+excluded), and the gate's notion of "placed" had to grow a meaning for the classes
+that come with it: the **pages** are roots and therefore placed by definition, and
+the non-widget helper classes are excluded by the `DECL` pattern, which only matches
+`StatelessWidget` and `StatefulWidget`.
+
+**The rule for the next reader: a gate's inventory is a CLAIM about where the
+subject can live, and it must be checked against the tree.** The design system's
+three directories — `effects/`, `motion/` and `tokens/` — are all outside
+`*/widgets/`, and the gate's own doc never said so.
+
+**161. THE GOLD FLECKS CAME BACK, AND THE REASON IS THE **ORIGINAL PLAN'S VERIFY
+LINE** — NOT A PREFERENCE FOR AN ORNAMENT.**
+
+The redesign's `.opt` paints border, fill and badge and nothing else
+(`eva/redesign.html:337-341`), and the client's suite used to assert the flecks'
+**absence**: *"the flecks died with the prototype that drew them, and the sweep above
+is what keeps them from coming back."* That was a **drift and not a decision**:
+
+* **`docs/plans/08-build-phases.md:112`** — the original build plan's Phase 8 verify
+  line reads *"a widget test that `QuizOptionCard` shows `correct` + `GoldFlecks`
+  after checking"*. The flecks were **required**, and the Lumen redesign dropped them
+  without recording that it was dropping them.
+* the brief's own rule — "the ONLY sacred cues are: gold flecks (tiny, sparse,
+  decorative)" (`eva/src/imports/pasted_text/pasted-attachment.txt:51`).
+
+They are now on the quiz's correct option, as a `Positioned.fill` overlay inside a
+`Stack(clipBehavior: Clip.none, fit: StackFit.passthrough)` — `Clip.none` because two
+of the four sit **outside** the card's left edge, and `StackFit.passthrough` because
+the card's own layout must not change. **The offsets are derived**: the prototype's
+right-hand pair (`356`, `362`) are screen pixels on a 390px frame, so they are
+**6 and 12 pixels past the card's right edge** and the client's pair is
+`cardWidth + 6` / `cardWidth + 12`. The left-hand pair (`-10`, `-15`) is already
+card-relative and does not move.
+
+**The test was rewritten, not deleted.** A reversal that leaves no trace is a
+reversal nobody can audit.
+
+**162. THE TYPE SCALE IS INSTALLED BY THE **WIDGET**, AND THE CLAMP IS DEFENCE IN
+DEPTH — NOT A NEW RULE.**
+
+`MaterialApp.router.builder` used to spell the install out by hand as a `MediaQuery`
+with a `copyWith(textScaler: evaScalerFor(settings.fontStep))`. That was the **third**
+spelling of the same rule — `/reading`'s §14 overflow suite and `/settings`'s
+stepper were the other two — and "a bare `MediaQuery` spelled three times is three
+rules" is `barrel.dart`'s own argument for one import surface. It is now
+`EvaTypeScale(step: settings.fontStep, child: …)`, **at the site its own doc always
+named**.
+
+**The widget clamps and the hand-written install did not**, and the clamp changes
+**nothing a reader can reach**: `clampFontStep` is the identity on every step in
+`kFontStepMin`…`kFontStepMax` (1…5), and `SettingsCubit` is the authoritative
+boundary — it clamps on `load` and on every write. The two agree, so the rendered
+scale is byte-identical for every persistable step, and the only input the clamp
+changes is the one neither the stepper nor the cubit can produce.
+
+**163. THE TOAST IS **ONE** WIDGET IN THE DESIGN SYSTEM, AND THE **PAGE** OWNS THE
+CLOCK.**
+
+The prototype's `.toast` is **one** CSS rule (`eva/redesign.html:466-468`), and
+this client had **three** implementations of it: a feature-local copy in
+`features/leaderboard/`, a feature-local copy in `features/settings/`, and the
+amen, which had no toast at all. AGENT_CONTEXT §3's rule that **no feature may
+import another feature** is what made the shared copy the only possible home
+rather than a preference — and the shared copy is
+`core/design_system/widgets/eva_toast.dart`.
+
+**The PAGE owns the clock, not the widget.** The prototype's `toast(m)` (`:1393`)
+shows the message for 1800 ms and then removes it, and that is a `setTimeout` at
+the **screen root**: the screen knows when the event happened and when the
+screen is disposed, and a widget that owned its own timer would have to be
+told to stop. **The page raises it, times it, and takes it away; the widget
+draws.**
+
+**And the label is announced ONCE.** A `Semantics(label: message)` over a
+`Text(message)` announces the message **twice**. The shared toast's own test
+*pinned the doubling* and said it was not fixed there, because the two
+implementations it replaced had that announcement as their behaviour — a
+constraint that **expired** when those implementations became this widget. The
+fix is `excludeSemantics: true`, and the **appearance is untouched** because
+semantics are not painted.
+
+**164. THE QUIZ'S ANSWER HAPTICS FIRE ON THE **EDGE**, AND `null` MEANS "NO
+VERDICT".**
+
+`eva/redesign.html:1428`'s `haptic(30)` and `:1429`'s `haptic([40,60,40])` are
+the prototype's firm bump and buzz. The mapping is a **pure domain function**
+(`features/quiz/domain/answer_haptic.dart`) because "domain logic must not be
+buried inside a widget" (AGENT_CONTEXT §6), and it returns `null` for an
+answer that is not graded.
+
+**The haptic fires on the EDGE — ungraded → graded — and not from `build`.** A
+`build`-time call fires per rebuild, and **a rebuild is not a check**. The
+prototype grades on the tap (`:1423`'s `pick`); this client grades on a *second*
+press, because the grade is a `POST`, so the event is "the verdict arrived" and
+only a listener can see that edge.
+
+**`null` is the "say nothing" answer**: a chosen-but-unchecked answer and a
+failed submit both land there, and a haptic there would announce a verdict the
+server never sent (AGENT_CONTEXT §5's traps).
+
+**165. THE SHADER CLOCK IS **HELD AT ZERO** UNDER REDUCED MOTION — NOT AT
+"WHEREVER IT HAD REACHED".**
+
+`core/design_system/effects/lumen_clock.dart` holds `u_time` at **zero** when
+the reader has asked for reduced motion, and
+`core/design_system/effects/neural_motion.dart` drives it. The prototype's
+answer is different and is a **divergence, not a port**: `eva/redesign.html:888`
+**scales** the accumulator (`timeAcc += dt*(reduceMotion?0.15:1)`), so its
+aurora keeps drifting, slowly.
+
+**Why zero and not the value it had.** A freeze at the value it had is a
+function of **how long the app had been running** and of **when the reader
+toggled the setting** — so two readers with the same settings would see two
+different auroras, and a reduced-motion golden would be a fact about the
+session that captured it. **At zero it is a function of the setting alone.**
+That is the same discipline the vespers' injectable hour came from, one level
+up.
+
+**The hold is a REPORTING rule, not a destruction of history.** The accumulator
+keeps the elapsed time, so turning reduced motion **off** restores the aurora
+to the phase it had reached. The visible cost is stated rather than smoothed
+over: the shader's phase snaps back in one frame. **The other three clocks
+(float, hue, aurora) are untouched and still stop wherever they stood.**
+
+**166. THE OS'S OWN REDUCE-MOTION SWITCH IS HONOURED **MID-SESSION**, AND THE
+COMPOSITION ROOT IS THE OBSERVER.**
+
+`lib/app/app.dart` observes `didChangeAccessibilityFeatures` and rebuilds, so
+the **combined** answer — the platform's signal *and* the reader's stored
+preference — is recomputed and handed to `NeuralMotionScope`, whose
+`didUpdateWidget` already had the mechanism to stop or restart the clocks.
+
+**It was not honoured before, and the reason is a dead branch.**
+`NeuralMotionScope.didChangeAccessibilityFeatures` acts only
+`if (widget.animationsEnabled == null)`, and `app.dart` **always** passes an
+explicit value. So the scope's observer was dead code, and a reader who turned
+the OS's switch on while the app was open got it for the per-widget
+`MediaQuery.disableAnimationsOf` checks but **not** for the four shared clocks.
+
+**And the file argued with itself about it**: the class doc said the signal was
+"honoured again if the reader toggles it mid-session" and the helper's own doc,
+three paragraphs below, said the opposite. **Both were in the same file.** A
+file that documents the same mechanism twice is a file with two claims, and only
+one of them is checked.
+
+**167. THE PROTOTYPE'S I18N TABLE IS **MEASURED**, AND A ROW THE CLIENT DOES NOT
+DRAW GETS **NO KEY**.**
+
+`eva/redesign.html:924-977` holds **128 rows**. Measured against the ARB pair
+**by English value** — parsing the prototype's own `I18N` literal rather than
+quoting it — **103** are carried verbatim, **13** are carried under another
+name or as a live composition, and **12** are excluded with a reason each.
+**Zero keys were added**, and that is the correct outcome: a row the client does
+not draw gets **no key**, because a key nobody reads is a key a translator will
+translate for a screen that does not exist.
+
+**And the measurement is a GATE.** `test/l10n/app_localizations_test.dart` holds
+a map of the prototype's 128 rows to their fate, and asserts that the map is
+**exactly** the tail, that no row is missing, that no entry is stale, and that
+the verbatim count is 103. **A row cannot be silently dropped from the
+prototype's table.**
