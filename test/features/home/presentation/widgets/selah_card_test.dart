@@ -67,7 +67,6 @@ void main() {
               seconds: seconds,
               beginLabel: 'Begin the selah',
               endLabel: 'End the selah',
-              amenLabel: 'selah · amen',
               hapticsEnabled: hapticsEnabled,
               onCompleted: onCompleted,
             );
@@ -162,15 +161,27 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
     });
 
-    testWidgets('and the amen\'s own timer is cancelled too', (
+    testWidgets('and the silence ending leaves no timer behind either', (
       WidgetTester tester,
     ) async {
+      // **The card's timer is cancelled the moment the silence ends** — the
+      // `_complete` path — so a card that is still on screen when the silence
+      // runs out is not still counting. That is a **different** path from the
+      // disposal above, and it is the one a reader reaches: they sit on `/`
+      // after the silence and the card is still there.
+      //
+      // **The amen's own clock is the PAGE's** — the home page owns the toast
+      // (`:1330`'s `toast(tr('amen'))`, anchored to the screen root), and
+      // `home_page_test.dart`'s selah-toast group is where that timer is
+      // asserted. The card has no clock of its own to leak.
       await pumpCard(tester, seconds: 1);
       await tester.tap(circle());
       await tester.pump();
-      // One second later the silence ends and the amen's 1800ms timer starts.
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('selah · amen'), findsOneWidget);
+
+      // Five seconds later, nothing on the card has moved.
+      await tester.pump(const Duration(seconds: 5));
+      expect(find.text('60'), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 5));
@@ -178,34 +189,45 @@ void main() {
   });
 
   group('the amen', () {
-    testWidgets('it is shown when the silence runs its course', (
-      WidgetTester tester,
-    ) async {
-      await pumpCard(tester, seconds: 2);
-      await tester.tap(circle());
-      await tester.pump();
-
-      await tester.pump(const Duration(seconds: 2));
-
-      expect(find.text('selah · amen'), findsOneWidget);
-      // **And the count is gone** — the message took its place.
-      expect(find.text('0'), findsNothing);
-    });
-
-    testWidgets('it lasts the prototype\'s 1800ms', (
+    // ## THE CARD DOES **NOT** DRAW IT, AND THE PAGE **DOES**
+    //
+    // The prototype raises the amen as a **toast** (`:1330`'s
+    // `toast(tr('amen'))`), anchored to the screen root (`:466`). This card
+    // used to draw it **in the count's corner** and record the divergence, on
+    // the grounds that "this client has no app-level toast surface: the
+    // communion page builds its own, and `/` has none".
+    //
+    // **That reason has stopped being true**: the toast is a shared
+    // design-system widget and the home page owns it. So the card's whole
+    // half of the amen is [SelahCard.onCompleted] — the moment the silence ran
+    // its course — and the message is the page's.
+    testWidgets('the card draws no message of its own', (
       WidgetTester tester,
     ) async {
       await pumpCard(tester, seconds: 1);
       await tester.tap(circle());
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text('selah · amen'), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 1700));
-      expect(find.text('selah · amen'), findsOneWidget);
-
-      await tester.pump(const Duration(milliseconds: 200));
+      // **The regression guard on the recorded divergence.** A card that drew
+      // the amen again would put the message in a second place, and the second
+      // place is where the divergence was recorded before.
       expect(find.text('selah · amen'), findsNothing);
+    });
+
+    testWidgets('and it tells the page when the silence runs its course', (
+      WidgetTester tester,
+    ) async {
+      bool completed = false;
+      await pumpCard(tester, seconds: 1, onCompleted: () => completed = true);
+      await tester.tap(circle());
+      await tester.pump();
+
+      expect(completed, isFalse);
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(completed, isTrue);
     });
 
     testWidgets('a silence stopped early says nothing', (
@@ -308,6 +330,34 @@ void main() {
       await tester.pump();
 
       expect(scene!.focusDimmed, isFalse);
+    });
+  });
+
+  group('the aurora', () {
+    // ## THE PROTOTYPE'S **SPIKE** IS PORTED, AND THE **FLARE** IS NOT
+    //
+    // `:1330` — `if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5;
+    // haptic([30,40,30]); }`
+    //
+    // `V.spike=.5` is the aurora's kick, and this client has the mechanism —
+    // `LumenScene.raiseSpike` — so the selah raises it, by the prototype's own
+    // number.
+    //
+    // `addStar(true)` is the **flare** into the witness sky, and it is **not**
+    // ported: the client's sky is keyed `book:chapter:verse` and a selah lights
+    // no verse. `SelahCard`'s class doc carries the whole account.
+    testWidgets('the silence ending raises the prototype\'s spike', (
+      WidgetTester tester,
+    ) async {
+      await pumpCard(tester, seconds: 1);
+      expect(scene!.spike, 0);
+
+      await tester.tap(circle());
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(scene!.spike, kSelahCompletionSpike);
+      expect(kSelahCompletionSpike, 0.5, reason: '`:1330` — if(V)V.spike=.5;');
     });
   });
 

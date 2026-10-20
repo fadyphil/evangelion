@@ -7,16 +7,26 @@ import 'package:flutter/material.dart';
 /// استُعيدت الافتراضيات"]` — raised by the reset handler at `:1525` and shown for
 /// **1800ms** by `:1393`'s `toast(m)`.
 ///
-/// ## IT IS A **FEATURE-LOCAL** WIDGET, AND `/communion`'s IS ITS SIBLING
+/// ## IT DELEGATES TO THE **SHARED** TOAST, AND IT USED TO BE A SECOND COPY
 ///
-/// `features/leaderboard/presentation/widgets/communion_cheer_toast.dart` is the
-/// same shape for the same prototype rule: the same pill, the same mono 10.5px
-/// with `.12em` of tracking (`:466-467`), the same gold hairline, and the same
-/// `Semantics(liveRegion: true)`.
+/// This file used to carry a **complete second implementation** of the
+/// prototype's `.toast` — the same pill, the same mono 10.5px with `.12em` of
+/// tracking (`:466-467`), the same gold hairline, the same
+/// `Semantics(liveRegion: true)`. So did
+/// `features/leaderboard/presentation/widgets/communion_cheer_toast.dart`, and
+/// the home page's amen toast was a third thing that did not exist yet.
 ///
-/// **Not a design-system widget**, because it has one caller: §3's placement test
-/// puts a widget two features read in the shared kernel, and a widget one feature
-/// reads in that feature.
+/// **Two implementations of one CSS rule, in two features, is the duplication
+/// this repository refuses wherever it finds it** — and §3's rule that **no
+/// feature may import another feature** is what made the shared copy the only
+/// possible home rather than a preference. So the drawing is
+/// `core/design_system/widgets/eva_toast.dart`'s now, and this class is the
+/// **screen's** half of it: the message, and the one thing that is genuinely
+/// the restore's own — the `↺`'s fallback.
+///
+/// **The golden is byte-identical**, because the two implementations drew the
+/// same pill with the same numbers, and §5.2's rule that the app has **one**
+/// spelling of 10.5 was already honoured by both.
 ///
 /// ## THE `↺` AND ITS `fontFamilyFallback`
 ///
@@ -30,6 +40,11 @@ import 'package:flutter/material.dart';
 /// the prototype's `font-family:var(--mono)` survives for everything else. The
 /// fallback is what makes the row's own `↺` paintable too, and it is the same
 /// reason there.
+///
+/// **It is a PARAMETER of the shared toast and not a rule inside it**, because
+/// the glyph is the **message's** business and not the toast's: the cheer
+/// paints a star and the restore carries an arrow, and neither is the toast's
+/// to know about.
 class WorkshopRestoreToast extends StatelessWidget {
   /// Creates the toast.
   const WorkshopRestoreToast({required this.message, super.key});
@@ -53,59 +68,9 @@ class WorkshopRestoreToast extends StatelessWidget {
   static const double trackingEm = 0.12;
 
   @override
-  Widget build(BuildContext context) {
-    final EvaColors colors = context.colors;
-    final TextDirection direction = Directionality.of(context);
-
-    return Semantics(
-      liveRegion: true,
-      label: message,
-      child: Center(
-        child: Container(
-          // `:467` — `padding:10px 18px`.
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: colors.surface.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(99),
-            // `:466` — `border:1px solid rgba(232,176,75,.5)`, the same gold
-            // hairline `/communion`'s toast carries.
-            border: Border.all(color: colors.ember.withValues(alpha: 0.5)),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: colors.ink.withValues(alpha: 0.15),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Text(
-            message,
-            style: arabicAware(
-              EvaTypography.monoCaps(colors).copyWith(
-                // `:467` — `font-family:var(--mono);font-size:10.5px;
-                // letter-spacing:.12em`. **The `.12em` is premultiplied by the
-                // 10.5px**, which is `1.26` — the house rule, and the same number
-                // `/communion`'s toast uses.
-                //
-                // **AND NEITHER NUMBER IS A LITERAL.** The size is borrowed from
-                // [EvaSectionHeader.sectionSize] — the same 10.5 this screen's
-                // version chip borrows — so the app has **one** spelling of it
-                // and not three, and the tracking is the em value multiplied by
-                // that size rather than the product written out, so a change to
-                // the size cannot leave the tracking behind.
-                fontSize: EvaSectionHeader.sectionSize,
-                letterSpacing:
-                    EvaSectionHeader.sectionSize *
-                    WorkshopRestoreToast.trackingEm,
-                color: colors.ink,
-                // The arrow's fallback. See the class doc.
-                fontFamilyFallback: const <String>[EvaTypography.uiFamily],
-              ),
-              direction,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => EvaToast(
+    message: message,
+    // The arrow's fallback. See the class doc.
+    fontFamilyFallback: const <String>[EvaTypography.uiFamily],
+  );
 }

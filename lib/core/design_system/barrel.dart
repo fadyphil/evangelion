@@ -102,6 +102,7 @@ export 'package:evangelion/core/design_system/widgets/eva_button.dart';
 export 'package:evangelion/core/design_system/widgets/eva_range_slider.dart';
 export 'package:evangelion/core/design_system/widgets/eva_section_header.dart';
 export 'package:evangelion/core/design_system/widgets/eva_text_field.dart';
+export 'package:evangelion/core/design_system/widgets/eva_toast.dart';
 export 'package:evangelion/core/design_system/widgets/eva_toggle.dart';
 export 'package:evangelion/core/design_system/widgets/focus_ring.dart';
 export 'package:evangelion/core/design_system/widgets/font_size_stepper.dart';

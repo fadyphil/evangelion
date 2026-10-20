@@ -5,6 +5,7 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/scripture_verse.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/presentation/widgets/last_light_card.dart';
 import 'package:evangelion/features/home/presentation/widgets/library_carousel.dart';
@@ -458,6 +459,160 @@ void main() {
         isEmpty,
       );
       handle.dispose();
+    });
+  });
+
+  // ## THE AMEN IS A **TOAST**, AND THE SCREEN OWNS IT
+  //
+  // `eva/redesign.html:1330` — `toast(tr('amen'))` — and the toast is
+  // anchored to the **screen root** (`:466`'s
+  // `position:absolute;left:50%;bottom:110px`).
+  //
+  // **This group is the other half of the selah's divergence closing.** The
+  // amen used to be drawn in the card's count corner, and the card recorded
+  // the reason: "this client has no app-level toast surface: the communion
+  // page builds its own, and `/` has none". The toast is now a **shared
+  // design-system widget** (`EvaToast`) and this page owns it, so the card's
+  // half is the callback and the message is the screen's.
+  group('the selah\'s amen', () {
+    /// The toast, as the screen draws it.
+    Finder toast() => find.byType(EvaToast);
+
+    /// Runs the silence to its end and returns nothing.
+    Future<void> runTheSilence(WidgetTester tester) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SelahCard),
+          matching: find.byType(FourPointedStar),
+        ),
+      );
+      await tester.pump();
+      // **Fifteen seconds**, and that is the Workshop's own minimum
+      // (`eva/redesign.html:684` — a 15…120 second range) — so the test waits
+      // out a silence a reader can actually choose. The clock is fake, so
+      // the wait costs nothing.
+      await tester.pump(const Duration(seconds: 15));
+    }
+
+    testWidgets('is a toast, and it carries the app\'s own amen', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      // **The shortest silence the Workshop offers** — 15 seconds
+      // (`eva/redesign.html:684`) — so the test waits out a silence a reader
+      // can actually choose. The length is the reader's own
+      // (`UserSettings.selahLengthSec`) and the harness seeds it.
+      await pumpHome(
+        tester,
+        bloc: h.bloc,
+        settings: const UserSettings(selahLengthSec: 15),
+      );
+
+      expect(toast(), findsNothing);
+
+      await runTheSilence(tester);
+
+      expect(toast(), findsOneWidget);
+      // `eva/redesign.html:970` — `amen:["selah · amen","سِلاه · آمين"]`.
+      expect(find.text(en.homeSelahAmen), findsOneWidget);
+      // **And the CARD carries no amen of its own** — the message has left
+      // the count's corner, and the corner is the countdown's alone. This is
+      // the regression guard on the divergence the card used to record.
+      expect(
+        find.descendant(
+          of: find.byType(SelahCard),
+          matching: find.text(en.homeSelahAmen),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('lasts the prototype\'s 1800ms', (WidgetTester tester) async {
+      final HomeHarness h = harness();
+      await pumpHome(
+        tester,
+        bloc: h.bloc,
+        settings: const UserSettings(selahLengthSec: 15),
+      );
+      await runTheSilence(tester);
+
+      expect(toast(), findsOneWidget);
+
+      // `:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`.
+      await tester.pump(const Duration(milliseconds: 1700));
+      expect(toast(), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(toast(), findsNothing);
+    });
+
+    testWidgets('is anchored to the viewport, and not to the content', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(
+        tester,
+        bloc: h.bloc,
+        settings: const UserSettings(selahLengthSec: 15),
+      );
+      await runTheSilence(tester);
+
+      // **The prototype's `bottom: 110px` (`:466`)**, measured off the
+      // viewport rather than off the content — which is the whole reason the
+      // toast lives in the scaffold's `overlay` slot and not in the page's
+      // own column.
+      final Rect painted = tester.getRect(toast());
+      final Size screen =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(
+        screen.height - painted.bottom,
+        closeTo(110, 1),
+        reason: 'eva/redesign.html:466 — bottom:110px',
+      );
+    });
+
+    testWidgets('cannot be tapped through, and says so in the tree', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(
+        tester,
+        bloc: h.bloc,
+        settings: const UserSettings(selahLengthSec: 15),
+      );
+      await runTheSilence(tester);
+
+      // `:466` ends `pointer-events:none`. A confirmation is a **notice**, not
+      // a control: it must never take a tap that belonged to the card under
+      // it. `IgnorePointer` does that and leaves the semantics tree alone.
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.ancestor(of: toast(), matching: find.byType(IgnorePointer)),
+            )
+            .where((IgnorePointer pointer) => pointer.ignoring),
+        isNotEmpty,
+      );
+    });
+
+    testWidgets('and its clock does not outlive the screen', (
+      WidgetTester tester,
+    ) async {
+      final HomeHarness h = harness();
+      await pumpHome(
+        tester,
+        bloc: h.bloc,
+        settings: const UserSettings(selahLengthSec: 15),
+      );
+      await runTheSilence(tester);
+
+      expect(toast(), findsOneWidget);
+
+      // **A pending timer fails a `flutter_test` case**, and this one is the
+      // page's: the toast's 1800 ms is the page's clock, and the page has to
+      // cancel it on the way out.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 

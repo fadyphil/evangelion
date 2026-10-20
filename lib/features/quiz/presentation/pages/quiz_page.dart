@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
+import 'package:evangelion/app/settings_handle.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/quiz_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/ritual_haptic.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:evangelion/features/quiz/domain/answer_haptic.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/quiz/presentation/quiz_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_header.dart';
@@ -406,10 +409,63 @@ class _QuizBodyState extends State<_QuizBody> {
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
 
-    return BlocBuilder<QuizBloc, QuizState>(
-      builder: (BuildContext context, QuizState state) =>
-          _body(context, strings: strings, state: state),
+    // ## THE VERDICT'S HAPTIC, AND WHY IT IS A **LISTENER**
+    //
+    // `eva/redesign.html:1428` — a correct answer is `haptic(30)`, a firm bump.
+    // `eva/redesign.html:1429` — a wrong one is `haptic([40,60,40])`, a buzz.
+    //
+    // **The listener is the only place the moment exists.** The prototype fires
+    // its haptic inside `pick` (`:1423`'s one-shot), which is an *event*; this
+    // client grades on a second press, so the event is "the verdict arrived",
+    // and the only widget that can see that edge is a listener. A `build`-time
+    // call would fire on every rebuild, and a rebuild is not a check.
+    //
+    // The mapping itself is `features/quiz/domain/answer_haptic.dart`'s —
+    // AGENT_CONTEXT §6's "domain logic must not be buried inside a widget".
+    return BlocListener<QuizBloc, QuizState>(
+      listenWhen: _gradedJustNow,
+      listener: _onGraded,
+      child: BlocBuilder<QuizBloc, QuizState>(
+        builder: (BuildContext context, QuizState state) =>
+            _body(context, strings: strings, state: state),
+      ),
     );
+  }
+
+  /// Whether [current] is the first state in which the answer on screen is
+  /// graded.
+  ///
+  /// ## THE GATE IS AN **EDGE**, NOT A STATE
+  ///
+  /// "The answer is graded" is true of every frame after the check, so a gate
+  /// that asked it would fire on every rebuild — and a rebuild is not an event.
+  /// The prototype fires its haptic **once**, inside `pick`; so this fires once
+  /// too, on the transition from ungraded to graded.
+  ///
+  /// **The two ends are read from the two states, not from the answer's
+  /// identity**: the same question is ungraded before the check and graded
+  /// after it, and the reader's own selection is carried across both.
+  bool _gradedJustNow(QuizState previous, QuizState current) {
+    final QuizAnswer? before = previous.currentAnswer;
+    final QuizAnswer? after = current.currentAnswer;
+    return !(before?.isChecked ?? false) && (after?.isChecked ?? false);
+  }
+
+  /// Announces the verdict the server has just given.
+  ///
+  /// `:1428` — a right answer is the prototype's firm bump; `:1429` — a wrong
+  /// one is its buzz. The **rhythm** is lost and the strength survives, which
+  /// `core/domain/entities/ritual_haptic.dart` records.
+  ///
+  /// **The reader's own switch, read without a dependency**, because a
+  /// listener's callback runs outside a build and `SettingsScope.of` is a
+  /// *dependent* lookup, which Flutter refuses there.
+  /// `ritualHapticsEnabled` is the app's own answer for exactly that case, and
+  /// `result_sheet.dart` uses it for the same reason.
+  void _onGraded(BuildContext context, QuizState state) {
+    final RitualHaptic? haptic = answerHapticFor(state.currentAnswer);
+    if (haptic == null) return;
+    fireRitualHaptic(haptic, enabled: ritualHapticsEnabled());
   }
 
   /// The screen for [state]: the question, the options and the CTA.

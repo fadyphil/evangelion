@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/settings_scope.dart';
@@ -64,8 +66,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 /// **The redesign draws no seal on `/`** — `:513-538` has no floating control at
 /// all — so the divergence that was recorded here is discharged rather than
 /// carried.
+///
+/// ## AND THE PAGE **OWNS** THE SELAH'S TOAST, AS THE PROTOTYPE'S SCREEN DOES
+///
+/// `:1330`'s `toast(tr('amen'))` is anchored to the **screen root** (`:466`),
+/// and the screen is what raises it and what takes it away (`:1393` — the
+/// message shows for 1800 ms). So the toast is this page's, and the page is
+/// **stateful** for it: the message, the clock, and the `overlay` slot the
+/// toast is placed in.
+///
+/// **The state is here and not in the selah card**, and the reason is the same
+/// one `settings_page.dart` records for the restore toast: a card that owned
+/// the message would own the clock too, and a clock that outlives the screen
+/// is a timer nobody cancels. The card's whole half of the amen is
+/// [SelahCard.onCompleted] — the moment the silence ran its course — and the
+/// page decides what that means for the reader.
 @RoutePage()
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   /// The home screen.
   const HomePage({super.key, this.bloc});
 
@@ -148,12 +165,102 @@ class HomePage extends StatelessWidget {
   static const double kBottomClearance = 130;
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  /// The amen's message, or `null` when no toast is up.
+  String? _amen;
+
+  /// The timer that takes the toast away.
+  ///
+  /// **Cancelled in [dispose], and that is not tidiness.** `flutter_test` fails
+  /// a test on a pending timer, and a reader who leaves `/` inside the amen's
+  /// 1800 ms would otherwise be held by a timer whose widget is gone.
+  Timer? _amenTimer;
+
+  @override
+  void dispose() {
+    _amenTimer?.cancel();
+    _amenTimer = null;
+    super.dispose();
+  }
+
+  /// Raises the amen for [message] and takes it away again after
+  /// [kSelahAmenDuration].
+  ///
+  /// **The timer is cancelled first**, because the prototype's own `toast(m)`
+  /// does exactly that (`:1393` — `clearTimeout(t._x)` before the new timeout),
+  /// and a second silence that ends while the first amen is up must not leave
+  /// two timers racing to clear the same message.
+  void _showAmen(String message) {
+    _amenTimer?.cancel();
+    setState(() {
+      _amen = message;
+    });
+    _amenTimer = Timer(kSelahAmenDuration, () {
+      // `mounted` because the timer outlives a route pop: a screen that has been
+      // disposed must not call `setState` on the way out.
+      if (!mounted) return;
+      setState(() {
+        _amen = null;
+      });
+    });
+  }
+
+  /// The amen, **anchored to the viewport** and **transparent to taps**.
+  ///
+  /// ## WHY IT IS IN THE SCAFFOLD'S `overlay` SLOT
+  ///
+  /// The prototype anchors the toast to the **screen root**: `:466` —
+  /// `.toast{position:absolute;left:50%;bottom:110px;…}` — with the element a
+  /// direct child of the screen (`:738`) and **not** of the scrolling list.
+  ///
+  /// `/`'s own column is inside a `SingleChildScrollView` (`NeuralScaffold`'s
+  /// `scrollable: true`), so a toast placed in it would scroll away with the
+  /// content and would sit inside the scroll view's box rather than the
+  /// viewport's — the defect `/communion`'s suite measured and recorded.
+  /// `NeuralScaffold.overlay` is the viewport-fixed slot that already exists
+  /// for exactly this reason.
+  ///
+  /// ## AND WHY IT IS `IgnorePointer`
+  ///
+  /// The prototype's toast rule ends `pointer-events:none` (`:466`). A
+  /// confirmation is a **notice**, not a control: it must never take a tap
+  /// that belonged to the row under it. `IgnorePointer` does that, and it
+  /// leaves the semantics tree alone — the `liveRegion` announcement is the
+  /// point of the toast for a screen-reader user.
+  Widget? _toastOverlay() {
+    final String? message = _amen;
+    if (message == null) return null;
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          left: 20,
+          right: 20,
+          // The prototype's `bottom: 110px` (`:466`) — high enough to clear the
+          // bottom of the screen and the card under it.
+          bottom: 110,
+          child: IgnorePointer(child: EvaToast(message: message)),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Two sources for one bloc, one provider either way — see [bloc]. A bloc the
-    // page owns is loaded by `_HomeBody`; one the caller passed is the caller's,
-    // and it is already holding whatever state the caller wants to test.
-    final HomeBloc? passed = bloc;
+    // Two sources for one bloc, one provider either way — see [HomePage.bloc]. A
+    // bloc the page owns is loaded by `_HomeBody`; one the caller passed is the
+    // caller's, and it is already holding whatever state the caller wants to
+    // test.
+    final HomeBloc? passed = widget.bloc;
     final HomeBloc resolved = passed ?? getIt<HomeBloc>();
+    // **The amen's own string, read here and not in the callback.**
+    // `context.l10n` is a *dependent* lookup, and Flutter refuses one outside a
+    // build — and the toast is raised from a timer, which is not a build. So
+    // the message is read on the frame the page is built and handed to the
+    // callback as a value.
+    final AppLocalizations strings = context.l10n;
 
     return NeuralScaffold(
       variant: NeuralVariant.home,
@@ -166,19 +273,28 @@ class HomePage extends StatelessWidget {
       // where the prototype writes them — [kGreetGutter] on the greeting and
       // [kScrollGutter] on the column below it.
       padding: EdgeInsets.zero,
-      // **No `overlay:` slot, and that is Phase 6's doing.** The slot used to hold
-      // the `SealFab`, the interim holder for the destinations the redesign's
-      // dock now owns. The redesign draws no float on `/` (`redesign.html:513-538`)
-      // and the dock is the prototype's own home for the board and the journey
-      // (`:706`, `:707`), so the seal is deleted rather than kept beside a dock
-      // that says the same thing twice.
+      // **The `overlay:` slot holds the amen, and that is Phase 6's slot put back
+      // to a use the prototype has.** It used to hold the `SealFab`, the interim
+      // holder for the destinations the redesign's dock now owns; the seal is
+      // gone (the redesign draws no float on `/`, `:513-538`), and what the
+      // prototype's screen root carries is the **toast** (`:466`, `:738`).
+      overlay: _toastOverlay(),
       child: BlocProvider<HomeBloc>.value(
         value: resolved,
-        child: const _HomeBody(),
+        child: _HomeBody(
+          onSelahCompleted: () => _showAmen(strings.homeSelahAmen),
+        ),
       ),
     );
   }
 }
+
+/// How long the selah's amen stays up.
+///
+/// `eva/redesign.html:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`
+/// — the prototype's own toast duration, and the same one the restore and the
+/// cheer use.
+const Duration kSelahAmenDuration = Duration(milliseconds: 1800);
 
 /// Everything below the scaffold: the greeting and the four sections of the scroll.
 ///
@@ -251,7 +367,14 @@ class HomePage extends StatelessWidget {
 /// than a boolean fixes the second trigger in the same place, and
 /// `home_page_test.dart` drives both.
 class _HomeBody extends StatefulWidget {
-  const _HomeBody();
+  const _HomeBody({required this.onSelahCompleted});
+
+  /// Runs when the selah's silence has run its course.
+  ///
+  /// **The page's own half of the prototype's `toast(tr('amen'))` (`:1330`)**,
+  /// and the reason the card does not raise the toast itself: the toast is
+  /// anchored to the **screen root** (`:466`) and the screen owns it.
+  final VoidCallback onSelahCompleted;
 
   @override
   State<_HomeBody> createState() => _HomeBodyState();
@@ -511,7 +634,9 @@ class _HomeBodyState extends State<_HomeBody> implements AutoRouteAware {
                       hapticsEnabled: settings.haptics,
                       beginLabel: strings.homeSelahBegin,
                       endLabel: strings.homeSelahEnd,
-                      amenLabel: strings.homeSelahAmen,
+                      // **The amen is the page's toast, and the card's only half
+                      // of it is this callback.** See [HomePage]'s class doc.
+                      onCompleted: widget.onSelahCompleted,
                     ),
                   ),
                   const SizedBox(height: HomePage.kLabelGap),

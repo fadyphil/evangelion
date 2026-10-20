@@ -37,13 +37,68 @@ import 'package:flutter/material.dart';
 /// `:1330` asks for `haptic([30,40,30])` — two buzzes with a pause — and
 /// `HapticFeedback` has no pattern API. `ritual_haptic.dart` records that
 /// loss: the rhythm becomes its strongest element, a heavy impact.
+///
+/// ## AND THE PROTOTYPE'S **FLARE** IS **NOT** PORTED — AND WHY, IN FULL
+///
+/// The prototype's completion is one line (`eva/redesign.html:1330`):
+///
+/// ```js
+/// if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5; haptic([30,40,30]); }
+/// ```
+///
+/// Three of its four halves are here. The **toast** is the home page's (see
+/// [onCompleted]); the **spike** is [kSelahCompletionSpike] through
+/// `LumenScene.raiseSpike`; the **haptic** is `RitualHaptic.selahCompleted`.
+/// The fourth — `addStar(true)` — is the **flare**: a bigger star in the
+/// **witness sky** (`:1148`, `big?5:3+Math.random()*2`, with the wide halo
+/// from `starShadows`), and it is **not** ported.
+///
+/// **The reason is the sky's key space, and it is not a shortcut.** This
+/// client's witness sky is **verse-keyed**: `SkyEntry`
+/// (`core/domain/entities/sky_entry.dart`) carries a book, a chapter and a
+/// verse, and `/reading` lights one star per verse as it crosses the scroll
+/// threshold (`:1219`). **A selah lights no verse.** There is no honest key
+/// for it:
+///
+/// * `SkyEntry`'s `chapter` and `verse` are **required `int`s**, and `0` is
+///   not a verse of any book — a synthetic key would be a made-up verse;
+/// * the entity is **`freezed`**, so making the verse optional is a change to
+///   the constructor and the generated copy, and the key space is shared with
+///   `/reading`'s real stars and with the constellation's book-scoped polyline
+///   (`:1167-1185`), where a point that belongs to no book is a visible
+///   fiction; and
+/// * ADR-0022's fiction table governs what may be fabricated, and the
+///   starfield's row says the **storage** is a stub
+///   (`docs/adr/0022-full-fidelity-redesign-supersedes-0001.md:59`) —
+///   not that its keys may be invented.
+///
+/// **And there is a second, independent reason, which is the one that would
+/// have sunk it anyway: the sky is not on this screen.** The prototype's sky is
+/// a **global background layer** — `:500`'s `<div id="sky">` is a direct child
+/// of `.screen`, and `:116`'s `#sky{position:absolute;inset:0;z-index:2}` puts
+/// it over every route — so a flare lit from the home is visible at once. This
+/// client mounts `WitnessSky` on **`/reading` only**
+/// (`features/reading/presentation/pages/reading_page.dart:604`), and the home
+/// feature **reads the sky nowhere**: the only mentions of `Sky` under
+/// `lib/features/home/` are prose — this paragraph and a doc comment in the
+/// library catalogue's port (`domain/library_catalogue_repository.dart:26`).
+/// A star lit on `/` would be invisible where the selah ended, and would
+/// appear later — among the verses — in a screen the reader is not on.
+///
+/// **The precedent is the cheer, and it is the same shape.** `:1123` — the
+/// communion cheer — also ends in `addStar(true)`, and
+/// `core/design_system/widgets/leaderboard_row_tile.dart` resolved it the same
+/// way: "`SkyEntry` is **verse-keyed** … and `/communion` has no verse", so
+/// the flare is **row-local and transient** rather than a sky entry. **A
+/// card-local flare is the same answer for the selah**, and it is the ready-made
+/// follow-up for whoever owns the sky: one `FourPointedStar` in the card's own
+/// corner, fading, in place of a sky entry this client cannot honestly name.
 class SelahCard extends StatefulWidget {
   /// The card: the word, the duration, and the control that starts the silence.
   const SelahCard({
     required this.seconds,
     required this.beginLabel,
     required this.endLabel,
-    required this.amenLabel,
     required this.hapticsEnabled,
     this.onCompleted,
     super.key,
@@ -66,24 +121,6 @@ class SelahCard extends StatefulWidget {
   /// Written for the same reason as [beginLabel].
   final String endLabel;
 
-  /// The message the finished silence shows.
-  ///
-  /// `eva/redesign.html:970` — `amen:["selah · amen","سِلاه · آمين"]`.
-  ///
-  /// ## AND WHY IT IS DRAWN **IN THE CARD** AND NOT AS A TOAST
-  ///
-  /// The prototype raises it as a **toast** — `:1330`'s
-  /// `toast(tr('amen'))` — and a toast is anchored to the screen root
-  /// (`:466`). This client has no app-level toast surface: the communion page
-  /// builds its own, and `/` has none.
-  ///
-  /// So the message takes the place of the **count** — the same corner, the
-  /// same gold, the same 16px — and the divergence is recorded here rather
-  /// than hidden. The alternative rejected was a second toast implementation
-  /// in a second feature, which is the duplication this repository refuses
-  /// wherever it finds it.
-  final String amenLabel;
-
   /// Whether the reader has asked for haptics.
   ///
   /// `UserSettings.haptics` — the Workshop's own switch (`:689`).
@@ -93,6 +130,28 @@ class SelahCard extends StatefulWidget {
   ///
   /// The page's half of the prototype's `toast(tr('amen'))` (`:1330`) — the
   /// toast is anchored to the screen root and the screen owns it.
+  ///
+  /// ## AND THE CARD **NO LONGER** DRAWS THE AMEN
+  ///
+  /// The prototype raises the amen as a **toast** — `:1330`'s
+  /// `toast(tr('amen'))` — and a toast is anchored to the screen root
+  /// (`:466`). This card used to draw it **in the count's corner** and record
+  /// the divergence, on the grounds that "this client has no app-level toast
+  /// surface: the communion page builds its own, and `/` has none".
+  ///
+  /// **That reason has stopped being true.** The toast is now a **shared
+  /// design-system widget** (`core/design_system/widgets/eva_toast.dart`) —
+  /// one implementation of the prototype's `.toast` for the amen, the cheer
+  /// and the restore — and the **home page** owns it, exactly as the
+  /// prototype's screen root does. So the amen is a toast again, and this
+  /// card's only job is to say that the silence has run its course.
+  ///
+  /// The card therefore has **no message of its own** any more, and that is
+  /// the point: a card that carried the string would be a second place the
+  /// amen lives, and the second place is where the divergence was recorded
+  /// before. The message itself is the app's own — `homeSelahAmen`, the
+  /// prototype's `amen:["selah · amen","سِلاه · آمين"]` (`:970`) — and the
+  /// home page holds it.
   final VoidCallback? onCompleted;
 
   /// The silence's length. `redesign.html:1323` — `let selahDur = 60`.
@@ -197,23 +256,10 @@ class _SelahCardState extends State<SelahCard> {
   /// flag is what says whether it has one.
   bool _dimming = false;
 
-  /// Whether the finished silence is still showing its message.
-  bool _amen = false;
-
-  /// The clock behind the amen message.
-  ///
-  /// **Cancelled in [dispose]**, for the same reason the countdown's is: a
-  /// pending timer fails a `flutter_test` case, and a reader who leaves `/`
-  /// inside the amen's 1800 ms would otherwise be held by a timer whose widget
-  /// is gone.
-  Timer? _amenTimer;
-
   @override
   void dispose() {
     _timer?.cancel();
     _timer = null;
-    _amenTimer?.cancel();
-    _amenTimer = null;
     if (_dimming) {
       _scene?.undimFocus();
       _dimming = false;
@@ -289,23 +335,27 @@ class _SelahCardState extends State<SelahCard> {
     _releaseDim();
     // `:1330` — `if(done){ toast(tr('amen')); addStar(true); if(V)V.spike=.5;
     // haptic([30,40,30]); }`
+    //
+    // ## THE **SPIKE** IS PORTED, AND THE **FLARE** IS NOT
+    //
+    // `V.spike=.5` is the aurora's kick, and this client has the mechanism:
+    // `LumenScene.raiseSpike` — so the selah raises it, by the prototype's
+    // own number ([kSelahCompletionSpike]).
+    //
+    // `addStar(true)` is the **flare** — a bigger star in the **witness sky**
+    // (`:1148`, `big?5:3+Math.random()*2`) — and it is **not** ported, because
+    // this client's sky is keyed `book:chapter:verse` and **a selah lights no
+    // verse**. The full account, and the two independent reasons, are on
+    // [SelahCard]'s class doc.
     _scene?.raiseSpike(kSelahCompletionSpike);
     fireRitualHaptic(
       RitualHaptic.selahCompleted,
       enabled: widget.hapticsEnabled,
     );
-    // The amen, in the count's corner, for the prototype's toast duration —
-    // `:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`.
-    _amenTimer?.cancel();
-    setState(() {
-      _amen = true;
-    });
-    _amenTimer = Timer(kSelahAmenDuration, () {
-      if (!mounted) return;
-      setState(() {
-        _amen = false;
-      });
-    });
+    // **The amen is the page's.** The prototype's `toast(tr('amen'))` is
+    // anchored to the screen root (`:466`) and the screen owns it — so the
+    // card's only half of it is this callback, and the home page raises the
+    // toast.
     widget.onCompleted?.call();
   }
 
@@ -323,7 +373,6 @@ class _SelahCardState extends State<SelahCard> {
     final TextDirection direction = Directionality.of(context);
     final SelahCountdown? countdown = _countdown;
     final bool running = countdown != null;
-    final bool amen = _amen;
 
     return GlassSurface(
       // `tint`, and not `bloom`: `.selah` (`:261-262`) carries no `.bloom` child.
@@ -414,10 +463,16 @@ class _SelahCardState extends State<SelahCard> {
           // The gap is the card's own `gap: 14px` (`:262`), and a hidden element
           // creates no gap in CSS — so the count's `SizedBox` is here rather
           // than a constant gap before the button.
-          if (running || amen) ...<Widget>[
+          //
+          // **The count is the count, and nothing else.** It used to double as
+          // the amen's carrier — the divergence this card recorded before the
+          // toast was a shared widget — and the two are now separate: the
+          // amen is a **toast** on the home page, anchored to the screen root
+          // (`:466`), and the corner is the countdown's alone.
+          if (running) ...<Widget>[
             const SizedBox(width: SelahCard.gap),
             Text(
-              amen ? widget.amenLabel : strings.digits(countdown!.remaining),
+              strings.digits(countdown.remaining),
               style: EvaTypography.monoCaps(colors).copyWith(
                 fontSize: kSelahCountSize,
                 letterSpacing: 0,
@@ -675,13 +730,13 @@ const double kSelahActiveBorderAlpha = 0.5;
 /// The count's size. `eva/redesign.html:532` — `font-size:16px`.
 const double kSelahCountSize = 16;
 
-/// How long the finished silence's message stays up.
-///
-/// `eva/redesign.html:1393` — `setTimeout(()=>t.classList.remove('show'),1800)`
-/// — the prototype's own toast duration.
-const Duration kSelahAmenDuration = Duration(milliseconds: 1800);
-
 /// The spike the aurora takes when the silence ends.
 ///
 /// `eva/redesign.html:1330` — `if(V)V.spike=.5;`.
+///
+/// ## AND IT IS **ASSIGNED**, NOT ACCUMULATED
+///
+/// `LumenScene.raiseSpike`'s doc says the same of the prototype: `V.spike=.5`
+/// is an assignment, and a caller that raises the spike while another is
+/// decaying it replaces it rather than adding to it.
 const double kSelahCompletionSpike = 0.5;

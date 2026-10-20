@@ -238,8 +238,9 @@ class NeuralScaffold extends StatelessWidget {
   /// it, and the redesign's **dock** is the shape it survives as — a viewport-fixed
   /// control over a scrolling page. The dock is built by the shell's own `Stack`
   /// (`lib/app/router/dock_shell_page.dart`) rather than through this slot, but the
-  /// arrangement is the one the slot exists for, and `/login`'s footer and the two
-  /// toast overlays are its callers now.
+  /// arrangement is the one the slot exists for, and `/login`'s footer and the
+  /// **three** toast overlays — `/communion`'s cheer, `/settings`'s restore and
+  /// `/`'s selah amen — are its callers now.
   ///
   /// The `Stack` here is already the prototype's `position: absolute; inset: 0`
   /// container (`ds.tsx:162`), so an overlay is the shape the prototype actually had

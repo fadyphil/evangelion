@@ -5,13 +5,30 @@ import 'package:evangelion/core/domain/entities/sky_entry.dart';
 ///
 /// ## WHY IT IS DECLARED IN `core/domain/` AND NOT IN ANY ONE FEATURE
 ///
-/// Three consumers, which is §3's placement test:
+/// Three consumers, which is §3's placement test — and **one of the three is a
+/// consumer the port supports and no feature is**:
 ///
 /// | consumer | what it asks |
 /// | --- | --- |
 /// | `reading` | [record], as verses scroll into view (`addStar(false)`) |
-/// | `quiz` | [record], with [SkyEntry.isFlare] set, for the celebrated moments |
 /// | `journey` | [count] (and [entries]), for the sky widget's star count |
+/// | `quiz` | [record], with [SkyEntry.isFlare] set, for the celebrated moments — **NOT WIRED** |
+///
+/// **The `quiz` row is a capability with no caller, and that is stated rather
+/// than left to look like a fact.** The prototype's three `addStar(true)`
+/// sites are the communion's cheer (`:1123`), the selah's end (`:1330`) and a
+/// correct answer (`:1428`), and **none of them can be ported honestly yet**:
+/// `SkyEntry` is **verse-keyed** (`book`, a required `chapter`, a required
+/// `verse` — `sky_entry.dart`), a flare that is not a verse has no key, and
+/// ADR-0022's fiction table is the authority on what may be fabricated. The
+/// house's answer for the celebration that has one already is the cheer's: a
+/// **row-local, transient** flare
+/// (`core/design_system/widgets/leaderboard_row_tile.dart`), not a sky entry.
+///
+/// The port keeps the capability because the **repository's** contract is
+/// stated once and tested (`sky_repository_test.dart` pins the flare upgrade
+/// and its monotonicity), and a port that dropped a capability a future
+/// consumer needs would push that contract into a second adapter.
 ///
 /// A port inside any one feature would make the other two import it, which §3
 /// forbids with no exceptions and `tool/verify_purity.sh` Gate 2 fails on the
@@ -22,8 +39,8 @@ import 'package:evangelion/core/domain/entities/sky_entry.dart';
 /// ## FOUR METHODS, AND WHAT EACH ONE IS FOR
 ///
 /// * [record] — lights one verse. Idempotent by [SkyEntry.key]: the reader
-///   that lights (quiz flares) and the sanctuary that re-lights on scroll
-///   both call it, and neither has to check first.
+///   that lights and the sanctuary that re-lights on scroll both call it, and
+///   neither has to check first.
 /// * [entries] — the sky in lit order, for the constellation polylines
 ///   (`eva/redesign.html:1167-1185` read the stars back in DOM order).
 /// * [count] — how many stars are lit, for `journey`'s widget, which draws
