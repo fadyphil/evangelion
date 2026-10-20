@@ -322,13 +322,63 @@ fi
 
 # --- 7. coverage + baseline --------------------------------------------------
 printf '\n%s7. coverage and the recorded floor%s\n' "$B" "$N"
+# ## THE MEASUREMENT IS A SAMPLE, AND THE FLOOR IS A BUDGET OF LINES
+#
+# `flutter test --coverage` does not measure the whole run. It collects from
+# **one isolate per isolate group** (`package:coverage` 1.15.1's
+# `coveredIsolateGroups`), because the VM shares program counters between the
+# isolates of a group and collecting from all of them would count every hit
+# twice.
+#
+# **A `const` CONSTRUCTOR IS NOT A PROGRAM COUNTER.** Materialising a canonical
+# constant is a **per-isolate** event, so the line that records a
+# materialisation is reported as covered or **not** depending on which isolate
+# the collector happened to sample. Measured on one tree, one line, on
+# 2026-10-20: 4 on a 16-core machine, 2 at `--concurrency=2`, and **0 on the CI
+# runner** — which was the whole of the difference between the runner's
+# 8501/8601 and the local 8503/8601.
+#
+# So the coverage number this gate compares is a measurement with a **±1 line
+# of noise**, and a floor compared against it with zero tolerance is a coin
+# flip. The floor is therefore a **BUDGET OF UNCOVERED LINES** — an integer —
+# and not a percentage:
+#
+#   * an integer has no rounding, so the comparison is exact;
+#   * a budget does not drift as the code grows, where a percentage does: a
+#     percentage floor of 98.85% on 8701 lines admits 100 uncovered lines,
+#     while the same floor on 8601 lines admits 99, so adding covered code
+#     **widens** a percentage floor without anybody deciding to widen it;
+#   * and the recorded number is one a run actually produced, which a
+#     two-decimal percentage of a sampled measurement is not.
+#
+# `coverage_pct` is still recorded, because it is the number a human reads, and
+# it is still printed — but the **comparison** is the integer. The percentage
+# is a rendering of the budget at the tree's current size, not the budget.
+#
+# **THIS IS NOT A REASON TO WIDEN THE FLOOR.** Widening a floor to make a red
+# run green is the thing the baseline file exists to prevent. The fix for a
+# genuinely uncovered line is to COVER THE LINE, and the fix for a line that is
+# only covered incidentally is to GIVE IT A TEST — which is what `EvaShake`
+# got, and its test is what stopped the runner and the local machine from
+# disagreeing about whether a `const` had been materialised.
+#
+# The comparison lives in ONE function, so the self-test can exercise the
+# shipped thing rather than a second copy of it.
+coverage_floor_met() {
+  # $1 covered, $2 total, $3 the floor (uncovered lines allowed).
+  [[ $(( $2 - $1 )) -le $3 ]]
+}
+
 if [[ ! -f "$BASELINE" ]]; then
   fatal "baseline file missing: $BASELINE"
-elif ! grep -qE '^test_count[[:space:]]+[0-9]+' "$BASELINE" || ! grep -qE '^coverage_pct[[:space:]]+[0-9.]+' "$BASELINE"; then
-  fatal "baseline file malformed: $BASELINE (need test_count and coverage_pct)"
+elif ! grep -qE '^test_count[[:space:]]+[0-9]+' "$BASELINE" || \
+  ! grep -qE '^coverage_pct[[:space:]]+[0-9.]+' "$BASELINE" || \
+  ! grep -qE '^uncovered_lines[[:space:]]+[0-9]+' "$BASELINE"; then
+  fatal "baseline file malformed: $BASELINE (need test_count, coverage_pct and uncovered_lines)"
 else
   FLOOR_TESTS=$(grep -E '^test_count[[:space:]]' "$BASELINE" | grep -oE '[0-9]+' | tail -1)
   FLOOR_COV=$(grep -E '^coverage_pct[[:space:]]' "$BASELINE" | grep -oE '[0-9.]+' | tail -1)
+  FLOOR_UNCOVERED=$(grep -E '^uncovered_lines[[:space:]]' "$BASELINE" | grep -oE '[0-9]+' | tail -1)
 
   if [[ $UPDATE_BASELINE -eq 1 ]]; then
     printf '  %s%-6s%s baseline update requested\n' "$Y" "note" "$N"
@@ -340,13 +390,14 @@ else
         fatal "flutter test --coverage produced no coverage/lcov.info"
       else
         read -r LH LF <<<"$(awk -F: '/^LH:/{lh+=$2} /^LF:/{lf+=$2} END{print lh, lf}' coverage/lcov.info)"
+        UNCOVERED=$((LF - LH))
         PCT=$(python3 -c "print(f'{100*$LH/$LF:.2f}')" 2>/dev/null || echo "0.00")
-        printf '         coverage %s%% (%s/%s) · floor %s%% · tests %s · floor %s\n' \
-          "$PCT" "$LH" "$LF" "$FLOOR_COV" "${ACTUAL_TESTS:-?}" "$FLOOR_TESTS"
+        printf '         coverage %s%% (%s/%s) · uncovered %s · floor %s · tests %s · floor %s\n' \
+          "$PCT" "$LH" "$LF" "$UNCOVERED" "$FLOOR_UNCOVERED" "${ACTUAL_TESTS:-?}" "$FLOOR_TESTS"
 
         below=0
-        python3 -c "import sys; sys.exit(0 if $PCT + 1e-9 >= $FLOOR_COV else 1)" \
-          || { fail "coverage $PCT% is BELOW the recorded floor $FLOOR_COV%"; below=1; }
+        coverage_floor_met "$LH" "$LF" "$FLOOR_UNCOVERED" \
+          || { fail "coverage $PCT% leaves $UNCOVERED uncovered line(s), over the recorded floor of $FLOOR_UNCOVERED"; below=1; }
         if [[ -z "${ACTUAL_TESTS:-}" ]]; then
           # Defence in depth. Gate 6 already FATALs on an unparsable summary, so
           # reaching here empty means something reached past it. Skipping is what
@@ -356,7 +407,7 @@ else
         elif [[ "$ACTUAL_TESTS" -lt "$FLOOR_TESTS" ]]; then
           fail "test count $ACTUAL_TESTS is BELOW the recorded floor $FLOOR_TESTS"; below=1
         fi
-        [[ $below -eq 0 ]] && pass "coverage $PCT% and $ACTUAL_TESTS tests meet the recorded floor"
+        [[ $below -eq 0 ]] && pass "coverage $PCT% ($UNCOVERED uncovered of $LF) and $ACTUAL_TESTS tests meet the recorded floor"
       fi
     else
       fail "flutter test --coverage — $(printf '%s' "$out" | grep -oE '\+[0-9]+ -[0-9]+' | tail -1)"
@@ -370,16 +421,39 @@ else
       LH=$(awk -F: '/^LH:/{lh+=$2} END{print lh+0}' coverage/lcov.info)
       LF=$(awk -F: '/^LF:/{lf+=$2} END{print lf+0}' coverage/lcov.info)
       NEW_PCT=$(python3 -c "print(f'{100*$LH/$LF:.2f}')" 2>/dev/null || echo "0.00")
+      NEW_UNCOVERED=$((LF - LH))
       NEW_TESTS="${ACTUAL_TESTS:-$(grep -c '' /dev/null || echo 0)}"
-      printf '         %s %s -> %s   %s %s -> %s\n' \
-        "tests" "$FLOOR_TESTS" "$NEW_TESTS" "coverage" "$FLOOR_COV" "$NEW_PCT"
+      printf '         %s %s -> %s   %s %s -> %s   %s %s -> %s\n' \
+        "tests" "$FLOOR_TESTS" "$NEW_TESTS" "coverage" "$FLOOR_COV" "$NEW_PCT" \
+        "uncovered" "$FLOOR_UNCOVERED" "$NEW_UNCOVERED"
       [[ "$NEW_TESTS" -eq 0 ]] && fatal "cannot re-record: no test count captured this run"
-      {
-        printf '# Recorded %s. Update ONLY via: tool/verify_all.sh --update-baseline\n' "$(date +%F)"
-        printf 'test_count      %s\n' "$NEW_TESTS"
-        printf 'coverage_pct    %s\n' "$NEW_PCT"
-      } > "$BASELINE"
-      pass "baseline re-recorded (review this diff)"
+      # ## THE HISTORY IS KEPT, AND THAT IS THE POINT
+      #
+      # This used to write the file out with `> "$BASELINE"` and three `printf`s
+      # — which **replaced the whole file with three lines** and destroyed every
+      # word of the history above them. The file's own comment records that
+      # happening and the history being "put back by hand", which is a
+      # re-recording that has to be repaired by a person afterwards, and the
+      # next re-recording would have wiped it again.
+      #
+      # The file's rule is that the old and the new values are visible in the
+      # commit, and a running history is how a reader tells a **strengthening**
+      # from a **lowered** floor. So the three value lines are rewritten **in
+      # place** and everything else — the history, the reasons, the caveats — is
+      # left exactly as it was.
+      awk -v t="$NEW_TESTS" -v c="$NEW_PCT" -v u="$NEW_UNCOVERED" '
+        /^test_count[[:space:]]/      { print "test_count      " t;  seen["t"]=1; next }
+        /^coverage_pct[[:space:]]/    { print "coverage_pct    " c;  seen["c"]=1; next }
+        /^uncovered_lines[[:space:]]/ { print "uncovered_lines " u;  seen["u"]=1; next }
+        { print }
+        END {
+          # A key that was not in the file is appended rather than lost.
+          if (!seen["t"]) print "test_count      " t
+          if (!seen["c"]) print "coverage_pct    " c
+          if (!seen["u"]) print "uncovered_lines " u
+        }
+      ' "$BASELINE" > "$BASELINE.tmp" && mv "$BASELINE.tmp" "$BASELINE"
+      pass "baseline re-recorded (review this diff — the history above it is kept)"
     fi
   fi
 fi

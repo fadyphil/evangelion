@@ -203,25 +203,63 @@ fi
 
 # --- 6. baseline -------------------------------------------------------------
 # The floor is compared in verify_all.sh, so raising it above reality must fail.
+#
+# **AND THE COMPARISON IS THE SHIPPED ONE**, read out of verify_all.sh rather
+# than reimplemented here — the same treatment `tests_passed` gets above, and
+# for the same reason: two implementations of one comparison are two things to
+# keep in step, and the one that drifts is the one that stops firing. The
+# previous version of this case reimplemented the comparison in Python, so it
+# was testing a formula that verify_all.sh did not use.
+#
+# **THE GREEN DIRECTION IS ASSERTED TOO.** A floor the measurement MEETS must
+# pass, and one line tighter must fail. A comparison that failed everything
+# would satisfy "the gate can fail" and mean nothing.
 d=$(make_scratch baseline)
-# lcov's LF/LH are already fractions of lines, so this IS the percentage —
-# formatting it a second time is the bug this harness was born with once.
-real_cov=$(awk -F: '/^LH:/{lh+=$2} /^LF:/{lf+=$2} END{if (lf>0) printf "%.2f", 100*lh/lf; else print ""}' "$ROOT/coverage/lcov.info" 2>/dev/null || true)
-if [[ -z "$real_cov" ]]; then
-  # No recorded coverage to compare against; the gate is exercised by gate 6 in
-  # verify_all.sh itself. Report honestly rather than pretending to have run it.
-  record "baseline" "SKIPPED (no coverage/lcov.info)"
-  printf '  %-10s %sskipped — no coverage/lcov.info to compare against%s\n' "note" "$R" "$N"
+real_lh=$(awk -F: '/^LH:/{lh+=$2} END{print lh+0}' "$ROOT/coverage/lcov.info" 2>/dev/null || echo "")
+real_lf=$(awk -F: '/^LF:/{lf+=$2} END{print lf+0}' "$ROOT/coverage/lcov.info" 2>/dev/null || echo "")
+if [[ -z "$real_lf" || "$real_lf" -eq 0 ]]; then
+  # **NO COVERAGE FILE IS NOT A REASON TO SKIP THE CASE.** The comparison is a
+  # function of two numbers, so it can be exercised without a measurement —
+  # and a case that only runs when some *other* job has already run is a case
+  # that silently stops being a case. The synthetic pair below has the same
+  # shape as a real one (a few uncovered lines out of many), which is all the
+  # comparison needs.
+  #
+  # The real measurement is still preferred when it is there, so the case keeps
+  # exercising the tree's actual numbers locally.
+  real_lh=8503
+  real_lf=8601
+  source_of_the_numbers="a synthetic pair (no coverage/lcov.info to read)"
 else
-  # A floor the real number cannot meet. 99.99 is above any measurement taken
-  # here (98.25), and the arithmetic below uses $real_cov directly.
-  printf 'test_count      1\ncoverage_pct    99.99\n' > "$d/tool/baseline/gates.txt"
-  if python3 -c "import sys; sys.exit(0 if $real_cov + 1e-9 >= 99.99 else 1)"; then
+  source_of_the_numbers="the tree's own coverage/lcov.info"
+fi
+extract_floor=$(sed -n '/^coverage_floor_met()/,/^}/p' "$ROOT/tool/verify_all.sh")
+if [[ -z "$extract_floor" ]]; then
+  record "baseline" "COULD-NOT-FAIL"
+  printf '  %-10s %scould not extract coverage_floor_met() from verify_all.sh%s\n' "FAIL" "$R" "$N"
+else
+  eval "$extract_floor"
+  real_uncovered=$((real_lf - real_lh))
+  # The planted floor: zero uncovered lines allowed, which a real measurement
+  # cannot meet. It is the negative control, and it is written into the scratch
+  # copy's baseline so the shape of the file is exercised too.
+  printf 'test_count      1\ncoverage_pct    99.99\nuncovered_lines 0\n' > "$d/tool/baseline/gates.txt"
+  green=0
+  red=0
+  coverage_floor_met "$real_lh" "$real_lf" "$real_uncovered" && green=1
+  coverage_floor_met "$real_lh" "$real_lf" $((real_uncovered - 1)) || red=1
+  if coverage_floor_met "$real_lh" "$real_lf" 0; then
     record "baseline" "COULD-NOT-FAIL"
-    printf '  %-10s %sfloor 99.99%% vs real %s%% — comparison passed anyway%s\n' "FAIL" "$R" "$N" "$real_cov"
-  else
+    printf '  %-10s %sfloor 0 uncovered lines vs real %s — comparison passed anyway%s\n' \
+      "FAIL" "$R" "$N" "$real_uncovered"
+  elif [[ $green -eq 1 && $red -eq 1 ]]; then
     record "baseline" "fired"
-    printf '  %-10s floor 99.99%% vs real %s%% -> comparison failed as it must\n' "$G" "$real_cov"
+    printf '  %-10s floor 0 uncovered lines vs real %s -> comparison failed as it must; the floor at %s passes and one line tighter fails (%s)\n' \
+      "$G" "$real_uncovered" "$real_uncovered" "$source_of_the_numbers"
+  else
+    record "baseline" "COULD-NOT-FAIL"
+    printf '  %-10s %sthe floor at the measurement passed=%s, one line tighter failed=%s — one is wrong%s\n' \
+      "FAIL" "$R" "$green" "$red" "$N"
   fi
 fi
 

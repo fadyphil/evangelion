@@ -59,5 +59,62 @@
 # with coverage rising or holding at every step, and every re-recording taken
 # from a GREEN run. A bare `test_count` line cannot say that, and the next
 # re-recording would have had nothing to point at.
-test_count      3633
+#
+# ## `uncovered_lines` IS THE FLOOR, AND `coverage_pct` IS NOT
+#
+# The floor is now a **budget of uncovered lines** — an integer — and the
+# percentage beside it is a rendering of that budget at the tree's current
+# size, not the budget itself. The comparison gate 7 makes is
+# `uncovered <= uncovered_lines`, exactly.
+#
+# **WHY A PERCENTAGE WAS NOT ENOUGH, and this is not a story about rounding.**
+#
+# **A PERCENTAGE FLOOR WIDENS ITSELF AS THE CODE GROWS.** 98.85% of 8601
+# lines is 99 uncovered lines; 98.85% of 8701 lines is **100** — so adding a
+# hundred *covered* lines silently admitted one more uncovered line, without
+# anybody deciding to admit it. A budget of uncovered lines does not move when
+# the code grows, so "no new uncovered code" means the same thing on Tuesday
+# as it did when the floor was recorded.
+#
+# **AND THE MEASUREMENT IS A SAMPLE, SO A PERCENTAGE OF IT WAS A NUMBER NO
+# RUN PRODUCED.** `flutter test --coverage` collects from **one isolate per
+# isolate group** (`package:coverage` 1.15.1's `coveredIsolateGroups`),
+# because the VM shares program counters between the isolates of a group.
+# **A `const` CONSTRUCTOR IS NOT A PROGRAM COUNTER** — materialising a
+# canonical constant is a *per-isolate* event — so the line recording a
+# materialisation is reported as covered or **not** depending on which isolate
+# the collector sampled.
+#
+# **MEASURED, 2026-10-20, on one tree, one line** (`eva_motion.dart:1046`, the
+# `const EvaShake();` declaration):
+#
+#     16-core machine, default concurrency   4
+#     the same tree, --concurrency=2         2
+#     the CI runner                         0
+#
+# That single line was the **whole** of the difference between the runner's
+# 8501/8601 and the local 8503/8601, and it is why the runner measured 98.84%
+# against a floor of 98.85% for three consecutive runs — and why the floor was
+# compared with a ROUNDED percentage, which is the only reason a number no run
+# produced could pass at all.
+#
+# **THE FIX WAS NOT A TOLERANCE.** A tolerance is a floor that is not a floor,
+# and this file exists to stop that. The fix was that `EvaShake` — the
+# design system's own shake curve, `redesign.html:360`'s `@keyframes shake`,
+# used by `/login`'s `.cta.err` and the quiz's `.opt.wrong` — **had no test of
+# its own**. It was covered only incidentally, by whichever test happened to
+# build one of those two screens and run the animation, and nothing asserted
+# a single number about it. AGENT_CONTEXT §6 requires red-first for motion
+# tables, and a motion table with no test is a table nobody is holding up. It
+# has one now: the four waypoints, the two ends, the interpolation between
+# them, the duration, and the band.
+#
+# **3633 → 3639 tests, and 99 uncovered lines, with the floor's PERCENTAGE
+# UNCHANGED at 98.85.** The count rises to the suite's own size, which is a
+# **strengthening** — a run that lost a test is now red rather than merely
+# smaller. The coverage floor is **not** lowered: 99 uncovered lines is what
+# the CI runner measured on this tree, and the local machine measures 98, so
+# the floor admits both and is not one line wider than the worst of them.
+test_count      3639
 coverage_pct    98.85
+uncovered_lines 99
