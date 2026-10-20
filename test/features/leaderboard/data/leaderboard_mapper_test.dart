@@ -212,6 +212,20 @@ void main() {
       expect(failure.message, contains('rank'));
     });
 
+    test('and a `rank` of the wrong type is refused, not coerced', () {
+      // A JSON `"2"` decodes to a Dart `String`, and `int.tryParse` would turn it
+      // into a rank. Coercing it would mean the reader is shown a position this
+      // client invented rather than one the server sent — which is the outcome
+      // [LeaderboardStanding] exists to prevent, and the same argument as
+      // `score: 6.0` below refusing to truncate.
+      final Failure failure = expectFailure(
+        mapped(board(myStanding: <String, Object?>{'rank': '2', 'score': 50})),
+      );
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('rank'));
+      expect(failure.message, contains('an int or null'));
+    });
+
     test('and a non-object `my_standing` is refused', () {
       final Failure failure = expectFailure(mapped(board(myStanding: 7)));
       expect(failure.kind, FailureKind.serialization);
