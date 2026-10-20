@@ -75,6 +75,30 @@ class DockShellPage extends StatelessWidget {
       // `TabsRouter.maybePop` does exactly that when `homeIndex` is set
       // (`routing_controller.dart:745`).
       homeIndex: DockTabs.home,
+      // **The tab transition's DURATION, and it was missing.**
+      //
+      // `eva/redesign.html:128` — `transition:transform .4s var(--e-light),
+      // opacity .4s var(--e-light)` — is **400ms**, and `EvaMotion.tabTransition`
+      // is 400ms, and its own doc says the caller must pass it:
+      //
+      // ```dart
+      // AutoTabsRouter(
+      //   duration: EvaMotion.tabTransition,
+      //   transitionBuilder: EvaMotion.tabSwap,
+      // )
+      // ```
+      //
+      // **The `transitionBuilder` was passed and the `duration` was not**, so
+      // the dock ran auto_route's own default — `const Duration(milliseconds:
+      // 300)` (`auto_tabs_router.dart:249`) — and the tab swap was 100ms
+      // **faster** than the design says.
+      //
+      // **And that is why the token looked dead.** A search for
+      // `EvaMotion.tabTransition` found nothing, and a token with no call site
+      // is exactly the shape the fourteen dead tokens have. The difference is
+      // that this one had a **documented call site that was never made** — so
+      // the honest fix was to make it, not to delete it.
+      duration: EvaMotion.tabTransition,
       // The prototype's `tab-pre` pose: the incoming tab rises 10px and scales
       // from 0.985. See `EvaMotion.tabSwap` for the one part of the prototype's
       // tab transition that auto_route's model cannot show.

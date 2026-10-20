@@ -61,26 +61,6 @@ abstract final class EvaMotion {
   /// `2000ms` — one full there-and-back cycle of a `GoldFlecks` fleck.
   static const Duration fleck = Duration(seconds: 2);
 
-  /// `14s` — one full aurora cycle.
-  static const Duration aurora = Duration(seconds: 14);
-
-  /// `14s` — the shortest an orb's float cycle may run.
-  ///
-  /// §5.3 gives `orbFloat` as the range `14–28s per orb`, not a single value, so
-  /// the range is the token and [orbFloatFor] spreads it. There is no single
-  /// "orbFloat duration" to expose, and exposing the minimum alone would quietly
-  /// collapse the range.
-  static const Duration orbFloatMin = Duration(seconds: 14);
-
-  /// `28s` — the longest an orb's float cycle may run.
-  static const Duration orbFloatMax = Duration(seconds: 28);
-
-  /// `7s` — the shortest an orb's hue cycle may run.
-  static const Duration orbHueMin = Duration(seconds: 7);
-
-  /// `14s` — the longest an orb's hue cycle may run.
-  static const Duration orbHueMax = Duration(seconds: 14);
-
   // --- The redesign's bottom dock --------------------------------------------
   //
   // The prototype's dock (`eva/redesign.html:208-234`) declares four timings of
@@ -134,16 +114,6 @@ abstract final class EvaMotion {
 
   /// `easeOut` — with [fleck]; see [fleckAlternates] for the direction.
   static const Curve fleckCurve = Curves.easeOut;
-
-  /// `easeInOut` — with the orb float cycles.
-  static const Curve orbFloatCurve = Curves.easeInOut;
-
-  /// `linear` — with the orb hue cycles. A hue *rotation* eased would
-  /// accelerate through the colour wheel and read as flicker, not breathing.
-  static const Curve orbHueCurve = Curves.linear;
-
-  /// `easeInOut` — with [aurora].
-  static const Curve auroraCurve = Curves.easeInOut;
 
   /// `cubic-bezier(0,0,.2,1)` — the prototype's `--e-out`.
   ///
@@ -426,12 +396,6 @@ abstract final class EvaMotion {
   /// having neither.
   static bool get achievementOvershoots => achievementDampingRatio < 1.0;
 
-  /// Whether a fleck animation should run there-and-back rather than restarting.
-  ///
-  /// The `alternate` column of the §5.3 table. Phase 2 reads this to choose
-  /// `repeat(reverse: true)` over `repeat()`.
-  static const bool fleckAlternates = true;
-
   // --- The global screen transition -----------------------------------------
 
   /// `8` logical pixels — how far the global screen transition slides a page.
@@ -604,41 +568,6 @@ abstract final class EvaMotion {
   /// file for two unrelated reasons, which is why the two are not conflated.
   static const Duration routeTransition = Duration(milliseconds: 400);
 
-  /// `400ms` — the redesign's tab swap.
-  ///
-  /// ## WHY IT IS 400ms AND NOT THE 260ms AT `:1266`
-  ///
-  /// The prototype's `tab()` writes two different numbers, and they are not the
-  /// same thing:
-  ///
-  /// * `:1266` — `setTimeout(()=>{f.classList.add('hidden');f.classList.remove('tab-out');},260)`
-  ///   is a **cleanup timer**. 260ms after the swap starts, the *outgoing* tab
-  ///   is hidden and its `tab-out` class is removed. It is how long the
-  ///   prototype waits before it stops drawing the outgoing tab — a DOM
-  ///   housekeeping detail this client has no use for, because auto_route's
-  ///   `IndexedStack` keeps the outgoing tab alive and simply stops painting it.
-  /// * `:128` — `.route`'s own `transition:transform .4s …` is what actually
-  ///   *moves* the incoming tab off its `tab-pre` pose, and it is 400ms.
-  ///
-  /// The visible motion is the second one, so the token is 400ms. The 260ms is
-  /// recorded here because a reader who finds it in the prototype and looks for
-  /// it in this file must find the reason it is absent.
-  ///
-  /// ## IT IS THE ROUTER'S DURATION, NOT THE BUILDER'S
-  ///
-  /// A transitions builder cannot choose how long it runs. `AutoTabsRouter`
-  /// owns the controller (`auto_tabs_router.dart:249` — `duration`, default
-  /// 300ms) and hands the builder an `Animation` already running on it. So
-  /// this token is what the **caller** must pass:
-  ///
-  /// ```dart
-  /// AutoTabsRouter(
-  ///   duration: EvaMotion.tabTransition,
-  ///   transitionBuilder: EvaMotion.tabSwap,
-  /// )
-  /// ```
-  static const Duration tabTransition = Duration(milliseconds: 400);
-
   /// `38%` of the route's width — the `gone-right` pose's horizontal offset.
   ///
   /// `eva/redesign.html:130` —
@@ -706,28 +635,6 @@ abstract final class EvaMotion {
   /// a phone's width is a couple of pixels, while 2% of a route's width is a
   /// visible shift.
   static const double tabPreScale = 0.985;
-
-  /// `6px` — the outgoing tab's vertical offset.
-  ///
-  /// `eva/redesign.html:133` — `.route.tab-out{opacity:0;transform:translateY(-6px) scale(.99);pointer-events:none}`.
-  ///
-  /// **Recorded, and deliberately NOT used by the shipped builder.** The
-  /// prototype's outgoing tab *rises* 6px as it leaves — a smaller step than
-  /// the incoming tab's 10px, in the opposite direction — and auto_route's
-  /// `AutoTabsRouter` cannot show it: its `transitionBuilder` hook wraps the
-  /// whole `IndexedStack`, and the `IndexedStack` paints only the active tab.
-  /// The number is here so the divergence has a value and so the CSS check in
-  /// `test/core/design_system/tokens/eva_motion_test.dart` has something to
-  /// compare the prototype against.
-  static const double tabOutOffset = 6;
-
-  /// `0.99` — the outgoing tab's scale.
-  ///
-  /// `eva/redesign.html:133` — `.route.tab-out{…scale(.99)…}`.
-  ///
-  /// **Recorded, and deliberately NOT used by the shipped builder**, for the
-  /// same reason as [tabOutOffset].
-  static const double tabOutScale = 0.99;
 
   /// The redesign's route transition: the route arrives from the right and the
   /// route it covers leaves to the left.
@@ -921,6 +828,63 @@ abstract final class EvaMotion {
     );
   }
 
+  /// `6px` — the outgoing tab's vertical offset.
+  ///
+  /// `eva/redesign.html:133` — `.route.tab-out{opacity:0;transform:translateY(-6px) scale(.99);pointer-events:none}`.
+  ///
+  /// **Recorded, and deliberately NOT used by the shipped builder.** The
+  /// prototype's outgoing tab *rises* 6px as it leaves — a smaller step than
+  /// the incoming tab's 10px, in the opposite direction — and auto_route's
+  /// `AutoTabsRouter` cannot show it: its `transitionBuilder` hook wraps the
+  /// whole `IndexedStack`, and the `IndexedStack` paints only the active tab.
+  /// The number is here so the divergence has a value and so the CSS check in
+  /// `test/core/design_system/tokens/eva_motion_test.dart` has something to
+  /// compare the prototype against.
+  static const double tabOutOffset = 6;
+
+  /// `0.99` — the outgoing tab's scale.
+  ///
+  /// `eva/redesign.html:133` — `.route.tab-out{…scale(.99)…}`.
+  ///
+  /// **Recorded, and deliberately NOT used by the shipped builder**, for the
+  /// same reason as [tabOutOffset].
+  static const double tabOutScale = 0.99;
+
+  /// `400ms` — the redesign's tab swap.
+  ///
+  /// ## WHY IT IS 400ms AND NOT THE 260ms AT `:1266`
+  ///
+  /// The prototype's `tab()` writes two different numbers, and they are not the
+  /// same thing:
+  ///
+  /// * `:1266` — `setTimeout(()=>{f.classList.add('hidden');f.classList.remove('tab-out');},260)`
+  ///   is a **cleanup timer**. 260ms after the swap starts, the *outgoing* tab
+  ///   is hidden and its `tab-out` class is removed. It is how long the
+  ///   prototype waits before it stops drawing the outgoing tab — a DOM
+  ///   housekeeping detail this client has no use for, because auto_route's
+  ///   `IndexedStack` keeps the outgoing tab alive and simply stops painting it.
+  /// * `:128` — `.route`'s own `transition:transform .4s …` is what actually
+  ///   *moves* the incoming tab off its `tab-pre` pose, and it is 400ms.
+  ///
+  /// The visible motion is the second one, so the token is 400ms. The 260ms is
+  /// recorded here because a reader who finds it in the prototype and looks for
+  /// it in this file must find the reason it is absent.
+  ///
+  /// ## IT IS THE ROUTER'S DURATION, NOT THE BUILDER'S
+  ///
+  /// A transitions builder cannot choose how long it runs. `AutoTabsRouter`
+  /// owns the controller (`auto_tabs_router.dart:249` — `duration`, default
+  /// 300ms) and hands the builder an `Animation` already running on it. So
+  /// this token is what the **caller** must pass:
+  ///
+  /// ```dart
+  /// AutoTabsRouter(
+  ///   duration: EvaMotion.tabTransition,
+  ///   transitionBuilder: EvaMotion.tabSwap,
+  /// )
+  /// ```
+  static const Duration tabTransition = Duration(milliseconds: 400);
+
   /// The redesign's tab swap: the incoming tab rises 10px into place while it
   /// fades in.
   ///
@@ -1020,40 +984,6 @@ abstract final class EvaMotion {
   static double _lerp(double a, double b, double t) => a * (1 - t) + b * t;
 
   // --- Per-orb spread ------------------------------------------------------
-
-  /// The float duration of the [index]-th of [count] orbs.
-  ///
-  /// SPREAD ACROSS THE SPEC RANGE, ENDPOINTS INCLUDED. §5.3 gives `14–28s per
-  /// orb` and nothing else, so this is the one place a formula had to be chosen:
-  /// the even spread, so orb 0 runs [orbFloatMin] and orb `count - 1` runs
-  /// [orbFloatMax]. The alternative — one duration for every orb — is precisely
-  /// the lockstep pulse `09-quality-gates.md` §13 mitigation 2 forbids, and a
-  /// random spread is untestable, which is the other half of why this is even.
-  ///
-  /// Phase 2 derives the *phase* offset the same way (`index / count`); only the
-  /// duration lives here.
-  static Duration orbFloatFor(int index, int count) =>
-      _spread(index, count, orbFloatMin, orbFloatMax);
-
-  /// The hue-rotation duration of the [index]-th of [count] orbs. The even
-  /// spread of §5.3's `7–14s per orb` range; see [orbFloatFor].
-  static Duration orbHueFor(int index, int count) =>
-      _spread(index, count, orbHueMin, orbHueMax);
-
-  /// Even spread of `[min, max]` across `count` slots, `min` at index 0 and
-  /// `max` at `count - 1`.
-  ///
-  /// A single orb collapses to [min] rather than dividing by `count - 1 == 0`.
-  /// One orb is a real configuration: `NeuralTier` drops to `low` with no orbs
-  /// at all, and a narrow window can leave exactly one.
-  static Duration _spread(int index, int count, Duration min, Duration max) {
-    assert(count > 0, 'orb count must be positive, got $count');
-    if (count == 1) return min;
-    final int micros =
-        min.inMicroseconds +
-        (max.inMicroseconds - min.inMicroseconds) * index ~/ (count - 1);
-    return Duration(microseconds: micros);
-  }
 }
 
 /// `.cta.err`'s and `.opt.wrong`'s shake (`eva/redesign.html:360`), as a curve.
