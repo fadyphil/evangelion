@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/fadyphil/evangelion/actions/workflows/ci.yml/badge.svg)](https://github.com/fadyphil/evangelion/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-ember.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-98.39%25-c8143a.svg)](ROADMAP.md#status)
-[![Tests](https://img.shields.io/badge/tests-2507%20passing-2c7a4b.svg)](ROADMAP.md#status)
+[![Coverage](https://img.shields.io/badge/coverage-98.86%25-c8143a.svg)](ROADMAP.md#status)
+[![Tests](https://img.shields.io/badge/tests-3639%20passing-2c7a4b.svg)](ROADMAP.md#status)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.4-42a5f5.svg)](pubspec.yaml)
 [![Dart](https://img.shields.io/badge/Dart-3.13.3-0175c2.svg)](pubspec.yaml)
 [![Backend](https://img.shields.io/badge/backend-read--only-informational.svg)](docs/BACKEND-VERIFICATION.md)

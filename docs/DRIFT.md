@@ -692,3 +692,90 @@ Moving the brief to `brief.txt` and matching the **named references** (rather
 than a generic `.txt` extension, which turned every `CMakeLists.txt:25` in the
 tree into a broken citation) closed the hole. **The brief is now the gate's
 second reference, and its lines are checked.**
+
+---
+
+## 13. THE COVERAGE FLOOR WAS A NUMBER NO RUN PRODUCED — AND THE ROADMAP SAID
+## THE REPOSITORY HAD NO CI AT ALL
+
+Two claims, both in live documents, both wrong, and both the kind of wrongness
+that only shows up when a machine other than the author's checks them.
+
+### The floor: `98.85` was never measured
+
+`tool/baseline/gates.txt` recorded `coverage_pct 98.85`. **No run ever measured
+that.** The suite measured `8501/8601` — **98.8373 %** — on the CI runner, and
+`8503/8601` — 98.8606 % — locally. The floor sat **between the two**, and it
+passed only because gate 7 compared a **ROUNDED** percentage: `98.84` rounded
+up to two places is `98.85`, which equals the floor, which passes.
+
+**So a floor that no run produced was enforced by a rounding step that no
+document mentioned.** The gate was not measuring the number it claimed to
+measure, and the reason it was not wrong is a coincidence of arithmetic.
+
+### And the measurement is a SAMPLE, not a sum
+
+`flutter test --coverage` collects from **one isolate per isolate group**
+(`package:coverage` 1.15.1's `coveredIsolateGroups`) — the VM shares program
+counters between the isolates of a group, so collecting from all of them would
+count every hit twice. **A `const` constructor is not a program counter**:
+materialising a canonical constant is a *per-isolate* event, so the line that
+records a materialisation is reported as covered or **not** depending on which
+isolate the collector happened to sample.
+
+**Measured, on one tree, one line** (`eva_motion.dart:1046`, the
+`const EvaShake();` declaration):
+
+| Where | The line's count |
+| --- | --- |
+| 16-core machine, default concurrency | 4 |
+| the same tree, `--concurrency=2` | 2 |
+| the CI runner | **0** |
+
+**That single line was the whole of the difference** between the runner's
+`8501/8601` and the local `8503/8601`, and it is why the runner measured
+98.84 % against a floor of 98.85 % for **three consecutive runs**.
+
+### And the floor WIDENED ITSELF as the code grew
+
+A percentage floor is a function of the denominator. 98.85 % is 99 uncovered
+lines out of 8601 and **100** out of 8701 — so adding a hundred *covered* lines
+silently admitted one more uncovered line, without anybody deciding to admit
+it. A floor that widens itself is not a floor.
+
+### RESOLVED — the floor is a BUDGET OF UNCOVERED LINES, and it is compared exactly
+
+`tool/baseline/gates.txt` now records `uncovered_lines 99` and gate 7 compares
+`uncovered <= 99` — an integer, with no rounding, that does not move when the
+code grows. The percentage is still recorded, because it is the number a human
+reads, and it is still printed; it is a **rendering of the budget at the tree's
+current size**, not the budget.
+
+**AND THE REAL GAP WAS CLOSED RATHER THAN TOLERATED.** `EvaShake` — the design
+system's own shake curve, used by `/login`'s `.cta.err` and the quiz's
+`.opt.wrong` — **had no test of its own**: it was covered only incidentally, by
+whichever test happened to build one of those two screens and run the
+animation, and nothing asserted a single number about it. AGENT_CONTEXT §6
+requires red-first for motion tables. It has a test now, and the tree's
+measurement no longer depends on which isolate the collector sampled.
+
+### The other claim: the ROADMAP said there is no CI
+
+`ROADMAP.md` carried a row reading *"Continuous integration | no workflow files
+exist"*, and a paragraph under it explaining at length that there is **no**
+`.github/workflows/` directory, that no workflow runs any of the gates, and that
+"a green state is a property of that person's discipline rather than of the
+repository".
+
+**`.github/workflows/ci.yml` landed on 2026-10-12** (`198ff74`, *"ci: run the
+seven gates on every push and pull request"*) — **one day after** the ROADMAP
+row was written on 2026-10-11 (`b020a72`). So the row was **true when it was
+written**, it stopped being true the next day, and nobody re-measured it in the
+nine days since. That is the same failure as every other entry in this file: a
+claim written down once and then believed, and a claim about a *measurement* is
+not a claim about an intention.
+
+It is corrected, and the CI now runs **all eight gates** in three jobs, with
+the runner image, the Flutter version and every action **pinned** — because a
+coverage floor and a golden PNG are only meaningful against a fixed
+toolchain, and `ubuntu-latest` had already begun migrating to Ubuntu 26.

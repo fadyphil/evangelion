@@ -552,7 +552,6 @@ tool/
   gates/citation_check.py          every reference claim resolves
   gates/orphan_widget_check.py     every design-system widget is reachable
   baseline/gates.txt               the recorded coverage/test floor
-
 docs/
   ARCHITECTURE.md                  this file — the navigable map
   SEAMS.md                         the seven seams — read this for depth
@@ -593,6 +592,12 @@ Every rule above that can be checked mechanically has a gate, and every gate
 lives in `tool/verify_all.sh` (gates 1–7) or `tool/verify_purity.sh` (the four
 architecture gates). Run `tool/verify_all.sh` for the seven fast ones and
 `--with-build` to add the eighth.
+
+**CI runs the same script**, in three jobs — gates 1–7, gate 8 on its own
+runner, and `tool/verify_gates_selftest.sh`, which plants one violation per
+gate and requires each gate to fail. A gate is never implemented twice: the
+workflow calls the script, so what CI checks and what a contributor checks are
+the same thing by construction.
 
 | # | Rule | Enforcing gate | A failure means |
 | --- | --- | --- | --- |

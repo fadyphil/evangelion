@@ -38,8 +38,8 @@ or released.
 | DI modules | 8, of which 7 carry providers | `lib/app/di/modules/` |
 | ARB keys | 111 per locale | `lib/l10n/app_en.arb` |
 | Design-system widgets | 23 | `lib/core/design_system/widgets/` |
-| Tests | 2507, all passing | `flutter test` |
-| Line coverage | 98.39 % (4753/4831) | `flutter test --coverage` |
+| Tests | 3639, all passing | `flutter test` |
+| Line coverage | 98.86 % (8503/8601) · 98 uncovered | `flutter test --coverage` |
 | Analyzer | no issues | `dart analyze --fatal-infos --fatal-warnings` |
 
 The last three rows are what `tool/verify_all.sh` reports. Running it prints a
@@ -47,12 +47,16 @@ summary of the same seven gates and exits `0`.
 
 > [!NOTE]
 > The recorded floor in
-> [`tool/baseline/gates.txt`](tool/baseline/gates.txt) reads `2507` tests and
-> `98.25` percent. The test count matches. The coverage figure does not: that
-> file's own comment records coverage *rising* to 98.39 % when `EvaChip` was
-> deleted, and the `coverage_pct` field was never re-recorded. **98.25 % is the
-> recorded floor; 98.39 % is the current measurement.** Both are true, of
-> different things, and the floor is only ever rewritten by
+> [`tool/baseline/gates.txt`](tool/baseline/gates.txt) reads `3639` tests and
+> `99` uncovered lines. **The floor is a BUDGET OF UNCOVERED LINES, not a
+> percentage**, and the percentage beside it — `98.85` — is what that budget
+> renders as at the tree's current size, not the budget itself. The reason is
+> in the file: a percentage floor widens itself as the code grows (98.85% is 99
+> uncovered lines out of 8601 and **100** out of 8701), and the coverage
+> measurement is a **sample** — `flutter test --coverage` collects from one
+> isolate per isolate group, and a `const` constructor's materialisation is a
+> per-isolate event — so the same tree can measure one line differently on two
+> machines. The floor is written **only** by
 > `tool/verify_all.sh --update-baseline`.
 
 ## Design overhaul
@@ -313,23 +317,34 @@ hidden, and none is expensive; all three are unfinished.
 | --- | --- | --- |
 | Android application id | `com.example.evangelion` | `android/app/build.gradle.kts:19` |
 | iOS bundle identifier | `com.example.evangelion` | `ios/Runner.xcodeproj/project.pbxproj:386` |
-| Continuous integration | no workflow files exist | `.github/` |
 
 The two identifiers are still the `flutter create` placeholders. They share a
 name across both platforms and must be changed before any real distribution.
 
-The CI row is worth reading precisely, because it is a measurement rather than
-an expectation. `.github/` exists and contains a single
-`.github/modernize/` directory holding PowerShell and shell hook scripts. There
-is **no** `.github/workflows/` directory and therefore no workflow that runs any
-of the seven gates. Every gate in this repository is currently enforced by a
-person running `tool/verify_all.sh`, which means a green state is a property of
-that person's discipline rather than of the repository.
+> [!NOTE]
+> **Continuous integration is no longer on this list, because it is no longer
+> missing.** This section used to carry a third row — *"Continuous integration
+> | no workflow files exist"* — and the paragraph under it explained at length
+> that there is **no** `.github/workflows/` directory and therefore no workflow
+> that runs any of the gates, so a green state was a property of one person's
+> discipline rather than of the repository.
+>
+> **That was true when it was written and it stopped being true**, which is
+> what `docs/DRIFT.md` is a catalogue of. `.github/workflows/ci.yml` now runs
+> **all eight gates** in three jobs: gates 1-7 through `tool/verify_all.sh`
+> (the same script a contributor runs, so a gate is never implemented twice),
+> gate 8 — the real Linux build — on its own runner, and
+> `tool/verify_gates_selftest.sh`, which plants one violation per gate and
+> requires each gate to fail. The runner image, the Flutter version and every
+> action are pinned, because a coverage floor and a golden PNG are only
+> meaningful against a fixed toolchain.
 
 The Linux build gate is a related caution. It is the slowest gate and it
 **wipes `build/linux/x64/{debug,release}`** before rebuilding, so
-`tool/verify_all.sh` runs it only behind `--with-build`. On a fresh clone the
-build is therefore unverified until someone asks for it.
+`tool/verify_all.sh` runs it only behind `--with-build`. On a contributor's
+machine the build is therefore unverified until someone asks for it — and on
+CI it is verified on every push, because a hosted runner's tree is disposable
+and the wiping is free there.
 
 > [!WARNING]
 > Do not trust `flutter build linux --release` reporting success on its own. It

@@ -137,13 +137,28 @@ other seven are §7's, and gate 8 is §7's seventh line made opt-in.
 | 4 | Citations and reachability | `python3 tool/gates/citation_check.py` and `python3 tool/gates/orphan_widget_check.py` | A `*.tsx:NNN` claim points at a prototype line that no longer says what it said, or **a widget anywhere under `lib/`** is built and tested but no screen's tree contains it. The orphan gate's inventory is **all of `lib/`** — not the `*/widgets/` directories — so a widget in `effects/`, `motion/` or `tokens/` is in scope like any other; its roots are the **registered pages plus the app root**; and it exits **2** (FATAL) when it cannot find the app's router, because "no page is registered" and "the router moved" must not be the same answer. |
 | 5 | Fixable APIs | `dart fix --dry-run` | Deprecated or lint-fixable usage remains. This command **exits `0` even when it has work to do**, so its output is the check, not its exit code. |
 | 6 | Test suite | `flutter test` | A behaviour changed, or a test is flaky. |
-| 7 | Coverage and the recorded floor | `flutter test --coverage` | Line coverage or test count fell below `tool/baseline/gates.txt`. |
+| 7 | Coverage and the recorded floor | `flutter test --coverage` | The number of **uncovered lines** rose above the budget in `tool/baseline/gates.txt`, or the test count fell below it. |
 | 8 | Linux build (opt-in) | `tool/verify_linux_build.sh` | The app does not really build. See below. |
 
 Gate 8 is numbered separately because `tool/verify_all.sh` runs it only when
 you pass `--with-build`. It is the slowest gate, and it **wipes
 `build/linux/x64/{debug,release}`** before rebuilding, so it is the only gate
 that mutates the tree rather than reading it.
+
+> [!NOTE]
+> **CI runs all eight, in three jobs.** `.github/workflows/ci.yml` runs gates
+> 1-7 through `tool/verify_all.sh` — the same script, so a gate implemented
+> twice is a gate that can disagree with itself — and runs gate 8 as its own
+> job, because a hosted runner's tree is disposable and the reason gate 8 was
+> kept off CI (it wipes `build/`) does not apply to one. A third job runs
+> `tool/verify_gates_selftest.sh`, which plants one violation per gate and
+> requires each gate to fail — so the green check on a pull request is not a
+> green run over a surface the gates never examined.
+>
+> The runner image is **pinned** (`ubuntu-24.04`), the Flutter version is
+> **pinned** (3.47.4), and every action is pinned to a **commit SHA**. A
+> coverage floor and a golden PNG are only meaningful against a fixed
+> toolchain, and `ubuntu-latest` had already begun migrating to Ubuntu 26.
 
 ### One command for all of them
 
@@ -172,6 +187,16 @@ the exit code alone is not enough: `2` means nothing was checked.
 > **only** by `--update-baseline`, which prints the old and new values so the
 > change is visible in the commit diff. Re-recording the floor is a deliberate,
 > reviewed decision — it is never a way to make a red run green.
+>
+> **The floor is a BUDGET OF UNCOVERED LINES, not a percentage**, and the
+> reason is worth knowing before you touch it. A percentage floor **widens
+> itself as the code grows**: 98.85% is 99 uncovered lines out of 8601 and
+> **100** out of 8701, so adding a hundred *covered* lines silently admitted
+> one more uncovered line. And the measurement itself is a **sample** —
+> `flutter test --coverage` collects from one isolate per isolate group, and a
+> `const` constructor's materialisation is a per-isolate event, so the same
+> tree measures one line differently on two machines. An integer budget has
+> neither problem. The file records the finding in full.
 
 ## A gate that cannot fail is worse than no gate
 
