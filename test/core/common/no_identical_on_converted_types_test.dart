@@ -865,47 +865,16 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'three live tabs would show three phases of one aurora. '
             '`LumenScene` is a plain class and defines no `==`.',
       ),
-  'test/core/design_system/effects/neural_background_test.dart#NeuralBackground.build does not re-run across 60 frames':
+  'test/core/design_system/effects/lumen_background_test.dart#and the page above the ambient is untouched too':
       _Reviewed(
         sites: 1,
         converted: false,
         reason:
-            'Widget identity: "build ran once" is observable only as "the same '
-            'boundary object". Phase 5 performance mitigation, untouched.',
-      ),
-  'test/core/design_system/effects/neural_background_test.dart#but the ListenableBuilder DOES rebuild — that is §13.1':
-      _Reviewed(
-        sites: 1,
-        converted: false,
-        reason:
-            'The negative control for the row above: a rebuild must produce a '
-            'NEW boundary. Without it, "never rebuilt" would also be satisfied '
-            'by "never built".',
-      ),
-  'test/core/design_system/effects/neural_background_test.dart#changing the palette repaints the painter':
-      _Reviewed(
-        sites: 1,
-        converted: false,
-        reason:
-            '`CustomPaint` identity across a palette change — Phase 8\'s '
-            'recorded case, where comparing two `CustomPaint`s with `identical` '
-            'is vacuous because `CustomPaint` is rebuilt every build. The '
-            'assertion here is the `isFalse` half, which is the one with '
-            'content. Untouched.',
-      ),
-  'test/core/design_system/effects/neural_background_test.dart#changing the variant repaints the painter':
-      _Reviewed(
-        sites: 1,
-        converted: false,
-        reason: 'The second `CustomPaint` identity row, same shape.',
-      ),
-  'test/core/design_system/effects/neural_background_test.dart#the page above the background is untouched too':
-      _Reviewed(
-        sites: 1,
-        converted: false,
-        reason:
-            '`Element` identity for a `Text` above the background: sixty '
-            'animation frames must not rebuild the subtree. Untouched.',
+            '`Element` identity for the content above the ambient: thirty '
+            'animation frames must not rebuild the subtree. This is the row '
+            'the old `neural_background_test.dart` carried for the same '
+            'behaviour, re-aimed at the LUMEN ambient. `Element` defines no '
+            '`==`, and nothing else can see "the same element".',
       ),
   'test/core/design_system/effects/neural_motion_test.dart#a second mount gets brand new controllers':
       _Reviewed(

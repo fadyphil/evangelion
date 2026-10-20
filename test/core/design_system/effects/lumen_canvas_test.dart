@@ -1040,7 +1040,7 @@ void main() {
     ) async {
       // THE NEGATIVE CONTROL. Without it the test above is satisfied by a shader
       // that ignores `u_time` entirely — which is the D1 defect
-      // `neural_background.dart` documents for the painted background, wearing a
+      // `neural_motion.dart` documents for the painted background, wearing a
       // shader's hat. If these frames were equal the golden strategy would still
       // be sound and the *clock* would be pointless, so this pair is the whole
       // argument.

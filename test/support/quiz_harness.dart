@@ -306,9 +306,9 @@ Future<void> pumpQuiz(
       // | probe | result |
       // | --- | --- |
       // | `MediaQuery.maybeDisableAnimationsOf` at the `QuizPage` element | `true` |
-      // | … at the `NeuralBackground` element | `true` |
+      // | … at the `LumenBackground` element | `true` |
       // | … at the `GoldFlecks` element (on a graded-correct card) | `true` |
-      // | `NeuralTiers.resolve` at that position — the value `NeuralBackground.build` computes | `NeuralTier.low`, where the same probe with the flag off resolves `NeuralTier.mid` |
+      // | `LumenTiers.resolve` at that position — the value `LumenBackground.build` computes | `LumenShaderTier.off`, where the same probe with the flag off resolves `LumenShaderTier.full` |
       // | the `animate` field on the painter `GoldFlecks` builds | `false`, where the flag off gives `true` — i.e. the flecks freeze at clock `0` instead of reading it |
       //
       // So the flag reaches the `MediaQuery` **and two widgets observe it**, which is

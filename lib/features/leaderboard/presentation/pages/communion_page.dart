@@ -151,7 +151,6 @@ class _CommunionBodyState extends State<_CommunionBody> {
     return BlocBuilder<LeaderboardCubit, LeaderboardState>(
       builder: (BuildContext context, LeaderboardState state) {
         return NeuralScaffold(
-          variant: NeuralVariant.home,
           scrollable: true,
           padding: EdgeInsets.zero,
           // The viewport-fixed slot — see [_toastOverlay]'s doc for why the

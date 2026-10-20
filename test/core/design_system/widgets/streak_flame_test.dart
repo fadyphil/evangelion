@@ -474,9 +474,9 @@ void main() {
     // theme change over `kThemeAnimationDuration` (200ms), and the single
     // zero-duration `pump()` after `pumpWidget` does not advance that lerp. So
     // `goldens/streak_flame_light.png` was a byte-identical copy of the dark one
-    // and `--update-goldens` re-cemented it. `sun_burst_test.dart`,
-    // `seal_monogram_test.dart` and `neural_background_test.dart` already hoist;
-    // the mechanism is pinned by the test in this file's last group.
+    // and `--update-goldens` re-cemented it. `sun_burst_test.dart` and
+    // `seal_monogram_test.dart` already hoist; the mechanism is pinned by the
+    // test in this file's last group.
     for (final (String label, ThemeData theme) in <(String, ThemeData)>[
       ('dark', EvaThemeDark.theme),
       ('light', EvaThemeLight.theme),
@@ -586,9 +586,8 @@ void main() {
       (WidgetTester tester) async {
         // One theme per test body: the first frame of a new binding has no previous
         // palette to lerp *from*, so the very first `pump()` is already the new one.
-        // That is the arrangement `sun_burst_test.dart`, `seal_monogram_test.dart`
-        // and `neural_background_test.dart` already use, and the reason their
-        // light and dark goldens differ.
+        // That is the arrangement `sun_burst_test.dart` and `seal_monogram_test.dart`
+        // already use, and the reason their light and dark goldens differ.
         _pinSurface(tester);
         await tester.pumpWidget(_inkOnly(theme: EvaThemeLight.theme));
         await tester.pump();

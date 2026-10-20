@@ -301,7 +301,6 @@ class _SettingsBodyState extends State<_SettingsBody> {
     final AppLocalizations strings = context.l10n;
 
     return NeuralScaffold(
-      variant: NeuralVariant.settings,
       // `eva/redesign.html:644`'s `.scroll` container is the page's own scroll, and
       // `NeuralScaffold`'s doc names `/settings` as one of the three screens whose
       // root scrolls. **The page does not fit at 320×568** and that is the

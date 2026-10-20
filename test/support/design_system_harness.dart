@@ -20,9 +20,14 @@ export 'package:flutter/semantics.dart'
 ///
 /// Fixed, because a golden is only reproducible if the surface is. The default
 /// test surface is 800x600 logical at devicePixelRatio 3, which is neither a
-/// phone nor anything the orb offsets were authored for; 390x844 is the window
-/// `ORB_CONFIGS` positions its orbs for (`x: -160, y: 640`, `ds.tsx:77-80`), so
-/// the goldens show what the prototype showed.
+/// phone nor the size the prototype was drawn at; **390×844 is the
+/// prototype's own device frame** (`eva/redesign.html:43` —
+/// `.device{width:390px;height:844px;…}`), so a surface pinned to it shows
+/// what the prototype showed.
+///
+/// The old reason for the number — the window `ORB_CONFIGS` positioned its
+/// orbs for — died with the orbs, and the number stayed because the
+/// prototype's *screen* is still the reference.
 const Size kAmbientSurface = Size(390, 844);
 
 /// Pins the test surface and restores the framework's defaults afterwards.
@@ -63,12 +68,12 @@ Widget evaAmbientHarness({
   // The ambient's target carries the vespers factor
   // (`eva/redesign.html:890` — `const vesp=vespersOn&&isNight()?0.78:1;`), so
   // a scene built on the real wall clock would paint a **different aurora at
-  // 22:00** than at 09:00 — and the background's sixteen goldens are captured
-  // through this harness. The hour they were captured at is now a fact about
-  // the harness and not about the night the suite ran.
+  // 22:00** than at 09:00 — and any golden of the ambient is captured through
+  // this harness. The hour it was captured at is now a fact about the harness
+  // and not about the night the suite ran.
   //
-  // **09:30 is outside the vespers window**, so the goldens are captured at
-  // the prototype's plain ambient.
+  // **09:30 is outside the vespers window**, so an ambient captured here is
+  // captured at the prototype's plain ambient.
   now: () => DateTime(2026, 10, 3, 9, 30),
   child: MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -92,33 +97,46 @@ Widget evaAmbientHarness({
   ),
 );
 
-/// A `NeuralBackground` filling its parent, the way `NeuralScaffold` will.
+/// The key of the harness's own `RepaintBoundary` around the ambient.
 ///
-/// The widget itself is a bare `CustomPaint` and sizes itself to nothing, which
-/// is correct — a background must not decide the page's layout — so every test
-/// has to give it a box. Doing that here means the fourteen goldens are all
-/// captured through one arrangement instead of fourteen ad-hoc `Stack`s.
-Widget ambientBackground({required NeuralVariant variant, NeuralTier? tier}) =>
-    Stack(
-      children: <Widget>[
-        Positioned.fill(
-          child: NeuralBackground(variant: variant, tier: tier),
-        ),
-      ],
-    );
+/// **A key rather than a positional finder**, because `MaterialApp`, `Scaffold`
+/// and `Stack` all insert `RepaintBoundary`s of their own, and "the first one
+/// in the tree" would silently start capturing a different layer the day any of
+/// them does. The key names the one the harness built, so the probe cannot be
+/// pointed at the wrong thing.
+const Key kAmbientBoundaryKey = Key('eva.ambient.boundary');
 
-/// Advances the three shared clocks to a known phase and settles.
+/// A `LumenBackground` filling its parent, the way `NeuralScaffold` will.
 ///
-/// Golden determinism depends on this: `AnimationController.value` is a pure
-/// function of elapsed time, so pumping a fixed duration puts every clock at an
-/// exact value. Without it a golden captures whatever fraction of a frame the
-/// test happened to stop on.
-Future<void> pumpAmbientPhase(WidgetTester tester, Duration elapsed) async {
-  await tester.pump();
-  await tester.pump(elapsed);
-}
+/// ## THE HARNESS'S OWN `RepaintBoundary`, AND WHY IT IS NOT DECORATION
+///
+/// The ambient's two shapes do not agree on their tree. The **aurora** is a
+/// `RepaintBoundary` around a `CustomPaint`; the **fallback** is a bare
+/// `ColoredBox` with no boundary anywhere near it. A probe that looked for a
+/// boundary *inside* the background would find one when the aurora paints and
+/// **nothing at all** when the fallback does — and the fallback is the half
+/// the pixel probe most has to reach, because it is the flat canvas every
+/// reduced-motion reader sees.
+///
+/// So the harness owns the boundary, wraps both shapes in it, and finds it by
+/// [kAmbientBoundaryKey].
+///
+/// The widget itself still sizes itself to nothing in the fallback case —
+/// a background must not decide the page's layout — so every test still has
+/// to give it a box, and doing that here means the ambient is captured
+/// through one arrangement instead of an ad-hoc `Stack` per suite.
+Widget ambientBackground({LumenShaderTier? tier}) => Stack(
+  children: <Widget>[
+    Positioned.fill(
+      child: RepaintBoundary(
+        key: kAmbientBoundaryKey,
+        child: LumenBackground(tier: tier),
+      ),
+    ),
+  ],
+);
 
-/// The raw RGBA bytes of the `NeuralBackground`'s own layer.
+/// The raw RGBA bytes of the ambient's own layer.
 ///
 /// ## WHY `toImageSync` AND NOT `toImage`
 ///
@@ -136,15 +154,23 @@ Future<void> pumpAmbientPhase(WidgetTester tester, Duration elapsed) async {
 ///
 /// The render object is fetched *before* `runAsync` on purpose: reading the
 /// element tree inside it is fine, but it must not be the thing being measured.
+///
+/// ## AND IT READS **BOTH** SHAPES
+///
+/// The harness's boundary wraps the whole ambient, so the same probe reads the
+/// aurora's shader output and the fallback's flat canvas. That is the point of
+/// the wrapper: the two are compared against each other in
+/// `lumen_background_test.dart`, and a probe that could only see one of them
+/// could not make that comparison.
 Future<Uint8List> backgroundPixels(WidgetTester tester) async {
   final RenderRepaintBoundary boundary = tester
-      .renderObject<RenderRepaintBoundary>(_backgroundBoundary(tester));
+      .renderObject<RenderRepaintBoundary>(_ambientBoundary(tester));
   final Uint8List? bytes = await tester.runAsync<Uint8List>(() async {
     final ui.Image image = boundary.toImageSync();
     final ByteData? data = await image.toByteData();
     image.dispose();
     if (data == null) {
-      throw StateError('the background layer produced no pixels');
+      throw StateError('the ambient layer produced no pixels');
     }
     return data.buffer.asUint8List();
   });
@@ -154,35 +180,8 @@ Future<Uint8List> backgroundPixels(WidgetTester tester) async {
   return bytes;
 }
 
-/// The `RepaintBoundary` §13.1 puts around the background.
-///
-/// Anchored as a descendant of `NeuralBackground` rather than as "the first
-/// `RepaintBoundary` in the tree": `MaterialApp`, `Scaffold` and `Stack` all
-/// insert their own, and "first" would silently start capturing the wrong layer
-/// the day any of them does.
-Finder _backgroundBoundary(WidgetTester tester) => find.descendant(
-  of: find.byType(NeuralBackground),
-  matching: find.byType(RepaintBoundary),
-);
-
-/// The `RepaintBoundary` widget instance `NeuralBackground.build` created.
-///
-/// **This is the rebuild counter.** `NeuralBackground` is a
-/// `StatelessWidget`, so its `build` re-running is the only way anything inside
-/// it can be rebuilt by Flutter; the `RepaintBoundary` it returns is a fresh
-/// object each time it runs, so `identical` across two samples means "did not
-/// rebuild". Counting instances would need a counter in production code;
-/// identity needs none.
-Widget backgroundBoundaryInstance(WidgetTester tester) =>
-    tester.widget(_backgroundBoundary(tester));
-
-/// The `CustomPaint` the `ListenableBuilder`'s closure produced.
-///
-/// The counterpart to [backgroundBoundaryInstance]: §13.1's `ListenableBuilder`
-/// *should* rebuild per frame, and this is how that is observed — a new painter
-/// each time the closure runs.
-CustomPaint backgroundPaintInstance(WidgetTester tester) =>
-    tester.widget<CustomPaint>(find.byType(CustomPaint));
+/// The harness's own `RepaintBoundary` around the ambient.
+Finder _ambientBoundary(WidgetTester tester) => find.byKey(kAmbientBoundaryKey);
 
 /// The viewport §14's text-scaling requirement is stated at: 320px wide.
 ///
@@ -202,7 +201,7 @@ const double kEvaRequiredTextScale = 1.22;
 /// | constant | size | what it was for |
 /// | --- | --- | --- |
 /// | `kNarrowSurface` | 320×568 | §14's overflow requirement, "text scales to 1.22× without overflow at 320px width" |
-/// | `kAmbientSurface` | 390×844 | the ambient goldens — "a phone at 390 so the orb offsets land where the prototype put them" |
+/// | `kAmbientSurface` | 390×844 | the ambient — the prototype's own device frame (`eva/redesign.html:43`) |
 /// | `kGeometrySurface` | 430×932 | `/reading`'s and `/quiz`'s geometry suites, at the width `ds.tsx` was drawn at |
 ///
 /// So the three screens each had **one** viewport asserted against it, and no
@@ -210,7 +209,7 @@ const double kEvaRequiredTextScale = 1.22;
 /// into a matrix, and it is the phase's verify line rather than a new property.
 ///
 /// [kNarrowSurface] and [kAmbientSurface] are here; `kGeometrySurface` lives in
-/// `reading_harness.dart` because §13.2's orb geometry is measured with it.
+/// `reading_harness.dart` because §13.2's geometry is measured with it.
 ///
 /// **Why the matrix is six screens by three sizes and not one screen by three.** The
 /// three numbers are the whole of "renders correctly" as a *reader* experiences it,
@@ -304,11 +303,10 @@ List<Object> drainOverflowErrors(WidgetTester tester) {
 
 /// Wraps [child] in the composition a Phase-3 primitive is pumped inside.
 ///
-/// Narrower than [kAmbientSurface] and deliberately so: the ambient goldens want
-/// a phone at 390 so the orb offsets land where the prototype put them, while
-/// §14's overflow requirement is at **320**. Using the ambient surface for a
-/// primitive golden would test the wrong width and every overflow test would be
-/// passing for the wrong reason.
+/// Narrower than [kAmbientSurface] and deliberately so: the ambient is captured
+/// at the prototype's own 390-wide screen, while §14's overflow requirement is
+/// at **320**. Using the ambient surface for a primitive golden would test the
+/// wrong width and every overflow test would be passing for the wrong reason.
 ///
 /// [textScale] is injected through [MediaQuery.textScalerOf], which is where a
 /// device puts it — not through `MaterialApp.builder`.
@@ -345,7 +343,7 @@ Widget evaPrimitiveHarness({
   // was captured on.
   now: () => DateTime(2026, 10, 3, 9, 30),
   // OFF by default, and that is not a shortcut. A primitive test never paints a
-  // [NeuralBackground], so the three shared clocks tick forever over nothing —
+  // [LumenBackground], so the two shared clocks tick forever over nothing —
   // and a forever-ticking ticker makes `pumpAndSettle` time out, which silently
   // costs every test that wanted to settle a press animation. This is a
   // *different* switch from [disableAnimations]: that one is §14's reduced-motion

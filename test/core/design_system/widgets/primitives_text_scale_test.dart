@@ -211,7 +211,6 @@ void main() {
     await pumpPrimitive(
       tester,
       const NeuralScaffold(
-        variant: NeuralVariant.login,
         scrollable: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,

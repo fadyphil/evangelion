@@ -139,7 +139,7 @@ void main() {
       expect(find.text('Create account'), findsNothing);
     });
 
-    testWidgets('sits on the login scaffold, centred, with the login orbs', (
+    testWidgets('sits on the login scaffold, centred, with the shared ambient', (
       WidgetTester tester,
     ) async {
       final LoginFixture fixture = buildFixture();
@@ -149,11 +149,20 @@ void main() {
         find.byType(NeuralScaffold),
       );
 
-      // `NeuralVariant.login` in both directions. The redesign's screen carries
-      // `data-shape="top"` (`eva/redesign.html:497`) and there is no Arabic
-      // login screen to inherit a different group from — the ambient group is a
-      // property of the route, not of the language.
-      expect(scaffold.variant, NeuralVariant.login);
+      // The ambient is **not** a property of the route any more. This test used
+      // to assert `NeuralVariant.login` in both directions — the old design gave
+      // every screen its own orb group — but the redesign gives every screen
+      // **one** canvas (`eva/redesign.html:46`) and the orbs that selected one
+      // are retired. The surviving claim is the opposite one, and it is the
+      // stronger one: the ambient is told **nothing** about the screen it is
+      // on, so it cannot vary by one.
+      expect(
+        tester.widget<LumenBackground>(find.byType(LumenBackground)).tier,
+        isNull,
+        reason:
+            'the ambient resolves its own tier; the login screen does not name '
+            'itself to it',
+      );
 
       // `:369` — `.login` is `align-items:center; justify-content:center` with
       // no overflow of its own, so the scaffold does not scroll, and the form
@@ -507,19 +516,34 @@ void main() {
       expect(Directionality.of(tester.element(arabicCta)), TextDirection.rtl);
     });
 
-    testWidgets(
-      'keeps the ambient group, because the variant is the route\'s',
-      (WidgetTester tester) async {
-        final LoginFixture fixture = buildFixture();
-        await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
-        await tester.pump(const Duration(milliseconds: 1200));
+    testWidgets('the ambient is the same on both arms — it does not vary by route or by '
+        'language', (WidgetTester tester) async {
+      // The old claim was the opposite one: that the ambient group was a
+      // property of the route, so the Arabic arm inherited the login group.
+      // The orbs that made a group per route are retired, and the redesign
+      // gives every screen **one** canvas (`eva/redesign.html:46`), so the
+      // ambient has nothing left to vary by.
+      //
+      // The surviving claim is the stronger one, and it is asserted on **both**
+      // arms: the ambient is mounted identically, so it cannot be told the
+      // route or the language apart.
+      final LoginFixture fixture = buildFixture();
+      await pumpLogin(tester, bloc: fixture.bloc, locale: const Locale('ar'));
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(
+        tester.widget<LumenBackground>(find.byType(LumenBackground)).tier,
+        isNull,
+        reason: 'the ambient resolves its own tier on the Arabic arm too',
+      );
 
-        final NeuralScaffold scaffold = tester.widget<NeuralScaffold>(
-          find.byType(NeuralScaffold),
-        );
-        expect(scaffold.variant, NeuralVariant.login);
-      },
-    );
+      await pumpLogin(tester, bloc: fixture.bloc);
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(
+        tester.widget<LumenBackground>(find.byType(LumenBackground)).tier,
+        isNull,
+        reason: 'and on the English arm',
+      );
+    });
 
     testWidgets('the tagline and footer stay Latin on the Arabic arm, as the '
         'redesign renders them', (WidgetTester tester) async {

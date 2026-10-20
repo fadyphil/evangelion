@@ -371,11 +371,12 @@ void main() {
       // So this test closes the **screen** half of the chain, and the design system
       // already owns the other half: `progress_beads_test.dart`'s reduced-motion row
       // proves the dot pulse is not painted when the clock is stopped, and
-      // `neural_background`'s tier tests prove the same for the orbs. What neither
-      // can do is show that `pumpQuiz`'s flag arrives at those widgets — that is a
-      // wiring fact about this screen, and it is what this asserts. (The probe used
-      // to be `GoldFlecks`, which died with the old prototype's flecks; the beads
-      // row is the redesign's own ambient animation, and it reads the same flag.)
+      // `lumen_background_test.dart`'s fallback rows prove the same for the
+      // ambient. What neither can do is show that `pumpQuiz`'s flag arrives at
+      // those widgets — that is a wiring fact about this screen, and it is what
+      // this asserts. (The probe used to be `GoldFlecks`, which died with the
+      // old prototype's flecks; the beads row is the redesign's own ambient
+      // animation, and it reads the same flag.)
       //
       // **No freeze assertion here on purpose.** A first draft compared the two
       // `CustomPaint` widgets the two runs produced and asserted they differed. That
@@ -413,26 +414,26 @@ void main() {
         expect(find.byType(ProgressBeads), findsOneWidget);
       }
 
-      /// The flag as `ProgressBeads._Bead` and `NeuralBackground.build` read it,
+      /// The flag as `ProgressBeads._Bead` and `LumenBackground.build` read it,
       /// taken off the mounted tree at each widget rather than from a parameter —
       /// so a harness that stopped passing the flag reads `false` here and fails.
-      ({bool atBeads, bool atBackground, NeuralTier tier}) probe() {
+      ({bool atBeads, bool atBackground, LumenShaderTier tier}) probe() {
         final BuildContext beads = tester.element(find.byType(ProgressBeads));
         final BuildContext background = tester.element(
-          find.byType(NeuralBackground),
+          find.byType(LumenBackground),
         );
         return (
           atBeads: MediaQuery.maybeDisableAnimationsOf(beads) ?? false,
           atBackground:
               MediaQuery.maybeDisableAnimationsOf(background) ?? false,
-          // The exact two arguments `NeuralBackground.build` passes, at the position
+          // The exact two arguments `LumenBackground.build` passes, at the position
           // it passes them from. A literal `resolve(…, animationsEnabled: false)`
           // would assert the pure function against itself and survive the background
           // ceasing to read the flag.
           // `override` is left at its `null` default, which is the claim: the
           // background passes no override, and a call that merely omitted it
           // would say nothing.
-          tier: NeuralTiers.resolve(
+          tier: LumenTiers.resolve(
             size: MediaQuery.sizeOf(background),
             animationsEnabled:
                 !(MediaQuery.maybeDisableAnimationsOf(background) ?? false),
@@ -441,26 +442,28 @@ void main() {
       }
 
       await runWith(disableAnimations: true);
-      final ({bool atBeads, bool atBackground, NeuralTier tier}) on = probe();
+      final ({bool atBeads, bool atBackground, LumenShaderTier tier}) on =
+          probe();
       expect(on.atBeads, isTrue, reason: 'the flag reaches the bead row');
       expect(on.atBackground, isTrue, reason: '…and the background');
       expect(
         on.tier,
-        NeuralTier.low,
-        reason: '430×932 resolves `mid` with motion on, so the flag moved it',
+        LumenShaderTier.off,
+        reason: '430×932 resolves `full` with motion on, so the flag moved it',
       );
 
       // **The negative control the first run cannot supply for itself.** Without it,
       // "the flag arrives" would also be satisfied by a screen where the flag arrives
       // at everything because the harness always set it.
       await runWith(disableAnimations: false);
-      final ({bool atBeads, bool atBackground, NeuralTier tier}) off = probe();
+      final ({bool atBeads, bool atBackground, LumenShaderTier tier}) off =
+          probe();
       expect(off.atBeads, isFalse, reason: 'the default call does not set it');
       expect(off.atBackground, isFalse);
       expect(
         off.tier,
-        NeuralTier.mid,
-        reason: 'the control that makes the `low` above mean something',
+        LumenShaderTier.full,
+        reason: 'the control that makes the `off` above mean something',
       );
     });
 

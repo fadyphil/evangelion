@@ -513,7 +513,6 @@ class _ReadingBodyState extends State<_ReadingBody> {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
-    final ReadingLanguage language = _language;
     // ## THE SKY'S PREFERENCES, READ **ONCE** AND WATCHED
     //
     // `SettingsScope.of` is a dependent lookup, so this registers the page's
@@ -564,9 +563,6 @@ class _ReadingBodyState extends State<_ReadingBody> {
         return Listener(
           onPointerDown: (PointerDownEvent _) => _poke(),
           child: NeuralScaffold(
-            variant: language == ReadingLanguage.english
-                ? NeuralVariant.readingEn
-                : NeuralVariant.readingAr,
             // `EdgeInsets.zero`: the route's own `padding` is `:142`'s and
             // `:159`'s, transcribed by the two widgets that own them, and a second
             // inset here would compose with them.

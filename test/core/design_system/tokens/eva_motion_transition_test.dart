@@ -358,6 +358,15 @@ void main() {
   /// | `SegmentedControl` track | `segmented_control.dart:135` | yes |
   /// | **the global route transition** | **`eva_motion.dart:144`** | **no** |
   ///
+  /// **Two of those rows name a file that is gone, and the table is kept as
+  /// Phase 10 wrote it** — it is the record of the enumeration that phase did,
+  /// not a claim about today's tree. The old ambient is retired:
+  /// `neural_background.dart` and `neural_orbs.dart` are gone with the old
+  /// design's orbs. The ambient's place in the list is now `LumenBackground`,
+  /// and it honours the flag through `LumenTiers.resolve` — the same last-word
+  /// rule the old painter read from `MediaQuery` — so the row's answer is
+  /// unchanged.
+  ///
   /// And it is the one a reader meets most: `AppRouter.defaultRouteType` installs
   /// this builder **app-wide**, so every one of the six screens arrives with a
   /// 250ms fade and an 8px slide whether or not the reader asked for reduced

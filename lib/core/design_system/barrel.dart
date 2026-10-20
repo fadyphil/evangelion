@@ -71,17 +71,15 @@
 library;
 
 export 'package:evangelion/core/design_system/effects/gold_flecks.dart';
-export 'package:evangelion/core/design_system/effects/hue_rotate_matrix.dart';
 export 'package:evangelion/core/design_system/effects/lumen_background.dart';
 export 'package:evangelion/core/design_system/effects/lumen_canvas.dart';
 export 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 export 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
 export 'package:evangelion/core/design_system/effects/lumen_program.dart';
 export 'package:evangelion/core/design_system/effects/lumen_scene.dart';
+export 'package:evangelion/core/design_system/effects/lumen_tier.dart';
 export 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
-export 'package:evangelion/core/design_system/effects/neural_background.dart';
 export 'package:evangelion/core/design_system/effects/neural_motion.dart';
-export 'package:evangelion/core/design_system/effects/neural_orbs.dart';
 export 'package:evangelion/core/design_system/effects/ritual_haptics.dart';
 export 'package:evangelion/core/design_system/motion/eva_animate.dart';
 export 'package:evangelion/core/design_system/theme/eva_theme.dart';

@@ -97,10 +97,11 @@ void main() {
     });
 
     test('a shader that will not load does not stop the launch', () async {
-      // The ambient has a fallback — the legacy `NeuralBackground` — so a
-      // missing or unloadable shader asset must cost the reader the aurora
-      // and not the app. The failure path is unreachable otherwise, because
-      // the asset is either there or the build is broken.
+      // The ambient has a fallback — the **flat canvas**, which
+      // `LumenBackground` paints when the shader is not there — so a missing
+      // or unloadable shader asset must cost the reader the aurora and not the
+      // app. The failure path is unreachable otherwise, because the asset is
+      // either there or the build is broken.
       bool ran = false;
       await bootstrapApp(
         run: (Widget _) {

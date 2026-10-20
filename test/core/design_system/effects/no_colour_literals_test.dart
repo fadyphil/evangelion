@@ -28,7 +28,7 @@ import '../../../support/project_import_graph.dart';
 /// | `Color(int.parse('FF6C3FE8', radix: 16))` | **no** |
 /// | `Color.fromARGB(` split over lines | yes — but only because `dart format` collapses it, and §7 runs the format gate |
 ///
-/// So a split `fromARGB` was caught by the formatter, not the regex, and the
+/// So a split `fromARGB` was caught by the formatter, not by the regex, and the
 /// other four spellings walked straight through. Every one of them is a colour
 /// that never went through `EvaColors`, which is the entire rule.
 ///
@@ -38,29 +38,24 @@ import '../../../support/project_import_graph.dart';
 /// or `context.colors.…`; everything else — every spelling, computed or literal
 /// — is an offender. `Colors.transparent` is admitted as a **(value, value)**
 /// pair rather than as a substring, so it cannot carry a Material palette colour
-/// along on the same line. The two token files and the one transcribed prototype
-/// table are exempt as a whole, because that is where a colour is *supposed* to
-/// be introduced.
+/// along on the same line. The token files and the transcribed prototype tables
+/// are exempt as a whole, because that is where a colour is *supposed* to be
+/// introduced.
 ///
 /// The cost of inverting is that the exemptions are now file-scoped rather than
 /// value-scoped, and that is deliberate: "which file is allowed to introduce
 /// colour" is a smaller and more stable question than "which spellings count",
 /// and the second test below keeps the exemptions honest.
 ///
-/// ## THE THREE FILES THAT ARE ALLOWED TO INTRODUCE COLOUR
+/// ## THE FILES THAT ARE ALLOWED TO INTRODUCE COLOUR
 ///
 /// - `tokens/**` — Phase 1's published token table. That is what a token *is*.
 ///
-/// The two transcription sites below are the other two, and both are exempt for
-/// the same reason: **the value is in the prototype and is not in
+/// The transcription sites below are the others, and each is exempt for the
+/// same reason: **the value is in the prototype and is not in
 /// `03-design-system.md`**, and promoting it into `EvaColors` would put a value
 /// into a file that claims to be the spec's token table.
 ///
-/// - `effects/neural_orbs.dart` — the transcription of `ORB_CONFIGS`
-///   (`eva/src/components/ds.tsx:68-114`) and of the aurora `rgba()` bands
-///   (`ds.tsx:165-191`). §5.1 publishes fourteen colour tokens per brightness and
-///   not one of them is an orb accent or an aurora stop, and the sticker palette
-///   is a different seven-colour vocabulary.
 /// - `widgets/eva_toggle.dart` — `EvaToggleKnob.color`, one literal, `#FFFFFF`,
 ///   from `SettingsScreen.tsx:24` (`background: '#ffffff'` on the switch knob).
 ///   §5.1 publishes no white that means "the handle of a control": `surface` is
@@ -72,10 +67,18 @@ import '../../../support/project_import_graph.dart';
 ///   packed `bloomArgb` values are built through. §5.1 publishes no per-card
 ///   wash; `EvaColors.bloom` is the `var(--bh, …)` **fallback**, and the
 ///   prototype gives the two cards different values.
+/// - `features/journey/presentation/journey_colours.dart` — the journey's own
+///   table; see the constant's own doc.
 ///
-/// This test is why those bullets are decisions rather than leaks: move a colour
-/// into a painter and this goes red. And the second test below pins what each
-/// exemption holds, so one cannot quietly grow a second colour.
+/// **The orb transcription is GONE.** `effects/neural_orbs.dart` held the
+/// `ORB_CONFIGS` table and the aurora band's `rgba()` stops, and the orbs are
+/// retired with the old design's ambient. Its exemption went with the file:
+/// an exemption for a file that no longer exists is a hole in the walk, and a
+/// hole nobody reads is how a colour ends up in `lib/` unchallenged.
+///
+/// This test is why the bullets above are decisions rather than leaks: move a
+/// colour into a painter and this goes red. And the second test below pins what
+/// each exemption holds, so one cannot quietly grow a second colour.
 ///
 /// ## FAIL-CLOSED
 ///
@@ -85,10 +88,14 @@ import '../../../support/project_import_graph.dart';
 /// - a file that cannot be read → **fail**, naming the file.
 /// - an empty walk → **fail**. A walk that found nothing proves nothing, and a
 ///   count of zero over nothing is not a pass.
-const String _exemptOrbTranscription =
-    'lib/core/design_system/effects/neural_orbs.dart';
-
-/// The Phase-3 addition to the exemption list. See above.
+///
+/// ## AND NO EXEMPTION MAY NAME A FILE THAT DOES NOT EXIST
+///
+/// A stale exemption is a hole with no reader: the walk skips a path that is
+/// not in the tree, nothing complains, and the "exemption" is invisible. The
+/// second test below therefore asserts that every exempted path is a file on
+/// disk — which is what would have caught the orb exemption the moment the orbs
+/// were retired.
 const String _exemptToggleKnob =
     'lib/core/design_system/widgets/eva_toggle.dart';
 
@@ -96,13 +103,13 @@ const String _exemptToggleKnob =
 ///
 /// `eva/redesign.html` writes each glass card's wash as an **inline** custom
 /// property, not a rule — `:519` is `style="--bh:rgba(228,87,214,.55)"` on
-/// `#votdCard` and `:524` is `style="--bh:rgba(232,176,75,.35)"` on
-/// `#lastCard` — so the values are per-card identity that no token table
-/// carries, which is the same shape of fact the orbs' table holds. The file
-/// holds the two packed ints and **one** colour construction
-/// (`homeCardWash(int)`) that the carousel routes the catalogue's per-book
-/// washes through, so the whole screen has one line where a colour is built
-/// from a transcription. The second test below pins that count.
+/// `#votdCard` and `:524` is `style="--bh:rgba(232,176,75,.35)"` — so the
+/// values are per-card identity that no token table carries, which is the same
+/// shape of fact the card washes' table holds. The file holds the two packed
+/// ints and **one** colour construction (`homeCardWash(int)`) that the
+/// carousel routes the catalogue's per-book washes through, so the whole screen
+/// has one line where a colour is built from a transcription. The second test
+/// below pins that count.
 const String _exemptCardWashes =
     'lib/features/home/presentation/widgets/card_washes.dart';
 
@@ -112,7 +119,7 @@ const String _exemptCardWashes =
 /// **inline** colours on the elements themselves — `:592`'s `stroke:#3EC9B0`,
 /// `:594`'s `stroke:#4F74FF`, and `:599-602`'s four `--bh:rgba(…, .5)` — so the
 /// values are per-element identity that no token table carries, which is the same
-/// shape of fact the orbs' table and the card washes' table hold.
+/// shape of fact the card washes' table holds.
 ///
 /// **The one colour that IS a token is not here.** The prototype's magenta
 /// (`#E457D6`, `:593` and `:600`) is `EvaColors.bloom`'s exact hue, and the
@@ -129,7 +136,6 @@ const String _exemptJourneyColours =
 
 /// The files exempt from the rule.
 const Set<String> _colourExemptions = <String>{
-  _exemptOrbTranscription,
   _exemptToggleKnob,
   _exemptCardWashes,
   _exemptJourneyColours,
@@ -281,35 +287,39 @@ void main() {
       isEmpty,
       reason:
           'every colour resolves through EvaColors / EvaStickerPalette, or '
-          'through the one transcribed prototype table in neural_orbs.dart. A '
-          'name this test has never heard of is a colour that never went '
+          'through one of the transcribed prototype tables this file exempts. '
+          'A name this test has never heard of is a colour that never went '
           'through a token table — which is the rule, whichever syntax it '
           'arrives in:\n${offenders.join('\n')}',
     );
+  });
+
+  test('and no exemption names a file that is not there', () {
+    // A stale exemption is a hole with no reader: the walk skips a path that
+    // is not in the tree, nothing complains, and the "exemption" is invisible.
+    // The orb exemption outlived `effects/neural_orbs.dart` by exactly the
+    // length of the window between the orbs' retirement and this change.
+    for (final String path in _colourExemptions) {
+      expect(
+        File.fromUri(packageRoot.uri.resolve(path)).existsSync(),
+        isTrue,
+        reason:
+            '$path is exempt from the colour rule, so it must exist — an '
+            'exemption for a file that is not there is a hole nobody reads',
+      );
+    }
   });
 
   test('and the exemptions really do hold the tables they are for', () {
     // Without this the first test could be satisfied by an exemption that grew,
     // or by a file whose tables were moved somewhere the first test does not
     // reach. Both failure modes are the same bug: two homes for one table.
-    final String orbs = File.fromUri(
-      packageRoot.uri.resolve(_exemptOrbTranscription),
-    ).readAsStringSync();
-    expect(
-      'const Map<OrbGroup, List<OrbSpec>> orbGroups'.allMatches(orbs).length,
-      1,
-      reason: 'the ORB_CONFIGS transcription',
-    );
-    expect(
-      'abstract final class NeuralAurora'.allMatches(orbs).length,
-      1,
-      reason:
-          'the aurora band transcription, kept beside the orbs so this '
-          "file's exemption above is a single entry",
-    );
-
+    //
+    // The orb table used to be pinned here, and it is gone with the orbs: the
+    // file it named is retired, and the exemption that named it went with it.
+    //
     // The toggle exemption is a whole *widget file*, which is a much broader
-    // licence than the orbs' — so it is pinned to exactly one colour
+    // licence than a table's — so it is pinned to exactly one colour
     // construction. Without this the exemption would silently become a hole
     // every future widget edit could drop a hex into.
     final String toggle = File.fromUri(

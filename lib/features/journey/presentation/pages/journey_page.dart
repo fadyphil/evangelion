@@ -329,7 +329,6 @@ class _JourneyBodyState extends State<_JourneyBody> implements AutoRouteAware {
           // cut-and-kept-for-index-alignment, because the profile was cut then.
           // The journey IS the profile, and it is the one group whose first orb
           // cycles backwards (ds.tsx:106).
-          variant: NeuralVariant.journey,
           scrollable: true,
           // **The prototype's `.scroll` owns the gutter** — `:157` is `6px 14px
           // 118px` — and the scaffold's own padding would be a second one.

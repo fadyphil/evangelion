@@ -263,7 +263,6 @@ class _HomePageState extends State<HomePage> {
     final AppLocalizations strings = context.l10n;
 
     return NeuralScaffold(
-      variant: NeuralVariant.home,
       // `redesign.html:518` — `.scroll{overflow-y: auto}` on the whole section.
       scrollable: true,
       // **`EdgeInsets.zero`, and this is the load-bearing decision on this screen.**

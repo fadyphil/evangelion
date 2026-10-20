@@ -2,7 +2,6 @@ import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
 import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
 import 'package:evangelion/core/design_system/effects/lumen_uniforms.dart';
-import 'package:evangelion/core/design_system/effects/neural_orbs.dart';
 import 'package:evangelion/core/domain/entities/curtain_shape.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -143,6 +142,16 @@ void main() {
         now: () => DateTime(2026, 10, 3, 22),
       );
       expect(off.ambientTarget, closeTo(0.9, 1e-12));
+    });
+
+    test('and the scene reads the clock it was given', () {
+      // The scene's own `now` is the injected wall clock, and the point of
+      // injecting it is that a scene built on `DateTime.now()` would be
+      // **time-dependent**: the same assertion would pass at 09:00 and fail at
+      // 22:00. So the getter has to hand back the injected hour, and this is
+      // the assertion that says it does.
+      expect(at(22).now(), DateTime(2026, 10, 3, 22));
+      expect(at(3).now(), DateTime(2026, 10, 3, 3));
     });
   });
 
@@ -499,28 +508,30 @@ void main() {
       expect(atBottom.dy, closeTo(-844 / 2 / 390, 1e-12));
     });
 
-    test('it is NOT the orb parallax offset', () {
-      // The negative control: the two are different numbers that look alike.
-      // The parallax offset divides by the width and the height *separately*
-      // and scales by the parallax box; this one divides by the short side.
-      final Offset parallax = pointerOffsetFor(
-        size: const Size(390, 844),
-        local: const Offset(195, 422),
+    test('the divisor is the SHORT side, not the width', () {
+      // ## THE NEGATIVE CONTROL, REWRITTEN
+      //
+      // The old control compared this normalisation against the **orb
+      // parallax** offset — a second number that divides by the width and the
+      // height *separately*. The orbs are retired, so that comparison has no
+      // subject, and a control against a number that no longer exists proves
+      // nothing.
+      //
+      // What distinguishes this normalisation from a per-axis one is the
+      // **divisor**, and that is asserted directly: on a landscape viewport the
+      // short side is the height, so the X is divided by 390 and not by 844.
+      // A per-axis normalisation would answer `195 / 844`.
+      final Offset landscape = lumenPointerFor(
+        size: const Size(844, 390),
+        local: const Offset(844, 195),
       );
-      expect(parallax.dx, closeTo(0, 1e-12));
-      expect(parallax.dy, closeTo(0, 1e-12));
-      // At the centre they agree, so the witness has to be off-centre.
-      final Offset offCentre = lumenPointerFor(
-        size: const Size(390, 844),
-        local: const Offset(390, 422),
+      expect(landscape.dx, closeTo(422 / 390, 1e-12));
+      expect(
+        landscape.dx,
+        isNot(closeTo(422 / 844, 1e-6)),
+        reason: 'a per-axis normalisation would have divided by the width',
       );
-      final Offset parallaxOffCentre = pointerOffsetFor(
-        size: const Size(390, 844),
-        local: const Offset(390, 422),
-      );
-      expect(offCentre.dx, closeTo(195 / 390, 1e-12));
-      expect(parallaxOffCentre.dx, closeTo(0.5 * kPointerSpanX, 1e-12));
-      expect(offCentre.dx, isNot(closeTo(parallaxOffCentre.dx, 1e-6)));
+      expect(landscape.dy, closeTo(0, 1e-12));
     });
   });
 }

@@ -682,7 +682,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // §13.2's collapse, and the reason the flare's one-shot is not ported.
-      // Four ambient clocks is the app's whole ambient budget.
+      // Two ambient clocks is the app's whole ambient budget — the float
+      // clock and the LUMEN shader clock, the hue and aurora clocks having
+      // gone with the old design's orbs.
       tester.view.physicalSize = _surface;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -699,9 +701,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(
         SchedulerBinding.instance.transientCallbackCount,
-        4,
+        2,
         reason:
-            'four shared ambient clocks and no controller of its own when '
+            'two shared ambient clocks and no controller of its own when '
             'there is no constellation to draw',
       );
 
@@ -710,7 +712,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(
         SchedulerBinding.instance.transientCallbackCount,
-        5,
+        3,
         reason: 'exactly one more: the single draw-on, for 3 stars and for 44',
       );
     });
@@ -880,9 +882,9 @@ void main() {
       WidgetTester tester,
     ) async {
       // §14's "jump straight to the end state", and the half that is easy to get
-      // wrong: `forward()` reaches the end state too, and leaves a fifth
+      // wrong: `forward()` reaches the end state too, and leaves a third
       // transient callback running under a sky that has already finished. §13.2's
-      // budget is four, app-wide.
+      // budget is two, app-wide.
       tester.view.physicalSize = _surface;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -899,11 +901,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(
         SchedulerBinding.instance.transientCallbackCount,
-        4,
+        2,
         reason:
-            'the four shared ambient clocks. A fifth is the draw-on still '
+            'the two shared ambient clocks. A third is the draw-on still '
             'ticking after it has reached its end state — measured at 5 on the '
-            'pre-fix tree.',
+            'pre-fix tree, when the bundle carried four clocks.',
       );
 
       // And the end state is the FINISHED line, not an absent one. The control
@@ -945,8 +947,8 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       expect(
         SchedulerBinding.instance.transientCallbackCount,
-        4,
-        reason: 'the four ambient clocks — the draw-on has completed',
+        2,
+        reason: 'the two ambient clocks — the draw-on has completed',
       );
     });
   });

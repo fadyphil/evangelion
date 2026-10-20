@@ -475,7 +475,6 @@ class _QuizBodyState extends State<_QuizBody> {
     required QuizState state,
   }) => switch (state.status) {
     QuizStatus.loading => const NeuralScaffold(
-      variant: NeuralVariant.quiz,
       // `scrollable` is left at its `false` default, which is what the
       // prototype's flexed `.qbody` asks for: the prototype's own scrollable, and
       // the reason `/reading` and this screen agree.
@@ -513,7 +512,6 @@ class _QuizBodyState extends State<_QuizBody> {
     final QuizAnswer? answer = state.currentAnswer;
 
     return NeuralScaffold(
-      variant: NeuralVariant.quiz,
       // **Zero, and every region owns its own padding.** The redesign's screen is
       // not one padded box: the appbar is `46/18/4` (`:142`), the dots row
       // `8/0/4` (`:328`), the body `0 26px` (`:333`) and the CTA `6/26/30`
@@ -1030,7 +1028,6 @@ class _FailedOrEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => NeuralScaffold(
-    variant: NeuralVariant.quiz,
     padding: EdgeInsets.zero,
     child: Center(
       child: empty

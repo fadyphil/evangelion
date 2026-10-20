@@ -285,7 +285,6 @@ class LoginPage extends StatelessWidget {
     return NeuralScaffold(
       // The prototype passes `variant={0}` unconditionally, and there is no
       // Arabic login screen to inherit a different one from.
-      variant: NeuralVariant.login,
       // `redesign.html:369` — `.login` centres its column and declares no
       // overflow of its own; the old prototype's scrolling root is gone with the
       // form panel, so `scrollable` stays its default `false`. The

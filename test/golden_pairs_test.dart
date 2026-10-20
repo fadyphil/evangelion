@@ -89,9 +89,9 @@ void main() {
           'zero over nothing is not a pass.',
     );
 
-    // Keyed by directory **plus** stem. The stem alone is not unique —
-    // `neural_background_*` exists in one directory and the widget goldens in
-    // another — and an earlier version of this loop keyed on the whole
+    // Keyed by directory **plus** stem. The file name alone is not unique — the
+    // goldens live in five directories, and the same name could sit in two of
+    // them — and an earlier version of this loop keyed on the whole
     // package-relative path, which then made `_sibling` look for
     // `…/goldens/test/core/…/goldens/…_light.png` and find nothing. The gate went
     // green over the two duplicates it exists to catch, which is §7's failure in

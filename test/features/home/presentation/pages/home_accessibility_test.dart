@@ -494,7 +494,7 @@ void main() {
       await pumpHome(tester, bloc: h.bloc, disableAnimations: true);
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(NeuralBackground), findsOneWidget);
+      expect(find.byType(LumenBackground), findsOneWidget);
     });
 
     testWidgets('and the carousel\'s strip does not animate on its own', (

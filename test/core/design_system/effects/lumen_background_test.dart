@@ -8,15 +8,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../support/design_system_harness.dart';
+
 /// The mounted aurora — the redesign's ambient layer.
 ///
-/// ## THE THREE THINGS THIS FILE PROVES
+/// ## THE FOUR THINGS THIS FILE PROVES
 ///
 /// 1. **The aurora paints** where the reader's choices are published, and the
 ///    **fallback** paints everywhere else.
 /// 2. **The painter is long-lived**, so the shader's uniform buffer is
 ///    allocated once and not once a frame.
 /// 3. **The reader's choices reach the shader**, through the scene.
+/// 4. **The fallback is the flat canvas**, pixel for pixel — which is the
+///    prototype's own screen root (`eva/redesign.html:46`), not a degraded
+///    aurora.
 void main() {
   /// The aurora's painter, or null when the fallback is painting.
   LumenCanvas? lumenPainter(WidgetTester tester) {
@@ -66,18 +71,24 @@ void main() {
     testWidgets('where the reader\'s choices are published', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        harness(const LumenBackground(variant: NeuralVariant.home)),
-      );
+      await tester.pumpWidget(harness(const LumenBackground()));
       await tester.pump();
       expect(lumenPainter(tester), isNotNull);
-      expect(find.byType(NeuralBackground), findsNothing);
+      // The two shapes are **exclusive**: the aurora paints *instead of* the
+      // flat canvas, never on top of it. The assertion here used to be that
+      // the legacy painter was absent from the tree; the legacy painter is
+      // gone with the orbs, and this is the claim that replaced it.
+      expect(
+        find.descendant(
+          of: find.byType(LumenBackground),
+          matching: find.byType(ColoredBox),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('and it fills the page', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        harness(const LumenBackground(variant: NeuralVariant.home)),
-      );
+      await tester.pumpWidget(harness(const LumenBackground()));
       await tester.pump();
       final CustomPaint paint = tester.widget<CustomPaint>(
         find.descendant(
@@ -93,15 +104,10 @@ void main() {
 
   group('the fallback paints', () {
     testWidgets('when no choices are published', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        harness(
-          const LumenBackground(variant: NeuralVariant.home),
-          publish: false,
-        ),
-      );
+      await tester.pumpWidget(harness(const LumenBackground(), publish: false));
       await tester.pump();
       expect(lumenPainter(tester), isNull);
-      expect(find.byType(NeuralBackground), findsOneWidget);
+      expect(find.byType(LumenBackground), findsOneWidget);
     });
 
     testWidgets('when the reader turns the aurora off', (
@@ -109,29 +115,325 @@ void main() {
     ) async {
       await tester.pumpWidget(
         harness(
-          const LumenBackground(variant: NeuralVariant.home),
+          const LumenBackground(),
           preferences: const LumenPreferences(enabled: false),
         ),
       );
       await tester.pump();
       expect(lumenPainter(tester), isNull);
-      expect(find.byType(NeuralBackground), findsOneWidget);
+      expect(find.byType(LumenBackground), findsOneWidget);
     });
 
-    testWidgets('and when reduced motion drops the tier to `low`', (
+    testWidgets('and when reduced motion drops the tier to `off`', (
       WidgetTester tester,
     ) async {
-      // `NeuralTiers.resolve` makes reduced motion the **last word**: it
-      // returns `low` whatever the size says, and `low` maps to `off`.
+      // `LumenTiers.resolve` makes reduced motion the **last word**: it
+      // returns `off` whatever the size says and whatever the override says.
       await tester.pumpWidget(
-        harness(
-          const LumenBackground(variant: NeuralVariant.home),
-          disableAnimations: true,
-        ),
+        harness(const LumenBackground(), disableAnimations: true),
       );
       await tester.pump();
       expect(lumenPainter(tester), isNull);
-      expect(find.byType(NeuralBackground), findsOneWidget);
+      expect(find.byType(LumenBackground), findsOneWidget);
+    });
+  });
+
+  group('the flat canvas, pixel for pixel', () {
+    // ## THE FALLBACK IS NOT A DEGRADED AURORA — IT IS THE PROTOTYPE'S OWN
+    //
+    // `eva/redesign.html:46` gives every screen **one** canvas, and the
+    // prototype's screen root is `background: T.canvas` (`ds.tsx:162`). The old
+    // design's per-screen orb groups stood in for that fill and are gone, so
+    // what is left when the aurora does not paint is the fill itself — the
+    // design, not a consolation prize.
+    //
+    // These are the pixel-level assertions the old background's suite carried
+    // and this file inherits. The old subject was `NeuralTier.low`; the new
+    // subject is `LumenShaderTier.off`, and the behaviour is identical: the
+    // whole layer is the canvas and nothing else.
+    //
+    // ## PER-PIXEL, NOT "AT MOST A FEW DISTINCT BYTES"
+    //
+    // A distinct-count check is satisfied by a buffer of nothing but one
+    // repeated byte — which paints no canvas at all. So the count is of pixels
+    // that are *not* the canvas.
+
+    /// The ambient as the shared harness mounts it, at the prototype's screen.
+    Widget ambient({
+      LumenShaderTier? tier,
+      bool disableAnimations = false,
+      bool animationsEnabled = true,
+      LumenPreferences? preferences,
+      ThemeData? theme,
+    }) => evaAmbientHarness(
+      theme: theme,
+      animationsEnabled: animationsEnabled,
+      disableAnimations: disableAnimations,
+      child: preferences == null
+          ? ambientBackground(tier: tier)
+          : LumenPreferencesScope(
+              preferences: preferences,
+              child: ambientBackground(tier: tier),
+            ),
+    );
+
+    testWidgets('the fallback paints the canvas and nothing else', (
+      WidgetTester tester,
+    ) async {
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient());
+      await tester.pump();
+
+      final Uint8List rgba = await backgroundPixels(tester);
+      expect(
+        _notCanvas(rgba, const EvaColors.dark().canvas),
+        0,
+        reason:
+            'the fallback is the flat canvas, so every pixel of the ambient is '
+            'the canvas — or something is still drawing over it',
+      );
+    });
+
+    testWidgets('and reduced motion paints the same flat canvas', (
+      WidgetTester tester,
+    ) async {
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient(disableAnimations: true));
+      await tester.pump();
+
+      final Uint8List rgba = await backgroundPixels(tester);
+      expect(
+        _notCanvas(rgba, const EvaColors.dark().canvas),
+        0,
+        reason:
+            'reduced motion drops the tier to `off`, and `off` is the canvas',
+      );
+    });
+
+    testWidgets('and an explicit `full` override cannot beat reduced motion', (
+      WidgetTester tester,
+    ) async {
+      // The override seam is a **cost** decision; the accessibility decision is
+      // not overridable. `LumenTiers.resolve` says so in its own doc, and this
+      // is the pixel-level consequence: the canvas paints.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(
+        ambient(tier: LumenShaderTier.full, disableAnimations: true),
+      );
+      await tester.pump();
+
+      final Uint8List rgba = await backgroundPixels(tester);
+      expect(
+        _notCanvas(rgba, const EvaColors.dark().canvas),
+        0,
+        reason: 'the override cannot re-enable motion the reader switched off',
+      );
+    });
+
+    testWidgets('and the aurora paints more than the fallback does', (
+      WidgetTester tester,
+    ) async {
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient());
+      await tester.pump();
+      final Uint8List fallback = await backgroundPixels(tester);
+
+      await tester.pumpWidget(ambient(preferences: const LumenPreferences()));
+      await tester.pump();
+      final Uint8List aurora = await backgroundPixels(tester);
+
+      expect(
+        aurora.toString(),
+        isNot(fallback.toString()),
+        reason:
+            'the aurora is not the canvas — and the comparison is over the '
+            'whole layer, so a shader that painted nothing would fail here',
+      );
+    });
+
+    testWidgets('and the fallback never repaints on a frame', (
+      WidgetTester tester,
+    ) async {
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient());
+      await tester.pump();
+      final Uint8List before = await backgroundPixels(tester);
+      await tester.pump(const Duration(seconds: 5));
+      expect(
+        before.toString(),
+        (await backgroundPixels(tester)).toString(),
+        reason: 'a static canvas has nothing to repaint',
+      );
+    });
+
+    testWidgets('and it asks the framework to keep nothing alive', (
+      WidgetTester tester,
+    ) async {
+      // The old assertion was `willChange == false` on the background's own
+      // `CustomPaint`. The fallback has **no `CustomPaint` at all** — it is a
+      // `ColoredBox` — so the stronger claim is available: there is no layer
+      // that the framework might keep alive for a repaint that never comes.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient());
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(LumenBackground),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+      );
+
+      // And the aurora does have one, which is what makes the difference
+      // observable rather than a claim about a widget that is not there.
+      await tester.pumpWidget(ambient(preferences: const LumenPreferences()));
+      await tester.pump();
+      expect(
+        find.descendant(
+          of: find.byType(LumenBackground),
+          matching: find.byType(CustomPaint),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('and the aurora repaints as its clock advances', (
+      WidgetTester tester,
+    ) async {
+      // D1 — "a repaint genuinely happens". The old suite proved it by
+      // comparing the background's own pixels across a pumped interval; the
+      // subject is now the aurora, and the mechanism is `u_time` rather than
+      // an orb's float.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(ambient(preferences: const LumenPreferences()));
+      await tester.pump();
+      final Uint8List before = await backgroundPixels(tester);
+
+      await tester.pump(const Duration(seconds: 3));
+      final Uint8List after = await backgroundPixels(tester);
+
+      expect(before.length, after.length, reason: 'same surface, same layer');
+      expect(
+        List<int>.generate(
+          before.length,
+          (int i) => i,
+        ).where((int i) => before[i] != after[i]),
+        isNotEmpty,
+        reason:
+            'advancing the clock must repaint the aurora; a painter that paints '
+            'once and never again is the reference implementation\'s actual '
+            'behaviour',
+      );
+    });
+
+    testWidgets('and a stopped clock leaves the aurora\'s pixels identical', (
+      WidgetTester tester,
+    ) async {
+      // THE NEGATIVE CONTROL for the test above. Without it, "the pixels
+      // differ" could be satisfied by anything that repaints — a theme change,
+      // an antialiasing wobble. The old suite had this control against the
+      // orbs' float; the clock that is stopped now is the shader's.
+      //
+      // **The clocks are stopped but the aurora still paints**, because the
+      // tier is resolved from the *reader's* motion preference
+      // (`MediaQuery.disableAnimationsOf`) and not from the scope's
+      // `animationsEnabled`. The two are different switches, and the ambient
+      // is what the first one governs.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(
+        ambient(
+          preferences: const LumenPreferences(),
+          animationsEnabled: false,
+        ),
+      );
+      await tester.pump();
+      final Uint8List before = await backgroundPixels(tester);
+
+      await tester.pump(const Duration(seconds: 3));
+      expect(
+        before.toString(),
+        (await backgroundPixels(tester)).toString(),
+        reason: 'a stopped clock has nothing to repaint',
+      );
+    });
+
+    testWidgets('and the two themes paint different pixels', (
+      WidgetTester tester,
+    ) async {
+      // The old suite asserted this twice — "light mode paints the light
+      // aurora" and "changing the palette repaints the painter" — and both
+      // claims are one here.
+      //
+      // **The clock is frozen, so the palette is the ONLY variable.** A
+      // comparison with the clock running would differ for the clock's sake,
+      // and would pass even if the theme reached the ambient nowhere.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(
+        ambient(
+          preferences: const LumenPreferences(),
+          theme: EvaThemeDark.theme,
+          animationsEnabled: false,
+        ),
+      );
+      await tester.pump();
+      final Uint8List dark = await backgroundPixels(tester);
+
+      await tester.pumpWidget(
+        ambient(
+          preferences: const LumenPreferences(),
+          theme: EvaThemeLight.theme,
+          animationsEnabled: false,
+        ),
+      );
+      await tester.pump();
+      // `MaterialApp` installs an `AnimatedTheme` that lerps a theme change
+      // over `kThemeAnimationDuration`, and a single zero-duration `pump()`
+      // does not advance it — so the second capture would still read the
+      // **previous** palette, which is the bug `golden_pairs_test.dart`'s
+      // comment records.
+      await tester.pump(kThemeAnimationDuration);
+      final Uint8List light = await backgroundPixels(tester);
+
+      expect(
+        light.toString(),
+        isNot(dark.toString()),
+        reason:
+            'the light canvas is multiplied into the aurora '
+            '(`eva/redesign.html:60`) and the scene is retargeted for the '
+            'brightness, so the two themes cannot paint the same bytes',
+      );
+    });
+
+    testWidgets('and the page above the ambient is untouched too', (
+      WidgetTester tester,
+    ) async {
+      // D1, the other half: the ambient must not dirty the subtree above it.
+      // Thirty animation frames must not rebuild the content — the old suite
+      // asserted this against the orbs, and the ambient is still the layer
+      // that repaints every frame.
+      useAmbientSurface(tester);
+      await tester.pumpWidget(
+        evaAmbientHarness(
+          child: const LumenPreferencesScope(
+            preferences: LumenPreferences(),
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(child: LumenBackground()),
+                Positioned(top: 100, left: 20, child: Text('Today\'s reading')),
+              ],
+            ),
+          ),
+        ),
+      );
+      final Element textElement = tester.element(find.text('Today\'s reading'));
+      for (int frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(
+        identical(textElement, tester.element(find.text('Today\'s reading'))),
+        isTrue,
+        reason: 'thirty animation frames must not rebuild the content above it',
+      );
     });
   });
 
@@ -139,9 +441,7 @@ void main() {
     testWidgets('the shader is allocated once, however many frames paint', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        harness(const LumenBackground(variant: NeuralVariant.home)),
-      );
+      await tester.pumpWidget(harness(const LumenBackground()));
       await tester.pump();
       final LumenCanvas canvas = lumenPainter(tester)!;
 
@@ -164,9 +464,7 @@ void main() {
     testWidgets('and the painter instance itself does not change', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        harness(const LumenBackground(variant: NeuralVariant.home)),
-      );
+      await tester.pumpWidget(harness(const LumenBackground()));
       await tester.pump();
       final LumenCanvas canvas = lumenPainter(tester)!;
       await tester.pump(const Duration(milliseconds: 16));
@@ -179,7 +477,7 @@ void main() {
     testWidgets('through the scene', (WidgetTester tester) async {
       await tester.pumpWidget(
         harness(
-          const LumenBackground(variant: NeuralVariant.home),
+          const LumenBackground(),
           preferences: const LumenPreferences(
             reach: 110,
             touchGlow: 100,
@@ -205,10 +503,7 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        harness(
-          const LumenBackground(variant: NeuralVariant.home),
-          preferences: const LumenPreferences(),
-        ),
+        harness(const LumenBackground(), preferences: const LumenPreferences()),
       );
       await tester.pump();
       expect(
@@ -218,7 +513,7 @@ void main() {
 
       await tester.pumpWidget(
         harness(
-          const LumenBackground(variant: NeuralVariant.home),
+          const LumenBackground(),
           preferences: const LumenPreferences(reach: 60),
         ),
       );
@@ -237,10 +532,7 @@ void main() {
       await tester.pumpWidget(
         harness(
           const Column(
-            children: <Widget>[
-              LumenBackground(variant: NeuralVariant.home),
-              LumenBackground(variant: NeuralVariant.quiz),
-            ],
+            children: <Widget>[LumenBackground(), LumenBackground()],
           ),
         ),
       );
@@ -264,7 +556,7 @@ void main() {
       // (`eva/redesign.html:881-912`), so they survive a screen change.
       await tester.pumpWidget(
         harness(
-          const LumenBackground(variant: NeuralVariant.home),
+          const LumenBackground(),
           preferences: const LumenPreferences(hue: 12),
         ),
       );
@@ -278,7 +570,7 @@ void main() {
       // A different screen, the same app.
       await tester.pumpWidget(
         harness(
-          const LumenBackground(variant: NeuralVariant.quiz),
+          const LumenBackground(),
           preferences: const LumenPreferences(hue: 12),
         ),
       );
@@ -310,10 +602,7 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        harness(
-          const LumenBackground(variant: NeuralVariant.home),
-          theme: EvaThemeLight.theme,
-        ),
+        harness(const LumenBackground(), theme: EvaThemeLight.theme),
       );
       await tester.pump();
 
@@ -359,10 +648,7 @@ void main() {
     // not by the background, because the prototype tracks it on `#screen`
     // (`eva/redesign.html:916`) and a listener in the background layer would
     // only see the moves the content above it does not absorb.
-    Widget scaffold() => const NeuralScaffold(
-      variant: NeuralVariant.home,
-      child: SizedBox.shrink(),
-    );
+    Widget scaffold() => const NeuralScaffold(child: SizedBox.shrink());
 
     testWidgets('a hover puts the glow where the pointer is', (
       WidgetTester tester,
@@ -431,4 +717,26 @@ void main() {
       expect(scene.pointer.value, kLumenNoPointer);
     });
   });
+}
+
+/// How many pixels of [rgba] are **not** [canvas].
+///
+/// The red / green / blue bytes are read out of `toARGB32()` by hand rather
+/// than through `Color.red`, because `toARGB32` packs **A**RRGGBB — `& 0xFF`
+/// on the whole word is the *blue* channel, and getting that backwards makes a
+/// correct renderer look broken.
+int _notCanvas(Uint8List rgba, Color canvas) {
+  final int red = (canvas.toARGB32() >> 16) & 0xFF;
+  final int green = (canvas.toARGB32() >> 8) & 0xFF;
+  final int blue = canvas.toARGB32() & 0xFF;
+  int painted = 0;
+  for (int offset = 0; offset + 3 < rgba.length; offset += 4) {
+    if (rgba[offset] != red ||
+        rgba[offset + 1] != green ||
+        rgba[offset + 2] != blue ||
+        rgba[offset + 3] != 0xFF) {
+      painted++;
+    }
+  }
+  return painted;
 }

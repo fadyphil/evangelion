@@ -155,40 +155,40 @@ const double curtainSideAlphaLight = 0.9;
 /// 4. **What actually carries layering:** `line`, the glass triple, and the one
 ///    ambient shadow — see `eva_elevations.dart`.
 ///
-/// ## D2 — THE LANGUAGE IS NOT A SECOND SOURCE OF TRUTH FOR THE VARIANT
+/// ## D2 — THE VARIANT IS **GONE**, AND IT WAS ONLY EVER A WAY TO CARRY A
+/// ## LANGUAGE INTO AN ORB GROUP
 ///
-/// `NeuralVariant.readingEn` and `NeuralVariant.readingAr` are separate values,
-/// not one `reading` plus a direction, because the prototype draws a different
-/// orb group per language: English opens blue and has no cyan orb
-/// (`ds.tsx:83-86`), Arabic opens violet and pairs it with cyan (`ds.tsx:88-91`).
+/// This widget used to take a `NeuralVariant`, and the decision it made was
+/// "**the language is already in `variant`, and nothing here re-derives it**" —
+/// the alternative, a `ReadingLanguage` field or an [InheritedWidget] to read
+/// one from, was rejected because a second source of truth for one fact is the
+/// exact hazard Phase 2 recorded.
 ///
-/// The decision this widget makes is: **the language is already in `variant`, and
-/// nothing here re-derives it.** The alternative — a `ReadingLanguage` field,
-/// or an [InheritedWidget] to read one from — was rejected for three reasons:
+/// **That whole argument was about the ORBS.** The prototype draws a different
+/// orb group per language — English opens blue and has no cyan orb
+/// (`ds.tsx:83-86`), Arabic opens violet and pairs it with cyan
+/// (`ds.tsx:88-91`) — and the redesign has **one** canvas for every screen
+/// (`eva/redesign.html:46`), so the aurora does not vary by language and the
+/// variant has nothing left to select.
 ///
-/// - **A second source of truth for one fact is the exact hazard Phase 2 already
-///   recorded.** `orbGroupFor`'s doc explains why the variant→group mapping is an
-///   exhaustive `switch` and not `variant.index`: an off-by-one there hands
-///   `/settings` the Profile orbs, and *nothing fails*. Adding `language` beside
-///   `variant` creates the same class of bug with the same invisibility.
-/// - **Nothing in this phase owns the language.** The app's language is a
-///   [UserSettings] value, read by the settings cubit. A context read would need an
-///   [InheritedWidget] with no producer, and therefore a silent fallback — which is
-///   a guess wearing an API. **Phase 9 brought the producer** (`SettingsScope`), and
-///   the reason this widget still reads the language from [variant] is the bullet
-///   above: a second source of truth for one fact.
-/// - **The one caller that would want it already switches.** Phase 7's
-///   `ReadingPage` renders EN and AR scripture from the same language value, so
-///   it has it in hand and passes `NeuralVariant.readingEn` or
-///   `NeuralVariant.readingAr` with nothing else to keep in step.
+/// **So the parameter is gone, and with it a fact that was carried by the
+/// wrong thing.** The reading screen's language is now read from the locale
+/// where the scripture itself is read, and the scaffold says nothing about
+/// language at all — which is the honest state of a widget that draws a
+/// background.
 ///
-/// `neural_scaffold_test.dart` asserts the two reading variants paint different
-/// orb groups, so "the language is honoured" is checked rather than asserted in a
-/// comment.
+/// The lesson, because it is the second time this repository has met it: **a
+/// parameter's reason can die with the thing it selects, and the parameter
+/// outlives it.** The `variant` outlived the orbs, and it is gone with them.
+///
+/// **The `NeuralMotionScope` is the same shape and is NOT renamed here** — it
+/// hosts the LUMEN clock and the float clock, and the name is a leftover of
+/// the old design. It is renamed in the commit that follows, on its own,
+/// because a rename that touches thirty-one files has no business sharing a
+/// diff with a deletion.
 class NeuralScaffold extends StatelessWidget {
-  /// A screen root for [variant] wrapping [child].
+  /// A screen root wrapping [child].
   const NeuralScaffold({
-    required this.variant,
     required this.child,
     this.scrollable = false,
     this.padding = const EdgeInsets.symmetric(horizontal: EvaSpacing.lg),
@@ -198,10 +198,6 @@ class NeuralScaffold extends StatelessWidget {
     this.tier,
     super.key,
   });
-
-  /// Which screen's ambient background to paint. **Also** which language the
-  /// reading screens are in — see the D2 note above.
-  final NeuralVariant variant;
 
   /// The screen's content.
   final Widget child;
@@ -299,9 +295,10 @@ class NeuralScaffold extends StatelessWidget {
   /// today (`/reading`, whose CTA sits at the foot) keeps the shade it has.
   final CurtainShape curtain;
 
-  /// Forces a [NeuralTier] instead of resolving one. `null` resolves from the
-  /// viewport and the reader's reduced-motion preference — see [NeuralBackground].
-  final NeuralTier? tier;
+  /// Forces a [LumenShaderTier] instead of resolving one. `null` resolves from
+  /// the viewport and the reader's reduced-motion preference — see
+  /// [LumenTiers].
+  final LumenShaderTier? tier;
 
   @override
   Widget build(BuildContext context) {
@@ -384,13 +381,13 @@ class NeuralScaffold extends StatelessWidget {
                 // container is `position: absolute; inset: 0`
                 // (`ds.tsx:162`) and the screens above it rely on that to be
                 // immersive. The [SafeArea] is applied to the *content*, not to the
-                // stack, so the canvas and the orbs reach under the status bar.
+                // stack, so the canvas reaches under the status bar.
                 //
                 // `LumenBackground` is the redesign's ambient: the aurora
                 // (`eva/redesign.html:46`, `.screen canvas`) when the reader's
-                // choices and the tier allow it, and the legacy
-                // `NeuralBackground` otherwise. See its doc for the table.
-                LumenBackground(variant: variant, tier: tier),
+                // choices and the tier allow it, and the **flat canvas**
+                // otherwise. See its doc for the table.
+                LumenBackground(tier: tier),
                 SafeArea(
                   // Bottom included: the sticky CTA's scrim has to clear the home
                   // indicator, or the button sits under it.

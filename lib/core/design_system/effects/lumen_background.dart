@@ -2,41 +2,54 @@ import 'package:evangelion/core/design_system/effects/lumen_canvas.dart';
 import 'package:evangelion/core/design_system/effects/lumen_preferences.dart';
 import 'package:evangelion/core/design_system/effects/lumen_program.dart';
 import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
-import 'package:evangelion/core/design_system/effects/neural_background.dart';
+import 'package:evangelion/core/design_system/effects/lumen_tier.dart';
 import 'package:evangelion/core/design_system/effects/neural_motion.dart';
 import 'package:evangelion/core/design_system/tokens/eva_colors.dart';
 import 'package:flutter/material.dart';
 
-/// The screen's ambient layer: the LUMEN aurora, or the fallback.
+/// The screen's ambient layer: the LUMEN aurora, or the flat canvas.
 ///
 /// ## WHAT IT REPLACES, AND WHY BOTH ARE HERE
 ///
 /// `NeuralScaffold` used to paint `NeuralBackground` — the old design's neural
-/// orbs — as its first stack child. This widget stands in that place and
-/// decides, per frame of the reader's life, which of the two paints:
+/// orbs — as its first stack child, and the redesign's plan made this widget
+/// stand in that place and decide, per frame of the reader's life, which of the
+/// two paints:
 ///
 /// | the reader | the tier | what paints |
 /// | --- | --- | --- |
-/// | the aurora is on | `mid` / `high` | **the aurora** — `shaders/lumen.frag` |
-/// | the aurora is on | `low` (or reduced motion) | `NeuralBackground` |
-/// | the aurora is off | any | `NeuralBackground` |
-/// | no preferences published | any | `NeuralBackground` |
+/// | the aurora is on | `full` / `noShafts` | **the aurora** — `shaders/lumen.frag` |
+/// | the aurora is on | `off` (or reduced motion) | the **flat canvas** |
+/// | the aurora is off | any | the **flat canvas** |
+/// | no preferences published | any | the **flat canvas** |
 ///
-/// ## WHY THE FALLBACK IS **TODAY'S** BACKGROUND
+/// ## AND THE FALLBACK IS NOW THE **FLAT CANVAS**, WHICH IS THE PROTOTYPE'S OWN
 ///
-/// Because the plan says so — Task 1.5 Step 3 (`plan:799-801`): *"`low` (or
+/// **The old design's orbs are gone**, and what replaced them is not a
+/// smaller version of them: it is the **canvas fill**, because
+/// `eva/redesign.html:46` gives every screen **one** canvas and the
+/// prototype's screen root is `background: T.canvas` with a transparent
+/// background layer above it (`ds.tsx:162`).
+///
+/// **The plan asked for the legacy painter, and the reason it gave was the
+/// legacy painter's own.** Task 1.5 Step 3 (`plan:799-801`): *"`low` (or
 /// reduce-motion) → shader off, static `CustomPainter` aurora — today's
 /// `neural_background.dart` behaviour, which is already tier-aware."* The
 /// legacy painter is not rewritten to look like the shader; it is the thing
 /// that was already there, and it is what a reduced-motion reader sees.
 ///
+/// **The orbs were never part of this redesign**, so "the thing that was
+/// already there" was the wrong thing to keep: the orbs were the *old*
+/// design's per-screen orb groups, and the redesign replaced them with one
+/// canvas for every screen. What survives of the legacy painter is the one
+/// thing that was already the prototype's — the fill.
+///
 /// ## WHY THE TIER IS RESOLVED **HERE** AND NOT IN THE SCOPE
 ///
-/// Because `NeuralTiers.resolveShader` needs the viewport and the reader's
-/// motion preference, and this widget is the first thing in the tree that
-/// has both. `NeuralBackground` resolves the same tier for itself, which is
-/// one extra resolution on the fallback path and no second source of truth —
-/// `NeuralTiers.resolve` is a pure function of its two arguments.
+/// Because `LumenTiers.resolve` needs the viewport and the reader's motion
+/// preference, and this widget is the first thing in the tree that has both.
+/// `LumenTiers.resolve` is a pure function of its two arguments, so there is
+/// no second source of truth to drift.
 ///
 /// ## WHY THE PAINTER IS HELD ACROSS FRAMES
 ///
@@ -51,19 +64,11 @@ import 'package:flutter/material.dart';
 /// changes every frame, and that is what the [LumenUniformSource] seam is
 /// for.
 class LumenBackground extends StatefulWidget {
-  /// Paints the ambient background for [variant].
-  const LumenBackground({required this.variant, this.tier, super.key});
+  /// Paints the ambient background.
+  const LumenBackground({this.tier, super.key});
 
-  /// Which screen's fallback orb group to paint.
-  ///
-  /// **The variant no longer selects the ambient.** The redesign has one
-  /// canvas for every screen (`eva/redesign.html:46`), so the aurora does not
-  /// vary by screen; the variant selects the **fallback's** orb group, which
-  /// is the only thing that still varies.
-  final NeuralVariant variant;
-
-  /// Forces a [NeuralTier] instead of resolving one. `null` resolves.
-  final NeuralTier? tier;
+  /// Forces a [LumenShaderTier] instead of resolving one. `null` resolves.
+  final LumenShaderTier? tier;
 
   @override
   State<LumenBackground> createState() => _LumenBackgroundState();
@@ -122,16 +127,16 @@ class _LumenBackgroundState extends State<LumenBackground> {
 
   /// The shader's tier — and therefore whether it paints at all.
   LumenShaderTier _shaderTier(Brightness brightness) {
-    // Reduced motion is the last word, and `NeuralTiers.resolve` says so: it
-    // returns `low` whatever the size and whatever the override say, and
-    // `low` maps to `off`. The brightness argument is not read here — it is
-    // the *theme's*, and the theme is a separate question from the motion
-    // preference. It is carried so the call reads as one decision.
+    // Reduced motion is the last word, and `LumenTiers.resolve` says so: it
+    // returns `off` whatever the size and whatever the override say. The
+    // brightness argument is not read here — it is the *theme's*, and the theme
+    // is a separate question from the motion preference. It is carried so the
+    // call reads as one decision.
     assert(
       brightness == Brightness.light || brightness == Brightness.dark,
       'the theme carries one of two brightnesses',
     );
-    return NeuralTiers.resolveShader(
+    return LumenTiers.resolve(
       size: MediaQuery.sizeOf(context),
       animationsEnabled: !MediaQuery.disableAnimationsOf(context),
       override: widget.tier,
@@ -155,7 +160,19 @@ class _LumenBackgroundState extends State<LumenBackground> {
   @override
   Widget build(BuildContext context) {
     if (!_paintsAurora) {
-      return NeuralBackground(variant: widget.variant, tier: widget.tier);
+      // ## THE FALLBACK IS THE **FLAT CANVAS**, AND IT IS THE PROTOTYPE'S OWN
+      //
+      // `eva/redesign.html:46` gives every screen **one** canvas, and the
+      // prototype's screen root is `background: T.canvas` with a transparent
+      // background layer above it (`ds.tsx:162` — the container has no
+      // background of its own). **So the canvas fill IS the design**, and the
+      // thing that used to stand in for it — the old design's per-screen orb
+      // groups — was never part of this redesign.
+      //
+      // A `ColoredBox` and not a `CustomPaint`: the old painter did the same
+      // fill with a `RepaintBoundary` and a `CustomPainter` around it, and a
+      // widget that paints one rectangle does not need either.
+      return ColoredBox(color: context.colors.canvas);
     }
     final LumenScene scene = _scene!;
     final LumenCanvas canvas = _canvas ??= LumenCanvas.source(

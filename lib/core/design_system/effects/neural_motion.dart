@@ -1,17 +1,33 @@
 import 'package:evangelion/core/design_system/effects/lumen_clock.dart';
 import 'package:evangelion/core/design_system/effects/lumen_scene.dart';
-import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 
-/// The four shared controllers app-wide, plus the pointer offset.
+/// The two shared controllers app-wide.
 ///
 /// §13.2, mitigation 2: the prototype declares 3–4 orbs per screen each with
 /// independent `floatDur` / `hueDur`, which is eight screens × 4 orbs × 2
-/// animations = **64** animations. This collapses to **four**
+/// animations = **64** animations. This collapsed to **four**
 /// [AnimationController]s — float, hue, aurora, and the LUMEN shader clock —
-/// created once, above `MaterialApp`, published by [NeuralMotionScope] and
-/// never recreated per screen.
+/// and the orbs' retirement took it to **two**: the float clock and the shader
+/// clock. Both are created once, above `MaterialApp`, published by
+/// [NeuralMotionScope] and never recreated per screen.
+///
+/// ## WHY THE **FLOAT** CLOCK OUTLIVED THE ORBS
+///
+/// The float clock was the old design's *orb* float, and the orbs are gone —
+/// but two things read it, and neither is an orb:
+///
+/// * `GoldFlecks` — the flecks' own float, and the flecks are on the quiz's
+///   correct option today;
+/// * the witness sky's star twinkle, whose phase is derived from the float
+///   clock the same way the flecks' is (`kFloatPeriod` is still the shared
+///   period).
+///
+/// **So the clock stayed and the orbs went**, and that is the shape of every
+/// retirement in this repository: the thing that was *built around* the removed
+/// thing can outlive it, and the honest test is "who reads it now", not "what
+/// was it for".
 ///
 /// ## WHY IT IS A `ChangeNotifier` AND NOT JUST A BAG OF CONTROLLERS
 ///
@@ -22,8 +38,8 @@ import 'package:flutter/scheduler.dart' show SchedulerBinding;
 /// page — silently degrades into a static gradient while every test still
 /// passes. That is the D1 defect, and it is the same failure mode §13 exists to
 /// kill, so the notification is wired here at the source instead: one listener on
-/// each of the five sources, one [notifyListeners] per change, and
-/// `ListenableBuilder(listenable: motion.repaint)` in `neural_background.dart`
+/// each of the two sources, one [notifyListeners] per change, and
+/// `ListenableBuilder(listenable: motion.repaint)` in `lumen_background.dart`
 /// therefore rebuilds because the controllers actually moved.
 ///
 /// ## WHY `repaint` IS A SEPARATE GETTER
@@ -42,35 +58,18 @@ import 'package:flutter/scheduler.dart' show SchedulerBinding;
 /// controllers there is no way to honour twenty-two of them, and no amount of
 /// cleverness changes that: one clock has one rate. §13.2 anticipates exactly this and
 /// prescribes the replacement — "derive per-orb phase from `i / orbCount`" — so
-/// that is what [floatPhaseFor] does and what the painter reads.
+/// that is what the orb painter did, and the orbs' retirement took the
+/// prescription with it.
 ///
-/// What survives, and is tested:
+/// **What survives, and is tested:**
 ///
-/// - **shape** — the `orb-float-a/b/c` keyframes per orb ([OrbFloatPath]), which
-///   is what actually makes the orbs look like different orbs rather than the
-///   same one at different offsets;
-/// - **phase** — `i / orbCount` ([floatPhaseFor]), so orbs never pulse in
-///   lockstep;
-/// - **direction** — `hue-cycle` vs `hue-cycle-rev` as a sign
-///   ([OrbHueDirection] → `hueDirectionSign`), so half the orbs sweep the wheel
-///   the other way;
-/// - **hue delay** — the prototype's negative `animation-delay`, expressed as a
-///   fraction of that orb's own `hueDur` ([OrbSpec.hueDelaySeconds]), which is
-///   what makes orb 2 start a third of the way round instead of in lockstep;
-/// - **parallax** — the mouse-response amplitude, as a multiplier of the
-///   pointer offset.
-///
-/// What does not survive is the *rate*: every orb now shares the float
-/// controller's 20s period and the hue controller's 12s period. The cost is
-/// real and worth naming — the prototype's Home group has a 200px amber orb
-/// drifting at 19s next to a 500px blue one at 16s, and here they drift
-/// together. The saving is the point of §13.2: 64 animations become 3.
-///
-/// Both numbers are still transcribed into [OrbSpec] so the table stays
-/// auditable and restoring them is a data change. `EvaMotion.orbFloatFor` /
-/// `orbHueFor` — which spread §5.3's `14–28s` and `7–14s` ranges — have **no
-/// production caller left** as a consequence. They still have their Phase-1
-/// tests, and this doc is the note that says why.
+/// - the **float clock's** own 20s period, which the flecks and the sky's
+///   twinkle both read;
+/// - `EvaMotion.orbFloatFor` / `orbHueFor`, which spread §5.3's `14–28s` and
+///   `7–14s` ranges — they have **no production caller left**, because the orbs
+///   that needed them are gone. They are recorded here so a reader knows they
+///   are transcriptions of the prototype's table and not of a live rule.
+
 class EvaNeuralMotion extends ChangeNotifier {
   /// Creates the bundle and wires the notification.
   ///
@@ -81,19 +80,10 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// per-controller explosion this class removes.
   EvaNeuralMotion({
     required this.float,
-    required this.hue,
-    required this.aurora,
-    required this.pointer,
     required this.lumen,
     DateTime Function()? now,
   }) : lumenScene = LumenScene(clock: lumen, now: now) {
-    _sources = Listenable.merge(<Listenable>[
-      float,
-      hue,
-      aurora,
-      pointer,
-      lumen,
-    ]);
+    _sources = Listenable.merge(<Listenable>[float, lumen]);
     _sources.addListener(_onSourceChanged);
   }
 
@@ -102,23 +92,22 @@ class EvaNeuralMotion extends ChangeNotifier {
   bool _notifiedThisFrame = false;
   bool _disposed = false;
 
-  /// Coalesces the five sources into **one** notification per frame.
+  /// Coalesces the two sources into **one** notification per frame.
   ///
   /// ## WHY COALESCING IS NOT OPTIONAL HERE
   ///
-  /// Four `repeat()`ing controllers each fire their own listener every frame,
-  /// so a naive forward fires `notifyListeners` **four times per frame** and the
-  /// `ListenableBuilder` in `neural_background.dart` rebuilds the painter four
-  /// times for one visual update. That is the churn §13's collapse to three
+  /// Two `repeat()`ing controllers each fire their own listener every frame,
+  /// so a naive forward fires `notifyListeners` **twice per frame** and the
+  /// `ListenableBuilder` in `lumen_background.dart` rebuilds the painter twice
+  /// for one visual update. That is the churn §13's collapse to three
   /// controllers was supposed to *remove*, reintroduced one layer up.
   ///
-  /// Nothing is lost by dropping the second, third and fourth. All four tickers
-  /// run in the same `transientCallbacks` pass, before the build and paint
-  /// phases, so by the time the painter reads `floatValue` / `hueValue` /
-  /// `auroraValue` / `lumen.seconds` every clock has already advanced. The
-  /// first notification is therefore a complete one, and the flag is cleared
-  /// in a post-frame callback — the end of the same frame, not the start of
-  /// the next.
+  /// Nothing is lost by dropping the second. Both tickers run in the same
+  /// `transientCallbacks` pass, before the build and paint phases, so by the
+  /// time the painter reads `floatValue` / `lumen.seconds` every clock has
+  /// already advanced. The first notification is therefore a complete one, and
+  /// the flag is cleared in a post-frame callback — the end of the same frame,
+  /// not the start of the next.
   ///
   /// `addPostFrameCallback` rather than a microtask: the scheduler's frame
   /// callback is synchronous from transient callbacks through paint, so a
@@ -135,27 +124,12 @@ class EvaNeuralMotion extends ChangeNotifier {
   }
 
   /// The orb float clock. §13.2's reference duration: 20s.
+  ///
+  /// **It outlived the orbs**, and that is worth saying: the clock itself was
+  /// the old design's *orb* float, and the orbs are gone, but two things read
+  /// it — `GoldFlecks` (the flecks' own float) and the witness sky's star
+  /// twinkle — so the clock stays and only the orbs go.
   final AnimationController float;
-
-  /// The orb hue clock. §13.2's reference duration: 12s.
-  final AnimationController hue;
-
-  /// The aurora band clock. §13.2's reference duration: 14s.
-  ///
-  /// Runs **forwards**, not `reverse: true` — see [setAnimationsEnabled] for why
-  /// the reference snippet's `reverse` halves the wave's rate.
-  final AnimationController aurora;
-
-  /// The pointer offset that drives orb parallax, normalised to the ±16 / ±12
-  /// box the prototype uses.
-  ///
-  /// A [ValueNotifier] rather than a controller: it is not a clock, it is
-  /// a position, and it settles. The prototype lerps it towards the target at
-  /// 0.05 per frame (`ds.tsx:143-144`); Flutter's [Listener] reports a pointer
-  /// position directly, so the smoothing would be the *only* thing missing and
-  /// it is deliberately not added — see the D3 note in this class's doc for the
-  /// same reason the durations are not honoured.
-  final ValueNotifier<Offset> pointer;
 
   /// The LUMEN shader's clock — `u_time`, in unwrapped elapsed seconds.
   ///
@@ -198,8 +172,7 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// for the app to burn frames.
   final LumenScene lumenScene;
 
-  /// The listenable that fires whenever any of the four clocks advances or the
-  /// pointer moves.
+  /// The listenable that fires whenever either clock advances.
   ///
   /// This object. See the class doc for why the reference implementation's
   /// version of this never fired.
@@ -208,36 +181,17 @@ class EvaNeuralMotion extends ChangeNotifier {
   /// [float]'s position in `0..1`.
   double get floatValue => float.value;
 
-  /// [hue]'s position in `0..1`.
-  double get hueValue => hue.value;
-
-  /// [aurora]'s position in `0..1`.
-  double get auroraValue => aurora.value;
-
-  /// The [index]-th of [count] orbs' float phase, offset so orbs never pulse in
-  /// lockstep.
-  ///
-  /// §13.2's own prescription, verbatim: `(index / count) % 1.0`. Orb 0 is at
-  /// rest when the clock starts, orb 1 is already a third of the way along, and
-  /// `count == 1` — a real configuration, since a narrow window can leave
-  /// exactly one orb — collapses to `0` rather than dividing by zero.
-  double floatPhaseFor(int index, int count) {
-    assert(count > 0, 'orb count must be positive, got $count');
-    if (count <= 1) return 0;
-    return (index / count) % 1.0;
-  }
-
-  /// Starts or stops all four clocks together.
+  /// Starts or stops both clocks together.
   ///
   /// ## WHY THIS IS HERE AND NOT ONLY A TIER DECISION
   ///
-  /// [NeuralTiers.resolve] drops the *painted* layers to nothing when the user
+  /// `LumenTiers.resolve` drops the *painted* layer to nothing when the user
   /// has asked for reduced motion, and that is the requirement. This is the
-  /// other half: four controllers left `repeat()`ing under a background that
-  /// draws none of them are four tickers burning frames for a decision that has
-  /// already been made. [NeuralMotionScope] exposes it so the composition root
-  /// can turn the clock off outright rather than pay for a background it will
-  /// not show.
+  /// other half: two controllers left `repeat()`ing under a background that
+  /// draws neither of them are two tickers burning frames for a decision that
+  /// has already been made. [NeuralMotionScope] exposes it so the composition
+  /// root can turn the clock off outright rather than pay for a background it
+  /// will not show.
   ///
   /// Stopping rather than setting `value` to zero: a reduced-motion user should
   /// get a still background, not one snapped to the top of its cycle, and
@@ -245,19 +199,18 @@ class EvaNeuralMotion extends ChangeNotifier {
   ///
   /// ## THE SHADER CLOCK IS HELD AT **ZERO**, AND THAT IS A DIFFERENT THING
   ///
-  /// The other three clocks stop **wherever they had got to** — a still
-  /// background, not a snapped one. The shader clock does not: under reduced
-  /// motion the shader's `u_time` reads **0**, so the aurora is a still image
-  /// of its initial state rather than of wherever it happened to be. The plan
-  /// asks for exactly that — "a shader clock frozen at `t = 0`"
-  /// (`plan:2392-2394`) — and it is a *different answer* to the prototype's,
-  /// which scales `u_time` by `0.15` and lets it keep advancing
-  /// (`eva/redesign.html:888`). The divergence is recorded at
-  /// `plan:2004-2007` and at `lumen_clock.dart`'s
+  /// The float clock stops **wherever it had got to** — a still background, not
+  /// a snapped one. The shader clock does not: under reduced motion the
+  /// shader's `u_time` reads **0**, so the aurora is a still image of its
+  /// initial state rather than of wherever it happened to be. The plan asks for
+  /// exactly that — "a shader clock frozen at `t = 0`" (`plan:2392-2394`) — and
+  /// it is a *different answer* to the prototype's, which scales `u_time` by
+  /// `0.15` and lets it keep advancing (`eva/redesign.html:888`). The
+  /// divergence is recorded at `plan:2004-2007` and at `lumen_clock.dart`'s
   /// [TickedLumenClock.setReducedMotion].
   ///
   /// **A freeze at "wherever it had reached" would be a function of how long
-  /// the app had been running** and of when the reader toggled the setting,
+  /// the app has been running** and of when the reader toggled the setting,
   /// so the same reader on the same screen would see two different frames.
   /// At zero it is a function of the setting and of nothing else.
   ///
@@ -280,21 +233,6 @@ class EvaNeuralMotion extends ChangeNotifier {
   void setAnimationsEnabled({required bool enabled}) {
     if (enabled) {
       float.repeat();
-      hue.repeat();
-      // `repeat()`, NOT §13.2's `repeat(reverse: true)`.
-      //
-      // `reverse: true` is how one usually expresses a there-and-back triangle
-      // from a `0→1` controller — and it is right for a control the reader
-      // completes. It is wrong here, because `reverse: true` runs *forward for
-      // the full 14s and then back for another 14s*, putting the peak at t=14s
-      // and completing a wave every 28 seconds.
-      //
-      // The prototype's keyframes are `0% → 50% → 100%` on a `14s infinite`
-      // animation (`index.css:79-81`): the peak is at t=7s and the wave completes
-      // in 14. So the triangle is built from the raw 14s clock instead, by
-      // `auroraPulse`, and the controller is left running forwards. Same wave,
-      // correct period.
-      aurora.repeat();
       // The lift before the restart, for the reason the class doc gives: the
       // notification is the repaint, and the frame it paints is the restored
       // one.
@@ -302,8 +240,6 @@ class EvaNeuralMotion extends ChangeNotifier {
       lumen.ticker.repeat();
     } else {
       float.stop(canceled: false);
-      hue.stop(canceled: false);
-      aurora.stop(canceled: false);
       // The stop before the hold, for the same reason: the notification
       // arrives with the clock at rest.
       lumen.ticker.stop(canceled: false);
@@ -318,7 +254,6 @@ class EvaNeuralMotion extends ChangeNotifier {
     // half-disposed notifier.
     _disposed = true;
     _sources.removeListener(_onSourceChanged);
-    pointer.dispose();
     // The scene first: it holds a listener on `lumen`, and `lumen.dispose()`
     // clears the clock's listeners — so the scene has to let go before the
     // clock does.
@@ -327,8 +262,6 @@ class EvaNeuralMotion extends ChangeNotifier {
     // from a controller that is already gone.
     lumen.dispose();
     float.dispose();
-    hue.dispose();
-    aurora.dispose();
     lumen.ticker.dispose();
     super.dispose();
   }
@@ -462,16 +395,6 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       // letting the behaviour rewrite the duration behind them.
       animationBehavior: AnimationBehavior.preserve,
     );
-    final AnimationController hue = AnimationController(
-      vsync: this,
-      duration: kHuePeriod,
-      animationBehavior: AnimationBehavior.preserve,
-    );
-    final AnimationController aurora = AnimationController(
-      vsync: this,
-      duration: EvaMotion.aurora,
-      animationBehavior: AnimationBehavior.preserve,
-    );
     final AnimationController lumenTicker = AnimationController(
       vsync: this,
       duration: kLumenClockPeriod,
@@ -486,9 +409,6 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
     );
     final EvaNeuralMotion motion = EvaNeuralMotion(
       float: float,
-      hue: hue,
-      aurora: aurora,
-      pointer: ValueNotifier<Offset>(Offset.zero),
       lumen: TickedLumenClock(ticker: lumenTicker),
       now: widget.now,
     );
@@ -571,9 +491,6 @@ class _NeuralMotionScopeInherited extends InheritedWidget {
 
 /// The shared float clock's period. §13.2's reference: 20 seconds.
 const Duration kFloatPeriod = Duration(seconds: 20);
-
-/// The shared hue clock's period. §13.2's reference: 12 seconds.
-const Duration kHuePeriod = Duration(seconds: 12);
 
 /// The LUMEN shader clock's controller period.
 ///

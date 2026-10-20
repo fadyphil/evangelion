@@ -441,7 +441,7 @@ void main() {
       await pumpResult(tester, result: aSentinelResult);
 
       expect(
-        find.byType(NeuralBackground),
+        find.byType(LumenBackground),
         findsNothing,
         reason:
             'the result is a card over the quiz, and the background belongs to '

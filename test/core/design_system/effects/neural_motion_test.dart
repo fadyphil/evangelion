@@ -1,5 +1,4 @@
-import 'package:evangelion/core/design_system/effects/neural_background.dart';
-import 'package:evangelion/core/design_system/effects/neural_motion.dart';
+import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,75 +36,70 @@ Future<EvaNeuralMotion> pumpScope(
 ///
 /// `SchedulerBinding.transientCallbackCount` is the closest thing the framework
 /// exposes to "how many animations are running", and it is exact: a running
-/// `Ticker` registers one transient callback per frame for itself, so four
-/// running clocks read `4` and four stopped clocks read `0`. Measured in this
+/// `Ticker` registers one transient callback per frame for itself, so two
+/// running clocks read `2` and two stopped clocks read `0`. Measured in this
 /// suite, and the negative controls are the tests either side of the reduced-
 /// motion group.
 ///
 /// This is a stronger witness than `isAnimating`, which only says what one
 /// controller was told — a ticker can be scheduled without the controller
-/// reporting it, and a leaked fifth ticker has no controller to ask about.
+/// reporting it, and a leaked third ticker has no controller to ask about.
 int get _tickers => SchedulerBinding.instance.transientCallbackCount;
 
 void main() {
-  group('the bundle is four controllers and a pointer', () {
+  group('the bundle is two clocks and a pointer', () {
     testWidgets('publishes itself to a descendant', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(tester);
       expect(motion.float.duration, kFloatPeriod);
-      expect(motion.hue.duration, kHuePeriod);
+      expect(motion.lumen.ticker.duration, kLumenClockPeriod);
     });
 
-    testWidgets('all four clocks are running when animations are enabled', (
+    testWidgets('both clocks are running when animations are enabled', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(tester);
       expect(motion.float.isAnimating, isTrue);
-      expect(motion.hue.isAnimating, isTrue);
-      expect(motion.aurora.isAnimating, isTrue);
       expect(motion.lumen.ticker.isAnimating, isTrue);
       await tester.pump();
       expect(
         _tickers,
-        4,
+        2,
         reason:
-            'the control for the reduced-motion group below: four running '
-            'clocks register four transient callbacks, and this is the number '
+            'the control for the reduced-motion group below: two running '
+            'clocks register two transient callbacks, and this is the number '
             'that goes to zero when the platform asks for reduced motion',
       );
     });
 
-    testWidgets('the aurora clock reverses, the others do not', (
+    testWidgets('both clocks run forward, and neither wraps', (
       WidgetTester tester,
     ) async {
-      // `index.css:79-81` — `aurora-drift 14s`: 0% at 0, peak at 50%, back at
-      // 100%. So the band peaks at t=7s and completes a wave in 14.
+      // The old suite asserted the aurora's triangle wave and the hue clock's
+      // forward sweep. Both of those clocks are gone with the orbs — the aurora
+      // band they drove is the LUMEN shader's, and the shader reads `u_time`
+      // instead of a triangle — and what survives is the pair that is left.
       //
-      // The controller runs FORWARDS and `auroraPulse` builds the triangle; §13.2
-      //'s reference `repeat(reverse: true)` would instead peak at t=14s and take
-      // 28s per wave. The test below pins the prototype's period, not the
-      // reference snippet's.
+      // The float clock is the flecks' and the witness sky's twinkle; the
+      // shader clock is `u_time`. Both are unwrapped in the sense that matters:
+      // the float clock's `value` grows inside its 20s cycle, and the shader
+      // clock's seconds are monotonic by construction.
       final EvaNeuralMotion motion = await pumpScope(tester);
-      await tester.pump(const Duration(seconds: 7));
-      expect(
-        motion.auroraValue,
-        closeTo(0.5, 1e-9),
-        reason: 'the raw clock peaks at the half cycle',
-      );
-      await tester.pump(const Duration(seconds: 7));
-      expect(
-        motion.auroraValue,
-        closeTo(0.0, 1e-9),
-        reason: 'and the wave completes in 14s, not 28',
-      );
+      await tester.pump(const Duration(seconds: 1));
+      final double float = motion.floatValue;
+      final double seconds = motion.lumen.seconds;
 
-      final double hue = motion.hueValue;
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(motion.hueValue, greaterThan(hue));
+      await tester.pump(const Duration(seconds: 1));
+      expect(motion.floatValue, greaterThan(float));
+      expect(
+        motion.lumen.seconds,
+        greaterThan(seconds),
+        reason: '`u_time` is monotonic — it never wraps',
+      );
     });
 
-    testWidgets('animationsEnabled: false leaves all four stopped', (
+    testWidgets('animationsEnabled: false leaves both clocks stopped', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(
@@ -113,8 +107,6 @@ void main() {
         animationsEnabled: false,
       );
       expect(motion.float.isAnimating, isFalse);
-      expect(motion.hue.isAnimating, isFalse);
-      expect(motion.aurora.isAnimating, isFalse);
       expect(motion.lumen.ticker.isAnimating, isFalse);
     });
 
@@ -154,7 +146,7 @@ void main() {
         isFalse,
         reason: 'a stopped background must not leave a running ticker',
       );
-      expect(captured.hue.isAnimating, isFalse);
+      expect(captured.lumen.ticker.isAnimating, isFalse);
 
       enabled = true;
       setOuter(() {});
@@ -171,8 +163,8 @@ void main() {
     // anywhere. Measured before the fix, with `disableAnimations: true` set on
     // the dispatcher: float 0.05 → 0.1, hue 0.0833 → 0.1667, aurora 0.0714 →
     // 0.1429 after one second, and all three still `isAnimating == true`. The
-    // *painted* result honoured reduced motion, because `NeuralBackground`
-    // collapses the layer to the canvas via `MediaQuery`; the *clock* did not.
+    // *painted* result honoured reduced motion, because the ambient collapses
+    // the layer to the canvas via `MediaQuery`; the *clock* did not.
 
     void useReducedMotionPlatform(WidgetTester tester) {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
@@ -206,13 +198,12 @@ void main() {
       await tester.pump();
 
       expect(motion.float.isAnimating, isFalse);
-      expect(motion.hue.isAnimating, isFalse);
-      expect(motion.aurora.isAnimating, isFalse);
+      expect(motion.lumen.ticker.isAnimating, isFalse);
       expect(
         _tickers,
         0,
         reason:
-            'four tickers burning frames under a background that paints none '
+            'two tickers burning frames under a background that paints none '
             'of them is the exact cost §13 exists to remove, and '
             'isAnimating alone would not catch a ticker the controllers lost '
             'track of',
@@ -234,17 +225,18 @@ void main() {
       );
       await tester.pump();
       final double float0 = motion.floatValue;
-      final double hue0 = motion.hueValue;
-      final double aurora0 = motion.auroraValue;
+      final double seconds0 = motion.lumen.seconds;
 
       await tester.pump(const Duration(seconds: 1));
 
       expect(motion.floatValue, float0);
-      expect(motion.hueValue, hue0);
-      expect(motion.auroraValue, aurora0);
+      // The shader clock is **held at zero** under reduced motion, which is a
+      // different answer from "stopped where it had reached" — see
+      // `lumen_clock.dart`'s `TickedLumenClock.setReducedMotion`.
+      expect(motion.lumen.seconds, seconds0);
     });
 
-    testWidgets('with the signal off, all four run — the negative control', (
+    testWidgets('with the signal off, both run — the negative control', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(
@@ -253,7 +245,7 @@ void main() {
       );
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 4);
+      expect(_tickers, 2);
     });
 
     testWidgets('an explicit true overrides the platform', (
@@ -270,7 +262,7 @@ void main() {
       final EvaNeuralMotion motion = await pumpScope(tester);
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 4);
+      expect(_tickers, 2);
     });
 
     testWidgets('an OS toggle mid-session stops the clocks', (
@@ -284,7 +276,7 @@ void main() {
       );
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(_tickers, 4);
+      expect(_tickers, 2);
 
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
@@ -316,8 +308,7 @@ void main() {
           const FakeAccessibilityFeatures();
       await tester.pump();
       expect(motion.float.isAnimating, isTrue);
-      expect(motion.hue.isAnimating, isTrue);
-      expect(motion.aurora.isAnimating, isTrue);
+      expect(motion.lumen.ticker.isAnimating, isTrue);
     });
 
     testWidgets('an explicit value opts out of the observer entirely', (
@@ -409,11 +400,11 @@ void main() {
       );
     });
 
-    testWidgets('one frame produces one notification, not four', (
+    testWidgets('one frame produces one notification, not two', (
       WidgetTester tester,
     ) async {
-      // One merged listener rather than one per source: four controllers firing
-      // four `notifyListeners` in a frame would rebuild the painter four times.
+      // One merged listener rather than one per source: two controllers firing
+      // two `notifyListeners` in a frame would rebuild the painter twice.
       final EvaNeuralMotion motion = await pumpScope(tester);
       int notifications = 0;
       void bump() {
@@ -446,21 +437,32 @@ void main() {
       expect(notifications, 0);
     });
 
-    testWidgets('the pointer offset is a repaint source too', (
+    testWidgets('the pointer offset repaints the scene', (
       WidgetTester tester,
     ) async {
-      // `parallax` is only worth preserving if moving the pointer repaints.
+      // ## THE POINTER MOVED INTO THE SCENE, AND THE CLAIM MOVED WITH IT
+      //
+      // The old assertion was that the bundle's own `repaint` listable fired
+      // when the pointer moved, because the old `pointer` notifier was one of
+      // the bundle's five merged sources. The pointer now belongs to the
+      // **scene** — the shader's own `u_ptr` — and the scene is what the
+      // painter listens to. So the claim is now: moving the pointer notifies
+      // the scene, and the scene is the aurora's repaint signal.
+      //
+      // Asserting it on the *bundle* instead would be a claim about a wiring
+      // that no longer exists, and asserting nothing at all would leave the
+      // touch glow — the Workshop's own "Touch glow" control — unasserted.
       final EvaNeuralMotion motion = await pumpScope(tester);
       int notifications = 0;
       void bump() {
         notifications++;
       }
 
-      motion.repaint.addListener(bump);
+      motion.lumenScene.addListener(bump);
       await tester.pump();
       notifications = 0;
 
-      motion.pointer.value = const Offset(4, 4);
+      motion.lumenScene.pointer.value = const Offset(4, 4);
       expect(notifications, 1);
     });
 
@@ -477,7 +479,7 @@ void main() {
   });
 
   group('D1 — disposal', () {
-    testWidgets('unmounting the scope disposes all four controllers', (
+    testWidgets('unmounting the scope disposes both controllers', (
       WidgetTester tester,
     ) async {
       final EvaNeuralMotion motion = await pumpScope(tester);
@@ -494,8 +496,6 @@ void main() {
       // nulled — so this is the framework reporting the disposal, not a
       // property this suite invented.
       expect(motion.float.stop, throwsA(isA<AssertionError>()));
-      expect(motion.hue.stop, throwsA(isA<AssertionError>()));
-      expect(motion.aurora.stop, throwsA(isA<AssertionError>()));
       expect(motion.lumen.ticker.stop, throwsA(isA<AssertionError>()));
     });
 
@@ -507,7 +507,7 @@ void main() {
       expect(tester.takeException(), isNull);
       void noop() {}
       expect(
-        () => motion.pointer.addListener(noop),
+        () => motion.lumenScene.pointer.addListener(noop),
         throwsA(isA<AssertionError>()),
         reason: 'ChangeNotifier.addListener asserts after dispose()',
       );
@@ -537,166 +537,131 @@ void main() {
     });
   });
 
-  group('floatPhaseFor — §13.2 mitigation 2', () {
-    testWidgets('stagger orbs by index over the count', (
-      WidgetTester tester,
-    ) async {
-      final EvaNeuralMotion motion = await pumpScope(tester);
-      expect(motion.floatPhaseFor(0, 4), 0.0);
-      expect(motion.floatPhaseFor(1, 4), 0.25);
-      expect(motion.floatPhaseFor(2, 4), 0.5);
-      expect(motion.floatPhaseFor(3, 4), 0.75);
-    });
+  group('LumenTiers.resolve — the tier is the shader tier', () {
+    // ## WHY THERE IS ONE GROUP AND NOT TWO
+    //
+    // The old suite had two: `NeuralTiers.resolve` (a *cost* tier) and
+    // `NeuralTiers.resolveShader` (the shader's tier). They are one function
+    // now — `LumenTiers.resolve` returns a `LumenShaderTier` — so the two
+    // groups are one, and the three pairs that asserted the *same* call twice
+    // are one assertion each. What is left is every distinct rule.
+    //
+    // ## THE RULES, IN ONE PLACE
+    //
+    // | rule | source |
+    // | --- | --- |
+    // | reduced motion is the last word | the reader's, and it beats the override |
+    // | the override replaces the *size* decision | the caller's cost decision |
+    // | a viewport narrower than [kNarrowViewport] is `off` | `eva/redesign.html:46` — one canvas for every screen |
+    // | over [kShaftsPixelBudget] logical px, the shafts go | the measured 5.04 ns/px |
 
-    testWidgets('two orbs are half a cycle apart — never in lockstep', (
-      WidgetTester tester,
-    ) async {
-      final EvaNeuralMotion motion = await pumpScope(tester);
-      expect(motion.floatPhaseFor(0, 2), 0.0);
-      expect(motion.floatPhaseFor(1, 2), 0.5);
-    });
-
-    testWidgets('a single orb rests at zero rather than dividing by zero', (
-      WidgetTester tester,
-    ) async {
-      final EvaNeuralMotion motion = await pumpScope(tester);
-      expect(motion.floatPhaseFor(0, 1), 0.0);
-      expect(motion.floatPhaseFor(0, 1).isNaN, isFalse);
-    });
-
-    testWidgets('every real orb group produces distinct phases', (
-      WidgetTester tester,
-    ) async {
-      final EvaNeuralMotion motion = await pumpScope(tester);
-      for (final NeuralVariant variant in NeuralVariant.values) {
-        final int count = orbsFor(variant).length;
-        final Set<double> phases = <double>{
-          for (int i = 0; i < count; i++) motion.floatPhaseFor(i, count),
-        };
-        expect(phases, hasLength(count), reason: variant.name);
-      }
-    });
-  });
-
-  group('D5 — NeuralTiers.resolve', () {
     test('an explicit tier wins outright, even a bad one', () {
-      // The injection seam: a test that needs `low` must be able to ask for it
-      // without arranging a viewport that resolves to `low` on its own.
+      // The injection seam: a test that needs `off` must be able to ask for it
+      // without arranging a viewport that resolves to `off` on its own.
       expect(
-        NeuralTiers.resolve(
+        LumenTiers.resolve(
           size: const Size(1400, 2000),
           animationsEnabled: true,
-          override: NeuralTier.low,
+          override: LumenShaderTier.off,
         ),
-        NeuralTier.low,
+        LumenShaderTier.off,
       );
     });
 
     test('reduced motion wins before the size rules are consulted', () {
       // A 4K desktop is the largest viewport this app will ever see and it must
-      // still be `low` if the reader asked for reduced motion.
+      // still be `off` if the reader asked for reduced motion.
       expect(
-        NeuralTiers.resolve(
+        LumenTiers.resolve(
           size: const Size(3840, 2160),
           animationsEnabled: false,
         ),
-        NeuralTier.low,
+        LumenShaderTier.off,
       );
     });
 
-    test('reduced motion beats an explicit `high` too', () {
+    test('reduced motion beats an explicit `full` too', () {
       // …and an override cannot re-enable motion the user switched off. The
       // override is for the *cost* decision; the accessibility decision is not
       // overridable. This is the one place `override` does not win.
       expect(
-        NeuralTiers.resolve(
+        LumenTiers.resolve(
           size: const Size(1200, 2000),
           animationsEnabled: false,
-          override: NeuralTier.high,
+          override: LumenShaderTier.full,
         ),
-        isNot(NeuralTier.high),
+        isNot(LumenShaderTier.full),
+      );
+      // And it is `off`, not merely "not full" — the flat canvas paints.
+      expect(
+        LumenTiers.resolve(
+          size: const Size(1200, 2000),
+          animationsEnabled: false,
+          override: LumenShaderTier.full,
+        ),
+        LumenShaderTier.off,
       );
     });
 
-    test('a narrow phone drops to low', () {
+    test('a narrow phone drops to `off`', () {
       expect(
-        NeuralTiers.resolve(
-          size: const Size(320, 568),
-          animationsEnabled: true,
-        ),
-        NeuralTier.low,
+        LumenTiers.resolve(size: const Size(320, 568), animationsEnabled: true),
+        LumenShaderTier.off,
       );
     });
 
-    test('an ordinary phone is mid', () {
+    test('an ordinary phone gets the full shader', () {
       expect(
-        NeuralTiers.resolve(
-          size: const Size(393, 852),
-          animationsEnabled: true,
-        ),
-        NeuralTier.mid,
+        LumenTiers.resolve(size: const Size(393, 852), animationsEnabled: true),
+        LumenShaderTier.full,
       );
     });
 
-    test('a phone is mid however tall it is; a tablet is high', () {
-      // `high` needs 640 on the *short* side, so no phone reaches it — which is
-      // the right answer: `ORB_CONFIGS` positions orbs at absolute px offsets
-      // authored for a ~390x844 window, and a phone already shows all of them.
-      // `high` is the "a tablet or a desktop shows the whole composition" tier.
+    test('a phone is `full` however tall it is; a tablet is `full` too', () {
+      // The old tiers were `low` / `mid` / `high` and counted **orb layers** —
+      // and the shader's decision never read the difference. `mid` and `high`
+      // both meant "the shader is on, and the shafts are governed by the pixel
+      // budget", and the budget is one rule for every viewport. So a phone and
+      // a tablet now resolve the same way, and the rule that separates them is
+      // pixels, not a tier name.
       expect(
-        NeuralTiers.resolve(
-          size: const Size(414, 896),
-          animationsEnabled: true,
-        ),
-        NeuralTier.mid,
+        LumenTiers.resolve(size: const Size(414, 896), animationsEnabled: true),
+        LumenShaderTier.full,
       );
       expect(
-        NeuralTiers.resolve(
+        LumenTiers.resolve(
           size: const Size(1024, 1366),
           animationsEnabled: true,
         ),
-        NeuralTier.high,
+        LumenShaderTier.full,
       );
     });
 
     test('the thresholds are the ones the documentation names', () {
       expect(kNarrowViewport, 360.0);
-      expect(kWideViewport, 640.0);
       expect(
-        NeuralTiers.resolve(
-          size: const Size(360, 800),
-          animationsEnabled: true,
-        ),
-        NeuralTier.mid,
+        LumenTiers.resolve(size: const Size(360, 800), animationsEnabled: true),
+        LumenShaderTier.full,
         reason: '360 is the first width that is not narrow',
       );
       expect(
-        NeuralTiers.resolve(
-          size: const Size(640, 800),
-          animationsEnabled: true,
-        ),
-        NeuralTier.high,
-        reason: '640 is the first height that shows a whole orb',
+        LumenTiers.resolve(size: const Size(359, 800), animationsEnabled: true),
+        LumenShaderTier.off,
+        reason: 'and 359 is the last width that is',
       );
     });
 
     test('it reads the shortest side, so landscape and portrait agree', () {
       expect(
-        NeuralTiers.resolve(
-          size: const Size(852, 393),
-          animationsEnabled: true,
-        ),
-        NeuralTiers.resolve(
-          size: const Size(393, 852),
-          animationsEnabled: true,
-        ),
+        LumenTiers.resolve(size: const Size(852, 393), animationsEnabled: true),
+        LumenTiers.resolve(size: const Size(393, 852), animationsEnabled: true),
       );
     });
 
     test('every tier is reachable through the override', () {
-      for (final NeuralTier tier in NeuralTier.values) {
+      for (final LumenShaderTier tier in LumenShaderTier.values) {
         expect(
-          NeuralTiers.resolve(
+          LumenTiers.resolve(
             size: const Size(393, 852),
             animationsEnabled: true,
             override: tier,
@@ -706,79 +671,22 @@ void main() {
         );
       }
     });
-  });
 
-  group('Task 1.5 — NeuralTiers.resolveShader', () {
-    test('low means the shader stays off', () {
+    test('`off` means the shader stays off', () {
       expect(
-        NeuralTiers.resolveShader(
+        LumenTiers.resolve(
           size: const Size(393, 852),
           animationsEnabled: true,
-          override: NeuralTier.low,
+          override: LumenShaderTier.off,
         ),
         LumenShaderTier.off,
-      );
-    });
-
-    test('a narrow phone resolves to low, so the shader stays off', () {
-      expect(
-        NeuralTiers.resolveShader(
-          size: const Size(320, 568),
-          animationsEnabled: true,
-        ),
-        LumenShaderTier.off,
-      );
-    });
-
-    test('reduced motion keeps the shader off on a 4K desktop', () {
-      expect(
-        NeuralTiers.resolveShader(
-          size: const Size(3840, 2160),
-          animationsEnabled: false,
-        ),
-        LumenShaderTier.off,
-      );
-    });
-
-    test('reduced motion beats an explicit high override', () {
-      expect(
-        NeuralTiers.resolveShader(
-          size: const Size(1200, 2000),
-          animationsEnabled: false,
-          override: NeuralTier.high,
-        ),
-        LumenShaderTier.off,
-      );
-    });
-
-    test(
-      'an ordinary phone gets the full shader — 0.33 Mpx is far under budget',
-      () {
-        expect(
-          NeuralTiers.resolveShader(
-            size: const Size(393, 852),
-            animationsEnabled: true,
-          ),
-          LumenShaderTier.full,
-        );
-      },
-    );
-
-    test('a tablet under budget gets shafts too', () {
-      // 1024 x 1366 = 1.40 Mpx.
-      expect(
-        NeuralTiers.resolveShader(
-          size: const Size(1024, 1366),
-          animationsEnabled: true,
-        ),
-        LumenShaderTier.full,
       );
     });
 
     test('a 1080p desktop loses shafts but keeps the shader', () {
       // 1920 x 1080 = 2.07 Mpx — the first common viewport over budget.
       expect(
-        NeuralTiers.resolveShader(
+        LumenTiers.resolve(
           size: const Size(1920, 1080),
           animationsEnabled: true,
         ),
@@ -790,7 +698,7 @@ void main() {
       'a 4K frame with animations on still paints — just without shafts',
       () {
         expect(
-          NeuralTiers.resolveShader(
+          LumenTiers.resolve(
             size: const Size(3840, 2160),
             animationsEnabled: true,
           ),
@@ -801,14 +709,14 @@ void main() {
 
     test('exactly 2 Mpx keeps shafts; one row more loses them', () {
       expect(
-        NeuralTiers.resolveShader(
+        LumenTiers.resolve(
           size: const Size(2000, 1000),
           animationsEnabled: true,
         ),
         LumenShaderTier.full,
       );
       expect(
-        NeuralTiers.resolveShader(
+        LumenTiers.resolve(
           size: const Size(2001, 1000),
           animationsEnabled: true,
         ),
@@ -816,72 +724,47 @@ void main() {
       );
     });
 
-    test(
-      'the pixel gate applies to mid too — a tall narrow window over budget',
-      () {
-        // Shortest side 600 < 640, so mid — but 600 x 3400 = 2.04 Mpx.
-        expect(
-          NeuralTiers.resolveShader(
-            size: const Size(600, 3400),
-            animationsEnabled: true,
-          ),
-          LumenShaderTier.noShafts,
-        );
-      },
-    );
+    test('the pixel gate is one rule, not one per tier', () {
+      // A tall narrow window over budget: 600 x 3400 = 2.04 Mpx. Under the old
+      // tiers this was a `mid` viewport, and the gate was still the same rule —
+      // which is why the tier that separated the two is gone.
+      expect(
+        LumenTiers.resolve(
+          size: const Size(600, 3400),
+          animationsEnabled: true,
+        ),
+        LumenShaderTier.noShafts,
+      );
+    });
 
     test('the budget is two million logical px', () {
       expect(kShaftsPixelBudget, 2000000);
     });
 
     test(
-      'an explicit high override re-enables the shader on a narrow viewport',
+      'an explicit `full` override re-enables the shader on a narrow viewport',
       () {
         // The override seam: the cost decision belongs to the caller.
         expect(
-          NeuralTiers.resolveShader(
+          LumenTiers.resolve(
             size: const Size(320, 568),
             animationsEnabled: true,
-            override: NeuralTier.high,
+            override: LumenShaderTier.full,
           ),
           LumenShaderTier.full,
         );
       },
     );
 
-    test('an explicit low override keeps the shader off on a desktop', () {
+    test('an explicit `off` override keeps the shader off on a desktop', () {
       expect(
-        NeuralTiers.resolveShader(
+        LumenTiers.resolve(
           size: const Size(1920, 1080),
           animationsEnabled: true,
-          override: NeuralTier.low,
+          override: LumenShaderTier.off,
         ),
         LumenShaderTier.off,
       );
-    });
-  });
-
-  group('auroraPulse — the 0 → 1 → 0 wave of index.css:79-81', () {
-    test('is 0 at the start, 1 at the half cycle, 0 at the end', () {
-      expect(auroraPulse(0), 0.0);
-      expect(auroraPulse(0.5), 1.0);
-      expect(auroraPulse(1.0), 0.0);
-    });
-
-    test('is symmetric about the half cycle', () {
-      expect(auroraPulse(0.25), closeTo(auroraPulse(0.75), 1e-12));
-      expect(auroraPulse(0.1), closeTo(auroraPulse(0.9), 1e-12));
-    });
-
-    test('is periodic — a clock past 1.0 keeps waving', () {
-      expect(auroraPulse(1.25), closeTo(auroraPulse(0.25), 1e-12));
-      expect(auroraPulse(3.5), closeTo(auroraPulse(0.5), 1e-12));
-    });
-
-    test('never leaves [0, 1]', () {
-      for (int step = 0; step <= 200; step++) {
-        expect(auroraPulse(step / 50), inInclusiveRange(0.0, 1.0));
-      }
     });
   });
 }

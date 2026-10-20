@@ -41,16 +41,16 @@ void main() {
   }
 
   NeuralScaffold scaffold({
-    NeuralVariant variant = NeuralVariant.home,
     bool scrollable = true,
     bool bottomFade = false,
     CurtainShape curtain = CurtainShape.bottom,
+    LumenShaderTier? tier,
     Widget? child,
   }) => NeuralScaffold(
-    variant: variant,
     scrollable: scrollable,
     bottomFade: bottomFade,
     curtain: curtain,
+    tier: tier,
     child: child ?? const SizedBox.shrink(),
   );
 
@@ -188,44 +188,69 @@ void main() {
     });
   });
 
-  group('D2 — the language is in the variant, and nothing re-derives it', () {
-    testWidgets('readingEn and readingAr paint different orb groups', (
+  group('D2 — the background does not vary by screen', () {
+    testWidgets('the ambient carries no screen, so it cannot vary by one', (
       WidgetTester tester,
     ) async {
+      // ## THE SURVIVING CLAIM, AND IT IS THE STRONGER ONE
+      //
+      // The claim this group used to make was that the two reading arms paint
+      // different orb groups — a claim about a **per-screen selection**. The
+      // redesign replaced that selection with **one canvas for every screen**
+      // (`eva/redesign.html:46`), and the orbs that carried it are retired, so
+      // the selection is gone.
+      //
+      // What is left is stronger than "the two arms match": there is no input
+      // left that could make the ambient vary. `LumenBackground`'s only
+      // optional parameter is the tier, so a screen cannot name itself to the
+      // ambient even if it wanted to — and a future one that adds a screen
+      // parameter has to come here and say why.
       expect(
-        orbGroups[orbGroupFor(NeuralVariant.readingEn)],
-        isNot(orbGroups[orbGroupFor(NeuralVariant.readingAr)]),
+        _constructorParametersOf(
+          path: 'lib/core/design_system/effects/lumen_background.dart',
+          className: 'LumenBackground',
+        ),
+        <String>{'tier', 'key'},
         reason:
-            'ds.tsx:83-86 (blue, no cyan) against ds.tsx:88-91 (violet + cyan). '
-            'If these ever matched, the language distinction would be dead and '
-            'no test of the scaffold would notice.',
+            'the ambient\'s whole parameter set. A screen-identifying '
+            'parameter here would put a second background in the design, and '
+            'the redesign gives every screen one canvas (`eva/redesign.html:46`)',
       );
+      expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the scaffold paints the variant it was given', (
+    testWidgets('the scaffold passes its tier to the ambient unmodified', (
       WidgetTester tester,
     ) async {
-      for (final NeuralVariant variant in NeuralVariant.values) {
-        await pumpAt(tester, scaffold(variant: variant, scrollable: false));
-        expect(
-          tester
-              .widget<NeuralBackground>(find.byType(NeuralBackground))
-              .variant,
-          variant,
-          reason: '$variant must reach the background unmodified',
-        );
-      }
+      // The one knob the ambient does have, and the scaffold is its carrier.
+      // It is asserted **through the tree** rather than against the scaffold's
+      // own field, because a tier the scaffold holds and never forwards is a
+      // parameter that does nothing.
+      await pumpAt(
+        tester,
+        scaffold(tier: LumenShaderTier.noShafts, scrollable: false),
+      );
+      expect(
+        tester.widget<LumenBackground>(find.byType(LumenBackground)).tier,
+        LumenShaderTier.noShafts,
+        reason: 'the tier must reach the ambient unmodified',
+      );
+
+      // And `null` — the default — means "resolve one", not "off".
+      await pumpAt(tester, scaffold(scrollable: false));
+      expect(
+        tester.widget<LumenBackground>(find.byType(LumenBackground)).tier,
+        isNull,
+      );
     });
 
     testWidgets('the scaffold takes no language parameter of its own', (
       WidgetTester tester,
     ) async {
-      // A `ScriptureLanguage` field beside `variant` would be a second source of
-      // truth for one fact — the same hazard `orbGroupFor`'s doc records for
-      // `variant.index`, where a wrong answer is invisible to every golden.
-      // Read from the widget's own source, because Dart has no reflection and a
-      // hand-written list of parameter names would only assert that the list still
-      // compiles.
+      // A `ScriptureLanguage` field would be a second source of truth for one
+      // fact. Read from the widget's own source, because Dart has no reflection
+      // and a hand-written list of parameter names would only assert that the
+      // list still compiles.
       //
       // ## THE EXACT SET, NOT A SUBSTRING
       //
@@ -245,7 +270,6 @@ void main() {
       expect(
         _scaffoldConstructorParameters(),
         <String>{
-          'variant',
           'child',
           'scrollable',
           'padding',
@@ -256,9 +280,14 @@ void main() {
           'key',
         },
         reason:
-            'D2 — the language arrives inside `variant`, not beside it, and every '
-            'parameter this widget accepts is listed. A new one is a deliberate '
+            'D2 — the background does not vary by screen, and every parameter '
+            'this widget accepts is listed. A new one is a deliberate '
             'act on the screen root: add it here with the reason it is allowed.\n\n'
+            '**`variant` is GONE, and its absence is the point.** It used to be '
+            'the per-screen orb-group selector, and the orbs it selected are '
+            'retired, so a parameter whose reason had died is a parameter that '
+            'can only confuse the next reader. `eva/redesign.html:46` gives every '
+            'screen one canvas.\n\n'
             '**`overlay` is the sixth, added for the `SealFab`.** It is a viewport-fixed '
             'widget placed above the content and below `bottomFade`\'s scrim, and the '
             'gate that caught it is the reason it is worth stating: the content is '
@@ -273,7 +302,7 @@ void main() {
             '**`curtain` is the seventh, added with `:112-115`.** '
             '`eva/redesign.html` '
             'declares `.scrim` once and overrides its whole `background` per '
-            '`data-shape`, so a shape here is not a direction on one ramp \u2014 it picks '
+            '`data-shape`, so a shape here is not a direction on one ramp — it picks '
             'between two different ones, and `:115`\'s `.88`-at-both-edges / '
             'nothing-in-the-middle is neither. A single `LinearGradient` hard-wired '
             'to the CTA\'s would have been a ramp the prototype does not have.',
@@ -288,12 +317,10 @@ void main() {
         isNot(contains(contains('locale'))),
         reason: 'nor for a locale',
       );
-      // `variant` and `child` are the two the constructor requires, so they are
-      // the two whose disappearance would break every call site in the suite
-      // loudly. Named explicitly anyway: they are what the D2 argument above is
-      // actually about, and a set assertion alone says nothing about which entries
-      // are load-bearing.
-      expect(_scaffoldConstructorParameters(), contains('variant'));
+      // `child` is the one the constructor requires, so it is the one whose
+      // disappearance would break every call site in the suite loudly. Named
+      // explicitly anyway: a set assertion alone says nothing about which
+      // entries are load-bearing.
       expect(_scaffoldConstructorParameters(), contains('child'));
       expect(tester.takeException(), isNull);
     });
@@ -574,28 +601,28 @@ void main() {
     ) async {
       await pumpAt(tester, scaffold());
       final Stack stack = tester.widget<Stack>(find.byType(Stack).first);
-      // **The redesign's ambient**, not the legacy background: the aurora is
-      // mounted in the screen root (`eva/redesign.html:46`, `.screen canvas`),
-      // and `LumenBackground` is what decides between it and the fallback.
+      // **The redesign's ambient**: the aurora is mounted in the screen root
+      // (`eva/redesign.html:46`, `.screen canvas`), and `LumenBackground` is
+      // what decides between it and the fallback.
       expect(stack.children.first, isA<LumenBackground>());
       expect(stack.fit, StackFit.expand);
 
       // And the **fallback** is what this harness paints, because it
       // publishes no `LumenPreferencesScope` — an ambient with no choices
-      // published has no choices to paint with. The legacy painter is still
-      // there, still first in the tree, and still behind the content.
-      expect(find.byType(NeuralBackground), findsOneWidget);
+      // published has no choices to paint with. The ambient is still first in
+      // the tree, and still behind the content.
+      expect(find.byType(LumenBackground), findsOneWidget);
     });
 
     testWidgets('the fallback fills the page, and it is the first thing', (
       WidgetTester tester,
     ) async {
       await pumpAt(tester, scaffold());
-      // The background's own box is the page's box. The legacy painter is a
-      // bare `CustomPaint` and sizes itself to nothing, so the *scaffold's*
-      // stack is what gives it a box — and the assertion is on the painted
-      // result, not on a widget's declared size.
-      final Size painted = tester.getSize(find.byType(NeuralBackground));
+      // The background's own box is the page's box. The ambient sizes itself
+      // to nothing in the fallback case, so the *scaffold's* stack is what
+      // gives it a box — and the assertion is on the painted result, not on a
+      // widget's declared size.
+      final Size painted = tester.getSize(find.byType(LumenBackground));
       expect(painted, const Size(390, 844));
     });
 
@@ -604,15 +631,26 @@ void main() {
     ) async {
       await pumpAt(tester, scaffold(), disableAnimations: true);
       expect(
-        NeuralTiers.resolve(
+        LumenTiers.resolve(
           size: const Size(390, 844),
           animationsEnabled: false,
         ),
-        NeuralTier.low,
+        LumenShaderTier.off,
+        reason:
+            'reduced motion is the last word: `off` whatever the size says and '
+            'whatever the override says',
       );
-      // The visible consequence: no orbs are painted.
-      expect(orbsFor(NeuralVariant.home), isNotEmpty);
-      expect(NeuralTier.values, contains(NeuralTier.low));
+      // The visible consequence: the flat canvas paints and the aurora does
+      // not. The `LumenBackground` is still mounted — the fallback is a
+      // `ColoredBox` inside it, not a different widget.
+      expect(
+        find.descendant(
+          of: find.byType(LumenBackground),
+          matching: find.byType(CustomPaint),
+        ),
+        findsNothing,
+        reason: 'no aurora means no `CustomPaint` at all',
+      );
     });
   });
 
@@ -713,12 +751,25 @@ void _noop() {}
 /// `contains('child')` — the two parameters without defaults — and a `lang`
 /// substring that garbage does not contain. A reading that is wrong about four
 /// entries out of seven still satisfies every question that was asked of it.
-List<String> _scaffoldConstructorParameters() {
-  final File file = File.fromUri(
-    packageRoot.uri.resolve(
-      'lib/core/design_system/widgets/neural_scaffold.dart',
-    ),
-  );
+List<String> _scaffoldConstructorParameters() => _constructorParametersOf(
+  path: 'lib/core/design_system/widgets/neural_scaffold.dart',
+  className: 'NeuralScaffold',
+);
+
+/// A named constructor's parameter names, read off its own source, **lower
+/// cased**.
+///
+/// [path] is package-relative and [className] is the class whose `const`
+/// constructor is read. The two are parameters rather than two copies of the
+/// reader because the reader is the fragile half and there are now **two**
+/// subjects for it: this widget's own constructor and the ambient's — and the
+/// ambient's parameter set is what proves that the background cannot vary by
+/// screen.
+List<String> _constructorParametersOf({
+  required String path,
+  required String className,
+}) {
+  final File file = File.fromUri(packageRoot.uri.resolve(path));
   expect(
     file.existsSync(),
     isTrue,
@@ -726,7 +777,7 @@ List<String> _scaffoldConstructorParameters() {
   );
 
   final RegExpMatch? constructor = RegExp(
-    r'const NeuralScaffold\(\{([^}]*)\}\)',
+    'const ${RegExp.escape(className)}\\(\\{([^}]*)\\}\\)',
   ).firstMatch(withoutDartComments(file.readAsStringSync()));
   expect(
     constructor,
