@@ -4520,3 +4520,106 @@ a map of the prototype's 128 rows to their fate, and asserts that the map is
 **exactly** the tail, that no row is missing, that no entry is stale, and that
 the verbatim count is 103. **A row cannot be silently dropped from the
 prototype's table.**
+
+**168. THE OLD DESIGN'S ORBS ARE RETIRED, THE FALLBACK IS THE **FLAT CANVAS**, AND
+`NeuralVariant` AND `NeuralTier` ARE GONE WITH THEM.**
+
+`NeuralBackground` was the redesign's **fallback** — the plan's Task 1.5 Step 3
+kept the legacy painter because it was *"the thing that was already there"* —
+and what was already there was the **old design's per-screen orb groups**, which
+this redesign replaced with **one canvas for every screen**
+(`eva/redesign.html:46`). The prototype's own answer for "no aurora" is the
+canvas fill: the screen root is `background: T.canvas` with a transparent
+background layer above it (`ds.tsx:162`).
+
+**So the fallback is now a `ColoredBox(color: colors.canvas)`**, and the rules a
+reader needs:
+
+* **`NeuralScaffold` takes no `variant:`, and `LumenBackground` takes none
+  either.** `NeuralVariant`'s only job was to select an orb group, and there
+  are no orb groups. Eight pages stopped passing one.
+* **`NeuralTier` and `NeuralTiers` are gone.** The tier counted **orb layers**;
+  `mid` and `high` meant the same thing to the shader, so the three tiers
+  collapse into the **`LumenShaderTier`** that already existed
+  (`core/design_system/effects/lumen_tier.dart`): `off` / `noShafts` / `full`.
+  `NeuralTier.low` became `LumenShaderTier.off`; `mid` and `high` both became
+  `full`, because the shader's decision never read the difference and the
+  **pixel budget** still gates the shafts.
+* **The bundle has TWO clocks, not four.** The `hue` and `aurora` controllers
+  and the `pointer` notifier were read only by the old painter — **two
+  `AnimationController`s were ticking every frame for nothing.**
+
+**AND THE FLOAT CLOCK OUTLIVED THE ORBS, WHICH IS THE PART WORTH KEEPING.** It
+was the old design's *orb* float, and the orbs are gone, but `GoldFlecks` and
+the witness sky's twinkle both read it — so the clock stayed and the orbs went.
+**The honest test of a retirement is "who reads it now", not "what was it
+for".**
+
+**AND THE TWELVE DEAD `EvaMotion` MEMBERS ARE THE SAME DEFECT ONE LEVEL DOWN.**
+Twelve members had **no live use in `lib/` at all** — their own test suites
+assert them and nothing else does: **ten** are the old design's
+(`auroraCurve` / `aurora` / `orbFloatCurve` / `orbHueCurve` / `orbFloatMin` /
+`orbFloatMax` / `orbHueMin` / `orbHueMax` and the two spreaders `orbFloatFor`
+/ `orbHueFor` that used them), **one** is `fleckAlternates` — a flag whose own
+test says *"for Phase 2 to act on"*, and Phase 2 came and went — and their
+**private helper** `_spread` went with the spreaders.
+
+**A token is not a widget, so the orphan gate could not see any of it.** That is
+the same shape as decision 144 and decision 160, and the same blind spot: a
+gate that walks one kind of declaration cannot see a defect in another kind.
+
+**AND THE MEASUREMENT THAT FOUND THEM FELL INTO THE TRAP FOUR TIMES, WHICH IS
+WORTH RECORDING BECAUSE THE TRAP IS EASY.** A search for a member's name
+**outside** the file that declares it reports it dead — and that is wrong for
+every member used by **another member of the same file**. A first pass reported
+**nineteen**, and they split four ways: **nine** were live
+(`achievementSpring` → `achievementBounce`, `fadeSlide` → `screenCurve`,
+`goneSlide` → the four `gone*` numbers, `tabSwap` → the two `tabPre*` ones,
+`screenSlideBeginFor` → `screenSlidePixels`); **two** were **legitimate**
+(`tabOutOffset` / `tabOutScale` record the prototype's tab-out pose so the
+divergence has values, and the suite asserts the builder never applies them);
+**one** had a **documented call site that was never made** (`tabTransition` —
+the dock passed the `transitionBuilder` and not the duration, so the tab swap
+ran auto_route's 300 ms default where the prototype says 400 ms, and the fix
+was to make the call); and **five** more were dead and the first pass **missed**
+them. **The number was settled by deleting the candidates and letting the
+compiler answer**, which is the only measurement that cannot be wrong about
+that — and it is also why there is **no dead-token gate**: a regex cannot decide
+it, and a gate that reports a live member as dead is turned off within a week,
+and a turned-off gate is worse than a missing one.
+
+**AND ONE OF THE NINETEEN WAS NOT DEAD AT ALL — IT HAD A CALL SITE THAT WAS
+NEVER MADE.** `EvaMotion.tabTransition` is 400 ms, the prototype's tab swap is
+400 ms (`eva/redesign.html:128`), and the app's own **route** transition is 400 ms
+(`app_router.dart`'s `duration: EvaMotion.routeTransition`). **The dock passed
+the `transitionBuilder` and not the duration**, so the tab swap ran auto_route's
+own default of **300 ms** (`auto_tabs_router.dart:249`) — 100 ms faster than the
+design, with the tab-out poses at half the prototype's.
+
+**The token's own doc showed the call site:**
+
+```dart
+AutoTabsRouter(
+  duration: EvaMotion.tabTransition,
+  transitionBuilder: EvaMotion.tabSwap,
+)
+```
+
+**And the fix was to MAKE THE CALL, not to delete the token.** That is the
+general rule this whole retirement turns on: **a token with no caller is a
+question, not a verdict.** Sometimes the answer is "dead"; sometimes it is "the
+call site was never made"; and sometimes — as with `tabOutOffset` and
+`tabOutScale`, which record the prototype's tab-out pose so the divergence has
+values and whose test asserts the builder never applies them — it is "it is a
+recorded divergence, and the receipt is the point".
+
+**AND THE SIXTEEN GOLDENS PHOTOGRAPHED A DESIGN THAT DOES NOT SHIP.** The
+ambient's only pixel-level net was
+`test/core/design_system/effects/goldens/neural_background_*.png` — sixteen
+images of the **old design's orbs**. **The LUMEN shader, which is what the app
+paints, had no golden at all.** The goldens went with the orbs they
+photographed, and **the ambient now has no pixel net** — which is not a
+regression, because it had none for the design that ships. It is a **hole that
+was always there**, and it is the next thing to close: the shader's own
+goldens, with the capture harness re-checked against the plan's recorded risk
+(`flutter test` ≠ Impeller — the tests run Skia software).

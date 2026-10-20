@@ -114,7 +114,7 @@ Every path this plan touches, with its single responsibility.
 | `lib/core/design_system/tokens/eva_colors.dart` | The redesign palette. |
 | `lib/core/design_system/tokens/eva_motion.dart` | Lumen motion table. |
 | `lib/core/design_system/effects/neural_motion.dart` | Own the shader clock. |
-| `lib/core/design_system/effects/neural_background.dart` | Shader tier + fallback. |
+| `lib/core/design_system/effects/lumen_tier.dart` | Shader tier. **The file this row named (`neural_background.dart`) was the old design's orbs and is retired** — see "The old design's orbs, retired". |
 | `lib/core/design_system/widgets/glass_surface.dart` | `GlassTier.bloom`. |
 | `lib/core/design_system/barrel.dart` | Export every new widget. |
 | `lib/core/domain/entities/user_settings.dart` | +28 settings fields. |
@@ -1866,6 +1866,15 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > screen. It is not deleted, because the plan never retired it and the
 > fallback is a thing the design has.
 >
+> **SUPERSEDED — AND THE VARIANT IS NOW DELETED.** "The fallback is a thing
+> the design has" turned out to be the wrong reason to keep the *orbs*, and
+> the plan's own sentence above is where the mistake was: the fallback is a
+> thing the design has, and **the thing the fallback had was the old
+> design's**. The orbs are retired, the fallback is the **flat canvas** — the
+> prototype's own — and `NeuralVariant` went with them, because selecting an
+> orb group was the only thing it did. See "The old design's orbs, retired"
+> below.
+>
 > **THE SCENE IS THE PROTOTYPE'S RENDER LOOP, AND IT IS APP-GLOBAL.** The
 > prototype's eased state — the hue, the ambient intensity, the spike — lives
 > in one JS closure behind one canvas (`:881-912`), and it **survives a screen
@@ -1939,7 +1948,7 @@ h 2px, r 2px, bottom 20%, glow `0 0 14px rgba(255,255,255,.6)`.
 > would depend on the order the listeners happened to be registered in.
 >
 > **THE FALLBACK IS TODAY'S BACKGROUND, AND THE TIER DECIDES.**
-> `NeuralTiers.resolveShader` already decided `off`/`noShafts`/`full` and
+> `LumenTiers.resolve` already decided `off`/`noShafts`/`full` and
 > already treated reduced motion as the last word; its own doc said *"wiring a
 > painter to it belongs to whoever mounts the shader (Phase 5), not to this
 > file. Nothing here is mounted anywhere."* — **this task is that wiring, and
@@ -2875,11 +2884,198 @@ tool/verify_all.sh --with-build
 
 ---
 
+---
+
+# The old design's orbs, retired — and the flat canvas that replaced them
+
+**This is not a phase; it is a decision about the plan's own output, and it
+belongs here because the plan is where the Lumen redesign's decisions live.**
+
+## WHAT WAS RETIRED, AND WHY IT WAS NOT DEAD CODE
+
+`NeuralBackground` was the redesign's **fallback**, and the plan said so — Task
+1.5 Step 3: *"`low` (or reduce-motion) → shader off, static `CustomPainter`
+aurora — today's `neural_background.dart` behaviour, which is already
+tier-aware."* It painted when the reader switched the aurora off, when the
+shader failed to compile, and at the `low` tier.
+
+**And the orbs were almost never seen.** At `low` the old painter returned
+right after the canvas fill, so the orbs painted in exactly one ordinary case:
+the reader flipping the **Aurora engine** switch on a normal viewport with
+motion on.
+
+**The reason they were kept was the plan's own, and the reason has expired.**
+The plan kept the legacy painter because it was *"the thing that was already
+there"* — and what was already there was the **old design's per-screen orb
+groups**, which the redesign replaced with **one canvas for every screen**
+(`eva/redesign.html:46`). The prototype's own answer for "no aurora" is the
+canvas fill: the screen root is `background: T.canvas` with a transparent
+background layer above it (`ds.tsx:162`), and the old painter already drew
+that fill **first**, before the orbs.
+
+So the fallback is now a `ColoredBox(color: colors.canvas)` — the prototype's
+own, and the redesign's, and not a smaller version of the orbs.
+
+## WHAT DIED WITH IT, MEASURED
+
+| what | size | why it died |
+| --- | --- | --- |
+| `neural_orbs.dart` | **711 lines** | the orb table, and the old pointer normalisation the shader never used — `lumenPointerFor` is the shader's own, and `lumen_scene.dart` says so in as many words |
+| `neural_background.dart` | **661 lines** | the orbs, the old aurora bands, and the canvas fill that survives as a `ColoredBox` |
+| `hue_rotate_matrix.dart` | — | only the orbs read it |
+| `NeuralVariant` | 8 values | its only job was to select the orb group; **`NeuralScaffold` no longer takes a `variant:`**, and eight pages stopped passing one |
+| `NeuralTier` / `NeuralTiers` | 3 values | the tier counted **orb layers**; `mid` and `high` meant the same thing to the shader, so the three tiers collapse into the `LumenShaderTier` that already existed |
+| the bundle's `hue` and `aurora` controllers | **2 tickers** | only the old painter read them — **two `AnimationController`s were ticking every frame for nothing** |
+| the bundle's `pointer` notifier | — | only the old painter wrote it; the shader has its own |
+
+**And what OUTLIVED the orbs, which is the part worth keeping: the float
+clock.** It was the old design's *orb* float, and the orbs are gone, but
+`GoldFlecks` and the witness sky's twinkle both read it — so the clock stayed
+and the orbs went. **The honest test of a retirement is "who reads it now",
+not "what was it for".**
+
+## AND THE **TWELVE DEAD TOKENS**, WHICH ARE THE SAME DEFECT ONE LEVEL DOWN
+
+`EvaMotion` had **twelve** members with **no live use in `lib/` at all** — their
+own test suites assert them and nothing else does:
+
+* **ten** are the old design's — `auroraCurve` and `aurora` (the old aurora
+  band's curve and its 14 s duration), `orbFloatCurve` and `orbHueCurve`,
+  `orbFloatMin` / `orbFloatMax`, `orbHueMin` / `orbHueMax`, and the two
+  spreaders `orbFloatFor` / `orbHueFor` that used them;
+* **one** is `fleckAlternates`, a flag whose own test says *"for Phase 2 to act
+  on"* — and Phase 2 came and went without acting on it. The flecks'
+  there-and-back is built by `goldFleckTriangle` instead, so the direction is
+  the widget's arithmetic and not a token's;
+* and their **private helper** `_spread`, which went with the two spreaders.
+
+**That is the same shape as the three unplaced widgets, one level down**: a
+thing built, tested and never used. The difference is that **no gate could see
+it**, because a token is not a widget and the orphan gate walks widget classes.
+
+### AND THERE IS **NO GATE** FOR IT, AND THAT IS A DELIBERATE ANSWER
+
+**A dead-token gate was considered and not built**, and the reason is worth
+recording because it is the same reasoning the repository applies to gates
+everywhere: *a gate that cries wolf is as bad as one that cannot fail*.
+
+The obstacle is mechanical. A member is dead when **nothing reaches it**, and
+"reaches it" includes a member of the **same file** using it — `achievementSpring`
+uses `achievementBounce`, `fadeSlide` uses `screenCurve`, `goneSlide` uses the
+four `gone*` numbers, `tabSwap` uses the two `tabPre*` ones. **A search for a
+name outside the file that declares it reports all nine dead, and they are all
+live.**
+
+The first measurement made exactly that mistake, and it is recorded above
+because the *mistake* is the finding: the number was wrong by nine out of
+nineteen, and only **deleting the candidates and letting the compiler answer**
+got it right. A regex gate cannot be the thing that settles it, and a gate that
+reports a live member as dead would be turned off within a week — and a turned-
+off gate is worse than a missing one, because the next reader believes the
+category is covered.
+
+**So the honest position is: the COMPILER is the instrument for this, and the
+rule is that a member of a token table earns its place by being named in the
+code that uses it.** A token table is a small file, and the one that grew to
+forty-one members is the one that needed the review.
+
+### AND THE **MEASUREMENT** THAT FOUND THEM, WHICH FELL INTO THE TRAP **FOUR
+### TIMES** BEFORE IT GOT IT RIGHT
+
+**A first pass measured this by grepping for a name outside the file, and it
+reported NINETEEN.** Every one of those nineteen needed a second look, and they
+split four ways:
+
+* **NINE were LIVE**, and the grep could not see it because it was looking for
+  the name *outside* the file that declares it — and a member used by **another
+  member of the same file** is invisible to that search. `achievementSpring`
+  uses `achievementBounce`, `fadeSlide` uses `screenCurve`, `goneSlide` uses the
+  four `gone*` numbers, `tabSwap` uses the two `tabPre*` ones, and
+  `screenSlideBeginFor` uses `screenSlidePixels`.
+* **TWO were LEGITIMATE**: `tabOutOffset` and `tabOutScale` exist to record the
+  prototype's tab-out pose so the divergence has **values**, and the suite
+  asserts that the shipped builder never applies them. A token with no
+  production caller is not automatically dead when it is a **recorded
+  divergence** — and deleting these would have deleted the receipt.
+* **ONE HAD A CALL SITE THAT WAS NEVER MADE**: `tabTransition`. Its own doc
+  says the caller must pass it —
+  `AutoTabsRouter(duration: EvaMotion.tabTransition, transitionBuilder:
+  EvaMotion.tabSwap)` — and the dock passed the `transitionBuilder` and **not
+  the duration**, so the tab swap ran auto_route's own default of **300 ms**
+  where the prototype says **400 ms** (`eva/redesign.html:128`). **The fix was
+  to make the call, not to delete the token** — and the dock now runs the
+  transition the design specifies.
+* **FIVE MORE WERE DEAD AND THE FIRST PASS MISSED THEM**, because their
+  declarations are two lines long and their names collide with other words in
+  the file: `aurora`, `orbFloatCurve`, `orbFloatFor`, `orbHueFor` and the
+  private `_spread`.
+
+**The number was settled by deleting the candidates and letting the COMPILER
+answer**, which is the only measurement that cannot be wrong about a name used
+inside the file it is declared in. Four rounds of it, and the count moved
+**19 → 10 → 12** as the compiler rejected candidates that were live.
+
+## AND ONE THING THE ORBS' RETIREMENT FOUND **BY ACCIDENT**: THE DOCK'S TAB SWAP
+## WAS **100 MS FAST**
+
+**`EvaMotion.tabTransition` was one of the nineteen the first pass called
+dead** — and it was not dead. It had a **documented call site that was never
+made**.
+
+Its own doc says the caller must pass it:
+
+```dart
+AutoTabsRouter(
+  duration: EvaMotion.tabTransition,
+  transitionBuilder: EvaMotion.tabSwap,
+)
+```
+
+**The dock passed the `transitionBuilder` and not the duration.** So the tab
+swap ran auto_route's own default — `const Duration(milliseconds: 300)`
+(`auto_tabs_router.dart:249`) — where the prototype says **400 ms**
+(`eva/redesign.html:128` — `transition:transform .4s var(--e-light),opacity .4s
+var(--e-light)`), and where the app's own **route** transition says 400 ms
+(`app_router.dart`'s `duration: EvaMotion.routeTransition`).
+
+**So the tab swap was 100 ms faster than the design, and the tab-out poses were
+half the prototype's.** The token that recorded the right number sat in the
+table, unused, with a doc that showed the call site nobody wrote.
+
+**The fix was to make the call, not to delete the token** — and that is the
+general rule this whole section turns on: **a token with no caller is a
+question, not a verdict.** Sometimes the answer is "dead"; sometimes it is
+"the call site was never made"; and sometimes — as with `tabOutOffset` and
+`tabOutScale` — it is "it is a recorded divergence and the receipt is the
+point".
+
+**And the answer is not always discoverable by looking.** This one was found
+because a *different* question was being asked — "which tokens are dead?" — and
+the one token that turned out to have a story was the one whose absence would
+have been invisible.
+
+## AND THE THING NOBODY LOOKED FOR: **THE SIXTEEN GOLDENS COVERED A DESIGN THAT
+## DOES NOT SHIP**
+
+The ambient's only pixel-level regression net was
+`test/core/design_system/effects/goldens/neural_background_*.png` — sixteen
+images of the **old design's orbs**. **The LUMEN shader, which is what the app
+actually paints, had no golden at all.** The goldens were a net under a
+fallback, and the thing above them was uncovered.
+
+**That is the finding, and the fix is not in this change.** The sixteen
+goldens go with the orbs they photographed, and the ambient is left with **no
+pixel net** — which is not a regression, because it had none for the design
+that ships. It is a **hole that was always there**, and it is the next thing
+to close: the shader's own goldens, with the capture harness re-checked
+against the plan's recorded risk (`flutter test` ≠ Impeller — tests run Skia
+software).
+
 ## Risks
 
 | Risk | Evidence | Mitigation |
 | --- | --- | --- |
-| Shader too slow at 4K | shafts **5.04 ns/px** vs 2.98 | shape 3 disabled above ~2 Mpx; `NeuralTier.low` → static fallback |
+| Shader too slow at 4K | shafts **5.04 ns/px** vs 2.98 | shape 3 disabled above ~2 Mpx; `LumenShaderTier.off` → the flat canvas |
 | `u_time` posterisation | measured onset **≈10 h**, not 1 h; 161 distinct values at ≈100 h | **accepted, no code.** Task 1.4 cut. Same as the prototype. A regression test asserts the clock is unwrapped so the decision stays visible. |
 | 240 goldens churn | palette + shader invalidate all of them | Task 1.3's injectable clock keeps them byte-stable |
 | Citations rot silently | `citation_check.py` checks **existence and range only** — *not* that line NNN says what the comment claims | per-widget re-pointing; plant a violation in every harness |

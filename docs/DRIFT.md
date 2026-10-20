@@ -519,3 +519,48 @@ green tree, a bogus page, an unregistered page, a renamed router, a missing
 router, and an orphan outside `*/widgets/`) and three for the blur budget
 (a block comment, a real site, and the one-definition case). **The blur budget
 had none at all before**, which is the same defect in a different place.
+
+---
+
+## 10. THE SIXTEEN BACKGROUND GOLDENS PHOTOGRAPHED A DESIGN THAT DOES NOT SHIP
+
+The ambient's only pixel-level regression net was
+`test/core/design_system/effects/goldens/neural_background_*.png` — sixteen
+images, eight screens × two themes.
+
+**They were of the OLD design.** The golden group pumped
+`NeuralBackground(variant: NeuralVariant.home)` — the old design's neural
+orbs — and the file they are named after was `neural_background_test.dart`.
+**The LUMEN shader, which is what the app actually paints, had no golden at
+all.** `lumen_canvas_test.dart` asserts the shader's *mechanics* — the
+uniforms, the slot layout, the allocation, the clock — and never its *pixels*.
+
+### WHY THIS SURVIVED FOR PHASES
+
+Because the goldens were **green**, and because they are a net under a
+**fallback**: `NeuralBackground` only paints when the reader switches the
+aurora off, when the shader fails to compile, or at the `low` tier. So the
+sixteen images were a regression net for a path a reader reaches by flipping
+one switch in the Workshop, and the path every reader actually sees — the
+aurora — was **unphotographed**.
+
+**That is the same shape as the other two gates' blind spots**, and it is the
+one that is hardest to see, because a green golden suite is the *most*
+reassuring thing a repository can show. A net under the wrong thing is
+indistinguishable from a net.
+
+### RESOLVED — THE ORBS ARE GONE, AND THE HOLE IS **NAMED** RATHER THAN CLOSED
+
+The orbs' retirement removed the sixteen goldens with the thing they
+photographed, and the ambient is now left with **no pixel net at all** — which
+is not a regression, because it had none for the design that ships.
+
+**The hole is the next thing to close**, and it is a real piece of work: the
+shader's own goldens, with the capture harness re-checked against the plan's
+recorded risk — `flutter test` ≠ Impeller, because the tests run Skia software
+(`flutter_tester_device.dart:113`). The plan's risk table says the harness must
+be re-checked whenever the capture path is touched, and this would be touching
+it.
+
+**A golden is a claim about a specific frame, and sixteen of them were a claim
+about a frame nobody sees.**
