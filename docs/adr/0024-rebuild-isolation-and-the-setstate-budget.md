@@ -66,6 +66,15 @@ is** — and on this tree it was the whole screen, for a hue.
    scaffold, the app bar and the language dial **do not rebuild** on a verse
    tap, and bounds the totals.
 
+6. **And the `setState` policy is a second gate.**
+   `test/setstate_budget_test.dart` holds an allowlist of the **sixteen**
+   sites whose `State.build` output *is* the state, and fails on any new
+   one, on any stale row, and on a scan that finds nothing at all. The key is
+   a **file** plus the **multiset** of its normalised statements — a
+   `file:line` key is brittle in the worst way, because any edit above a
+   site moves it and the gate would cry wolf on a change that changed
+   nothing.
+
 ## Alternatives considered
 
 ### `buildWhen` on the existing `BlocBuilder`s
@@ -171,7 +180,8 @@ is** — and on this tree it was the whole screen, for a hue.
 - `docs/adr/0019-performance-budget.md` — the decision this one enforces
 - `docs/adr/0020-a-gate-that-cannot-fail-is-worse-than-no-gate.md`
 - `docs/PERFORMANCE.md` — the measurements and the commands that reproduce them
-- `test/rebuild_isolation_budget_test.dart` — the gate
+- `test/rebuild_isolation_budget_test.dart` — the rebuild-boundary gate
+- `test/setstate_budget_test.dart` — the `setState` allowlist gate
 - `test/support/rebuild_counter.dart` — the instrument
 - `lib/app/settings_scope.dart` — the slices
 - `lib/features/settings/presentation/pages/settings_page.dart` — `_SettingRow`

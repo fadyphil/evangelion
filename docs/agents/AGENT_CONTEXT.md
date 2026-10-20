@@ -4993,3 +4993,43 @@ a frame is captured on, and a golden captures a **design** — so
 time the budget did.**
 
 See ADR-0025.
+
+**176. THE `setState` POLICY IS A **GATE**, AND THE SIXTEEN THAT REMAIN ARE
+THE ONES WHOSE `build` OUTPUT *IS* THE STATE.**
+
+§13 rule 1 says **"No `setState` per frame"**, and it has said it since the
+first phase. **It was never enforced against anything**, so the tree grew to
+**twenty-nine** of them, and several of those rebuilt a **whole screen** to
+change one boolean.
+
+**A RULE THAT CANNOT FAIL IS WORSE THAN NO RULE**, and this repository has met
+that three times (ADR-0020, decision 142). So the rule is now a gate:
+`test/setstate_budget_test.dart`.
+
+**THE KEY IS A FILE PLUS THE MULTISET OF ITS NORMALISED STATEMENTS, AND NOT
+A `file:line`.** A line key is brittle in the worst way: any edit above a
+site moves it, and the gate would cry wolf on a change that changed nothing.
+The multiset catches all three things a gate must — a **new** statement, a
+**removed** one, and an **edited** one — and a *set* would collapse the four
+identical `setState`s in `selah_card.dart` into one and let a fifth slip
+through.
+
+**AND THE GATE FAILS ON THREE THINGS.** A `setState` outside the allowlist; a
+**stale** allowlist row, because a row whose site has gone is a row that still
+permits a `setState` nobody has looked at; and **zero matches**, because a
+scan that finds nothing is a scan whose matcher has rotted — and a gate that
+reports a pass over a surface it no longer examines is the ADR-0020 shape.
+`tool/verify_gates_selftest.sh` plants each of the three and requires the
+gate to fire.
+
+**THE SIXTEEN THAT REMAIN ARE ALL THE SAME ANSWER.** Each one's `State.build`
+output *is* the state: a button's press highlight, a row's hover wash, the
+dial's measured thumb, the dock slot's scale, the selah card's own countdown
+(the one `setState` in the tree that fires on a **timer**), the quiz CTA's
+hover, the aurora's backing widget (three widgets, once at startup), and the
+composition root's **two** — the first **guarded** on the four settings that
+reach the shell, the second on the platform's accessibility signal.
+
+**And the six toasts became notifiers** in the same change: a toast is one
+widget in the overlay slot, and a `setState` rebuilt the whole screen to
+show it and to take it away again.
