@@ -35,6 +35,24 @@ import 'package:flutter/material.dart';
 /// without inventing geometry: a second, larger, dimmer ring around each fleck.
 /// Recorded here so a later phase does not go looking for a prototype that was
 /// never built.
+///
+/// ## AND IT IS **PLACED**
+///
+/// The widget was built, exported, given a full suite — and, until the quiz's
+/// correct option put it on screen, **placed on nothing**: AGENT_CONTEXT's
+/// decision 144 records that "a component that is built, tested and never
+/// placed is invisible to every assertion that does not look for it on the
+/// screen", and the orphan gate could not see it either, because that gate
+/// only walks the classes declared under `*/widgets/` and this one lives under
+/// `*/effects/`.
+///
+/// The call site is `features/quiz/presentation/widgets/quiz_option_card.dart`:
+/// the **correct** option, and only that one, with the offsets derived from
+/// the card's own width — see `QuizOptionCard.goldFleckOffsetsFor` for the
+/// derivation and the prototype lines it comes from. The brief's own rule is
+/// the authority for the ornament ("tiny gold flecks floating near the correct
+/// option — sparse, 3–4 max",
+/// `eva/src/imports/pasted_text/pasted-attachment.txt:97`).
 class GoldFlecks extends StatelessWidget {
   /// Draws one fleck per entry in [offsets].
   const GoldFlecks({required this.offsets, this.dense = false, super.key});

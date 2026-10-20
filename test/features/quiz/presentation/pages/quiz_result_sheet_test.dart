@@ -166,6 +166,17 @@ void main() {
 
       await tapTheSheetCta(tester, en.resultReflectAgain);
       await pumpUntilGone(tester, find.byType(ResultSheet));
+      // **The quiz was REBUILT**, so its option cards were built again — and
+      // every card's entrance carries `flutter_animate`'s `Animate` widget,
+      // whose `initState` ends in `Future.delayed(Duration.zero)`. That is a
+      // real `Timer`, and a zero-length pump does not drain it, so the tree
+      // would be torn down with a timer still pending. One frame past it
+      // settles the rebuild.
+      //
+      // `pumpQuizFrames` rather than a bare `pump`, because a bare `pump` does
+      // not advance the fake clock at all — see `eva_animate_test.dart`'s
+      // `pumpEva` for the same measurement.
+      await pumpQuizFrames(tester, 1);
 
       // **No dialog left on screen.** The order is the whole of it: the button
       // pops the sheet with the action and the page acts afterwards, so a

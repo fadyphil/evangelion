@@ -336,14 +336,33 @@ class _EvangelionAppState extends State<EvangelionApp> {
               /// own language, and it is the only one the app offers. §14's requirement
               /// (survive 1.22× without overflow at 320px) is what bounds the table, and
               /// it is satisfied by construction.
-              builder: (BuildContext context, Widget? child) {
-                final Widget body = child ?? const SizedBox.shrink();
-                return MediaQuery(
-                  data: MediaQuery.of(context)
-                      .copyWith(textScaler: evaScalerFor(settings.fontStep)),
-                  child: body,
-                );
-              },
+              ///
+              /// ## AND IT IS [EvaTypeScale] — THE WIDGET, NOT THE `MediaQuery`
+              ///
+              /// This line used to spell the install out by hand: a `MediaQuery` with a
+              /// `copyWith(textScaler: evaScalerFor(settings.fontStep))`. That is the
+              /// **third** spelling of the same rule — `/reading`'s §14 overflow suite
+              /// and `/settings`'s stepper were the other two — and
+              /// `eva_type_scale.dart` exists precisely because "a bare `MediaQuery`
+              /// spelled three times is three rules" (`barrel.dart`'s own argument for
+              /// one import surface).
+              ///
+              /// **The widget clamps; this line did not, and the clamp changes nothing
+              /// a reader can reach.** `clampFontStep` is the identity on every step in
+              /// `kFontStepMin`…`kFontStepMax` (1…5), and `SettingsCubit` is the
+              /// authoritative boundary: it clamps on `load` — so a hand-edited
+              /// preference cannot arrive out of range — and on every write
+              /// (`settings_cubit.dart`'s `_clamp`). **The two therefore agree**, and
+              /// the value this line reads is already inside the table, so the widget's
+              /// clamp is defence in depth and the rendered scale is **unchanged** for
+              /// every step the reader can persist. The one input it does change is
+              /// the one the reader cannot reach: without the clamp, a step of 0 or 6
+              /// would reach `evaScalerFor`'s `_` arm as 1.22× while the stepper's knob
+              /// sat at a position no step owns.
+              builder: (BuildContext context, Widget? child) => EvaTypeScale(
+                step: settings.fontStep,
+                child: child ?? const SizedBox.shrink(),
+              ),
 
               // The one place the router enters the widget tree. See the class doc for
               // why it is resolved from the locator and never constructed here, and for

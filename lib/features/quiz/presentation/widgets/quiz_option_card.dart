@@ -64,6 +64,28 @@ enum QuizOptionState {
 /// and not a *statement*: §14's disabled row wants `Semantics(enabled: false)` with
 /// the tap action genuinely absent **and the reason in the accessible name**, and
 /// `SocialAuthButton`'s doc is the precedent for all three at once.
+///
+/// ## AND IT **ARRIVES**, AND IT CARRIES THE FLECKS
+///
+/// Two motions the redesign specifies for `.opt` and this client did not
+/// perform, both placed here:
+///
+/// * the **entrance** — `:340`'s `opacity:0; transform:translateY(16px)` and
+///   `:341`'s `.opt.in{opacity:1; transform:none}` — built from
+///   [MotionMoment.achievement] through [EvaAnimate], and
+/// * the **flecks** on the correct card, from the brief's own rule ("tiny gold
+///   flecks floating near the correct option — sparse, 3–4 max",
+///   `eva/src/imports/pasted_text/pasted-attachment.txt:97`) and the
+///   superseded prototype's four of them
+///   (`eva/src/screens/QuizScreen.tsx:92-95`).
+///
+/// **The redesign's `.opt` paints neither**, and this client's suite used to
+/// assert the flecks' absence. The brief's rule is the authority for the
+/// ornament, and the placement is what AGENT_CONTEXT's decision 144 is about:
+/// a component that is built, tested and never placed is invisible to every
+/// assertion that does not look for it on the screen. Both are recorded at
+/// their call sites — the entrance in [_QuizOptionCardState.build] and the
+/// flecks in [goldFleckOffsetsFor].
 class QuizOptionCard extends StatefulWidget {
   /// An option showing [letter] and [text] in [state].
   const QuizOptionCard({
@@ -280,6 +302,70 @@ class QuizOptionCard extends StatefulWidget {
   static bool isGraded(QuizOptionState state) =>
       state == QuizOptionState.correct || state == QuizOptionState.incorrect;
 
+  /// ## THE FLECK OFFSETS, AND WHY THEY ARE **DERIVED** RATHER THAN PASTED
+  ///
+  /// The brief's own rule is "tiny gold flecks floating near the correct option
+  /// — sparse, 3–4 max"
+  /// (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for
+  /// "gold flecks fade in with 150ms delay"), and the superseded prototype drew
+  /// them at four positions (`eva/src/screens/QuizScreen.tsx:92-95`):
+  ///
+  /// ```html
+  /// <GoldFleck x={-10} y={12}  delay={0}   />
+  /// <GoldFleck x={-15} y={36}  delay={220} />
+  /// <GoldFleck x={356} y={8}   delay={110} />
+  /// <GoldFleck x={362} y={30}  delay={340} />
+  /// ```
+  ///
+  /// Those `x` values are measured **from the option card's own box** — the
+  /// wrapper `<div style={{position:'relative'}}>` at `QuizScreen.tsx:88` — and
+  /// two of the four are **screen pixels on a 390px frame**
+  /// (`eva/src/App.tsx:89` — `width: 390`):
+  ///
+  /// * `-10` and `-15` are already card-relative: they are negative, so they
+  ///   sit just **outside** the card's left edge, and they do not move when the
+  ///   card's width does;
+  /// * `356` and `362` are not. The quiz screen's own padding is
+  ///   `20px 20px 28px` (`QuizScreen.tsx:41`), so the card's box is
+  ///   `390 - 20 - 20 = 350` wide — and `356` and `362` are therefore **6 and
+  ///   12 pixels past the card's right edge**.
+  ///
+  /// **The card's width is not 350 here.** The redesign's `.opt` is `width:100%`
+  /// (`eva/redesign.html:337`) inside a body padded `0 26px` (`:333`), so it is
+  /// as wide as the screen allows. Pasting `356` and `362` would put the
+  /// right-hand pair in the wrong place on every screen but a 390px one, and
+  /// off the edge entirely on a narrower one. So the right-hand pair is
+  /// **derived from the card's own width** and the left-hand pair is not.
+  ///
+  /// **The `y` values are the prototype's own, in pixels from the card's top
+  /// edge**, and they are not scaled by the card's height: the prototype's card
+  /// is 64 tall (`eva/src/components/ds.tsx:433` — `minHeight: 64`) and the
+  /// redesign's `.opt` declares no height at all, so a proportional reading
+  /// would scatter the cluster over a tall card instead of keeping it near the
+  /// top corner where the prototype put it. All four land inside the card,
+  /// whose height is at least the badge's 26 plus the padding's 32.
+  ///
+  /// The four are in the prototype's **order**, because the order is the
+  /// stagger: `GoldFlecks` spreads the phases by index, and the prototype's
+  /// own delays (0 / 220 / 110 / 340) are not monotonic in the list.
+  static List<Offset> goldFleckOffsetsFor(double cardWidth) => <Offset>[
+    const Offset(-10, 12),
+    const Offset(-15, 36),
+    Offset(cardWidth + 6, 8),
+    Offset(cardWidth + 12, 30),
+  ];
+
+  /// How far an arriving card starts below its final place.
+  ///
+  /// `eva/redesign.html:340` — `transform: translateY(16px)`, on the `.opt`
+  /// rule that opens with `opacity:0`.
+  ///
+  /// **Pixels, and not a fraction of the card's height**, for the reason
+  /// `VerseLine.entranceOffset` records: the same 16px is a quarter of a
+  /// one-line card and a tenth of a five-line one, so a fraction would move
+  /// the two by different distances.
+  static const double entranceOffset = 16;
+
   @override
   State<QuizOptionCard> createState() => _QuizOptionCardState();
 
@@ -489,6 +575,47 @@ class _QuizOptionCardState extends State<QuizOptionCard>
       ),
     );
 
+    // ## THE FLECK OVERLAY, AND WHY IT IS AN **OVERLAY**
+    //
+    // The prototype's flecks are `position: absolute` inside the relative
+    // wrapper around the card (`eva/src/screens/QuizScreen.tsx:15` and `:88`),
+    // and two of the four sit **outside** the card's left edge. So they cannot
+    // be a child in the flow: they are painted over the card and past its edge,
+    // and they contribute nothing to its size.
+    //
+    // `StackFit.passthrough` is what keeps the card's own layout untouched —
+    // it hands the non-positioned child the **incoming constraints unchanged**,
+    // where the default `StackFit.loose` would loosen them and let a `Row`
+    // with an `Expanded` child size itself differently. `Clip.none` is what
+    // lets the flecks leave the card's box at all: `Stack`'s default
+    // `clipBehavior` is `Clip.hardEdge`, which would cut off the very two
+    // flecks the prototype put outside the edge.
+    final Widget decorated = widget.state == QuizOptionState.correct
+        ? Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.passthrough,
+            children: <Widget>[
+              surface,
+              // `Positioned.fill` gives the overlay the card's own box, and
+              // the `LayoutBuilder` inside it reads that box's **width** — the
+              // number the two right-hand flecks are derived from. The
+              // `LayoutBuilder` is inside the `Positioned` rather than outside
+              // it because that is what makes its constraints the card's
+              // *exact* size rather than the space the card was offered.
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) =>
+                      GoldFlecks(
+                        offsets: QuizOptionCard.goldFleckOffsetsFor(
+                          constraints.maxWidth,
+                        ),
+                      ),
+                ),
+              ),
+            ],
+          )
+        : surface;
+
     final Widget shaken = AnimatedBuilder(
       animation: _shake,
       builder: (BuildContext context, Widget? child) => Transform.translate(
@@ -496,7 +623,7 @@ class _QuizOptionCardState extends State<QuizOptionCard>
         offset: Offset(_shakeCurve.transform(_shake.value), 0),
         child: child,
       ),
-      child: surface,
+      child: decorated,
     );
 
     // ## THE TAP HANDLER IS HERE AND IT WAS **MISSING** ON THE FIRST RUN
@@ -526,6 +653,58 @@ class _QuizOptionCardState extends State<QuizOptionCard>
           )
         : shaken;
 
+    // ## THE CARD'S ENTRANCE, AND WHY IT SITS **INSIDE** THE `Semantics`
+    //
+    // `eva/redesign.html:340` — `.opt` opens with `opacity:0;
+    // transform:translateY(16px)` — and `:341` — `.opt.in{opacity:1;
+    // transform:none}`. The prototype adds `.in` to a **rebuilt** options box
+    // (`eva/redesign.html:1422`: `[...box.children].forEach((o,i)=>setTimeout(
+    // ()=>o.classList.add('in'),(reduceMotion?0:120+i*40)))`), so the cards
+    // arrive with the question.
+    //
+    // **The `Semantics` is ABOVE the animation, and that is the whole of §14
+    // here.** `RenderAnimatedOpacity` drops the semantics of a fully
+    // transparent subtree (`RenderAnimatedOpacityMixin.visitChildrenForSemantics`
+    // skips the child while the alpha is 0), so a fade that enclosed the
+    // card's `Semantics` would leave an interactive control with **no
+    // accessible name** for the length of the entrance. Above it, the card's
+    // own node — its name, its `enabled` flag and its tap action — survives
+    // the whole animation, and the subtree below is excluded by
+    // `excludeSemantics` anyway.
+    //
+    // ## THE TRIGGER IS THE OPTION'S **TEXT**, AND THAT IS A LIMITATION
+    //
+    // The prototype replays the entrance on every question because it rebuilds
+    // the DOM. This client's option cards are **reused**: the quiz page lays
+    // them out as the unkeyed children of one `Column`
+    // (`lib/features/quiz/presentation/pages/quiz_page.dart`), so advancing to
+    // the next question hands the same elements new text rather than new
+    // elements. The trigger is therefore the option's own text: it changes
+    // exactly when the card's content changes, and it does **not** change when
+    // the card is graded — the verdict changes the card's `state` and its
+    // `semanticLabel`, and an entrance that replayed on grading would throw
+    // the reader's own answer away.
+    //
+    // **The limitation is recorded rather than hidden:** two consecutive
+    // questions that share an option's text would leave that one card
+    // un-replayed, because the card does not know its question's id and the
+    // page that does is not this widget's to change. Every other card in the
+    // same question would still arrive.
+    final Widget arriving = EvaAnimate(
+      // `MotionMoment.achievement` is the only member of the enum on
+      // `Curves.easeOutBack`, and `--e-spring` — the curve `.opt`'s own
+      // transition names (`eva/redesign.html:340`) — is
+      // `cubic-bezier(.34,1.56,.64,1)` (`eva/redesign.html:18`), which is that
+      // curve verbatim. The **344ms** is the moment's measured settle against
+      // the prototype's **300ms**, and the divergence is the price of the
+      // enum's closed set: a caller cannot choose a duration.
+      effects: MotionMoment.achievement.entrance(
+        const Offset(0, QuizOptionCard.entranceOffset),
+      ),
+      trigger: widget.text,
+      child: pressable,
+    );
+
     return Semantics(
       // §14's disabled row, `SocialAuthButton`'s shape: `enabled` is stated,
       // `onTap` is **absent** rather than present-and-flagged, and the name
@@ -538,7 +717,7 @@ class _QuizOptionCardState extends State<QuizOptionCard>
       // node that survives is the one with the name on it.
       excludeSemantics: true,
       onTap: interactive ? widget.onTap : null,
-      child: pressable,
+      child: arriving,
     );
   }
 }

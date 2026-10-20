@@ -1,5 +1,7 @@
 import 'package:evangelion/core/design_system/tokens/eva_colors.dart';
+import 'package:evangelion/core/design_system/tokens/eva_type_scale.dart';
 import 'package:evangelion/core/design_system/tokens/eva_typography.dart';
+import 'package:evangelion/core/design_system/widgets/font_size_stepper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -444,6 +446,78 @@ void main() {
           greaterThanOrEqualTo(12.0 * 0.90 - 1e-9),
         );
       }
+    });
+  });
+
+  // =========================================================================
+  group('EvaTypeScale — the widget that INSTALLS the table', () {
+    /// The scale a widget under [EvaTypeScale] resolved.
+    ///
+    /// Read from a `Builder` **inside** the widget, because the claim is about
+    /// what the subtree sees and not about what the widget was handed.
+    Future<double> scaleUnder(WidgetTester tester, int step) async {
+      late double scale;
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: EvaTypeScale(
+              step: step,
+              child: Builder(
+                builder: (BuildContext context) {
+                  scale = MediaQuery.textScalerOf(context).scale(1.0);
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      return scale;
+    }
+
+    testWidgets('installs the table\'s own row, for every step a reader can '
+        'persist', (WidgetTester tester) async {
+      // The claim the placement rests on: **the widget changes nothing for an
+      // in-range step.** The app's install used to spell this `MediaQuery` out
+      // by hand — `evaScalerFor(settings.fontStep)` with no clamp — so the
+      // rendered scale of every step the reader can choose must be identical
+      // before and after.
+      for (int step = kFontStepMin; step <= kFontStepMax; step++) {
+        expect(
+          await scaleUnder(tester, step),
+          closeTo(evaScalerFor(step).scale(1.0), 1e-9),
+          reason: 'step $step',
+        );
+      }
+    });
+
+    testWidgets('and CLAMPS a step below the table before it reaches the '
+        'engine', (WidgetTester tester) async {
+      // `evaScalerFor`'s `_` arm sends every out-of-range step to **1.22×** —
+      // the same number step 5 renders at, and a number no step owns. The
+      // widget's clamp is what stops it: `clampFontStep(0)` is 1, and step 1
+      // is 0.90×.
+      //
+      // **This is the only value the two clamps disagree about, and the one
+      // neither the stepper nor the cubit can produce** — `SettingsCubit`
+      // clamps on `load` and on every write, so a persisted step is already
+      // inside the table by the time the app reads it. The widget's clamp is
+      // the belt to that braces.
+      expect(await scaleUnder(tester, 0), closeTo(0.90, 1e-9));
+      expect(await scaleUnder(tester, -1), closeTo(0.90, 1e-9));
+    });
+
+    testWidgets('and a step above the table lands on the table\'s top row', (
+      WidgetTester tester,
+    ) async {
+      // `clampFontStep(99)` is 5, and step 5 is 1.22× — the same number the
+      // `_` arm would have produced, so this case does not discriminate. It is
+      // asserted anyway, because "the clamp is a no-op above the table" is a
+      // fact about the widget and not only about the discriminating case.
+      expect(await scaleUnder(tester, 99), closeTo(1.22, 1e-9));
+      expect(await scaleUnder(tester, 6), closeTo(1.22, 1e-9));
     });
   });
 }

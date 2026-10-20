@@ -417,6 +417,36 @@ void main() {
     });
 
     testWidgets(
+      'the app\'s tree carries the `EvaTypeScale` WIDGET, not a hand-written '
+      '`MediaQuery`',
+      (WidgetTester tester) async {
+        // ## THE PLACEMENT ASSERTION, WHICH IS A DIFFERENT CLAIM FROM THE
+        // ## **SCALE**
+        //
+        // The tests above are about the **number** a widget renders at. This
+        // one is about the **component** that installs it, and it is the shape
+        // decision 144 is about: "a component that is built, tested and never
+        // placed is invisible to every assertion that does not look for it on
+        // the screen." `EvaTypeScale` was built, exported, documented — its
+        // own doc names this exact site — and placed on **no screen at all**,
+        // while `app.dart` spelled the same `MediaQuery` out by hand.
+        //
+        // The rendered-scale assertions above stayed green throughout, which is
+        // the point: a number can be right while the component that produced
+        // it is unused.
+        await pumpApp(tester);
+        expect(
+          find.byType(EvaTypeScale),
+          findsOneWidget,
+          reason:
+              '`EvaTypeScale` is the design system\'s own install of the reader\'s '
+              'step, and `MaterialApp.builder` is the only site above every route. '
+              'Its own doc names this line.',
+        );
+      },
+    );
+
+    testWidgets(
       'a step outside the table is CLAMPED before it reaches the engine',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues(<String, Object>{

@@ -68,6 +68,7 @@ void main() {
           moment.fadeIn(),
           moment.fadeOut(),
           moment.slide(const Offset(0, 8)),
+          moment.move(const Offset(0, 8)),
           moment.scaleFrom(0.94),
           moment.shake(),
           moment.saturate(end: MotionMoment.desaturated),
@@ -126,6 +127,48 @@ void main() {
       final ScaleEffect effect = MotionMoment.routine.scaleFrom(0.94);
       expect((effect.begin as Offset).dx, 0.94);
       expect(ScaleEffect.minScale, greaterThan(0.0));
+    });
+
+    test('move is in PIXELS and slide is a FRACTION, and they are not the '
+        'same thing', () {
+      // ## THE TWO SPELLINGS OF "HOW FAR", AND THE HAZARD
+      //
+      // `SlideEffect` drives a `FractionalTranslation` — its offsets are
+      // fractions of the child's own size — and `MoveEffect` drives a
+      // `Transform.translate` — its offsets are logical pixels. A caller who
+      // read "absolute offsets" on `slide` and wrote `Offset(0, 16)` would
+      // move a 53px card by **848px**.
+      //
+      // The redesign's own transforms are in pixels (`.opt`'s
+      // `translateY(16px)`, `eva/redesign.html:340`), and CSS's `translateX
+      // (-100%)` is a fraction — so both spellings have a use, and the
+      // distinction has to be mechanical rather than remembered.
+      final MoveEffect move = MotionMoment.routine.move(const Offset(0, 16));
+      expect(move.begin, const Offset(0, 16));
+      expect(move.end, Offset.zero);
+      expect(move, isA<MoveEffect>());
+
+      final SlideEffect slide = MotionMoment.routine.slide(const Offset(-1, 0));
+      expect(slide.begin, const Offset(-1, 0));
+      expect(slide, isA<SlideEffect>());
+      expect(
+        move,
+        isNot(isA<SlideEffect>()),
+        reason: 'a pixel move must not be a fractional slide',
+      );
+    });
+
+    test('entrance is a rise AND a fade, and it names no duration', () {
+      final List<Effect<dynamic>> effects = MotionMoment.achievement.entrance(
+        const Offset(0, 16),
+      );
+      expect(effects, hasLength(2));
+      expect(effects.first, isA<MoveEffect>());
+      expect(effects.last, isA<FadeEffect>());
+      for (final Effect<dynamic> effect in effects) {
+        expect(effect.duration, MotionMoment.achievement.duration);
+        expect(effect.curve, MotionMoment.achievement.curve);
+      }
     });
   });
 

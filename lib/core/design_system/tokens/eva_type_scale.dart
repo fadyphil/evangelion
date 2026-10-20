@@ -48,6 +48,23 @@ import 'package:flutter/material.dart';
 /// for**: `/settings` → Appearance → Font size, in the reader's own language, on every
 /// screen. §14's requirement (survive 1.22× at 320px) is what bounds the table, and it
 /// is what `evaScalerFor` publishes.
+///
+/// ## AND IT IS **INSTALLED**
+///
+/// The three sites this doc names were spelled by hand for a while, and the
+/// app's own install was one of them: `lib/app/app.dart`'s
+/// `MaterialApp.router.builder` used to write the `MediaQuery` out itself.
+/// That is now this widget, at the site this doc has named since the file
+/// existed.
+///
+/// **The install clamps, and the clamp changes nothing a reader can reach.**
+/// `clampFontStep` is the identity on every step in `kFontStepMin`…
+/// `kFontStepMax`, and `SettingsCubit` is the authoritative boundary — it
+/// clamps on `load` and on every write — so the two agree and the rendered
+/// scale is unchanged for every step the reader can persist. The value they
+/// differ on is the one neither can produce: a step of 0 would reach
+/// `evaScalerFor`'s `_` arm as 1.22×, which is the number step 5 renders at
+/// and a number no step owns.
 class EvaTypeScale extends StatelessWidget {
   /// Wraps [child] in a [MediaQuery] rendering at [step].
   const EvaTypeScale({required this.step, required this.child, super.key});

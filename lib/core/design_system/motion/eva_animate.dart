@@ -49,6 +49,30 @@ import 'package:flutter_animate/flutter_animate.dart';
 /// `t >= 0.0 && t <= 1.0` — measured, it throws. A widget that wants real physics
 /// drives its own controller with `animateWith`; see [EvaMotion.achievementSpring]'s
 /// doc for where that applies and [EvaMotion.achievementCurve] for here.
+///
+/// ## AND IT IS **PLACED**
+///
+/// The widget was built, exported and given a full suite — and, until the
+/// quiz's option cards put it on screen, **placed on nothing**. AGENT_CONTEXT's
+/// decision 144 records that "a component that is built, tested and never placed
+/// is invisible to every assertion that does not look for it on the screen", and
+/// the orphan gate could not see it either: that gate walks the classes
+/// declared under `*/widgets/`, and this one lives under `*/motion/`.
+///
+/// The call site is `features/quiz/presentation/widgets/quiz_option_card.dart`
+/// — the option card's **entrance**, `eva/redesign.html:340`'s
+/// `opacity:0; transform:translateY(16px)` and `:341`'s
+/// `.opt.in{opacity:1; transform:none}` — and it is where the two hazards this
+/// widget carries are visible in the shipped tree:
+///
+/// * the frame that creates the animated subtree draws it at **opacity 0**, and
+///   `RenderAnimatedOpacity` **drops the semantics of a fully transparent
+///   subtree**, so the card's `Semantics` sits **above** the animation and the
+///   card's accessible name survives the entrance;
+/// * the package's `Animate.initState` ends in `Future.delayed(Duration.zero)`,
+///   which creates a real `Timer` — so a test that mounts a card has to advance
+///   the fake clock past it, and `eva_animate_test.dart`'s `pumpEva` records
+///   the measurement.
 class EvaAnimate extends StatefulWidget {
   /// Runs [effects] on [child].
   ///
@@ -243,16 +267,59 @@ enum MotionMoment {
   FadeEffect fadeOut({double end = 0.0}) =>
       FadeEffect(duration: duration, curve: curve, begin: 1.0, end: end);
 
-  /// Translates from [begin] to [end].
+  /// Translates from [begin] to [end], as a **fraction of the target's own size**.
   ///
-  /// [begin] and [end] are absolute offsets, so a caller choosing a travel distance
-  /// still cannot choose a duration.
+  /// ## THIS IS A FRACTION, AND THE DOC USED TO SAY OTHERWISE
+  ///
+  /// The package's `SlideEffect` drives a `FractionalTranslation`, so
+  /// `Offset(0, 0.1)` is a **tenth of the child's height** and `Offset(0, 1)`
+  /// is its whole height. This doc used to call the offsets "absolute", and a
+  /// caller reading it would have written `Offset(0, 16)` and moved the child
+  /// **sixteen times its own height**.
+  ///
+  /// **Use [move] for pixels.** The redesign's own transforms are in pixels —
+  /// `.opt`'s `translateY(16px)` (`eva/redesign.html:340`) — and a pixel
+  /// distance has to be expressible without the caller dividing it by a height
+  /// it does not know.
+  ///
+  /// The fraction is the right tool for a *proportional* move: CSS's
+  /// `translateX(-100%)` is exactly `Offset(-1, 0)` here, and a sweep that
+  /// crosses the card is a fraction of the card and not a pixel count.
   SlideEffect slide(Offset begin, {Offset? end}) => SlideEffect(
     duration: duration,
     curve: curve,
     begin: begin,
     end: end ?? Offset.zero,
   );
+
+  /// Translates from [begin] to [end], in **logical pixels**.
+  ///
+  /// The package's `MoveEffect` drives a `Transform.translate`, so the offsets
+  /// are absolute distances and the target's size is not an input. This is the
+  /// one a transcribed pixel offset wants — see [slide] for the fractional
+  /// sibling and the reason the two are not the same thing.
+  MoveEffect move(Offset begin, {Offset? end}) => MoveEffect(
+    duration: duration,
+    curve: curve,
+    begin: begin,
+    end: end ?? Offset.zero,
+  );
+
+  /// A surface arriving: a rise of [enter] logical pixels and a fade in.
+  ///
+  /// ## WHY THE LIST LIVES HERE AND NOT AT THE CALL SITE
+  ///
+  /// The package's effect type is `Effect<dynamic>`, so a caller that spelled
+  /// the list out would have to **name** it — and naming it means importing
+  /// `package:flutter_animate/flutter_animate.dart` from a feature, which
+  /// gives the feature a second vocabulary for motion next to this file's.
+  /// Returning the list lets the caller choose the *shape* (how far it rises)
+  /// and this enum choose the *timing*, which is the division the class doc
+  /// already draws.
+  List<Effect<dynamic>> entrance(Offset enter) => <Effect<dynamic>>[
+    move(enter),
+    fadeIn(),
+  ];
 
   /// Scales from [from] to 1.0.
   ///

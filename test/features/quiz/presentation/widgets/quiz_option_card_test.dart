@@ -8,6 +8,7 @@ import 'package:evangelion/l10n/app_localizations_ar.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -75,8 +76,27 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1));
   }
+
+  /// Advances the clock past the `Animate` widget's own zero-delay timer.
+  ///
+  /// ## WHY THE PUMP IS **1ms** AND NOT `pump()`
+  ///
+  /// `flutter_animate`'s `Animate.initState` ends in
+  /// `Future.delayed(widget.delay, …)` — and `Future.delayed` creates a real
+  /// `Timer` even for `Duration.zero`. One therefore hangs off **every**
+  /// `Animate` in the tree until a frame turns past it, and a test body that
+  /// ends first fails with *"A Timer is still pending even after the widget
+  /// tree was disposed"*. The failure surfaces against whichever test ran
+  /// next, which is how a real problem gets misfiled as flakiness.
+  ///
+  /// A bare `await tester.pump()` does **not** drain it, because a zero-length
+  /// pump does not advance the fake clock and the timer is already due *at*
+  /// the current time. `pump(const Duration(milliseconds: 1))` advances past
+  /// it. `eva_animate_test.dart`'s `pumpEva` records the same measurement.
+  Future<void> pumpPastTheTimer(WidgetTester tester) =>
+      tester.pump(const Duration(milliseconds: 1));
 
   group('the four states', () {
     testWidgets('each has its own accent, and `idle` has none', (
@@ -356,16 +376,273 @@ void main() {
     });
   });
 
-  group('the old prototype\'s ornaments are gone', () {
-    testWidgets('no flecks, and the long-label card still grows instead of '
-        'overflowing', (WidgetTester tester) async {
-      // The old card decorated a correct answer with four positioned flecks whose
-      // offsets were a function of the card's width. The redesign's `.opt`
-      // (`eva/redesign.html:337-362`) paints border, fill and badge and nothing
-      // else — the flecks died with the prototype that drew them, and the sweep
-      // above is what keeps them from coming back.
+  group('the four flecks, and where they sit', () {
+    // ## THE DERIVATION, AND WHY IT IS NOT FOUR LITERALS
+    //
+    // The prototype places them at `x: -10, -15, 356, 362`
+    // (`eva/src/screens/QuizScreen.tsx:92-95`) **relative to the option card's
+    // own box** — the wrapper `<div style={{position:'relative'}}>` at `:88`.
+    //
+    // Two of those are already card-relative (they are negative: outside the
+    // card's left edge). The other two are **screen pixels on a 390px frame**
+    // (`eva/src/App.tsx:89` — `width: 390`), and the card's box is not 390 wide:
+    // the quiz screen's own padding is `20px 20px 28px` (`QuizScreen.tsx:41`),
+    // so the card is `390 - 20 - 20 = 350` wide, and `356` and `362` are
+    // therefore **6 and 12 pixels past the card's right edge**.
+    //
+    // The card's width is variable here — the redesign's `.opt` is `width:100%`
+    // (`eva/redesign.html:337`) inside a body padded `0 26px` (`:333`) — so the
+    // right-hand pair has to be derived from the card's own size or it lands in
+    // the wrong place on every screen but a 390px one.
+    test('the offsets are derived from the card\'s own width', () {
+      // At the prototype's own 350px card, the derived offsets are the
+      // prototype's literals — which is the check that the derivation is right
+      // and not merely plausible.
+      expect(QuizOptionCard.goldFleckOffsetsFor(350), <Offset>[
+        const Offset(-10, 12),
+        const Offset(-15, 36),
+        const Offset(356, 8),
+        const Offset(362, 30),
+      ]);
+
+      // And the right-hand pair tracks the width, while the left-hand pair —
+      // already relative to the card's left edge — does not move at all.
+      expect(QuizOptionCard.goldFleckOffsetsFor(300), <Offset>[
+        const Offset(-10, 12),
+        const Offset(-15, 36),
+        const Offset(306, 8),
+        const Offset(312, 30),
+      ]);
+    });
+
+    testWidgets('the CORRECT card carries them, and the other three do not', (
+      WidgetTester tester,
+    ) async {
+      // The brief's own rule — "tiny gold flecks floating near the correct
+      // option — sparse, 3–4 max"
+      // (`eva/src/imports/pasted_text/pasted-attachment.txt:97`, and `:114` for
+      // the "gold flecks fade in with 150ms delay" line) — and the superseded
+      // prototype that drew them (`QuizScreen.tsx:90-97`: the flecks are
+      // rendered only `when (checked && opt.letter === CORRECT)`).
+      //
+      // **The redesign's `.opt` (`:337-362`) does not draw them**, and this
+      // client's suite used to assert their absence. The brief's rule is the
+      // authority for the ornament, and the placement is what decision 144 is
+      // about: a component that is built, tested and never placed is invisible
+      // to every assertion that does not look for it on the screen.
+      for (final (QuizOptionState, bool) row in <(QuizOptionState, bool)>[
+        (QuizOptionState.idle, false),
+        (QuizOptionState.selected, false),
+        (QuizOptionState.correct, true),
+        (QuizOptionState.incorrect, false),
+      ]) {
+        await pumpCard(tester, state: row.$1);
+        expect(
+          find.byType(GoldFlecks),
+          row.$2 ? findsOneWidget : findsNothing,
+          reason: '`${row.$1.name}`',
+        );
+      }
+    });
+
+    testWidgets('and the offsets it is given are the derived ones', (
+      WidgetTester tester,
+    ) async {
+      // The harness's card is 320px wide, so the right-hand pair is 6 and 12
+      // pixels past that, not the prototype's 356 and 362.
       await pumpCard(tester, state: QuizOptionState.correct);
-      expect(find.byType(GoldFlecks), findsNothing);
+      final GoldFlecks flecks = tester.widget<GoldFlecks>(
+        find.byType(GoldFlecks),
+      );
+      expect(flecks.offsets, QuizOptionCard.goldFleckOffsetsFor(320));
+      expect(flecks.offsets[2], const Offset(326, 8));
+      expect(flecks.offsets[3], const Offset(332, 30));
+    });
+
+    testWidgets('and they change NEITHER the card\'s size NOR the option\'s '
+        'layout', (WidgetTester tester) async {
+      // The flecks are an **overlay**: `Positioned.fill` inside a `Stack` whose
+      // only non-positioned child is the card itself, so they contribute
+      // nothing to the layout. The prototype's own flecks are `position:
+      // absolute` (`QuizScreen.tsx:15`) inside the same relative wrapper.
+      //
+      // The idle card and the correct card carry the same one-line label, and
+      // the correct card's extra verdict glyph sits at the row's far end, so
+      // the two agree on both the card's height and where the option text
+      // starts. If the overlay had joined the flow, both would move.
+      await pumpCard(tester, state: QuizOptionState.idle);
+      final Size idleSize = tester.getSize(find.byType(QuizOptionCard));
+      final double idleTextLeft = tester.getTopLeft(find.text('Nicodemus')).dx;
+
+      await pumpCard(tester, state: QuizOptionState.correct);
+      final Size correctSize = tester.getSize(find.byType(QuizOptionCard));
+      final double correctTextLeft = tester
+          .getTopLeft(find.text('Nicodemus'))
+          .dx;
+
+      expect(correctSize.height, idleSize.height);
+      expect(correctTextLeft, moreOrLessEquals(idleTextLeft, epsilon: 0.01));
+    });
+  });
+
+  group('the card\'s ARRIVAL', () {
+    /// The controller the built `Animate` is reading.
+    ///
+    /// The same reach as `eva_animate_test.dart`'s `controllerOf`: state, not
+    /// appearance, so the claim is about the animation rather than about a
+    /// pixel.
+    AnimationController controllerOf(WidgetTester tester) =>
+        tester.widget<Animate>(find.byType(Animate)).controller!;
+
+    testWidgets('the card is DRAWN HIDDEN on the frame that creates it', (
+      WidgetTester tester,
+    ) async {
+      // `eva/redesign.html:340` — `.opt` opens with `opacity:0` — and the
+      // hazard this asserts: `EvaAnimate` sets its controller to `0.0` and
+      // calls `_play()` from a **post-frame callback**, so the frame that
+      // creates the animated subtree draws it at opacity 0.
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          theme: EvaThemeDark.theme,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+          child: const Center(
+            child: SizedBox(
+              width: 320,
+              child: QuizOptionCard(
+                letter: 'A',
+                text: 'Nicodemus',
+                state: QuizOptionState.idle,
+                language: ReadingLanguage.english,
+                semanticLabel: 'A. Nicodemus',
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(
+        controllerOf(tester).value,
+        0.0,
+        reason:
+            'the card must not be painted at full strength on its first '
+            'frame — that is what makes the entrance an entrance',
+      );
+      // The clock is advanced **after** the assertion, and only to drain the
+      // `Animate` widget's own zero-delay timer — see `pumpPastTheTimer`.
+      await pumpPastTheTimer(tester);
+    });
+
+    testWidgets('and it FINISHES', (WidgetTester tester) async {
+      // A **bounded loop** rather than a magic pump count, and the bound is
+      // the claim: "the entrance finishes". A hand-counted sequence passes for
+      // the wrong reason on a different frame budget — the lesson decision 155
+      // records for the dock's pills.
+      //
+      // `pumpAndSettle` is not the answer either: `NeuralScaffold` paints orbs
+      // on the shared float clock, so it times out with a message about the
+      // background rather than about the card.
+      await pumpCard(tester, state: QuizOptionState.idle);
+      bool settled = false;
+      for (int frame = 0; frame < 120; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        if (controllerOf(tester).value >= 1.0) {
+          settled = true;
+          break;
+        }
+      }
+      expect(
+        settled,
+        isTrue,
+        reason:
+            'the entrance finishes — 120 frames is nearly two seconds '
+            'against a 344ms moment',
+      );
+    });
+
+    testWidgets('and the card\'s accessible name SURVIVES it', (
+      WidgetTester tester,
+    ) async {
+      // ## §14'S ROW, AND THE ORDERING THAT SATISFIES IT
+      //
+      // `RenderAnimatedOpacity` **drops the semantics of a fully transparent
+      // subtree** — `RenderAnimatedOpacityMixin.visitChildrenForSemantics`
+      // skips the child while the alpha is 0 — so a fade that enclosed the
+      // card's `Semantics` would leave an interactive control with no
+      // accessible name for the length of the entrance. The `Semantics` is
+      // **above** the animation, so the card's node survives it.
+      //
+      // The assertion is made while the card is **still transparent**, which
+      // is the only frame in which the claim has any teeth.
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpCard(tester, state: QuizOptionState.idle, onTap: () {});
+      expect(
+        controllerOf(tester).value,
+        lessThan(1.0),
+        reason: 'the card is still arriving — that is the frame under test',
+      );
+      expect(
+        find.bySemanticsLabel('A. Nicodemus'),
+        findsOneWidget,
+        reason:
+            'an interactive node needs an accessible name (§14), and a '
+            'transparent card is not a reason to lose it',
+      );
+      final Semantics node = _nodeLabelled(tester, 'A. Nicodemus');
+      expect(node.properties.onTap, isNotNull);
+      handle.dispose();
+    });
+
+    testWidgets('and under reduced motion it is simply THERE', (
+      WidgetTester tester,
+    ) async {
+      // §14: "when disabled, jump straight to the end state". `EvaAnimate`
+      // sets its controller to `1.0` rather than dropping the subtree, so the
+      // card's shape is the same either way.
+      await tester.pumpWidget(
+        evaPrimitiveHarness(
+          theme: EvaThemeDark.theme,
+          disableAnimations: true,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const <Locale>[Locale('en'), Locale('ar')],
+          child: const Center(
+            child: SizedBox(
+              width: 320,
+              child: QuizOptionCard(
+                letter: 'A',
+                text: 'Nicodemus',
+                state: QuizOptionState.idle,
+                language: ReadingLanguage.english,
+                semanticLabel: 'A. Nicodemus',
+              ),
+            ),
+          ),
+        ),
+      );
+      await pumpPastTheTimer(tester);
+      expect(controllerOf(tester).value, 1.0);
+      expect(controllerOf(tester).isAnimating, isFalse);
+    });
+
+    testWidgets('and it does NOT replay when the card is GRADED', (
+      WidgetTester tester,
+    ) async {
+      // The trigger is the option's **text**, so grading — which changes the
+      // card's `state` and its accessible name but not its text — leaves the
+      // entrance alone. An entrance that replayed on grading would throw the
+      // reader's own answer away.
+      await pumpCard(tester, state: QuizOptionState.idle);
+      for (int frame = 0; frame < 60; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        if (controllerOf(tester).value >= 1.0) break;
+      }
+      expect(controllerOf(tester).value, 1.0);
+
+      await pumpCard(tester, state: QuizOptionState.correct);
+      expect(
+        controllerOf(tester).value,
+        1.0,
+        reason: 'the verdict arrived; the card must not start arriving again',
+      );
     });
   });
 
@@ -430,7 +707,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
+      await pumpPastTheTimer(tester);
       expect(tester.takeException(), isNull);
       expect(
         tester.getSize(find.byType(QuizOptionCard)).height,
