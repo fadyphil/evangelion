@@ -174,8 +174,42 @@ abstract interface class RoleAccess {
   /// table is a second source of truth, free to drift from the first, and the
   /// drift would be silent in both directions.
   ///
+  /// MUST be answered **through** [allowsRole] — the role read once, and the
+  /// grant asked of this seam about that role. Two members that could answer
+  /// differently would be two sources of truth for one value.
+  ///
   /// MUST NOT throw, for the same reason [role] must not. See above.
   bool allows(UserCapability capability);
+
+  /// Whether [capability] is one the **given** [role] grants.
+  ///
+  /// ## WHY THIS MEMBER EXISTS
+  ///
+  /// A seam built on a reader guarantees **liveness** and not **atomicity**:
+  /// two reads in one decision can be handed two different roles if the app
+  /// emits in between (hazard #2 below). A caller that must reason about ONE
+  /// reader consistently therefore captures the role **once** —
+  /// `final UserRole role = access.role;` — and then needs the grant for
+  /// *that* role.
+  ///
+  /// The obvious way to get it is `UserRole.grantsFor(role)`, and that is the
+  /// **wrong** way here: the caller would hold its own copy of the grant table
+  /// while the seam holds another, and the two could drift. That is the "two
+  /// sources of truth for one value" shape decisions 5 and 68 each removed —
+  /// and it would put the portal's guard and the portal's hub on two different
+  /// answers to "may this reader be offered this screen?".
+  ///
+  /// So the member exists to let a caller **capture the role once and still ask
+  /// the seam** — not the table — for the grant. The role is an argument here,
+  /// and the seam is still the one that knows what a role grants.
+  ///
+  /// MUST NOT go back to the seam for the role. The role is handed in; a
+  /// member that read it again would turn one capture into two reads and hand
+  /// the caller the very inconsistency this member exists to remove.
+  ///
+  /// MUST NOT throw, for the same reason the `role` getter must not. See
+  /// above.
+  bool allowsRole(UserRole role, UserCapability capability);
 }
 
 /// The canonical [RoleAccess]: it answers from a reader, and reads it again on
@@ -248,11 +282,31 @@ abstract interface class RoleAccess {
 /// see "WHY IT TAKES A READER AND NOT A `UserRole`" above — and it has a
 /// consequence worth stating: a caller that reads `role` once and then reads it
 /// again within a single navigation decision can be handed **two different
-/// roles**, because the bloc emitted in between. A guard that must reason about
-/// one reader consistently has to capture `final UserRole role = access.role;`
-/// once and pass that to `UserRole.grantsFor` itself. The seam guarantees
-/// liveness; it does not guarantee atomicity across two reads, and no seam built
-/// on a reader can.
+/// roles**, because the bloc emitted in between. The seam guarantees liveness;
+/// it does not guarantee atomicity across two reads, and no seam built on a
+/// reader can.
+///
+/// **AND THE REMEDY IS [allowsRole], AND THE PORTAL'S GUARD USES IT.** A guard
+/// that must reason about one reader consistently captures
+/// `final UserRole role = access.role;` **once** and hands that role to
+/// [allowsRole], which answers from the same table **without reading the seam
+/// again**. The decision and its destination are therefore one snapshot, and a
+/// reader cannot be refused on one role and sent to another role's page.
+///
+/// The earlier draft of this paragraph named the wrong remedy: it said to
+/// "pass that to `UserRole.grantsFor` itself", which would have made the
+/// caller a second holder of the grant table — the "two sources of truth for
+/// one value" shape decisions 5 and 68 each removed, and it would have put
+/// the portal's guard and the portal's hub on two different answers to "may
+/// this reader be offered this screen?". [allowsRole] is the seam's own
+/// answer for a role it is **handed**, so the caller captures the role once
+/// and still asks **the seam** for the grant.
+///
+/// `lib/app/router/role_guard.dart` is the consumer this member was written
+/// for: its `onNavigation` captures the role once, asks [allowsRole] for the
+/// grant, and sends a refusal to `landingRouteFor` of **that same role**.
+/// `role_access_test.dart` holds the property by **counting reads** — the
+/// seam's role is read once per answer, and [allowsRole] reads it not at all.
 ///
 /// The freeze-at-construction contract this paragraph defends is pinned in two
 /// places now. `test/app/di/navigation_injection_test.dart:393` drives the bloc
@@ -298,11 +352,12 @@ abstract interface class RoleAccess {
 ///
 /// ## AND IT CANNOT BE SLOW, BECAUSE IT HAS NOWHERE TO BE SLOW
 ///
-/// The body of [allows] is a set lookup on an unmodifiable `const` table —
-/// [UserRole.grantsFor] returns one by construction — and the body of [role] is
-/// one field read of whatever the reader closes over. There is no allocation on
-/// either path, which is what lets a future guard call `allows` several times
-/// per navigation without thinking about it.
+/// The body of [allowsRole] is a set lookup on an unmodifiable `const` table —
+/// [UserRole.grantsFor] returns one by construction — the body of [allows] is
+/// that same lookup with one read of the role in front of it, and the body of
+/// [role] is one field read of whatever the reader closes over. There is no
+/// allocation on any of those paths, which is what lets a guard ask the seam
+/// once per navigation without thinking about it.
 final class LiveRoleAccess implements RoleAccess {
   /// Answers from [read], consulted afresh on every call.
   const LiveRoleAccess(this._read);
@@ -317,6 +372,9 @@ final class LiveRoleAccess implements RoleAccess {
   UserRole get role => _read();
 
   @override
-  bool allows(UserCapability capability) =>
+  bool allows(UserCapability capability) => allowsRole(role, capability);
+
+  @override
+  bool allowsRole(UserRole role, UserCapability capability) =>
       UserRole.grantsFor(role).contains(capability);
 }

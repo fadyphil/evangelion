@@ -36,17 +36,23 @@ import '../../support/project_import_graph.dart';
 /// loop over a table that granted everything, or nothing, would pass for the
 /// wrong reason, so both directions are shown to be populated.
 ///
-/// ## WHAT THIS SUITE CANNOT SEE, STATED RATHER THAN LEFT TO A LATER PHASE
+/// ## AND WHERE THE GUARD'S OWN HALVES LIVE
 ///
-/// There is **no role guard in the tree yet** — nothing reads [RoleAccess] in
-/// `lib/` at this commit, exactly as `user_role.dart` records for its own two
-/// unreferenced conversions. So the half of the obligation `auth_status.dart`
-/// pins against a *guard* ("the router builds nothing at all") has no
-/// counterpart here, and this suite does not pretend to one. What it pins is
-/// the half that is reachable: the throw **propagates**, and the seam contains
-/// **no handler that could swallow it** — the property that makes a later
-/// guard's behaviour predictable rather than hopeful. When a guard exists, the
-/// "nothing was built" assertion belongs beside it and not here.
+/// There **is** a role guard in the tree — `lib/app/router/role_guard.dart`,
+/// landed with the servant portal's routes — and it reads this seam. This
+/// suite used to say there was none, and to point at `user_role.dart`'s
+/// record of its own unreferenced conversions; that paragraph described a
+/// state that had already stopped being true, and a reader who took it at
+/// face value would look for a guard that was right there in `lib/`.
+///
+/// So the obligation is split across two suites, and the split is
+/// deliberate. **Here**, the seam's own halves: the throw **propagates**
+/// rather than being absorbed, and the seam contains **no handler that could
+/// swallow one** — the property that makes a guard's behaviour predictable
+/// rather than hopeful. **There**, in `test/app/router/role_guard_test.dart`,
+/// the guard's halves: what the guard does with a seam that breaks its
+/// contract, and the fact that it reads the role **once** per decision, so
+/// the grant and the refusal's destination are one snapshot.
 void main() {
   group('the seam', () {
     test('role reports what the app currently believes, for every role', () {
@@ -68,26 +74,9 @@ void main() {
   });
 
   group('allows answers exactly the grant table, over the whole cross product', () {
-    // Every implementation is driven through the same loop, so the shipped one
-    // is never the only thing under test. An interface nobody can implement by
-    // hand is an interface whose only implementation is the one being tested —
-    // `auth_status_test.dart`'s "one boolean a feature can implement on its own"
-    // in the role seam's shape.
-    //
-    // Each subject is built from a *reader* rather than a value because a
-    // `RoleAccess` holds its role and a loop has to change it per iteration; the
-    // reader is what makes "swap the role, ask again" expressible without
-    // either implementation growing a test-only setter.
-    final List<({String label, RoleAccess Function(UserRole Function()) build})>
-    subjects =
-        <({String label, RoleAccess Function(UserRole Function()) build})>[
-          (label: 'LiveRoleAccess', build: LiveRoleAccess.new),
-          (label: '_MutableRoleAccess', build: _MutableRoleAccess.new),
-        ];
-
     for (final ({String label, RoleAccess Function(UserRole Function()) build})
         subject
-        in subjects) {
+        in _subjects) {
       test('${subject.label}, for all three roles', () {
         UserRole held = UserRole.kid;
         final RoleAccess access = subject.build(() => held);
@@ -144,6 +133,159 @@ void main() {
             'smaller total means it skipped some and a larger one means the '
             'table is not the one being walked',
       );
+    });
+  });
+
+  group('allowsRole answers for the role it is HANDED', () {
+    // ## WHY THE SEAM HAS A MEMBER THAT TAKES A ROLE
+    //
+    // `role_access.dart`'s hazard #2 says a caller that must reason about ONE
+    // reader consistently has to capture the role once — because a seam built
+    // on a reader guarantees liveness and NOT atomicity, and two reads in one
+    // decision can be handed two roles if the app emits in between.
+    //
+    // The hazard's first draft told such a caller to "pass that to
+    // `UserRole.grantsFor` itself", and that would have been the wrong remedy:
+    // it makes the caller answer the grant from the TABLE, while the seam
+    // answers it from the same table — two copies of one policy, free to
+    // drift. Decisions 5 and 68 each removed a second copy of one value in
+    // favour of a single source.
+    //
+    // `allowsRole` is the seam's own answer to that: the role is HANDED in, so
+    // the seam is still the one that knows what a role grants, and the caller
+    // still gets its answer from the seam rather than from a table of its own.
+    // The portal's `RoleGuard` is the consumer this member was written for.
+
+    // The same cross product the `allows` loop walks, with the role supplied
+    // rather than read — and the same two implementations, so the shipped one
+    // is never the only thing under test.
+    for (final ({String label, RoleAccess Function(UserRole Function()) build})
+        subject
+        in _subjects) {
+      test('${subject.label}, for all three roles', () {
+        UserRole held = UserRole.kid;
+        final RoleAccess access = subject.build(() => held);
+
+        for (final UserRole role in UserRole.values) {
+          held = role;
+          final Set<UserCapability> granted = UserRole.grantsFor(role);
+
+          for (final UserCapability capability in UserCapability.values) {
+            expect(
+              access.allowsRole(role, capability),
+              granted.contains(capability),
+              reason:
+                  'allowsRole($role, $capability) disagreed with '
+                  'UserRole.grantsFor, which grants ${granted.length} of '
+                  '${UserCapability.values.length} capabilities',
+            );
+          }
+        }
+      });
+    }
+
+    test('and it does NOT read the seam: the role is handed in', () {
+      // The property that makes the member worth having. If `allowsRole` read
+      // the role for itself, a caller that captured one would be back to two
+      // reads — and the role it was handed would be beside the point.
+      //
+      // The seam here holds `kid` and is asked about `adminServant`, so the
+      // two answers differ: a member that read the seam would answer about
+      // `kid` and refuse.
+      for (final ({
+            String label,
+            RoleAccess Function(UserRole Function()) build,
+          })
+          subject
+          in _subjects) {
+        int reads = 0;
+        const UserRole held = UserRole.kid;
+        final RoleAccess access = subject.build(() {
+          reads++;
+          return held;
+        });
+
+        final bool granted = access.allowsRole(
+          UserRole.adminServant,
+          UserCapability.manageQuestions,
+        );
+
+        expect(
+          reads,
+          0,
+          reason:
+              '${subject.label}.allowsRole read the seam: the role is handed to '
+              'it, and a second read is the defect hazard #2 is about',
+        );
+        expect(
+          granted,
+          isTrue,
+          reason:
+              'the answer is about the role HANDED (an admin servant), not the '
+              'role the seam happens to hold (a kid)',
+        );
+      }
+    });
+
+    test('and it answers even when the seam behind it could not be read', () {
+      // A total function of its argument. The role is handed in, so nothing is
+      // read and nothing can fail — which is the other half of "the role is
+      // handed": the grant for a role the caller already holds cannot be
+      // lost to a broken reader.
+      final RoleAccess access = LiveRoleAccess(
+        () => throw StateError('role is undefined behaviour'),
+      );
+
+      expect(
+        () => access.allowsRole(UserRole.kid, UserCapability.submitQuiz),
+        returnsNormally,
+        reason:
+            'the role was handed in, so the seam had nothing to read and nothing '
+            'that could throw — a broken reader cannot take an answer away',
+      );
+    });
+
+    test('and `allows` and `allowsRole` are ONE answer path', () {
+      // The seam's own rule, restated as a fact about the code: `allows` MUST
+      // answer through `allowsRole`, so a caller that asks either way gets the
+      // same answer, and the grant table is consulted in one place.
+      //
+      // The read count is the half that can catch a divergence, because a
+      // second copy of the table would answer the same way while reading the
+      // seam a different number of times.
+      for (final ({
+            String label,
+            RoleAccess Function(UserRole Function()) build,
+          })
+          subject
+          in _subjects) {
+        for (final UserRole role in UserRole.values) {
+          int reads = 0;
+          final RoleAccess access = subject.build(() {
+            reads++;
+            return role;
+          });
+
+          for (final UserCapability capability in UserCapability.values) {
+            expect(
+              access.allows(capability),
+              access.allowsRole(role, capability),
+              reason:
+                  '${subject.label}: allows and allowsRole disagreed for $role / '
+                  '$capability, so the seam has two answers for one question',
+            );
+          }
+
+          expect(
+            reads,
+            UserCapability.values.length,
+            reason:
+                'each `allows` reads the role exactly once — a second read per '
+                'answer is the two-reads hazard, and zero reads would mean the '
+                'answer came from somewhere other than the seam',
+          );
+        }
+      }
     });
   });
 
@@ -240,6 +382,11 @@ void main() {
             () => access.allows(capability),
             returnsNormally,
             reason: 'allows($capability) threw for $role',
+          );
+          expect(
+            () => access.allowsRole(role, capability),
+            returnsNormally,
+            reason: 'allowsRole($role, $capability) threw',
           );
         }
       }
@@ -505,6 +652,29 @@ void main() {
   });
 }
 
+/// The implementations the cross-product loops drive.
+///
+/// Every implementation is driven through the same loop, so the shipped one is
+/// never the only thing under test. An interface nobody can implement by hand
+/// is an interface whose only implementation is the one being tested —
+/// `auth_status_test.dart`'s "one boolean a feature can implement on its own"
+/// in the role seam's shape.
+///
+/// Each subject is built from a *reader* rather than a value because a
+/// `RoleAccess` holds its role and a loop has to change it per iteration; the
+/// reader is what makes "swap the role, ask again" expressible without either
+/// implementation growing a test-only setter.
+///
+/// **File-level rather than local to one group** because two groups now drive
+/// it — the one about `allows` and the one about `allowsRole` — and two
+/// copies of a list of implementations is exactly the "second source of truth"
+/// shape this suite is about.
+final List<({String label, RoleAccess Function(UserRole Function()) build})>
+_subjects = <({String label, RoleAccess Function(UserRole Function()) build})>[
+  (label: 'LiveRoleAccess', build: LiveRoleAccess.new),
+  (label: '_MutableRoleAccess', build: _MutableRoleAccess.new),
+];
+
 /// The smallest thing that can implement [RoleAccess], built from the
 /// interface alone.
 ///
@@ -527,7 +697,10 @@ final class _MutableRoleAccess implements RoleAccess {
   UserRole get role => _read();
 
   @override
-  bool allows(UserCapability capability) =>
+  bool allows(UserCapability capability) => allowsRole(role, capability);
+
+  @override
+  bool allowsRole(UserRole role, UserCapability capability) =>
       UserRole.grantsFor(role).contains(capability);
 }
 

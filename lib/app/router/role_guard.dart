@@ -26,16 +26,16 @@ enum RoleGuardDecision {
 ///
 /// ## WHAT IT PROTECTS: AN **ACCIDENT**, NOT AN ATTACK
 ///
-/// [RoleAccess.allows] answers a **UI question** — *"should this screen be
-/// offered to this reader?"* — and never a security one, *"may this request be
-/// made?"*. The two are not the same question with different words, and the
-/// wire settles which one this client can answer: the backend parses
+/// [RoleAccess]'s grant members answer a **UI question** — *"should this
+/// screen be offered to this reader?"* — and never a security one, *"may this
+/// request be made?"*. The two are not the same question with different words,
+/// and the wire settles which one this client can answer: the backend parses
 /// `X-User-Role` at `src/middleware/identity.middleware.ts:24`, assigns it at
 /// `:31`, and never reads it again, so there is **no server-side answer to the
 /// second question** for this client to ask. Every endpoint answers whoever
 /// sends a user id.
 ///
-/// So a passing `allows` means *"this screen was chosen sensibly for this
+/// So a passing grant means *"this screen was chosen sensibly for this
 /// reader"*, never *"this reader is allowed to be here"*. What the guard buys
 /// is that a child is not dropped onto a scheduling screen that makes no sense
 /// for them, and that a viewer servant is not shown a control that reports
@@ -81,24 +81,27 @@ enum RoleGuardDecision {
 /// app currently believes, on every call. The role is chosen on the login
 /// screen, so it changes — a guard that remembered its first answer would keep
 /// allowing a capability the reader has since lost, and would keep refusing
-/// one they have since gained. `decide()` asks the seam every time.
+/// one they have since gained. [decideNow] asks the seam every time.
 ///
-/// ## AND THE ROLE IS READ TWICE, WHICH IS THE SEAM'S OWN LIMIT
+/// ## AND THE ROLE IS READ **ONCE** PER NAVIGATION
 ///
-/// `decide()` asks `allows` — which reads the role — and the landing path
-/// asks the role again. `role_access.dart` records that a seam built on a
-/// reader guarantees liveness and not atomicity: two reads can be handed two
-/// roles if the app emits in between, and it names the remedy for a guard that
-/// must reason about one reader consistently.
+/// `role_access.dart`'s hazard #2 says a seam built on a reader guarantees
+/// **liveness** and not **atomicity**: two reads in one decision can be handed
+/// two different roles if the app emits in between. So this guard reads the
+/// role **once** — `final UserRole role = _access.role;` — asks
+/// [RoleAccess.allowsRole] for the grant of **that** role, and sends a
+/// refusal to `landingRouteFor` of **that same role**. The decision and its
+/// destination are therefore one snapshot, and a reader cannot be refused on
+/// one role and sent to another role's page.
 ///
-/// The consequence here is bounded and worth naming rather than leaving
-/// implicit: a refusal computed against one role can send the reader to
-/// another role's route. Both candidates are a valid landing route for some
-/// role, and the landing navigation re-reads the role, so the reader ends up
-/// somewhere that is theirs. The alternative — capturing the role once and
-/// reading the grant table directly — would mean the guard stopped asking the
-/// seam the question the seam exists to answer, and `role_access.dart` says
-/// out loud that this guard is that seam's consumer.
+/// **AND THE GRANT STILL COMES FROM THE SEAM.** The obvious way to get the
+/// grant for a captured role is `UserRole.grantsFor(role)`, and that was the
+/// remedy hazard #2 used to name — and it is the **wrong** remedy, because a
+/// guard that reads the table holds a second copy of the policy, and the guard
+/// and the portal's hub would then answer *"may this reader be offered this
+/// screen?"* from two different places. [RoleAccess.allowsRole] is the seam's
+/// own answer for a role it is **handed**, so the guard asks the seam, and
+/// there is still one answer path.
 ///
 /// ## AND THE REDIRECT **REPLACES** RATHER THAN STACKS
 ///
@@ -118,31 +121,47 @@ class RoleGuard extends AutoRouteGuard {
   /// The capability the guarded route needs.
   final UserCapability _capability;
 
-  /// The guard's decision, as a value.
+  /// The guard's decision, for a **given** role, as a value.
   ///
-  /// Split out of [onNavigation] so the branch can be exercised without a
-  /// `Navigator`, which is the only part of this class that is genuinely pure.
-  /// The round trip it drives is exercised end to end where the routes that
-  /// carry this guard are registered.
-  RoleGuardDecision decide() => _access.allows(_capability)
+  /// The role is a **parameter** rather than something read here, because the
+  /// seam guarantees liveness and not atomicity: a member that read the role
+  /// for itself would hand the caller a second read, and the caller would be
+  /// back to two roles in one decision. Split out of [onNavigation] so the
+  /// branch can be exercised without a `Navigator`, which is the only part of
+  /// this class that is genuinely pure.
+  RoleGuardDecision decideFor(UserRole role) =>
+      _access.allowsRole(role, _capability)
       ? RoleGuardDecision.allow
       : RoleGuardDecision.redirectToLanding;
 
-  /// Where a refused navigation sends the reader.
+  /// The whole decision — the grant **and** the destination — from **one**
+  /// read of the seam.
   ///
-  /// The reader's own landing route, and therefore the reader's own app: `/`
-  /// for a child, the portal's hub for either servant role. Read from the
-  /// seam rather than spelled out here, so the guard and the sign-in path
-  /// cannot land the same role on two different screens.
-  String get landingPath => landingRouteFor(_access.role);
+  /// The role is captured here, once, and both answers come from it: the
+  /// grant from [decideFor], the destination from `landingRouteFor` of that
+  /// same role. That is the whole of the "read once" arrangement, and it is a
+  /// **value** rather than a second way of making a decision — [onNavigation]
+  /// is a switch over what this returns.
+  ///
+  /// It is public because the property it holds — one read, one role, one
+  /// destination — is the property worth pinning, and pinning it needs a
+  /// handle on the decision that does not need a `Navigator`.
+  ({RoleGuardDecision decision, String landingPath}) decideNow() {
+    final UserRole role = _access.role;
+
+    return (decision: decideFor(role), landingPath: landingRouteFor(role));
+  }
 
   @override
   void onNavigation(NavigationResolver resolver, StackRouter router) {
-    switch (decide()) {
+    final ({RoleGuardDecision decision, String landingPath}) outcome =
+        decideNow();
+
+    switch (outcome.decision) {
       case RoleGuardDecision.allow:
         resolver.resolveNext(true, reevaluateNext: false);
       case RoleGuardDecision.redirectToLanding:
-        _redirectToLanding(resolver, router);
+        _redirectToLanding(resolver, router, outcome.landingPath);
     }
   }
 
@@ -152,9 +171,16 @@ class RoleGuard extends AutoRouteGuard {
   /// pending routes of the same navigation event belong to a navigation that
   /// is not happening, and re-pushing them would carry the refusal into a
   /// second route.
-  void _redirectToLanding(NavigationResolver resolver, StackRouter router) {
-    final String path = landingPath;
-
+  ///
+  /// The path is the caller's, and the caller computed it from the role it
+  /// captured — so the destination and the refusal are the same snapshot, and
+  /// there is no second read of the seam here that could disagree with the
+  /// first.
+  void _redirectToLanding(
+    NavigationResolver resolver,
+    StackRouter router,
+    String path,
+  ) {
     resolver.resolveNext(false, reevaluateNext: false);
     unawaited(router.replacePath<void>(path));
   }
