@@ -56,6 +56,67 @@ const ScheduleResult result = ScheduleResult(
   readingIds: <String>['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
 );
 
+/// The cubit, with the page's reports counted.
+///
+/// **A spy, and not a mock**: the question is *which* of the cubit's writers
+/// the page called, and a subclass that records the call and then does the
+/// real thing answers it without replacing the cubit's behaviour. A mock would
+/// have to answer `state` as well, and the state is what the page renders.
+final class _SpyCubit extends ScheduleReadingCubit {
+  _SpyCubit({required super.scheduleReading});
+
+  /// Every edit the page reported, in the page's own words.
+  final List<String> reported = <String>[];
+
+  @override
+  void setGroupIds(String text) {
+    reported.add('groups: $text');
+    super.setGroupIds(text);
+  }
+
+  @override
+  void setScheduledDate(String text) {
+    reported.add('date: $text');
+    super.setScheduledDate(text);
+  }
+
+  @override
+  void setBookNumber(String text) {
+    reported.add('book: $text');
+    super.setBookNumber(text);
+  }
+
+  @override
+  void setStartChapter(String text) {
+    reported.add('start chapter: $text');
+    super.setStartChapter(text);
+  }
+
+  @override
+  void setStartVerse(String text) {
+    reported.add('start verse: $text');
+    super.setStartVerse(text);
+  }
+
+  @override
+  void setEndChapter(String text) {
+    reported.add('end chapter: $text');
+    super.setEndChapter(text);
+  }
+
+  @override
+  void setEndVerse(String text) {
+    reported.add('end verse: $text');
+    super.setEndVerse(text);
+  }
+
+  @override
+  void setExcludedVerses(String text) {
+    reported.add('excluded: $text');
+    super.setExcludedVerses(text);
+  }
+}
+
 void main() {
   /// Fills the form with a passage.
   ///
@@ -130,6 +191,18 @@ void main() {
     addTearDown(cubit.close);
     return cubit;
   }
+
+  /// The text the field at [index] holds.
+  ///
+  /// **THE FIELD, AND NOT THE STATE.** The defect this suite's re-entry group
+  /// is about was invisible for one reason: the state held the whole passage
+  /// the whole time, and only the **field** was empty. So the claim has to be a
+  /// claim about the field the admin reads — and reading the controller is
+  /// reading the field's own text, not the cubit's copy of it.
+  String textIn(WidgetTester tester, int index) => tester
+      .widget<TextField>(find.byType(TextField).at(index))
+      .controller!
+      .text;
 
   group('the two backend behaviours the screen must state', () {
     testWidgets('are on screen, next to the AI switch', (
@@ -216,6 +289,156 @@ void main() {
 
       expect(repo.asked.single.generateAiQuestions, isTrue);
     });
+  });
+
+  // ## THE ROUTE BEING **OPENED AGAIN**
+  //
+  // The cubit is a **singleton** — `navigation_injection.dart` says so and
+  // gives the reason: "a reader who left `/servant/schedule` and came back
+  // would find their edits gone". So the passage the admin was writing has to
+  // survive the route being popped and pushed again over that one cubit.
+  //
+  // **AND THE POP IS A REAL DISMOUNT.** The page is a `StatefulWidget` with
+  // eight controllers of its own, so the pop disposes them and the push builds
+  // new ones — which is what makes the passage on screen the state's job
+  // rather than the controllers'.
+  group('the route being opened again', () {
+    testWidgets('shows the passage the state holds, and sends that passage', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ScheduleResult>.of(result));
+      final ScheduleReadingCubit cubit = cubitOver(repo);
+
+      await pumpForm(tester, cubit);
+      await fillTheForm(tester);
+
+      // **The state holds the passage** — and this half of the claim was
+      // already true, which is exactly why the defect was invisible: the
+      // state and the screen had stopped agreeing, and only the screen was
+      // empty.
+      expect(cubit.state.form.groupIdsText, '3');
+      expect(cubit.state.form.bookNumberText, '43');
+
+      // **The route is popped and pushed again**, over the same singleton
+      // cubit — the hub pushes the route, and the cubit is one for the
+      // process.
+      await pumpServant(
+        tester,
+        const SizedBox.shrink(),
+        size: const Size(390, 1500),
+      );
+      await pumpForm(tester, cubit);
+
+      // **AND IT IS ON SCREEN** — the eight fields, not the state. The
+      // controllers are the page's own, and the page's own are built empty
+      // every time, so a form that shows the passage is a form the **state**
+      // filled.
+      expect(textIn(tester, 0), '3', reason: 'the cohorts');
+      expect(textIn(tester, 1), '2026-10-21', reason: 'the date');
+      expect(textIn(tester, 2), '43', reason: 'the book');
+      expect(textIn(tester, 3), '3', reason: 'the start chapter');
+      expect(textIn(tester, 4), '1', reason: 'the start verse');
+      expect(textIn(tester, 5), '', reason: 'the end chapter');
+      expect(textIn(tester, 6), '5', reason: 'the end verse');
+      expect(textIn(tester, 7), '', reason: 'the excluded verses');
+
+      // **AND THE REQUEST CARRIES THE PASSAGE THE SCREEN SHOWS.** The
+      // server's insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE`
+      // (`admin.routes.ts:157`), so a request built from a form the admin
+      // cannot see **replaces** the cohort's passage.
+      await tester.ensureVisible(find.text('Schedule the reading'));
+      await tester.tap(find.text('Schedule the reading'));
+      await tester.pump();
+
+      expect(repo.asked, hasLength(1));
+      expect(repo.asked.single.groupIds, <int>[3]);
+      expect(repo.asked.single.scheduledDate, '2026-10-21');
+      expect(repo.asked.single.bookNumber, 43);
+      expect(repo.asked.single.startChapter, 3);
+      expect(repo.asked.single.startVerse, 1);
+      expect(repo.asked.single.endChapter, isNull);
+      expect(repo.asked.single.endVerse, 5);
+    });
+
+    testWidgets('and the page\'s own writes are not reported as edits', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ScheduleResult>.of(result));
+      final _SpyCubit cubit = _SpyCubit(scheduleReading: ScheduleReading(repo));
+      addTearDown(cubit.close);
+
+      await pumpForm(tester, cubit);
+      await fillTheForm(tester);
+
+      // **Only the admin's own keystrokes so far.** The list is cleared so
+      // the claim below is about the **re-entry's** writes and not about the
+      // typing above.
+      cubit.reported.clear();
+
+      await pumpServant(
+        tester,
+        const SizedBox.shrink(),
+        size: const Size(390, 1500),
+      );
+      await pumpForm(tester, cubit);
+
+      // **A WRITE THE PAGE MADE IS NOT SOMETHING THE READER DID.** The
+      // form's eight controllers are the page's own, and the page's own are
+      // built empty — so filling them from the state is the page's own
+      // write, and the controller's listener is the page's own way of
+      // reporting a keystroke. Reported as an edit, the write told the cubit
+      // the reader had typed, and the cubit's edit writer drops the server's
+      // answer with the edit it invented.
+      expect(cubit.reported, isEmpty);
+    });
+
+    // ## THE WRITE THAT HAPPENS **WHILE THE FORM IS OPEN**
+    //
+    // The re-entry above is the page's own write at **mount**, and the mount
+    // reads the state **before** the listeners are attached — so the write
+    // cannot reach the cubit at all, and the `_writing` flag is not what
+    // stops it. The flag is what stops the write that happens **later**,
+    // when the listeners are attached and the page's own write would be
+    // reported as the reader's own keystroke.
+    //
+    // **AND THE DIVERGENCE IS PLANTED, BECAUSE THE APP'S OWN WRITERS CANNOT
+    // PRODUCE IT.** Every writer of this cubit's form is the page's own, and
+    // the page reports each field as the admin types it — so the state and
+    // the screen agree about every field, and the sync has nothing to write.
+    // A writer **outside** the page is what makes the two disagree, and the
+    // cubit's own writer is the way to say that.
+    testWidgets(
+      'a write the page makes while the form is open is not an edit',
+      (WidgetTester tester) async {
+        final _Repo repo = _Repo(Result<ScheduleResult>.of(result));
+        final _SpyCubit cubit = _SpyCubit(
+          scheduleReading: ScheduleReading(repo),
+        );
+        addTearDown(cubit.close);
+
+        await pumpForm(tester, cubit);
+        await fillTheForm(tester);
+
+        // **THE STATE SAYS SOMETHING THE SCREEN DOES NOT.** The cubit is the
+        // state and the page is the screen, and a writer outside the page is
+        // what makes the two disagree.
+        cubit.setGroupIds('7');
+        // **The call above is the test's own, not the page's** — so the list
+        // is cleared after it and before the page's own write.
+        cubit.reported.clear();
+        await tester.pump();
+
+        // **AND THE SCREEN IS IN STEP** — and this half is what keeps the
+        // claim below from being vacuous: a page that wrote nothing would
+        // report nothing, and the assertion would be about nothing.
+        expect(textIn(tester, 0), '7');
+
+        // **AND THE PAGE'S OWN WRITE WAS NOT REPORTED AS THE READER'S EDIT.**
+        // The listener is the page's own way of reporting a keystroke, and the
+        // page did not read a keystroke.
+        expect(cubit.reported, isEmpty);
+      },
+    );
   });
 
   // ## THE STATES THE ADMIN CAN REACH, AND THE TWO ARMS OF EACH

@@ -44,7 +44,17 @@ class ScheduleReadingPage extends StatelessWidget {
         passed ?? getIt<ScheduleReadingCubit>();
     return BlocProvider<ScheduleReadingCubit>.value(
       value: resolved,
-      child: const _ScheduleBody(),
+      // **THE BUILDER IS **ABOVE** THE FORM**, and that is the whole of the
+      // sync mechanism: the form is a `StatefulWidget` that owns the eight
+      // controllers, and it can only learn that the passage on screen changed
+      // if its own widget is rebuilt with the new state — which is what
+      // `didUpdateWidget` is for. A builder inside the form would rebuild the
+      // form's own subtree and never the form, and the fields would never
+      // fill.
+      child: BlocBuilder<ScheduleReadingCubit, ScheduleReadingState>(
+        builder: (BuildContext context, ScheduleReadingState state) =>
+            _ScheduleBody(state: state),
+      ),
     );
   }
 }
@@ -58,40 +68,54 @@ class ScheduleReadingPage extends StatelessWidget {
 /// the page reports every keystroke. The parse happens once, on submit, and
 /// it is the parse that refuses.
 ///
-/// ## AND THE FORM IS **NOT READ BACK** — A KNOWN DEFECT, STATED HERE
+/// ## AND THE FORM IS **READ BACK** INTO ITS OWN CONTROLLERS
 ///
-/// The cubit holds the form's text and this page reports every keystroke,
-/// but this page **never reads the state back into its eight controllers**.
-/// The question editor has the one-sided sync for the same reason, and this
-/// screen does not — and the cubit is a **singleton**, and the registration
-/// in `navigation_injection.dart` says the form the admin is halfway
-/// through filling is one of the three reasons it is one.
+/// The cubit holds the form's text and this page reports every keystroke, so
+/// the two are one form in two shapes — and the shape the admin **reads** is
+/// the controller's. The controllers are the page's own and they are built
+/// empty every time, so a form that showed nothing on a re-entry would show
+/// an empty passage while the state held the whole one.
 ///
-/// **MEASURED, 2026-10-21**, over that one cubit, with a route popped and
-/// pushed again:
+/// **THE CUBIT IS A SINGLETON**, and the registration in
+/// `navigation_injection.dart` says the form the admin is halfway through
+/// filling is one of the three reasons it is one — so the passage has to
+/// survive the route being popped and pushed again. It does: the page **fills
+/// its own controllers from the state at mount**, before the listeners are
+/// attached, and then on every rebuild through the one-sided sync.
 ///
-/// ```text
-/// field 0 after re-entry: ""
-/// state form after re-entry: ScheduleReadingForm(groupIdsText: 3,
-///   scheduledDateText: 2026-10-21, bookNumberText: 43, startChapterText: 3,
-///   startVerseText: 1, endChapterText: , endVerseText: 5, ...)
-/// asked the port for: [ReadingSchedule(groupIds: [3],
-///   scheduledDate: 2026-10-21, bookNumber: 43, startChapter: 3,
-///   startVerse: 1, endChapter: null, endVerse: 5, ...)]
-/// ```
+/// ## AND EVERY FIELD'S DIRECTION IS DECIDED THE **SAME** WAY
 ///
-/// **THE SCREEN SHOWS ONE FORM AND THE BUTTON SENDS ANOTHER.** The fields
-/// are empty, the state holds the whole passage, and "Schedule the
-/// reading" sends the passage the admin can no longer see — and the
-/// server's insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE`
-/// (`admin.routes.ts:157`), so it **replaces** the passage.
+/// **The state decides, per field, and the comparison is the field's own.**
+/// A controller is written **only when its text differs from the state's text
+/// for that same field**, and the eight fields are compared one by one — so
+/// there is no whole-form copy that could carry a stale field over a fresh
+/// one.
 ///
-/// **THE FIX IS NOT ONE LINE.** The reverse sync needs the `_writing` flag
-/// the question editor has, because a write the page made on purpose is
-/// not something the reader did — and that flag is the whole of the
-/// question editor's `_write`.
+/// **AND THAT CANNOT CLOBBER THE ADMIN'S OWN EDIT.** The state holds the
+/// admin's **last keystroke** for every field — the page reports each one
+/// synchronously, and the report is the cubit's own `copyWith` of that one
+/// field — so a field the admin is typing in already agrees with the state,
+/// and the comparison finds nothing to write. The write happens only where
+/// the two **disagree**, and the two can only disagree about a field the
+/// admin has not touched since the state last changed.
+///
+/// **AND THE NINTH CONTROL HAS NO CONTROLLER AT ALL.** The AI switch is read
+/// straight off the state, so its direction is **state → screen** with no
+/// reverse report — the only control on this form that is not a text field,
+/// and the only one whose direction is one-way by construction.
+///
+/// **AND A WRITE THE PAGE MADE IS NOT REPORTED TO THE CUBIT.** The sync
+/// writes into a controller, the controller tells its listener, and the
+/// listener is the page's own way of reporting a keystroke — so a write the
+/// page made on purpose, reported that way, told the cubit the reader had
+/// typed, and the cubit's edit writer drops the **server's sentence** — the
+/// `ScheduleResult` and the `scheduled` arm — with the edit it invented. The
+/// flag `_writing` is up for exactly the window of a programmatic write.
 class _ScheduleBody extends StatefulWidget {
-  const _ScheduleBody();
+  const _ScheduleBody({required this.state});
+
+  /// The form as the state holds it.
+  final ScheduleReadingState state;
 
   @override
   State<_ScheduleBody> createState() => _ScheduleBodyState();
@@ -111,10 +135,29 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
   /// exactly those and not whatever is there.
   final List<VoidCallback> _listeners = <VoidCallback>[];
 
+  /// Whether the page is writing into a controller on purpose.
+  ///
+  /// **A WRITE THE PAGE MADE IS NOT SOMETHING THE READER DID.** The
+  /// one-sided sync fills a controller from the state, and the controller
+  /// tells its listener — which is the page's own way of reporting a
+  /// keystroke. A write the page made on purpose reported that way told the
+  /// cubit the reader had typed, and the cubit's edit writer drops the
+  /// **server's sentence** — the `ScheduleResult` and the `scheduled` arm —
+  /// with the edit: **the answer could vanish in the frame it arrived.**
+  bool _writing = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final ScheduleReadingCubit cubit = context.read<ScheduleReadingCubit>();
+
+    // **THE PAGE FILLS ITS OWN CONTROLLERS FROM THE STATE, AND IT DOES IT
+    // BEFORE THE LISTENERS ARE ATTACHED.** The eight controllers are the
+    // page's own and they are built empty, so the passage the admin was
+    // writing is the **state's** to show — and a write the page made on
+    // purpose is not something the reader did, so it is made before the
+    // listeners are attached and it reports nothing.
+    _syncFrom(cubit.state);
 
     for (final VoidCallback listener in _listeners) {
       for (final TextEditingController controller in _controllers) {
@@ -123,14 +166,14 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
     }
     _listeners
       ..clear()
-      ..add(() => cubit.setGroupIds(_groupIds.text))
-      ..add(() => cubit.setScheduledDate(_date.text))
-      ..add(() => cubit.setBookNumber(_book.text))
-      ..add(() => cubit.setStartChapter(_startChapter.text))
-      ..add(() => cubit.setStartVerse(_startVerse.text))
-      ..add(() => cubit.setEndChapter(_endChapter.text))
-      ..add(() => cubit.setEndVerse(_endVerse.text))
-      ..add(() => cubit.setExcludedVerses(_excluded.text));
+      ..add(() => _report(cubit.setGroupIds, _groupIds.text))
+      ..add(() => _report(cubit.setScheduledDate, _date.text))
+      ..add(() => _report(cubit.setBookNumber, _book.text))
+      ..add(() => _report(cubit.setStartChapter, _startChapter.text))
+      ..add(() => _report(cubit.setStartVerse, _startVerse.text))
+      ..add(() => _report(cubit.setEndChapter, _endChapter.text))
+      ..add(() => _report(cubit.setEndVerse, _endVerse.text))
+      ..add(() => _report(cubit.setExcludedVerses, _excluded.text));
     for (int i = 0; i < _controllers.length; i++) {
       _controllers[i].addListener(_listeners[i]);
     }
@@ -149,6 +192,72 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
   ];
 
   @override
+  void didUpdateWidget(_ScheduleBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // **THE ONE-SIDED SYNC.** A controller is written only when the passage
+    // on screen says something different, so a rebuild never moves the caret
+    // and the admin's own edit is never undone.
+    _syncFrom(widget.state);
+  }
+
+  /// Writes the passage in [state] into the eight controllers.
+  ///
+  /// **THE STATE IS THE TRUTH, AND THE CONTROLLERS ARE THE PAGE'S.** The
+  /// two are one form in two shapes, and this is the direction that fills the
+  /// fields: the admin comes back to the route, and the eight controllers are
+  /// built empty every time.
+  ///
+  /// **AND EVERY FIELD IS COMPARED ON ITS OWN.** A controller is written
+  /// only when **that** field's text differs, so a field the admin has
+  /// changed is never carried over by another field's stale copy — and a
+  /// field the admin has not touched since the state last changed is filled.
+  ///
+  /// **AND IT REPORTS NOTHING.** Every write here is the page's own, and the
+  /// controller's listener is the page's own way of reporting a keystroke.
+  void _syncFrom(ScheduleReadingState state) {
+    _write(_groupIds, state.form.groupIdsText);
+    _write(_date, state.form.scheduledDateText);
+    _write(_book, state.form.bookNumberText);
+    _write(_startChapter, state.form.startChapterText);
+    _write(_startVerse, state.form.startVerseText);
+    _write(_endChapter, state.form.endChapterText);
+    _write(_endVerse, state.form.endVerseText);
+    _write(_excluded, state.form.excludedVersesText);
+  }
+
+  /// Writes [value] into [controller] when they differ, and tells the cubit
+  /// **nothing**.
+  ///
+  /// **The write is the page's own**, and the controller's listener is the
+  /// page's own way of reporting a keystroke — so a listener that reported
+  /// this write would be telling the cubit the reader had typed.
+  ///
+  /// The controller notifies its listeners **synchronously**, so [_writing] is
+  /// up for the whole write and down before the frame ends, and the
+  /// `try`/`finally` puts it down even if the write throws.
+  void _write(TextEditingController controller, String value) {
+    if (controller.text == value) return;
+    _writing = true;
+    try {
+      controller.text = value;
+    } finally {
+      _writing = false;
+    }
+  }
+
+  /// Reports [text] to [report] — unless the page is writing on purpose.
+  ///
+  /// **A WRITE THE PAGE MADE IS NOT SOMETHING THE READER DID**, and the
+  /// cubit must not be told it was: its edit writer answers the reader's
+  /// correction by dropping the **server's sentence** and the `scheduled`
+  /// arm — and a sentence the page wrote on purpose was never the reader's
+  /// correction, so it did not earn that.
+  void _report(void Function(String) report, String text) {
+    if (_writing) return;
+    report(text);
+  }
+
+  @override
   void dispose() {
     for (final VoidCallback listener in _listeners) {
       for (final TextEditingController controller in _controllers) {
@@ -165,133 +274,125 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
     final TextDirection direction = Directionality.of(context);
-
-    return BlocBuilder<ScheduleReadingCubit, ScheduleReadingState>(
-      builder: (BuildContext context, ScheduleReadingState state) {
-        final bool busy = state.status == ScheduleReadingStatus.submitting;
-        return NeuralScaffold(
-          scrollable: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    // **THE STATE THE PAGE WAS BUILT WITH.** The builder that watches the
+    // cubit is **above** this widget, so the state arrives as a widget
+    // parameter — and the page can then compare it with its own controllers.
+    final ScheduleReadingState state = widget.state;
+    final bool busy = state.status == ScheduleReadingStatus.submitting;
+    return NeuralScaffold(
+      scrollable: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SettingsGroup(
+            label: strings.servantScheduleTitle,
             children: <Widget>[
-              SettingsGroup(
-                label: strings.servantScheduleTitle,
-                children: <Widget>[
-                  EvaTextField(
-                    label: strings.servantScheduleGroupIdsLabel,
-                    hintText: strings.servantScheduleGroupIdsHint,
-                    controller: _groupIds,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.groupIds,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleDateLabel,
-                    hintText: strings.servantScheduleDateHint,
-                    controller: _date,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.date,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleBookLabel,
-                    controller: _book,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.bookNumber,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleStartChapterLabel,
-                    controller: _startChapter,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.startChapter,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleStartVerseLabel,
-                    controller: _startVerse,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.startVerse,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleEndChapterLabel,
-                    controller: _endChapter,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.endChapter,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleEndVerseLabel,
-                    controller: _endVerse,
-                    keyboardType: TextInputType.number,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.endVerse,
-                      strings,
-                    ),
-                  ),
-                  EvaTextField(
-                    label: strings.servantScheduleExcludedLabel,
-                    hintText: strings.servantScheduleExcludedHint,
-                    controller: _excluded,
-                    errorText: _errorFor(
-                      state,
-                      ScheduleReadingField.excludedVerses,
-                      strings,
-                    ),
-                  ),
-                  _AiSwitch(
-                    value: state.form.generateAiQuestions,
-                    onChanged: (bool generate) => context
-                        .read<ScheduleReadingCubit>()
-                        .setGenerateAiQuestions(generate: generate),
-                  ),
-                  EvaButton(
-                    label: strings.servantScheduleSubmit,
-                    onPressed: busy
-                        ? null
-                        : () => context.read<ScheduleReadingCubit>().submit(),
-                    labelFamily: arabicAwareFamily(
-                      direction,
-                      EvaTypography.uiFamily,
-                    ),
-                  ),
-                ],
-              ),
-              if (state.result case final ScheduleResult result)
-                _ScheduleOutcome(message: result.message),
-              if (state.failure case final Failure failure)
-                ErrorView(
-                  message: failure.message,
-                  onRetry: () => context.read<ScheduleReadingCubit>().retry(),
-                  retryLabel: strings.servantScheduleRetry,
-                  retryFamily: arabicAwareFamily(
-                    direction,
-                    EvaTypography.uiFamily,
-                  ),
+              EvaTextField(
+                label: strings.servantScheduleGroupIdsLabel,
+                hintText: strings.servantScheduleGroupIdsHint,
+                controller: _groupIds,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.groupIds,
+                  strings,
                 ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleDateLabel,
+                hintText: strings.servantScheduleDateHint,
+                controller: _date,
+                errorText: _errorFor(state, ScheduleReadingField.date, strings),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleBookLabel,
+                controller: _book,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.bookNumber,
+                  strings,
+                ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleStartChapterLabel,
+                controller: _startChapter,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.startChapter,
+                  strings,
+                ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleStartVerseLabel,
+                controller: _startVerse,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.startVerse,
+                  strings,
+                ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleEndChapterLabel,
+                controller: _endChapter,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.endChapter,
+                  strings,
+                ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleEndVerseLabel,
+                controller: _endVerse,
+                keyboardType: TextInputType.number,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.endVerse,
+                  strings,
+                ),
+              ),
+              EvaTextField(
+                label: strings.servantScheduleExcludedLabel,
+                hintText: strings.servantScheduleExcludedHint,
+                controller: _excluded,
+                errorText: _errorFor(
+                  state,
+                  ScheduleReadingField.excludedVerses,
+                  strings,
+                ),
+              ),
+              _AiSwitch(
+                value: state.form.generateAiQuestions,
+                onChanged: (bool generate) => context
+                    .read<ScheduleReadingCubit>()
+                    .setGenerateAiQuestions(generate: generate),
+              ),
+              EvaButton(
+                label: strings.servantScheduleSubmit,
+                onPressed: busy
+                    ? null
+                    : () => context.read<ScheduleReadingCubit>().submit(),
+                labelFamily: arabicAwareFamily(
+                  direction,
+                  EvaTypography.uiFamily,
+                ),
+              ),
             ],
           ),
-        );
-      },
+          if (state.result case final ScheduleResult result)
+            _ScheduleOutcome(message: result.message),
+          if (state.failure case final Failure failure)
+            ErrorView(
+              message: failure.message,
+              onRetry: () => context.read<ScheduleReadingCubit>().retry(),
+              retryLabel: strings.servantScheduleRetry,
+              retryFamily: arabicAwareFamily(direction, EvaTypography.uiFamily),
+            ),
+        ],
+      ),
     );
   }
 
