@@ -98,6 +98,7 @@ export 'package:evangelion/core/design_system/tokens/sticker_palette.dart';
 export 'package:evangelion/core/design_system/widgets/empty_state.dart';
 export 'package:evangelion/core/design_system/widgets/error_view.dart';
 export 'package:evangelion/core/design_system/widgets/eva_button.dart';
+export 'package:evangelion/core/design_system/widgets/eva_controlled_field.dart';
 export 'package:evangelion/core/design_system/widgets/eva_range_slider.dart';
 export 'package:evangelion/core/design_system/widgets/eva_section_header.dart';
 export 'package:evangelion/core/design_system/widgets/eva_text_field.dart';

@@ -654,7 +654,7 @@ class _RingDelegation {
   final String reason;
 }
 
-/// The two files whose interactive surface is entirely a *child* widget that
+/// The three files whose interactive surface is entirely a *child* widget that
 /// carries the ring itself.
 ///
 /// The source scan genuinely cannot see through them — it reads one file at a
@@ -683,6 +683,18 @@ _delegatesFocusRingTo = <String, _RingDelegation>{
         'track is a GestureDetector that is deliberately not focusable — it '
         'is reachable through Semantics onIncrease / onDecrease instead, so a '
         'screen-reader user is not offered a third tab stop.',
+  ),
+  'lib/core/design_system/widgets/eva_controlled_field.dart': _RingDelegation(
+    path: 'lib/core/design_system/widgets/eva_controlled_field.dart',
+    symbol: 'EvaControlledField',
+    surfaces: <String>['EvaTextField'],
+    reason:
+        'the only interactive surface is the EvaTextField it delegates to, and '
+        'EvaTextField carries the ring itself — the field\'s own rim is the '
+        'ring (see EvaTextField\'s own doc), and it never builds an '
+        'EvaFocusRing. The controlled field adds no surface of its own: it '
+        'owns a TextEditingController and no focus node, and its own test '
+        'asserts the ring is drawn.',
   ),
 };
 

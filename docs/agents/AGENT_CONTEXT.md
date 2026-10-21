@@ -5272,3 +5272,122 @@ from their tests would have been a rewrite of working code for a process
 record, and the tests' bite was demonstrated instead. A future cubit in this
 repository gets the red-first the protocol asks for — **this one did not, and
 this paragraph is where that fact lives.**
+
+**188. A SCREEN AND THE STATE IT MIRRORS MUST AGREE, AND THE **REQUEST** IS THE
+ONE THAT WRITES.**
+
+**Six defects of one class** were found in this repository's servant-portal work,
+and **every one of them was found by an agent reading the code — not by a gate.**
+The class is:
+
+> **A screen and the state it mirrors can stop agreeing — and the request is the
+> one that writes.**
+
+**THE ROOT CAUSE IS THAT THE CORRECT PATTERN WAS NOT EXPRESSIBLE.** A page that
+mirrors a cubit-held value into a `TextEditingController` has to hand-roll it,
+and hand-rolling has **three** ways to be wrong — **the write is reported**, the
+field is **seeded instead of read back**, the mirror runs in the **wrong
+direction** — and **no way to be caught**. `LoginPage` gets away with it only
+because its state is cleared on every path that unmounts the page, and **that is
+a coincidence, not a design.**
+
+**THE SIX, BY SCREEN, SO THAT THE NEXT ONE CAN BE RECOGNISED.**
+
+| # | screen | what it got wrong |
+| --- | --- | --- |
+| 1 | `/servant/questions` | **A programmatic write reported as a user edit.** The editor wrote the state's `pointsText` into a controller that had started **empty**, the controller notified, and the cubit was told the **reader** had edited the question. The cubit's edit writer then dropped the **server's failure** with it — **a server's refusal erased itself in one frame.** |
+| 2 | `/servant/questions` | **A seed that reported the controllers' contents at mount.** The controllers start empty, so the seed told the cubit *"the reader cleared the question"* — and the admin's in-progress question was wiped on re-entry, over the **singleton** cubit whose one purpose is to survive the route. |
+| 3 | `/servant/schedule` | **The same seed, on the schedule form.** The form was never read back, so the admin saw an **empty form** while the state held a passage, and the button sent the passage the admin could no longer see. The server's insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE` (`admin.routes.ts:157`), so that **replaces the cohort's scheduled passage**. |
+| 4 | `/servant/report` | **The same seed, on the report page.** The servant's cohort and date were wiped, and the roster they had loaded was dropped with them. |
+| 5 | `/servant/questions` | **An edit dropping the server's failure.** The server's answer vanished the moment the admin corrected the field it was about: the cubit's edit writer answers a keystroke by replacing the form's text, and the answer went with it. |
+| 6 | `/servant/report` | **An in-flight answer landing under a form that had moved on.** The report cubit's answer for **cohort 3** landed under a form that said **7**. |
+
+**AND THEY REDUCE TO TWO MISTAKES**, which are the two the mechanism is built to
+remove:
+
+1. **A write the program made, reported as a write the reader made.** Instances
+   **1** and **5** are that mistake seen twice: the page wrote the state's value
+   into a controller, the controller told its listener, and the listener was the
+   page's own way of reporting a keystroke.
+2. **A controller seeded from the program instead of read back from the state.**
+   Instances **2**, **3** and **4** are that mistake three times: the page
+   *seeded* the cubit with the controllers' contents at mount, and the
+   controllers start empty.
+
+**INSTANCE 6 IS THE CLASS'S THIRD SHAPE, AND IT LIVES IN THE CUBIT.** A request
+that answers a form that has moved on is the request writing over a state the
+reader has already changed, and **no field can see it** — the fix there is a
+staleness rule in the cubit, not a mirror. It is named here so that nobody
+mistakes the mechanism for a fix for it.
+
+**THE RULE THAT STOPS THE CLASS.**
+
+> **A value that is mirrored into a control is mirrored by the **one** controlled
+> field, in **one** direction, and a programmatic write is never reported as the
+> reader's.**
+
+**THE MECHANISM IS `lib/core/design_system/widgets/eva_controlled_field.dart`** —
+a controlled field that takes the value, reports **only the reader's input**, and
+owns its `TextEditingController` so that the page does not have to.
+
+**AND HOW IT TELLS THE READER'S INPUT FROM ITS OWN WRITE IS TWO COMPARISONS,
+NOT A FLAG.** The servant pages use a `_writing` boolean, and it works — but a
+boolean has to be set and cleared around **every** write, and the failure mode
+of a boolean that is not set is exactly defect **1**. The controlled field
+compares instead:
+
+| question | answer | what it buys |
+| --- | --- | --- |
+| *is the controller's new text the controlled value?* | then it is **the widget's own write** — or an echo of a value the state already holds — and **nothing is reported** | the server's draft arrives, the field fills, and the cubit is **not** told the admin typed it |
+| *is the controlled value the last text the widget reported?* | then the state has **caught up with the reader**, and **nothing is mirrored back** | a state one keystroke behind cannot revert the reader's newer keystrokes |
+
+**The first comparison is the crux, and it works because the widget only ever
+writes the controlled value into its controller.** There is no other write, so
+"the controller's text is the controlled value" is not a coincidence to be
+detected — it is the only thing that can have happened. **And the comparison is
+against the controlled value and not only against the last reported text**,
+because the state can move for a reason the reader had nothing to do with — the
+server's draft arrives, the cubit resets the form — and a comparison against the
+last reported value alone would read those as *the reader typing* and report
+them, which is defect **1** again.
+
+**THE GATE IS `test/core/design_system/widgets/mirrored_controller_check_test.dart`,
+and the command is**
+
+```bash
+flutter test test/core/design_system/widgets/mirrored_controller_check_test.dart
+```
+
+**IT SCANS ALL OF `lib/`** — not the widget directories, which is the structural
+mistake `orphan_widget_check.py` was built to fix, and here the filter would have
+found **none** of the six sites, because every one of them is a page. The rule is
+that a `TextEditingController` may only be **created** in the controlled field or
+in the login page; the allowlist is a **file plus the normalised text of each
+declaration**, and **a stale row is a failure** — the same rule
+`test/setstate_budget_test.dart` applies to its `setState` rows — so the
+servant rows are **live** and the portal's migration cannot land without the row
+it retires being re-read.
+
+**THE LOGIN PAGE IS THE ONE DELIBERATE EXCEPTION, AND ITS RECEIPT IS CHECKED
+RATHER THAN ASSERTED.** It is allowed to own controllers because its form is
+**one-way**: the reader types, the page reports, the bloc records, and **nothing
+ever flows back** — the gate asserts that the page **never assigns to a
+controller's text**, so the bloc's state is never mirrored into the field and
+there is no mirror here to get wrong. And the state is cleared on every path
+that unmounts the page: `LoginPage.build` dispatches `AuthStarted` on every
+build, `AuthBloc._onStarted` emits a **fresh** `AuthState` in both of its arms,
+and a fresh `AuthState` holds an empty email and an empty password — while the
+page's two controllers are created empty. The screen and the state therefore
+start every mount in agreement, and only the reader's own keystroke moves either
+of them afterwards.
+
+**AND THE COST, STATED RATHER THAN HIDDEN.** The controlled field is **one more
+abstraction over `EvaTextField`**, and a reader who knows `EvaTextField` now has
+to know this too. The price is paid in exchange for the gate: the gate can say
+*one file may create a `TextEditingController`*, because the pattern is in one
+place instead of in every page that mirrors a value — and **a page that needs a
+controller for something other than a mirrored value has to say why it is not
+mirroring one**, which is the question the gate asks. The mechanism also does
+**not** fix the cubit half of instances **5** and **6**: whether a keystroke
+clears a failure, and whether a stale answer may land on a form that has moved
+on, are rules in the cubit, and no field can see either.

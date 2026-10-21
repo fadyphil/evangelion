@@ -570,6 +570,42 @@ ALLOWLIST: dict[str, str] = {
         "so whether this one is deleted or kept is an OPEN decision. STALE the "
         "moment any page constructs it."
     ),
+
+    # ## `EvaControlledField` — THE **MECHANISM**, AND IT HAS NO CALLER YET
+    #
+    # This entry is a **decision with a date on it**, and it is the same shape as
+    # `WitnessSky`'s was: the widget ships **before** the pages that use it,
+    # because the pages that use it are the servant portal's three screens and
+    # their option editor, and **their** migration off the hand-rolled
+    # controllers is a separate task.
+    #
+    # **THE WIDGET IS THE FIX FOR A CLASS OF DEFECT, AND THE GATE THAT KEEPS
+    # THE FIX IN PLACE IS A SEPARATE FILE.** Decision 188 records six defects
+    # of one class — "a screen and the state it mirrors can stop agreeing, and
+    # the request is the one that writes" — and every one of them was found by
+    # an agent reading the code rather than by a gate. The mechanism is this
+    # widget; the gate is
+    # `test/core/design_system/widgets/mirrored_controller_check_test.dart`,
+    # which allows exactly **one** file to create a `TextEditingController`:
+    # this one, plus the login page's two and the servant portal's eighteen.
+    #
+    # **STALE THE MOMENT ANY PAGE CONSTRUCTS IT**, and the gate says so:
+    # `stale_allow` reports an allowlisted widget that **is** placed, and the
+    # entry has to be deleted then. The servant migration is what ends this
+    # entry, and it cannot land without the row being re-read.
+    "EvaControlledField": (
+        "UNPLACED, AND THE REASON IS A SEPARATE TASK. The controlled field is "
+        "the mechanism for decision 188's class of defect — a screen and the "
+        "state it mirrors can stop agreeing, and the request is the one that "
+        "writes — and it ships before the pages that will use it. Its callers "
+        "are the servant portal's three screens and their option editor, and "
+        "their migration off the hand-rolled controllers is a separate task. "
+        "The gate that keeps the hand-rolled version out is "
+        "`test/core/design_system/widgets/mirrored_controller_check_test.dart`, "
+        "which allows exactly one file to create a `TextEditingController` "
+        "besides the login page's deliberate exception. STALE the moment any "
+        "page constructs it."
+    ),
 }
 
 
