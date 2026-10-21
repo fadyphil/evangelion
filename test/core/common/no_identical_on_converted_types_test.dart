@@ -89,7 +89,7 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(58),
+        hasLength(62),
         reason:
             'the converted set moved, so the table\'s flags are stale. 34 was the '
             'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`, '
@@ -100,7 +100,9 @@ void main() {
             'portal\'s Task 1**, for `AuthRoleChanged` — the event that carries '
             'the role the reader chose on the login form. **47 → 58 in the '
             'servant portal\'s Task 3**, for that feature\'s eleven: eight '
-            'entities and three params objects.',
+            'entities and three params objects. **58 → 62 in the servant '
+            'portal\'s Task 4**, for the three cubit states and the form '
+            'object one of them holds.',
       );
     });
   });

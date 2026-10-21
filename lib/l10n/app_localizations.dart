@@ -1585,6 +1585,396 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get journeyRetry;
+
+  /// Written, not transcribed: `eva/redesign.html` draws no servant portal at all — the redesign has seven reader screens and no admin surface, because the admin routes are the 2026-10-21 amendment (ADR-0026) and the prototype predates them. This is the hub's own section label.
+  ///
+  /// In en, this message translates to:
+  /// **'Servant portal'**
+  String get servantHubTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. This names the one section every servant role has — the cohort's roster for one day — and it is the same word the report screen's own title uses (`servantReportTitle`), because they are the same surface seen from two places.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily report'**
+  String get servantHubReportTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. This names the admin servant's second section — choosing the passage a cohort reads next — and the backend's own route is `POST /admin/readings/schedule`.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule a reading'**
+  String get servantHubScheduleTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. This names the admin servant's third section — writing or drafting the questions a reading is served with — and the backend's own routes are `/admin/questions/commit` and `/admin/questions/ai-generate`.
+  ///
+  /// In en, this message translates to:
+  /// **'Author questions'**
+  String get servantHubQuestionsTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. This is the admin-can-use-the-kids'-app half of the portal: the entry opens the reader's own shell at `/`, because a servant is also a reader — the grant table's first three capabilities are every role's.
+  ///
+  /// In en, this message translates to:
+  /// **'Read as a reader'**
+  String get servantHubReaderTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. This is the report screen's own title, and it is the same word the hub uses for the section that opens it, because they are one surface seen from two places.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily report'**
+  String get servantReportTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The report's querystring names it `group_id` and the backend's rows are `groups`; the reader-facing word is the one the app's own `/communion` screen uses for the same cohort.
+  ///
+  /// In en, this message translates to:
+  /// **'Cohort'**
+  String get servantReportGroupLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The report's second querystring parameter, `date`, in the shape `YYYY-MM-DD` the backend echoes back as `report_date`.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get servantReportDateLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The report's one action, and it names what it does — the roster — rather than the request behind it.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the roster'**
+  String get servantReportSubmit;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The caption of the report's first total, which is the server's own `total_students` — a count over the rows the server sent and never one this client counted.
+  ///
+  /// In en, this message translates to:
+  /// **'Children'**
+  String get servantReportTotalStudents;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The caption of the report's second total, which is the server's own `completed_count` — the children whose approved questions are all answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get servantReportCompleted;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The empty state's headline, for a cohort with no children on that day — a real answer, because the report's query is a LEFT JOIN and produces rows even with no reading.
+  ///
+  /// In en, this message translates to:
+  /// **'No roster'**
+  String get servantReportEmptyTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The empty state's explanation, and it names the day — a roster for another day is not an empty roster.
+  ///
+  /// In en, this message translates to:
+  /// **'This cohort has no children for that day.'**
+  String get servantReportEmptyMessage;
+
+  /// Written, not transcribed: the prototype has no failure state at all. This is the servant portal's **first** per-screen `*Retry` key, and the repository namespaces `retry` per screen on purpose — `homeRetry`, `quizRetry`, `readingRetry`, `settingsRetry`, `leaderboardRetry` and `journeyRetry` are six more.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get servantReportRetry;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The roster row's first number, the child's lifetime `total_points` — the server's own figure, drawn beside the child's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Points'**
+  String get servantReportPoints;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The roster row's second number, the child's `current_streak` in days. The word is the app's own — the home screen's streak chip says the same thing.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak'**
+  String get servantReportStreak;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The caption of the roster row's third number — the server's own `questions_progress` string, drawn **verbatim** as `3/5` and never re-parsed into two numbers.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get servantReportProgress;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The refusal the report form makes **before** it asks, because the report's querystring types the cohort as a number and the server's 400 would name a field the servant never saw.
+  ///
+  /// In en, this message translates to:
+  /// **'The cohort must be a whole number.'**
+  String get servantReportInvalidGroup;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The report form's second refusal. The server defaults the date to its own today when the querystring omits it, and this client always sends one — so an empty date is this client's own gap.
+  ///
+  /// In en, this message translates to:
+  /// **'The date is required.'**
+  String get servantReportMissingDate;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule screen's own title, and the same word the hub uses for the section that opens it, because they are one surface seen from two places.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule a reading'**
+  String get servantScheduleTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's first field, which the backend types as `group_ids` — an array of at least one, so the form takes a list and the label says so.
+  ///
+  /// In en, this message translates to:
+  /// **'Cohort ids'**
+  String get servantScheduleGroupIdsLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The hint that says how the cohort list is written. The backend takes an array, and a form that took one id could not schedule a reading for two cohorts at once.
+  ///
+  /// In en, this message translates to:
+  /// **'comma separated'**
+  String get servantScheduleGroupIdsHint;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's date field, which the backend types as `scheduled_date` in a fixed `YYYY-MM-DD` shape and refuses anything else.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get servantScheduleDateLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The hint that says how the date is written — in words rather than in the machine's own separators, because the field is a plain text field and the backend's own error would not say it.
+  ///
+  /// In en, this message translates to:
+  /// **'year, month, day'**
+  String get servantScheduleDateHint;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's book field, which the backend types as `book_number` between 1 and 66 — one is Genesis and 43 is John.
+  ///
+  /// In en, this message translates to:
+  /// **'Book number'**
+  String get servantScheduleBookLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's first boundary, which the backend types as `start_chapter` and pairs with `start_verse` to name the passage's first word.
+  ///
+  /// In en, this message translates to:
+  /// **'Start chapter'**
+  String get servantScheduleStartChapterLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's first verse, which the backend types as `start_verse`.
+  ///
+  /// In en, this message translates to:
+  /// **'Start verse'**
+  String get servantScheduleStartVerseLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's last chapter, which the backend types as an **optional** `end_chapter` — the server's own transform substitutes the start chapter for a missing one, and this form leaves it empty rather than guessing.
+  ///
+  /// In en, this message translates to:
+  /// **'End chapter'**
+  String get servantScheduleEndChapterLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's last verse, which the backend types as `end_verse`.
+  ///
+  /// In en, this message translates to:
+  /// **'End verse'**
+  String get servantScheduleEndVerseLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's exclusion list, which the backend types as `excluded_verses` — an array of `{chapter, verse}` objects, so this form takes a pair at a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded verses'**
+  String get servantScheduleExcludedLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The hint that says how one excluded verse is written and how several are separated. The backend takes an array of pairs, and a field that took one pair at a time could not leave more than one verse out.
+  ///
+  /// In en, this message translates to:
+  /// **'chapter and verse, comma separated'**
+  String get servantScheduleExcludedHint;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The label of the schedule form's only switch, which the backend types as `generate_ai_questions` — and it says **generate the question**, not *schedule with AI*, because the server generates the question and attaches it to the reading it just wrote.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate the question with AI'**
+  String get servantScheduleAiLabel;
+
+  /// Written, not transcribed, and **it states a backend behaviour the screen must not hide**: `admin.routes.ts:195` runs `DELETE FROM questions WHERE reading_id = $1` when the AI switch is on, so re-scheduling the same cohort and date destroys the questions already written for it. The server does not say so in its answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduling the same cohort and date again with this on deletes the questions already written for that date.'**
+  String get servantScheduleAiWarning;
+
+  /// Written, not transcribed, and **it states a backend behaviour the screen must not hide**: the insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE` (`admin.routes.ts:157`), so scheduling the same cohort and date again replaces the passage rather than failing or duplicating it.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduling the same cohort and date again replaces the passage.'**
+  String get servantScheduleUpsertWarning;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's one action, and it names what it does — the reading — rather than the request behind it.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule the reading'**
+  String get servantScheduleSubmit;
+
+  /// Written, not transcribed: the prototype has no failure state at all. This is the servant portal's **second** per-screen `*Retry` key, and the repository namespaces `retry` per screen on purpose, so this screen does not borrow the report's.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get servantScheduleRetry;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's first refusal, and it is the server's own rule — `admin.routes.ts:9` types `group_ids` as an array with `min(1)` — checked before the request rather than after it.
+  ///
+  /// In en, this message translates to:
+  /// **'Name at least one cohort.'**
+  String get servantScheduleErrorEmptyGroupIds;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's refusal for a numeric field that is not a whole number, or is a number the server's own minimum and maximum refuse. The message names the fault and not the field, because the field carries it.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a whole number.'**
+  String get servantScheduleErrorInvalidNumber;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's refusal for a date that is not the shape `admin.routes.ts:10` types — a regex over the text, which the server would answer with a 400 naming a field the admin never saw.
+  ///
+  /// In en, this message translates to:
+  /// **'The date must be written as year, month, day.'**
+  String get servantScheduleErrorInvalidDate;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's refusal for an excluded verse that is not a pair. The backend types one as an object (`admin.routes.ts:16-28`) and this form writes the lower-case spelling of it.
+  ///
+  /// In en, this message translates to:
+  /// **'An excluded verse is written as a chapter and a verse.'**
+  String get servantScheduleErrorInvalidExcludedVerse;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The schedule form's range refusal, and it is the server's own rule: `admin.routes.ts:126-129` answers a passage whose start boundary is after its end boundary with a 400 and the sentence `start boundary cannot be after end boundary`.
+  ///
+  /// In en, this message translates to:
+  /// **'The start of the passage cannot be after its end.'**
+  String get servantScheduleErrorReversedRange;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The question editor's own title, and the same word the hub uses for the section that opens it, because they are one surface seen from two places.
+  ///
+  /// In en, this message translates to:
+  /// **'Author questions'**
+  String get servantQuestionsTitle;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's reading field, which the backend types as `reading_id` — a plain non-empty string, and not a uuid, because the ids this backend mints are not uuids either.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading id'**
+  String get servantQuestionsReadingIdLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. **The note that says where the id came from**, because the backend has **no endpoint that lists a cohort's scheduled readings** — the schedule route is the only one that creates a reading, and it answers with the id. A screen that pretended a lookup existed would be lying about the backend.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no list of a cohort\'s scheduled readings, so this id is the one the schedule answered with or one you typed.'**
+  String get servantQuestionsReadingIdNote;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's type control's accessible name, and it names the **control** rather than the selected option — the segmented control's track is an activatable node of its own, and naming it after the selected option would put two activatable nodes on screen with the same label.
+  ///
+  /// In en, this message translates to:
+  /// **'Question type'**
+  String get servantQuestionsTypeLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The label of the backend's `mcq` question type — the only one the AI route accepts by default, and the one the schedule route generates.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple choice'**
+  String get servantQuestionsTypeMcq;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The label of the backend's `true_false` question type, the second of the two the AI route accepts.
+  ///
+  /// In en, this message translates to:
+  /// **'True or false'**
+  String get servantQuestionsTypeTrueFalse;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The label of the backend's `short_answer` question type — the one the AI route **refuses**, because `ai.routes.ts:10` types its request as an enum of two.
+  ///
+  /// In en, this message translates to:
+  /// **'Short answer'**
+  String get servantQuestionsTypeShortAnswer;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's Arabic prompt, which the commit schema types as `prompt_ar` — the app's two languages are the app's own, and the question is served to children in both.
+  ///
+  /// In en, this message translates to:
+  /// **'Question in Arabic'**
+  String get servantQuestionsPromptArLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's English prompt, which the commit schema types as `prompt_en`.
+  ///
+  /// In en, this message translates to:
+  /// **'Question in English'**
+  String get servantQuestionsPromptEnLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The Arabic half of one answer option, which the commit schema types as `{ar, en}` — a pair, so an option's editor has two fields and not one.
+  ///
+  /// In en, this message translates to:
+  /// **'Option in Arabic'**
+  String get servantQuestionsOptionArLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The English half of one answer option, which the commit schema types as `{ar, en}` — the same pair the AI draft returns, which is why a draft is editable and committable without a conversion.
+  ///
+  /// In en, this message translates to:
+  /// **'Option in English'**
+  String get servantQuestionsOptionEnLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's correct-answer field, which the commit schema types as `correct_answer` — a letter for a question with options, and the answer itself for a short answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct answer'**
+  String get servantQuestionsCorrectAnswerLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's point value, which the commit schema types as `points_value` and defaults to ten.
+  ///
+  /// In en, this message translates to:
+  /// **'Points'**
+  String get servantQuestionsPointsLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's sort order, which the commit schema types as `sort_order` and defaults to one — the order the reader meets the questions in.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get servantQuestionsOrderLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's AI action, and it names what it asks for — a **draft**, which the admin then edits before committing. The server's own route is `/admin/questions/ai-generate`.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for a draft'**
+  String get servantQuestionsDraftButton;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's one committing action, and it names what it does — the question is stored, not merely drafted.
+  ///
+  /// In en, this message translates to:
+  /// **'Commit the question'**
+  String get servantQuestionsCommitButton;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's control for one more answer option, which the commit schema types as an optional `options` map of lettered pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an option'**
+  String get servantQuestionsAddOption;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's control for taking one answer option away again. **A short word on purpose**: it sits on a row that already names the option's letter.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get servantQuestionsRemoveOption;
+
+  /// Written, not transcribed: the prototype has no failure state at all. This is the servant portal's **third** per-screen `*Retry` key, and the repository namespaces `retry` per screen on purpose, so this screen does not borrow the report's or the schedule form's.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get servantQuestionsRetry;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's first refusal, and it is the commit schema's own rule — `admin.routes.ts:36` types `reading_id` as a non-empty string — checked before the request rather than after it.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the reading id first.'**
+  String get servantQuestionsErrorMissingReadingId;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's refusal for a missing prompt, and it names **both** languages because the commit schema types both prompts as `min(1)` — a question with one language is a question half the cohort cannot read.
+  ///
+  /// In en, this message translates to:
+  /// **'The question needs both languages.'**
+  String get servantQuestionsErrorEmptyPrompt;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's refusal for a question with no correct answer, and it is the commit schema's own rule — `admin.routes.ts:45` types `correct_answer` as `min(1)` — checked before the request.
+  ///
+  /// In en, this message translates to:
+  /// **'Say which answer is correct.'**
+  String get servantQuestionsErrorEmptyCorrectAnswer;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The note under the editor's empty options list, and it says **why** the list is empty rather than leaving a reader to wonder whether the form had broken.
+  ///
+  /// In en, this message translates to:
+  /// **'A short-answer question has no options.'**
+  String get servantQuestionsEmptyOptions;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's refusal for a point value or an order that is not a whole number, and it is the commit schema's own rule — `admin.routes.ts:46-47` types both as `z.number().int()`.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a whole number.'**
+  String get servantQuestionsErrorInvalidNumber;
 }
 
 class _AppLocalizationsDelegate

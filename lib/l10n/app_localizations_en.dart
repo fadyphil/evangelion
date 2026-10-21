@@ -623,4 +623,212 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get journeyRetry => 'Try again';
+
+  @override
+  String get servantHubTitle => 'Servant portal';
+
+  @override
+  String get servantHubReportTitle => 'Daily report';
+
+  @override
+  String get servantHubScheduleTitle => 'Schedule a reading';
+
+  @override
+  String get servantHubQuestionsTitle => 'Author questions';
+
+  @override
+  String get servantHubReaderTitle => 'Read as a reader';
+
+  @override
+  String get servantReportTitle => 'Daily report';
+
+  @override
+  String get servantReportGroupLabel => 'Cohort';
+
+  @override
+  String get servantReportDateLabel => 'Date';
+
+  @override
+  String get servantReportSubmit => 'Show the roster';
+
+  @override
+  String get servantReportTotalStudents => 'Children';
+
+  @override
+  String get servantReportCompleted => 'Completed';
+
+  @override
+  String get servantReportEmptyTitle => 'No roster';
+
+  @override
+  String get servantReportEmptyMessage =>
+      'This cohort has no children for that day.';
+
+  @override
+  String get servantReportRetry => 'Try again';
+
+  @override
+  String get servantReportPoints => 'Points';
+
+  @override
+  String get servantReportStreak => 'Streak';
+
+  @override
+  String get servantReportProgress => 'Questions';
+
+  @override
+  String get servantReportInvalidGroup => 'The cohort must be a whole number.';
+
+  @override
+  String get servantReportMissingDate => 'The date is required.';
+
+  @override
+  String get servantScheduleTitle => 'Schedule a reading';
+
+  @override
+  String get servantScheduleGroupIdsLabel => 'Cohort ids';
+
+  @override
+  String get servantScheduleGroupIdsHint => 'comma separated';
+
+  @override
+  String get servantScheduleDateLabel => 'Date';
+
+  @override
+  String get servantScheduleDateHint => 'year, month, day';
+
+  @override
+  String get servantScheduleBookLabel => 'Book number';
+
+  @override
+  String get servantScheduleStartChapterLabel => 'Start chapter';
+
+  @override
+  String get servantScheduleStartVerseLabel => 'Start verse';
+
+  @override
+  String get servantScheduleEndChapterLabel => 'End chapter';
+
+  @override
+  String get servantScheduleEndVerseLabel => 'End verse';
+
+  @override
+  String get servantScheduleExcludedLabel => 'Excluded verses';
+
+  @override
+  String get servantScheduleExcludedHint =>
+      'chapter and verse, comma separated';
+
+  @override
+  String get servantScheduleAiLabel => 'Generate the question with AI';
+
+  @override
+  String get servantScheduleAiWarning =>
+      'Scheduling the same cohort and date again with this on deletes the questions already written for that date.';
+
+  @override
+  String get servantScheduleUpsertWarning =>
+      'Scheduling the same cohort and date again replaces the passage.';
+
+  @override
+  String get servantScheduleSubmit => 'Schedule the reading';
+
+  @override
+  String get servantScheduleRetry => 'Try again';
+
+  @override
+  String get servantScheduleErrorEmptyGroupIds => 'Name at least one cohort.';
+
+  @override
+  String get servantScheduleErrorInvalidNumber => 'That is not a whole number.';
+
+  @override
+  String get servantScheduleErrorInvalidDate =>
+      'The date must be written as year, month, day.';
+
+  @override
+  String get servantScheduleErrorInvalidExcludedVerse =>
+      'An excluded verse is written as a chapter and a verse.';
+
+  @override
+  String get servantScheduleErrorReversedRange =>
+      'The start of the passage cannot be after its end.';
+
+  @override
+  String get servantQuestionsTitle => 'Author questions';
+
+  @override
+  String get servantQuestionsReadingIdLabel => 'Reading id';
+
+  @override
+  String get servantQuestionsReadingIdNote =>
+      'There is no list of a cohort\'s scheduled readings, so this id is the one the schedule answered with or one you typed.';
+
+  @override
+  String get servantQuestionsTypeLabel => 'Question type';
+
+  @override
+  String get servantQuestionsTypeMcq => 'Multiple choice';
+
+  @override
+  String get servantQuestionsTypeTrueFalse => 'True or false';
+
+  @override
+  String get servantQuestionsTypeShortAnswer => 'Short answer';
+
+  @override
+  String get servantQuestionsPromptArLabel => 'Question in Arabic';
+
+  @override
+  String get servantQuestionsPromptEnLabel => 'Question in English';
+
+  @override
+  String get servantQuestionsOptionArLabel => 'Option in Arabic';
+
+  @override
+  String get servantQuestionsOptionEnLabel => 'Option in English';
+
+  @override
+  String get servantQuestionsCorrectAnswerLabel => 'Correct answer';
+
+  @override
+  String get servantQuestionsPointsLabel => 'Points';
+
+  @override
+  String get servantQuestionsOrderLabel => 'Order';
+
+  @override
+  String get servantQuestionsDraftButton => 'Ask for a draft';
+
+  @override
+  String get servantQuestionsCommitButton => 'Commit the question';
+
+  @override
+  String get servantQuestionsAddOption => 'Add an option';
+
+  @override
+  String get servantQuestionsRemoveOption => 'Remove';
+
+  @override
+  String get servantQuestionsRetry => 'Try again';
+
+  @override
+  String get servantQuestionsErrorMissingReadingId =>
+      'Type the reading id first.';
+
+  @override
+  String get servantQuestionsErrorEmptyPrompt =>
+      'The question needs both languages.';
+
+  @override
+  String get servantQuestionsErrorEmptyCorrectAnswer =>
+      'Say which answer is correct.';
+
+  @override
+  String get servantQuestionsEmptyOptions =>
+      'A short-answer question has no options.';
+
+  @override
+  String get servantQuestionsErrorInvalidNumber =>
+      'That is not a whole number.';
 }

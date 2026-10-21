@@ -37,6 +37,9 @@ import 'package:evangelion/features/servant/domain/entities/servant_report.dart'
 import 'package:evangelion/features/servant/domain/usecases/commit_questions.dart';
 import 'package:evangelion/features/servant/domain/usecases/generate_ai_draft.dart';
 import 'package:evangelion/features/servant/domain/usecases/load_daily_report.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:evangelion/features/sky/presentation/cubit/sky_state.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -869,6 +872,183 @@ void main() {
     });
   });
 
+  // ## THE SERVANT PORTAL'S **STATES**, AND THE FOUR OF THEM
+  //
+  // Three cubits and the form object one of them holds. They are here for the
+  // reason every other converted type is here: **`freezed` derives `==` from
+  // the constructor, so a dropped field is invisible to an equality assertion
+  // and visible only to a `_differsInEveryField` sweep.**
+  //
+  // **And two of them are `@Freezed(copyWith: false)`,** so the sweep is the
+  // only thing that can see a field the generated writer would have skipped.
+  group('the servant portal\'s states', () {
+    test('`ServantReportState`', () {
+      _equalAndDistinct(
+        'ServantReportState',
+        _servantReportState(),
+        _servantReportState(),
+      );
+      _differsInEveryField(
+        'ServantReportState',
+        _servantReportState(),
+        fields: 6,
+        variants: <({String field, ServantReportState value})>[
+          (
+            field: 'status',
+            value: _servantReportState(status: ServantReportStatus.ready),
+          ),
+          (field: 'groupIdText', value: _servantReportState(groupIdText: '4')),
+          (
+            field: 'dateText',
+            value: _servantReportState(dateText: '2026-10-22'),
+          ),
+          (
+            field: 'report',
+            value: _servantReportState(report: _servantReport()),
+          ),
+          (field: 'failure', value: _servantReportState(failure: _failure())),
+          (
+            field: 'formError',
+            value: _servantReportState(
+              formError: ServantReportFormError.invalidGroupId,
+            ),
+          ),
+        ],
+      );
+    });
+
+    test('`ScheduleReadingForm`', () {
+      _equalAndDistinct(
+        'ScheduleReadingForm',
+        _scheduleForm(),
+        _scheduleForm(),
+      );
+      _differsInEveryField(
+        'ScheduleReadingForm',
+        _scheduleForm(),
+        fields: 9,
+        variants: <({String field, ScheduleReadingForm value})>[
+          (field: 'groupIdsText', value: _scheduleForm(groupIdsText: '4')),
+          (
+            field: 'scheduledDateText',
+            value: _scheduleForm(scheduledDateText: '2026-10-22'),
+          ),
+          (field: 'bookNumberText', value: _scheduleForm(bookNumberText: '44')),
+          (
+            field: 'startChapterText',
+            value: _scheduleForm(startChapterText: '4'),
+          ),
+          (field: 'startVerseText', value: _scheduleForm(startVerseText: '2')),
+          (field: 'endChapterText', value: _scheduleForm(endChapterText: '5')),
+          (field: 'endVerseText', value: _scheduleForm(endVerseText: '6')),
+          (
+            field: 'excludedVersesText',
+            value: _scheduleForm(excludedVersesText: '3:2'),
+          ),
+          (
+            field: 'generateAiQuestions',
+            value: _scheduleForm(generateAiQuestions: true),
+          ),
+        ],
+      );
+    });
+
+    test('`ScheduleReadingState`', () {
+      _equalAndDistinct(
+        'ScheduleReadingState',
+        _scheduleReadingState(),
+        _scheduleReadingState(),
+      );
+      _differsInEveryField(
+        'ScheduleReadingState',
+        _scheduleReadingState(),
+        fields: 6,
+        variants: <({String field, ScheduleReadingState value})>[
+          (
+            field: 'status',
+            value: _scheduleReadingState(
+              status: ScheduleReadingStatus.submitting,
+            ),
+          ),
+          (
+            field: 'form',
+            value: _scheduleReadingState(
+              form: _scheduleForm(groupIdsText: '4'),
+            ),
+          ),
+          (
+            field: 'result',
+            value: _scheduleReadingState(result: _scheduleResult()),
+          ),
+          (field: 'failure', value: _scheduleReadingState(failure: _failure())),
+          (
+            field: 'formError',
+            value: _scheduleReadingState(
+              formError: ScheduleReadingFormError.reversedRange,
+            ),
+          ),
+          (
+            field: 'formField',
+            value: _scheduleReadingState(
+              formField: ScheduleReadingField.startChapter,
+            ),
+          ),
+        ],
+      );
+    });
+
+    test('`QuestionAuthoringState`', () {
+      _equalAndDistinct(
+        'QuestionAuthoringState',
+        _questionAuthoringState(),
+        _questionAuthoringState(),
+      );
+      _differsInEveryField(
+        'QuestionAuthoringState',
+        _questionAuthoringState(),
+        fields: 8,
+        variants: <({String field, QuestionAuthoringState value})>[
+          (
+            field: 'status',
+            value: _questionAuthoringState(
+              status: QuestionAuthoringStatus.working,
+            ),
+          ),
+          (
+            field: 'readingId',
+            value: _questionAuthoringState(readingId: 'reading-2'),
+          ),
+          (
+            field: 'draft',
+            value: _questionAuthoringState(draft: _questionDraft()),
+          ),
+          (
+            field: 'commitResult',
+            value: _questionAuthoringState(commitResult: _commitResult()),
+          ),
+          (
+            field: 'failure',
+            value: _questionAuthoringState(failure: _failure()),
+          ),
+          (
+            field: 'formError',
+            value: _questionAuthoringState(
+              formError: QuestionAuthoringFormError.emptyPrompt,
+            ),
+          ),
+          (
+            field: 'pointsText',
+            value: _questionAuthoringState(pointsText: '20'),
+          ),
+          (
+            field: 'sortOrderText',
+            value: _questionAuthoringState(sortOrderText: '2'),
+          ),
+        ],
+      );
+    });
+  });
+
   group('auth', () {
     test('`LoginCredentials`', () {
       _equalAndDistinct('LoginCredentials', _credentials(), _credentials());
@@ -1288,7 +1468,7 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(58),
+        hasLength(62),
         reason:
             'the converted set moved. 25 classes, 15 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
@@ -1301,6 +1481,12 @@ void main() {
             'because the catalogue is ADR-0022\'s invented data behind a port. '
             '**46 → 47 in the servant portal\'s Task 1**, for `AuthRoleChanged` — '
             'the event that carries the role the reader chose on the login form. '
+            '**58 → 62 in the servant portal\'s Task 4**, for the three cubit '
+            'states and the form object — `ServantReportState`, '
+            '`ScheduleReadingForm`, `ScheduleReadingState` and '
+            '`QuestionAuthoringState`. **Two of the three states are '
+            '`@Freezed(copyWith: false)`**, so the sweep below is the only thing '
+            'that can see a field a partial writer would have skipped. '
             '**47 → 58 in the servant portal\'s Task 3**, for that feature\'s '
             '**eleven**: eight entities (`ExcludedVerse`, `ReadingSchedule`, '
             '`ScheduleResult`, `QuestionOption`, `QuestionDraft`, '
@@ -1441,6 +1627,12 @@ String _onlyFieldOf(Object event) {
 const Set<String> _assertedTypeNames = <String>{
   // The journey's own state — added in Task 5.6 with `/journey`.
   'JourneyState',
+  // The servant portal's three cubit states and the form object one of them
+  // holds — added in Task 4.
+  'ServantReportState',
+  'ScheduleReadingForm',
+  'ScheduleReadingState',
+  'QuestionAuthoringState',
   // The 17 classes with fields of their own.
   'Verse',
   'ScriptureText',
@@ -2148,6 +2340,84 @@ GenerateAiDraftParams _draftParams({
 
 DailyReportQuery _reportQuery({int groupId = 3, String date = '2026-10-21'}) =>
     DailyReportQuery(groupId: _int(groupId), date: _text(date));
+
+/// The report cubit's state, in the same shape as every builder above.
+ServantReportState _servantReportState({
+  ServantReportStatus status = ServantReportStatus.idle,
+  String groupIdText = '3',
+  String dateText = '2026-10-21',
+  ServantReport? report,
+  Failure? failure,
+  ServantReportFormError? formError,
+}) => ServantReportState(
+  status: status,
+  groupIdText: _text(groupIdText),
+  dateText: _text(dateText),
+  report: report,
+  failure: failure,
+  formError: formError,
+);
+
+/// The schedule form's fields.
+ScheduleReadingForm _scheduleForm({
+  String groupIdsText = '3',
+  String scheduledDateText = '2026-10-21',
+  String bookNumberText = '43',
+  String startChapterText = '3',
+  String startVerseText = '1',
+  String endChapterText = '',
+  String endVerseText = '5',
+  String excludedVersesText = '',
+  bool generateAiQuestions = false,
+}) => ScheduleReadingForm(
+  groupIdsText: _text(groupIdsText),
+  scheduledDateText: _text(scheduledDateText),
+  bookNumberText: _text(bookNumberText),
+  startChapterText: _text(startChapterText),
+  startVerseText: _text(startVerseText),
+  endChapterText: _text(endChapterText),
+  endVerseText: _text(endVerseText),
+  excludedVersesText: _text(excludedVersesText),
+  generateAiQuestions: _bool(generateAiQuestions),
+);
+
+/// The schedule cubit's state.
+ScheduleReadingState _scheduleReadingState({
+  ScheduleReadingStatus status = ScheduleReadingStatus.idle,
+  ScheduleReadingForm? form,
+  ScheduleResult? result,
+  Failure? failure,
+  ScheduleReadingFormError? formError,
+  ScheduleReadingField? formField,
+}) => ScheduleReadingState(
+  status: status,
+  form: form ?? _scheduleForm(),
+  result: result,
+  failure: failure,
+  formError: formError,
+  formField: formField,
+);
+
+/// The question editor's state.
+QuestionAuthoringState _questionAuthoringState({
+  QuestionAuthoringStatus status = QuestionAuthoringStatus.ready,
+  String readingId = 'reading-1',
+  QuestionDraft? draft,
+  CommitResult? commitResult,
+  Failure? failure,
+  QuestionAuthoringFormError? formError,
+  String pointsText = '10',
+  String sortOrderText = '1',
+}) => QuestionAuthoringState(
+  status: status,
+  readingId: _text(readingId),
+  draft: draft,
+  commitResult: commitResult,
+  failure: failure,
+  formError: formError,
+  pointsText: _text(pointsText),
+  sortOrderText: _text(sortOrderText),
+);
 
 /// A `Failure` for the three states that carry one.
 ///

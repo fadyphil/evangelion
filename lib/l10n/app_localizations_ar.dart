@@ -631,4 +631,209 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get journeyRetry => 'حاول مرة أخرى';
+
+  @override
+  String get servantHubTitle => 'بوابة الخدام';
+
+  @override
+  String get servantHubReportTitle => 'التقرير اليومي';
+
+  @override
+  String get servantHubScheduleTitle => 'جدولة قراءة';
+
+  @override
+  String get servantHubQuestionsTitle => 'صياغة الأسئلة';
+
+  @override
+  String get servantHubReaderTitle => 'اقرأ كقارئ';
+
+  @override
+  String get servantReportTitle => 'التقرير اليومي';
+
+  @override
+  String get servantReportGroupLabel => 'المجموعة';
+
+  @override
+  String get servantReportDateLabel => 'التاريخ';
+
+  @override
+  String get servantReportSubmit => 'اعرض القائمة';
+
+  @override
+  String get servantReportTotalStudents => 'الأطفال';
+
+  @override
+  String get servantReportCompleted => 'أكملوا';
+
+  @override
+  String get servantReportEmptyTitle => 'لا قائمة';
+
+  @override
+  String get servantReportEmptyMessage =>
+      'لا يوجد أطفال في هذه المجموعة في ذلك اليوم.';
+
+  @override
+  String get servantReportRetry => 'حاول مرة أخرى';
+
+  @override
+  String get servantReportPoints => 'النقاط';
+
+  @override
+  String get servantReportStreak => 'أيام متتالية';
+
+  @override
+  String get servantReportProgress => 'الأسئلة';
+
+  @override
+  String get servantReportInvalidGroup => 'يجب أن تكون المجموعة عددًا صحيحًا.';
+
+  @override
+  String get servantReportMissingDate => 'التاريخ مطلوب.';
+
+  @override
+  String get servantScheduleTitle => 'جدولة قراءة';
+
+  @override
+  String get servantScheduleGroupIdsLabel => 'أرقام المجموعات';
+
+  @override
+  String get servantScheduleGroupIdsHint => 'مفصولة بفواصل';
+
+  @override
+  String get servantScheduleDateLabel => 'التاريخ';
+
+  @override
+  String get servantScheduleDateHint => 'سنة ثم شهر ثم يوم';
+
+  @override
+  String get servantScheduleBookLabel => 'رقم الكتاب';
+
+  @override
+  String get servantScheduleStartChapterLabel => 'الفصل الأول';
+
+  @override
+  String get servantScheduleStartVerseLabel => 'الآية الأولى';
+
+  @override
+  String get servantScheduleEndChapterLabel => 'الفصل الأخير';
+
+  @override
+  String get servantScheduleEndVerseLabel => 'الآية الأخيرة';
+
+  @override
+  String get servantScheduleExcludedLabel => 'الآيات المستثناة';
+
+  @override
+  String get servantScheduleExcludedHint => 'فصل ثم آية، مفصولة بفواصل';
+
+  @override
+  String get servantScheduleAiLabel => 'ولّد السؤال بالذكاء الاصطناعي';
+
+  @override
+  String get servantScheduleAiWarning =>
+      'إعادة الجدولة لنفس المجموعة في نفس التاريخ مع تفعيل هذا تحذف الأسئلة المكتوبة لذلك التاريخ.';
+
+  @override
+  String get servantScheduleUpsertWarning =>
+      'إعادة جدولة نفس المجموعة في نفس التاريخ تستبدل الفصل.';
+
+  @override
+  String get servantScheduleSubmit => 'جدولة القراءة';
+
+  @override
+  String get servantScheduleRetry => 'حاول مرة أخرى';
+
+  @override
+  String get servantScheduleErrorEmptyGroupIds =>
+      'اذكر مجموعة واحدة على الأقل.';
+
+  @override
+  String get servantScheduleErrorInvalidNumber => 'هذا ليس عددًا صحيحًا.';
+
+  @override
+  String get servantScheduleErrorInvalidDate =>
+      'يجب كتابة التاريخ سنة ثم شهر ثم يوم.';
+
+  @override
+  String get servantScheduleErrorInvalidExcludedVerse =>
+      'تُكتب الآية المستثناة فصلًا ثم آية.';
+
+  @override
+  String get servantScheduleErrorReversedRange =>
+      'لا يمكن أن يبدأ الفصل بعد نهايته.';
+
+  @override
+  String get servantQuestionsTitle => 'صياغة الأسئلة';
+
+  @override
+  String get servantQuestionsReadingIdLabel => 'معرّف القراءة';
+
+  @override
+  String get servantQuestionsReadingIdNote =>
+      'لا توجد قائمة بالقراءات المجدولة، فهذا المعرّف هو ما أجب عنه الجدولة أو ما كتبته.';
+
+  @override
+  String get servantQuestionsTypeLabel => 'نوع السؤال';
+
+  @override
+  String get servantQuestionsTypeMcq => 'اختيار من متعدد';
+
+  @override
+  String get servantQuestionsTypeTrueFalse => 'صح أم خطأ';
+
+  @override
+  String get servantQuestionsTypeShortAnswer => 'إجابة قصيرة';
+
+  @override
+  String get servantQuestionsPromptArLabel => 'السؤال بالعربية';
+
+  @override
+  String get servantQuestionsPromptEnLabel => 'السؤال بالإنجليزية';
+
+  @override
+  String get servantQuestionsOptionArLabel => 'الخيار بالعربية';
+
+  @override
+  String get servantQuestionsOptionEnLabel => 'الخيار بالإنجليزية';
+
+  @override
+  String get servantQuestionsCorrectAnswerLabel => 'الإجابة الصحيحة';
+
+  @override
+  String get servantQuestionsPointsLabel => 'النقاط';
+
+  @override
+  String get servantQuestionsOrderLabel => 'الترتيب';
+
+  @override
+  String get servantQuestionsDraftButton => 'اطلب مسودة';
+
+  @override
+  String get servantQuestionsCommitButton => 'اعتمد السؤال';
+
+  @override
+  String get servantQuestionsAddOption => 'أضف خيارًا';
+
+  @override
+  String get servantQuestionsRemoveOption => 'احذف';
+
+  @override
+  String get servantQuestionsRetry => 'حاول مرة أخرى';
+
+  @override
+  String get servantQuestionsErrorMissingReadingId =>
+      'اكتب معرّف القراءة أولًا.';
+
+  @override
+  String get servantQuestionsErrorEmptyPrompt => 'السؤال يحتاج إلى اللغتين.';
+
+  @override
+  String get servantQuestionsErrorEmptyCorrectAnswer => 'حدّد الإجابة الصحيحة.';
+
+  @override
+  String get servantQuestionsEmptyOptions =>
+      'سؤال الإجابة القصيرة لا يحتاج خيارات.';
+
+  @override
+  String get servantQuestionsErrorInvalidNumber => 'هذا ليس عددًا صحيحًا.';
 }
