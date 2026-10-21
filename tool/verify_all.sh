@@ -161,8 +161,20 @@ printf '\n%s2. analyze%s\n' "$B" "$N"
 if out=$(dart analyze --fatal-infos --fatal-warnings 2>&1); then
   pass "dart analyze — $(printf '%s' "$out" | tail -1)"
 else
-  n=$(printf '%s' "$out" | grep -cE '^\s+(error|warning|info) - ')
-  fail "dart analyze — $n issue(s); first: $(printf '%s' "$out" | grep -E '^\s+(error|warning|info) - ' | head -1 | sed 's/^ *//')"
+  # **The leading whitespace is OPTIONAL, and it was not.** `dart analyze` prints
+  # `error` and `info` indented, but prints **`warning` at column 0** — so a
+  # pattern that required the indentation counted the errors and the infos and
+  # **never counted a warning**. The gate still FAILED (it is fail-closed, and
+  # the count was only ever a report), but the number it reported was wrong:
+  # reproduced on a tree with 4 issues, the script's counter printed 1.
+  #
+  # **A number in a gate is a claim about a specific thing**, so the count has to
+  # be the count. The pattern now accepts the message at any indentation, and
+  # still requires the ` - ` separator, so an echoed source line that merely
+  # *contains* "error - " is not mistaken for a diagnostic any more than it was
+  # before.
+  n=$(printf '%s' "$out" | grep -cE '^\s*(error|warning|info) - ')
+  fail "dart analyze — $n issue(s); first: $(printf '%s' "$out" | grep -E '^\s*(error|warning|info) - ' | head -1 | sed 's/^ *//')"
 fi
 
 # --- 3. purity ---------------------------------------------------------------

@@ -133,10 +133,15 @@ from that same table, so the screen and the gate cannot disagree.
   the four routes above, with the upsert and the delete-on-AI behaviours of the
   schedule endpoint stated on screen rather than discovered by losing work.
 - **The role model stops being a mechanism with no consumer.**
-  `UserRole.fromWire` has **no caller in `lib/`** at all, and
-  `UserRole.grantsFor`'s only one is `LiveRoleAccess.allows`
-  (`lib/core/navigation/role_access.dart:289`) — a seam that nothing in `lib/`
-  reads yet. The portal is what both of them were waiting for.
+  `UserRole.fromWire` has **no caller in `lib/`** at all, and still has none —
+  the portal did not give it one, because the client's role is *chosen* rather
+  than decoded. `UserRole.grantsFor`'s only caller is
+  `LiveRoleAccess.allowsRole`
+  (`lib/core/navigation/role_access.dart:378-379`) — a seam that **did** get a
+  consumer, and the grant table is now consulted in exactly one place in the
+  app. **One of the two was waiting for this portal and got it; the other is
+  still waiting**, and saying otherwise would be a claim about a caller that
+  does not exist.
 - **`landingRouteFor()` gets its first caller.** The function in
   `lib/core/navigation/landing_route.dart` was built for exactly this and had
   none; a `kid` lands on `/` and either servant role lands on `/servant`.
