@@ -184,8 +184,9 @@ abstract final class AppRoutes {
   /// rather than by throwing — `AuthGuard`'s recorded reason, stated in
   /// `core/navigation/auth_status.dart`'s own words. The hub's entries are read
   /// from that same table rather than from an `if` ladder of their own, and so
-  /// is the gate's answer (`core/navigation/role_access.dart:288` —
-  /// `allows` is `UserRole.grantsFor(role).contains(capability)`), so the
+  /// is the gate's answer (`core/navigation/role_access.dart` —
+  /// `allowsRole` is `UserRole.grantsFor(role).contains(capability)`, and
+  /// `allows` delegates to it), so the
   /// screen and the gate cannot disagree.
   ///
   /// ## AND IT IS NOT A PERMISSION
