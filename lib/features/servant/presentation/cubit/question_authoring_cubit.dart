@@ -520,15 +520,39 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// [arabic] says **which** of the option's two texts changed, because an
   /// option holds a pair (`admin.routes.ts:41-44`) and a method that took one
   /// string could not say which half it meant.
+  ///
+  /// ## AND IT **TAKES** THE KEYSTROKE, ALWAYS
+  ///
+  /// **THE CUBIT MUST TAKE EVERY KEYSTROKE**, and
+  /// `core/design_system/widgets/eva_controlled_field.dart` is where that
+  /// rule lives: a state that refuses a keystroke leaves the field showing a
+  /// character the state does not have, and the field's third guard — *the
+  /// controlled value must have moved* — means the character is **never**
+  /// written back, so the two disagree **permanently**.
+  ///
+  /// **SO THE OPTION IS CREATED WHEN THE LETTER HAS NONE.** The letter is
+  /// the caller's — the page owns the editor and picks the first free letter
+  /// — and a keystroke can only arrive for a letter from a field that showed
+  /// that letter. A reader who typed under the letter "A" has said what
+  /// option A says, so the question gets that option. **The refusal would
+  /// lose the reader's text**, and a lost text is the field and the state
+  /// disagreeing — the very thing this method must not do.
+  ///
+  /// **AND THE QUESTION ITSELF IS CREATED WHEN THERE IS NONE**, for
+  /// [QuestionAuthoringState.draft]'s reason: "the first thing the admin
+  /// writes creates the draft". [setPromptAr], [setPointsText] and [setType]
+  /// have always done it that way, and a writer that is the only exception
+  /// in the cubit is a writer whose rule nobody can remember.
   void setOptionText(
     String letter, {
     required bool arabic,
     required String text,
   }) {
-    final QuestionDraft? draft = state.draft;
-    if (draft == null) return;
-    final QuestionOption? option = draft.options[letter];
-    if (option == null) return;
+    final QuestionDraft draft = state.draft ?? blankDraft;
+    // **THE OPTION UNDER THE LETTER, OR AN EMPTY ONE.** The empty one is the
+    // pair's other half, and the other half is the reader's to write.
+    final QuestionOption option =
+        draft.options[letter] ?? const QuestionOption(ar: '', en: '');
     emit(
       QuestionAuthoringState(
         status: state.status,

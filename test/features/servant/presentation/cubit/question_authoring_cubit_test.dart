@@ -820,4 +820,176 @@ void main() {
       await cubit.close();
     });
   });
+
+  // ## THE CUBIT TAKES **EVERY** KEYSTROKE
+  //
+  // `lib/core/design_system/widgets/eva_controlled_field.dart` says it: **the
+  // cubit must take every keystroke**, or the screen and the state disagree
+  // and the field cannot tell which of them is right.
+  //
+  // **AND A REFUSAL IS NOT A TEMPORARY MISMATCH BUT A PERMANENT ONE.** The
+  // field's third guard — *the controlled value must have moved* — means a
+  // value the state kept is never written back, so the character the reader
+  // typed stays on the screen for ever while the state does not have it.
+  //
+  // **SO THE RULE IS ABOUT EVERY WRITER, AND NOT ABOUT THE ONES THE PAGE
+  // HAPPENS TO REACH.** A writer that can refuse is a writer the mechanism's
+  // safety does not hold for, whether or not the page can reach it today —
+  // and the option writer **could** refuse: it returned early when the
+  // question had no option under the letter.
+  group('the cubit takes every keystroke', () {
+    test('a keystroke for a letter with no option is taken, and the option is '
+        'created', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+      // The question exists, and it has no options at all.
+      cubit.setPromptEn('A question');
+
+      // **A LETTER THAT HAS NO OPTION.** The reader typed under the letter
+      // "A", so the question gets an option "A" — and the state holds what
+      // the reader wrote.
+      cubit.setOptionText('A', arabic: true, text: 'الخير');
+
+      expect(
+        cubit.state.draft!.options.keys,
+        <String>['A'],
+        reason:
+            'the keystroke was refused, so the field would be showing a '
+            'character the state does not have — and the field\'s own guard '
+            'means the character is never written back, so the two would '
+            'disagree permanently',
+      );
+      expect(cubit.state.draft!.options['A']!.ar, 'الخير');
+      expect(
+        cubit.state.draft!.options['A']!.en,
+        '',
+        reason:
+            'the other half of the pair is the reader\'s to write, not ours',
+      );
+
+      await cubit.close();
+    });
+
+    test('and a keystroke when there is no question at all is taken', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+
+      // **NO QUESTION AT ALL.** The state\'s own rule is that "the first thing
+      // the admin writes creates the draft", and every other writer in this
+      // cubit has always done it that way.
+      expect(cubit.state.draft, isNull);
+
+      cubit.setOptionText('A', arabic: false, text: 'The good');
+
+      expect(cubit.state.draft, isNotNull);
+      expect(cubit.state.draft!.options['A']!.en, 'The good');
+
+      await cubit.close();
+    });
+
+    test('and every writer takes the text it is given', () async {
+      // **THE TABLE IS THE CLAIM, AND EVERY ROW IS A NAMED WRITER.** A claim
+      // about "the writers" is a claim about a set of specific things, so the
+      // set is written down here — and a writer added to the cubit without a
+      // row here is a writer this test does not speak for, which is a gap a
+      // reader can see rather than one they have to trust.
+      final List<
+        ({
+          String name,
+          void Function(QuestionAuthoringCubit cubit) write,
+          String? Function(QuestionAuthoringState state) read,
+          String expected,
+        })
+      >
+      writers =
+          <
+            ({
+              String name,
+              void Function(QuestionAuthoringCubit cubit) write,
+              String? Function(QuestionAuthoringState state) read,
+              String expected,
+            })
+          >[
+            (
+              name: 'setReadingId',
+              write: (QuestionAuthoringCubit c) => c.setReadingId('a-reading'),
+              read: (QuestionAuthoringState s) => s.readingId,
+              expected: 'a-reading',
+            ),
+            (
+              name: 'setPromptAr',
+              write: (QuestionAuthoringCubit c) => c.setPromptAr('سؤال'),
+              read: (QuestionAuthoringState s) => s.draft?.promptAr,
+              expected: 'سؤال',
+            ),
+            (
+              name: 'setPromptEn',
+              write: (QuestionAuthoringCubit c) => c.setPromptEn('A question'),
+              read: (QuestionAuthoringState s) => s.draft?.promptEn,
+              expected: 'A question',
+            ),
+            (
+              name: 'setCorrectAnswer',
+              write: (QuestionAuthoringCubit c) => c.setCorrectAnswer('A'),
+              read: (QuestionAuthoringState s) => s.draft?.correctAnswer,
+              expected: 'A',
+            ),
+            (
+              name: 'setPointsText',
+              write: (QuestionAuthoringCubit c) => c.setPointsText('20'),
+              read: (QuestionAuthoringState s) => s.pointsText,
+              expected: '20',
+            ),
+            (
+              name: 'setSortOrderText',
+              write: (QuestionAuthoringCubit c) => c.setSortOrderText('3'),
+              read: (QuestionAuthoringState s) => s.sortOrderText,
+              expected: '3',
+            ),
+            (
+              name: 'setType',
+              // **A CONTROL AND NOT A FIELD**, and it is in the table because the
+              // rule is the same one: the reader's input is taken, not refused.
+              write: (QuestionAuthoringCubit c) =>
+                  c.setType(QuestionType.trueFalse),
+              read: (QuestionAuthoringState s) => s.draft?.type.name,
+              expected: 'trueFalse',
+            ),
+            (
+              name: 'setOptionText',
+              // **THE ONE THAT USED TO REFUSE.** A letter with no option is the
+              // case the refusal rejected, and the option is created here.
+              write: (QuestionAuthoringCubit c) =>
+                  c.setOptionText('A', arabic: true, text: 'الخير'),
+              read: (QuestionAuthoringState s) => s.draft?.options['A']?.ar,
+              expected: 'الخير',
+            ),
+          ];
+
+      for (final ({
+            String name,
+            void Function(QuestionAuthoringCubit cubit) write,
+            String? Function(QuestionAuthoringState state) read,
+            String expected,
+          })
+          writer
+          in writers) {
+        // **A FRESH CUBIT FOR EVERY WRITER**, so one writer's draft cannot be
+        // the next writer's reason for anything.
+        final QuestionAuthoringCubit cubit = cubitWith();
+
+        writer.write(cubit);
+
+        expect(
+          writer.read(cubit.state),
+          writer.expected,
+          reason:
+              '${writer.name} did not take the reader\'s input. A writer that '
+              'refuses leaves the field showing a character the state does not '
+              'have, and the field\'s own guard means the character is never '
+              'written back — so the two disagree permanently.',
+        );
+
+        await cubit.close();
+      }
+    });
+  });
 }

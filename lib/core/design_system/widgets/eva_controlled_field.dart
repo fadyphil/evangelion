@@ -124,10 +124,51 @@ import 'package:flutter/material.dart';
 ///   reader's text on the screen until the value next moves. **That is a rule
 ///   in the cubit, and this is the field's boundary**: the cubit must take
 ///   every keystroke, or the screen and the state disagree and the field
-///   cannot tell which of them is right. Every cubit in this repository does
-///   take it — `setPointsText` writes `pointsText: text` and nothing else —
-///   and that is what makes the boundary empty here rather than merely
-///   unstated.
+///   cannot tell which of them is right.
+///
+///   **AND A REFUSAL IS NOT A TEMPORARY MISMATCH BUT A PERMANENT ONE.** The
+///   third guard — *the controlled value must have moved* — means a value the
+///   state kept is never written back, so the character the reader typed
+///   stays on the screen **for ever** while the state does not have it, and
+///   neither of them knows which of them is right.
+///
+///   **AND THE RULE IS **CHECKED**, NOT ASSERTED.** No cubit behind a
+///   controlled field refuses a keystroke — there are three today, the
+///   question editor's, the schedule form's and the report form's — and the
+///   check is a gate:
+///
+///   `flutter test test/core/design_system/widgets/keystroke_taker_check_test.dart`
+///
+///   **THE GATE **DERIVES** ITS SUBJECT**: the cubits behind the controlled
+///   field, from the files that use one to the cubits those files import, and
+///   it fails if one of their keystroke writers can leave without emitting —
+///   a `return` before the emit, or an emit of the state the cubit already
+///   holds. **A gate that names its own subject cannot notice the subject
+///   moving**, so a screen that adopts the controlled field brings its cubit
+///   with it, and a writer added to one of them is checked the day it is
+///   written.
+///
+///   **AND THE BEHAVIOUR IS CHECKED TOO**, writer by writer, in
+///   `test/features/servant/presentation/cubit/question_authoring_cubit_test.dart`:
+///   the question editor's cubit is asked to take a keystroke by each of its
+///   writers in turn and is checked to have taken it. **`setPointsText`
+///   writes `pointsText: text` and nothing else** — that is what a writer
+///   that takes the keystroke looks like, and the table in that test is the
+///   list of them.
+///
+///   **AND THE SENTENCE THIS REPLACES WAS **FALSE**, WHICH IS WHY IT IS
+///   WRITTEN DOWN HERE.** It used to say that "every cubit in this repository
+///   does take it", and one did not: `QuestionAuthoringCubit.setOptionText`
+///   returned early when the question had no option under the letter, so a
+///   keystroke for a letter with no option was **refused**. **The refusal was
+///   unreachable from the page** — the option editor is drawn only for the
+///   letters the question already has — and that is exactly how it survived:
+///   a defect nobody can reach is a defect nobody looks for. **AND A PREMISE
+///   NOBODY CAN CHECK IS A GATE THAT CANNOT FAIL**: the safety does not
+///   depend on the claim being true *being* true — it depends on a reader
+///   being able to check it. The writer takes the keystroke now, and creates
+///   the option the reader typed into, and the claim is the narrower one the
+///   check can carry.
 ///
 /// ## THE COST, STATED RATHER THAN HIDDEN
 ///
