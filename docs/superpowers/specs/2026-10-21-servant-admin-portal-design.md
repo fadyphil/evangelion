@@ -323,6 +323,16 @@ throws**, for `AuthGuard`'s recorded reason: a throw escapes
 frame. `RoleAccess.allows` is documented as a **UI question, not a security
 one**, and that wording must survive into the guard's own doc.
 
+**The guard reads the role ONCE, and the seam answers for a given role.** A
+seam built on a reader guarantees liveness, not atomicity — two reads can be
+handed two roles if the app emits in between — and `role_access.dart`'s own
+hazard #2 names the remedy: capture the role once. So the interface gains
+`allowsRole(UserRole role, UserCapability capability)`, `allows` answers through
+it, and the guard captures the role **once** per navigation, asks the grant for
+*that* role, and sends the refusal to `landingRouteFor` of *that same role*.
+**One answer path**: the guard and the hub must not answer the same question
+from two places.
+
 ---
 
 ## 9. Testing
