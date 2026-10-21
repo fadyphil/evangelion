@@ -177,8 +177,8 @@ backend's admin, AI and report routes are client surface for the first time.
 has, and it is **not** an `AutoTabsRouter`, because a `viewer_servant` has
 exactly **one** section — the daily report — and a tab bar holding one tab is
 chrome for nothing. Its three sub-routes are therefore **root-level absolute
-paths** and not children of the hub. **The eleven rows are **TWO SURFACES**,
-not eleven screens in one**: decision 1's seven screens are the **reader's**
+paths** and not children of the hub. **The eleven rows are TWO SURFACES, not
+eleven screens in one**: decision 1's seven screens are the **reader's**
 app, and the portal's four are a **second** surface that a `kid` cannot reach.
 
 **`landingRouteFor()` GETS ITS FIRST CALLER WITH THE PORTAL, AND IT IS THE
@@ -187,7 +187,7 @@ ROLE'S OWN ROUTE.** `lib/core/navigation/landing_route.dart` is the one place a
 caller at all**: a `kid` lands on `/` and either servant role lands on
 `/servant`.
 
-**THE ROLE GATE IS **ADVISORY UX, NOT AUTHORISATION**, AND THE MEASUREMENT IS TWO
+**THE ROLE GATE IS ADVISORY UX, NOT AUTHORISATION, AND THE MEASUREMENT IS TWO
 GREPS.** The backend parses `X-User-Role` at
 `src/middleware/identity.middleware.ts:24`, assigns it to `request.user.role` at
 `:31`, and **never reads it again**: `rg 'user\??\.role' src/` returns **no
@@ -198,8 +198,8 @@ makes no sense for them — and it buys nothing an attacker would have to defeat
 because there is nothing on the server to defeat. The header is set by the
 client and every endpoint answers whoever asks.
 
-**THE PARAGRAPH THAT SAID "`/servant` IS **DECLARED, NOT YET ROUTED**" IS
-**REPLACED**, NOT ANNOTATED.** `lib/core/navigation/app_routes.dart`'s
+**THE PARAGRAPH THAT SAID "`/servant` IS DECLARED, NOT YET ROUTED" IS REPLACED,
+NOT ANNOTATED.** `lib/core/navigation/app_routes.dart`'s
 `servant` constant said it in its own words, ending with "the successor that
 registers the portal route replaces this paragraph". The probe behind it is
 dated: `router.matcher.match('/servant')` yielded `name=HomeRoute`, `path=/`,
