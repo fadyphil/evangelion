@@ -542,10 +542,11 @@ class ServantReportRoute extends _i13.PageRouteInfo<ServantReportRouteArgs> {
   ServantReportRoute({
     _i14.Key? key,
     _i24.ServantReportCubit? cubit,
+    DateTime Function()? today,
     List<_i13.PageRouteInfo>? children,
   }) : super(
          ServantReportRoute.name,
-         args: ServantReportRouteArgs(key: key, cubit: cubit),
+         args: ServantReportRouteArgs(key: key, cubit: cubit, today: today),
          initialChildren: children,
        );
 
@@ -557,21 +558,27 @@ class ServantReportRoute extends _i13.PageRouteInfo<ServantReportRouteArgs> {
       final args = data.argsAs<ServantReportRouteArgs>(
         orElse: () => const ServantReportRouteArgs(),
       );
-      return _i11.ServantReportPage(key: args.key, cubit: args.cubit);
+      return _i11.ServantReportPage(
+        key: args.key,
+        cubit: args.cubit,
+        today: args.today,
+      );
     },
   );
 }
 
 class ServantReportRouteArgs {
-  const ServantReportRouteArgs({this.key, this.cubit});
+  const ServantReportRouteArgs({this.key, this.cubit, this.today});
 
   final _i14.Key? key;
 
   final _i24.ServantReportCubit? cubit;
 
+  final DateTime Function()? today;
+
   @override
   String toString() {
-    return 'ServantReportRouteArgs{key: $key, cubit: $cubit}';
+    return 'ServantReportRouteArgs{key: $key, cubit: $cubit, today: $today}';
   }
 
   @override

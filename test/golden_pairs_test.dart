@@ -253,4 +253,15 @@ const List<String> kGoldenRoots = <String>[
   // the depth is part of it: this directory is three levels below `test/`,
   // where the widget goldens are four.
   'test/features/settings/presentation/goldens',
+  // ## THE PORTAL'S FOUR
+  //
+  // `test/features/servant/presentation/goldens` holds the servant portal's
+  // four screens in the two themes — the hub, the report, the schedule form and
+  // the question editor.
+  //
+  // **A directory the gate does not walk is a directory whose pairs are never
+  // compared** — so its two themes could be byte-identical and nothing would
+  // say so, which is the exact failure this gate exists for. The list is the
+  // one place a new golden directory becomes **walked**.
+  'test/features/servant/presentation/goldens',
 ];

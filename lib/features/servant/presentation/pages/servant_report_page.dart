@@ -22,10 +22,33 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 @RoutePage()
 class ServantReportPage extends StatelessWidget {
   /// The report screen.
-  const ServantReportPage({super.key, this.cubit});
+  const ServantReportPage({super.key, this.cubit, this.today});
 
   /// The cubit to render, or `null` to resolve the app's own.
   final ServantReportCubit? cubit;
+
+  /// The wall clock the form's date default is read from, or `null` for the
+  /// real one.
+  ///
+  /// ## WHY A PAGE THAT HAS NO CLOCK DEPENDENCY **NEEDS** A CLOCK
+  ///
+  /// The form's date field is **pre-filled with today**, so the screen's own
+  /// rendering depends on the day it is rendered on. That was fine while the
+  /// screen had no golden — a widget test asserts the *shape* of what is on
+  /// screen, and today's date is a shape.
+  ///
+  /// **A golden is not a shape: it is a picture.** A picture of
+  /// `2026-10-21` is a picture that fails on `2026-10-22`, and a golden that
+  /// fails every morning is a golden nobody keeps.
+  ///
+  /// So the clock is a **seam**, exactly as `CommunionCountdownLine`'s `now` is
+  /// — the same shape, the same reason, and the same precedent in this
+  /// repository: *"the widget owns the seam that fixes it: the `now` parameter
+  /// exists 'for deterministic testing' and the page does not pass it"*.
+  ///
+  /// **AND THE REAL ONE IS STILL THE DEFAULT.** `null` means `DateTime.now`, so
+  /// production is unchanged, and the golden passes a fixed instant.
+  final DateTime Function()? today;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +56,7 @@ class ServantReportPage extends StatelessWidget {
     final ServantReportCubit resolved = passed ?? getIt<ServantReportCubit>();
     return BlocProvider<ServantReportCubit>.value(
       value: resolved,
-      child: const _ReportBody(),
+      child: _ReportBody(today: today),
     );
   }
 }
@@ -48,7 +71,10 @@ class ServantReportPage extends StatelessWidget {
 /// the page reports every keystroke and never writes into a controller behind
 /// the cubit's back.
 class _ReportBody extends StatefulWidget {
-  const _ReportBody();
+  const _ReportBody({this.today});
+
+  /// The wall clock the date default is read from. See [ServantReportPage.today].
+  final DateTime Function()? today;
 
   @override
   State<_ReportBody> createState() => _ReportBodyState();
@@ -112,11 +138,13 @@ class _ReportBodyState extends State<_ReportBody> {
 
   /// Today, in the shape the server's querystring wants.
   ///
-  /// **A wall clock, and it is a form default rather than a decoration** — the
-  /// reading screen's own rule about injected clocks is about what a *frame*
-  /// depends on, and a form's default date is not a frame.
-  static String _today() {
-    final DateTime now = DateTime.now();
+  /// **A wall clock by default, and a seam for a golden.** The reading screen's
+  /// own rule about injected clocks is about what a *frame* depends on — and a
+  /// golden is a frame, so the date the form is pre-filled with is a rendering
+  /// input and has to be injectable. `ServantReportPage.today` is the seam;
+  /// `null` means the real clock, and a golden passes a fixed instant.
+  String _today() {
+    final DateTime now = (widget.today ?? DateTime.now)();
     return '${now.year.toString().padLeft(4, '0')}-'
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
