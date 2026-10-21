@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
@@ -48,6 +50,14 @@ const Failure failure = Failure(kind: FailureKind.server, message: 'HTTP 500');
 
 /// The reading the question belongs to.
 const String readingId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+/// **THE OTHER READING**, and the one the admin types while a request is open.
+///
+/// **A DIFFERENT READING, AND NOT A MALFORMED ONE.** The defect is about a
+/// question about one passage being stored against another reading, so the
+/// id has to be a **real** one — a typo would be a different defect, and a
+/// test that proved the wrong one would be a test about nothing.
+const String otherReadingId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 void main() {
   late MockServantAdminRepository repository;
@@ -118,10 +128,13 @@ void main() {
           status: QuestionAuthoringStatus.working,
           readingId: readingId,
         ),
+        // **AND THE DRAFT REMEMBERS THE READING IT WAS ASKED FOR** — that is
+        // what lets the commit refuse to send it against another one.
         const QuestionAuthoringState(
           status: QuestionAuthoringStatus.ready,
           readingId: readingId,
           draft: draft,
+          draftReadingId: readingId,
         ),
       ],
       verify: (_) {
@@ -183,6 +196,113 @@ void main() {
         await cubit.close();
       },
     );
+  });
+
+  // ## THE ANSWER THAT LANDS UNDER A FORM THAT **MOVED ON**
+  //
+  // `requestDraft` is a **READ** — the ai-generate route writes nothing: it
+  // selects the reading, extracts the verses, calls the AI and returns the
+  // draft (`ai.routes.ts:47-110`). So its answer is a **picture of the form's
+  // result**, and the house's rule is that a read's answer goes when the form
+  // moves on.
+  //
+  // **AND THE READING ID AND THE **TYPE** ARE BOTH PART OF THE REQUEST.** The
+  // request names a reading and a type (`ai.routes.ts:10` accepts two of the
+  // three), and **both** are editable while the request is open — the reading
+  // id is a field and the type is a control, and neither is disabled while
+  // the request is in flight. A comparison that forgot the type would be
+  // incomplete, and the defect it would leave is the same one.
+  group('the draft that lands under a form that moved on', () {
+    /// The request, held open until the test releases it.
+    ///
+    /// **A HELD ANSWER, BECAUSE A PORT THAT ANSWERS AT ONCE CANNOT PRODUCE
+    /// THIS ORDER AT ALL.** The defect is a **timing** defect: the form moves
+    /// on **before** the answer exists.
+    ///
+    /// The three members are the cubit, the **held** answer, and the request's
+    /// own future — the last one because the test has to **await** the
+    /// request's completion, and the request cannot complete until the answer
+    /// is released.
+    ({
+      QuestionAuthoringCubit cubit,
+      Completer<Result<QuestionDraft>> answer,
+      Future<void> pending,
+    })
+    openRequest() {
+      final Completer<Result<QuestionDraft>> answer =
+          Completer<Result<QuestionDraft>>();
+      when(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) => answer.future);
+      final QuestionAuthoringCubit cubit = cubitWith();
+      final Future<void> pending = cubit.requestDraft();
+      expect(cubit.state.status, QuestionAuthoringStatus.working);
+      return (cubit: cubit, answer: answer, pending: pending);
+    }
+
+    test('is not applied, because the reading id is another one', () async {
+      final ({
+        QuestionAuthoringCubit cubit,
+        Completer<Result<QuestionDraft>> answer,
+        Future<void> pending,
+      })
+      fixture = openRequest();
+
+      // **THE ADMIN CORRECTS THE READING ID WHILE THE REQUEST IS OPEN.**
+      fixture.cubit.setReadingId(otherReadingId);
+
+      fixture.answer.complete(Result<QuestionDraft>.of(draft));
+      await fixture.pending;
+
+      // **AND THE DRAFT IS NOT THE QUESTION ON SCREEN.** The draft is a
+      // question about the FIRST reading's passage, and the form names the
+      // second — and the commit would send the first reading's question
+      // against the second reading's id.
+      expect(
+        fixture.cubit.state.draft?.promptEn,
+        isNot(draft.promptEn),
+        reason:
+            'the request asked for one reading and the form names another, so '
+            'the answer describes a form that is not on screen',
+      );
+      // **AND THE EDITOR IS BACK ON ITS ARM**, so the admin presses again.
+      expect(fixture.cubit.state.status, QuestionAuthoringStatus.ready);
+
+      await fixture.cubit.close();
+    });
+
+    test('and the type is part of the request\'s identity too', () async {
+      final ({
+        QuestionAuthoringCubit cubit,
+        Completer<Result<QuestionDraft>> answer,
+        Future<void> pending,
+      })
+      fixture = openRequest();
+
+      // **THE ADMIN CHANGES THE QUESTION'S TYPE WHILE THE REQUEST IS OPEN.**
+      // The type is in the request (`ai.routes.ts:10`), and the control that
+      // offers it is not disabled while the request is in flight.
+      fixture.cubit.setType(QuestionType.trueFalse);
+
+      fixture.answer.complete(Result<QuestionDraft>.of(draft));
+      await fixture.pending;
+
+      // **AND THE DRAFT IS NOT THE QUESTION ON SCREEN** — a draft of one type
+      // is not the draft of another.
+      expect(
+        fixture.cubit.state.draft?.promptEn,
+        isNot(draft.promptEn),
+        reason:
+            'the request asked for one type and the form names another, so '
+            'the answer describes a form that is not on screen',
+      );
+      expect(fixture.cubit.state.status, QuestionAuthoringStatus.ready);
+
+      await fixture.cubit.close();
+    });
   });
 
   group('the commit', () {
@@ -325,6 +445,70 @@ void main() {
             questions: any(named: 'questions'),
           ),
         );
+
+        await cubit.close();
+      },
+    );
+
+    // ## THE COMMIT AGAINST A DRAFT THAT BELONGS TO **ANOTHER READING**
+    //
+    // **THIS IS THE WRITE HALF, AND IT IS THE ONE THAT MATTERS.** The read's
+    // half drops a draft that lands under a form that moved on — but even with
+    // that fixed, an admin can have a draft for reading A on screen, change
+    // the reading id to B, and commit: **B's id with A's question**, a
+    // question about one passage stored against another reading.
+    //
+    // **A REFUSAL IS BETTER THAN A WRONG WRITE**, and the refusal has to be
+    // **visible** — the admin is told why.
+    test('a draft that belongs to another reading is refused, and nothing is '
+        'asked', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+
+      // **THE DRAFT IS ASKED FOR, AND IT ARRIVES.** The request names the
+      // reading the form named, so the draft is the form's own.
+      await cubit.requestDraft();
+      expect(cubit.state.draft, draft);
+
+      // **AND THE ADMIN CHANGES THE READING.** The reading id is a field
+      // and it is editable while the form is open.
+      cubit.setReadingId(otherReadingId);
+
+      await cubit.commit();
+
+      // **SO THE COMMIT IS REFUSED**, and the admin is told why.
+      expect(
+        cubit.state.formError,
+        QuestionAuthoringFormError.draftForAnotherReading,
+      );
+      // **AND NOTHING WAS ASKED** — a wrong write is worse than no write.
+      verifyNever(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      );
+      // **AND THE QUESTION IS STILL ON SCREEN**, because a refusal that
+      // emptied the form would make the admin write it a second time.
+      expect(cubit.state.draft, draft);
+
+      await cubit.close();
+    });
+
+    test(
+      'and a question the admin wrote is committed against any reading',
+      () async {
+        // **THE COUNTER, AND IT IS WHAT MAKES THE RULE A RULE AND NOT A BAN.**
+        // The refusal is about a **draft** — a question the AI wrote about one
+        // reading's passage. A question the **admin** wrote is the admin's, and
+        // the admin may commit it against whatever reading they meant.
+        final QuestionAuthoringCubit cubit = cubitWith();
+        cubit.setPromptAr('سؤال');
+        cubit.setPromptEn('A question');
+        cubit.setCorrectAnswer('A');
+        await cubit.commit();
+
+        expect(cubit.state.formError, isNull);
+        expect(capturedQuestions().single.single.promptEn, 'A question');
 
         await cubit.close();
       },

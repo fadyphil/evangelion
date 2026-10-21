@@ -1975,6 +1975,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That is not a whole number.'**
   String get servantQuestionsErrorInvalidNumber;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The editor's refusal for a draft that the AI wrote about ONE reading's passage while the form names ANOTHER — the commit would store the second reading's id with the first reading's question, so the commit is refused and the admin is told why. **The way out is in the sentence**: ask for a draft again, or change the reading id.
+  ///
+  /// In en, this message translates to:
+  /// **'This draft is about another reading. Ask for a draft again, or change the reading id.'**
+  String get servantQuestionsErrorDraftForAnotherReading;
 }
 
 class _AppLocalizationsDelegate

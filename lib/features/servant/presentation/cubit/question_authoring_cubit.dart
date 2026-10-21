@@ -63,6 +63,24 @@ enum QuestionAuthoringFormError {
   /// `z.number().int()`, and the client's defaults — ten points, order one —
   /// are the schema's defaults rather than this client's.
   invalidNumber,
+
+  /// The draft on screen is about **another** reading.
+  ///
+  /// **THE WRITE HALF OF THE SEVENTH DEFECT, AND IT IS THE ONE THAT MATTERS.**
+  /// A draft is a question the AI wrote about **one** reading's passage, and
+  /// the reading id is a field the admin may correct — so a draft for reading
+  /// A can be on screen while the form names reading B, and the commit would
+  /// then store **B's id with A's question**: a question about one passage
+  /// against another reading.
+  ///
+  /// **A REFUSAL IS BETTER THAN A WRONG WRITE**, and the refusal is **visible**
+  /// — the admin is told why, and the way out is in the sentence.
+  ///
+  /// **AND IT IS ABOUT A **DRAFT**, AND NOT ABOUT A QUESTION.** A question the
+  /// admin wrote is the admin's, and the admin may commit it against whatever
+  /// reading they meant — so this refusal has a **counter** in the suite, and
+  /// the counter is what makes the rule a rule and not a ban.
+  draftForAnotherReading,
 }
 
 /// What `/servant/questions` is showing.
@@ -87,11 +105,13 @@ enum QuestionAuthoringFormError {
 /// * a **form error** belongs to a `ready` state, because the form refuses
 ///   before it asks;
 /// * a **commit result** belongs to a `ready` state, because the commit
-///   answered.
+///   answered;
+/// * a **draft reading** belongs to a **draft that came from the server**, and
+///   to nothing else — see [draftReadingId].
 ///
 /// An **edit** keeps the first of those pairs whole — the failure and the arm
-/// that names it — and drops the second and third, which are about the
-/// question as it **was**. The cubit's own doc says why.
+/// that names it — and drops the second, which is about the question as it
+/// **was**. The cubit's own doc says why.
 @Freezed(copyWith: false)
 final class QuestionAuthoringState with _$QuestionAuthoringState {
   /// A state on the given arm.
@@ -104,6 +124,7 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
     required this.status,
     this.readingId = '',
     this.draft,
+    this.draftReadingId,
     this.commitResult,
     this.failure,
     this.formError,
@@ -125,6 +146,30 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
   /// rules, and the cubit enforces them on the way out — see
   /// [QuestionAuthoringFormError].
   final QuestionDraft? draft;
+
+  /// The reading the draft on screen was **asked for**, or `null`.
+  ///
+  /// ## AND IT IS `null` FOR A QUESTION THE **ADMIN** WROTE
+  ///
+  /// A draft is a question the **AI** wrote about **one** reading's passage,
+  /// and the reading id is a field the admin may correct — so a draft for
+  /// reading A can be on screen while the form names reading B, and the
+  /// commit would then store **B's id with A's question**. This field is what
+  /// makes that shape **detectable**: it is the reading the request named, and
+  /// the commit refuses when it is not the reading on the form.
+  ///
+  /// **AND IT IS `null` WHILE THE QUESTION ON SCREEN IS THE ADMIN'S OWN**,
+  /// because a question the admin wrote is the admin's, and the admin may
+  /// commit it against whatever reading they meant. The refusal is about a
+  /// **draft**, and it is not a ban.
+  ///
+  /// ## AND IT IS **CARRIED** BY EVERY WRITER, AND THAT IS THE POINT
+  ///
+  /// It is a fact about the draft on screen, so it travels with the draft:
+  /// editing the draft's text, its type, its options, its points or its order
+  /// **keeps** it — the question is still the same question, about the same
+  /// reading — and only a **new** draft replaces it.
+  final String? draftReadingId;
 
   /// What the server answered, or `null`.
   final CommitResult? commitResult;
@@ -181,6 +226,55 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
 /// **A NEW REQUEST REPLACES THE OUTCOME.** The `working` state and the two
 /// answers that follow it belong to the attempt that is being made now, and
 /// they carry no failure from the last one.
+///
+/// ## AND THE **SEVENTH DEFECT** IS **TWO RULES**, AND BOTH ARE ABOUT **THE
+/// REQUEST'S OWN IDENTITY**
+///
+/// `requestDraft` is a **READ** — the ai-generate route writes nothing: it
+/// selects the reading, extracts the verses, calls the AI and returns the
+/// draft (`ai.routes.ts:47-110`) — and its answer is a **picture of the form's
+/// result**. `commit` is a **WRITE**, and its answer reports a write that
+/// happened.
+///
+/// **MEASURED, over this cubit**, with the first reading asked for and the
+/// second typed while the request was open:
+///
+/// ```text
+/// the request asked for = [aaaaaaaa-…aaa]
+/// the form says = bbbbbbbb-…bbb
+/// the draft on screen = A question about the FIRST reading
+/// the commit went to reading = bbbbbbbb-…  the committed prompt = A question about the FIRST reading
+/// ```
+///
+/// So a question drafted from one reading's passage was committed to another
+/// reading, and **the window is reachable from the screen**: the reading-id
+/// field is not disabled while the request is open, and the type control is
+/// not either.
+///
+/// **THE TWO RULES ARE THE TWO HALVES OF ONE SENTENCE**, and the sentence is
+/// the one the house already has:
+///
+/// > **A READ's answer is a display of the form's result, and it goes when the
+/// > form moves on. A WRITE's answer reports a write that happened, and it
+/// > stays.**
+///
+/// * **THE READ'S HALF — the draft is applied only if the form still
+///   describes the request.** The request's identity is **two** facts — the
+///   **reading** and the **type** — and both are editable mid-flight, so both
+///   are remembered and both are compared when the answer lands. A comparison
+///   that forgot the type would be incomplete, and the defect it would leave
+///   is the same one.
+/// * **THE WRITE'S HALF — a commit refuses a draft that belongs to another
+///   reading.** Even with the read fixed, an admin can have a draft for
+///   reading A on screen, change the reading id to B, and commit: **B's id
+///   with A's question**. The draft remembers the reading it was asked for,
+///   and the commit refuses to send it against a different one. **A refusal
+///   is better than a wrong write**, and it is **visible**.
+///
+/// **AND THE COST IS ACCEPTED, AND IT IS THE SIBLING'S COST.** A press whose
+/// answer arrives too late leaves the screen with nothing to show for it, and
+/// the admin presses again — the same cost `ServantReportCubit` charges, and
+/// the same rule.
 class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// Drives the editor over [generateAiDraft] and [commitQuestions].
   QuestionAuthoringCubit({
@@ -220,6 +314,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: id,
       draft: state.draft,
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -232,6 +327,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(type: type),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -244,6 +340,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptAr: text),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -256,6 +353,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptEn: text),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -268,6 +366,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(correctAnswer: answer),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -280,6 +379,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: _draftWithPoints(text),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: text,
       sortOrderText: state.sortOrderText,
@@ -292,6 +392,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: state.status,
       readingId: state.readingId,
       draft: _draftWithOrder(text),
+      draftReadingId: state.draftReadingId,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: text,
@@ -337,6 +438,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             letter: const QuestionOption(ar: '', en: ''),
           },
         ),
+        draftReadingId: state.draftReadingId,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
@@ -360,6 +462,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
               if (entry.key != letter) entry.key: entry.value,
           },
         ),
+        draftReadingId: state.draftReadingId,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
@@ -393,6 +496,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
                 : option.copyWith(en: text),
           },
         ),
+        draftReadingId: state.draftReadingId,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
@@ -407,6 +511,27 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// It is a draft, and the admin edits it after — so a hand-written question
   /// that was on screen is replaced, not merged. The replacement is the
   /// server's answer and not a merge of two answers.
+  ///
+  /// ## AND THE ANSWER IS APPLIED **ONLY IF THE FORM IS **STILL** THE REQUEST**
+  ///
+  /// **THIS IS A **READ**, SO ITS ANSWER IS A PICTURE OF THE FORM'S RESULT.**
+  /// The ai-generate route writes nothing — it selects the reading, extracts
+  /// the verses, calls the AI and returns the draft (`ai.routes.ts:47-110`) —
+  /// so the answer is about the form the request was made with, and a form
+  /// that has moved on is a form the answer does not describe.
+  ///
+  /// **AND THE REQUEST'S IDENTITY IS **TWO** FACTS: THE READING AND THE
+  /// TYPE.** The reading id is a field and the type is a control, and
+  /// **neither is disabled while the request is in flight** — so both are
+  /// editable mid-flight, and a comparison that remembered only one of them
+  /// would be incomplete. The type is in the request because the ai-generate
+  /// route accepts two of the three (`ai.routes.ts:10`).
+  ///
+  /// **AND THE MISMATCH LEAVES NO DRAFT, NO FAILURE, AND NO MESSAGE.** The
+  /// state goes back to the arm it was in before the press, with the form as
+  /// the admin has it and the button live again — so **the admin presses
+  /// again**. That is the cost, and it is the **same cost** the report
+  /// cubit's own rule charges (`ServantReportCubit._formStillDescribes`).
   Future<void> requestDraft() async {
     final String readingId = state.readingId.trim();
     if (readingId.isEmpty) {
@@ -415,25 +540,38 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
     }
     if (state.status == QuestionAuthoringStatus.working) return;
 
+    // **THE REQUEST'S OWN IDENTITY, REMEMBERED BEFORE THE REQUEST IS MADE.**
+    //
+    // The type of the question on screen, or the schema's own default. The AI
+    // route accepts two of the three types (`ai.routes.ts:10`), and the
+    // adapter is the one that refuses the third — see
+    // `DioServantAdminRepository.generateAiDraft`.
+    final QuestionType type = state.draft?.type ?? QuestionType.mcq;
+
     emit(
       QuestionAuthoringState(
         status: QuestionAuthoringStatus.working,
         readingId: state.readingId,
         draft: state.draft,
+        draftReadingId: state.draftReadingId,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
       ),
     );
     final Result<QuestionDraft> result = await generateAiDraft(
-      GenerateAiDraftParams(
-        readingId: readingId,
-        // The type of the question on screen, or the schema's own default.
-        // The AI route accepts two of the three types
-        // (`ai.routes.ts:10`), and the adapter is the one that refuses the
-        // third — see `DioServantAdminRepository.generateAiDraft`.
-        type: state.draft?.type ?? QuestionType.mcq,
-      ),
+      GenerateAiDraftParams(readingId: readingId, type: type),
     );
+
+    // **THE ANSWER IS APPLIED **ONLY IF THE FORM IS **STILL** THE REQUEST.**
+    //
+    // The request carried the reading and the type, and the pair is compared
+    // with the form on screen before the answer is applied — see
+    // [_formStillDescribes] and the class doc.
+    if (!_formStillDescribes(readingId, type)) {
+      _emitDropped();
+      return;
+    }
+
     switch (result) {
       case Right<Failure, QuestionDraft>(:final QuestionDraft value):
         emit(
@@ -441,6 +579,9 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             status: QuestionAuthoringStatus.ready,
             readingId: state.readingId,
             draft: value,
+            // **AND THE DRAFT REMEMBERS THE READING IT WAS ASKED FOR.** That
+            // is what lets the commit refuse to send it against another one.
+            draftReadingId: readingId,
             pointsText: state.pointsText,
             sortOrderText: state.sortOrderText,
           ),
@@ -451,6 +592,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             status: QuestionAuthoringStatus.draftFailed,
             readingId: state.readingId,
             draft: state.draft,
+            draftReadingId: state.draftReadingId,
             failure: failure,
             pointsText: state.pointsText,
             sortOrderText: state.sortOrderText,
@@ -459,6 +601,51 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
     }
   }
 
+  /// Whether the form on screen still describes the request that was made.
+  ///
+  /// ## THE REQUEST'S IDENTITY IS **TWO** FACTS, AND BOTH ARE COMPARED
+  ///
+  /// The **reading** and the **type**. The reading id is a field and the type
+  /// is a control, and neither is disabled while the request is open — so a
+  /// comparison that remembered only the reading would let a **true-false**
+  /// request land under a form that has become a **short-answer** one, which
+  /// is the same defect wearing a different hat.
+  ///
+  /// ## AND THE COMPARISON IS **NOT** A COUNTER
+  ///
+  /// A **generation** — the guard `LeaderboardCubit` and `JourneyCubit` use —
+  /// would throw away an answer whose form moved on and came **back**, and
+  /// the answer describes the form on screen in that case. So the pair is
+  /// compared, and a form that comes back takes its answer.
+  ///
+  /// ## AND THE READING IS COMPARED **AS THE REQUEST CARRIES IT**
+  ///
+  /// The request carries a **trimmed** reading id, and the form's **text** is
+  /// what the admin is halfway through typing — so the trimmed id is what the
+  /// trimmed form is compared against.
+  bool _formStillDescribes(String readingId, QuestionType type) {
+    if (state.readingId.trim() != readingId) return false;
+    return (state.draft?.type ?? QuestionType.mcq) == type;
+  }
+
+  /// The answer that was not applied, and nothing else.
+  ///
+  /// **NO DRAFT, NO FAILURE, AND NOTHING CLAIMING THE PRESS DID SOMETHING.**
+  /// The state goes back to the arm it was in before the press, with the form
+  /// as the admin has it — so the button is live again and **the admin
+  /// presses again**. That is the cost, and the class doc says so in the same
+  /// breath as the rule.
+  void _emitDropped() => emit(
+    QuestionAuthoringState(
+      status: QuestionAuthoringStatus.ready,
+      readingId: state.readingId,
+      draft: state.draft,
+      draftReadingId: state.draftReadingId,
+      pointsText: state.pointsText,
+      sortOrderText: state.sortOrderText,
+    ),
+  );
+
   /// Commits the question on screen.
   ///
   /// ## AND THE **REFUSAL** COMES FIRST
@@ -466,10 +653,38 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The commit schema's own `min(1)` rules are checked here, and the request
   /// is not made when one of them is broken: the server would have refused it
   /// with a body that names a field the admin never saw.
+  ///
+  /// ## AND THE **DRAFT'S OWN READING** IS CHECKED **BEFORE** THE FORM IS
+  /// **COMPLETE**
+  ///
+  /// **THIS IS THE WRITE HALF, AND IT IS THE ONE THAT MATTERS.** A draft is a
+  /// question the **AI** wrote about **one** reading's passage, and the reading
+  /// id is a field the admin may correct — so a draft for reading A can be on
+  /// screen while the form names reading B, and the commit would then store
+  /// **B's id with A's question**: a question about one passage against
+  /// another reading.
+  ///
+  /// **A REFUSAL IS BETTER THAN A WRONG WRITE**, and it is **visible** — the
+  /// admin is told why, and the way out is in the sentence.
+  ///
+  /// **AND IDENTITY IS CHECKED BEFORE COMPLETENESS**, because the identity is
+  /// the thing that cannot be typed around: a form that is also missing its
+  /// prompt would send the admin to the prompt, and the prompt is not the
+  /// problem.
   Future<void> commit() async {
     final String readingId = state.readingId.trim();
     if (readingId.isEmpty) {
       _refuse(QuestionAuthoringFormError.missingReadingId);
+      return;
+    }
+    // **AND THE DRAFT MUST BE ABOUT **THIS** READING.**
+    //
+    // `draftReadingId` is `null` for a question the **admin** wrote, and a
+    // question the admin wrote is the admin's — so the refusal is about a
+    // **draft** and not a ban on the form.
+    final String? draftReading = state.draftReadingId;
+    if (draftReading != null && draftReading != readingId) {
+      _refuse(QuestionAuthoringFormError.draftForAnotherReading);
       return;
     }
     final QuestionDraft? draft = state.draft;
@@ -496,6 +711,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
         status: QuestionAuthoringStatus.working,
         readingId: state.readingId,
         draft: state.draft,
+        draftReadingId: state.draftReadingId,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
       ),
@@ -513,6 +729,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             status: QuestionAuthoringStatus.ready,
             readingId: state.readingId,
             draft: state.draft,
+            draftReadingId: state.draftReadingId,
             commitResult: value,
             pointsText: state.pointsText,
             sortOrderText: state.sortOrderText,
@@ -524,6 +741,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             status: QuestionAuthoringStatus.commitFailed,
             readingId: state.readingId,
             draft: state.draft,
+            draftReadingId: state.draftReadingId,
             failure: failure,
             pointsText: state.pointsText,
             sortOrderText: state.sortOrderText,
@@ -557,6 +775,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       status: QuestionAuthoringStatus.ready,
       readingId: state.readingId,
       draft: state.draft,
+      draftReadingId: state.draftReadingId,
       formError: error,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,

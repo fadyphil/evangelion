@@ -289,5 +289,6 @@
   "servantQuestionsErrorEmptyPrompt": "السؤال يحتاج إلى اللغتين.",
   "servantQuestionsErrorEmptyCorrectAnswer": "حدّد الإجابة الصحيحة.",
   "servantQuestionsEmptyOptions": "سؤال الإجابة القصيرة لا يحتاج خيارات.",
-  "servantQuestionsErrorInvalidNumber": "هذا ليس عددًا صحيحًا."
+  "servantQuestionsErrorInvalidNumber": "هذا ليس عددًا صحيحًا.",
+  "servantQuestionsErrorDraftForAnotherReading": "هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف القراءة."
 }

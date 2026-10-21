@@ -831,4 +831,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get servantQuestionsErrorInvalidNumber =>
       'That is not a whole number.';
+
+  @override
+  String get servantQuestionsErrorDraftForAnotherReading =>
+      'This draft is about another reading. Ask for a draft again, or change the reading id.';
 }

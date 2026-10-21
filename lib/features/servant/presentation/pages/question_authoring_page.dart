@@ -341,6 +341,8 @@ class _FormError extends StatelessWidget {
         strings.servantQuestionsErrorEmptyCorrectAnswer,
       QuestionAuthoringFormError.invalidNumber =>
         strings.servantQuestionsErrorInvalidNumber,
+      QuestionAuthoringFormError.draftForAnotherReading =>
+        strings.servantQuestionsErrorDraftForAnotherReading,
     };
     return Padding(
       padding: const EdgeInsets.only(top: EvaSpacing.md),

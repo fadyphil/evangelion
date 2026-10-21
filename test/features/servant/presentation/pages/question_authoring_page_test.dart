@@ -83,6 +83,14 @@ const QuestionDraft serverDraft = QuestionDraft(
 /// The reading the route carried.
 const String readingId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
+/// **THE OTHER READING**, and the one the admin types while a draft is on
+/// screen.
+///
+/// **A DIFFERENT READING, AND NOT A MALFORMED ONE.** The defect is about a
+/// question about one passage being stored against another reading, so the id
+/// has to be a **real** one.
+const String otherReadingId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
 /// The cubit, with the page's reports counted.
 ///
 /// **A spy, and not a mock**: the question is *which* of the cubit's writers
@@ -638,6 +646,66 @@ void main() {
       await tester.tap(find.text('Commit the question'));
       await tester.pump();
     }
+
+    // ## THE COMMIT AGAINST A DRAFT THAT BELONGS TO **ANOTHER READING**
+    //
+    // The draft is a question the AI wrote about **one** reading's passage,
+    // and the reading id is a field the admin may correct — so a draft for
+    // reading A can be on screen while the form names reading B, and the
+    // commit would store **B's id with A's question**.
+    //
+    // **THE CLAIM BELOW IS ABOUT THE **SCREEN**, NOT ABOUT THE STATE.** The
+    // state held the whole time, and a reader of the state alone could not
+    // tell a draft about reading A from a draft about reading B.
+    testWidgets(
+      'a draft about another reading is refused, and the admin is told why',
+      (WidgetTester tester) async {
+        final ({QuestionAuthoringCubit cubit, _Repo repo}) fixture = editor();
+        await pumpEditor(
+          tester,
+          QuestionAuthoringPage(cubit: fixture.cubit, readingId: readingId),
+        );
+
+        // **THE DRAFT ARRIVES**, and it is about the reading the form names.
+        await tester.ensureVisible(find.text('Ask for a draft'));
+        await tester.tap(find.text('Ask for a draft'));
+        await tester.pump();
+        expect(find.text('What did Christ say?'), findsOneWidget);
+
+        // **AND THE ADMIN CHANGES THE READING.** The reading id is a field
+        // and it is editable while the form is open.
+        await tester.ensureVisible(find.byType(TextField).at(0));
+        await tester.enterText(find.byType(TextField).at(0), otherReadingId);
+        await tester.pump();
+
+        await commit(tester);
+
+        // **AND NOTHING WAS SENT** — a wrong write is worse than no write.
+        expect(fixture.repo.committed, isEmpty);
+        // **AND THE ADMIN IS TOLD WHY**, in the reader's own language.
+        expect(
+          find.text(
+            'This draft is about another reading. Ask for a draft again, or '
+            'change the reading id.',
+          ),
+          findsOneWidget,
+        );
+
+        await pumpEditor(
+          tester,
+          QuestionAuthoringPage(cubit: fixture.cubit, readingId: readingId),
+          locale: otherArmFor(const Locale('en')),
+        );
+
+        expect(
+          find.text(
+            'هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف '
+            'القراءة.',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets(
       'a question with one language is refused, and nothing is sent',

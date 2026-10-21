@@ -461,12 +461,21 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        251,
+        252,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**251 → 252 with the servant portal\'s **seventh** defect**, for the '
+            'editor\'s refusal for a draft that belongs to **another** reading: a '
+            'draft is a question the AI wrote about ONE reading\'s passage, the '
+            'reading id is a field the admin may correct, and the commit would '
+            'then store the second reading\'s id with the first reading\'s '
+            'question. **A refusal is better than a wrong write**, and the refusal '
+            'is visible — so the sentence names the reason **and the way out** '
+            '("ask for a draft again, or change the reading id"), because a '
+            'refusal the admin cannot act on is a refusal that strands them.\n\n'
             '**186 → 251 in the servant portal\'s Task 4**, for the portal\'s **four '
             'screens**: **65** keys arrived, and every one of them is **WRITTEN, '
             'not transcribed** — `eva/redesign.html` draws no servant portal at '

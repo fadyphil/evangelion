@@ -5392,3 +5392,70 @@ mirroring one**, which is the question the gate asks. The mechanism also does
 **not** fix the cubit half of instances **5** and **6**: whether a keystroke
 clears a failure, and whether a stale answer may land on a form that has moved
 on, are rules in the cubit, and no field can see either.
+
+**189. THE PORTAL'S MIGRATION LANDED, AND IT BROUGHT A **SEVENTH** DEFECT WITH
+IT.**
+
+**THE EIGHTEEN HAND-ROLLED MIRRORS ARE GONE.** The three pages and the option
+editor held **eighteen** `TextEditingController`s between them, and every one of
+them was the shape decision 188 forbids. They are on `EvaControlledField` now,
+so the mirrored-controller gate's allowlist went from **twenty-one** reviewed
+sites to **three** — the mechanism's one and the login page's two — and the
+number is **pinned at three**, so a row that comes back has to be re-read to
+bring it. The orphan gate's entry for the mechanism was deleted in the same
+change, with the receipt left in its place, and the gate said so:
+`STALE ALLOWLIST  EvaControlledField  is allowlisted but IS placed`.
+
+**AND THE PORTAL'S **SEVENTH** DEFECT IS THE **SAME CLASS**, AND IT IS THE
+**FIRST ONE THE MIGRATION'S OWN MECHANISM DID NOT CATCH.** A draft is a
+question the **AI** wrote about **one** reading's passage, and the reading id
+is a field the admin may correct — so a draft for reading A can be on screen
+while the form names reading B, and the commit would then store **B's id with
+A's question**. MEASURED over `QuestionAuthoringCubit`:
+
+```text
+the request asked for = [aaaaaaaa-…aaa]
+the form says = bbbbbbbb-…bbb
+the draft on screen = A question about the FIRST reading
+the commit went to reading = bbbbbbbb-…  the committed prompt = A question about the FIRST reading
+```
+
+**`requestDraft` IS A **READ** — THE `ai-generate` ROUTE WRITES NOTHING.** It
+selects the reading, extracts the verses, calls the AI and returns the draft
+(`ai.routes.ts:47-110`), so its answer is a **picture of the form's result** and
+it goes when the form moves on. And **the reading id and the question type are
+BOTH part of the request** and both are editable mid-flight — the reading id is
+a field and the type is a control, and neither is disabled while the request is
+open.
+
+**SO THE TWO HALVES ARE THE HOUSE'S RULE, APPLIED TO A SECOND CUBIT.**
+
+* **THE READ'S HALF — the draft is applied only if the form still describes
+  the request.** The request's identity is **two** facts — the **reading** and
+  the **type** — and both are remembered and both are compared when the answer
+  lands. A comparison that forgot the type would be incomplete, and the defect
+  it would leave is the same one. The shape is `ServantReportCubit`'s, and the
+  cost is its cost: **a press whose answer arrives too late leaves the screen
+  with nothing to show for it, and the admin presses again.**
+* **THE WRITE'S HALF — a commit refuses a draft that belongs to another
+  reading.** Even with the read fixed, an admin can have a draft for reading A
+  on screen, change the reading id to B, and commit. **The draft remembers the
+  reading it was asked for** — `QuestionAuthoringState.draftReadingId` — and
+  the commit refuses to send it against a different one. **A refusal is better
+  than a wrong write**, and it is **visible**: the admin is told why, and the
+  way out is in the sentence.
+
+**AND THE REFUSAL IS ABOUT A **DRAFT**, AND NOT A BAN.** `draftReadingId` is
+`null` for a question the **admin** wrote, and a question the admin wrote is
+the admin's — so the counter is in the suite, and the counter is what makes the
+rule a rule and not a prohibition.
+
+**AND THE READING ID IS **NOT** LOCKED WHILE THE REQUEST IS IN FLIGHT, AND
+THAT IS A PRODUCT DECISION.** Disabling the field would close the window at
+the source, and it was **not** done: the two rules above make the window
+**harmless** — a stale read is dropped and a wrong write is refused — while
+locking it would take away the admin's ability to **correct** a reading id
+they mistyped while a request was open, which the screen explicitly supports
+("the one the schedule answered with **or one you typed**"). A field that
+cannot be corrected while a request is open is a field that strands the admin
+with a request they cannot stop and an id they cannot fix.

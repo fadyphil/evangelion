@@ -836,4 +836,8 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get servantQuestionsErrorInvalidNumber => 'هذا ليس عددًا صحيحًا.';
+
+  @override
+  String get servantQuestionsErrorDraftForAnotherReading =>
+      'هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف القراءة.';
 }
