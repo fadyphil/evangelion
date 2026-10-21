@@ -76,11 +76,19 @@ enum ServantReportFormError {
 ///
 /// ## AND THE **INVARIANT** IS ONE SENTENCE
 ///
-/// **A roster on screen describes the form on screen.** The report is a
-/// roster of **children**, and the cohort and the day are what the roster is
-/// about — the server's own `group_id` and `report_date`
+/// **A roster on screen describes the form on screen, or there is no roster.**
+/// The report is a roster of **children**, and the cohort and the day are
+/// what the roster is about — the server's own `group_id` and `report_date`
 /// (`admin.routes.ts:416-422`), and `ServantReport`'s own doc says the same
 /// of `reportDate`: "the report's date is the date the request named".
+///
+/// **AND IT IS **UNCONDITIONAL**, AND THE WORD THAT CARRIES IT IS "OR".**
+/// Not "a roster on screen describes the form **that asked for it**" — a
+/// roster that describes the *request* but not the *form* is exactly the
+/// wrongness the sentence exists to forbid. So the roster is either **about
+/// the form on screen** or **not on screen**, and there is no third case: a
+/// roster for cohort 3 under a form that says cohort 7 is one cohort's
+/// children under another cohort's name.
 ///
 /// So a status that promises an answer never stands without one, and an
 /// **edit** — the only thing a servant can do to this form besides asking —
@@ -258,7 +266,7 @@ final class ServantReportState with _$ServantReportState {
 /// roster on screen, which described the form as it **was**, goes with it.
 /// The rule, and the cost of it, are [ServantReportState]'s.
 ///
-/// ## AND THE ONE WINDOW WHERE A ROSTER **CAN** BE ABOUT ANOTHER COHORT
+/// ## AND AN ANSWER IS **APPLIED** ONLY IF THE FORM IS **STILL THE FORM**
 ///
 /// **MEASURED, 2026-10-21, over this cubit** — a cohort that changes while
 /// the request is open:
@@ -278,22 +286,49 @@ final class ServantReportState with _$ServantReportState {
 /// rule cannot reach it: the edit happened before the answer existed, and
 /// there was no roster to drop.
 ///
-/// **AND IT IS THE **SIBLINGS'** WINDOW TOO**, measured the same way over
-/// `ScheduleReadingCubit`:
+/// **AND SO THE CUBIT **REMEMBERS** THE FORM THE REQUEST WAS MADE WITH.** The
+/// request carries the pair the server's own querystring names
+/// (`admin.routes.ts:416-422` — `group_id` and `report_date`), and the pair
+/// is compared with the pair on screen when the answer lands. **A match
+/// applies the answer; a mismatch does not.** The form is remembered **as the
+/// request carries it** — the cohort as a whole number and the day trimmed —
+/// because the form's **text** is what the servant is halfway through typing,
+/// and `03` and `3` are one cohort. [_formStillDescribes] has the rules and
+/// the reasons.
 ///
-/// ```text
-/// the status while open = submitting
-/// the status after the edit = submitting
-/// the form says = 7
-/// the status when it lands = scheduled
-/// the form says = 7
-/// ```
+/// **AND THE **MISMATCH** LEAVES **NO ROSTER, NO FAILURE, AND NO MESSAGE.**
+/// The state goes back to the arm it was in before the press, with the form
+/// as the servant has it and the button live again — so **the admin presses
+/// again**. That is the cost, and it is the **same cost the edit rule
+/// already charges**: a press whose answer arrives too late leaves the
+/// screen with nothing to show for it.
 ///
-/// `QuestionAuthoringCubit.requestDraft` answers under the form as it is
-/// when the answer lands too, and the family has left all three the same
-/// way. **Closing it is a second policy decision** — the answer can be
-/// dropped, or the form can be rolled back to what was asked for — and it
-/// is not this rule's to make.
+/// **AND THE COST IS **ACCEPTED**, AND IT IS THE PRICE OF THE INVARIANT.** A
+/// roster that never contradicts the form is worth a press.
+///
+/// ## AND **THIS IS A READ**, SO **ITS ANSWER GOES**
+///
+/// **THE HOUSE'S RULE IS ABOUT **WHAT THE ANSWER IS ABOUT**, AND IT HAS TWO
+/// HALVES.** A **read's** answer is a **picture of the form's result** — the
+/// roster the server drew for the cohort and the day on the form — so it
+/// goes when the form moves on. A **write's** answer **reports a write that
+/// happened**, so it stays; `ScheduleReadingCubit`'s doc is the write's half,
+/// and the two cubits are **not in conflict** — they are on two sides of one
+/// rule. The rule is here and there so that the next reader sees **why they
+/// differ** rather than assuming one of them is wrong.
+///
+/// **AND THE **FAILURE** AND THE **ARM THAT NAMES IT** STAY.** A failure on
+/// screen is the server's answer about **one request**, and the servant
+/// correcting a field is not the server changing its mind — so the failure
+/// and the arm that names it stay, and `retry` still repeats that request.
+/// The failure is the one answer the edit rule keeps, and it is kept because
+/// it names a request rather than because it describes the form.
+///
+/// **AND THE COST IS ACCEPTED, AND STATED.** A servant who mistypes the
+/// cohort loses the loaded roster, and reloads it with one press of the
+/// button. A press whose answer arrives after the form moved on leaves the
+/// screen with no roster and no message, and the servant presses again. Both
+/// prices are worth paying for a roster that never contradicts the form.
 class ServantReportCubit extends Cubit<ServantReportState> {
   /// Drives the report over [loadDailyReport].
   ServantReportCubit({required this.loadDailyReport})
@@ -328,15 +363,21 @@ class ServantReportCubit extends Cubit<ServantReportState> {
   /// form stays — and the roster goes, because a roster drawn under a form
   /// that has been refused is a roster about a different cohort. That is the
   /// same rule the **edit** writers follow, and [_emitRefused] says why.
+  ///
+  /// ## AND AN ANSWER THAT **DOES NOT DESCRIBE THE FORM** IS **NOT APPLIED**
+  ///
+  /// The request carries the form, and the form is compared with the request
+  /// when the answer lands — so a roster for a cohort the form no longer
+  /// names is not drawn, and the press is repeated instead. The class doc
+  /// has the measurement, the rule and the cost.
   Future<void> load() async {
     // **A second request while one is open is refused.** The screen's busy
     // state is the status, and the busy state is what disables the submit
     // button; a caller that asked anyway would get a second roster for a
     // question that has already been answered.
     if (state.status == ServantReportStatus.loading) return;
-    final String groupIdRaw = state.groupIdText.trim();
-    final int? groupId = int.tryParse(groupIdRaw);
-    if (groupId == null || groupId <= 0) {
+    final int? groupId = _cohortIn(state.groupIdText);
+    if (groupId == null) {
       _emitRefused(ServantReportFormError.invalidGroupId);
       return;
     }
@@ -357,6 +398,16 @@ class ServantReportCubit extends Cubit<ServantReportState> {
     final Result<ServantReport> result = await loadDailyReport(
       DailyReportQuery(groupId: groupId, date: date),
     );
+
+    // **THE ANSWER IS APPLIED **ONLY IF THE FORM IS **STILL THE FORM**.**
+    // The request carried the pair the server's own querystring names, and
+    // the pair is compared with the pair on screen before the answer is
+    // applied — see [_formStillDescribes] and the class doc.
+    if (!_formStillDescribes(groupId, date)) {
+      _emitDropped();
+      return;
+    }
+
     switch (result) {
       case Right<Failure, ServantReport>(:final ServantReport value):
         emit(
@@ -386,6 +437,60 @@ class ServantReportCubit extends Cubit<ServantReportState> {
   /// calls would be a method that exists only to be read as "retry" at the
   /// call site.
   Future<void> retry() => load();
+
+  /// Whether the form on screen still describes the request that was made.
+  ///
+  /// ## THE FORM IS COMPARED **AS THE REQUEST CARRIES IT**
+  ///
+  /// The request carries a **whole number** for the cohort and a **trimmed**
+  /// day, and the pair is what the roster is about — so the pair is what is
+  /// compared. The form's **text** is what the servant is halfway through
+  /// typing, and `03` and `3` are one cohort, so a text that spells the same
+  /// cohort is the same form.
+  ///
+  /// **AND A FORM THAT NAMES NO COHORT IS A MISMATCH.** `three` is not a
+  /// cohort, and a roster under a form that cannot be asked for describes
+  /// nothing.
+  ///
+  /// ## AND THE COMPARISON IS **NOT** A COUNTER
+  ///
+  /// A **generation** — the guard `LeaderboardCubit` and `JourneyCubit` use —
+  /// would throw away an answer whose form moved on and came **back**, and
+  /// the answer describes the form on screen in that case. So the pair is
+  /// compared, and a form that comes back takes its answer.
+  bool _formStillDescribes(int groupId, String date) {
+    final int? cohort = _cohortIn(state.groupIdText);
+    if (cohort == null) return false;
+    if (cohort != groupId) return false;
+    return state.dateText.trim() == date;
+  }
+
+  /// The cohort the form names, or `null` when it names none.
+  ///
+  /// **ONE PARSE, AND IT IS THE SAME ONE IN BOTH PLACES.** The refusal in
+  /// [load] and the comparison in [_formStillDescribes] ask the same
+  /// question — "what cohort does this form name?" — and two spellings of
+  /// one question are two answers that can disagree.
+  static int? _cohortIn(String text) {
+    final int? parsed = int.tryParse(text.trim());
+    if (parsed == null || parsed <= 0) return null;
+    return parsed;
+  }
+
+  /// The answer that was not applied, and nothing else.
+  ///
+  /// **NO ROSTER, NO FAILURE, AND NOTHING CLAIMING THE PRESS DID
+  /// SOMETHING.** The state goes back to the arm it was in before the press,
+  /// with the form as the servant has it — so the button is live again and
+  /// **the admin presses again**. That is the cost, and the class doc says so
+  /// in the same breath as the rule.
+  void _emitDropped() => emit(
+    ServantReportState(
+      status: ServantReportStatus.idle,
+      groupIdText: state.groupIdText,
+      dateText: state.dateText,
+    ),
+  );
 
   /// The refusal, and nothing else.
   ///

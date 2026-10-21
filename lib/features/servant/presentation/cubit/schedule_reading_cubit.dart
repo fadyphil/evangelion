@@ -243,6 +243,50 @@ final class ScheduleReadingState with _$ScheduleReadingState {
 /// changing its mind. The form's own refusal goes, and the server's answer
 /// goes, because both are about the form as it **was**. The rules are spelled
 /// out on [_edit], and they are the question cubit's rules verbatim.
+///
+/// ## AND **THIS IS A WRITE**, SO **THE RESULT THAT LANDS STAYS**
+///
+/// **THE HOUSE'S RULE IS ABOUT **WHAT THE ANSWER IS ABOUT**, AND IT HAS TWO
+/// HALVES.** A **read's** answer is a **picture of the form's result** — the
+/// roster the server drew for the cohort and the day on the form — so it
+/// goes when the form moves on. `ServantReportCubit`'s doc is the read's
+/// half, and it is the half this cubit is **not**.
+///
+/// A **write's** answer **reports a write that happened**, and it stays.
+///
+/// **AND WHY THE WRITE'S ANSWER STAYS.** The request carried the form **as
+/// it was when the button was pressed**, and the server did that write. A
+/// keystroke that came **after** the request does not undo it — so a
+/// confirmation that lands under a form that has since moved on is still a
+/// **true statement**: *that* write happened. Discarding it would leave an
+/// admin who pressed "Schedule" with **no confirmation that it landed**, and
+/// a write that landed without a confirmation is a write the admin has to
+/// guess about.
+///
+/// **AND THE COST IS ACCEPTED.** A confirmation can sit under a form that has
+/// moved on: the result names the passage that was scheduled, and the form
+/// may since name another. The admin reads the confirmation as **"the
+/// schedule happened"** and not as **"the form still says this"** — and that
+/// is the trade, made on purpose. The screen draws the server's own sentence
+/// (`admin.routes.ts:218-221` — "Successfully scheduled reading for N
+/// groups"), which names no passage and no cohort, and that is what a
+/// receipt looks like.
+///
+/// **AND THE **EDIT** IS **ANOTHER MOMENT**, AND [_edit] HAS **ITS OWN**
+/// RULE.** A receipt that is **already on screen** when the form changes
+/// goes with the form, and that rule was decided with the cubit. The rule
+/// above is about the answer that **lands**, and the two are different
+/// moments: a receipt the admin is **looking at**, and a receipt that
+/// **arrives** after the form has moved on.
+///
+/// **AND THE TWO COST **DIFFERENTLY**, WHICH IS WHY THE RULE HAS TWO
+/// HALVES.** The receipt is the server's own sentence, and it names **no
+/// passage and no cohort** — so a receipt that outlives the form is a
+/// sentence about a past write, and the admin loses only the knowledge that
+/// it landed. The **roster** is not like that: it names a cohort's
+/// **children**, so a roster that outlives its form puts one cohort's
+/// children under another cohort's name, and that is the wrongness the
+/// read's half exists to forbid.
 class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// Drives the form over [scheduleReading].
   ScheduleReadingCubit({required this.scheduleReading})

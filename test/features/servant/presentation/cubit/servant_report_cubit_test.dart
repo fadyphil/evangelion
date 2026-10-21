@@ -440,4 +440,242 @@ void main() {
       ],
     );
   });
+
+  // ## THE **ANSWER THAT LANDS AFTER THE FORM MOVED ON**
+  //
+  // The edit rule above drops the roster that is **on screen** when the form
+  // changes. This is the **other** moment: the form changes **before** the
+  // answer exists, so there is no roster to drop — and the answer that lands
+  // is the one that was **asked for**, under a form that has moved on.
+  //
+  // **MEASURED, 2026-10-21, over this cubit:**
+  //
+  // ```text
+  // the status while open = loading
+  // the status after the edit = loading
+  // the form says = 7
+  // the status when it lands = ready
+  // the form says = 7
+  // the report is for = 3
+  // ```
+  //
+  // **AND THE PROPERTY IS UNCONDITIONAL.** A roster on screen describes the
+  // form on screen, **or there is no roster** — and the word that carries it
+  // is "or": a roster that describes the *request* but not the *form* is the
+  // wrongness the property exists to forbid.
+  group('the answer that lands after the form moved on', () {
+    test('the cohort changed, and the roster that lands is not applied', () async {
+      final Completer<Result<ServantReport>> pending =
+          Completer<Result<ServantReport>>();
+      when(
+        () => repository.loadDailyReport(
+          groupId: any(named: 'groupId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final ServantReportCubit cubit = cubitWith(
+        groupId: '3',
+        date: '2026-10-21',
+      );
+      cubit
+        ..setGroupId('3')
+        ..setDate('2026-10-21');
+      final Future<void> request = cubit.load();
+      expect(cubit.state.status, ServantReportStatus.loading);
+
+      // **THE SERVANT CORRECTS THE COHORT WHILE THE REQUEST IS OPEN.**
+      cubit.setGroupId('7');
+      expect(cubit.state.status, ServantReportStatus.loading);
+
+      // **AND THE ANSWER ARRIVES** — the roster of cohort 3.
+      pending.complete(Result<ServantReport>.of(report));
+      await request;
+
+      // **AND THE ROSTER IS NOT APPLIED.** A roster of cohort 3's children
+      // under a form that says cohort 7 is one cohort's children under
+      // another cohort's name.
+      expect(cubit.state.report, isNull);
+      // **AND THE STATE IS BACK WHERE THE PRESS LEFT IT** — no roster, no
+      // failure, and nothing claiming the press did something.
+      expect(cubit.state.status, ServantReportStatus.idle);
+      expect(cubit.state.failure, isNull);
+      // **AND THE FORM IS STILL THE SERVANT'S** — the keystroke is not undone,
+      // because the press is repeated with the form as it now reads.
+      expect(cubit.state.groupIdText, '7');
+
+      await cubit.close();
+    });
+
+    test('the day changed, and the roster that lands is not applied', () async {
+      final Completer<Result<ServantReport>> pending =
+          Completer<Result<ServantReport>>();
+      when(
+        () => repository.loadDailyReport(
+          groupId: any(named: 'groupId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final ServantReportCubit cubit = cubitWith(
+        groupId: '3',
+        date: '2026-10-21',
+      );
+      cubit
+        ..setGroupId('3')
+        ..setDate('2026-10-21');
+      final Future<void> request = cubit.load();
+
+      // **THE SERVANT CHOOSES ANOTHER DAY WHILE THE REQUEST IS OPEN.**
+      cubit.setDate('2026-10-14');
+
+      pending.complete(Result<ServantReport>.of(report));
+      await request;
+
+      // **AND NO ROSTER** — the same children, another day's answers, under a
+      // form that names the other day. The pair is one thing, so the rule is
+      // one rule.
+      expect(cubit.state.report, isNull);
+      expect(cubit.state.status, ServantReportStatus.idle);
+      expect(cubit.state.dateText, '2026-10-14');
+
+      await cubit.close();
+    });
+
+    test('and the failure that lands is not applied either', () async {
+      final Completer<Result<ServantReport>> pending =
+          Completer<Result<ServantReport>>();
+      when(
+        () => repository.loadDailyReport(
+          groupId: any(named: 'groupId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final ServantReportCubit cubit = cubitWith(
+        groupId: '3',
+        date: '2026-10-21',
+      );
+      cubit
+        ..setGroupId('3')
+        ..setDate('2026-10-21');
+      final Future<void> request = cubit.load();
+
+      cubit.setGroupId('7');
+
+      pending.complete(const Left<Failure, ServantReport>(failure));
+      await request;
+
+      // **AND NO FAILURE** — a failure about cohort 3 is about a request the
+      // form no longer names, and the arm that named it would name a request
+      // nobody made.
+      expect(cubit.state.failure, isNull);
+      expect(cubit.state.status, ServantReportStatus.idle);
+
+      await cubit.close();
+    });
+
+    test('and a form that names no cohort takes no answer', () async {
+      final Completer<Result<ServantReport>> pending =
+          Completer<Result<ServantReport>>();
+      when(
+        () => repository.loadDailyReport(
+          groupId: any(named: 'groupId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final ServantReportCubit cubit = cubitWith(
+        groupId: '3',
+        date: '2026-10-21',
+      );
+      cubit
+        ..setGroupId('3')
+        ..setDate('2026-10-21');
+      final Future<void> request = cubit.load();
+
+      // **THE SERVANT TYPES SOMETHING THAT IS NOT A COHORT.**
+      cubit.setGroupId('three');
+
+      pending.complete(Result<ServantReport>.of(report));
+      await request;
+
+      // **AND NO ROSTER** — a form that cannot be asked for names no cohort,
+      // so a roster under it describes nothing.
+      expect(cubit.state.report, isNull);
+      expect(cubit.state.status, ServantReportStatus.idle);
+
+      await cubit.close();
+    });
+
+    test('and the form that moved on and came back takes the answer', () async {
+      final Completer<Result<ServantReport>> pending =
+          Completer<Result<ServantReport>>();
+      when(
+        () => repository.loadDailyReport(
+          groupId: any(named: 'groupId'),
+          date: any(named: 'date'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final ServantReportCubit cubit = cubitWith(
+        groupId: '3',
+        date: '2026-10-21',
+      );
+      cubit
+        ..setGroupId('3')
+        ..setDate('2026-10-21');
+      final Future<void> request = cubit.load();
+
+      // **THE FORM GOES AWAY AND COMES BACK** — the same cohort, typed twice.
+      cubit
+        ..setGroupId('7')
+        ..setGroupId('3');
+
+      pending.complete(Result<ServantReport>.of(report));
+      await request;
+
+      // **AND THE ANSWER LANDS** — because the form on screen is the form the
+      // request was made with, and a **counter** would have thrown this away.
+      expect(cubit.state.report, report);
+      expect(cubit.state.status, ServantReportStatus.ready);
+
+      await cubit.close();
+    });
+
+    test(
+      'and a cohort written with a leading zero is the same cohort',
+      () async {
+        final Completer<Result<ServantReport>> pending =
+            Completer<Result<ServantReport>>();
+        when(
+          () => repository.loadDailyReport(
+            groupId: any(named: 'groupId'),
+            date: any(named: 'date'),
+          ),
+        ).thenAnswer((_) => pending.future);
+
+        final ServantReportCubit cubit = cubitWith(
+          groupId: '3',
+          date: '2026-10-21',
+        );
+        cubit
+          ..setGroupId('3')
+          ..setDate('2026-10-21');
+        final Future<void> request = cubit.load();
+
+        // **THE SAME COHORT, TYPED DIFFERENTLY** — the form's text is what the
+        // servant is halfway through typing, and `03` and `3` are one cohort.
+        cubit.setGroupId('03');
+
+        pending.complete(Result<ServantReport>.of(report));
+        await request;
+
+        expect(cubit.state.report, report);
+        expect(cubit.state.status, ServantReportStatus.ready);
+
+        await cubit.close();
+      },
+    );
+  });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -42,6 +44,29 @@ final class _Repo implements ServantReportRepository {
     calls++;
     asked.add(DailyReportQuery(groupId: groupId, date: date));
     return result;
+  }
+}
+
+/// A port that **holds** the answer open until the test releases it.
+///
+/// The defect this suite's group is about is a **timing** defect: the answer
+/// lands after the form has moved on, and a port that answers at once cannot
+/// produce that order at all.
+final class _HeldRepo implements ServantReportRepository {
+  /// The answer the test releases.
+  final Completer<Result<ServantReport>> answer =
+      Completer<Result<ServantReport>>();
+
+  /// What the port was asked, in the port's own words.
+  final List<DailyReportQuery> asked = <DailyReportQuery>[];
+
+  @override
+  Future<Result<ServantReport>> loadDailyReport({
+    required int groupId,
+    required String date,
+  }) {
+    asked.add(DailyReportQuery(groupId: groupId, date: date));
+    return answer.future;
   }
 }
 
@@ -650,6 +675,72 @@ void main() {
       // **AND THE FORM SAYS THE DAY THE SERVANT CHOSE.**
       expect(textIn(tester, 1), _chosenDate);
     });
+  });
+
+  // ## THE ANSWER THAT **LANDS AFTER THE FORM MOVED ON**
+  //
+  // The group above is about the roster **on screen** and the form **on
+  // screen**. This is the moment that claim could not reach: the form
+  // changes **before** the answer exists, so there is no roster to drop — and
+  // the answer that lands is the one that was **asked for**.
+  //
+  // **AND THE CLAIM BELOW IS ABOUT **THE SCREEN**, NOT ABOUT THE STATE.**
+  // The state held the whole time, and a reader of the state alone could not
+  // tell a roster about cohort 3 from a roster about cohort 7 — the state
+  // said "3" about the roster and "7" about the form.
+  group('the answer that lands after the form moved on', () {
+    testWidgets(
+      'the cohort changes while the request is open, and the roster that lands is not on screen',
+      (WidgetTester tester) async {
+        final _HeldRepo repo = _HeldRepo();
+        final ServantReportCubit cubit = ServantReportCubit(
+          loadDailyReport: LoadDailyReport(repo),
+        );
+        addTearDown(cubit.close);
+
+        await pumpServant(
+          tester,
+          ServantReportPage(cubit: cubit, today: () => _defaultToday),
+        );
+        await tester.enterText(find.byType(TextField).at(0), '3');
+        await tester.tap(find.text('Show the roster'));
+        await tester.pump();
+
+        // **THE REQUEST IS OPEN** — and the field is not disabled while it
+        // is, so the servant can correct the cohort in the meantime.
+        expect(cubit.state.status, ServantReportStatus.loading);
+
+        await tester.enterText(find.byType(TextField).at(0), '7');
+        await tester.pump();
+
+        // **AND THE ANSWER ARRIVES** — the roster of cohort 3.
+        repo.answer.complete(Result<ServantReport>.of(report));
+        await tester.pump();
+        await tester.pump();
+
+        // **AND THE ROSTER IS NOT ON SCREEN** — one cohort's children under
+        // another cohort's name, which is the wrongness the whole rule
+        // exists to forbid.
+        expect(find.byType(RosterRow), findsNothing);
+        // **AND SO ARE THE TWO TOTALS**, because they count the roster's
+        // rows.
+        expect(find.byType(StatTile), findsNothing);
+
+        // **AND THE FORM SAYS WHAT THE SERVANT TYPED**, so the claim above is
+        // not vacuous: a form that did not change would not have dropped
+        // anything.
+        expect(textIn(tester, 0), '7');
+
+        // **AND ONE PRESS BRINGS THE ROSTER BACK** — the cost of the rule,
+        // measured. The press is repeated with the form as it now reads, and
+        // this time the answer describes it.
+        await tester.tap(find.text('Show the roster'));
+        await tester.pump();
+
+        expect(repo.asked.last.groupId, 7);
+        expect(find.byType(RosterRow), findsOneWidget);
+      },
+    );
   });
 
   group('the reader\'s own language', () {
