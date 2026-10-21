@@ -202,11 +202,14 @@ bloc builds it **in the test body**, with `addTearDown(…close)`.
 
 `lib/app/router/app_router.dart` · `auth_guard.dart`
 
-**9 entries in `AppRouter.routes`**: the guarded dock shell at `/` with its three tab
-children, `/login`, `/reading`, `/quiz`, `/settings`, and a `RedirectRoute` for `*`.
+**13 entries in `AppRouter.routes`**: the guarded dock shell at `/` with its three tab
+children, `/login`, `/reading`, `/quiz`, `/settings`, the portal's four
+(`/servant`, `/servant/report`, `/servant/schedule`, `/servant/questions`), and a
+`RedirectRoute` for `*`.
 **`/result` is not one of them** — it is a modal over the quiz, not a route.
-**9 constants** exist in `app_routes.dart` (the seven screens, `/servant`, and the `*`
-fallback); `/servant` is declared deliberately unrouted.
+**12 constants** exist in `app_routes.dart` (the seven screens, the portal's four,
+and the `*` fallback); `/servant` and its three siblings **are** routed, behind
+an auth guard and a role guard.
 
 **And the count in a paragraph is a claim that nobody checks, while a count in a
 test is a claim that fails.** The two paragraphs above were three tasks out of

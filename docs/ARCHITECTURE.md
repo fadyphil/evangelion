@@ -347,10 +347,10 @@ blank frame — left green.
 Navigation is `auto_route`, and `AppRouter` declares the shell, the screens and
 a `RedirectRoute` for `*`. **`/result` is not one of them**: the result is a
 modal over the quiz, so it is presented with `showGeneralDialog` and never
-appears in the route table. `app_routes.dart` declares **9** route constants —
-the seven screens, plus `/servant`, which is deliberately declared but not
-routed, plus the `*` fallback. Gate 4
-verifies all nine are plain string literals, which is what makes the invariants
+appears in the route table. `app_routes.dart` declares **12** route constants —
+the seven screens, the portal's four (`/servant` and its three siblings, all of
+them routed), plus the `*` fallback. Gate 4
+verifies all twelve are plain string literals, which is what makes the invariants
 in `app_routes_test.dart` assert anything at all.
 
 The wildcard must be listed **last**. `auto_route` matches in declaration order,

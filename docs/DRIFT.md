@@ -864,12 +864,10 @@ the guarded dock shell at `/` with its three tab children, `/login`, `/reading`,
 exist in `app_routes.dart` (the seven screens, `/servant`, and the `*`
 fallback); `/servant` is declared deliberately unrouted."*
 
-**The reality.** There are **twelve** declarations in `app_routes.dart` — the
-seven screens' paths, the portal's four (`/servant`, `/servant/report`,
-`/servant/schedule`, `/servant/questions`) and the `*` fallback — and
-`AppRouter.routes` carries **eleven** routes plus the wildcard. `tool/route_check.dart`
-prints "12 route declaration(s), all plain string literals", and
-`test/core/navigation/app_routes_test.dart` now asserts twelve names.
+**The reality.** `AppRouter.routes` carries **twelve** routes plus the wildcard.
+`tool/route_check.dart` prints "12 route declaration(s), all plain string
+literals", and `test/core/navigation/app_routes_test.dart` now asserts twelve
+names.
 
 **The second half of the claim is the one that rotted hardest**: *"`/servant` is
 declared deliberately unrouted"* described a **placeholder state** that the
@@ -877,6 +875,10 @@ declared deliberately unrouted"* described a **placeholder state** that the
 paragraph said so, and the same file said the successor that registers the
 route "replaces this paragraph". **It has been replaced, and the replacement is
 in the file.**
+
+**Fixed — 2026-10-22.** `docs/SEAMS.md` now says **13 entries** in
+`AppRouter.routes` (twelve `AutoRoute`s and the `RedirectRoute`) and **12
+constants**, names the portal's four, and says they **are** routed.
 
 ### 9.2 `docs/ARCHITECTURE.md` — "**declares 9 route constants** … `/servant`, which is deliberately declared but not routed"
 
@@ -890,6 +892,9 @@ all nine are plain string literals."*
 all nine" is now "all twelve", and the phrase "deliberately declared but not
 routed" is the drift's whole content: it described a deliberate choice that has
 been reversed.
+
+**Fixed — 2026-10-22.** `docs/ARCHITECTURE.md` now says **12** route constants,
+names the portal's four, and says they are routed.
 
 ### 9.3 `README.md` and `CONTRIBUTING.md` — "**Seven screens**"
 
