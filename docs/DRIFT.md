@@ -846,3 +846,92 @@ correction to a mechanism that is not there.
 rewriting a comment that says the code does something it does not is a
 **behaviour** question for whoever owns the reader's focus mode. Recorded
 here so the next reader does not take the comment's word for the code's.
+
+---
+
+## 9. The servant portal (2026-10-21) — four route counts, and one resume mechanism
+
+**Decision 5 was reversed** — AGENT_CONTEXT §2 now reads "**The servant/admin
+portal ships**" (ADR-0026) — and the route table gained four rows. **Four
+documents still describe the tree as it was before that**, and one of them is a
+count a reader would take at face value.
+
+### 9.1 `docs/SEAMS.md` — "**9 entries in `AppRouter.routes`**" and "**9 constants**"
+
+**The claim**, at `docs/SEAMS.md:206-209`: *"**9 entries in `AppRouter.routes`**:
+the guarded dock shell at `/` with its three tab children, `/login`, `/reading`,
+`/quiz`, `/settings`, and a `RedirectRoute` for `*`."* and *"**9 constants**
+exist in `app_routes.dart` (the seven screens, `/servant`, and the `*`
+fallback); `/servant` is declared deliberately unrouted."*
+
+**The reality.** There are **twelve** declarations in `app_routes.dart` — the
+seven screens' paths, the portal's four (`/servant`, `/servant/report`,
+`/servant/schedule`, `/servant/questions`) and the `*` fallback — and
+`AppRouter.routes` carries **eleven** routes plus the wildcard. `tool/route_check.dart`
+prints "12 route declaration(s), all plain string literals", and
+`test/core/navigation/app_routes_test.dart` now asserts twelve names.
+
+**The second half of the claim is the one that rotted hardest**: *"`/servant` is
+declared deliberately unrouted"* described a **placeholder state** that the
+2026-10-21 change removed. It was true when written — `app_routes.dart`'s own
+paragraph said so, and the same file said the successor that registers the
+route "replaces this paragraph". **It has been replaced, and the replacement is
+in the file.**
+
+### 9.2 `docs/ARCHITECTURE.md` — "**declares 9 route constants** … `/servant`, which is deliberately declared but not routed"
+
+**The claim**, at `docs/ARCHITECTURE.md:350-353`: *"`app_routes.dart` declares
+**9** route constants — the seven screens, plus `/servant`, which is
+deliberately declared but not routed, plus the `*` fallback. Gate 4 verifies
+all nine are plain string literals."*
+
+**The reality.** **Twelve** constants, all plain string literals, and
+`/servant` **is** routed — with three siblings. The sentence "Gate 4 verifies
+all nine" is now "all twelve", and the phrase "deliberately declared but not
+routed" is the drift's whole content: it described a deliberate choice that has
+been reversed.
+
+### 9.3 `README.md` and `CONTRIBUTING.md` — "**Seven screens**"
+
+**The claim**, at `README.md:12`: *"Seven screens, a dark glassmorphic design
+system, and a verification regime built around the idea that **a gate which
+cannot fail is worse than no gate**."* and, at `CONTRIBUTING.md:67`: *"Four of
+the seven screens read live data."*
+
+**The reality.** There are still **seven screens in the reader's app** — that
+part did not change, and the phrase is true of the reader. What changed is that
+there is now a **second surface** with **four more routes**, and a document
+that says "seven screens" without saying *whose* screens will read as a claim
+about the whole app.
+
+**Recorded rather than rewritten here**, because these are the two documents a
+new reader opens first, and the fix is a wording question about what the
+product is called — not a mechanical one. The route table in AGENT_CONTEXT §2
+is the authority, and it now carries both surfaces and says so.
+
+### 9.4 `lib/app/router/auth_guard.dart` — "**the resume is carried by the `ReevaluateListenable`**"
+
+**The claim**, at `lib/app/router/auth_guard.dart:158`: *"The accurate statement
+is that the resume is carried by the `ReevaluateListenable` —
+`navigation_injection.dart` wires it to the bloc's stream precisely so a
+sign-out and a sign-in both re-run this guard."*
+
+**The reality, measured on 2026-10-21** while the portal's landing was wired:
+the **resume of an interrupted navigation** is carried by the **`onResult`
+callback** — `LoginPage` reports `LoginOutcome.signedIn`, and the guard's
+`onResult` calls `resolveNext(true)`. The `ReevaluateListenable` does a
+**different** job: it re-runs the guard over the whole stack when the
+**session changes**, which is what sends a signed-out reader to `/login`.
+
+**Two different mechanisms, one sentence naming the wrong one.** The cost was
+measurable and is the reason this entry exists: with the landing issued from
+the sign-in listener, the removal took the *login* route and the guard's resume
+then pushed the interrupted route **on top** — measured
+`[DockShellRoute, ServantHomeRoute]`, and `[DockShellRoute, DockShellRoute]`
+for a kid: **two copies of the reader's own screen.** The portal's landing is
+therefore deferred one frame (AGENT_CONTEXT's recorded decision 185).
+
+**Not fixed in the file here**, because the file is not this entry's to rewrite
+and a concurrent slice was in flight. The correction is one sentence: the
+**resume** is carried by the `onResult` callback; the `ReevaluateListenable`
+carries the **re-evaluation on a session change**.

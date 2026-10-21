@@ -5082,3 +5082,193 @@ reach the shell, the second on the platform's accessibility signal.
 **And the six toasts became notifiers** in the same change: a toast is one
 widget in the overlay slot, and a `setState` rebuilt the whole screen to
 show it and to take it away again.
+
+---
+
+### Recorded decisions — the servant portal (2026-10-21)
+
+The portal is `docs/adr/0026-the-servant-admin-portal.md`; the design is
+`docs/superpowers/specs/2026-10-21-servant-admin-portal-design.md`; the plan is
+`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`. **Decision 5 was
+reversed** — see §2 — and these are the decisions the build took inside it.
+
+**177. THE PORTAL'S SHELL IS A **HUB**, NOT A TAB SHELL, AND THE REASON IS THE
+ROLE LADDER'S BOTTOM RUNG.**
+
+`/servant` is a page that lists the sections this role has. It is **not** an
+`AutoTabsRouter`, and the alternative was measured rather than assumed: a
+`viewerServant` holds exactly **one** capability beyond the reader's three
+(`UserRole.grantsFor` — `viewServantReport`), so a tab shell would have
+rendered a tab bar holding a single tab, which is chrome for nothing. A hub
+degrades to one entry and a tab shell does not.
+
+*Rejected: one tab shell with a hidden tab for the viewer.* The hidden tab is
+the tab bar again, and the reader's app keeps its five-slot dock — the portal
+is a **second surface**, not a fourth slot in the first.
+
+**178. THE ROLE IS **ONE FACT READ FROM TWO ANGLES**, AND THE WIRE READS IT
+TOO.**
+
+`AuthSession.role` is the source of truth. `RoleAccess` is a **reader** over it
+(`LiveRoleAccess`, `lib/core/navigation/role_access.dart`), and two things ask
+that reader: the **navigation guard** and the **`X-User-Role` header**.
+
+The header was a frozen `kid` string baked into `IdentityHeadersInterceptor` at
+composition, so a client that believed it was an `admin_servant` sent `kid` on
+every request. It is now a **reader called per request**
+(`role: () => roleAccess.role.wireValue`), so the wire carries what the client
+believes. **The backend does not care** — it parses the header at
+`src/middleware/identity.middleware.ts:24`, assigns it at `:31`, and never reads
+it again — and the client should not lie about it anyway.
+
+**There is exactly one place the session is held**, and it is the
+`AuthLocalDataSource`'s in-memory field. The `RoleAccess` is registered in the
+**pure** DI half (`lib/app/di/modules/auth_module.dart`) so `injection.dart`'s
+Flutter-free import-graph gate still holds; the guard and the wire read that
+one registration. **One session, one role, two readers** — never a mirror.
+
+**179. THE SEAM ANSWERS FOR A **GIVEN** ROLE, AND THE GUARD READS THE ROLE
+**ONCE**.**
+
+`RoleAccess` gained **`allowsRole(UserRole role, UserCapability capability)`**,
+and `allows(capability)` answers through it. The member exists because a seam
+built on a reader guarantees **liveness, not atomicity**: `role_access.dart`'s
+own hazard #2 says two reads "can be handed two different roles, because the
+bloc emitted in between".
+
+**The guard's decision and its destination are therefore one snapshot.** It
+captures the role once, asks `allowsRole` for the grant, and refuses to
+`landingRouteFor` of **that same role**. The reads of the seam's `role` per
+navigation went from **2** to **1** — and the "before" number is measured, not
+asserted: it is the `Actual: <2>` a planted two-read guard produced against the
+new test.
+
+*Rejected: the guard calling `UserRole.grantsFor` itself, which the old hazard
+#2 text prescribed.* That would make the caller a **second holder of the grant
+table** — the shape decisions 5 and 68 each removed — and it would put the
+guard and the hub on **two answers to one question**. The seam answers; the
+table is consulted in exactly one place.
+
+**180. THE GRANT TABLE HAS **EXACTLY ONE CALL SITE**, AND A GATE HOLDS IT.**
+
+`UserRole.grantsFor(` is called from exactly one file in `lib/`:
+`lib/core/navigation/role_access.dart`. The hub originally read the table
+directly — the same table, so the two answers agreed, which is precisely what
+made the duplication invisible — and it now asks the **seam** instead.
+
+**The gate is structural, not a count in a paragraph**: a test walks every
+`.dart` file under `lib/`, skips comment lines, matches the **qualified**
+`UserRole.grantsFor(` (so the enum's own declaration is not counted as a caller
+of itself), and asserts the call sites are exactly
+`lib/core/navigation/role_access.dart`. Planting the table back into the hub
+turns it red.
+
+**181. TWO PORTS, NOT ONE, AND THE PORT IS **WIDER THAN ITS ADAPTER** ON ONE
+METHOD.**
+
+`ServantAdminRepository` (schedule / commit / ai-draft) and
+`ServantReportRepository` (the daily roster) are **two narrow ports** in
+`features/servant/domain/repositories/`, not one fat one (§3's ISP). They live
+in the feature's `domain/` and **not** in `core/domain/`, because each has
+exactly **one** consumer — §3's placement test.
+
+**The AI-draft port is wider than its adapter, and that is recorded rather than
+hidden.** `QuestionType` has three members (`mcq`, `true_false`,
+`short_answer`) because the **commit** route accepts all three
+(`admin.routes.ts:38`), while the **ai-generate** route accepts only two
+(`ai.routes.ts:10`). The refusal for `short_answer` therefore lives in the
+**mapper**, as a `validation` failure, rather than narrowing the port: the
+domain type stays as wide as the union it names, and the port's doc says so.
+
+**182. THE AI QUESTION HAS **THREE DOORS**, AND A DRAFT IS COMMITTABLE
+BECAUSE THE TWO BODIES SHARE A SHAPE.**
+
+1. **AI at schedule time** — `generate_ai_questions: true` makes the server
+   generate and attach the question inside the schedule transaction. One call.
+2. **Hand-written** — `generate_ai_questions: false`, and the admin writes the
+   question and the answers on `/servant/questions`, which receives the
+   `reading_id` from the schedule response.
+3. **AI draft, then edit, then commit** — schedule without AI, ask
+   `ai-generate` for a draft, edit it, commit it.
+
+**Door 3 works because the draft's `options` has the same shape as the commit
+body's**: `Record<string, {ar, en}>` — `ai.service.ts:9` and its
+`responseSchema` — so a draft needs no conversion before it is committed.
+
+**And there is no fourth door, because there is no endpoint for one.** The
+backend has **no "list my scheduled readings" route**, so the questions screen
+accepts a **typed** `reading_id` for a reading scheduled in an earlier session,
+and says where it came from rather than pretending a lookup exists.
+
+**183. THE SCHEDULE ENDPOINT **UPSERTS**, AND WITH AI ON IT **DELETES THE
+QUESTIONS** — SO THE UI STATES BOTH.**
+
+The insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE`
+(`admin.routes.ts:157`), so scheduling the same cohort and date again
+**replaces** the passage. And with `generate_ai_questions` on, the route runs
+`DELETE FROM questions WHERE reading_id = $1` (`admin.routes.ts:195`) — so
+re-scheduling with AI on **removes the previous questions** for that reading.
+
+Both are **stated on the schedule screen**, not hidden: a screen that silently
+replaces a passage and silently deletes its questions is the kind of screen
+that loses a week of preparation. The wording is **written, not transcribed** —
+`eva/redesign.html` draws no portal.
+
+**184. THE GOLDEN'S "TODAY" IS A **SEAM**, NOT A CLOCK.**
+
+`ServantReportPage` pre-fills the report's date with today. A golden is a
+**picture**, not a shape, so a golden of a screen that reads the wall clock
+fails **every morning** — a flaky test nobody can debug. The date is therefore
+a parameter of the page, `null` meaning the real clock, following
+`CommunionCountdownLine`'s `now` precedent. The form default is still today's
+date, because a screen that asked an adult to type it by hand would be a worse
+product.
+
+**185. THE LANDING IS **DEFERRED ONE FRAME**, AND THE REASON IS MEASURED.**
+
+`landingRouteFor` had **no caller** since it was written, and its own doc said
+the two call sites would arrive separately so they could not drift. The login
+result handler is now the first.
+
+**But issuing the landing straight from the sign-in listener produced TWO
+copies of the reader's own screen.** `replacePath` removes the last route
+**synchronously** and pushes **asynchronously**, so the removal took the
+*login* route and the guard's resume then pushed the interrupted route **on
+top**: measured `[DockShellRoute, ServantHomeRoute]`, and
+`[DockShellRoute, DockShellRoute]` for a kid. **The landing is therefore
+deferred to the end of the next frame**, where the removal takes the **guard's**
+route: measured `[ServantHomeRoute]` — one route, and it is the landing.
+
+**186. THE ROLE LABELS ARE **SHORT**, AND THE MEASUREMENT IS WHY.**
+
+"Kid", "Servant" and "Admin", not "Viewer servant" and "Admin servant". At
+320px and 1.22× — §14's own numbers — the two-word labels do not fit the
+default `SegmentedControl` geometry: the content column is
+`320 − 2×34 = 252px`, the track takes 8, three segments share 244 → **81.3px**
+each, and the default's `segmentPadding` leaves **57.3px** of text where
+"SERVANT" wants **64.9px**. The default mode **ellipsises** it, and a clipped
+label is §14's "the reader's words deleted". The wide mode's numbers fix it
+(**62.5px against 81.3px**), and `login_text_scale_test.dart` asserts each
+label's rendered width against the width it wants, in **both** arms.
+
+**The two servant roles are told apart in a church by what they do** — one reads
+the report, one administers — not by the word "servant".
+
+**187. THE THREE CUBITS WERE **NOT WRITTEN TEST-FIRST**, AND THAT IS RECORDED
+HERE RATHER THAN CLAIMED ELSEWHERE.**
+
+AGENT_CONTEXT §6 requires red-first for **every cubit**. The three portal
+cubits (`ServantReportCubit`, `ScheduleReadingCubit`, `QuestionAuthoringCubit`)
+were implemented before their tests were written.
+
+**The recovery is a mutation run, and it is a weaker instrument than a genuine
+red**: it proves the tests **bite**, not that they **drove** the design. Five
+tests went red with the intended messages. A reviewer should read this slice's
+record as *"the tests were written after the cubits and were shown to fail when
+the cubits were broken"*, never as a §6 red-first record.
+
+**The honest remedy was not taken and is not hidden**: re-deriving the cubits
+from their tests would have been a rewrite of working code for a process
+record, and the tests' bite was demonstrated instead. A future cubit in this
+repository gets the red-first the protocol asks for — **this one did not, and
+this paragraph is where that fact lives.**
