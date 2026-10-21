@@ -911,27 +911,51 @@ is the authority, and it now carries both surfaces and says so.
 
 ### 9.4 `lib/app/router/auth_guard.dart` — "**the resume is carried by the `ReevaluateListenable`**"
 
-**The claim**, at `lib/app/router/auth_guard.dart:158`: *"The accurate statement
-is that the resume is carried by the `ReevaluateListenable` —
-`navigation_injection.dart` wires it to the bloc's stream precisely so a
-sign-out and a sign-in both re-run this guard."*
+**The claim**, at `lib/app/router/auth_guard.dart:158` and again at `:214-220`:
+*"The accurate statement is that the resume is carried by the
+`ReevaluateListenable` — `navigation_injection.dart` wires it to the bloc's
+stream precisely so a sign-out and a sign-in both re-run this guard"* and *"It
+is carried by the `ReevaluateListenable`: the bloc emits `signedIn`, the router
+re-runs this guard over the stack, and `decide()` now returns `allow`, which
+resolves the *pending* navigation. Measured on a cold launch: the stack goes
+`[LoginRoute]` → `[]` → `[HomeRoute]`."*
 
-**The reality, measured on 2026-10-21** while the portal's landing was wired:
-the **resume of an interrupted navigation** is carried by the **`onResult`
-callback** — `LoginPage` reports `LoginOutcome.signedIn`, and the guard's
-`onResult` calls `resolveNext(true)`. The `ReevaluateListenable` does a
-**different** job: it re-runs the guard over the whole stack when the
-**session changes**, which is what sends a signed-out reader to `/login`.
+**The reality, measured on 2026-10-21 with two probes over the real router.**
+**There are TWO mechanisms, they are not interchangeable, and they land the
+reader on DIFFERENT screens.** The file's comment names the second and calls it
+"the resume"; the first is the resume of the **interrupted** navigation, and
+the two are not the same thing.
 
-**Two different mechanisms, one sentence naming the wrong one.** The cost was
-measurable and is the reason this entry exists: with the landing issued from
-the sign-in listener, the removal took the *login* route and the guard's resume
-then pushed the interrupted route **on top** — measured
-`[DockShellRoute, ServantHomeRoute]`, and `[DockShellRoute, DockShellRoute]`
-for a kid: **two copies of the reader's own screen.** The portal's landing is
-therefore deferred one frame (AGENT_CONTEXT's recorded decision 185).
+Both probes pushed `/reading` while signed out, so the `AuthGuard` redirected
+to `/login` and the stack was **`[LoginRoute, LoginRoute]`** — the app's entry
+route, and the redirect's, the second carrying the resumable `onResult`.
 
-**Not fixed in the file here**, because the file is not this entry's to rewrite
-and a concurrent slice was in flight. The correction is one sentence: the
-**resume** is carried by the `onResult` callback; the `ReevaluateListenable`
-carries the **re-evaluation on a session change**.
+| probe | what was done | the stack afterwards |
+| --- | --- | --- |
+| **1** — the listenable **inert** (a `ReevaluateListenable` that never notifies) | `onResult(LoginOutcome.signedIn)` | **`[LoginRoute, ReadingRoute]`** — the **interrupted** navigation was resumed |
+| **2** — the listenable **fires** (the status flips to authenticated, the signal notifies) and the `onResult` is **not** called | the listenable alone | **`[LoginRoute, DockShellRoute]`** — the app's **default** route; the interrupted `/reading` was **not** resumed |
+
+**So the two paths are not the same path.** The `onResult` callback resumes the
+screen the reader was trying to reach; the re-evaluation lands them on the app's
+default route, because the guard's redirect had already consumed the pending
+navigation.
+
+**And the comment's own measurement is a cold launch** — `[LoginRoute]` →
+`[]` → `[HomeRoute]` — which has **no interrupted navigation to resume** at
+all. A cold launch is the case where the two mechanisms agree, which is why the
+distinction was not visible from it.
+
+**What this cost, and why it is not only a doc entry.** The portal's landing is
+issued from the sign-in listener, and with the `onResult` path still live the
+landing was pushed **on top of** the resumed route: measured
+`[DockShellRoute, ServantHomeRoute]`, and `[DockShellRoute, DockShellRoute]` for
+a kid — **two copies of the reader's own screen**. The landing is therefore
+deferred to the end of the next frame, where the removal takes the **guard's**
+route: measured `[ServantHomeRoute]`. See AGENT_CONTEXT's recorded decision
+185.
+
+**The correction is two sentences in `auth_guard.dart`**, and the file is not
+this entry's to rewrite: the **resume of an interrupted navigation** is carried
+by the **`onResult` callback**; the `ReevaluateListenable` carries the
+**re-evaluation on a session change**, which lands the reader on the app's
+default route rather than on the screen they were heading for.

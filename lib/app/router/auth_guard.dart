@@ -155,10 +155,32 @@ class AuthGuard extends AutoRouteGuard {
   /// though it already did, and that the latch was protecting a navigation that
   /// did not exist yet. Both were wrong and the second was worse than vague: it
   /// named a mechanism that could not fire. The accurate statement is that the
-  /// resume is carried by the `ReevaluateListenable` — `navigation_injection.dart`
-  /// wires it to the bloc's stream precisely so a sign-out and a sign-in both
-  /// re-run this guard — and `navigation_injection_test.dart`'s integrated loop is
-  /// what proves it.
+  /// **resume of an interrupted navigation** is carried by the **`onResult`
+  /// callback** — this guard's own — and that the `ReevaluateListenable` carries
+  /// a **different** job: re-running this guard over the whole stack when the
+  /// **session changes**, which is what sends a signed-out reader to `/login`.
+  /// `navigation_injection_test.dart`'s integrated loop is what proves the
+  /// re-evaluation, and `docs/DRIFT.md` §9.4 carries the measurement that told
+  /// the two apart.
+  ///
+  /// The two are **not interchangeable**, and the difference is a screen the
+  /// reader lands on. Measured over the real router on 2026-10-21, with
+  /// `/reading` pushed while signed out — so the stack was
+  /// `[LoginRoute, LoginRoute]`, the second carrying the resumable `onResult`:
+  ///
+  /// * the listenable **inert**, and only `onResult(LoginOutcome.signedIn)`
+  ///   called → **`[LoginRoute, ReadingRoute]`** — the interrupted navigation
+  ///   was resumed;
+  /// * the listenable **firing** on the session change, and the `onResult`
+  ///   **not** called → **`[LoginRoute, DockShellRoute]`** — the app's default
+  ///   route, because the guard's redirect had already consumed the pending
+  ///   navigation.
+  ///
+  /// So the re-evaluation does not resume what the reader was heading for, and
+  /// this paragraph's earlier claim that it "resolves the *pending* navigation"
+  /// was true only of a **cold launch** — which has no interrupted navigation to
+  /// resume, which is why the two mechanisms agree there and the difference was
+  /// invisible from it.
   ///
   /// What remains true of the original reasoning, and is why nothing above was
   /// deleted: the failure it describes is not exotic, it is the ordinary
@@ -212,14 +234,26 @@ class AuthGuard extends AutoRouteGuard {
           // exactly this symptom to the caching defect; it is unconditional.
           //
           // So the resume is not carried by this call and has not been since the
-          // version bump. It is carried by the `ReevaluateListenable`: the bloc
-          // emits `signedIn`, the router re-runs this guard over the stack, and
-          // `decide()` now returns `allow`, which resolves the *pending*
-          // navigation. Measured on a cold launch: the stack goes
-          // `[LoginRoute]` → `[]` → `[HomeRoute]` with `HomePage` mounted, and
-          // `navigation_injection_test.dart`'s integrated loop asserts it.
+          // version bump. It is carried by the **`onResult` callback** — this
+          // guard's own — and the `ReevaluateListenable` carries a **different**
+          // job: re-running this guard over the stack when the **session
+          // changes**. Measured on 2026-10-21 over the real router, and the two
+          // land the reader on **different screens**: with the listenable inert
+          // and only `onResult(LoginOutcome.signedIn)` called, the stack went
+          // `[LoginRoute, LoginRoute]` → `[LoginRoute, ReadingRoute]` — the
+          // **interrupted** navigation resumed; with the listenable firing and
+          // the `onResult` not called, it went `[LoginRoute, LoginRoute]` →
+          // `[LoginRoute, DockShellRoute]` — the app's **default** route, because
+          // the guard's redirect had already consumed the pending navigation.
+          // The class doc above carries the same measurement, and
+          // `docs/DRIFT.md` §9.4 is the entry.
           //
-          // The latch stays above so the callback remains safe to *call* twice,
+          // The earlier version of this paragraph claimed the `ReevaluateListenable`
+          // carried the resume and cited a **cold launch** — `[LoginRoute]` →
+          // `[]` → `[HomeRoute]` — as its measurement. A cold launch has no
+          // interrupted navigation to resume, so it is the one case where the two
+          // mechanisms agree, and it is the case that hid the difference. The
+          // latch stays above so the callback remains safe to *call* twice,
           // which `auth_guard_test.dart` does. The comment below this one used to
           // claim the latch protected this navigation; it does not, and this
           // paragraph is the correction.
