@@ -23,7 +23,9 @@ enum ServantReportStatus {
   /// Nothing has been asked for yet. The form is on screen and empty.
   idle,
 
-  /// The request is open. The roster on screen is the previous one.
+  /// The request is open. **There is no roster on screen** — a roster drawn
+  /// under a form that is busy asking for another one is a roster about a
+  /// different request.
   loading,
 
   /// An answer is in hand. [ServantReportState.report] is non-null.
@@ -71,6 +73,60 @@ enum ServantReportFormError {
 ///
 /// The parse therefore happens **once**, in [ServantReportCubit.load], and it
 /// is the parse that refuses — never the field.
+///
+/// ## AND THE **INVARIANT** IS ONE SENTENCE
+///
+/// **A roster on screen describes the form on screen.** The report is a
+/// roster of **children**, and the cohort and the day are what the roster is
+/// about — the server's own `group_id` and `report_date`
+/// (`admin.routes.ts:416-422`), and `ServantReport`'s own doc says the same
+/// of `reportDate`: "the report's date is the date the request named".
+///
+/// So a status that promises an answer never stands without one, and an
+/// **edit** — the only thing a servant can do to this form besides asking —
+/// takes the answer away with the form it described.
+///
+/// ## AND AN **EDIT** IS **ONE RULE**, AND IT IS THE **SIBLINGS'** RULE
+///
+/// [withGroupId] and [withDate] are the two writers an edit reaches, and
+/// they answer the same question the same way:
+///
+/// * **The roster goes.** It described the form as it **was**, and the form
+///   is not that any more.
+/// * **The arm that promised the roster goes with it.** `ready` means "an
+///   answer is in hand", and the answer is gone.
+/// * **The server's failure stays, and the arm that names it.** The failure
+///   is the server's answer about the request it answered, and the servant
+///   correcting a field is not the server changing its mind.
+/// * **A request in flight stays in flight.** The busy state is the status,
+///   and the busy state is what disables the button.
+/// * **The form's own refusal goes.** The servant is correcting it, and a
+///   message that outlives the field it is about is a message about
+///   something else.
+///
+/// `ScheduleReadingCubit._edit` is the same rule, and each part's reason is
+/// that file's.
+///
+/// ## AND THE **COHORT** AND THE **DAY** ARE **ONE RULE**, NOT TWO
+///
+/// A report is identified by the **pair** — a cohort on a day — so a roster
+/// that does not describe the form is a roster about a different request,
+/// whichever coordinate moved. The two are not equal in **cost**, and the
+/// difference is worth writing down rather than rediscovering:
+///
+/// * a **cohort** change puts **another cohort's children** on screen — an
+///   identity, and the reason the rule exists at all;
+/// * a **day** change puts **the same children's other day** on screen — a
+///   freshness, and a less alarming version of the same wrongness.
+///
+/// Both are "a roster that does not describe the form", so both drop it, and
+/// **one** rule is cheaper to hold than two that agree by accident.
+///
+/// ## AND THE COST IS **ACCEPTED**, AND STATED
+///
+/// A servant who mistypes the cohort loses the loaded roster, and reloads it
+/// with one press of the button. That is a cheap price for never showing
+/// one cohort's children under another cohort's name.
 @Freezed(copyWith: false)
 final class ServantReportState with _$ServantReportState {
   /// A state on the given arm.
@@ -97,7 +153,11 @@ final class ServantReportState with _$ServantReportState {
   /// The date field, verbatim.
   final String dateText;
 
-  /// The roster, or `null` while loading and after a failure.
+  /// The roster, or `null` while loading, after a failure, and after an
+  /// **edit**.
+  ///
+  /// **AND IT IS NEVER A ROSTER ABOUT ANOTHER REQUEST.** A roster on screen
+  /// describes the form on screen — the class doc's invariant.
   final ServantReport? report;
 
   /// Why the request failed, or `null`.
@@ -113,24 +173,66 @@ final class ServantReportState with _$ServantReportState {
   /// *partial* writer, and a partial writer is a second spelling of these two
   /// methods that nobody would remember to keep in step. `HomeState`'s six
   /// writers are the precedent, and its doc gives the reason.
+  ///
+  /// ## AND THE **ROSTER** GOES WITH IT
+  ///
+  /// **THE COHORT IS WHAT THE ROSTER IS ABOUT**, so a cohort that changes
+  /// under a loaded roster puts **one cohort's children under another
+  /// cohort's name** — and the cubit's own refusal already forbids exactly
+  /// that shape: "a roster drawn under a form that has been refused is a
+  /// roster about a different cohort". A form that is merely *wrong* is the
+  /// same shape with a kinder cause.
+  ///
+  /// The rule, and the cost of it, are the class doc's.
   ServantReportState withGroupId(String text) => ServantReportState(
-    status: status,
+    status: _statusAfterEdit(),
     groupIdText: text,
     dateText: dateText,
-    report: report,
     failure: failure,
-    formError: formError,
   );
 
   /// The same state with a different date field.
+  ///
+  /// ## AND THE **DAY** IS **THE SAME RULE**, NOT A SECOND ONE
+  ///
+  /// The report is a cohort **on a day** — the server's `group_id` and
+  /// `report_date` (`admin.routes.ts:416-422`) — so the pair is one thing
+  /// and a roster that does not describe the form is a roster about a
+  /// different request, whichever coordinate moved. The **cost** differs
+  /// (another cohort's children, or the same children's other day), and the
+  /// class doc says so.
   ServantReportState withDate(String text) => ServantReportState(
-    status: status,
+    status: _statusAfterEdit(),
     groupIdText: groupIdText,
     dateText: text,
-    report: report,
     failure: failure,
-    formError: formError,
   );
+
+  /// The status an **edit** leaves behind.
+  ///
+  /// **THE FAILED REQUEST KEEPS ITS ARM, AND THE ANSWER LOSES ITS OWN.**
+  ///
+  /// The failure is the server's answer about one request, and the status is
+  /// what names that request — so an edit that kept the message and dropped
+  /// the arm would leave a state that says "something failed" and cannot say
+  /// what.
+  ///
+  /// **AND THE OTHER TWO ARMS ARE ABOUT THE FORM.** A request in flight
+  /// stays in flight, and an answer that has gone leaves an idle form —
+  /// because the roster it answered described the form as it **was**, and it
+  /// went with it.
+  ServantReportStatus _statusAfterEdit() => switch (status) {
+    // **A request in flight stays in flight** — the busy state is the
+    // status, and the busy state is what disables the button.
+    ServantReportStatus.loading => ServantReportStatus.loading,
+    // **The failed request keeps its arm**, because the failure it names is
+    // still on screen.
+    ServantReportStatus.failed => ServantReportStatus.failed,
+    // **The answer goes**, because the roster it answered described the form
+    // as it was — and the arm that promised it goes with it.
+    ServantReportStatus.ready => ServantReportStatus.idle,
+    ServantReportStatus.idle => ServantReportStatus.idle,
+  };
 }
 
 /// Drives `/servant/report` through [load] and [retry].
@@ -148,6 +250,50 @@ final class ServantReportState with _$ServantReportState {
 /// the mirror of it — no presentation file names a repository either. The
 /// cubit depends on [LoadDailyReport], so a test drives the real use case over
 /// a fake port, and the port is the only thing that has to be faked.
+///
+/// ## AND AN **EDIT** DROPS THE **ROSTER**
+///
+/// The two writers below are the only things a servant can do to this screen
+/// besides asking, and an edit changes what the form describes — so the
+/// roster on screen, which described the form as it **was**, goes with it.
+/// The rule, and the cost of it, are [ServantReportState]'s.
+///
+/// ## AND THE ONE WINDOW WHERE A ROSTER **CAN** BE ABOUT ANOTHER COHORT
+///
+/// **MEASURED, 2026-10-21, over this cubit** — a cohort that changes while
+/// the request is open:
+///
+/// ```text
+/// the status while open = loading
+/// the status after the edit = loading
+/// the form says = 7
+/// the status when it lands = ready
+/// the form says = 7
+/// the report is for = 3
+/// ```
+///
+/// The answer that lands is the one that was **asked for**, and the form has
+/// moved on since — so the roster on screen is the roster of the cohort the
+/// servant asked about, under a form that names another one. The **edit**
+/// rule cannot reach it: the edit happened before the answer existed, and
+/// there was no roster to drop.
+///
+/// **AND IT IS THE **SIBLINGS'** WINDOW TOO**, measured the same way over
+/// `ScheduleReadingCubit`:
+///
+/// ```text
+/// the status while open = submitting
+/// the status after the edit = submitting
+/// the form says = 7
+/// the status when it lands = scheduled
+/// the form says = 7
+/// ```
+///
+/// `QuestionAuthoringCubit.requestDraft` answers under the form as it is
+/// when the answer lands too, and the family has left all three the same
+/// way. **Closing it is a second policy decision** — the answer can be
+/// dropped, or the form can be rolled back to what was asked for — and it
+/// is not this rule's to make.
 class ServantReportCubit extends Cubit<ServantReportState> {
   /// Drives the report over [loadDailyReport].
   ServantReportCubit({required this.loadDailyReport})
@@ -157,9 +303,13 @@ class ServantReportCubit extends Cubit<ServantReportState> {
   final LoadDailyReport loadDailyReport;
 
   /// The cohort field changed.
+  ///
+  /// **AND THE ROSTER GOES WITH IT** — see [ServantReportState].
   void setGroupId(String text) => emit(state.withGroupId(text));
 
   /// The date field changed.
+  ///
+  /// **AND THE ROSTER GOES WITH IT** — see [ServantReportState].
   void setDate(String text) => emit(state.withDate(text));
 
   /// Asks for the roster on the form and answers with the whole state.
@@ -172,7 +322,12 @@ class ServantReportCubit extends Cubit<ServantReportState> {
   /// that asks first has said the same thing in the servant's own language and
   /// has not spent a request on it.
   ///
-  /// ## AND A REFUSAL **KEEPS THE FORM** and the last report
+  /// ## AND A REFUSAL **KEEPS THE FORM** and drops the report
+  ///
+  /// The form is the servant's and the refusal is about the form, so the
+  /// form stays — and the roster goes, because a roster drawn under a form
+  /// that has been refused is a roster about a different cohort. That is the
+  /// same rule the **edit** writers follow, and [_emitRefused] says why.
   Future<void> load() async {
     // **A second request while one is open is refused.** The screen's busy
     // state is the status, and the busy state is what disables the submit

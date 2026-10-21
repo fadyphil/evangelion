@@ -557,6 +557,101 @@ void main() {
     );
   });
 
+  // ## THE **ROSTER** AND THE **FORM**
+  //
+  // The report is a roster of **children**, and the cohort and the day are
+  // what the roster is about — the server's own `group_id` and `report_date`
+  // (`admin.routes.ts:416-422`). So a roster on screen has to describe the
+  // form on screen, and an **edit** is the only thing a servant can do to the
+  // form besides asking.
+  //
+  // **AND THE CLAIM BELOW IS ABOUT **THE ROSTER ON SCREEN**, NOT ABOUT THE
+  // STATE.** The state held the whole time, and holding the old roster is
+  // exactly what made the defect invisible: a reader of the state alone
+  // could not tell a roster about cohort 3 from a roster about cohort 7,
+  // because the state said "3" about the roster and "7" about the form.
+  group('the roster and the form', () {
+    testWidgets(
+      'the cohort changes, and the roster about the old cohort goes',
+      (WidgetTester tester) async {
+        final _Repo repo = _Repo(Result<ServantReport>.of(report));
+        final ServantReportCubit cubit = ServantReportCubit(
+          loadDailyReport: LoadDailyReport(repo),
+        );
+        addTearDown(cubit.close);
+
+        await pumpServant(tester, ServantReportPage(cubit: cubit));
+        await askForTheRoster(tester);
+
+        expect(find.byType(RosterRow), findsOneWidget);
+
+        // **THE SERVANT CORRECTS THE COHORT.**
+        await tester.enterText(find.byType(TextField).first, '7');
+        await tester.pump();
+
+        // **AND THE ROSTER IS GONE** — a roster of cohort 3's children under a
+        // form that says cohort 7 is one cohort's children under another
+        // cohort's name.
+        expect(find.byType(RosterRow), findsNothing);
+        // **AND SO ARE THE TWO TOTALS**, because they count the roster's rows.
+        expect(find.byType(StatTile), findsNothing);
+
+        // **AND THE FORM SAYS WHAT THE SERVANT TYPED**, so the claim above is
+        // not vacuous: a form that did not change would not have dropped
+        // anything.
+        expect(textIn(tester, 0), '7');
+
+        // **AND ONE PRESS BRINGS THE ROSTER BACK** — the cost of the rule,
+        // measured. A servant who mistypes the cohort loses the roster and
+        // reloads it with one press of the button.
+        //
+        // **THE FAKE ANSWERS THE SAME ROSTER FOR EVERY COHORT**, so the claim
+        // here is about **the request** — it carries the cohort on the form —
+        // and about **a roster being on screen again**. The payload the fake
+        // answers with is the fake's, and not the client's.
+        await tester.tap(find.text('Show the roster'));
+        await tester.pump();
+
+        expect(repo.asked.last.groupId, 7);
+        expect(find.byType(RosterRow), findsOneWidget);
+      },
+    );
+
+    testWidgets('the day changes, and the roster about the old day goes', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ServantReport>.of(report));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      // **THE DATE IS FIXED**, so the claim is about a day and not about the
+      // wall clock — and the day the servant chooses is not the default.
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit, today: () => _defaultToday),
+      );
+      await tester.enterText(find.byType(TextField).at(0), '3');
+      await tester.tap(find.text('Show the roster'));
+      await tester.pump();
+
+      expect(find.byType(RosterRow), findsOneWidget);
+
+      // **THE SERVANT CHOOSES ANOTHER DAY.**
+      await tester.enterText(find.byType(TextField).at(1), _chosenDate);
+      await tester.pump();
+
+      // **AND THE ROSTER IS GONE** — the same children, another day's
+      // answers, under a form that names the other day.
+      expect(find.byType(RosterRow), findsNothing);
+      expect(find.byType(StatTile), findsNothing);
+
+      // **AND THE FORM SAYS THE DAY THE SERVANT CHOSE.**
+      expect(textIn(tester, 1), _chosenDate);
+    });
+  });
+
   group('the reader\'s own language', () {
     testWidgets('and says its two totals in the reader\'s own language too', (
       WidgetTester tester,

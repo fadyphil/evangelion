@@ -315,4 +315,129 @@ void main() {
       },
     );
   });
+
+  // ## THE **EDIT**
+  //
+  // The report is a roster of **children**, and the cohort and the day are
+  // what the roster is about — the server's own `group_id` and `report_date`
+  // (`admin.routes.ts:416-422`). So a roster on screen has to describe the
+  // form on screen, and an **edit** is the only thing a servant can do to the
+  // form besides asking.
+  //
+  // **THE CUBIT'S WRITERS DECIDE WHAT THE EDIT INVALIDATES**, and the rule is
+  // the sibling cubits' rule: the answer on screen is about the form as it
+  // **was**, so it goes; the server's **failure** is about the request that
+  // failed, so it stays.
+  group('the edit', () {
+    blocTest<ServantReportCubit, ServantReportState>(
+      'the cohort changed, and the roster about the old cohort goes',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.ready,
+        groupIdText: '3',
+        dateText: '2026-10-21',
+        report: report,
+      ),
+      act: (ServantReportCubit cubit) => cubit.setGroupId('7'),
+      expect: () => <ServantReportState>[
+        // **NO ROSTER, AND NO `ready`** — the roster is gone and so is the
+        // arm that promised it, because an arm that promises an answer must
+        // never stand without one.
+        const ServantReportState(
+          status: ServantReportStatus.idle,
+          groupIdText: '7',
+          dateText: '2026-10-21',
+        ),
+      ],
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'the day changed, and the roster about the old day goes',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.ready,
+        groupIdText: '3',
+        dateText: '2026-10-21',
+        report: report,
+      ),
+      act: (ServantReportCubit cubit) => cubit.setDate('2026-10-14'),
+      expect: () => <ServantReportState>[
+        // **THE SAME RULE, AND NOT A SECOND ONE** — a report is identified by
+        // the pair, a cohort on a day, so a roster that does not describe the
+        // form is a roster about a different request whichever coordinate
+        // moved. The costs differ and the rule does not.
+        const ServantReportState(
+          status: ServantReportStatus.idle,
+          groupIdText: '3',
+          dateText: '2026-10-14',
+        ),
+      ],
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'and the server\'s failure stays, with the arm that names it',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.failed,
+        groupIdText: '3',
+        dateText: '2026-10-21',
+        failure: failure,
+      ),
+      act: (ServantReportCubit cubit) => cubit.setGroupId('7'),
+      expect: () => <ServantReportState>[
+        // **THE FAILURE IS ABOUT THE REQUEST THAT FAILED**, and the reader
+        // correcting a field is not the server changing its mind — so it
+        // stays, and the arm that names it stays with it, so `retry` still
+        // repeats that request.
+        const ServantReportState(
+          status: ServantReportStatus.failed,
+          groupIdText: '7',
+          dateText: '2026-10-21',
+          failure: failure,
+        ),
+      ],
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'and the form\'s own refusal goes, because the reader is correcting it',
+      build: () => cubitWith(groupId: 'three', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.idle,
+        groupIdText: 'three',
+        dateText: '2026-10-21',
+        formError: ServantReportFormError.invalidGroupId,
+      ),
+      act: (ServantReportCubit cubit) => cubit.setGroupId('3'),
+      expect: () => <ServantReportState>[
+        // **A MESSAGE THAT OUTLIVES THE FIELD IT IS ABOUT IS A MESSAGE ABOUT
+        // SOMETHING ELSE** — and the reader is correcting it.
+        const ServantReportState(
+          status: ServantReportStatus.idle,
+          groupIdText: '3',
+          dateText: '2026-10-21',
+        ),
+      ],
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'and a request in flight stays in flight',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.loading,
+        groupIdText: '3',
+        dateText: '2026-10-21',
+      ),
+      act: (ServantReportCubit cubit) => cubit.setGroupId('7'),
+      expect: () => <ServantReportState>[
+        // **THE BUSY STATE IS THE STATUS, AND THE BUSY STATE IS WHAT DISABLES
+        // THE BUTTON** — so an edit that dropped it would re-enable the
+        // button while the request was still open.
+        const ServantReportState(
+          status: ServantReportStatus.loading,
+          groupIdText: '7',
+          dateText: '2026-10-21',
+        ),
+      ],
+    );
+  });
 }
