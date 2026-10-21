@@ -28,6 +28,15 @@ import 'package:evangelion/features/quiz/domain/refreshed_questions.dart';
 import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/servant/domain/entities/commit_result.dart';
+import 'package:evangelion/features/servant/domain/entities/question_draft.dart';
+import 'package:evangelion/features/servant/domain/entities/reading_schedule.dart';
+import 'package:evangelion/features/servant/domain/entities/roster_student.dart';
+import 'package:evangelion/features/servant/domain/entities/schedule_result.dart';
+import 'package:evangelion/features/servant/domain/entities/servant_report.dart';
+import 'package:evangelion/features/servant/domain/usecases/commit_questions.dart';
+import 'package:evangelion/features/servant/domain/usecases/generate_ai_draft.dart';
+import 'package:evangelion/features/servant/domain/usecases/load_daily_report.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_state.dart';
 import 'package:evangelion/features/sky/presentation/cubit/sky_state.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -636,6 +645,230 @@ void main() {
     });
   });
 
+  // ## THE SERVANT PORTAL'S ELEVEN
+  //
+  // Eight entities and three params objects, from the `servant` feature's
+  // domain. They are here for the reason every other converted type is here:
+  // **`freezed` derives `==` from the constructor, so a dropped field is
+  // invisible to an equality assertion and visible only to a
+  // `_differsInEveryField` sweep.**
+  //
+  // Two of the eleven carry a **collection** — `ReadingSchedule.groupIds` and
+  // `.excludedVerses`, `QuestionDraft.options`, `ServantReport.students` and the
+  // two list-bearing params — so their equality is over **content** and their
+  // variants differ in content rather than in identity. `freezed` generates
+  // `DeepCollectionEquality` for collection fields, and the `LeaderboardBoard`
+  // test above is the precedent for asserting that rather than assuming it.
+  group('the servant portal', () {
+    test('`ExcludedVerse`', () {
+      _equalAndDistinct('ExcludedVerse', _excludedVerse(), _excludedVerse());
+      _differsInEveryField(
+        'ExcludedVerse',
+        _excludedVerse(),
+        fields: 2,
+        variants: <({String field, ExcludedVerse value})>[
+          (field: 'chapter', value: _excludedVerse(chapter: 4)),
+          (field: 'verse', value: _excludedVerse(verse: 7)),
+        ],
+      );
+    });
+
+    test('`ReadingSchedule`', () {
+      _equalAndDistinct('ReadingSchedule', _schedule(), _schedule());
+      _differsInEveryField(
+        'ReadingSchedule',
+        _schedule(),
+        fields: 9,
+        variants: <({String field, ReadingSchedule value})>[
+          (field: 'groupIds', value: _schedule(groupIds: <int>[4])),
+          (
+            field: 'scheduledDate',
+            value: _schedule(scheduledDate: '2026-10-22'),
+          ),
+          (field: 'bookNumber', value: _schedule(bookNumber: 44)),
+          (field: 'startChapter', value: _schedule(startChapter: 2)),
+          (field: 'startVerse', value: _schedule(startVerse: 3)),
+          // The nullable field, varied to its **absence** — the state the
+          // server's own `end_chapter ?? start_chapter` transform produces.
+          (field: 'endChapter', value: _schedule(endChapter: null)),
+          (field: 'endVerse', value: _schedule(endVerse: 6)),
+          (
+            field: 'excludedVerses',
+            value: _schedule(excludedVerses: <ExcludedVerse>[]),
+          ),
+          (
+            field: 'generateAiQuestions',
+            value: _schedule(generateAiQuestions: true),
+          ),
+        ],
+      );
+    });
+
+    test('`ScheduleResult`', () {
+      _equalAndDistinct('ScheduleResult', _scheduleResult(), _scheduleResult());
+      _differsInEveryField(
+        'ScheduleResult',
+        _scheduleResult(),
+        fields: 2,
+        variants: <({String field, ScheduleResult value})>[
+          (field: 'message', value: _scheduleResult(message: 'other')),
+          (field: 'readingIds', value: _scheduleResult(readingIds: <String>[])),
+        ],
+      );
+    });
+
+    test('`QuestionOption`', () {
+      _equalAndDistinct('QuestionOption', _option(), _option());
+      _differsInEveryField(
+        'QuestionOption',
+        _option(),
+        fields: 2,
+        variants: <({String field, QuestionOption value})>[
+          (field: 'ar', value: _option(ar: 'آخر')),
+          (field: 'en', value: _option(en: 'Another')),
+        ],
+      );
+    });
+
+    test('`QuestionDraft`', () {
+      _equalAndDistinct('QuestionDraft', _questionDraft(), _questionDraft());
+      _differsInEveryField(
+        'QuestionDraft',
+        _questionDraft(),
+        fields: 8,
+        variants: <({String field, QuestionDraft value})>[
+          (field: 'type', value: _questionDraft(type: QuestionType.trueFalse)),
+          (field: 'promptAr', value: _questionDraft(promptAr: 'سؤال آخر')),
+          (
+            field: 'promptEn',
+            value: _questionDraft(promptEn: 'Another question'),
+          ),
+          (
+            field: 'options',
+            value: _questionDraft(options: <String, QuestionOption>{}),
+          ),
+          (field: 'correctAnswer', value: _questionDraft(correctAnswer: 'B')),
+          (field: 'pointsValue', value: _questionDraft(pointsValue: 20)),
+          (field: 'sortOrder', value: _questionDraft(sortOrder: 2)),
+          (field: 'isApproved', value: _questionDraft(isApproved: false)),
+        ],
+      );
+    });
+
+    test('`CommitResult`', () {
+      _equalAndDistinct('CommitResult', _commitResult(), _commitResult());
+      _differsInEveryField(
+        'CommitResult',
+        _commitResult(),
+        fields: 2,
+        variants: <({String field, CommitResult value})>[
+          (field: 'message', value: _commitResult(message: 'other')),
+          (field: 'questionIds', value: _commitResult(questionIds: <String>[])),
+        ],
+      );
+    });
+
+    test('`RosterStudent`', () {
+      _equalAndDistinct('RosterStudent', _rosterStudent(), _rosterStudent());
+      _differsInEveryField(
+        'RosterStudent',
+        _rosterStudent(),
+        fields: 8,
+        variants: <({String field, RosterStudent value})>[
+          (field: 'userId', value: _rosterStudent(userId: 'other')),
+          (field: 'fullName', value: _rosterStudent(fullName: 'Someone Else')),
+          (field: 'preferredLang', value: _rosterStudent(preferredLang: 'ar')),
+          (field: 'totalPoints', value: _rosterStudent(totalPoints: 90)),
+          (field: 'currentStreak', value: _rosterStudent(currentStreak: 7)),
+          (
+            field: 'pointsEarnedToday',
+            value: _rosterStudent(pointsEarnedToday: 20),
+          ),
+          (
+            field: 'completedToday',
+            value: _rosterStudent(completedToday: false),
+          ),
+          (
+            field: 'questionsProgress',
+            value: _rosterStudent(questionsProgress: '5/5'),
+          ),
+        ],
+      );
+    });
+
+    test('`ServantReport`', () {
+      _equalAndDistinct('ServantReport', _servantReport(), _servantReport());
+      _differsInEveryField(
+        'ServantReport',
+        _servantReport(),
+        fields: 5,
+        variants: <({String field, ServantReport value})>[
+          (field: 'groupId', value: _servantReport(groupId: 4)),
+          (
+            field: 'reportDate',
+            value: _servantReport(reportDate: '2026-10-22'),
+          ),
+          (field: 'totalStudents', value: _servantReport(totalStudents: 9)),
+          (field: 'completedCount', value: _servantReport(completedCount: 0)),
+          (
+            field: 'students',
+            value: _servantReport(students: <RosterStudent>[]),
+          ),
+        ],
+      );
+    });
+
+    test('`CommitQuestionsParams`', () {
+      _equalAndDistinct(
+        'CommitQuestionsParams',
+        _commitParams(),
+        _commitParams(),
+      );
+      _differsInEveryField(
+        'CommitQuestionsParams',
+        _commitParams(),
+        fields: 2,
+        variants: <({String field, CommitQuestionsParams value})>[
+          (field: 'readingId', value: _commitParams(readingId: 'other')),
+          (
+            field: 'questions',
+            value: _commitParams(questions: <QuestionDraft>[]),
+          ),
+        ],
+      );
+    });
+
+    test('`GenerateAiDraftParams`', () {
+      _equalAndDistinct(
+        'GenerateAiDraftParams',
+        _draftParams(),
+        _draftParams(),
+      );
+      _differsInEveryField(
+        'GenerateAiDraftParams',
+        _draftParams(),
+        fields: 2,
+        variants: <({String field, GenerateAiDraftParams value})>[
+          (field: 'readingId', value: _draftParams(readingId: 'other')),
+          (field: 'type', value: _draftParams(type: QuestionType.trueFalse)),
+        ],
+      );
+    });
+
+    test('`DailyReportQuery`', () {
+      _equalAndDistinct('DailyReportQuery', _reportQuery(), _reportQuery());
+      _differsInEveryField(
+        'DailyReportQuery',
+        _reportQuery(),
+        fields: 2,
+        variants: <({String field, DailyReportQuery value})>[
+          (field: 'groupId', value: _reportQuery(groupId: 4)),
+          (field: 'date', value: _reportQuery(date: '2026-10-22')),
+        ],
+      );
+    });
+  });
+
   group('auth', () {
     test('`LoginCredentials`', () {
       _equalAndDistinct('LoginCredentials', _credentials(), _credentials());
@@ -1055,7 +1288,7 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(47),
+        hasLength(58),
         reason:
             'the converted set moved. 25 classes, 15 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
@@ -1068,6 +1301,12 @@ void main() {
             'because the catalogue is ADR-0022\'s invented data behind a port. '
             '**46 → 47 in the servant portal\'s Task 1**, for `AuthRoleChanged` — '
             'the event that carries the role the reader chose on the login form. '
+            '**47 → 58 in the servant portal\'s Task 3**, for that feature\'s '
+            '**eleven**: eight entities (`ExcludedVerse`, `ReadingSchedule`, '
+            '`ScheduleResult`, `QuestionOption`, `QuestionDraft`, '
+            '`CommitResult`, `RosterStudent`, `ServantReport`) and three params '
+            'objects (`CommitQuestionsParams`, `GenerateAiDraftParams`, '
+            '`DailyReportQuery`). '
             'If this number moved, the migration or the phase moved and this '
             'file has to be told',
       );
@@ -1260,6 +1499,22 @@ const Set<String> _assertedTypeNames = <String>{
   // form. It carries a field, so it belongs with the eight above rather than
   // with the field-less ones.
   'AuthRoleChanged',
+  // The servant portal's **eleven** from Task 3 — eight entities and three
+  // params objects. They are here for the reason every other converted type is
+  // here: `freezed` derives `==` from the constructor, so a dropped field is
+  // invisible to an equality assertion and visible only to a
+  // `_differsInEveryField` sweep.
+  'ExcludedVerse',
+  'ReadingSchedule',
+  'ScheduleResult',
+  'QuestionOption',
+  'QuestionDraft',
+  'CommitResult',
+  'RosterStudent',
+  'ServantReport',
+  'CommitQuestionsParams',
+  'GenerateAiDraftParams',
+  'DailyReportQuery',
   // And the 3 sealed bases. They carry no fields and are never instantiated, so
   // the only claim made about each is that `lib/` says freezed owns it — see the
   // group above. Listed so the count reconciles.
@@ -1775,6 +2030,124 @@ String _otherUserId() => '22222222-2222-4222-8222-222222222222';
 DateTime _firstInstant() => DateTime.utc(2026, 10, 4);
 
 DateTime _laterInstant() => DateTime.utc(2026, 10, 5);
+
+/// The servant portal's eleven, in the same shape as every builder above: each
+/// field is a parameter, each call returns a **new** object, and none of them
+/// is `const` — so no pair of calls can be canonicalised into one instance and
+/// every `identical` guard is a real guard.
+ExcludedVerse _excludedVerse({int chapter = 3, int verse = 2}) =>
+    ExcludedVerse(chapter: _int(chapter), verse: _int(verse));
+
+ReadingSchedule _schedule({
+  List<int>? groupIds,
+  String scheduledDate = '2026-10-21',
+  int bookNumber = 43,
+  int startChapter = 3,
+  int startVerse = 1,
+  int? endChapter = 4,
+  int endVerse = 5,
+  List<ExcludedVerse>? excludedVerses,
+  bool generateAiQuestions = false,
+}) => ReadingSchedule(
+  groupIds: groupIds ?? <int>[_int(3)],
+  scheduledDate: _text(scheduledDate),
+  bookNumber: _int(bookNumber),
+  startChapter: _int(startChapter),
+  startVerse: _int(startVerse),
+  endChapter: endChapter == null ? null : _int(endChapter),
+  endVerse: _int(endVerse),
+  excludedVerses: excludedVerses ?? <ExcludedVerse>[_excludedVerse()],
+  generateAiQuestions: _bool(generateAiQuestions),
+);
+
+ScheduleResult _scheduleResult({
+  String message = 'Successfully scheduled reading for 1 groups',
+  List<String>? readingIds,
+}) => ScheduleResult(
+  message: _text(message),
+  readingIds: readingIds ?? <String>[_text('reading-1')],
+);
+
+QuestionOption _option({String ar = 'الخيار أ', String en = 'Option A'}) =>
+    QuestionOption(ar: _text(ar), en: _text(en));
+
+QuestionDraft _questionDraft({
+  QuestionType type = QuestionType.mcq,
+  String promptAr = 'سؤال',
+  String promptEn = 'A question',
+  Map<String, QuestionOption>? options,
+  String correctAnswer = 'A',
+  int pointsValue = 10,
+  int sortOrder = 1,
+  bool isApproved = true,
+}) => QuestionDraft(
+  type: type,
+  promptAr: _text(promptAr),
+  promptEn: _text(promptEn),
+  options: options ?? <String, QuestionOption>{_text('A'): _option()},
+  correctAnswer: _text(correctAnswer),
+  pointsValue: _int(pointsValue),
+  sortOrder: _int(sortOrder),
+  isApproved: _bool(isApproved),
+);
+
+CommitResult _commitResult({
+  String message = 'Committed 1 questions for reading',
+  List<String>? questionIds,
+}) => CommitResult(
+  message: _text(message),
+  questionIds: questionIds ?? <String>[_text('question-1')],
+);
+
+RosterStudent _rosterStudent({
+  String userId = '11111111-1111-1111-1111-111111111111',
+  String fullName = 'David Mina',
+  String preferredLang = 'en',
+  int totalPoints = 40,
+  int currentStreak = 4,
+  int pointsEarnedToday = 10,
+  bool completedToday = true,
+  String questionsProgress = '3/5',
+}) => RosterStudent(
+  userId: _text(userId),
+  fullName: _text(fullName),
+  preferredLang: _text(preferredLang),
+  totalPoints: _int(totalPoints),
+  currentStreak: _int(currentStreak),
+  pointsEarnedToday: _int(pointsEarnedToday),
+  completedToday: _bool(completedToday),
+  questionsProgress: _text(questionsProgress),
+);
+
+ServantReport _servantReport({
+  int groupId = 3,
+  String reportDate = '2026-10-21',
+  int totalStudents = 2,
+  int completedCount = 1,
+  List<RosterStudent>? students,
+}) => ServantReport(
+  groupId: _int(groupId),
+  reportDate: _text(reportDate),
+  totalStudents: _int(totalStudents),
+  completedCount: _int(completedCount),
+  students: students ?? <RosterStudent>[_rosterStudent()],
+);
+
+CommitQuestionsParams _commitParams({
+  String readingId = 'reading-1',
+  List<QuestionDraft>? questions,
+}) => CommitQuestionsParams(
+  readingId: _text(readingId),
+  questions: questions ?? <QuestionDraft>[_questionDraft()],
+);
+
+GenerateAiDraftParams _draftParams({
+  String readingId = 'reading-1',
+  QuestionType type = QuestionType.mcq,
+}) => GenerateAiDraftParams(readingId: _text(readingId), type: type);
+
+DailyReportQuery _reportQuery({int groupId = 3, String date = '2026-10-21'}) =>
+    DailyReportQuery(groupId: _int(groupId), date: _text(date));
 
 /// A `Failure` for the three states that carry one.
 ///

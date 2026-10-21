@@ -69,6 +69,14 @@ import '../../features/reading/data/mappers/streak_summary_mapper.dart'
 import '../../features/reading/data/mappers/submit_result_mapper.dart' as _i840;
 import '../../features/reading/data/mappers/today_reading_mapper.dart' as _i220;
 import '../../features/reading/domain/usecases/load_scripture.dart' as _i574;
+import '../../features/servant/domain/repositories/servant_admin_repository.dart'
+    as _i884;
+import '../../features/servant/domain/repositories/servant_report_repository.dart'
+    as _i366;
+import '../../features/servant/domain/usecases/commit_questions.dart' as _i555;
+import '../../features/servant/domain/usecases/generate_ai_draft.dart' as _i867;
+import '../../features/servant/domain/usecases/load_daily_report.dart' as _i973;
+import '../../features/servant/domain/usecases/schedule_reading.dart' as _i491;
 import '../../features/settings/data/datasources/settings_local_data_source.dart'
     as _i599;
 import '../../features/settings/domain/usecases/get_settings.dart' as _i558;
@@ -78,10 +86,11 @@ import '../../features/sky/data/datasources/sky_local_data_source.dart'
 import 'modules/auth_module.dart' as _i4;
 import 'modules/core_module.dart' as _i134;
 import 'modules/home_module.dart' as _i443;
-import 'modules/journey_module.dart' as _i491;
+import 'modules/journey_module.dart' as _i492;
 import 'modules/leaderboard_module.dart' as _i820;
 import 'modules/quiz_module.dart' as _i697;
 import 'modules/reading_module.dart' as _i768;
+import 'modules/servant_module.dart' as _i885;
 import 'modules/settings_module.dart' as _i145;
 import 'modules/sky_module.dart' as _i696;
 
@@ -99,6 +108,7 @@ extension GetItInjectableX on _i174.GetIt {
     final leaderboardModule = _$LeaderboardModule();
     final quizModule = _$QuizModule();
     final readingModule = _$ReadingModule();
+    final servantModule = _$ServantModule();
     final settingsModule = _$SettingsModule();
     final skyModule = _$SkyModule();
     gh.lazySingleton<_i852.AuthLocalDataSource>(
@@ -185,6 +195,24 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i84.SubmitAnswer>(() => quizModule.submitAnswer);
     gh.lazySingleton<_i574.LoadScripture>(() => readingModule.loadScripture);
+    gh.lazySingleton<_i884.ServantAdminRepository>(
+      () => servantModule.servantAdminRepository,
+    );
+    gh.lazySingleton<_i366.ServantReportRepository>(
+      () => servantModule.servantReportRepository,
+    );
+    gh.lazySingleton<_i491.ScheduleReading>(
+      () => servantModule.scheduleReading,
+    );
+    gh.lazySingleton<_i555.CommitQuestions>(
+      () => servantModule.commitQuestions,
+    );
+    gh.lazySingleton<_i867.GenerateAiDraft>(
+      () => servantModule.generateAiDraft,
+    );
+    gh.lazySingleton<_i973.LoadDailyReport>(
+      () => servantModule.loadDailyReport,
+    );
     gh.lazySingleton<_i599.SettingsLocalDataSource>(
       () => settingsModule.settingsLocalDataSource,
     );
@@ -223,13 +251,15 @@ class _$CoreModule extends _i134.CoreModule {}
 
 class _$HomeModule extends _i443.HomeModule {}
 
-class _$JourneyModule extends _i491.JourneyModule {}
+class _$JourneyModule extends _i492.JourneyModule {}
 
 class _$LeaderboardModule extends _i820.LeaderboardModule {}
 
 class _$QuizModule extends _i697.QuizModule {}
 
 class _$ReadingModule extends _i768.ReadingModule {}
+
+class _$ServantModule extends _i885.ServantModule {}
 
 class _$SettingsModule extends _i145.SettingsModule {}
 

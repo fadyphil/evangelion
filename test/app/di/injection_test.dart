@@ -717,6 +717,32 @@ void main() {
           'lazySingleton<RefreshSessionQuestions> refreshSessionQuestions',
           'lazySingleton<SubmitAnswer> submitAnswer',
           'lazySingleton<LoadScripture> loadScripture',
+          // **The servant portal's Task 3 added these six**, and their position is
+          // the evidence again: they land in their own block, between the
+          // reading module's and the settings module's, because that is where
+          // injectable puts a module's providers — the servant's module is a
+          // **feature** module, for the reason `leaderboard_module.dart` is its
+          // own file. The generator chose this; this test asserts *which*
+          // providers exist.
+          //
+          // **THE TWO PORTS, NOT THE TWO ADAPTERS.** `servantAdminRepository` and
+          // `servantReportRepository` are the two **narrow** ports of the
+          // servant feature, and the concrete `DioServantAdminRepository` /
+          // `DioServantReportRepository` appear nowhere in the generated text —
+          // the same substitution the reading and leaderboard ports make, and
+          // the reason a future transport is a change to one provider body and
+          // nothing else.
+          //
+          // **AND THE DATA SOURCE AND THE THREE MAPPERS ARE NOT REGISTERED.**
+          // They are built inside the two repository providers, because nothing
+          // else in the graph reads them; the `Dio` they are built over is
+          // registered by `core_module.dart`.
+          'lazySingleton<ServantAdminRepository> servantAdminRepository',
+          'lazySingleton<ServantReportRepository> servantReportRepository',
+          'lazySingleton<ScheduleReading> scheduleReading',
+          'lazySingleton<CommitQuestions> commitQuestions',
+          'lazySingleton<GenerateAiDraft> generateAiDraft',
+          'lazySingleton<LoadDailyReport> loadDailyReport',
           'lazySingleton<SettingsLocalDataSource> settingsLocalDataSource',
           'lazySingleton<SettingsRepository> settingsRepository',
           'lazySingleton<GetSettings> getSettings',
