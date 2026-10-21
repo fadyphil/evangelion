@@ -61,7 +61,7 @@ import '../../../tool/route_check.dart';
 /// a **constant owned by another file**, restated in a suite about
 /// [landingRouteFor]. `app_routes_test.dart` already holds that invariant over
 /// the declaration site ("every route except the fallback starts with a slash"),
-/// it applies it to all nine declarations rather than to the one this suite
+/// it applies it to all twelve declarations rather than to the one this suite
 /// happens to name, and it fails for the identical reason. Two implementations
 /// of one invariant are two things to keep in step, which is §7's own note on
 /// Gate 4 and this file's opening argument against hand-written mirrors.
@@ -142,8 +142,8 @@ void main() {
     // hand-typed `'/servant'` inside the `switch` would compile, would answer
     // every assertion above, and would be invisible to all of them.
     //
-    // COMPLETE, all nine, and asserted complete against the declaration site
-    // below. An earlier version named seven of the nine and omitted
+    // COMPLETE, all twelve, and asserted complete against the declaration site
+    // below. An earlier version named seven of the then-nine and omitted
     // `communion` and `fallback`, which made the failure message factually
     // wrong: a landing on `/communion` would have been reported as "an
     // undeclared path" when `/communion` is very much declared. An incomplete
@@ -159,6 +159,14 @@ void main() {
     // added to `app_routes.dart` without being added here fails, and a
     // constant removed from there without being removed here fails the other
     // way round.
+    //
+    // **AND THE COUNT IS TWELVE NOW.** The 2026-10-21 amendment to decision 5
+    // (ADR-0026) gave the servant portal four paths of its own, and their
+    // constants arrived in `app_routes.dart` with the portal's navigation work.
+    // This mirror is the one place that has to follow, and the completeness
+    // test below is what made it follow: it failed on `/servant/report` the
+    // first time the constant was declared, which is precisely the gap this
+    // file's prose warned about.
     const Set<String> declared = <String>{
       AppRoutes.login,
       AppRoutes.home,
@@ -171,6 +179,13 @@ void main() {
       // landed in the gap unnoticed.
       AppRoutes.journey,
       AppRoutes.servant,
+      // The portal's three sub-routes. **None of them is a landing route** —
+      // `landingRouteFor` sends a servant to the hub — and the mirror names
+      // them anyway, because the claim it holds is one-directional: nothing
+      // may be *declared* that this suite would then call undeclared.
+      AppRoutes.servantReport,
+      AppRoutes.servantSchedule,
+      AppRoutes.servantQuestions,
       AppRoutes.fallback,
     };
 

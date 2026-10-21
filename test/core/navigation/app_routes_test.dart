@@ -35,7 +35,22 @@ void main() {
   final Map<String, String> inventory = declaredRouteValues(source);
   final List<String> declared = declaredRouteNames(source);
 
-  group('the seven locked routes', () {
+  group('the eleven locked routes', () {
+    // ## WHY THE GROUP IS NAMED AFTER A COUNT, and why the count had to move
+    // twice.
+    //
+    // The name used to be "the seven locked routes" and it was **already**
+    // wrong when the seventh screen was added: the group names a **value** for
+    // each path §2 locks, and `/journey` had no row, so a reader who opened
+    // this file and was told there were eight paths could not find the eighth.
+    // The rows are the point — "a reader who opens this file has just been
+    // told there are N paths, and this is where each one is named" — so the
+    // group now carries a row for every one of the eleven, and the name counts
+    // what is actually there.
+    //
+    // AGENT_CONTEXT §2 locks **eleven** paths as of the 2026-10-21 amendment
+    // to decision 5 (ADR-0026), which gave `/servant` and its three sub-routes
+    // rows of their own.
     test('login is /login', () {
       expect(AppRoutes.login, '/login');
     });
@@ -62,20 +77,143 @@ void main() {
       expect(AppRoutes.communion, '/communion');
     });
 
+    test('journey is /journey, and is slash-prefixed like the rest', () {
+      // The row this group was missing until the count was corrected. Phase 5.6
+      // added the profile ADR-0001 cut and ADR-0022 restored, and §2's table
+      // names it — so §2 locks it, and a locked path with no value row is a
+      // path this file claims to name and does not.
+      expect(AppRoutes.journey, '/journey');
+    });
+
     test('servant is /servant, and is slash-prefixed like the rest', () {
-      // The eighth declared route and now the **only** one whose path §2 does
-      // not fix, so it follows `communion` rather than arriving with the seven.
-      // Its value row is
-      // here for the same reason as that one's: a reader who opens this file has
-      // just been told there are eight paths, and this is where each one is named.
+      // The eighth declared route, and the first of the four the 2026-10-21
+      // amendment gave §2 rows of their own. Its value row is here for the
+      // same reason as the others': a reader who opens this file has just been
+      // told there are eleven paths, and this is where each one is named.
       //
       // `/servant` is **declared but not routed** — no `AutoRoute` in
-      // `app_router.dart` names it, so a push to it falls through the `'*'`
+      // `app_router.dart` names it yet, so a push to it falls through the `'*'`
       // wildcard. `landing_route_test.dart` records that; this row is only the
       // value, and it is the value `landingRouteFor` returns for both servant
       // roles, so a rename here and a stale string there would be two names for
       // one route.
       expect(AppRoutes.servant, '/servant');
+    });
+
+    test('servantReport is /servant/report', () {
+      // The daily roster completion report — the one section a
+      // `viewer_servant` has, which is why the hub is a page and not a tab
+      // shell.
+      expect(AppRoutes.servantReport, '/servant/report');
+    });
+
+    test('servantSchedule is /servant/schedule', () {
+      // Choosing what a group reads next. An `admin_servant` section.
+      expect(AppRoutes.servantSchedule, '/servant/schedule');
+    });
+
+    test('servantQuestions is /servant/questions', () {
+      // Authoring and committing a reading's questions. An `admin_servant`
+      // section.
+      expect(AppRoutes.servantQuestions, '/servant/questions');
+    });
+  });
+
+  group('the three servant sub-routes', () {
+    // ## WHY THIS GROUP EXISTS BESIDE THE VALUE ROWS
+    //
+    // The value rows above say what each path **is**. This group says what
+    // the three sub-routes **are not**, and each of those is a shape a future
+    // edit could quietly break:
+    //
+    //  * they are **plain string literals**, so `tool/route_check.dart` can
+    //    evaluate the structural invariants against them at all — a derived
+    //    path would be invisible to the invariants, and the gate says so
+    //    rather than skipping it;
+    //  * they are **distinct**, so the router's match order never decides
+    //    which screen a reader reaches;
+    //  * they are **absolute**, and they are **root-level**: they are not
+    //    children of the hub. auto_route rejects a child path that begins with
+    //    a slash (`RouteCollection.fromList` throws `Sub-paths can not start
+    //    with a "/"`), and the hub is a **page** rather than an
+    //    `AutoTabsRouter`, so it has no children for a path to be relative to.
+    //  * and they sit **under the hub's path**, so the four `/servant*` rows
+    //    in §2's table are one family rather than four unrelated strings.
+    //
+    // The last one is the claim that would rot first: nothing in the compiler
+    // ties `/servant/report` to `/servant`, and a rename of the hub would
+    // leave the three behind it as three paths that match no hub.
+
+    test('each is a plain string literal the route gate can read', () {
+      // The **parsed** map, not the constants: `declaredRouteValues` only
+      // holds a declaration whose initialiser is a plain literal, so a
+      // constant that stopped being one would fall out of this map and fail
+      // here rather than quietly escaping every invariant below.
+      expect(inventory['servantReport'], '/servant/report');
+      expect(inventory['servantSchedule'], '/servant/schedule');
+      expect(inventory['servantQuestions'], '/servant/questions');
+    });
+
+    test('the three are distinct paths', () {
+      final Set<String> paths = <String>{
+        AppRoutes.servantReport,
+        AppRoutes.servantSchedule,
+        AppRoutes.servantQuestions,
+      };
+
+      expect(paths, hasLength(3), reason: 'two of them spell the same path');
+    });
+
+    test('each is an absolute path', () {
+      for (final String path in <String>[
+        AppRoutes.servantReport,
+        AppRoutes.servantSchedule,
+        AppRoutes.servantQuestions,
+      ]) {
+        expect(
+          path,
+          startsWith('/'),
+          reason: '"$path" is not an absolute path',
+        );
+      }
+    });
+
+    test('each sits under the hub\'s path, so the four are one family', () {
+      for (final String path in <String>[
+        AppRoutes.servantReport,
+        AppRoutes.servantSchedule,
+        AppRoutes.servantQuestions,
+      ]) {
+        expect(
+          path,
+          startsWith('${AppRoutes.servant}/'),
+          reason:
+              '"$path" is not under the hub\'s path ("${AppRoutes.servant}"), so a '
+              'rename of the hub would leave it behind',
+        );
+      }
+    });
+
+    test('each is the hub\'s path plus exactly one segment', () {
+      // "Consistent with the hub" in its strongest form: a sub-route is **one
+      // step below** `/servant` in the URL space — not a sibling with a shared
+      // prefix, and not a deeper path. `/servant-portal/report` would satisfy
+      // the prefix test above and fail this one, and it is exactly the
+      // near-miss a rename of the hub produces.
+      for (final String path in <String>[
+        AppRoutes.servantReport,
+        AppRoutes.servantSchedule,
+        AppRoutes.servantQuestions,
+      ]) {
+        final String suffix = path.substring('${AppRoutes.servant}/'.length);
+
+        expect(suffix, isNotEmpty, reason: '"$path" names no section');
+        expect(
+          suffix,
+          isNot(contains('/')),
+          reason: '"$path" is more than one step below the hub',
+        );
+      }
     });
   });
 
@@ -85,9 +223,9 @@ void main() {
     // every `expect` in the group below would be iterating nothing and the
     // suite would pass while asserting nothing. That is the self-comparing
     // tautology the Phase 0b mutation audit removed from `failure_test.dart`, so
-    // the shape of the claim is asserted first, and the nine names are spelled
+    // the shape of the claim is asserted first, and the twelve names are spelled
     // out rather than merely counted: a parser that quietly returned the wrong
-    // nine would otherwise sail through.
+    // twelve would otherwise sail through.
     test('the parser sees every declaration, including ones it cannot read', () {
       // Anti-vacuity for the whole group below. A declaration whose initialiser
       // is not a plain literal is reported rather than dropped, because an
@@ -102,7 +240,7 @@ void main() {
       );
     });
 
-    test('the inventory is exactly the nine declared route names', () {
+    test('the inventory is exactly the twelve declared route names', () {
       expect(declared, <String>[
         'login',
         'home',
@@ -136,16 +274,29 @@ void main() {
         // name before anything else in the suite did, which is the whole reason the
         // inventory is spelled out instead of counted.
         'servant',
+        // The portal's three sub-routes, and the reason the count moved a second
+        // time. §2's route table carries a row for each of them since the
+        // 2026-10-21 amendment to decision 5 gave decision 5's reversal rows of
+        // its own (ADR-0026), and their **constants** are declared here while the
+        // `AutoRoute`s that register them arrive with the portal's own
+        // implementation.
+        //
+        // **They are root-level absolute paths, not children of `servant`** — the
+        // hub is a page rather than a tab shell, so it has no children for a
+        // relative path to belong to. See `app_routes.dart`'s own doc.
+        'servantReport',
+        'servantSchedule',
+        'servantQuestions',
         'fallback',
       ]);
-      expect(inventory, hasLength(9));
+      expect(inventory, hasLength(12));
       // `inventory.values.whereType<String>()` used to sit here, asserting that
-      // all nine entries were real strings. It could not fail: `inventory` is a
+      // all twelve entries were real strings. It could not fail: `inventory` is a
       // `Map<String, String>`, so `.values` is statically `Iterable<String>` and
-      // `whereType<String>()` is the identity — it returned all nine elements
+      // `whereType<String>()` is the identity — it returned all twelve elements
       // unconditionally. The hazard it guarded is unrepresentable too; a `null`
       // in a `Map<String, String>` literal is a compile error, not a runtime
-      // state, and `hasLength(9)` above already implies nine strings.
+      // state, and `hasLength(12)` above already implies twelve strings.
     });
 
     test('the three tab paths are derived, and are the relative halves', () {

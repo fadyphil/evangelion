@@ -4,13 +4,16 @@
 /// renamed route cannot find.
 ///
 /// AGENT_CONTEXT §2 locks **eleven** route paths, and this file declares
-/// **eight** of them today: the seven it has always locked, plus [servant],
-/// which the 2026-10-21 amendment to decision 5 gave a row (ADR-0026). The
-/// wildcard `'*'` is the ninth declaration and is a sentinel rather than a
-/// path. The three `/servant/*` sub-routes are §2's too, and they arrive in
-/// this file with the portal's own implementation — `tool/route_check.dart`
-/// reads this file's declarations, so a constant that is not here is not a
-/// route the structural invariants apply to.
+/// **all eleven** of them today: the seven it has always locked, plus [servant]
+/// and its three sub-routes, which the 2026-10-21 amendment to decision 5 gave
+/// rows of their own (ADR-0026). The wildcard `'*'` is the **twelfth**
+/// declaration and is a sentinel rather than a path.
+///
+/// The three sub-routes' **constants** arrive here with the portal's
+/// navigation work, while the **`AutoRoute`s that register them** arrive with
+/// the portal's own implementation — `tool/route_check.dart` reads this file's
+/// declarations, so a constant that is not here is not a route the structural
+/// invariants apply to.
 ///
 /// ## THE THREE TAB PATHS ARE **DERIVED**, NOT DECLARED, AND THAT IS THE POINT
 ///
@@ -194,25 +197,68 @@ abstract final class AppRoutes {
   ///
   /// ## AND IT IS ONE OF §2's LOCKED PATHS NOW
   ///
-  /// It was the eighth declaration and the only one §2 did not fix, until the
-  /// user **reversed** decision 5 on 2026-10-21 (ADR-0026). §2's route table
-  /// carries a row for it and three rows for its sub-routes, and the row exists
-  /// so a reader has one place to look for what each declared path is, not
-  /// because the value is in doubt — the value was never in doubt:
+  /// It **was** the eighth declaration and **the only one §2 did not fix**,
+  /// until the user **reversed** decision 5 on 2026-10-21 (ADR-0026) and §2's
+  /// route table carried a row for it and three rows for its sub-routes. The
+  /// row exists so a reader has one place to look for what each declared path
+  /// is, not because the value is in doubt — the value was never in doubt:
   /// `app_routes_test.dart` has carried a value row for it since Task 5.5 moved
   /// `/communion` into §2's table, which is why the count in that suite's name
-  /// and in its docs was a thing that had to move.
+  /// and in its docs was a thing that had to move. **It had to move a second
+  /// time** when the three sub-routes joined it, which is the same lesson in
+  /// the same place: a count in a suite's name is a claim about the tree, and
+  /// a tree that grows makes it false.
   ///
   /// ## AND WHAT IS TRUE AT **THIS** COMMIT
   ///
-  /// The registration and the three sub-route constants land with the portal's
-  /// own implementation
-  /// (`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`, Tasks 2 and
-  /// 5), and this paragraph is written in the present tense of the **finished**
-  /// portal rather than of this commit. The two facts that are true **now** are
-  /// the two this file can be checked against: the constant is declared here,
-  /// and the gate is advisory.
+  /// The three sub-route **constants** are declared in this same file, and the
+  /// four `AutoRoute`s that register the portal land with the portal's own
+  /// implementation
+  /// (`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`, Task 5), and
+  /// this paragraph is written in the present tense of the **finished** portal
+  /// rather than of this commit. The two facts that are true **now** are the
+  /// two this file can be checked against: the constants are declared here, and
+  /// the gate is advisory.
   static const String servant = '/servant';
+
+  /// `/servant/report` — the cohort's daily roster completion report.
+  ///
+  /// The one section a `viewer_servant` has: the cohort's roster, who finished
+  /// today's reading and who did not, and how many points each of them has.
+  ///
+  /// ## IT IS A **ROOT-LEVEL ABSOLUTE PATH**, NOT A CHILD OF [servant]
+  ///
+  /// The hub is a **page** rather than an `AutoTabsRouter`, so it has no
+  /// children for a path to be relative to — and auto_route rejects a child
+  /// path that begins with a slash (`RouteCollection.fromList` throws
+  /// `Sub-paths can not start with a "/"`). These three are therefore declared
+  /// as paths of their own, beside the hub rather than beneath it, and the
+  /// dock shell's three tab paths are relative for the **opposite** reason: it
+  /// is an `AutoTabsRouter`, and [homeTab] / [communionTab] / [journeyTab]
+  /// derive their relative halves from the absolute paths they belong to.
+  static const String servantReport = '/servant/report';
+
+  /// `/servant/schedule` — scheduling a reading for a cohort.
+  ///
+  /// Choosing what a group reads next: the passage, the date, and whether the
+  /// server generates the reflection question or the admin writes it. An
+  /// `admin_servant` section only, and the table that says so is
+  /// `UserRole.grantsFor` — the same one the portal's gate reads, so the hub
+  /// and the gate cannot disagree.
+  ///
+  /// A root-level absolute path, not a child of [servant] — see
+  /// [servantReport] for why.
+  static const String servantSchedule = '/servant/schedule';
+
+  /// `/servant/questions` — authoring and committing a reading's questions.
+  ///
+  /// The question, its answers and its point value, written by hand or drafted
+  /// by the server and then edited before it is committed. An `admin_servant`
+  /// section only — see `UserRole.grantsFor`.
+  ///
+  /// A root-level absolute path, not a child of [servant] — see
+  /// [servantReport] for why.
+  static const String servantQuestions = '/servant/questions';
 
   /// The wildcard catch-all, `'*'`. Unmatched paths redirect through this. See
   /// the file doc for what is and is not true about the value — in particular,
