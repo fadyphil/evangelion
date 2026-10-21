@@ -62,9 +62,9 @@ import '../../../support/project_import_graph.dart';
 /// one.
 ///
 /// **And the multiset, and not a set**, because two sites can carry the same
-/// text — `servant_report_page.dart`'s two declarations differ only in the
-/// field's name, and a set would collapse two rows into one and let a fifth
-/// slip through.
+/// text — `servant_report_page.dart`'s two declarations differed only in the
+/// field's name, and a set would have collapsed two rows into one and let a
+/// fifth slip through.
 ///
 /// ## AND A STALE ROW IS A **FAILURE**, NOT A NOTE
 ///
@@ -74,10 +74,21 @@ import '../../../support/project_import_graph.dart';
 /// test below is the one that keeps the receipts honest: **every row must still
 /// match the tree.**
 ///
-/// That is what makes the servant rows **live** rather than decorative. They
-/// are scheduled for migration, and the migration is the thing that makes them
-/// stale — and a stale row is red, so the migration cannot land without
-/// somebody looking at the row it retires.
+/// That is what makes every row **live** rather than decorative, and it is
+/// what the servant rows were.
+///
+/// **AND THE SERVANT ROWS ARE **GONE**, AND THAT IS THE MIGRATION'S RECEIPT.**
+/// The portal's three pages and its option editor held **eighteen** controllers
+/// between them, and every one of them was a hand-rolled mirror — the shape
+/// that produced six defects of one class (decision 188). They are on
+/// `EvaControlledField` now, so the rows that allowed them no longer match the
+/// tree, and **a row that no longer matches the tree is red**: the allowlist
+/// below went from **twenty-one** reviewed sites to **three**, and the count is
+/// pinned at three so that a row that comes back has to be re-read to bring it.
+///
+/// **The number fell by exactly eighteen**, which is the number of sites the
+/// migration removed — and a number that fell by any other amount would have
+/// been a finding rather than something to paper over.
 ///
 /// ## FAIL-CLOSED
 ///
@@ -160,10 +171,8 @@ void main() {
         isNotEmpty,
         reason:
             'the allowlist is empty, which would mean the gate forbids every '
-            'controller in the tree — and there are **twenty-one** that are '
-            'legitimate: one in the mechanism, two in the login page, and '
-            'eighteen in the servant portal, which are scheduled for '
-            'migration.',
+            'controller in the tree — and there are **three** that are '
+            'legitimate: one in the mechanism, and two in the login page.',
       );
       final int total = _allowlist.values.fold<int>(
         0,
@@ -171,12 +180,12 @@ void main() {
       );
       expect(
         total,
-        21,
+        3,
         reason:
-            'twenty-one reviewed sites. If this number moved, the allowlist '
-            'above and the tree have drifted apart, and one of them is wrong. '
-            'The servant rows go down as the portal migrates, and this number '
-            'goes with them.',
+            'three reviewed sites. If this number moved, the allowlist above '
+            'and the tree have drifted apart, and one of them is wrong. The '
+            'servant rows went down as the portal migrated, and this number '
+            'went with them.',
       );
     });
 
@@ -425,71 +434,4 @@ const Map<String, List<String>> _allowlist = <String, List<String>>{
     'finalTextEditingController_email=TextEditingController();',
     'finalTextEditingController_password=TextEditingController();',
   ],
-
-  // ## THE **SERVANT PORTAL**, AND THESE ROWS ARE **SCHEDULED FOR MIGRATION**.
-  //
-  // **The three pages and the one widget below still hand-roll their
-  // controllers**, and the hand-rolled version is what produced six defects of
-  // one class (decision 188). Their migration to the controlled field is a
-  // **separate task**, and until it lands these rows are what keeps the tree
-  // legal.
-  //
-  // **THEY ARE NOT DECORATIVE.** A row that no longer matches its site is a
-  // **failure**, not a note — the same rule `test/setstate_budget_test.dart`
-  // applies to its `setState` rows — so the migration cannot land without
-  // somebody looking at the row it retires, and a controller that somebody
-  // adds to one of these files without a review turns the gate red.
-  //
-  // **What each site is**, so a reader can recognise the next one:
-  //
-  // - `schedule_reading_page.dart` — the scheduling form: the cohort, the day,
-  //   the passage's book, chapters, verses and the excluded passages. **The
-  //   server's insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE`**,
-  //   so scheduling the same cohort and date again **replaces** the cohort's
-  //   passage. A form that shows the admin an empty passage while the state
-  //   holds one sends a passage nobody can see.
-  // - `question_authoring_page.dart` — the question editor: the reading id,
-  //   the Arabic and English prompts, the correct answer, the points and the
-  //   sort order. **The editor's own write of the state's `pointsText` into a
-  //   controller that started empty is defect #1** — it arrived at the cubit
-  //   as an edit the reader had made, and the cubit's edit writer dropped the
-  //   server's failure with it.
-  // - `servant_report_page.dart` — the report's form: the cohort and the day.
-  //   **Its seed is defect #4**: the seed reported the two controllers'
-  //   contents at mount, the controllers start empty, and the servant's cohort
-  //   and day were wiped along with the roster they had loaded.
-  // - `question_option_editor.dart` — one answer option's two lines. It is a
-  //   **widget**, not a page, and it is the fourth site rather than the third:
-  //   the option is a **pair** (`{ar, en}` in the commit body), and a pair of
-  //   fields that lived in different places would need the page to hold two
-  //   controllers per option and to know which letter each pair belongs to.
-  'lib/features/servant/presentation/pages/schedule_reading_page.dart':
-      <String>[
-        'finalTextEditingController_groupIds=TextEditingController();',
-        'finalTextEditingController_date=TextEditingController();',
-        'finalTextEditingController_book=TextEditingController();',
-        'finalTextEditingController_startChapter=TextEditingController();',
-        'finalTextEditingController_startVerse=TextEditingController();',
-        'finalTextEditingController_endChapter=TextEditingController();',
-        'finalTextEditingController_endVerse=TextEditingController();',
-        'finalTextEditingController_excluded=TextEditingController();',
-      ],
-  'lib/features/servant/presentation/pages/question_authoring_page.dart':
-      <String>[
-        'finalTextEditingController_readingId=TextEditingController();',
-        'finalTextEditingController_promptAr=TextEditingController();',
-        'finalTextEditingController_promptEn=TextEditingController();',
-        'finalTextEditingController_correctAnswer=TextEditingController();',
-        'finalTextEditingController_points=TextEditingController();',
-        'finalTextEditingController_sortOrder=TextEditingController();',
-      ],
-  'lib/features/servant/presentation/pages/servant_report_page.dart': <String>[
-    'finalTextEditingController_group=TextEditingController();',
-    'finalTextEditingController_date=TextEditingController();',
-  ],
-  'lib/features/servant/presentation/widgets/question_option_editor.dart':
-      <String>[
-        'finalTextEditingController_arabic=TextEditingController();',
-        'finalTextEditingController_english=TextEditingController();',
-      ],
 };

@@ -571,41 +571,32 @@ ALLOWLIST: dict[str, str] = {
         "moment any page constructs it."
     ),
 
-    # ## `EvaControlledField` — THE **MECHANISM**, AND IT HAS NO CALLER YET
+    # ## `EvaControlledField` LEFT THIS LIST, AND THE **MIGRATION** PLACED IT
     #
-    # This entry is a **decision with a date on it**, and it is the same shape as
-    # `WitnessSky`'s was: the widget ships **before** the pages that use it,
-    # because the pages that use it are the servant portal's three screens and
-    # their option editor, and **their** migration off the hand-rolled
-    # controllers is a separate task.
+    # The entry read "UNPLACED, AND THE REASON IS A SEPARATE TASK" and ended
+    # with the standing instruction: *"STALE the moment any page constructs
+    # it."*
     #
-    # **THE WIDGET IS THE FIX FOR A CLASS OF DEFECT, AND THE GATE THAT KEEPS
-    # THE FIX IN PLACE IS A SEPARATE FILE.** Decision 188 records six defects
-    # of one class — "a screen and the state it mirrors can stop agreeing, and
-    # the request is the one that writes" — and every one of them was found by
-    # an agent reading the code rather than by a gate. The mechanism is this
-    # widget; the gate is
-    # `test/core/design_system/widgets/mirrored_controller_check_test.dart`,
-    # which allows exactly **one** file to create a `TextEditingController`:
-    # this one, plus the login page's two and the servant portal's eighteen.
+    # **The servant portal's migration is that task.** The controlled field is
+    # the mechanism for decision 188's class of defect — "a screen and the
+    # state it mirrors can stop agreeing, and the request is the one that
+    # writes" — and it was shipped **before** the pages that use it, because
+    # their migration off the hand-rolled controllers was a separate task.
     #
-    # **STALE THE MOMENT ANY PAGE CONSTRUCTS IT**, and the gate says so:
-    # `stale_allow` reports an allowlisted widget that **is** placed, and the
-    # entry has to be deleted then. The servant migration is what ends this
-    # entry, and it cannot land without the row being re-read.
-    "EvaControlledField": (
-        "UNPLACED, AND THE REASON IS A SEPARATE TASK. The controlled field is "
-        "the mechanism for decision 188's class of defect — a screen and the "
-        "state it mirrors can stop agreeing, and the request is the one that "
-        "writes — and it ships before the pages that will use it. Its callers "
-        "are the servant portal's three screens and their option editor, and "
-        "their migration off the hand-rolled controllers is a separate task. "
-        "The gate that keeps the hand-rolled version out is "
-        "`test/core/design_system/widgets/mirrored_controller_check_test.dart`, "
-        "which allows exactly one file to create a `TextEditingController` "
-        "besides the login page's deliberate exception. STALE the moment any "
-        "page constructs it."
-    ),
+    # **The four files now construct it**: `question_authoring_page.dart` (six
+    # fields), `schedule_reading_page.dart` (eight), `servant_report_page.dart`
+    # (two) and `question_option_editor.dart` (two — one answer option's two
+    # lines). That is **eighteen** hand-rolled mirrors replaced by the one
+    # controlled field, and the gate that keeps the hand-rolled version out is
+    # `test/core/design_system/widgets/mirrored_controller_check_test.dart` —
+    # whose allowlist went from **twenty-one** reviewed sites to **three** in
+    # the same change.
+    #
+    # The gate said so: it prints `STALE ALLOWLIST  EvaControlledField  is
+    # allowlisted but IS placed — remove the entry`, and that is the receipt for
+    # this paragraph. **An allowlist row that has stopped being true is a false
+    # green**, so the row is gone and this paragraph is what remains of it,
+    # exactly as `WitnessSky`'s and `HairlineDivider`'s did.
 }
 
 

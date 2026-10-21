@@ -5,46 +5,40 @@ import 'package:flutter/material.dart';
 
 /// One answer option: its letter, its Arabic text and its English text.
 ///
-/// ## AND IT OWNS ITS **TWO CONTROLLERS**
+/// ## AND IT OWNS **NO CONTROLLER**, AND THE REASON IS THE **PAIR**
 ///
-/// `EvaTextField`'s contract is that "the controller is the caller's", and this
-/// widget **is** the caller — it hands two controllers to two fields and it
-/// reports what they say. The page owns the *question*; the option owns its
-/// own *two lines*.
+/// The option is a **pair** — the commit schema types it as `{ar, en}`
+/// (`admin.routes.ts:41-44`) — and a pair of fields that lived in different
+/// places would need the page to hold two controllers per option and to know
+/// which letter each pair belongs to. **One widget per option keeps that
+/// knowledge in one place**, and the widget holds the two texts the page hands
+/// it and reports the one that changed.
 ///
-/// The reason is the option's own shape: an option is a **pair** — the commit
-/// schema types it as `{ar, en}` (`admin.routes.ts:41-44`) — and a pair of
-/// fields that live in different places would need the page to hold two
-/// controllers per option and to know which letter each pair belongs to. One
-/// widget per option keeps that knowledge in one place.
+/// ## AND THE **TWO HALVES** ARE **TWO CONTROLLED FIELDS**
 ///
-/// ## AND THE SYNC IS **ONE-SIDED**
+/// `EvaControlledField` is the **one** controlled field in this repository
+/// (`core/design_system/widgets/eva_controlled_field.dart`), and decision
+/// 188's rule is that a value mirrored into a control is mirrored by that one
+/// field, in one direction, and a programmatic write is never reported as the
+/// reader's.
 ///
-/// [didUpdateWidget] writes the incoming text into the controllers **only when
-/// it differs from what they already hold**. That single rule is what makes
-/// the two directions safe:
+/// **This widget used to hand-roll that**, with a `_writing` boolean and two
+/// controllers of its own, and the hand-rolled version is what produced six
+/// defects of one class. The boolean was a flag that had to be set and cleared
+/// around every write, and the failure mode of a flag that is not set is
+/// exactly the defect it was there to prevent.
 ///
-/// * the admin types, the controller changes, the widget reports it, and the
-///   question on screen changes — and the next rebuild finds the controller
-///   already holding that text, so it writes nothing and the caret does not
-///   move;
-/// * the server's draft arrives, the incoming text differs from the empty
-///   controller, and the field is filled.
+/// **The controlled field compares instead**, and there is no flag here to get
+/// wrong: the field's own write is the controlled value, and the field knows
+/// that because it is the only thing that ever writes into its own controller.
 ///
-/// ## AND THE WIDGET REPORTS **ONLY WHAT THE READER DID**
+/// ## AND THE SERVER'S DRAFT STILL **FILLS** THE TWO FIELDS
 ///
-/// The sync is the other direction, and it is the one that can go wrong: the
-/// widget writes its own incoming text into a controller, the controller tells
-/// its listener, and the listener is the widget's way of reporting a
-/// keystroke. So a write the widget made on purpose — the server's draft
-/// arrives and the field is filled — arrived at the page as an edit the
-/// reader had made, and the cubit behind the page answers an edit by dropping
-/// the server's refusal with it.
-///
-/// **A SERVER'S ANSWER COULD VANISH IN THE FRAME IT ARRIVED.** The flag
-/// `_writing` is what the widget holds while it writes, and the report is
-/// suppressed for exactly that window.
-class QuestionOptionEditor extends StatefulWidget {
+/// The draft arrives as a new pair of texts, the fields' values change, and
+/// the controlled field mirrors them — **reporting nothing**, because the
+/// mirror is the field's own write. So the draft fills the two fields and the
+/// cubit behind the page is not told the admin typed them.
+class QuestionOptionEditor extends StatelessWidget {
   /// An option under [letter], with its two texts.
   const QuestionOptionEditor({
     required this.letter,
@@ -78,89 +72,6 @@ class QuestionOptionEditor extends StatefulWidget {
   final VoidCallback? onRemove;
 
   @override
-  State<QuestionOptionEditor> createState() => _QuestionOptionEditorState();
-}
-
-class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
-  final TextEditingController _arabic = TextEditingController();
-  final TextEditingController _english = TextEditingController();
-
-  /// Whether the widget is writing into a controller on purpose.
-  ///
-  /// **A WRITE THE WIDGET MADE IS NOT SOMETHING THE READER DID.** The
-  /// one-sided sync fills a controller from the widget's own incoming text,
-  /// and the controller tells its listener — which is the widget's way of
-  /// reporting a keystroke. A write the widget made on purpose reported that
-  /// way told the page the reader had typed, and the cubit behind the page
-  /// answers an edit by dropping the server's refusal with it: **a server's
-  /// answer could vanish in the frame it arrived.**
-  bool _writing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // **The two fields are written before the listeners are attached**, so
-    // the first text the widget holds is not reported either.
-    _arabic.text = widget.arabicText;
-    _english.text = widget.englishText;
-    _arabic.addListener(_onArabicChanged);
-    _english.addListener(_onEnglishChanged);
-  }
-
-  @override
-  void didUpdateWidget(QuestionOptionEditor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // **The one-sided sync.** The controller is written only when the
-    // incoming text differs from what it already holds, so a rebuild never
-    // moves the caret and the server's draft never fights the admin.
-    if (widget.arabicText != _arabic.text) {
-      _write(_arabic, widget.arabicText);
-    }
-    if (widget.englishText != _english.text) {
-      _write(_english, widget.englishText);
-    }
-  }
-
-  /// Writes [text] into [controller], and reports **nothing**.
-  ///
-  /// **The write is the widget's own**, and the controller's listener is the
-  /// widget's own way of reporting a keystroke — so a listener that reported
-  /// this write would be telling the page the reader had typed.
-  ///
-  /// The controller notifies its listeners **synchronously**, so [_writing] is
-  /// up for the whole write and down before the frame ends, and the
-  /// `try`/`finally` puts it down even if the write throws.
-  void _write(TextEditingController controller, String text) {
-    _writing = true;
-    try {
-      controller.text = text;
-    } finally {
-      _writing = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    _arabic
-      ..removeListener(_onArabicChanged)
-      ..dispose();
-    _english
-      ..removeListener(_onEnglishChanged)
-      ..dispose();
-    super.dispose();
-  }
-
-  void _onArabicChanged() {
-    if (_writing) return;
-    widget.onChanged(arabic: true, text: _arabic.text);
-  }
-
-  void _onEnglishChanged() {
-    if (_writing) return;
-    widget.onChanged(arabic: false, text: _english.text);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final AppLocalizations strings = context.l10n;
     final EvaColors colors = context.colors;
@@ -173,7 +84,7 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
             // The letter, and it is the option's **key** — the commit body
             // carries the options as a map keyed by it.
             Text(
-              widget.letter,
+              letter,
               style: EvaTypography.monoCaps(colors).copyWith(
                 fontSize: 12,
                 letterSpacing: 0,
@@ -182,7 +93,7 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
               ),
             ),
             const Spacer(),
-            if (widget.onRemove case final VoidCallback remove)
+            if (onRemove case final VoidCallback remove)
               TextButton(
                 onPressed: remove,
                 child: Text(
@@ -195,13 +106,15 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
               ),
           ],
         ),
-        EvaTextField(
+        EvaControlledField(
           label: strings.servantQuestionsOptionArLabel,
-          controller: _arabic,
+          value: arabicText,
+          onChanged: (String text) => onChanged(arabic: true, text: text),
         ),
-        EvaTextField(
+        EvaControlledField(
           label: strings.servantQuestionsOptionEnLabel,
-          controller: _english,
+          value: englishText,
+          onChanged: (String text) => onChanged(arabic: false, text: text),
         ),
       ],
     );
