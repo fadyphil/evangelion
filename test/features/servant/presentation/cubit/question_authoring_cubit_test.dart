@@ -785,5 +785,39 @@ void main() {
 
       await cubit.close();
     });
+
+    // ## THE **COMMIT RESULT** AND THE **EDIT**
+    //
+    // **A WRITE'S ANSWER REPORTS A WRITE THAT HAPPENED, AND IT STAYS.** The
+    // commit is a **write**: the questions are in the database whether or not
+    // the form is edited afterwards, so a keystroke that came after the
+    // commit does not undo it.
+    test('an edit keeps the commit result, because it reports a write that happened', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+      cubit.setPromptAr('سؤال');
+      cubit.setPromptEn('A question');
+      cubit.setCorrectAnswer('A');
+      await cubit.commit();
+      expect(cubit.state.commitResult, commitResult);
+
+      cubit.setPromptEn('Another question');
+
+      // **THE SERVER'S ANSWER IS STILL ON SCREEN.** The questions are in the
+      // database, and the admin corrected a field — the server has not said
+      // anything new, and a confirmation that vanished because the reader
+      // typed would be a confirmation the reader never got to read.
+      expect(
+        cubit.state.commitResult,
+        commitResult,
+        reason:
+            'the commit is a write, and a write that happened is not undone by '
+            'a keystroke that came after it',
+      );
+      // **AND THE ARM THAT NAMES IT STAYS** — the status is what the screen
+      // reads to know which request answered.
+      expect(cubit.state.status, QuestionAuthoringStatus.ready);
+
+      await cubit.close();
+    });
   });
 }

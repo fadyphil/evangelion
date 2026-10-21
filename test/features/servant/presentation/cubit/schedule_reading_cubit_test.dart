@@ -403,20 +403,21 @@ void main() {
   });
 
   group('the form', () {
+    // ## THE **RECEIPT** AND THE **EDIT**
+    //
+    // **A WRITE'S ANSWER REPORTS A WRITE THAT HAPPENED, AND IT STAYS.**
+    //
+    // The request carried the form **as it was when the button was pressed**,
+    // and the server did that write. A keystroke that came **after** the
+    // request does not undo it — so a confirmation that lands under a form that
+    // has since moved on is still a **true statement**: *that* write happened.
+    //
+    // **AND THE RECEIPT IS LOAD-BEARING.** It carries the `reading_ids` the
+    // questions flow needs — the ids the schedule answered with are how the
+    // admin writes questions against the reading they just scheduled — so
+    // dropping it on an edit would take that away.
     test(
-      'an edit forgets the last answer, because it answered another form',
-      () async {
-        final ScheduleReadingCubit cubit = filledCubit();
-        cubit.setBookNumber('44');
-        expect(cubit.state.form.bookNumberText, '44');
-        expect(cubit.state.status, ScheduleReadingStatus.idle);
-
-        await cubit.close();
-      },
-    );
-
-    test(
-      'an edit forgets the last answer, and the status that promised it',
+      'an edit keeps the receipt, because it reports a write that happened',
       () async {
         final ScheduleReadingCubit cubit = filledCubit();
         await cubit.submit();
@@ -425,16 +426,79 @@ void main() {
 
         cubit.setBookNumber('44');
 
-        // **The answer goes**, because it answered a form that no longer
-        // exists — and the status that promised it goes with it, because a
-        // status that says "the server answered" with no answer on screen is
-        // a status about nothing.
-        expect(cubit.state.result, isNull);
-        expect(cubit.state.status, ScheduleReadingStatus.idle);
+        // **THE RECEIPT STAYS**, and the status that promised it stays with
+        // it — a status that says "the server answered" with no answer on
+        // screen is a status about nothing.
+        expect(
+          cubit.state.result,
+          result,
+          reason:
+              'the write happened, and a keystroke that came after the request '
+              'does not undo it',
+        );
+        expect(cubit.state.status, ScheduleReadingStatus.scheduled);
+        // **AND THE READING IDS ARE STILL THERE** — they are how the admin
+        // writes questions against the reading they just scheduled.
+        expect(
+          cubit.state.result!.readingIds,
+          result.readingIds,
+          reason: 'the receipt is load-bearing, and it carries the ids',
+        );
 
         await cubit.close();
       },
     );
+
+    test('and the form\'s own refusal still goes', () async {
+      final ScheduleReadingCubit cubit = filledCubit();
+      await cubit.submit();
+
+      // **THE FORM IS REFUSED BEFORE THE REQUEST IS MADE** — the date is
+      // written the way the admin wrote it, and the form refuses it.
+      cubit.setScheduledDate('21/10/2026');
+      await cubit.submit();
+      expect(cubit.state.formError, ScheduleReadingFormError.invalidDate);
+
+      cubit.setScheduledDate('2026-10-21');
+
+      // **THE FORM'S OWN REFUSAL GOES**, because the reader is correcting it
+      // — and it is a *different* refusal from the server's, and the two are
+      // told apart.
+      expect(cubit.state.formError, isNull);
+      expect(cubit.state.formField, isNull);
+      expect(cubit.state.failure, isNull);
+
+      await cubit.close();
+    });
+
+    test('and a new attempt replaces the receipt, because it is a new answer', () async {
+      // **THE BOUNDARY, AND IT IS THE HOUSE'S OWN.** The receipt stays
+      // through an **edit** — the form moved on, and the write did not
+      // change. A **new attempt** is a new answer, and a new answer replaces
+      // the last one: the same rule that lets a refusal replace the server's
+      // failure, and the same rule that lets a second "Schedule" replace the
+      // first receipt.
+      final ScheduleReadingCubit cubit = filledCubit();
+      await cubit.submit();
+      expect(cubit.state.result, result);
+
+      // **A NEW ATTEMPT, AND IT IS REFUSED** — the form's own rule, and the
+      // request is never made.
+      cubit.setScheduledDate('21/10/2026');
+      await cubit.submit();
+
+      expect(cubit.state.formError, ScheduleReadingFormError.invalidDate);
+      expect(
+        cubit.state.result,
+        isNull,
+        reason:
+            'a new attempt is a new answer, and a new answer replaces the last '
+            'one — the receipt stays through an EDIT, and not through a new '
+            'attempt',
+      );
+
+      await cubit.close();
+    });
 
     test('an edit keeps the server\'s failure, because the reader did not cause it', () async {
       when(

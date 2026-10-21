@@ -109,14 +109,15 @@ import 'package:flutter/material.dart';
 ///   the only place it lives. A page that wants the field's text reads it from
 ///   the state — which is the point, and the reason this widget does not expose
 ///   its controller.
-/// * **It does not fix the cubit half.** Defect #5 — an edit dropping the
-///   server's failure — is a rule in the cubit, not in the field: the cubit's
-///   edit writer decides whether a keystroke clears a failure. This widget
+/// * **It does not fix the cubit half.** Whether a keystroke clears a failure,
+///   and whether a **write's receipt** survives an edit, are rules in the
+///   cubit and not in the field: the cubit's edit writer decides. This widget
 ///   removes the *programmatic* writes from that path, and it cannot remove the
 ///   reader's own keystroke from it.
-/// * **It does not fix a stale answer.** Defect #6 — an in-flight answer landing
-///   under a form that had moved on — is a race in the cubit, and no field can
-///   see it.
+/// * **It does not fix a stale answer.** An in-flight answer that lands under
+///   a form which has moved on is a race in the cubit, and no field can see
+///   it — the request's own identity is remembered by the cubit and compared
+///   with the form when the answer lands.
 /// * **It does not make a state that *refuses* a keystroke agree with the
 ///   screen.** The mirror runs when the controlled value **moves**, so a state
 ///   that takes a keystroke and then quietly keeps the old value leaves the

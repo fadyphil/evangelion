@@ -110,8 +110,10 @@ enum QuestionAuthoringFormError {
 ///   to nothing else — see [draftReadingId].
 ///
 /// An **edit** keeps the first of those pairs whole — the failure and the arm
-/// that names it — and drops the second, which is about the question as it
-/// **was**. The cubit's own doc says why.
+/// that names it — and keeps the third, because a **commit result** reports a
+/// **write that happened** and a keystroke that came after it does not undo
+/// it. It drops the second, which is about the question as it **was**. The
+/// cubit's own doc says why.
 @Freezed(copyWith: false)
 final class QuestionAuthoringState with _$QuestionAuthoringState {
   /// A state on the given arm.
@@ -221,11 +223,20 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
 /// * **The form's own refusal goes.** The reader is correcting it, and a
 ///   message that outlives the field it is about is a message about something
 ///   else.
-/// * **The commit result goes.** It described the question as it **was**.
+/// * **The commit result stays.** **This is the write's half of the house's
+///   rule**, and the reason is the same one the schedule cubit gives: the
+///   commit is a **write** — the questions are in the database whether or not
+///   the form is edited afterwards — so a keystroke that came **after** the
+///   commit does not undo it, and a confirmation that vanishes because the
+///   reader typed would be a confirmation the reader never got to read.
 ///
 /// **A NEW REQUEST REPLACES THE OUTCOME.** The `working` state and the two
 /// answers that follow it belong to the attempt that is being made now, and
-/// they carry no failure from the last one.
+/// they carry no failure from the last one. **The rule is about the form
+/// moving on, and not about a new request** — and the form's own **refusal**
+/// is a new answer too, so it replaces the commit result in the same way it
+/// replaces the server's failure. The commit result comes back with the next
+/// successful commit.
 ///
 /// ## AND THE **SEVENTH DEFECT** IS **TWO RULES**, AND BOTH ARE ABOUT **THE
 /// REQUEST'S OWN IDENTITY**
@@ -275,6 +286,31 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
 /// answer arrives too late leaves the screen with nothing to show for it, and
 /// the admin presses again — the same cost `ServantReportCubit` charges, and
 /// the same rule.
+///
+/// ## AND THE **EIGHTH** DEFECT IS **FOUND, NOT FIXED**
+///
+/// **THE WRITE'S RECEIPT LANDS UNDER A QUESTION THAT IS NOT THE ONE THAT WAS
+/// COMMITTED.** MEASURED over this cubit, with the question edited while the
+/// commit was open:
+///
+/// ```text
+/// while the commit is open = working
+/// the question the port was asked to commit = The question that was COMMITTED
+/// the question on screen = The question that is ON SCREEN
+/// the receipt = Committed 1 questions for reading
+/// the receipt names the question ids = [bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb]
+/// ```
+///
+/// The request wrote the **first** question and the screen shows the **second**
+/// one under the receipt — and the receipt names the server's ids and no
+/// question, so the admin cannot tell which of the two was committed.
+///
+/// **AND THE HOUSE'S RULE CANNOT FIX IT**, because the write's answer
+/// **stays**: dropping it would be the read's rule, and the read's rule is
+/// forbidden here. The fix would be in the answer's **content** — the client
+/// remembering what it sent and saying so — and that is a product decision and
+/// a state change, and it is **not** made here. The schedule cubit has the
+/// same shape, and its own doc carries the measurement.
 class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// Drives the editor over [generateAiDraft] and [commitQuestions].
   QuestionAuthoringCubit({
@@ -315,6 +351,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: id,
       draft: state.draft,
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -328,6 +365,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(type: type),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -341,6 +379,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptAr: text),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -354,6 +393,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptEn: text),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -367,6 +407,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(correctAnswer: answer),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
@@ -380,6 +421,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: _draftWithPoints(text),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: text,
       sortOrderText: state.sortOrderText,
@@ -393,6 +435,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       readingId: state.readingId,
       draft: _draftWithOrder(text),
       draftReadingId: state.draftReadingId,
+      commitResult: state.commitResult,
       failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: text,
@@ -439,6 +482,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
           },
         ),
         draftReadingId: state.draftReadingId,
+        commitResult: state.commitResult,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
@@ -463,6 +507,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
           },
         ),
         draftReadingId: state.draftReadingId,
+        commitResult: state.commitResult,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
@@ -497,6 +542,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
           },
         ),
         draftReadingId: state.draftReadingId,
+        commitResult: state.commitResult,
         failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,

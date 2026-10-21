@@ -189,8 +189,8 @@ final class ScheduleReadingForm with _$ScheduleReadingForm {
 /// failure, and a `scheduled` status carries the result — so the status
 /// always names the request that failed, and a status that promises an
 /// answer never stands without one. An **edit** keeps the failure and the
-/// arm that names it, and drops the result and the arm that promised it,
-/// and [_edit] says why.
+/// arm that names it, **and keeps the receipt and the arm that promised it**,
+/// and drops the form's own refusal — and [_edit] says why.
 @Freezed(copyWith: false)
 final class ScheduleReadingState with _$ScheduleReadingState {
   /// A state on the given arm.
@@ -240,11 +240,11 @@ final class ScheduleReadingState with _$ScheduleReadingState {
 /// Every writer below that answers something the reader did is an **edit**,
 /// and an edit keeps the server's **failure** and the **arm** that names the
 /// request it names — because the reader correcting a field is not the server
-/// changing its mind. The form's own refusal goes, and the server's answer
-/// goes, because both are about the form as it **was**. The rules are spelled
-/// out on [_edit], and they are the question cubit's rules verbatim.
+/// changing its mind. The form's own refusal goes, because the reader is
+/// correcting it. The rules are spelled out on [_edit], and they are the
+/// question cubit's rules verbatim.
 ///
-/// ## AND **THIS IS A WRITE**, SO **THE RESULT THAT LANDS STAYS**
+/// ## AND **THIS IS A WRITE**, SO **THE RECEIPT THAT LANDS STAYS**
 ///
 /// **THE HOUSE'S RULE IS ABOUT **WHAT THE ANSWER IS ABOUT**, AND IT HAS TWO
 /// HALVES.** A **read's** answer is a **picture of the form's result** — the
@@ -263,30 +263,63 @@ final class ScheduleReadingState with _$ScheduleReadingState {
 /// a write that landed without a confirmation is a write the admin has to
 /// guess about.
 ///
-/// **AND THE COST IS ACCEPTED.** A confirmation can sit under a form that has
-/// moved on: the result names the passage that was scheduled, and the form
-/// may since name another. The admin reads the confirmation as **"the
-/// schedule happened"** and not as **"the form still says this"** — and that
-/// is the trade, made on purpose. The screen draws the server's own sentence
-/// (`admin.routes.ts:218-221` — "Successfully scheduled reading for N
-/// groups"), which names no passage and no cohort, and that is what a
-/// receipt looks like.
+/// **AND THE RECEIPT IS LOAD-BEARING, WHICH IS THE SECOND REASON.** It
+/// carries the `reading_ids` the questions flow needs — the ids the schedule
+/// answered with are how the admin writes questions against the reading they
+/// just scheduled — so dropping it on an edit would take that away from
+/// them, and the question editor's reading id is a **typed** one (the backend
+/// has no route that lists a cohort's scheduled readings).
 ///
-/// **AND THE **EDIT** IS **ANOTHER MOMENT**, AND [_edit] HAS **ITS OWN**
-/// RULE.** A receipt that is **already on screen** when the form changes
-/// goes with the form, and that rule was decided with the cubit. The rule
-/// above is about the answer that **lands**, and the two are different
-/// moments: a receipt the admin is **looking at**, and a receipt that
-/// **arrives** after the form has moved on.
+/// **AND THE COST IS ACCEPTED — AND IT IS **BIGGER** THAN THIS PARAGRAPH USED
+/// TO SAY.** A confirmation can sit under a form that has moved on, and the
+/// admin reads it as **"the schedule happened"** and not as **"the form still
+/// says this"**.
 ///
-/// **AND THE TWO COST **DIFFERENTLY**, WHICH IS WHY THE RULE HAS TWO
-/// HALVES.** The receipt is the server's own sentence, and it names **no
-/// passage and no cohort** — so a receipt that outlives the form is a
-/// sentence about a past write, and the admin loses only the knowledge that
-/// it landed. The **roster** is not like that: it names a cohort's
-/// **children**, so a roster that outlives its form puts one cohort's
-/// children under another cohort's name, and that is the wrongness the
-/// read's half exists to forbid.
+/// **AND THE RECEIPT NAMES **NO PASSAGE**, WHICH IS THE EIGHTH DEFECT AND IT IS
+/// FOUND, NOT FIXED.** The screen draws the server's own sentence
+/// (`admin.routes.ts:218-221` — "Successfully scheduled reading for N groups"),
+/// and that sentence names no passage and no cohort — and this paragraph used
+/// to claim that "the result names the passage that was scheduled", which is
+/// **false**: `ScheduleResult` carries the server's message and the
+/// `reading_ids` and nothing else.
+///
+/// MEASURED over this cubit, with the passage edited while the request was
+/// open:
+///
+/// ```text
+/// while the schedule is open = submitting
+/// the passage the port was asked for = 43
+/// the passage on screen = 66
+/// the receipt = Successfully scheduled reading for 1 groups
+/// the receipt names the reading ids = [aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]
+/// ```
+///
+/// So the admin is told that a reading was scheduled, is given the reading's
+/// id — which is what the questions flow needs — and is **not** told which
+/// passage was written. **AND THE HOUSE'S RULE CANNOT FIX IT**, because the
+/// write's answer **stays**: dropping it would be the read's rule, and the
+/// read's rule is forbidden here. The fix would be in the answer's **content**
+/// — the client remembering what it sent and saying so — and that is a
+/// product decision and a state change, and it is **not** made here.
+///
+/// The question editor has the same shape, and the same measurement: a commit
+/// that answers after the question on screen has been edited reports "Committed
+/// 1 questions for reading" and the committed question's ids, and the question
+/// on screen is **not** the one that was committed.
+///
+/// **AND THE **READING ID** IS THE PART THAT SURVIVES, AND IT IS THE PART THE
+/// QUESTIONS FLOW NEEDS** — so the cost is a name the admin cannot recall, and
+/// not a reading they cannot write questions against.
+///
+/// **AND A NEW ATTEMPT STILL REPLACES THE OUTCOME.** The `working` state
+/// and the two answers that follow it belong to the attempt that is being
+/// made now — so a second "Schedule" replaces the first receipt, because the
+/// first receipt is about the first write and the new attempt has its own
+/// answer. **The rule is about the form moving on, and not about a new
+/// request** — and the form's own **refusal** is a new answer too, so it
+/// replaces the receipt in the same way it replaces the server's failure.
+/// The receipt comes back with the next successful schedule, and it carries
+/// the same `reading_ids` it carried before.
 class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// Drives the form over [scheduleReading].
   ScheduleReadingCubit({required this.scheduleReading})
@@ -414,8 +447,18 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// * **The form's own refusal goes.** The reader is correcting it, and a
   ///   message that outlives the field it is about is a message about
   ///   something else.
-  /// * **The server's answer goes**, and the status that promised it goes
-  ///   with it — it answered a form that no longer exists.
+  /// * **The server's **RECEIPT** STAYS**, and the arm that promised it
+  ///   stays with it. **This is the write's half of the house's rule**, and
+  ///   the reason is in the class doc: the request carried the form **as it
+  ///   was when the button was pressed**, and the server did that write — so a
+  ///   keystroke that came **after** the request does not undo it, and a
+  ///   confirmation that lands under a form that has since moved on is still a
+  ///   **true statement**: *that* write happened.
+  ///
+  /// **AND THE RECEIPT IS LOAD-BEARING.** It carries the `reading_ids` the
+  /// questions flow needs — the ids the schedule answered with are how the
+  /// admin writes questions against the reading they just scheduled — so
+  /// dropping it on an edit would take that away from them.
   ///
   /// ## AND A REQUEST **IN FLIGHT STAYS IN FLIGHT**
   ///
@@ -430,6 +473,10 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
     ScheduleReadingState(
       status: _statusAfterEdit(),
       form: form,
+      // **THE RECEIPT STAYS.** A write that happened is not undone by a
+      // keystroke, and the receipt carries the reading ids the questions flow
+      // needs.
+      result: state.result,
       failure: state.failure,
     ),
   );
@@ -441,6 +488,10 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// so an edit that kept the message and dropped the arm would leave a
   /// state that says "something failed" and cannot say what.
   ///
+  /// **AND THE **RECEIPT** KEEPS ITS ARM TOO.** The receipt reports a write
+  /// that happened, and the status is what says the server answered — so a
+  /// `scheduled` state with no receipt on screen is a status about nothing.
+  ///
   /// **AND THE OTHER TWO ARMS ARE ABOUT THE FORM.** A request in flight
   /// stays in flight, and an answer that has gone leaves an idle form.
   ScheduleReadingStatus _statusAfterEdit() => switch (state.status) {
@@ -449,9 +500,10 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
     // **The failed request keeps its arm**, because the failure it names is
     // still on screen.
     ScheduleReadingStatus.failed => ScheduleReadingStatus.failed,
-    // **The answer goes**, because it answered a form that no longer
-    // exists — and the status that promised it goes with it.
-    ScheduleReadingStatus.scheduled => ScheduleReadingStatus.idle,
+    // **The receipt keeps its arm**, because the receipt it promised is still
+    // on screen — it reports a write that happened, and a keystroke that came
+    // after the request does not undo it.
+    ScheduleReadingStatus.scheduled => ScheduleReadingStatus.scheduled,
     ScheduleReadingStatus.idle => ScheduleReadingStatus.idle,
   };
 }

@@ -5459,3 +5459,85 @@ they mistyped while a request was open, which the screen explicitly supports
 ("the one the schedule answered with **or one you typed**"). A field that
 cannot be corrected while a request is open is a field that strands the admin
 with a request they cannot stop and an id they cannot fix.
+
+**190. THE HOUSE'S RULE HAS **TWO HALVES**, AND TWO CUBITS WERE ON THE **WRONG
+SIDE** OF ONE OF THEM.**
+
+The rule is the one decision 189 quotes, and it is recorded in three cubits'
+own words so that the next reader sees **why they differ** rather than
+assuming one of them is wrong:
+
+> **A READ's answer is a display of the form's result, and it goes when the
+> form moves on. A WRITE's answer reports a write that happened, and it
+> stays.**
+
+`ServantReportCubit` is the **read's** half: a roster is a picture of the
+cohort and the day on the form, and it names a cohort's **children**, so a
+roster that outlives its form puts one cohort's children under another
+cohort's name. `ScheduleReadingCubit` and `QuestionAuthoringCubit` are the
+**write's** halves.
+
+**AND TWO OF THEM DID NOT OBEY THEIR OWN RULE.** `ScheduleReadingCubit._edit`
+dropped the schedule's **receipt** with the **read's** reason — "it answered a
+form that no longer exists" — and `QuestionAuthoringCubit`'s edit writers
+dropped the **commit result** for the same reason. **A WRITE'S RECEIPT
+STAYS**, and it stays for two reasons that are the same reason:
+
+* **THE WRITE HAPPENED.** The request carried the form **as it was when the
+  button was pressed**, and the server did that write. A keystroke that came
+  **after** the request does not undo it — so a confirmation that lands under a
+  form that has since moved on is still a **true statement**: *that* write
+  happened. Discarding it would leave an admin who pressed "Schedule" with
+  **no confirmation that it landed**, and a write that landed without a
+  confirmation is a write the admin has to guess about.
+* **THE RECEIPT IS LOAD-BEARING.** The schedule's receipt carries the
+  `reading_ids` the questions flow needs — the ids the schedule answered with
+  are how the admin writes questions against the reading they just scheduled,
+  and the question editor's reading id is a **typed** one (the backend has no
+  route that lists a cohort's scheduled readings). **Dropping it on an edit
+  would take that away.**
+
+**AND THE ARM THAT PROMISED IT STAYS WITH IT.** A `scheduled` state with no
+receipt on screen is a status about nothing, and the status is what says the
+server answered.
+
+**AND A NEW ATTEMPT STILL REPLACES THE OUTCOME** — that is the other half of
+the established rule, and it is unchanged: a second "Schedule", a second
+commit, and the form's own **refusal** are **new answers**, and a new answer
+replaces the last one. **The rule is about the form moving on, and not about
+a new request**, and the receipt comes back with the next successful attempt.
+
+**AND THE FAILURES AND THE ARMS ARE EXACTLY AS THE LAST TWO FIXES ESTABLISHED**:
+the server's failure and the arm that names the failed request stay, and the
+form's own refusal goes.
+
+**AND THE **EIGHTH** DEFECT IS **FOUND, NOT FIXED**, AND IT IS THE WRITE'S
+RECEIPT **NAMING NOTHING**.** A write's receipt stays, and the rule cannot
+reach this: the receipt lands under a form that has moved on, and it names
+neither the question nor the passage. MEASURED over the two write cubits:
+
+```text
+while the commit is open = working
+the question the port was asked to commit = The question that was COMMITTED
+the question on screen = The question that is ON SCREEN
+the receipt = Committed 1 questions for reading
+the receipt names the question ids = [bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb]
+
+while the schedule is open = submitting
+the passage the port was asked for = 43
+the passage on screen = 66
+the receipt = Successfully scheduled reading for 1 groups
+the receipt names the reading ids = [aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]
+```
+
+The server's own sentence names no passage and no cohort, and
+`ScheduleResult` and `CommitResult` carry the ids and nothing else — so the
+admin is told that a write happened and is given the **reading's** id, and is
+**not** told which question or passage was written. **The house's rule cannot
+fix it**, because the write's answer **stays**: dropping it would be the
+read's rule, and the read's rule is forbidden here. The fix would be in the
+answer's **content** — the client remembering what it sent and saying so — and
+that is a product decision and a state change, and it is **not** made here.
+The measurement is in the two cubits' own docs, and the schedule cubit's doc
+carries the correction of a claim that used to be false in it ("the result
+names the passage that was scheduled").
