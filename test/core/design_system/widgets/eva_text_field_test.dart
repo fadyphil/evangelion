@@ -245,6 +245,69 @@ void main() {
     });
   });
 
+  group('EvaTextFieldStyle — the value type', () {
+    // ## WHY THIS GROUP IS HERE
+    //
+    // `EvaTextFieldStyle` is a hand-written `==` over four fields, and it is
+    // the widget's own "has the treatment changed?" question — the widget
+    // compares two styles to decide whether to repaint. **A comparison with no
+    // test is a comparison nobody is holding up**: dropping the `border` clause
+    // would make a field that changed its rim look unchanged, and nothing in
+    // the suite would notice.
+    //
+    // **And it is a margin, deliberately.** `tool/verify_all.sh`'s own header
+    // says the coverage measurement carries "±1 line of noise", and "a floor
+    // compared against it with zero tolerance is a coin flip". The floor is
+    // 99 uncovered lines, so a tree measured at exactly 99 is one noisy line
+    // away from red — and the fix the script names for that is "COVER THE
+    // LINE", not a wider floor.
+
+    const EvaColors colors = EvaColors.dark();
+
+    /// The treatment for one set of inputs.
+    EvaTextFieldStyle styleFor({
+      bool focused = false,
+      bool hasError = false,
+      bool enabled = true,
+    }) => resolveTextFieldStyle(
+      colors: colors,
+      focused: focused,
+      hasError: hasError,
+      enabled: enabled,
+    );
+
+    test('two treatments with the same fields are equal', () {
+      final EvaTextFieldStyle idle = styleFor();
+      final EvaTextFieldStyle alsoIdle = styleFor();
+
+      expect(idle, alsoIdle);
+    });
+
+    test('and they hash the same, because the hash is the same question', () {
+      // **Two answers to one question** is the shape this repository keeps
+      // removing: a pair that is equal but hashes differently is a value type
+      // that says "yes" and "no" in two places.
+      expect(styleFor().hashCode, styleFor().hashCode);
+    });
+
+    test('a treatment whose rim differs is not the same treatment', () {
+      // **The rim is the field's own**, and an errored field's rim is the
+      // error colour — so the two are different treatments.
+      expect(styleFor(), isNot(styleFor(hasError: true)));
+    });
+
+    test('a treatment whose glow differs is not the same treatment', () {
+      // **The glow is the focus halo**, and an idle field has none.
+      expect(styleFor(), isNot(styleFor(focused: true)));
+    });
+
+    test('and a treatment is not equal to a thing that is not one', () {
+      // **The type test is the operator's own**, and it is the clause that
+      // stops a field's treatment from being equal to a string.
+      expect(styleFor(), isNot(equals('not a treatment')));
+    });
+  });
+
   group('the enum-free geometry the widget reads', () {
     test(
       'the prototype field is 52 tall with a 14 radius and 16/44 insets',
