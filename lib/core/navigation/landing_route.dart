@@ -5,11 +5,11 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 ///
 /// ## WHY ONE FUNCTION AND NOT TWO CALL SITES
 ///
-/// **Neither call site exists yet at this commit, and that is stated first
-/// because the argument below is about the future.** Nothing in `lib/` calls
-/// this, for the same reason `user_role.dart` records about its two
-/// conversions: the screens and the role picker that would ask belong to later
-/// tasks, and the absence is the task boundary rather than dead code.
+/// **The first call site has arrived** — the login result handler, which lands
+/// a reader who has just signed in on the route their **role** owns. The
+/// second — the cold-launch target, a process that already holds a session
+/// deciding its first route from the same role — has **not**, and that is
+/// stated first because the argument below is about the future.
 ///
 /// What is *not* deferred is the function — the value it computes is fixed,
 /// testable, and worth fixing now precisely because the two call sites will
@@ -19,9 +19,15 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 /// and they are **the same question**:
 ///
 ///  * **the login result handler** — the reader signs in, `AuthBloc` reaches
-///    `signedIn`, and the router resumes the navigation the guard interrupted;
+///    `signedIn`, and the page lands them on `landingRouteFor(session.role)`.
+///    **This is the call site that exists.** It lives in
+///    `features/auth/presentation/pages/login_page.dart`'s
+///    `_LoginFormState._landOnOwnRoute`, and the doc there carries the
+///    measurement that says how it and the guard's resume interact;
 ///  * **the cold-launch target** — a process that already holds a session has to
-///    decide its first route from the same role.
+///    decide its first route from the same role. **Not yet.** It is out of scope
+///    for the portal's navigation task, and this paragraph is the receipt that
+///    it was deliberately left out rather than forgotten.
 ///
 /// A second place computing a landing route is how a role and a screen drift
 /// apart: the login path grows a fourth role arm, the cold-launch path does not,
@@ -42,18 +48,21 @@ import 'package:evangelion/core/navigation/app_routes.dart';
 /// has the full measurement). A reader who reaches a path by hand reaches
 /// whatever is registered there.
 ///
-/// The one honest caveat, and it is a real one: [AppRoutes.servant] is
-/// **declared but not routed** — no `AutoRoute` in `app_router.dart` names it
-/// yet, so today a servant lands on [AppRoutes.home] through the `'*'`
-/// wildcard. **Measured** through the live matcher rather than reasoned:
-/// `router.matcher.match('/servant')` yields `name=HomeRoute`, `path=/`,
+/// The one honest caveat, and it is a real one: [AppRoutes.servant] used to be
+/// **declared but not routed** — no `AutoRoute` in `app_router.dart` named it,
+/// so a servant landed on [AppRoutes.home] through the `'*'` wildcard.
+/// **Measured** through the live matcher rather than reasoned:
+/// `router.matcher.match('/servant')` yielded `name=HomeRoute`, `path=/`,
 /// **`redirectedFrom=*`** — identical field-for-field to
 /// `router.matcher.match('/not-a-route')`, and **not** to
 /// `router.matcher.match('/')`, whose `redirectedFrom` is `null`. The `*` is the
-/// evidence that the wildcard handled the path rather than any route matching
-/// it. That is a placeholder state, not this function's answer, and it is
-/// recorded in both files rather than left to be discovered; registering it is
-/// task 5's job.
+/// evidence that the wildcard handled the path rather than any route matching it.
+///
+/// **That state is over.** The four portal routes are registered in
+/// `app_router.dart` now, and `/servant` names `ServantRoute`. The measurement
+/// is kept because it is the receipt for the shape a *declared but unrouted*
+/// path has, and because the same probe is what tells a reader that a path is
+/// *routed* rather than *declared*.
 ///
 /// ## WHY A `kid` LANDS ON `/` AND NOT ON A SERVANT SCREEN
 ///

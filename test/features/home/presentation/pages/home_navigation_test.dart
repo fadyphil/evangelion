@@ -712,7 +712,7 @@ TabsRouter tabsRouterOf(WidgetTester tester, Finder finder) {
 ///
 /// Three things are arranged and each one is a decision:
 ///
-/// 1. **`AppRouter(FakeAuthStatus(), _SilentAuthChanges())`** — authenticated, so
+/// 1. **`AppRouter(FakeAuthStatus(), _SilentAuthChanges(), testRoleAccess())`** — authenticated, so
 ///    the guard lets `/` through instead of redirecting to `/login`. Built here
 ///    rather than through `app_router_test.dart`'s `routerFor` because that helper
 ///    lives in a *test* file, and one suite importing another's `main` to reach a
@@ -741,7 +741,11 @@ Future<({AppRouter router, HomeHarness harness})> mountHomeWithAReading(
   addTearDown(() => getIt.unregister<HomeBloc>());
   addTearDown(h.bloc.close);
 
-  final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+  final AppRouter router = AppRouter(
+    FakeAuthStatus(),
+    _SilentAuthChanges(),
+    testRoleAccess(),
+  );
   addTearDown(router.dispose);
 
   tester.view.physicalSize = const Size(390, 844);

@@ -351,7 +351,11 @@ Future<({AppRouter router, QuizBloc bloc})> mountAQuiz(
     submission: defaultSubmission,
   );
 
-  final AppRouter router = AppRouter(FakeAuthStatus(), ManualAuthChanges());
+  final AppRouter router = AppRouter(
+    FakeAuthStatus(),
+    ManualAuthChanges(),
+    testRoleAccess(),
+  );
   addTearDown(router.dispose);
 
   await tester.pumpWidget(routerHost(router));

@@ -1,26 +1,29 @@
 import 'package:auto_route/auto_route.dart';
-// The generated `*Route` classes, and the ONLY bridge to the eight features.
+// The generated `*Route` classes, and the ONLY bridge to the features.
 //
 // auto_route_generator emits `app_router.gr.dart` as a separate library named
 // after this file rather than as a `part` of it, so this one import is what puts
-// `LoginRoute` / `HomeRoute` / … in scope. The router does not import the eight
-// pages themselves: `@RoutePage()` on each page is what produces its route, and
-// the generated library is already the reference to both. Eight unused page
+// `LoginRoute` / `HomeRoute` / … in scope. The router does not import the pages
+// themselves: `@RoutePage()` on each page is what produces its route, and
+// the generated library is already the reference to both. Unused page
 // imports is what the first draft had, and it is the shape a reader would read as
 // "the router knows the widgets".
 //
-// Losing this import is eight `undefined_identifier` errors — the cheap way to
-// find out that the router and its routes have come apart.
+// Losing this import is one `undefined_identifier` error per route — the cheap way
+// to find out that the router and its routes have come apart.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
+import 'package:evangelion/app/router/role_guard.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 
-/// The app's eight routes plus the catch-all, with the global transition and the
-/// auth gate installed.
+/// The app's eleven routes plus the catch-all, with the global transition and
+/// the auth gate installed.
 ///
 /// ## WHY IT LIVES IN `lib/app/` AND NOT IN `lib/core/navigation/`
 ///
@@ -56,6 +59,16 @@ import 'package:flutter/widgets.dart';
 /// where it re-runs the guard over the whole stack. Neither mentions `AuthBloc`,
 /// which is Phase 5's. See `core/navigation/auth_status.dart`.
 ///
+/// ## AND THE **ROLE** SEAM IS A THIRD, SEPARATE THING
+///
+/// [roleAccess] answers a **different** question — "may this reader be offered
+/// this screen?" — and it is not a member on [AuthStatus] and not a member on
+/// the reader's session. `core/navigation/role_access.dart` gives the whole
+/// argument, and the short version is that the two are different facts which
+/// survive each other disagreeing: a signed-in `kid` answers
+/// `isAuthenticated == true` and `allows(manageQuestions) == false` in the same
+/// instant.
+///
 /// ## WHY THE ROUTER IS NEVER A FIELD OF `app.dart`
 ///
 /// `06-navigation.md` §8: it takes the session by constructor, so a second
@@ -84,6 +97,21 @@ class AppRouter extends RootStackRouter {
   /// signal [authChanges], positionally and in that order — the order
   /// `06-navigation.md` §8 spells for `AppRouter(this._authBloc)`.
   ///
+  /// ## AND THE THIRD PARAMETER IS THE **ROLE SEAM**
+  ///
+  /// [roleAccess] is the seam the portal's `RoleGuard`s ask, and it is a
+  /// **parameter** rather than a lookup from inside this class for the same
+  /// reason [authStatus] is: the router has to be constructible over a
+  /// *substituted* session in a test, and a guard that read the locator would
+  /// answer a different question from the one the test is asking.
+  ///
+  /// **AND IT IS THE SAME OBJECT THE PORTAL'S HUB READS.** The hub resolves
+  /// `RoleAccess` from the locator, and `navigation_injection.dart` hands this
+  /// router `getIt<RoleAccess>()` — the one registration in the **pure** half
+  /// (`auth_module.dart`). So the guard's answer and the hub's answer come from
+  /// one seam, and "may this reader be offered this screen?" has one answer path
+  /// rather than two.
+  ///
   /// ## THE `AutoRouteObserver` IS NOT OPTIONAL, AND IT WAS MISSING
   ///
   /// `RootStackRouter`'s default `navigatorObservers` is
@@ -101,10 +129,17 @@ class AppRouter extends RootStackRouter {
   /// been covered and uncovered. Phase 6 added the one observer the app needs;
   /// `home_navigation_test.dart` drives a real push/pop and asserts the re-fetch,
   /// which is the proof that it is wired rather than present.
-  AppRouter(this._authStatus, this._authChanges);
+  AppRouter(this._authStatus, this._authChanges, this._roleAccess);
 
   final AuthStatus _authStatus;
   final ReevaluateListenable _authChanges;
+
+  /// The role seam the portal's guards ask.
+  ///
+  /// **A reader, never a copy of a role** — `core/navigation/role_access.dart`
+  /// carries the whole argument, and `LiveRoleAccess`'s own doc names the
+  /// freeze-at-construction hazard this field must not reproduce.
+  final RoleAccess _roleAccess;
 
   /// The one [AutoRouteObserver] this router installs.
   ///
@@ -236,7 +271,7 @@ class AppRouter extends RootStackRouter {
     clipBehavior: clipBehavior,
   );
 
-  /// The seven locked routes, then the wildcard.
+  /// The eleven locked routes, then the wildcard.
   ///
   /// Paths are [AppRoutes] constants, never re-spelled: `'/login'` written here
   /// and `AppRoutes.login` written there are two names for one route, and the
@@ -258,8 +293,18 @@ class AppRouter extends RootStackRouter {
   /// the shell, which is what hides the dock on them (`eva/redesign.html:1251` —
   /// the dock is visible on `home`, `journey` and `board` only).
   ///
-  /// ## WHAT IS AND IS NOT TRUE ABOUT THAT SENTINEL, because both halves were
-  /// wrong here once
+  /// ## AND THE PORTAL'S FOUR ARE **ROOT-LEVEL ABSOLUTE PATHS**
+  ///
+  /// `/servant` is a **hub page** rather than an `AutoTabsRouter` — a
+  /// `viewer_servant` has exactly **one** section, and a tab bar holding one tab
+  /// is chrome for nothing — and a page has no children for a path to be
+  /// relative to. So the portal's three sub-routes are declared beside the hub
+  /// rather than beneath it, and they are **absolute**: `/servant/report`,
+  /// `/servant/schedule` and `/servant/questions`. `AppRoutes` carries the
+  /// reasoning, and the auto_route rule it names is mechanical: a child path
+  /// that begins with a slash throws `Sub-paths can not start with a "/"`.
+  ///
+  /// ## WHAT IS TRUE ABOUT THAT SENTINEL, because both halves were wrong here once
   ///
   /// TRUE, and load-bearing: **`*` must be last** (see below).
   ///
@@ -272,7 +317,7 @@ class AppRouter extends RootStackRouter {
   /// form auto_route documents and because it leaves exactly one declared path
   /// outside the slash-prefixed set, not because `'/*'` is broken.
   ///
-  /// Of the seven, `/login` is the only unguarded one: it is the app's entry point,
+  /// Of the eleven, `/login` is the only unguarded one: it is the app's entry point,
   /// and a gate in front of it would redirect to itself forever. The wildcard is
   /// unguarded too, which is deliberate — an unknown path redirects to `/`, which
   /// bounces through the guard and lands on the login screen when there is no
@@ -317,6 +362,34 @@ class AppRouter extends RootStackRouter {
       page: SettingsRoute.page,
       guards: _guards,
     ),
+    // The servant portal's four routes.
+    //
+    // **THE HUB AND THE REPORT SHARE A CAPABILITY, and that is the table's
+    // answer rather than a copy of it**: `viewServantReport` is what a
+    // `viewer_servant` is granted, and the hub is the page that *lists* the
+    // report — so a viewer servant reaches the hub and the report, and nothing
+    // else. `scheduleReading` and `manageQuestions` are the two an
+    // `admin_servant` has on top.
+    AutoRoute(
+      path: AppRoutes.servant,
+      page: ServantHomeRoute.page,
+      guards: _servantGuards(UserCapability.viewServantReport),
+    ),
+    AutoRoute(
+      path: AppRoutes.servantReport,
+      page: ServantReportRoute.page,
+      guards: _servantGuards(UserCapability.viewServantReport),
+    ),
+    AutoRoute(
+      path: AppRoutes.servantSchedule,
+      page: ScheduleReadingRoute.page,
+      guards: _servantGuards(UserCapability.scheduleReading),
+    ),
+    AutoRoute(
+      path: AppRoutes.servantQuestions,
+      page: QuestionAuthoringRoute.page,
+      guards: _servantGuards(UserCapability.manageQuestions),
+    ),
     // `*` stays LAST. auto_route matches in declaration order, so moving the wildcard
     // up turns every path into `/` — measured at 46 tests when it was tried.
     RedirectRoute(path: AppRoutes.fallback, redirectTo: AppRoutes.home),
@@ -331,6 +404,35 @@ class AppRouter extends RootStackRouter {
   /// `app_router_test.dart` pins that property by flipping one session and
   /// checking every guard's decision moved with it.
   List<AutoRouteGuard> get _guards => <AutoRouteGuard>[AuthGuard(_authStatus)];
+
+  /// The portal's guards: the auth gate **and** the role gate.
+  ///
+  /// ## WHY BOTH, AND IN THIS ORDER
+  ///
+  /// [AuthGuard] answers "is there a session"; [RoleGuard] answers "may this
+  /// reader be offered this screen". They are **two different questions** and
+  /// neither is a security boundary — the backend parses `X-User-Role` and never
+  /// reads it again, so there is no server-side answer to the second one for this
+  /// client to ask.
+  ///
+  /// The auth gate is **first** because a reader with no session has no role to
+  /// be refused on: `RoleAccess.role` answers `kid` before a session exists, and
+  /// a `kid` is refused every portal route — so the role gate would send an
+  /// unauthenticated reader to their landing route instead of to the form, and
+  /// the reader would be stuck on a landing route they cannot use.
+  ///
+  /// ## AND THE ROLE GATE IS A **READER**, NOT A COPY
+  ///
+  /// The guard holds the seam, not a role: the role is chosen on the login
+  /// screen and changes, and a guard that remembered its first answer would keep
+  /// refusing a capability the reader has since gained. `role_access.dart` and
+  /// `role_guard.dart` carry the whole argument, and `RoleGuard.decideNow` is the
+  /// one-read shape the seam's own hazard #2 asks for.
+  List<AutoRouteGuard> _servantGuards(UserCapability capability) =>
+      <AutoRouteGuard>[
+        AuthGuard(_authStatus),
+        RoleGuard(_roleAccess, capability),
+      ];
 
   /// Releases the [ReevaluateListenable] this router was given, then itself.
   ///

@@ -981,6 +981,21 @@ void main() {
         // duplicate-type `ArgumentError` would surface in `configureNavigation()`
         // rather than in the file that caused it.
         'SkyCubit',
+        // **The servant portal's three, and the same wall for the same reason.**
+        // `ServantReportCubit`, `ScheduleReadingCubit` and
+        // `QuestionAuthoringCubit` all extend `Cubit`, so `Cubit` arrives through
+        // `flutter_bloc`, which re-exports Flutter's widget layer — and a
+        // `@module` naming one of them would drag `package:flutter/material.dart`
+        // into `injection.dart`'s transitive project-local import graph, which
+        // this same file walks and fails on.
+        //
+        // **AND THEIR USE CASES *ARE* GENERATED** (`servant_module.dart`), so
+        // this is the hand-written half depending on the generated one — the same
+        // shape the other eight registrations have. See
+        // `navigation_injection.dart`.
+        'ServantReportCubit',
+        'ScheduleReadingCubit',
+        'QuestionAuthoringCubit',
       ]) {
         expect(
           config,

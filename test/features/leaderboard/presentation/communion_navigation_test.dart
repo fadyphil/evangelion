@@ -267,7 +267,11 @@ Future<AppRouter> mountShell(
     _registerBoardCubit(board);
   }
 
-  final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+  final AppRouter router = AppRouter(
+    FakeAuthStatus(),
+    _SilentAuthChanges(),
+    testRoleAccess(),
+  );
   addTearDown(router.dispose);
 
   tester.view.physicalSize = size;

@@ -1,7 +1,24 @@
+import 'package:evangelion/core/common/failure.dart';
+import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/features/servant/domain/entities/commit_result.dart';
+import 'package:evangelion/features/servant/domain/entities/question_draft.dart';
+import 'package:evangelion/features/servant/domain/entities/reading_schedule.dart';
+import 'package:evangelion/features/servant/domain/entities/schedule_result.dart';
+import 'package:evangelion/features/servant/domain/entities/servant_report.dart';
+import 'package:evangelion/features/servant/domain/repositories/servant_admin_repository.dart';
+import 'package:evangelion/features/servant/domain/repositories/servant_report_repository.dart';
+import 'package:evangelion/features/servant/domain/usecases/commit_questions.dart';
+import 'package:evangelion/features/servant/domain/usecases/generate_ai_draft.dart';
+import 'package:evangelion/features/servant/domain/usecases/load_daily_report.dart';
+import 'package:evangelion/features/servant/domain/usecases/schedule_reading.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 
 import '../../../support/design_system_harness.dart';
 
@@ -76,3 +93,73 @@ Future<void> pumpServant(
     ),
   );
 }
+
+// ## THE TWO PORT STUBS, AND WHY THEY ARE NOT THE PAGE TESTS' FAKES
+//
+// The three page suites each hold a **behavioural** fake: it records what the
+// port was asked and answers a payload the suite then asserts on. Those are
+// about the *request*, and they are the right shape for what they are for.
+//
+// The two below are the opposite: they are **stubs for a screen that never
+// asks**. The golden tests pump the portal's four screens in their **initial**
+// state — the form before anybody pressed anything — and a port that is never
+// called is the honest fixture for that. They answer a `Failure` rather than a
+// payload, so a screen that *did* ask would show a failure instead of quietly
+// showing a made-up roster.
+
+/// A [ServantReportRepository] that is never asked.
+final class StubServantReportRepository implements ServantReportRepository {
+  @override
+  Future<Result<ServantReport>> loadDailyReport({
+    required int groupId,
+    required String date,
+  }) async => const Left<Failure, ServantReport>(
+    Failure(kind: FailureKind.network, message: 'This stub is never asked.'),
+  );
+}
+
+/// A [ServantAdminRepository] that is never asked.
+final class StubServantAdminRepository implements ServantAdminRepository {
+  @override
+  Future<Result<ScheduleResult>> scheduleReading(
+    ReadingSchedule schedule,
+  ) async => const Left<Failure, ScheduleResult>(
+    Failure(kind: FailureKind.network, message: 'This stub is never asked.'),
+  );
+
+  @override
+  Future<Result<CommitResult>> commitQuestions({
+    required String readingId,
+    required List<QuestionDraft> questions,
+  }) async => const Left<Failure, CommitResult>(
+    Failure(kind: FailureKind.network, message: 'This stub is never asked.'),
+  );
+
+  @override
+  Future<Result<QuestionDraft>> generateAiDraft({
+    required String readingId,
+    required QuestionType type,
+  }) async => const Left<Failure, QuestionDraft>(
+    Failure(kind: FailureKind.network, message: 'This stub is never asked.'),
+  );
+}
+
+/// The report cubit over a port that is never asked.
+///
+/// The cubit is a **whole-state writer** and it is closed by the caller, so the
+/// golden tests add a `tearDown` for it — the same arrangement
+/// `servant_report_page_test.dart` uses.
+ServantReportCubit stubServantReportCubit() => ServantReportCubit(
+  loadDailyReport: LoadDailyReport(StubServantReportRepository()),
+);
+
+/// The schedule cubit over a port that is never asked.
+ScheduleReadingCubit stubScheduleReadingCubit() => ScheduleReadingCubit(
+  scheduleReading: ScheduleReading(StubServantAdminRepository()),
+);
+
+/// The question-authoring cubit over a port that is never asked.
+QuestionAuthoringCubit stubQuestionAuthoringCubit() => QuestionAuthoringCubit(
+  commitQuestions: CommitQuestions(StubServantAdminRepository()),
+  generateAiDraft: GenerateAiDraft(StubServantAdminRepository()),
+);

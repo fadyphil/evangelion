@@ -59,7 +59,11 @@ final class AuthHarness {
     final FakeAuthStatus status = FakeAuthStatus(authenticated: authenticated);
     final ManualAuthChanges changes = ManualAuthChanges();
 
-    return AuthHarness._(status, changes, AppRouter(status, changes));
+    return AuthHarness._(
+      status,
+      changes,
+      AppRouter(status, changes, testRoleAccess()),
+    );
   }
 
   final FakeAuthStatus status;
@@ -690,6 +694,7 @@ void main() {
       final AppRouter router = AppRouter(
         const ThrowingAuthStatus('isAuthenticated is undefined behaviour'),
         ManualAuthChanges(),
+        testRoleAccess(),
       );
       addTearDown(router.dispose);
 

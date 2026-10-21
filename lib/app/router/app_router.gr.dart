@@ -493,15 +493,10 @@ class ServantHomeRoute extends _i13.PageRouteInfo<ServantHomeRouteArgs> {
   ServantHomeRoute({
     _i14.Key? key,
     _i23.RoleAccess? roleAccess,
-    void Function(String)? onOpenRoute,
     List<_i13.PageRouteInfo>? children,
   }) : super(
          ServantHomeRoute.name,
-         args: ServantHomeRouteArgs(
-           key: key,
-           roleAccess: roleAccess,
-           onOpenRoute: onOpenRoute,
-         ),
+         args: ServantHomeRouteArgs(key: key, roleAccess: roleAccess),
          initialChildren: children,
        );
 
@@ -513,27 +508,21 @@ class ServantHomeRoute extends _i13.PageRouteInfo<ServantHomeRouteArgs> {
       final args = data.argsAs<ServantHomeRouteArgs>(
         orElse: () => const ServantHomeRouteArgs(),
       );
-      return _i10.ServantHomePage(
-        key: args.key,
-        roleAccess: args.roleAccess,
-        onOpenRoute: args.onOpenRoute,
-      );
+      return _i10.ServantHomePage(key: args.key, roleAccess: args.roleAccess);
     },
   );
 }
 
 class ServantHomeRouteArgs {
-  const ServantHomeRouteArgs({this.key, this.roleAccess, this.onOpenRoute});
+  const ServantHomeRouteArgs({this.key, this.roleAccess});
 
   final _i14.Key? key;
 
   final _i23.RoleAccess? roleAccess;
 
-  final void Function(String)? onOpenRoute;
-
   @override
   String toString() {
-    return 'ServantHomeRouteArgs{key: $key, roleAccess: $roleAccess, onOpenRoute: $onOpenRoute}';
+    return 'ServantHomeRouteArgs{key: $key, roleAccess: $roleAccess}';
   }
 
   @override

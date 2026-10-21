@@ -16,10 +16,12 @@ import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -48,6 +50,20 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/servant/domain/entities/commit_result.dart';
+import 'package:evangelion/features/servant/domain/entities/question_draft.dart';
+import 'package:evangelion/features/servant/domain/entities/reading_schedule.dart';
+import 'package:evangelion/features/servant/domain/entities/schedule_result.dart';
+import 'package:evangelion/features/servant/domain/entities/servant_report.dart';
+import 'package:evangelion/features/servant/domain/repositories/servant_admin_repository.dart';
+import 'package:evangelion/features/servant/domain/repositories/servant_report_repository.dart';
+import 'package:evangelion/features/servant/domain/usecases/commit_questions.dart';
+import 'package:evangelion/features/servant/domain/usecases/generate_ai_draft.dart';
+import 'package:evangelion/features/servant/domain/usecases/load_daily_report.dart';
+import 'package:evangelion/features/servant/domain/usecases/schedule_reading.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -244,6 +260,31 @@ Widget routerHost(AppRouter router, {Locale? locale}) {
   if (!getIt.isRegistered<LeaderboardCubit>()) {
     registerTestLeaderboardCubit();
   }
+  // **The portal's own registrations, and the reason they are here.**
+  //
+  // `ServantHomePage` resolves its `RoleAccess` from the locator — `null` means
+  // "the app's own" — and the three portal screens resolve their cubits the
+  // same way every other page resolves its bloc. So a router test that lands on
+  // `/servant` needs a **role seam** in the graph, and one that lands on
+  // `/servant/report` needs a **cubit**.
+  //
+  // **And the role seam is registered only if it is absent**, so a suite that
+  // wants a particular role registers its own **first** and the router it builds
+  // is handed the same instance. Two instances would be two answers to "may
+  // this reader be offered this screen?" — the guard's and the hub's — which is
+  // the whole defect the seam exists to prevent.
+  if (!getIt.isRegistered<RoleAccess>()) {
+    registerTestRoleAccess(testRoleAccess());
+  }
+  if (!getIt.isRegistered<ServantReportCubit>()) {
+    registerTestServantReportCubit();
+  }
+  if (!getIt.isRegistered<ScheduleReadingCubit>()) {
+    registerTestScheduleReadingCubit();
+  }
+  if (!getIt.isRegistered<QuestionAuthoringCubit>()) {
+    registerTestQuestionAuthoringCubit();
+  }
   // `NeuralMotionScope` above the app, for the same reason `app.dart` mounts it
   // there: §13.2 mitigation 2 puts the three shared ambient controllers in ONE
   // `TickerProviderStateMixin` host above `MaterialApp`, so a screen never
@@ -392,6 +433,24 @@ final class FakeAuthStatus implements AuthStatus {
     return authenticated;
   }
 }
+
+/// The role seam a router that is **not** about the portal is built over.
+///
+/// ## WHY THE DEFAULT IS A `kid`
+///
+/// Because a `kid` is refused **every** portal route, so a suite that is not
+/// about the portal never has to think about the role at all — and the refusal
+/// is the right answer for a suite that pushes `/reading` and asserts the
+/// reader's own screen. The portal's own suites pass their **own** seam, and
+/// `app_router_test.dart`'s negative control is the one that proves a `kid`
+/// cannot reach `/servant`.
+///
+/// **A `LiveRoleAccess`, not a hand-written fake**, so the seam under test is
+/// the production one — `role_access.dart`'s own contract is that the grant
+/// table is consulted in exactly one place, and a hand-written answer would be a
+/// second place.
+RoleAccess testRoleAccess([UserRole role = UserRole.kid]) =>
+    LiveRoleAccess(() => role);
 
 /// Registers the `AuthBloc` [LoginPage] resolves, and returns it.
 ///
@@ -543,6 +602,111 @@ ReadingCubit registerTestReadingCubit() {
   addTearDown(() => getIt.unregister<ReadingCubit>());
   addTearDown(cubit.close);
   return cubit;
+}
+
+/// Registers the role seam the portal's guard and hub both read, and returns it.
+///
+/// **The ONE registration**, and that is the point: a router built over this
+/// instance and a hub that resolves it from the locator are then reading the
+/// same seam. Two instances would be two answers to *"may this reader be
+/// offered this screen?"* — the guard's and the hub's — which is the whole
+/// defect the seam exists to prevent.
+///
+/// A suite that wants a particular role registers its **own** seam here **first**
+/// and hands the same instance to the router it builds. `routerHost` registers
+/// the default only when the locator has none, so the suite's wins.
+RoleAccess registerTestRoleAccess(RoleAccess access) {
+  getIt.registerSingleton<RoleAccess>(access);
+  addTearDown(() => getIt.unregister<RoleAccess>());
+  return access;
+}
+
+/// Registers the [ServantReportCubit] `/servant/report` resolves, and returns it.
+///
+/// Over a fake that **fails**, like every other fake in this file: a router
+/// suite is about the route, and a stubbed roster would be a payload the next
+/// reader might mistake for real.
+ServantReportCubit registerTestServantReportCubit() {
+  final ServantReportCubit cubit = ServantReportCubit(
+    loadDailyReport: LoadDailyReport(_FakeServantReportRepository()),
+  );
+  getIt.registerSingleton<ServantReportCubit>(cubit);
+  addTearDown(() => getIt.unregister<ServantReportCubit>());
+  addTearDown(cubit.close);
+  return cubit;
+}
+
+/// Registers the [ScheduleReadingCubit] `/servant/schedule` resolves.
+ScheduleReadingCubit registerTestScheduleReadingCubit() {
+  final ScheduleReadingCubit cubit = ScheduleReadingCubit(
+    scheduleReading: ScheduleReading(_FakeServantAdminRepository()),
+  );
+  getIt.registerSingleton<ScheduleReadingCubit>(cubit);
+  addTearDown(() => getIt.unregister<ScheduleReadingCubit>());
+  addTearDown(cubit.close);
+  return cubit;
+}
+
+/// Registers the [QuestionAuthoringCubit] `/servant/questions` resolves.
+QuestionAuthoringCubit registerTestQuestionAuthoringCubit() {
+  final QuestionAuthoringCubit cubit = QuestionAuthoringCubit(
+    commitQuestions: CommitQuestions(_FakeServantAdminRepository()),
+    generateAiDraft: GenerateAiDraft(_FakeServantAdminRepository()),
+  );
+  getIt.registerSingleton<QuestionAuthoringCubit>(cubit);
+  addTearDown(() => getIt.unregister<QuestionAuthoringCubit>());
+  addTearDown(cubit.close);
+  return cubit;
+}
+
+/// The [ServantReportRepository] twin of [_FakeReadingRepository].
+final class _FakeServantReportRepository implements ServantReportRepository {
+  @override
+  Future<Result<ServantReport>> loadDailyReport({
+    required int groupId,
+    required String date,
+  }) async => const Left<Failure, ServantReport>(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No roster: this harness does not open a socket.',
+    ),
+  );
+}
+
+/// The [ServantAdminRepository] twin, and the **second** fake in this file that
+/// answers three methods.
+final class _FakeServantAdminRepository implements ServantAdminRepository {
+  @override
+  Future<Result<ScheduleResult>> scheduleReading(
+    ReadingSchedule schedule,
+  ) async => const Left<Failure, ScheduleResult>(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No schedule: this harness does not open a socket.',
+    ),
+  );
+
+  @override
+  Future<Result<CommitResult>> commitQuestions({
+    required String readingId,
+    required List<QuestionDraft> questions,
+  }) async => const Left<Failure, CommitResult>(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No commit: this harness does not open a socket.',
+    ),
+  );
+
+  @override
+  Future<Result<QuestionDraft>> generateAiDraft({
+    required String readingId,
+    required QuestionType type,
+  }) async => const Left<Failure, QuestionDraft>(
+    Failure(
+      kind: FailureKind.network,
+      message: 'No draft: this harness does not open a socket.',
+    ),
+  );
 }
 
 /// A [ReadingRepository] that answers a fixed reading.

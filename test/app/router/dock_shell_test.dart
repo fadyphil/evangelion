@@ -36,7 +36,11 @@ void main() {
   tearDown(resetServiceLocator);
 
   AppRouter routerFor() {
-    final AppRouter router = AppRouter(FakeAuthStatus(), ManualAuthChanges());
+    final AppRouter router = AppRouter(
+      FakeAuthStatus(),
+      ManualAuthChanges(),
+      testRoleAccess(),
+    );
     addTearDown(router.dispose);
     return router;
   }

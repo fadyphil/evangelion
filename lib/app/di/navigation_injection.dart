@@ -6,6 +6,7 @@ import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/domain/repositories/cheer_repository.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
@@ -31,6 +32,13 @@ import 'package:evangelion/features/quiz/domain/usecases/submit_answer.dart';
 import 'package:evangelion/features/quiz/presentation/bloc/quiz_bloc.dart';
 import 'package:evangelion/features/reading/domain/usecases/load_scripture.dart';
 import 'package:evangelion/features/reading/presentation/bloc/reading_cubit.dart';
+import 'package:evangelion/features/servant/domain/usecases/commit_questions.dart';
+import 'package:evangelion/features/servant/domain/usecases/generate_ai_draft.dart';
+import 'package:evangelion/features/servant/domain/usecases/load_daily_report.dart';
+import 'package:evangelion/features/servant/domain/usecases/schedule_reading.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -314,6 +322,39 @@ void configureNavigation() {
     recordEntry: skyCubit.record,
   );
 
+  // **Built here, not resolved from the locator** — and this is the **eighth**,
+  // **ninth** and **tenth** time a `Cubit` has hit the wall the sections above
+  // spend a paragraph each on. `ServantReportCubit`, `ScheduleReadingCubit` and
+  // `QuestionAuthoringCubit` all extend `Cubit`, so the mechanism is verbatim:
+  // `package:bloc/bloc.dart` is unavailable because `bloc` is a transitive
+  // dependency §8.4 will not promote, and
+  // `package:flutter_bloc/flutter_bloc.dart` re-exports Flutter's widget layer.
+  //
+  // **And NOT in `servant_module.dart`, for the reason its own doc gives**: a
+  // provider there would put `package:flutter/material.dart` inside
+  // `injection.dart`'s transitive project-local import graph, and
+  // `injection_test.dart` walks that whole graph and fails on any Flutter import
+  // it reaches. The use cases *are* generated, so this is the hand-written half
+  // depending on the generated one — the same shape the eight registrations above
+  // already have.
+  //
+  // `registerSingleton`, for the reader-visible reason the others carry: each of
+  // these holds the **screen's own state** — the report on screen, the form the
+  // admin is halfway through filling, the draft being edited — so a second
+  // instance would be a second report, a second form and a second draft, and a
+  // reader who left `/servant/questions` and came back would find their edits
+  // gone.
+  final ServantReportCubit servantReportCubit = ServantReportCubit(
+    loadDailyReport: getIt<LoadDailyReport>(),
+  );
+  final ScheduleReadingCubit scheduleReadingCubit = ScheduleReadingCubit(
+    scheduleReading: getIt<ScheduleReading>(),
+  );
+  final QuestionAuthoringCubit questionAuthoringCubit = QuestionAuthoringCubit(
+    commitQuestions: getIt<CommitQuestions>(),
+    generateAiDraft: getIt<GenerateAiDraft>(),
+  );
+
   getIt
     // `registerSingleton`, not `registerLazySingleton`: the object is already
     // built, and a lazy singleton whose factory re-ran would hand out a *second*
@@ -330,12 +371,31 @@ void configureNavigation() {
     ..registerSingleton<SkyCubit>(skyCubit)
     ..registerSingleton<SkyHandle>(skyHandle)
     ..registerSingleton<SettingsHandle>(settingsHandle)
+    ..registerSingleton<ServantReportCubit>(servantReportCubit)
+    ..registerSingleton<ScheduleReadingCubit>(scheduleReadingCubit)
+    ..registerSingleton<QuestionAuthoringCubit>(questionAuthoringCubit)
     ..registerLazySingleton<AuthStatus>(() => BlocAuthStatus(authBloc))
     ..registerLazySingleton<ReevaluateListenable>(
       () => ReevaluateListenable.stream(authBloc.stream),
     )
+    // **THE ROLE SEAM, AND IT IS THE **PURE** HALF'S REGISTRATION.**
+    //
+    // `RoleAccess` is registered in `auth_module.dart` — the half
+    // `injection.dart`'s graph is built from — over the pure
+    // `AuthLocalDataSource`, so it is already in the locator by the time this
+    // function runs. The router reads **that** registration, and the portal's
+    // hub reads **that** registration, so the guard's answer and the hub's
+    // answer come from one seam rather than from two.
+    //
+    // **AND IT IS THE SAME OBJECT, NOT A SECOND LOOKUP.** `getIt<RoleAccess>()`
+    // is a `@lazySingleton`, so the two lookups hand back one instance — which
+    // is what makes "one answer path" a fact rather than an intention.
     ..registerLazySingleton<AppRouter>(
-      () => AppRouter(getIt<AuthStatus>(), getIt<ReevaluateListenable>()),
+      () => AppRouter(
+        getIt<AuthStatus>(),
+        getIt<ReevaluateListenable>(),
+        getIt<RoleAccess>(),
+      ),
     );
 
   _clearHomeStateOnSignOut(authBloc, homeBloc);

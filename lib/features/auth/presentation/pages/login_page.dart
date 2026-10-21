@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/user_role.dart';
+import 'package:evangelion/core/navigation/landing_route.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/widgets/role_picker.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
@@ -144,11 +148,27 @@ typedef LoginResultCallback = void Function(LoginOutcome outcome);
 /// `login_page_test.dart` signs in on a page built with no [onResult] and asserts
 /// the bloc reaches `signedIn` and the page still comes down.
 ///
-/// ## AND NOTHING HERE NAVIGATES
+/// ## AND NOTHING HERE NAVIGATES **THE INTERRUPTED ROUTE**
 ///
 /// On success the page reports the outcome and stops. Resuming the interrupted
 /// navigation is the **guard's** job (`auth_guard.dart`). A `context.router`
-/// call here would be a second, competing resume path.
+/// call that resumed it here would be a second, competing resume path.
+///
+/// ## BUT THE PAGE **DOES** LAND THE READER — ON THEIR **OWN** ROUTE
+///
+/// The two are different questions, and the second one is this page's:
+///
+///  * **resuming** the interrupted navigation is *"where were you going?"*, and
+///    the guard owns it;
+///  * **landing** is *"where does this reader belong?"*, and the answer is a
+///    function of the **role** — `landingRouteFor`, the one place a `UserRole`
+///    becomes a path.
+///
+/// A cold launch interrupts `/` for everybody, so a servant resumed there would
+/// be resumed onto the **reader's** shell and the portal they chose a role for
+/// would be unreachable. `_LoginFormState._landOnOwnRoute` performs the
+/// landing, and its doc carries the measurement that says which of the two
+/// navigations ends up on the stack.
 ///
 /// ## AND ONE CONTROL ON THIS SCREEN IS **WRITTEN, NOT TRANSCRIBED**
 ///
@@ -467,6 +487,87 @@ class _LoginFormState extends State<_LoginForm>
       ..forward();
   }
 
+  /// Lands the reader on **their own** route.
+  ///
+  /// ## THE ROLE'S ROUTE, NOT THE INTERRUPTED NAVIGATION'S
+  ///
+  /// `landingRouteFor` is the one place a `UserRole` becomes a path, and it
+  /// answers `/` for a kid and `/servant` for either servant role. The
+  /// interrupted navigation is a **different** question — "where were you
+  /// going?" — and on a cold launch it is `/` for everybody, because the
+  /// interrupted navigation is the app's entry route.
+  ///
+  /// So a servant who signed in would be resumed onto the **reader's** shell,
+  /// and the portal they chose a role for would be a screen they could only
+  /// reach by typing its path. The landing is the role's own route, and it is
+  /// the role's own route because the role is the reader's own choice
+  /// (`core/domain/entities/user_role.dart` explains why there is no other
+  /// source for it).
+  ///
+  /// ## AND THE `AuthGuard`'s RESUME DOES **NOT** FIGHT IT — MEASURED
+  ///
+  /// The guard's resume and this landing are two navigations, and the question
+  /// is which one the reader ends up on. **Measured against this app's own
+  /// stack**, and the measurement is what the assertions in
+  /// `navigation_injection_test.dart` and `app_router_test.dart` hold:
+  ///
+  ///  * the guard's resume is carried by **the outcome callback** — `onResult`
+  ///    resolves the guard's own resolver, and the interrupted navigation is
+  ///    then completed. The `ReevaluateListenable` fires too, but it drives the
+  ///    router's **re-evaluation**, not the resume;
+  ///  * the resume is therefore **triggered by the line above** — the outcome is
+  ///    reported first, and the resumed route is pushed afterwards;
+  ///  * **`replacePath` removes the last route SYNCHRONOUSLY and pushes
+  ///    ASYNCHRONOUSLY**, and that split is the whole of the problem. Issued
+  ///    straight from the listener, the removal took the **login route** (the
+  ///    only route on the stack at that moment) and the guard's resume then
+  ///    pushed the interrupted route **on top of** the landing.
+  ///    **Measured: the stack was `[DockShellRoute, ServantHomeRoute]`** — the
+  ///    reader was on the right screen, with a second copy of the reader's shell
+  ///    underneath, and for a `kid` it was `[DockShellRoute, DockShellRoute]` —
+  ///    two copies of the same screen.
+  ///
+  /// **So the landing is deferred to the end of the next frame**, and that is
+  /// what makes it the last word: by the time the callback runs, the guard's
+  /// resume has pushed the interrupted route, so the removal takes **that** and
+  /// the push leaves the landing. **Measured: the stack is
+  /// `[ServantHomeRoute]`** — one route, and it is the landing.
+  ///
+  /// **AND THE DEFERRED CALLBACK IS SKIPPED WHEN THE READER IS ALREADY THERE.**
+  /// A `kid`'s landing is `/` and the guard's resume puts them on `/`, so the
+  /// navigation would be a no-op that pushed a second copy of the screen they
+  /// were on. The path is compared first, and the landing is skipped.
+  ///
+  /// ## AND **NO ROUTER** IS A LEGITIMATE ANSWER
+  ///
+  /// The page is mounted bare over a plain `MaterialApp` by three of its own
+  /// suites (`login_page_test.dart`, `login_accessibility_test.dart` and
+  /// `login_geometry_test.dart`), and there is no router in that tree. So the
+  /// router is looked up **safely** — `StackRouterScope.of` returns `null` when
+  /// there is none — and the landing is simply not performed. The sign-in still
+  /// works; there is nowhere to land.
+  void _landOnOwnRoute(BuildContext context, UserRole role) {
+    final StackRouterScope? scope = StackRouterScope.of(context);
+    if (scope == null) {
+      return;
+    }
+    final StackRouter router = scope.controller;
+    final String landing = landingRouteFor(role);
+
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      // The page may be gone by the time the frame ends — the reader may have
+      // navigated away, or the app may have been torn down — and a navigation
+      // issued from a disposed tree is a navigation nobody asked for.
+      if (!mounted) {
+        return;
+      }
+      if (router.currentPath == landing) {
+        return;
+      }
+      unawaited(router.replacePath<void>(landing));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final Locale locale = Localizations.localeOf(context);
@@ -490,6 +591,14 @@ class _LoginFormState extends State<_LoginForm>
         // on `LoginPage.onResult` would make the null case invisible.
         final LoginResultCallback? report = widget.onResult;
         (report ?? _nothing)(LoginOutcome.signedIn);
+        // **AND THE READER IS LANDED ON THEIR OWN ROUTE.** See
+        // `_landOnOwnRoute` for the whole of it, and for the measurement that
+        // says which of the two navigations wins.
+        final AuthSession? session = state.session;
+        if (session == null) {
+          return;
+        }
+        _landOnOwnRoute(context, session.role);
       },
       builder: (BuildContext context, AuthState state) {
         return LayoutBuilder(

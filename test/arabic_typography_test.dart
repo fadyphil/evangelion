@@ -74,6 +74,7 @@ import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart'
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
@@ -111,6 +112,13 @@ import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
+import 'package:evangelion/features/servant/presentation/pages/question_authoring_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/schedule_reading_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/servant_home_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/servant_report_page.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -126,6 +134,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
+import 'features/servant/presentation/servant_harness.dart';
 import 'support/arabic_typography_gate.dart';
 import 'support/contract_payloads.dart';
 import 'support/design_system_harness.dart';
@@ -2557,6 +2566,199 @@ void main() {
     });
   });
 
+  // ## THE PORTAL'S FOUR, AND WHY THEY ARE A **SECOND SURFACE**
+  //
+  // The portal is not a screen of the reader's app — it is a **second
+  // surface**, a second set of routes a `kid` cannot reach (ADR-0026). The
+  // typography gate is about "what a reader sees", and a servant is a reader,
+  // so the gate applies to these four exactly as it applies to the others.
+  //
+  // **AND THE ARABIC ARM IS A REAL TRANSLATION.** The portal's strings are in
+  // `app_ar.arb` and are not the English ones transliterated — the schedule
+  // screen's two warnings about what re-scheduling does are full Arabic
+  // sentences, and the gate is what says they render in a face that carries
+  // them.
+  group('`/servant` — the portal\'s hub', () {
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, with the admin\'s four sections', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(
+        tester,
+        ServantHomePage(
+          roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+        ),
+        locale: const Locale('ar'),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/servant',
+        expectedArabic: <String>[
+          ar.servantHubTitle,
+          ar.servantHubReportTitle,
+          ar.servantHubScheduleTitle,
+          ar.servantHubQuestionsTitle,
+          ar.servantHubReaderTitle,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/servant');
+    });
+
+    testWidgets('and in English it renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(
+        tester,
+        ServantHomePage(
+          roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+        ),
+      );
+      await _expectNoArabic(tester, '/servant');
+    });
+  });
+
+  group('`/servant/report` — the cohort\'s daily roster', () {
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, on the empty form', (
+      WidgetTester tester,
+    ) async {
+      final ServantReportCubit cubit = stubServantReportCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: const Locale('ar'),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/servant/report',
+        expectedArabic: <String>[
+          ar.servantReportTitle,
+          ar.servantReportGroupLabel,
+          ar.servantReportDateLabel,
+          ar.servantReportSubmit,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/servant/report');
+    });
+
+    testWidgets('and in English it renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      final ServantReportCubit cubit = stubServantReportCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await _expectNoArabic(tester, '/servant/report');
+    });
+  });
+
+  group('`/servant/schedule` — scheduling a reading', () {
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, on the empty form', (
+      WidgetTester tester,
+    ) async {
+      final ScheduleReadingCubit cubit = stubScheduleReadingCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(
+        tester,
+        ScheduleReadingPage(cubit: cubit),
+        locale: const Locale('ar'),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/servant/schedule',
+        expectedArabic: <String>[
+          ar.servantScheduleTitle,
+          ar.servantScheduleGroupIdsLabel,
+          ar.servantScheduleGroupIdsHint,
+          ar.servantScheduleDateLabel,
+          ar.servantScheduleDateHint,
+          ar.servantScheduleBookLabel,
+          ar.servantScheduleStartChapterLabel,
+          ar.servantScheduleStartVerseLabel,
+          ar.servantScheduleEndChapterLabel,
+          ar.servantScheduleEndVerseLabel,
+          ar.servantScheduleExcludedLabel,
+          ar.servantScheduleExcludedHint,
+          ar.servantScheduleAiLabel,
+          ar.servantScheduleAiWarning,
+          ar.servantScheduleUpsertWarning,
+          ar.servantScheduleSubmit,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/servant/schedule');
+    });
+
+    testWidgets('and in English it renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      final ScheduleReadingCubit cubit = stubScheduleReadingCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ScheduleReadingPage(cubit: cubit));
+      await _expectNoArabic(tester, '/servant/schedule');
+    });
+  });
+
+  group('`/servant/questions` — the question editor', () {
+    final AppLocalizations ar = AppLocalizationsAr();
+
+    testWidgets('the Arabic arm, on the empty editor', (
+      WidgetTester tester,
+    ) async {
+      final QuestionAuthoringCubit cubit = stubQuestionAuthoringCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: cubit),
+        locale: const Locale('ar'),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/servant/questions',
+        expectedArabic: <String>[
+          ar.servantQuestionsTitle,
+          ar.servantQuestionsReadingIdLabel,
+          ar.servantQuestionsReadingIdNote,
+          ar.servantQuestionsTypeMcq,
+          ar.servantQuestionsTypeTrueFalse,
+          ar.servantQuestionsTypeShortAnswer,
+          ar.servantQuestionsPromptArLabel,
+          ar.servantQuestionsPromptEnLabel,
+          ar.servantQuestionsAddOption,
+          ar.servantQuestionsEmptyOptions,
+          ar.servantQuestionsCorrectAnswerLabel,
+          ar.servantQuestionsPointsLabel,
+          ar.servantQuestionsOrderLabel,
+          ar.servantQuestionsDraftButton,
+          ar.servantQuestionsCommitButton,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/servant/questions');
+    });
+
+    testWidgets('and in English it renders no Arabic at all', (
+      WidgetTester tester,
+    ) async {
+      final QuestionAuthoringCubit cubit = stubQuestionAuthoringCubit();
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, QuestionAuthoringPage(cubit: cubit));
+      await _expectNoArabic(tester, '/servant/questions');
+    });
+  });
+
   group('the ARM ITSELF, and what the two hard-coded states of the rule do', () {
     // The three properties the whole mechanism rests on, tested as a plain function
     // with no widget tree — so they are a unit test rather than a widget test, and a
@@ -3815,7 +4017,17 @@ Future<void> _pumpDock(
 /// happened" to the two calls the app bar makes is the smallest way to give
 /// the screen a router without mounting the whole app.
 final class _JourneyRouter extends AppRouter {
-  _JourneyRouter() : super(const _JourneyAuthStatus(), _JourneyAuthChanges());
+  _JourneyRouter()
+    : super(
+        const _JourneyAuthStatus(),
+        _JourneyAuthChanges(),
+        // **The role seam, and it is a `kid`.** The journey is the reader's own
+        // screen, so the portal's routes are not reachable from it and the
+        // role is never asked about. A `kid` is refused every one of them, which
+        // is the right answer for a router that only ever pushes the journey's
+        // own chrome.
+        LiveRoleAccess(() => UserRole.kid),
+      );
 
   @override
   Future<T?> pushPath<T extends Object?>(

@@ -4,10 +4,15 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/app/di/navigation_injection.dart';
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/router/app_router.gr.dart';
+import 'package:evangelion/app/router/role_guard.dart';
 import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
+import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/auth_status.dart';
+import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -163,6 +168,52 @@ void main() {
       // the stale-bloc hazard `navigation_injection.dart` records for the router.
       expect(getIt<AuthBloc>(), same(getIt<AuthBloc>()));
     });
+
+    test('and the router reads the LIVE role, so a session change moves the gate', () async {
+      // ## THE ROLE DOES NOT EXIST YET WHEN THIS GRAPH IS BUILT
+      //
+      // There is no auth endpoint (AGENT_CONTEXT §2, decision 3), so the role is
+      // the reader's own choice on the login screen — and a router that captured
+      // the role at construction would answer for ever. The seam is a **reader**
+      // over the store for exactly this reason, and this is the assertion that
+      // the router reads it rather than a copy of it.
+      final AppRouter router = getIt<AppRouter>();
+      final AuthLocalDataSource source = getIt<AuthLocalDataSource>();
+
+      RoleGuard gateFor(String path) => router.routes
+          .firstWhere((AutoRoute route) => route.path == path)
+          .guards
+          .whereType<RoleGuard>()
+          .single;
+
+      // **Before any session**, the seam answers the seed — a `kid` — and a `kid`
+      // is refused every portal route.
+      expect(
+        gateFor(AppRoutes.servant).decideNow().decision,
+        RoleGuardDecision.redirectToLanding,
+        reason: 'no session yet, so the role is the seed, and a kid is refused',
+      );
+
+      // **And a session with a role moves the gate.**
+      await source.writeSession(
+        AuthSession(
+          userId: kSeedUserId,
+          email: kSeedEmail,
+          displayName: kSeedDisplayName,
+          initials: 'DM',
+          createdAt: DateTime.utc(2026),
+          role: UserRole.adminServant,
+        ),
+      );
+
+      expect(
+        gateFor(AppRoutes.servant).decideNow().decision,
+        RoleGuardDecision.allow,
+        reason:
+            'a router that captured the role at construction would still refuse, '
+            'and the portal would be unreachable for the reader who chose it',
+      );
+    });
   });
 
   group('app.dart resolves the router rather than building one', () {
@@ -236,7 +287,7 @@ void main() {
       await resetServiceLocator();
       final FakeAuthStatus status = FakeAuthStatus();
       final ManualAuthChanges changes = ManualAuthChanges();
-      final AppRouter router = AppRouter(status, changes);
+      final AppRouter router = AppRouter(status, changes, testRoleAccess());
       addTearDown(router.dispose);
       // Phase 5 added a fourth thing this hand-built graph must supply: `LoginPage`
       // resolves its `AuthBloc` from the locator, and `/login` is where every one of
@@ -712,6 +763,91 @@ void main() {
             'off the stack, so there is no way back to the form. **The root route is '
             'the dock shell**, and the home tab is inside it — so the stack names the '
             'shell and the tree carries the home page.',
+      );
+    });
+
+    testWidgets('signing in as a SERVANT lands on the portal, not on the shell', (
+      WidgetTester tester,
+    ) async {
+      // ## THE SECOND HALF OF THE LANDING, AND IT IS THE ONE THAT MATTERS
+      //
+      // The loop above signs in as the **default** role — a `kid` — and lands on
+      // the reader's shell. That half is the *unchanged* behaviour, and it is
+      // worth keeping as a control.
+      //
+      // This one signs in as an **admin servant**, and the reader must land on
+      // **`/servant`** — the portal they chose a role for. The landing is
+      // `landingRouteFor(session.role)`, the one place a role becomes a path, and
+      // this is the assertion that the function has a **caller** and that the
+      // caller's answer is the role's own route.
+      await pumpApp(tester);
+
+      final AppRouter router = getIt<AppRouter>();
+      final AuthBloc bloc = getIt<AuthBloc>();
+
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(bloc.state.role, UserRole.kid, reason: 'the seed role');
+
+      // **Pick the admin servant on the form.** The picker's labels are
+      // upper-cased on this arm — `SegmentedControl` upper-cases under LTR — so
+      // the label on the screen is 'ADMIN', and the picker's own suite is what
+      // asserts the control.
+      final Finder adminOption = find.text('ADMIN');
+      await tester.ensureVisible(adminOption);
+      await tester.tap(adminOption);
+      await tester.pump();
+
+      expect(
+        bloc.state.role,
+        UserRole.adminServant,
+        reason: 'the picker put the choice on the form',
+      );
+
+      await tester.enterText(
+        find.byType(TextField).at(0),
+        'david@evangelion.app',
+      );
+      await tester.enterText(find.byType(TextField).at(1), 'correct horse');
+      await tester.pump();
+
+      final Finder liveButton = find.byWidgetPredicate(
+        (Widget w) => w is EvaButton && w.onPressed != null,
+      );
+      await tester.tap(liveButton);
+
+      // The same bounded loop the control above uses, and the same bound.
+      for (int frame = 0; frame < 12; frame++) {
+        if (router.currentPath == AppRoutes.servant) break;
+        await tester.pump(EvaMotion.screen);
+      }
+      await tester.pump(EvaMotion.screen);
+      await tester.pump(EvaMotion.screen);
+
+      expect(
+        bloc.state.isSignedIn,
+        isTrue,
+        reason: 'the fixture is wrong if not',
+      );
+      expect(
+        bloc.state.session!.role,
+        UserRole.adminServant,
+        reason: 'the session carries the role the reader chose',
+      );
+      expect(
+        router.currentPath,
+        AppRoutes.servant,
+        reason:
+            'the landing is the ROLE\'s route — `landingRouteFor(session.role)` — '
+            'and not the interrupted navigation\'s, which is the reader\'s shell '
+            'for everybody',
+      );
+      expect(
+        router.stack.map((AutoRoutePage<Object?> page) => page.name),
+        <String>[ServantHomeRoute.name],
+        reason:
+            'and the stack is **one** route: the landing replaced the route the '
+            'guard resumed, so there is no copy of the reader\'s shell underneath '
+            'and the back arrow has nowhere to go.',
       );
     });
   });

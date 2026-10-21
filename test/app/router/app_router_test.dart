@@ -7,13 +7,18 @@ import 'package:evangelion/app/router/app_router.dart';
 // them: through the generated library, not through the six pages.
 import 'package:evangelion/app/router/app_router.gr.dart';
 import 'package:evangelion/app/router/auth_guard.dart';
+import 'package:evangelion/app/router/role_guard.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/dock_tabs.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
 import 'package:evangelion/features/home/presentation/pages/home_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/schedule_reading_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/servant_home_page.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -34,10 +39,20 @@ final class _SilentAuthChanges extends ReevaluateListenable {}
 /// Built directly rather than resolved from the locator, so a test can state what
 /// the session is without touching the object graph. `AppRouter`'s registration
 /// is exercised in `navigation_injection_test.dart`.
+///
+/// [roleAccess] is the third parameter, and it is **the portal's** answer to
+/// "may this reader be offered this screen?". A suite that is not about the
+/// portal gets a `kid` — which is refused every portal route, and is therefore
+/// the right default for a suite that never goes there.
 AppRouter routerFor(
   FakeAuthStatus status, {
   ReevaluateListenable? authChanges,
-}) => AppRouter(status, authChanges ?? _SilentAuthChanges());
+  RoleAccess? roleAccess,
+}) => AppRouter(
+  status,
+  authChanges ?? _SilentAuthChanges(),
+  roleAccess ?? testRoleAccess(),
+);
 
 void main() {
   setUp(resetServiceLocator);
@@ -49,7 +64,11 @@ void main() {
     // `AppRoutes`' values are pinned by `app_routes_test.dart` and every path
     // below is read off `AppRoutes` rather than re-spelled, so what is left is the
     // one thing a per-path assertion cannot see: that `*` is *last*.
-    final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+    final AppRouter router = AppRouter(
+      FakeAuthStatus(),
+      _SilentAuthChanges(),
+      testRoleAccess(),
+    );
     late List<AutoRoute> routes;
 
     setUp(() {
@@ -78,6 +97,13 @@ void main() {
           AppRoutes.reading,
           AppRoutes.quiz,
           AppRoutes.settings,
+          // **The portal's four**, and they are **root-level absolute paths** —
+          // the hub is a page rather than an `AutoTabsRouter`, so it has no
+          // children for a path to be relative to.
+          AppRoutes.servant,
+          AppRoutes.servantReport,
+          AppRoutes.servantSchedule,
+          AppRoutes.servantQuestions,
           // `*` last, always. Moving it to the front turns every path into `/` —
           // measured at 46 tests when it was tried.
           AppRoutes.fallback,
@@ -145,6 +171,14 @@ void main() {
             HomeRoute.name,
             CommunionRoute.name,
             JourneyRoute.name,
+            // **And the portal's four**, for the same reason: the wildcard has
+            // no page to build either, and a portal route that matched the
+            // wildcard would be a route the reader could reach but the app
+            // could not name.
+            ServantHomeRoute.name,
+            ServantReportRoute.name,
+            ScheduleReadingRoute.name,
+            QuestionAuthoringRoute.name,
           ]),
         ),
         reason: 'the bare asterisk has no page to build; it redirects',
@@ -167,6 +201,11 @@ void main() {
         ReadingRoute.name,
         QuizRoute.name,
         SettingsRoute.name,
+        // **The portal's four**, in the order the route table lists them.
+        ServantHomeRoute.name,
+        ServantReportRoute.name,
+        ScheduleReadingRoute.name,
+        QuestionAuthoringRoute.name,
       ], reason: 'the locked screens, in route-table order');
     });
 
@@ -185,6 +224,22 @@ void main() {
         AppRoutes.settings,
       ]) {
         expect(guardCounts[guarded], 1, reason: '$guarded is behind the guard');
+      }
+      // **AND THE PORTAL'S FOUR CARRY **TWO** GUARDS EACH** — the auth gate and
+      // the role gate. A portal route with one guard would be reachable by a
+      // `kid`, and a portal route with three would be a gate that answers a
+      // question nothing asks.
+      for (final String guarded in <String>[
+        AppRoutes.servant,
+        AppRoutes.servantReport,
+        AppRoutes.servantSchedule,
+        AppRoutes.servantQuestions,
+      ]) {
+        expect(
+          guardCounts[guarded],
+          2,
+          reason: '$guarded is behind the auth gate AND the role gate',
+        );
       }
       expect(
         guardCounts[AppRoutes.fallback],
@@ -215,12 +270,25 @@ void main() {
       // captured a *copy* of the session instead of the object, the two halves of
       // this test would disagree — and the symptom in the app would be "some
       // routes redirect and some do not", which is a miserable bug to diagnose.
+      //
+      // **AND THE `RoleGuard`s ARE FILTERED OUT RATHER THAN CAST.** The route
+      // table now carries two kinds of guard, and the cast this used to do
+      // would throw on the portal's four routes — which is the failure mode
+      // this repository keeps recording: a check that stops matching because
+      // the thing it checked grew a second kind. The claim is about the
+      // **auth** guards, so the role guards are excluded explicitly and the
+      // exclusion is asserted, so a route that grew a third kind of guard
+      // would not slip through the filter unnoticed.
       final FakeAuthStatus status = FakeAuthStatus(authenticated: false);
-      final AppRouter live = AppRouter(status, _SilentAuthChanges());
+      final AppRouter live = AppRouter(
+        status,
+        _SilentAuthChanges(),
+        testRoleAccess(),
+      );
 
       List<GuardDecision> decisionsOf(AppRouter subject) => subject.routes
           .expand((AutoRoute route) => route.guards)
-          .cast<AuthGuard>()
+          .whereType<AuthGuard>()
           .map((AuthGuard guard) => guard.decide())
           .toList();
 
@@ -234,6 +302,14 @@ void main() {
       expect(decisionsOf(live).toSet(), <GuardDecision>{
         GuardDecision.allow,
       }, reason: 'flipping the shared session must flip every guard at once');
+
+      // **AND THE ROLE GUARDS ARE THERE TOO**, one per portal route — so the
+      // filter above is filtering something real rather than nothing.
+      final List<AutoRouteGuard> roleGuards = live.routes
+          .expand((AutoRoute route) => route.guards)
+          .whereType<RoleGuard>()
+          .toList();
+      expect(roleGuards, hasLength(4), reason: 'the portal\'s four routes');
     });
   });
 
@@ -243,7 +319,11 @@ void main() {
     // order, takes the first config that matches, and follows a `RedirectRoute`
     // by re-matching its target. So a `*` at the front turns EVERY match into a
     // redirect to `/`, and these assertions are what notice.
-    final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+    final AppRouter router = AppRouter(
+      FakeAuthStatus(),
+      _SilentAuthChanges(),
+      testRoleAccess(),
+    );
 
     String? resolve(String rawPath) {
       final List<RouteMatch<dynamic>>? matches = router.matcher.match(rawPath);
@@ -284,6 +364,15 @@ void main() {
       expect(resolve(AppRoutes.reading), AppRoutes.reading);
       expect(resolve(AppRoutes.quiz), AppRoutes.quiz);
       expect(resolve(AppRoutes.settings), AppRoutes.settings);
+      // **AND THE PORTAL'S FOUR**, which is the assertion the whole portal's
+      // navigation rests on: a declared-but-unrouted path is swallowed by the
+      // wildcard and resolves to `/` — the shape `landing_route.dart` records
+      // for the pre-registration state, measured through the live matcher as
+      // `name=HomeRoute, path=/, redirectedFrom=*`.
+      expect(resolve(AppRoutes.servant), AppRoutes.servant);
+      expect(resolve(AppRoutes.servantReport), AppRoutes.servantReport);
+      expect(resolve(AppRoutes.servantSchedule), AppRoutes.servantSchedule);
+      expect(resolve(AppRoutes.servantQuestions), AppRoutes.servantQuestions);
       //
       // This used to be a second test, "the wildcard does not swallow the six
       // real routes", which iterated the same six paths and made the same six
@@ -362,6 +451,7 @@ void main() {
       final RouteType type = AppRouter(
         FakeAuthStatus(),
         _SilentAuthChanges(),
+        testRoleAccess(),
       ).defaultRouteType;
 
       expect(type, isA<CustomRouteType>());
@@ -404,7 +494,11 @@ void main() {
       // indistinguishable, and swapping in `RouteType.material()` would leave the
       // assertion above green.
       expect(
-        AppRouter(FakeAuthStatus(), _SilentAuthChanges()).defaultRouteType,
+        AppRouter(
+          FakeAuthStatus(),
+          _SilentAuthChanges(),
+          testRoleAccess(),
+        ).defaultRouteType,
         isNot(const RouteType.material()),
       );
     });
@@ -510,6 +604,109 @@ void main() {
     });
   });
 
+  // ## THE NEGATIVE CONTROL THE WHOLE ACCESS RULE RESTS ON
+  //
+  // The portal's hub carries **no** admin entry for a viewer servant, and the
+  // dock shell carries no portal entry at all. Both are **decoration**: they
+  // are about what the reader is *offered*, and the mechanism that keeps a
+  // child out of the admin shell is the **guard refusing the navigation**.
+  //
+  // So this group asserts the refusal, in the **failing** direction — a `kid`
+  // pushing `/servant` must land on the reader's own route and must **never
+  // build the servant page** — and the same push as an `adminServant` must
+  // land on `/servant`.
+  //
+  // **AND THE ROLE SEAM IS **ONE** OBJECT**, registered in the locator and
+  // handed to the router, because the guard's answer and the hub's answer have
+  // to come from the same seam. Two instances would be two answers to "may
+  // this reader be offered this screen?" — which is the defect the seam
+  // exists to prevent.
+  group('the servant portal\'s access rule', () {
+    /// The portal, mounted over a role the test controls.
+    ///
+    /// The seam is registered **first** and the same instance is handed to the
+    /// router, so the guard and the hub cannot disagree.
+    Future<AppRouter> pumpPortal(WidgetTester tester, UserRole role) async {
+      final RoleAccess access = registerTestRoleAccess(
+        LiveRoleAccess(() => role),
+      );
+      final AppRouter router = AppRouter(
+        FakeAuthStatus(),
+        ManualAuthChanges(),
+        access,
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(routerHost(router));
+      return router;
+    }
+
+    testWidgets('a kid is REFUSED /servant and lands on the reader\'s shell', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpPortal(tester, UserRole.kid);
+
+      unawaited(router.pushPath<void>(AppRoutes.servant));
+      await pumpUntilFound(tester, find.byType(HomePage));
+      await pumpUntilGone(tester, find.byType(ServantHomePage));
+
+      expect(
+        find.byType(ServantHomePage),
+        findsNothing,
+        reason:
+            'the hub was never built. The guard refuses the navigation, so the '
+            'page is not constructed at all — which is the whole difference '
+            'between a gate that refuses and a screen that merely hides an '
+            'entry.',
+      );
+      expect(
+        router.currentPath,
+        AppRoutes.home,
+        reason:
+            'a refused navigation sends the reader to the landing route of their '
+            'own role, and a kid\'s landing route is the reader\'s shell',
+      );
+    });
+
+    testWidgets('and the same push as an admin servant lands on /servant', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpPortal(tester, UserRole.adminServant);
+
+      unawaited(router.pushPath<void>(AppRoutes.servant));
+      await pumpUntilFound(tester, find.byType(ServantHomePage));
+
+      expect(find.byType(ServantHomePage), findsOneWidget);
+      expect(router.currentPath, AppRoutes.servant);
+    });
+
+    testWidgets('and a VIEWER servant is refused the scheduling screen', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpPortal(tester, UserRole.viewerServant);
+
+      unawaited(router.pushPath<void>(AppRoutes.servantSchedule));
+      await pumpUntilFound(tester, find.byType(ServantHomePage));
+      await pumpUntilGone(tester, find.byType(ScheduleReadingPage));
+
+      expect(
+        find.byType(ScheduleReadingPage),
+        findsNothing,
+        reason:
+            'the scheduling form was never built. A viewer servant is refused the '
+            'navigation, and the form is not constructed at all.',
+      );
+      expect(
+        router.currentPath,
+        AppRoutes.servant,
+        reason:
+            'and the refusal sends them to the landing route of their own role — '
+            'the portal\'s hub, which is the only page they were ever going to '
+            'be offered. A generic "go home" would have sent a servant out of '
+            'the portal they were working in.',
+      );
+    });
+  });
+
   // **THE `/result` GROUP THAT WAS HERE IS GONE, AND ITS REPLACEMENT IS A
   // COMMENT, NOT A WEAKER TEST.**
   //
@@ -611,7 +808,11 @@ void main() {
       // `AuthBloc` subscription, so an undisposed one is a live stream feeding a
       // dead delegate.
       final _SilentAuthChanges changes = _SilentAuthChanges();
-      final AppRouter router = AppRouter(FakeAuthStatus(), changes);
+      final AppRouter router = AppRouter(
+        FakeAuthStatus(),
+        changes,
+        testRoleAccess(),
+      );
 
       router.dispose();
 

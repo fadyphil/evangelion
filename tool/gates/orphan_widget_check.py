@@ -528,41 +528,22 @@ ALLOWLIST: dict[str, str] = {
     # true is a false green, not a harmless leftover — so the row is gone and
     # this paragraph is what remains of it, exactly as `WitnessSky`'s did.
 
-    # ## THE REASON THIS ENTRY EXISTED **EXPIRED**, AND THE ENTRY NOW SAYS SO
+    # ## `HairlineDivider` LEFT THIS LIST, AND THE PORTAL PLACED IT
     #
-    # It used to end: "The prototype's own rules name both consumers:
-    # `eva/redesign.html:314` — `.brow{...border-bottom:1px solid
-    # rgba(255,255,255,.05)}` is the journey's book row (Task 5.6), and `:419`/
-    # `:439` — `.srow` and `.sact`, each with a `border-bottom:1px`, are the
-    # settings rows and the sheet actions (Task 5.7)."
+    # The entry read "UNPLACED, AND THE REASON THIS ENTRY EXISTED HAS EXPIRED"
+    # and ended with the standing instruction: *"STALE the moment any page
+    # constructs it."*
     #
-    # **Tasks 5.6 and 5.7 have shipped, and neither placed it.** The journey
-    # draws its book row with its own hairline and the Workshop's rows draw
-    # theirs, and the widget is still on no screen. **The reason had a future
-    # tense in it, and the future arrived and the thing did not happen** — the
-    # same shape as the plan's unticked Phase 7 checkboxes, and the same lesson:
-    # a forward reference in a written reason is a promise, and a promise that
-    # is never kept must be *revoked*, not left to rot quietly.
+    # **The servant portal's roster separator constructs it.** The daily report's
+    # roster is a `ListView.separated` whose `separatorBuilder` is
+    # `const HairlineDivider()` (`servant_report_page.dart`), so the widget is
+    # on a screen as of the portal's navigation task.
     #
-    # **So the entry now says what is true**, and the decision it was holding
-    # open is named: `docs/DRIFT.md` §7 records `EvaChip` — the same shape, the
-    # same expired reason — and the repo's precedent there was **DELETION**. The
-    # allowlist's own rule says "place it or delete it — never allowlist", so
-    # this row is a **decision that is open**, not a permanent exemption.
-    "HairlineDivider": (
-        "UNPLACED, AND THE REASON THIS ENTRY EXISTED HAS EXPIRED. Task 5.3 made "
-        "this one real; its last two call sites were `reading_header.dart` and "
-        "`reading_controls.dart`, both deleted by the redesigned `/reading` "
-        "(`eva/redesign.html:540-560` has no header block and no settings row). "
-        "The entry then named the two tasks that were going to place it — the "
-        "journey's book row (Task 5.6) and the settings rows and sheet actions "
-        "(Task 5.7) — and **BOTH TASKS SHIPPED WITHOUT PLACING IT**. The "
-        "redesign draws those hairlines with its own rules and this widget is "
-        "on no screen. `docs/DRIFT.md` §7 records `EvaChip` — the same shape, the "
-        "same expired reason — and the precedent there was DELETION, so whether "
-        "this one is deleted or kept is an OPEN decision, not a settled one. "
-        "STALE the moment any page constructs it."
-    ),
+    # The gate said so: it printed `STALE ALLOWLIST  HairlineDivider  is
+    # allowlisted but IS placed — remove the entry`, and that is the receipt for
+    # this paragraph. **An allowlist row that has stopped being true is a false
+    # green**, so the row is gone and this paragraph is what remains of it.
+
     # ## AND THIS ONE'S REASON EXPIRED THE SAME WAY
     #
     # It used to end: "It survives because `/communion` draws

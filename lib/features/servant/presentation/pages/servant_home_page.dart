@@ -14,15 +14,26 @@ import 'package:flutter/material.dart';
 ///
 /// Because the **table** is the grant table and the enum is the only place the
 /// two meet: each entry names the capability it needs and the path it opens,
-/// and the hub asks [UserRole.grantsFor] which of them this role has. An
+/// and the hub asks **the seam** which of them this role has. An
 /// `if (role == UserRole.adminServant)` ladder would be a **second** copy of
 /// that policy, free to drift from the first, and the drift would be silent
 /// in both directions — a viewer servant offered the scheduling screen, or an
 /// admin servant not offered the report.
 ///
-/// The gate reads the same table (`core/navigation/role_access.dart`'s
-/// `allows` is `UserRole.grantsFor(role).contains(capability)`), so the screen
-/// and the gate cannot disagree.
+/// ## AND THE GRANT IS ASKED OF THE **SEAM**, NOT OF THE TABLE
+///
+/// The gate reads the same seam (`core/navigation/role_access.dart`'s
+/// `allowsRole` is `UserRole.grantsFor(role).contains(capability)`, and
+/// `allows` delegates to it), so the screen and the gate cannot disagree.
+///
+/// **And that is a deliberate change from the first version of this file, which
+/// read `UserRole.grantsFor(role)` directly.** Two answers to one question — the
+/// hub's and the gate's — is the "two sources of truth for one value" shape
+/// decisions 5 and 68 each removed, and it would have put the portal's hub and
+/// the portal's gate on two different answers to *"may this reader be offered
+/// this screen?"*. `RoleAccess.allowsRole` exists for exactly this: the caller
+/// captures the role **once** and still asks **the seam** for the grant, so
+/// there is one answer path.
 enum ServantHubEntry {
   /// The cohort's roster for one day. **Every servant role.**
   report(UserCapability.viewServantReport, AppRoutes.servantReport),
@@ -64,17 +75,27 @@ enum ServantHubEntry {
 /// entries this role has, and the three sub-routes are root-level absolute
 /// paths rather than children of this one (`app_routes.dart` says why).
 ///
-/// ## AND THE ROLE IS READ **ONCE**
+/// ## AND THE ROLE IS READ **ONCE**, AND THE GRANT IS ASKED OF THE **SEAM**
 ///
 /// [RoleAccess.role] is a plain read, and `role_access.dart`'s own hazard #2
 /// says that a reader that must reason about one reader consistently has to
 /// capture the role once: the seam guarantees liveness, not atomicity, and two
 /// reads inside one decision can be handed two roles. So the role is captured
-/// into a local and the grant table is read from **that**.
+/// into a local — and the grant for **that** role is asked of the **seam**,
+/// through [RoleAccess.allowsRole], rather than read out of the grant table.
+///
+/// **The first version of this file read `UserRole.grantsFor(role)` directly**,
+/// which made the hub a **second** holder of the policy beside the gate — the
+/// "two sources of truth for one value" shape decisions 5 and 68 each removed,
+/// and the drift would have been silent in both directions. The seam's own doc
+/// names the same hazard from the other side: *"the caller would hold its own
+/// copy of the grant table while the seam holds another, and the two could
+/// drift"*. `servant_home_page_test.dart` holds the property by **counting the
+/// call sites of the table** in `lib/`.
 @RoutePage()
 class ServantHomePage extends StatelessWidget {
   /// The hub.
-  const ServantHomePage({super.key, this.roleAccess, this.onOpenRoute});
+  const ServantHomePage({super.key, this.roleAccess});
 
   /// The role seam, or `null` to resolve the app's own from the locator.
   ///
@@ -82,26 +103,18 @@ class ServantHomePage extends StatelessWidget {
   /// the locator without configuring the whole graph, and this page is the one
   /// surface whose **whole content** depends on the role. `LoginPage`'s `bloc`
   /// is the same shape and the same reason.
+  ///
+  /// **And it is the SAME registration the navigation gate reads.** The router
+  /// is handed `getIt<RoleAccess>()` — the one registration in the **pure** half
+  /// (`auth_module.dart`) — and the hub resolves that same instance from the
+  /// locator, so the guard's answer and the hub's answer come from one seam.
   final RoleAccess? roleAccess;
-
-  /// Where a tapped entry goes.
-  ///
-  /// `null` means "push it on the app's router", which is the production path.
-  ///
-  /// **A callback and not a mock router**, and the reason is that the portal's
-  /// own routes are **not registered yet** — `app_router.dart` registers them
-  /// with the portal's navigation task, and until then a router built in a
-  /// test would answer a path it does not know. The value handed to the
-  /// callback is the app's own `AppRoutes` constant, so the assertion is
-  /// about a **real** path and not about a name somebody typed.
-  final void Function(String route)? onOpenRoute;
 
   @override
   Widget build(BuildContext context) {
     final RoleAccess access = roleAccess ?? getIt<RoleAccess>();
     // **One read.** See the class doc.
     final UserRole role = access.role;
-    final Set<UserCapability> grants = UserRole.grantsFor(role);
     final AppLocalizations strings = context.l10n;
 
     return NeuralScaffold(
@@ -110,7 +123,8 @@ class ServantHomePage extends StatelessWidget {
         label: strings.servantHubTitle,
         children: <Widget>[
           for (final ServantHubEntry entry in ServantHubEntry.values)
-            if (grants.contains(entry.capability))
+            // **The seam, not the table.** See the enum's doc.
+            if (access.allowsRole(role, entry.capability))
               SettingsTile(
                 title: entry.title(strings),
                 trailing: const _Chevron(),
@@ -121,14 +135,28 @@ class ServantHomePage extends StatelessWidget {
     );
   }
 
-  /// Opens [route], on the app's router or through the callback.
+  /// Opens [route] on the app's router.
+  ///
+  /// ## WHY THERE IS **NO CALLBACK** HERE ANY MORE
+  ///
+  /// The first version of this page took a `void Function(String route)?
+  /// onOpenRoute` and used it **instead of** the router, and its own doc gave
+  /// the reason: *"the portal's own routes are **not registered yet** — a router
+  /// built in a test would answer a path it does not know."*
+  ///
+  /// **That reason expired with the portal's navigation task**, and the four
+  /// routes are registered now — `/servant`, `/servant/report`,
+  /// `/servant/schedule` and `/servant/questions` are in `app_router.dart`'s
+  /// table, and the orphan gate reads the hub as a **root** because of it.
+  ///
+  /// So the callback was removed rather than re-documented, and the production
+  /// path is now the **only** path. A page that can be driven two ways is a
+  /// page whose behaviour depends on how it was constructed, and the second way
+  /// was a test seam standing in for a router that now exists. The navigation
+  /// itself is the router's business, and `servant_home_page_test.dart` proves
+  /// it against the **real** router rather than against a recorder.
   void _open(BuildContext context, String route) {
-    final void Function(String route)? open = onOpenRoute;
-    if (open != null) {
-      open(route);
-      return;
-    }
-    context.router.pushPath(route);
+    context.router.pushPath<void>(route);
   }
 }
 

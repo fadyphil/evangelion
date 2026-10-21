@@ -501,7 +501,11 @@ Future<AppRouter> pumpJourney(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+  final AppRouter router = AppRouter(
+    FakeAuthStatus(),
+    _SilentAuthChanges(),
+    testRoleAccess(),
+  );
   addTearDown(router.dispose);
 
   await tester.pumpWidget(routerHost(router, locale: locale));

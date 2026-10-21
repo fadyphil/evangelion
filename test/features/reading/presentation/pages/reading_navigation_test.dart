@@ -169,7 +169,11 @@ Future<({AppRouter router, ReadingHarness harness})> mountReadingOver(
   getIt.registerSingleton<ReadingCubit>(h.cubit);
   addTearDown(() => getIt.unregister<ReadingCubit>());
 
-  final AppRouter router = AppRouter(FakeAuthStatus(), _SilentAuthChanges());
+  final AppRouter router = AppRouter(
+    FakeAuthStatus(),
+    _SilentAuthChanges(),
+    testRoleAccess(),
+  );
   addTearDown(router.dispose);
 
   tester.view.physicalSize = const Size(430, 932);

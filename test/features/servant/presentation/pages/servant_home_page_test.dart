@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:evangelion/app/router/app_router.dart';
+import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
 import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/role_access.dart';
@@ -6,6 +11,7 @@ import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../../support/app_harness.dart';
 import '../servant_harness.dart';
 
 /// The portal's hub — the sections this role has.
@@ -16,12 +22,22 @@ import '../servant_harness.dart';
 /// the locator without configuring the whole graph. So the page takes its
 /// [RoleAccess] as a parameter — `LoginPage`'s `bloc` is the same shape and the
 /// same reason.
+///
+/// ## AND WHY THE NAVIGATION IS PROVED AGAINST THE **REAL** ROUTER
+///
+/// The hub used to take an `onOpenRoute` callback, and its own doc gave the
+/// reason: *"the portal's own routes are **not registered yet**"*. That reason
+/// expired with the portal's navigation task, so the callback is **gone** and
+/// the production path — `context.router.pushPath` — is the only path there is.
+///
+/// A recorder would have proved the same thing about a **second** way of
+/// navigating, which is the shape this repository keeps removing. So the
+/// navigation claims below are executed against the app's own router, and the
+/// route that lands is the route the **guard** accepted.
 void main() {
-  /// The hub, with the role fixed and the routes recorded.
-  Widget hubFor(UserRole role, {List<String>? opened}) => ServantHomePage(
-    roleAccess: LiveRoleAccess(() => role),
-    onOpenRoute: opened?.add,
-  );
+  /// The hub, with the role fixed.
+  Widget hubFor(UserRole role) =>
+      ServantHomePage(roleAccess: LiveRoleAccess(() => role));
 
   group('a viewer servant', () {
     testWidgets('sees the daily report and not the scheduling screen', (
@@ -55,55 +71,6 @@ void main() {
     });
   });
 
-  group('the reader\'s own shell', () {
-    testWidgets('is the entry that opens `/`', (WidgetTester tester) async {
-      final List<String> opened = <String>[];
-      await pumpServant(tester, hubFor(UserRole.adminServant, opened: opened));
-
-      await tester.tap(find.text('Read as a reader'));
-      await tester.pump();
-
-      expect(opened, <String>[AppRoutes.home]);
-      expect(AppRoutes.home, '/');
-    });
-
-    testWidgets('and the report entry opens the report', (
-      WidgetTester tester,
-    ) async {
-      final List<String> opened = <String>[];
-      await pumpServant(tester, hubFor(UserRole.adminServant, opened: opened));
-
-      await tester.tap(find.text('Daily report'));
-      await tester.pump();
-
-      expect(opened, <String>[AppRoutes.servantReport]);
-    });
-
-    testWidgets('and the scheduling entry opens the schedule', (
-      WidgetTester tester,
-    ) async {
-      final List<String> opened = <String>[];
-      await pumpServant(tester, hubFor(UserRole.adminServant, opened: opened));
-
-      await tester.tap(find.text('Schedule a reading'));
-      await tester.pump();
-
-      expect(opened, <String>[AppRoutes.servantSchedule]);
-    });
-
-    testWidgets('and the questions entry opens the editor', (
-      WidgetTester tester,
-    ) async {
-      final List<String> opened = <String>[];
-      await pumpServant(tester, hubFor(UserRole.adminServant, opened: opened));
-
-      await tester.tap(find.text('Author questions'));
-      await tester.pump();
-
-      expect(opened, <String>[AppRoutes.servantQuestions]);
-    });
-  });
-
   group('the grant table', () {
     testWidgets('is the only thing that decides the entries', (
       WidgetTester tester,
@@ -123,6 +90,147 @@ void main() {
           );
         }
       }
+    });
+
+    test('and it is consulted in EXACTLY ONE PLACE in the whole app', () {
+      // ## THE SHAPE OF THE DEFECT THIS HOLDS
+      //
+      // The hub used to read `UserRole.grantsFor(role)` **itself**, and the
+      // navigation gate read the same table through the `RoleAccess` seam. That
+      // is **two answers to one question** — "may this reader be offered this
+      // screen?" — and the shape has a name in this repository: the "two
+      // sources of truth for one value" defect that decisions 5 and 68 each
+      // removed elsewhere, and the drift would have been **silent in both
+      // directions**: a viewer servant offered the scheduling screen, or an
+      // admin servant not offered the report, with every other test green.
+      //
+      // ## AND THE SCAN IS OVER **EXECUTABLE LINES** IN **EVERY** FILE
+      //
+      // * **Every file under `lib/`**, not the seam's own directory — the
+      //   defect was never about where the second copy lived.
+      // * **`UserRole.grantsFor(`**, the **qualified** call, so the enum's own
+      //   *declaration* is not counted as a caller of itself. A scan for the
+      //   bare name would report `user_role.dart` and the assertion would be
+      //   about the wrong thing.
+      // * **Comment lines are skipped**, because a doc comment naming the table
+      //   is a reader being told why the seam exists, and `verify_purity.sh`'s
+      //   Gate 1 is anchored to the directive keyword for exactly this reason.
+      // * **Generated files are skipped**, for the same reason: a `.freezed.dart`
+      //   or a `.gr.dart` is not a place a hand-written policy can hide, and
+      //   counting them would make the assertion brittle for no gain.
+      final List<String> callers = <String>[];
+
+      for (final FileSystemEntity entity in Directory(
+        'lib',
+      ).listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        if (entity.path.endsWith('.freezed.dart')) continue;
+        if (entity.path.endsWith('.gr.dart')) continue;
+        if (entity.path.endsWith('.config.dart')) continue;
+
+        final List<String> lines = entity.readAsLinesSync();
+        for (int i = 0; i < lines.length; i++) {
+          final String line = lines[i];
+          if (line.trimLeft().startsWith('//')) continue;
+          if (!line.contains('UserRole.grantsFor(')) continue;
+          callers.add('${entity.path}:${i + 1}');
+        }
+      }
+
+      expect(
+        callers.map((String call) => call.split(':').first).toSet(),
+        <String>{'lib/core/navigation/role_access.dart'},
+        reason:
+            'the grant table is consulted in exactly one place — the seam — and '
+            'every other reader asks the seam. A second call site is the '
+            '"two sources of truth for one value" shape, and it is silent in '
+            'both directions.',
+      );
+      expect(
+        callers.length,
+        1,
+        reason:
+            'and it is consulted **once** there: `LiveRoleAccess.allowsRole`. A '
+            'second call in the same file would be the seam holding a second '
+            'answer to its own question.',
+      );
+    });
+  });
+
+  group('the navigation', () {
+    /// The hub, in the app's **real** router, with the role fixed.
+    ///
+    /// The role seam is registered **first** and the same instance is handed to
+    /// the router, so the guard's answer and the hub's answer come from one
+    /// seam — which is the property the whole portal rests on.
+    Future<AppRouter> pumpHub(WidgetTester tester, UserRole role) async {
+      final RoleAccess access = registerTestRoleAccess(
+        LiveRoleAccess(() => role),
+      );
+      final AppRouter router = AppRouter(
+        FakeAuthStatus(),
+        ManualAuthChanges(),
+        access,
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(routerHost(router));
+      unawaited(router.pushPath<void>(AppRoutes.servant));
+      await pumpUntilFound(tester, find.byType(ServantHomePage));
+
+      return router;
+    }
+
+    testWidgets('the report entry opens the report', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpHub(tester, UserRole.viewerServant);
+
+      await tester.tap(find.text('Daily report'));
+      await pumpUntilFound(tester, find.text('Cohort'));
+
+      expect(router.currentPath, AppRoutes.servantReport);
+    });
+
+    testWidgets('the scheduling entry opens the schedule', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpHub(tester, UserRole.adminServant);
+
+      await tester.tap(find.text('Schedule a reading'));
+      await pumpUntilFound(tester, find.text('Cohort ids'));
+
+      expect(router.currentPath, AppRoutes.servantSchedule);
+    });
+
+    testWidgets('the questions entry opens the editor', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpHub(tester, UserRole.adminServant);
+
+      await tester.tap(find.text('Author questions'));
+      await pumpUntilFound(tester, find.text('Reading id'));
+
+      expect(router.currentPath, AppRoutes.servantQuestions);
+    });
+
+    testWidgets('and the reader\'s own shell opens `/`', (
+      WidgetTester tester,
+    ) async {
+      final AppRouter router = await pumpHub(tester, UserRole.adminServant);
+
+      await tester.tap(find.text('Read as a reader'));
+      // **A bounded loop on the PATH, not on a finder.** The dock shell is the
+      // app's root route, so "the reader's own shell is on screen" is a claim
+      // about the **path** — and the hub's own title is still painted while the
+      // push animates, so a finder on the hub would match on the first frame
+      // and prove nothing.
+      for (int frame = 0; frame < 12; frame++) {
+        if (router.currentPath == AppRoutes.home) break;
+        await tester.pump(EvaMotion.screen);
+      }
+
+      expect(router.currentPath, AppRoutes.home);
     });
   });
 }

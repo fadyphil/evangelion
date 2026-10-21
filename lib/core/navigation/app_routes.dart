@@ -9,11 +9,12 @@
 /// rows of their own (ADR-0026). The wildcard `'*'` is the **twelfth**
 /// declaration and is a sentinel rather than a path.
 ///
-/// The three sub-routes' **constants** arrive here with the portal's
-/// navigation work, while the **`AutoRoute`s that register them** arrive with
-/// the portal's own implementation — `tool/route_check.dart` reads this file's
-/// declarations, so a constant that is not here is not a route the structural
-/// invariants apply to.
+/// The three sub-routes' **constants** and the four `AutoRoute`s that register
+/// the portal **land together**, in `app_router.dart` — a constant that is
+/// declared but not routed is a path the wildcard swallows, and the
+/// measurement of that shape is in [servant]'s doc.
+/// `tool/route_check.dart` reads this file's declarations, so a constant that
+/// is not here is not a route the structural invariants apply to.
 ///
 /// ## THE THREE TAB PATHS ARE **DERIVED**, NOT DECLARED, AND THAT IS THE POINT
 ///
@@ -210,16 +211,24 @@ abstract final class AppRoutes {
   /// the same place: a count in a suite's name is a claim about the tree, and
   /// a tree that grows makes it false.
   ///
-  /// ## AND WHAT IS TRUE AT **THIS** COMMIT
+  /// ## AND WHAT IS TRUE ABOUT THE **REGISTRATION**
   ///
-  /// The three sub-route **constants** are declared in this same file, and the
-  /// four `AutoRoute`s that register the portal land with the portal's own
-  /// implementation
-  /// (`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`, Task 5), and
-  /// this paragraph is written in the present tense of the **finished** portal
-  /// rather than of this commit. The two facts that are true **now** are the
-  /// two this file can be checked against: the constants are declared here, and
-  /// the gate is advisory.
+  /// The four `AutoRoute`s that register the portal are in
+  /// `app_router.dart` now — `/servant`, `/servant/report`, `/servant/schedule`
+  /// and `/servant/questions`, each behind the auth gate **and** the role gate
+  /// for the capability it needs. The orphan gate reads the hub as a **root**
+  /// because of it, and `app_router_test.dart` asserts that a push to
+  /// `/servant` is **refused** for a `kid` and lands on the reader's own shell.
+  ///
+  /// **The shape a *declared but unrouted* path has is kept here**, because it
+  /// is the receipt for the state this file was in and because the same probe
+  /// is what tells a reader that a path is *routed* rather than *declared*:
+  /// `router.matcher.match('/servant')` used to yield `name=HomeRoute`,
+  /// `path=/`, **`redirectedFrom=*`** — identical field-for-field to
+  /// `router.matcher.match('/not-a-route')`, and **not** to
+  /// `router.matcher.match('/')`, whose `redirectedFrom` is `null`. The `*` is
+  /// the evidence that the wildcard handled the path rather than any route
+  /// matching it.
   static const String servant = '/servant';
 
   /// `/servant/report` — the cohort's daily roster completion report.

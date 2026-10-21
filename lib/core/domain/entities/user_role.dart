@@ -70,15 +70,23 @@
 /// [UserRole.grantsFor] becomes a claim about the server rather than about the
 /// form.
 ///
-/// ## AND BOTH CONVERSIONS ARE CURRENTLY UNREFERENCED
+/// ## AND THE TWO CONVERSIONS ARE **NOT** IN THE SAME STATE
 ///
-/// [UserRole.fromWire] and [UserRole.grantsFor] have **no caller in `lib/`** at
-/// this commit, by design: this is the mechanism, and the screens that would
-/// ask either question belong to a later task. So a reader who greps for a
-/// caller, finds none, and reads that as dead code should read the opposite —
-/// the absence is the task boundary, and these are the two seams it hands
-/// forward. The [UserRole] enum itself is live: `AuthSession.role` and the seed
-/// both name it. Only the two functions are unreferenced.
+/// [UserRole.grantsFor] is **live**, and it is read in **exactly one place in
+/// the whole app**: `LiveRoleAccess.allowsRole` in
+/// `core/navigation/role_access.dart`. The navigation guard asks the seam, the
+/// portal's hub asks the seam, and the seam is the only holder of the table —
+/// so "may this reader be offered this screen?" has **one** answer path, and a
+/// second reader of the table would be the "two sources of truth for one value"
+/// shape this repository has removed three times on purpose.
+///
+/// [UserRole.fromWire] has **no caller in `lib/`** yet, and that is a task
+/// boundary rather than dead code: the wire decoder is the mechanism, and the
+/// transport that would carry a role off the wire belongs to a future change.
+/// A reader who greps for a caller, finds none, and reads that as dead code
+/// should read the opposite — the absence is the task boundary, and these are
+/// the two seams it hands forward. The [UserRole] enum itself is live:
+/// `AuthSession.role` and the seed both name it.
 ///
 /// ## AND NOTHING HERE RENDERS, SO NOTHING HERE IS TRANSLATED
 ///
