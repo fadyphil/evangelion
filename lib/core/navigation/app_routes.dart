@@ -3,10 +3,14 @@
 /// `context.router.pushNamed('/quiz')` is a typo the compiler cannot see and a
 /// renamed route cannot find.
 ///
-/// Seven of the paths are locked by AGENT_CONTEXT §2. One more is declared here
-/// and not by it — [servant] — and carries its own paragraph saying so, because
-/// "the seven" was this file's own headline and a reader who stopped reading there
-/// would have believed the ninth route was §2's too.
+/// AGENT_CONTEXT §2 locks **eleven** route paths, and this file declares
+/// **eight** of them today: the seven it has always locked, plus [servant],
+/// which the 2026-10-21 amendment to decision 5 gave a row (ADR-0026). The
+/// wildcard `'*'` is the ninth declaration and is a sentinel rather than a
+/// path. The three `/servant/*` sub-routes are §2's too, and they arrive in
+/// this file with the portal's own implementation — `tool/route_check.dart`
+/// reads this file's declarations, so a constant that is not here is not a
+/// route the structural invariants apply to.
 ///
 /// ## THE THREE TAB PATHS ARE **DERIVED**, NOT DECLARED, AND THAT IS THE POINT
 ///
@@ -142,73 +146,44 @@ abstract final class AppRoutes {
   /// See the file doc.
   static String get journeyTab => journey.substring(1);
 
-  /// `/servant` — where both servant roles land. **Declared, not yet routed.**
+  /// `/servant` — the servant portal's hub: the sections this role has.
   ///
-  /// ## WHY IT EXISTS NOW, AND WHAT IT IS NOT YET
+  /// ## IT IS A **HUB PAGE**, NOT A TAB SHELL
   ///
-  /// `core/navigation/landing_route.dart` has to name a destination for
-  /// `UserRole.viewerServant` and `UserRole.adminServant`, and a function cannot
-  /// return a route this file does not declare. So the constant arrives one task
-  /// ahead of the screen.
+  /// A `viewer_servant` has exactly **one** section — the cohort's daily roster
+  /// report — and a tab bar holding one tab is chrome for nothing. So `/servant`
+  /// is a page whose body is a list of the sections this role has, and it is
+  /// registered in `lib/app/router/app_router.dart` beside its three
+  /// sub-routes, which are **root-level absolute paths** declared in this same
+  /// file rather than children of the hub: auto_route rejects a child path that
+  /// begins with a slash (`RouteCollection.fromList` throws `Sub-paths can not
+  /// start with a "/"`), and a **page** has no children for a path to be
+  /// relative to. The dock shell's three tab paths are relative for the
+  /// opposite reason: it is an `AutoTabsRouter`, and [homeTab] / [communionTab]
+  /// / [journeyTab] derive their relative halves from the absolute paths they
+  /// belong to.
   ///
-  /// ## AND IT IS STILL UNREGISTERED — STATED WITHOUT CITING DECISION 5
+  /// ## IT IS THE LANDING ROUTE FOR BOTH SERVANT ROLES
   ///
-  /// **This paragraph deliberately cites no authority, because there is none to
-  /// cite.** AGENT_CONTEXT §2 decision 5 (`AGENT_CONTEXT.md:31`, under "Locked
-  /// decisions — NOT up for renegotiation") reads "**No servant/admin portal.**
-  /// Those backend routes stay untested from the client", so it is the *reason
-  /// the registration has not happened yet* and it is emphatically **not** a
-  /// permission. An earlier draft of this comment spent one sentence doing both
-  /// jobs — promising that "the portal routes themselves are registered in
-  /// `app_router.dart` by the task that builds them" and citing decision 5 as
-  /// the reason — which is a decision cited in support of the exact thing it
-  /// forbids.
+  /// `core/navigation/landing_route.dart` is the one place a `UserRole` turns
+  /// into a path: a `kid` lands on [home] and both servant roles land here.
+  /// The function was built for exactly this and had **no caller**; the portal
+  /// is its first.
   ///
-  /// The user has approved amending decision 5, and **that amendment is task 6's
-  /// to write.** So the honest position for this file is the two facts that do not
-  /// depend on either version of the decision:
+  /// ## WHO MAY OPEN IT — A `kid` MAY NOT, AND A `viewer_servant` MAY NOT
+  /// ## SCHEDULE
   ///
-  ///  1. `/servant` is **declared here and not registered in `app_router.dart`**.
-  ///  2. **Registering it is task 5's job**, not this file's, and nothing in this
-  ///     paragraph is a retroactive justification for the gap either way.
-  ///
-  /// **The honest consequence, which a reader will otherwise have to discover by
-  /// pushing it:** `AppRouter`'s table declares six routes — the login, the dock
-  /// shell with its three tabs, the reader, the quiz and the workshop — and then
-  /// `'*'`, and none of the six names this path — so a navigation to `/servant`
-  /// matches nothing and the wildcard redirects it to [home]. A servant therefore
-  /// lands on `/` today. That is the *correct outcome* for a role with nothing
-  /// extra to see, and it is a **coincidence rather than a design**: it is what the
-  /// fallback does with an unknown path.
-  ///
-  /// **Measured, not reasoned:** driving the live matcher on
-  /// `AppRouter(FakeAuthStatus(), _SilentAuthChanges())`,
-  /// `router.matcher.match('/servant')` yields `name=HomeRoute`,
-  /// `path=/`, **`redirectedFrom=*`** — field-for-field identical to
-  /// `router.matcher.match('/not-a-route')`. It is *not* identical to
-  /// `router.matcher.match('/')`, which yields the same `path` with
-  /// `redirectedFrom=null`; the `*` is precisely the evidence that `/servant` is
-  /// being handled by the catch-all rather than matched.
-  ///
-  /// No test in this repository asserts any of it, deliberately: pinning "a path
-  /// that is declared but not routed lands on `/`" would ratify a placeholder as a
-  /// finished screen, which is recorded decision 8's failure in its purest form.
-  /// The probe is therefore cited here and thrown away, and the successor that
-  /// registers the portal route replaces this paragraph.
-  ///
-  /// It is recorded here rather than left to be found because the alternative is
-  /// worse. The day this constant is used by something other than
-  /// `landingRouteFor`, the reader who has not read this paragraph will believe a
-  /// servant screen exists.
-  ///
-  /// ## WHY IT IS NOT ONE OF THE LOCKED PATHS, AND WHY IT STILL GETS A ROW
-  ///
-  /// §2 locks **seven** route paths; this is the eighth declaration and now the
-  /// **only** one whose value §2 does not fix. It was the second until Task 5.5
-  /// moved `/communion` — then `/leaderboard` — into §2's route table, which is
-  /// why `app_routes_test.dart` carries a value row for it rather than leaving it
-  /// to arrive silently. The row exists so a reader has one place to look for
-  /// what each declared path is, not because the value is in doubt.
+  /// The grant table is `UserRole.grantsFor`, and the answers are the ones that
+  /// table already gives: `viewer_servant` may read the daily report,
+  /// `admin_servant` may also schedule readings and author questions, and
+  /// `kid` may do none of it. A `RoleGuard` refuses a navigation whose
+  /// capability the role does not grant, and it **refuses by redirecting**
+  /// rather than by throwing — `AuthGuard`'s recorded reason, stated in
+  /// `core/navigation/auth_status.dart`'s own words. The hub's entries are read
+  /// from that same table rather than from an `if` ladder of their own, and so
+  /// is the gate's answer (`core/navigation/role_access.dart:288` —
+  /// `allows` is `UserRole.grantsFor(role).contains(capability)`), so the
+  /// screen and the gate cannot disagree.
   ///
   /// ## AND IT IS NOT A PERMISSION
   ///
@@ -216,6 +191,27 @@ abstract final class AppRoutes {
   /// at `:31`, and never reads it again — see `core/domain/entities/user_role.dart`
   /// for the two zero-match greps that settle it. A route constant is a path in
   /// this client, not an access control on anyone.
+  ///
+  /// ## AND IT IS ONE OF §2's LOCKED PATHS NOW
+  ///
+  /// It was the eighth declaration and the only one §2 did not fix, until the
+  /// user **reversed** decision 5 on 2026-10-21 (ADR-0026). §2's route table
+  /// carries a row for it and three rows for its sub-routes, and the row exists
+  /// so a reader has one place to look for what each declared path is, not
+  /// because the value is in doubt — the value was never in doubt:
+  /// `app_routes_test.dart` has carried a value row for it since Task 5.5 moved
+  /// `/communion` into §2's table, which is why the count in that suite's name
+  /// and in its docs was a thing that had to move.
+  ///
+  /// ## AND WHAT IS TRUE AT **THIS** COMMIT
+  ///
+  /// The registration and the three sub-route constants land with the portal's
+  /// own implementation
+  /// (`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`, Tasks 2 and
+  /// 5), and this paragraph is written in the present tense of the **finished**
+  /// portal rather than of this commit. The two facts that are true **now** are
+  /// the two this file can be checked against: the constant is declared here,
+  /// and the gate is advisory.
   static const String servant = '/servant';
 
   /// The wildcard catch-all, `'*'`. Unmatched paths redirect through this. See

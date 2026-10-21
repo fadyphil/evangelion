@@ -20,7 +20,7 @@ Toolchain: Flutter **3.47.4** / Dart **3.13.3** (stable). No FVM, no melos.
 
 ## 2. Locked decisions — NOT up for renegotiation
 
-These were decided with the user. Do not re-litigate. Do not expand scope. **There is exactly one exception, and it is dated:** decision 1 was deliberately reversed on 2026-10-13, and `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` is the authority for it — it ships the fiction table that says which of the redesign's surfaces have a measured endpoint behind them and which are stubs. Read that ADR before proposing anything about screens, the library, or the profile. Do not re-litigate it a second time either; it is decided and the plan that implements it is `docs/superpowers/plans/2026-10-13-lumen-redesign.md`.
+These were decided with the user. Do not re-litigate. Do not expand scope. **There are exactly two exceptions, and both are dated:** decision 1 was deliberately reversed on 2026-10-13, and `docs/adr/0022-full-fidelity-redesign-supersedes-0001.md` is the authority for it — it ships the fiction table that says which of the redesign's surfaces have a measured endpoint behind them and which are stubs. Read that ADR before proposing anything about screens, the library, or the profile. Do not re-litigate it a second time either; it is decided and the plan that implements it is `docs/superpowers/plans/2026-10-13-lumen-redesign.md`. **Decision 5 was reversed on 2026-10-21** — the servant/admin portal ships — and `docs/adr/0026-the-servant-admin-portal.md` is its authority. It is decided too, and the plan that implements it is `docs/superpowers/plans/2026-10-21-servant-admin-portal.md`.
 
 | # | Decision |
 | --- | --- |
@@ -28,7 +28,7 @@ These were decided with the user. Do not re-litigate. Do not expand scope. **The
 | 2 | **Live API** against `https://evangelion-backend.vercel.app` for reading / quiz / result / streak. **Amended 2026-10-20 (ADR-0023):** the base URL was `http://localhost:3000` and the deployed host is now the default; the local backend remains a second target behind `--dart-define=API_BASE_URL=http://localhost:3000`. §5's contract is held by **both** and they differ in three places — §5.1 lists them. |
 | 3 | **Login and onboarding are UI-only.** A `FakeAuthRepository` returns a seeded session. There is **no auth endpoint on the backend** and no login API call. |
 | 4 | **Settings are local only** (`shared_preferences`). No server sync. |
-| 5 | **No servant/admin portal.** Those backend routes stay untested from the client. |
+| 5 | **The servant/admin portal ships** (amended 2026-10-21, reversing the original "No servant/admin portal"). The `servant` feature gives the two servant roles their own shell at `/servant`: a `viewer_servant` reads the cohort's daily roster report, an `admin_servant` also schedules readings and authors their questions. A `kid` cannot reach it. The backend's admin, AI and report routes are now client surface. **The role gate is advisory UX, not authorisation** — the backend parses `X-User-Role` at `src/middleware/identity.middleware.ts:24`, assigns it at `:31`, and never reads it again (`rg 'user\??\.role' src/` → no matches; `rg '403' src/` → no matches). ADR-0026. |
 | 6 | **Dark glassmorphic design system** per `docs/plans/03-design-system.md`, including the five mandatory performance mitigations in `docs/plans/09-quality-gates.md` §13. **Amended 2026-10-20 (ADR-0024):** §13's rules 1 and 4 are now **enforced** — a state change rebuilds its target and nothing else, and the boundary is a **budget** rather than a paragraph. The measurements are in `docs/PERFORMANCE.md`; the gate is `test/rebuild_isolation_budget_test.dart`; the decisions are 170–174 below. |
 | 7 | **Error handling is `Result<T>`, a `typedef` for `fp_dart`'s `Either<Failure, T>`.** Amended again by §2.1's `fp_dart` correction below — the original wording said "NOT fp_dart" and was wrong. |
 | 8 | **States and entities use `freezed`; localization is ARB + `gen_l10n`.** Added by amendment — §2.1. |
@@ -153,7 +153,7 @@ decision 111 and marked here.)*
   `build` methods → `context.l10n`), and `didPopNext` is untouched and still gated —
   decision 106.
 
-### The seven routes, and the shell that holds the tabs
+### The eleven routes, and the shell that holds the tabs
 
 | Route | Screen | Data source |
 | --- | --- | --- |
@@ -164,6 +164,50 @@ decision 111 and marked here.)*
 | `/settings` | The Workshop — language, theme, light, sky, ritual, communion | local |
 | `/communion` | The cohort's board | **API** |
 | `/journey` | The reader's journey — orb, streak, rings, medals, account | **API** (streak) · local (medals stub) |
+| `/servant` | The servant portal's hub — the sections this role has | **API** |
+| `/servant/report` | The cohort's daily roster completion report | **API** |
+| `/servant/schedule` | Scheduling a reading for a cohort (admin servants only) | **API** |
+| `/servant/questions` | Authoring and committing a reading's questions (admin servants only) | **API** |
+
+**THE FOUR `/servant*` ROWS ARE THE 2026-10-21 AMENDMENT, AND THEY LAND WITH THE
+CODE THAT REGISTERS THEM** — the pending-implementation paragraph below says
+which commits. Decision 5 was **reversed** on 2026-10-21 (ADR-0026), so the
+backend's admin, AI and report routes are client surface for the first time.
+`/servant` is a **hub page**: its body is the list of the sections this role
+has, and it is **not** an `AutoTabsRouter`, because a `viewer_servant` has
+exactly **one** section — the daily report — and a tab bar holding one tab is
+chrome for nothing. Its three sub-routes are therefore **root-level absolute
+paths** and not children of the hub. **The eleven rows are **TWO SURFACES**,
+not eleven screens in one**: decision 1's seven screens are the **reader's**
+app, and the portal's four are a **second** surface that a `kid` cannot reach.
+
+**`landingRouteFor()` GETS ITS FIRST CALLER WITH THE PORTAL, AND IT IS THE
+ROLE'S OWN ROUTE.** `lib/core/navigation/landing_route.dart` is the one place a
+`UserRole` turns into a path, and the function was built for this with **no
+caller at all**: a `kid` lands on `/` and either servant role lands on
+`/servant`.
+
+**THE ROLE GATE IS **ADVISORY UX, NOT AUTHORISATION**, AND THE MEASUREMENT IS TWO
+GREPS.** The backend parses `X-User-Role` at
+`src/middleware/identity.middleware.ts:24`, assigns it to `request.user.role` at
+`:31`, and **never reads it again**: `rg 'user\??\.role' src/` returns **no
+matches** and `rg '403' src/` returns **no matches**, across all **seventeen**
+route registrations in `src/`. So the `RoleGuard` refuses a navigation to
+prevent an **accident** — a child is not dropped onto a scheduling screen that
+makes no sense for them — and it buys nothing an attacker would have to defeat,
+because there is nothing on the server to defeat. The header is set by the
+client and every endpoint answers whoever asks.
+
+**THE PARAGRAPH THAT SAID "`/servant` IS **DECLARED, NOT YET ROUTED**" IS
+**REPLACED**, NOT ANNOTATED.** `lib/core/navigation/app_routes.dart`'s
+`servant` constant said it in its own words, ending with "the successor that
+registers the portal route replaces this paragraph". The probe behind it is
+dated: `router.matcher.match('/servant')` yielded `name=HomeRoute`, `path=/`,
+**`redirectedFrom=*`** — field-for-field identical to
+`router.matcher.match('/not-a-route')`, and **not** to
+`router.matcher.match('/')`, whose `redirectedFrom` is `null`. The `*` is the
+evidence that the wildcard handled the path rather than any route matching it,
+and the same probe is recorded in `core/navigation/landing_route.dart`.
 
 **`/result` IS GONE, AND `/` IS A SHELL.** Phase 6 turned the result into a
 **modal** (`eva/redesign.html:718-727`), so it is no longer a route and
@@ -194,8 +238,13 @@ and retires one, and each lands with the code that registers it: `/communion`
 arrived in **Phase 5.5** (renamed from `/leaderboard`); **`/journey`** (the
 profile) arrived in **Phase 5.6**; **`/result`** retired to the modal in
 **Phase 6**. The library carousel returned to `/` in **Phase 5** as a surface
-rather than a route. Until each of those commits lands, this table is the truth
-and the ADR is the plan.
+rather than a route. **The four `/servant*` rows are the one exception this
+paragraph has to name**, and they follow the same rule: the three
+sub-route constants and the router's four `AutoRoute`s land **together, with
+the code that registers them**
+(`docs/superpowers/plans/2026-10-21-servant-admin-portal.md`, Tasks 2 and 5).
+Until each of those commits lands, this table is the truth and the ADR is the
+plan.
 
 **`/journey` AND `/communion` ARE TABS NOW, AND THAT IS A RECORDED CHANGE.**
 The paragraph below used to say the journey was *pushed* and needed a back
