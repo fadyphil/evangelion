@@ -99,10 +99,15 @@ import 'package:evangelion/core/domain/entities/user_role.dart';
 /// anything, so on a cold launch the reader gets a blank first frame and the
 /// only trace is `FlutterError.onError`.
 ///
-/// A role check has no such consumer **yet** — nothing in `lib/` reads this
-/// interface at this commit, exactly as `user_role.dart` records for its own two
-/// unreferenced conversions. So the cost of a throw here is stated rather than
-/// measured, and the half that *is* reachable is pinned instead:
+/// A role check **has** a consumer now, and it is the one this file was
+/// written for: the servant portal's `RoleGuard` asks it, and — since the
+/// servant portal's Task 1 — so does the **identity interceptor**, which reads
+/// the same registration to put `X-User-Role` on the wire. That is the point of
+/// the seam being one registration: the guard's answer and the header's value
+/// are one fact read from two angles.
+///
+/// So the cost of a throw here is **stated rather than measured** for the
+/// *navigation* half, and the half that *is* reachable is pinned:
 ///
 ///  * `role_access_test.dart` asserts a throwing implementation's throw
 ///    **propagates** rather than being absorbed, in the shape of
@@ -110,6 +115,13 @@ import 'package:evangelion/core/domain/entities/user_role.dart';
 ///  * it asserts this file contains **no `catch` at all**, so the obligation
 ///    holds structurally rather than by every future call site remembering not
 ///    to handle one.
+///
+/// **AND THE INTERCEPTOR'S USE MAKES THE OBLIGATION LOUDER, NOT QUIETER.** A
+/// throw out of [role] would escape `onRequest` — inside dio's own request
+/// pipeline, where a throw is not a refusal but a **failed request**, and the
+/// reader would see a network error rather than a role that could not be read.
+/// That is a *worse* outcome than the guard's silent `false`, which is why the
+/// implementation behind the registration reads a field and cannot throw.
 ///
 /// Why absorbing it would be worse than propagating it: a `try`/`catch` here
 /// would answer `false` for a role the app simply could not read, and a silent
@@ -242,15 +254,21 @@ abstract interface class RoleAccess {
 /// liveness; it does not guarantee atomicity across two reads, and no seam built
 /// on a reader can.
 ///
-/// The freeze-at-construction contract this paragraph defends is already pinned
-/// where the eventual registration lives:
-/// `test/app/di/navigation_injection_test.dart:393` drives the bloc and re-reads
-/// the seam, and the `same()` post-mortem above it (`:371-392`) records how a
-/// freeze there shipped with all 1200 tests green. [RoleAccess]'s analogue is in
-/// `role_access_test.dart`, which holds it by **counting reads** rather than
-/// comparing answers. When a `RoleAccess` is hand-registered in
-/// `lib/app/di/navigation_injection.dart`, those are the assertions its reader
-/// has to keep passing.
+/// The freeze-at-construction contract this paragraph defends is pinned in two
+/// places now. `test/app/di/navigation_injection_test.dart:393` drives the bloc
+/// and re-reads the seam, and the `same()` post-mortem above it (`:371-392`)
+/// records how a freeze there shipped with all 1200 tests green.
+/// [RoleAccess]'s analogue is in `role_access_test.dart`, which holds it by
+/// **counting reads** rather than comparing answers.
+///
+/// **AND THE REGISTRATION THAT NOW EXISTS IS HELD BY THE SAME KIND OF
+/// ASSERTION.** The servant portal's Task 1 registered the seam in
+/// `auth_module.dart` — the **pure** half — and
+/// `test/app/di/injection_test.dart`'s "the role seam is registered in the PURE
+/// half" group asserts that it is a **singleton** and that it answers the
+/// **session's** role once one exists. A registration that froze the role at
+/// composition would answer the seed for ever, and that is the whole defect
+/// the paragraph above is about, in the place it now lives.
 ///
 /// ## THE COMPOSITION ROOT IS WHERE THE READER COMES FROM
 ///
@@ -259,6 +277,20 @@ abstract interface class RoleAccess {
 /// That is the same wall recorded decision 17 records for `AuthBloc` itself, and
 /// it is why the bloc-backed implementation belongs beside `BlocAuthStatus` in
 /// `lib/app/di/navigation_injection.dart`, hand-registered.
+///
+/// **AND THE REGISTRATION THAT EXISTS IS OVER THE **PURE** HALF, NOT THE BLOC.**
+/// Since the servant portal's Task 1 this seam is registered in
+/// `lib/app/di/modules/auth_module.dart` — the **pure** half — over the
+/// `AuthLocalDataSource`'s **synchronous** view of the session, because
+/// `injection.dart`'s transitive project-local import graph is required to stay
+/// Flutter-free (AGENT_CONTEXT §6, recorded decision 4) and `AuthBloc` would
+/// have dragged the widget layer into it.
+///
+/// That is what makes the **interceptor** able to read it: the header's value
+/// is wanted **per request**, and a reader that had to be awaited could not
+/// answer a synchronous header write. The store is an in-memory field by
+/// design — see `AuthLocalDataSource`'s own doc — so a synchronous read is a
+/// field read and not a lie about a platform channel.
 ///
 /// A reader also keeps **the composition root's** choice out of this file: a
 /// caller may read a bloc's state, a session field, or a value in a test, and

@@ -3,6 +3,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -49,6 +50,11 @@ const StreakHistoryEntry _oneDay = StreakHistoryEntry(
 );
 
 void main() {
+  // `any(named: 'role')` cannot match a non-nullable enum without one of
+  // these. The value is never used — mocktail only needs *a* `UserRole` to
+  // know the type.
+  setUpAll(() => registerFallbackValue(UserRole.kid));
+
   late _MockAuthRepository auth;
   late _MockStreakRepository streaks;
   late _MockSkyRepository sky;
@@ -129,6 +135,7 @@ void main() {
         () => auth.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       );
     });

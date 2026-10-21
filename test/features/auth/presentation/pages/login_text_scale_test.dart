@@ -7,6 +7,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/design_system_harness.dart';
@@ -307,6 +308,85 @@ void main() {
               'the painted box is narrower than the words need, so the label was '
               'clipped — the `maxLines: 1` case the assertion above rules out',
         );
+      });
+    }
+  });
+
+  group('the role picker\'s labels FIT, in both arms', () {
+    // ## WHY THIS GROUP EXISTS, AND IT IS THE SAME REASON AS THE CTA'S
+    //
+    // A `SegmentedControl` segment clips its own label: `maxLines: 1` plus
+    // `TextOverflow.ellipsis`, so an over-wide label is **silently shortened**
+    // and `RenderFlex` never overflows — `takeException()` stays `null` and
+    // every "no overflow" test above stays green while the reader reads
+    // "SERVAN…".
+    //
+    // The role picker's labels are the **widest** thing on this screen that is
+    // not the CTA, and the default geometry of `SegmentedControl` **does**
+    // ellipsise "SERVANT" at 320px and 1.22× — measured, not reasoned, and
+    // the reason the picker uses the wide geometry. This group is what keeps
+    // that from regressing, and it measures the **scaled** text: a `TextPainter`
+    // over the unscaled style would compare a 12sp word against a 1.22× box and
+    // call it a fit.
+
+    for (final (String name, Locale locale, List<String> labels)
+        in <(String, Locale, List<String>)>[
+          ('English', const Locale('en'), <String>['KID', 'SERVANT', 'ADMIN']),
+          ('Arabic', const Locale('ar'), <String>['طفل', 'خادم', 'مُشرف']),
+        ]) {
+      testWidgets('the $name labels are not ellipsised', (
+        WidgetTester tester,
+      ) async {
+        final AuthBloc bloc = buildTestBloc();
+        addTearDown(bloc.close);
+        await pumpLogin(
+          tester,
+          bloc: bloc,
+          locale: locale,
+          textScale: kEvaRequiredTextScale,
+        );
+        await tester.pump(const Duration(milliseconds: 1200));
+
+        for (final String label in labels) {
+          final Finder finder = find.text(label);
+          expect(
+            finder,
+            findsOneWidget,
+            reason: 'the "$label" segment is drawn',
+          );
+
+          // The **effective** style, not `Text.style` — the `Text` inside a
+          // segment declares none, so its own `style` is `null` and a painter
+          // built from it would measure the *default* font at the *default*
+          // size, which is the test runner's square font and about twice as
+          // wide. The rendered paragraph carries the merged style.
+          final RenderParagraph paragraph = tester
+              .renderObject<RenderParagraph>(finder);
+          final TextStyle style =
+              paragraph.text.style ?? const TextStyle(fontSize: 12);
+          final TextPainter painter = TextPainter(
+            text: TextSpan(
+              text: paragraph.text.toPlainText(),
+              // **The scale applied**, because the box it is measured against is
+              // a 1.22× box.
+              style: style.copyWith(
+                fontSize: style.fontSize! * kEvaRequiredTextScale,
+              ),
+            ),
+            textDirection: Directionality.of(tester.element(finder)),
+            maxLines: 1,
+          )..layout();
+
+          final double rendered = tester.getSize(finder).width;
+          expect(
+            rendered,
+            greaterThanOrEqualTo(painter.width),
+            reason:
+                '"$label" wants ${painter.width}px and the box offers '
+                '${rendered}px. An ellipsis keeps this file\'s other tests green '
+                'while deleting the reader\'s words',
+          );
+        }
       });
     }
   });

@@ -727,6 +727,196 @@ case _:
 }
 
 /// @nodoc
+mixin _$AuthRoleChanged {
+
+
+/// Create a copy of AuthRoleChanged
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AuthRoleChangedCopyWith<AuthRoleChanged> get copyWith => _$AuthRoleChangedCopyWithImpl<AuthRoleChanged>(this as AuthRoleChanged, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  final _this = this as AuthRoleChanged;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthRoleChanged&&(identical(other.role, _this.role) || other.role == _this.role));
+}
+
+
+@override
+int get hashCode {
+  final _this = this as AuthRoleChanged;
+  return Object.hash(runtimeType,_this.role);
+}
+
+@override
+String toString() {
+  final _this = this as AuthRoleChanged;
+  return 'AuthRoleChanged(role: ${_this.role})';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $AuthRoleChangedCopyWith<$Res> implements $AuthEventCopyWith<$Res> {
+  factory $AuthRoleChangedCopyWith(AuthRoleChanged value, $Res Function(AuthRoleChanged) _then) = _$AuthRoleChangedCopyWithImpl;
+@useResult
+$Res call({
+ UserRole role
+});
+
+
+
+
+}
+/// @nodoc
+class _$AuthRoleChangedCopyWithImpl<$Res>
+    implements $AuthRoleChangedCopyWith<$Res> {
+  _$AuthRoleChangedCopyWithImpl(this._self, this._then);
+
+  final AuthRoleChanged _self;
+  final $Res Function(AuthRoleChanged) _then;
+
+/// Create a copy of AuthRoleChanged
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? role = null,}) {
+  return _then(AuthRoleChanged(
+null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
+as UserRole,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [AuthRoleChanged].
+extension AuthRoleChangedPatterns on AuthRoleChanged {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(){
+final _that = this;
+switch (_that) {
+case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(){
+final _that = this;
+switch (_that) {
+case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>() {final _that = this;
+switch (_that) {
+case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>() {final _that = this;
+switch (_that) {
+case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
 mixin _$AuthSubmitted {
 
 
@@ -1044,14 +1234,14 @@ mixin _$AuthState {
 @override
 bool operator ==(Object other) {
   final _this = this as AuthState;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.password, _this.password) || other.password == _this.password)&&(identical(other.isPasswordVisible, _this.isPasswordVisible) || other.isPasswordVisible == _this.isPasswordVisible)&&(identical(other.emailTouched, _this.emailTouched) || other.emailTouched == _this.emailTouched)&&(identical(other.passwordTouched, _this.passwordTouched) || other.passwordTouched == _this.passwordTouched)&&(identical(other.emailError, _this.emailError) || other.emailError == _this.emailError)&&(identical(other.passwordError, _this.passwordError) || other.passwordError == _this.passwordError)&&(identical(other.formError, _this.formError) || other.formError == _this.formError)&&(identical(other.session, _this.session) || other.session == _this.session));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AuthState&&(identical(other.status, _this.status) || other.status == _this.status)&&(identical(other.email, _this.email) || other.email == _this.email)&&(identical(other.password, _this.password) || other.password == _this.password)&&(identical(other.isPasswordVisible, _this.isPasswordVisible) || other.isPasswordVisible == _this.isPasswordVisible)&&(identical(other.emailTouched, _this.emailTouched) || other.emailTouched == _this.emailTouched)&&(identical(other.passwordTouched, _this.passwordTouched) || other.passwordTouched == _this.passwordTouched)&&(identical(other.emailError, _this.emailError) || other.emailError == _this.emailError)&&(identical(other.passwordError, _this.passwordError) || other.passwordError == _this.passwordError)&&(identical(other.formError, _this.formError) || other.formError == _this.formError)&&(identical(other.session, _this.session) || other.session == _this.session)&&(identical(other.role, _this.role) || other.role == _this.role));
 }
 
 
 @override
 int get hashCode {
   final _this = this as AuthState;
-  return Object.hash(runtimeType,_this.status,_this.email,_this.password,_this.isPasswordVisible,_this.emailTouched,_this.passwordTouched,_this.emailError,_this.passwordError,_this.formError,_this.session);
+  return Object.hash(runtimeType,_this.status,_this.email,_this.password,_this.isPasswordVisible,_this.emailTouched,_this.passwordTouched,_this.emailError,_this.passwordError,_this.formError,_this.session,_this.role);
 }
 
 

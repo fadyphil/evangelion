@@ -2,6 +2,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/features/leaderboard/domain/usecases/get_board_reader_session.dart';
@@ -74,6 +75,11 @@ final class _RecordingRepository implements LeaderboardRepository {
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 void main() {
+  // `any(named: 'role')` cannot match a non-nullable enum without one of
+  // these. The value is never used — mocktail only needs *a* `UserRole` to
+  // know the type.
+  setUpAll(() => registerFallbackValue(UserRole.kid));
+
   const LeaderboardBoard board = LeaderboardBoard(
     window: LeaderboardWindow.monthly,
     groupId: 3,
@@ -179,6 +185,7 @@ void main() {
         () => auth.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       );
     });

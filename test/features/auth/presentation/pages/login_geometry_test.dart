@@ -57,6 +57,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/auth/presentation/widgets/role_picker.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -199,14 +200,34 @@ void main() {
       expect(px(at('.field'), 'margin-bottom'), LoginPage.kFieldGap);
     });
 
-    test('kCtaTopGap is `.field`\'s margin and `.cta`\'s, summed', () {
+    test('kRolePickerToCtaGap is `.cta`\'s margin-top', () {
+      // The **second half** of the prototype's field→CTA distance. The picker
+      // sits between the password field and the CTA, so `.cta`'s own leading
+      // margin is the gap the picker leaves under itself.
+      expect(px(at('.cta'), 'margin-top'), LoginPage.kRolePickerToCtaGap);
+    });
+
+    test('the two gaps still sum to the prototype\'s own 22', () {
       // Flex does not collapse margins (`:128` — `.route` is `display:flex`),
       // so the rendered gap between the last field's box and the CTA is the
-      // **sum** of the two margins. Both are extracted; their sum is the
-      // constant.
+      // **sum** of the two margins. The prototype put them side by side; the
+      // role picker now sits between them, so the rendered distance is the two
+      // margins **plus the picker's own height** — and the prototype's own 22
+      // is preserved as the sum of the two numbers that *are* rendered.
+      //
+      // **This is the last of `kCtaTopGap`**, which was that sum when the two
+      // margins were adjacent and named nothing rendered once they were not.
       expect(
         px(at('.field'), 'margin-bottom') + px(at('.cta'), 'margin-top'),
-        LoginPage.kCtaTopGap,
+        22,
+      );
+      expect(
+        LoginPage.kFieldGap + LoginPage.kRolePickerToCtaGap,
+        22,
+        reason:
+            'the field\'s trailing margin and the CTA\'s leading margin are the '
+            'prototype\'s two numbers, and the picker does not change either of '
+            'them — it only sits between them',
       );
     });
 
@@ -303,9 +324,15 @@ void main() {
       expect(letter.style!.fontWeight, FontWeight.w800);
     });
 
-    testWidgets('the vertical rhythm is 6 · 34 · 14 · 22 · 14 · 10', (
+    testWidgets('the vertical rhythm is 6 · 34 · 14 · 14 · 8 · 14 · 10', (
       WidgetTester tester,
     ) async {
+      // **The prototype's own rhythm, with one control in it.** The redesign's
+      // sequence is 6 · 34 · 14 · 22 · 14 · 10; the 22 was `.field`'s trailing
+      // 14 plus `.cta`'s leading 8, and the role picker now sits between those
+      // two margins — so the same two numbers are still there, separated by
+      // the picker's own height. The **numbers** are the prototype's; the
+      // **sequence** has one element in it the prototype does not have.
       await pumpSettled(tester);
 
       final AppLocalizationsEn en = AppLocalizationsEn();
@@ -336,16 +363,35 @@ void main() {
           .getTopLeft(find.byType(EvaTextField).at(1))
           .dy;
       expect(field2Top - field1Bottom, moreOrLessEquals(LoginPage.kFieldGap));
-      // field → CTA: the two flex margins, summed — see the claims row.
+      final double field2Bottom = tester
+          .getBottomRight(find.byType(EvaTextField).at(1))
+          .dy;
+      // field → the role picker: `.field`'s own margin-bottom (14) — the same
+      // number the prototype used to separate the password field from the CTA.
+      // **The role picker is written, not transcribed**: `eva/redesign.html`
+      // draws no such control, and there is no auth endpoint (AGENT_CONTEXT §2,
+      // decision 3) for the role to come from. The **gaps** around it are the
+      // prototype's own, so the rhythm is still the redesign's with one control
+      // the redesign does not have sitting in it.
+      final double pickerTop = tester.getTopLeft(find.byType(RolePicker)).dy;
+      expect(
+        pickerTop - field2Bottom,
+        moreOrLessEquals(LoginPage.kFieldGap),
+        reason: 'the field leaves its own trailing margin above the picker',
+      );
+      // the picker → CTA: `.cta`'s own margin-top (8).
       final Finder cta = find.ancestor(
         of: find.text(en.authEnterTheWord),
         matching: find.byType(EvaButton),
       );
       final double ctaTop = tester.getTopLeft(cta).dy;
-      final double field2Bottom = tester
-          .getBottomRight(find.byType(EvaTextField).at(1))
+      final double pickerBottom = tester
+          .getBottomRight(find.byType(RolePicker))
           .dy;
-      expect(ctaTop - field2Bottom, moreOrLessEquals(LoginPage.kCtaTopGap));
+      expect(
+        ctaTop - pickerBottom,
+        moreOrLessEquals(LoginPage.kRolePickerToCtaGap),
+      );
       // CTA → ghosts: `.ghosts`' margin-top, button box to button box.
       final Finder google = find.ancestor(
         of: find.text(LoginPage.kGhostGoogle),
@@ -428,9 +474,8 @@ void main() {
       );
     });
 
-    testWidgets('the section\'s elements are the page\'s elements', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the section\'s elements are the page\'s elements, and the '
+        'role picker is the one it does not have', (WidgetTester tester) async {
       await pumpSettled(tester);
 
       // `eva/redesign.html:503-511`, element for element: one mark, one tag,
@@ -443,6 +488,15 @@ void main() {
       expect(find.byType(EvaTextField), findsNWidgets(2));
       expect(find.byType(EvaButton), findsNWidgets(3));
       expect(find.text(_monoUpper(LoginPage.kFooterText)), findsOneWidget);
+
+      // **And the ONE element the section does not have.** The role picker is
+      // written, not transcribed — `eva/redesign.html` draws no such control,
+      // because there is no auth endpoint (AGENT_CONTEXT §2, decision 3) for
+      // the role to come from and the prototype was a reader's app alone. It
+      // is asserted here rather than left to be noticed, so a future reader
+      // comparing this screen with the prototype finds the difference named
+      // instead of discovering it.
+      expect(find.byType(RolePicker), findsOneWidget);
     });
   });
 

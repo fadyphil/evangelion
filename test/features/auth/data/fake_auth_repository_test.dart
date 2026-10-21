@@ -116,6 +116,50 @@ void main() {
 
       expect(await AuthLocalDataSource().readSession(), isNull);
     });
+
+    // ## THE SYNCHRONOUS VIEW, AND WHY IT IS HONEST HERE
+    //
+    // `RoleAccess` reads the session's role from **this** store, and the
+    // interceptor reads it per request — so a reader that had to be awaited
+    // could not be consulted from a synchronous header write. The store is an
+    // in-memory field by design (its own doc says so), so a synchronous read is
+    // a read of a field, not a lie about a platform channel.
+
+    test('has no session synchronously to begin with', () {
+      expect(source.currentSession, isNull);
+    });
+
+    test('and reports the written session synchronously', () async {
+      final AuthSession session = seedAuthSession(
+        createdAt: DateTime.utc(2026),
+        role: UserRole.adminServant,
+      );
+      await source.writeSession(session);
+
+      expect(source.currentSession, same(session));
+      expect(source.currentSession?.role, UserRole.adminServant);
+    });
+
+    test('and forgets it synchronously too', () async {
+      await source.writeSession(seedAuthSession(createdAt: DateTime.utc(2026)));
+      await source.clearSession();
+
+      expect(source.currentSession, isNull);
+    });
+
+    test('and the synchronous view agrees with the async one', () async {
+      // Two answers to one question is a state this client should not be able to
+      // reach: the async read is the port's read and the synchronous one is the
+      // interceptor's, so a disagreement would put one role on the screen and
+      // another on the wire.
+      final AuthSession session = seedAuthSession(
+        createdAt: DateTime.utc(2026),
+        role: UserRole.viewerServant,
+      );
+      await source.writeSession(session);
+
+      expect(source.currentSession, await source.readSession());
+    });
   });
 
   group('FakeAuthRepository.signIn', () {
@@ -127,6 +171,7 @@ void main() {
       final Result<AuthSession> result = await repository.signIn(
         email: goodEmail,
         password: goodPassword,
+        role: UserRole.kid,
       );
 
       final AuthSession session = result.getOrElse((_) => _impossible);
@@ -138,6 +183,39 @@ void main() {
       expect(session.email, kSeedEmail);
     });
 
+    test('and the session carries the role the caller asked for', () async {
+      // **The role the reader chose on the login form**, and there is no server
+      // to ask — so the repository's job is to put the requested role in the
+      // session and nowhere else. A session that came back as `kid` whatever was
+      // asked for would put `kid` on the wire while the form said
+      // `admin_servant`.
+      final Result<AuthSession> result = await repository.signIn(
+        email: goodEmail,
+        password: goodPassword,
+        role: UserRole.adminServant,
+      );
+
+      expect(result.getOrElse((_) => _impossible).role, UserRole.adminServant);
+    });
+
+    test('and a sign-in with a DIFFERENT role replaces the session', () async {
+      // The role is part of the session's identity, so the cached session is not
+      // handed back under another role. The same role still returns the
+      // identical object — that property is the one below.
+      await repository.signIn(
+        email: goodEmail,
+        password: goodPassword,
+        role: UserRole.kid,
+      );
+      final Result<AuthSession> result = await repository.signIn(
+        email: goodEmail,
+        password: goodPassword,
+        role: UserRole.viewerServant,
+      );
+
+      expect(result.getOrElse((_) => _impossible).role, UserRole.viewerServant);
+    });
+
     test('returns the SAME session object on a second sign-in', () async {
       // Two calls must not mint two sessions: the session rides into bloc state,
       // and a fresh-but-equal one would still be a state change by identity
@@ -145,10 +223,12 @@ void main() {
       final Result<AuthSession> first = await repository.signIn(
         email: goodEmail,
         password: goodPassword,
+        role: UserRole.kid,
       );
       final Result<AuthSession> second = await repository.signIn(
         email: goodEmail,
         password: goodPassword,
+        role: UserRole.kid,
       );
 
       expect(
@@ -164,6 +244,7 @@ void main() {
       final Result<AuthSession> result = await repository.signIn(
         email: '',
         password: goodPassword,
+        role: UserRole.kid,
       );
 
       expect(result.isLeft(), isTrue);
@@ -181,6 +262,7 @@ void main() {
       final Result<AuthSession> result = await repository.signIn(
         email: 'david@evangelion',
         password: goodPassword,
+        role: UserRole.kid,
       );
 
       expect(
@@ -196,6 +278,7 @@ void main() {
       final Result<AuthSession> result = await repository.signIn(
         email: goodEmail,
         password: 'abc',
+        role: UserRole.kid,
       );
 
       expect(result.isLeft(), isTrue);
@@ -206,7 +289,11 @@ void main() {
     });
 
     test('does not write the session when it refuses', () async {
-      await repository.signIn(email: goodEmail, password: 'abc');
+      await repository.signIn(
+        email: goodEmail,
+        password: 'abc',
+        role: UserRole.kid,
+      );
 
       final Result<AuthSession> current = await repository.getCurrentSession();
 
@@ -227,7 +314,11 @@ void main() {
         ('david@evangelion.app', 'abc'),
       ]) {
         await expectLater(
-          repository.signIn(email: credentials.$1, password: credentials.$2),
+          repository.signIn(
+            email: credentials.$1,
+            password: credentials.$2,
+            role: UserRole.kid,
+          ),
           completes,
           reason: 'threw for ${credentials.$1}/${credentials.$2}',
         );
@@ -241,6 +332,7 @@ void main() {
       final Result<AuthSession> result = await repository.signIn(
         email: '   ',
         password: goodPassword,
+        role: UserRole.kid,
       );
 
       expect(result.isLeft(), isTrue);
@@ -257,7 +349,11 @@ void main() {
       () async {
         expect((await repository.getCurrentSession()).isLeft(), isTrue);
 
-        await repository.signIn(email: goodEmail, password: goodPassword);
+        await repository.signIn(
+          email: goodEmail,
+          password: goodPassword,
+          role: UserRole.kid,
+        );
 
         expect((await repository.getCurrentSession()).isRight(), isTrue);
       },
@@ -269,6 +365,7 @@ void main() {
         final Result<AuthSession> signedIn = await repository.signIn(
           email: goodEmail,
           password: goodPassword,
+          role: UserRole.kid,
         );
         final Result<AuthSession> current = await repository
             .getCurrentSession();
@@ -281,7 +378,11 @@ void main() {
     );
 
     test('signOut ends the session', () async {
-      await repository.signIn(email: goodEmail, password: goodPassword);
+      await repository.signIn(
+        email: goodEmail,
+        password: goodPassword,
+        role: UserRole.kid,
+      );
       final Result<void> result = await repository.signOut();
 
       expect(result.isRight(), isTrue);
@@ -304,7 +405,11 @@ void main() {
       // `shared_preferences` backing store would *not* have, and therefore the
       // one worth catching while the fake is in place.
       final FakeAuthRepository other = FakeAuthRepository();
-      await repository.signIn(email: goodEmail, password: goodPassword);
+      await repository.signIn(
+        email: goodEmail,
+        password: goodPassword,
+        role: UserRole.kid,
+      );
 
       expect((await other.getCurrentSession()).isLeft(), isTrue);
     });

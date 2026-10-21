@@ -5,8 +5,12 @@ import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/common/app_config.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
+import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
+import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:get_it/get_it.dart';
@@ -609,6 +613,19 @@ void main() {
           'lazySingleton<SignIn> signIn',
           'lazySingleton<GetCurrentSession> getCurrentSession',
           'lazySingleton<SignOut> signOut',
+          // **The servant portal's Task 1 added this**, and its position is the
+          // evidence: it lands directly after `signOut` — the last of the auth
+          // module's own providers — because injectable emits a module's
+          // providers in declaration order, and `roleAccess` is declared last
+          // in `auth_module.dart`. The generator chose this; this test asserts
+          // *which* providers exist.
+          //
+          // **It is in the PURE half on purpose.** A `RoleAccess` built over
+          // `AuthBloc` would have to name the bloc, whose only import
+          // re-exports Flutter's widget layer, and `injection.dart`'s graph is
+          // required to stay Flutter-free (AGENT_CONTEXT §6, recorded decision
+          // 4). This one is built over the pure `AuthLocalDataSource`.
+          'lazySingleton<RoleAccess> roleAccess',
           'lazySingleton<GetIt> serviceLocator',
           'lazySingleton<ApiErrorMapper> apiErrorMapper',
           'lazySingleton<TodayReadingMapper> todayReadingMapper',
@@ -960,6 +977,77 @@ void main() {
   //
   // These resolve `getIt<Dio>()` and read the transport configuration off it, so a
   // change to any of it is a failing assertion rather than an unexamined default.
+  group('the role seam is registered in the PURE half', () {
+    // ## WHY THE REGISTRATION LIVES IN `auth_module.dart` AND NOT IN THE
+    // ## FLUTTER HALF
+    //
+    // `injection.dart`'s whole transitive project-local import graph must stay
+    // Flutter-free (AGENT_CONTEXT §6, recorded decision 4), and this file walks
+    // it. A `RoleAccess` built over `AuthBloc` would have to name the bloc,
+    // whose only import re-exports Flutter's widget layer — so the seam is
+    // built over the **pure** `AuthLocalDataSource` instead, and the pure half
+    // registers it.
+    //
+    // The point of the assertion is that the **one** registration serves both
+    // readers: the navigation guard and the wire header. Two registrations
+    // would be two answers to "what role does this reader hold", free to
+    // disagree.
+
+    test('it resolves', () {
+      expect(getIt.isRegistered<RoleAccess>(), isTrue);
+      expect(getIt<RoleAccess>(), isA<RoleAccess>());
+    });
+
+    test('and it is a singleton, so there is one role in the app', () {
+      expect(getIt<RoleAccess>(), same(getIt<RoleAccess>()));
+    });
+
+    test('and it answers the seed before any session exists', () {
+      // No session has been written, so the seam answers the seed — which is
+      // `identity.middleware.ts:24`'s own fallback for an absent header.
+      expect(getIt<RoleAccess>().role, UserRole.kid);
+    });
+
+    test('and it answers the session\'s role once one exists', () async {
+      // **The live read**, and the reason this is a reader rather than a value:
+      // the session is written *after* the graph is built, so a seam that
+      // captured the role at construction would answer `kid` for ever.
+      final AuthLocalDataSource source = getIt<AuthLocalDataSource>();
+      await source.writeSession(
+        AuthSession(
+          userId: kSeedUserId,
+          email: kSeedEmail,
+          displayName: kSeedDisplayName,
+          initials: 'DM',
+          createdAt: DateTime.utc(2026),
+          role: UserRole.adminServant,
+        ),
+      );
+
+      expect(getIt<RoleAccess>().role, UserRole.adminServant);
+    });
+
+    test('and the client\'s identity header follows the SAME seam', () {
+      // **One session, one role, read from two angles.** The guard asks the
+      // seam, and the wire header asks the seam; neither keeps a copy. The
+      // assertion is that the header's reader is the registered one — a client
+      // that froze `kid` at composition would put `kid` on every request while
+      // the UI said `admin_servant`.
+      final Dio client = getIt<Dio>();
+      final IdentityHeadersInterceptor identity = client.interceptors
+          .whereType<IdentityHeadersInterceptor>()
+          .single;
+
+      expect(
+        identity.role(),
+        getIt<RoleAccess>().role.wireValue,
+        reason:
+            'the interceptor reads the role through the registered seam, so the '
+            'header and the guard cannot disagree',
+      );
+    });
+  });
+
   group('the API client the graph actually builds', () {
     // The file's own `setUp` already resets and rebuilds the graph, so this group
     // only has to resolve the client.

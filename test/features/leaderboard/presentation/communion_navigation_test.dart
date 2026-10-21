@@ -52,6 +52,7 @@ import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
 import 'package:evangelion/core/navigation/dock_tabs.dart';
@@ -366,6 +367,7 @@ final class _StubAuthRepo implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async => getCurrentSession();
 
   @override

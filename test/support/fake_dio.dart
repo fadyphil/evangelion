@@ -25,7 +25,10 @@ Dio dioWithAdapter(
   String baseUrl = 'http://localhost:3000',
 }) => buildApiDio(
   baseUrl: baseUrl,
-  identity: const IdentityHeadersInterceptor(userId: kSeededUserId),
+  identity: IdentityHeadersInterceptor(
+    userId: kSeededUserId,
+    role: () => 'kid',
+  ),
   connectTimeout: const Duration(seconds: 1),
   receiveTimeout: const Duration(seconds: 1),
 )..httpClientAdapter = adapter;

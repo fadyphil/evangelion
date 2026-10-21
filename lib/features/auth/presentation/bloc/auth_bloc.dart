@@ -62,6 +62,7 @@ library;
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
@@ -186,6 +187,26 @@ final class AuthPasswordVisibilityToggled extends AuthEvent
   const AuthPasswordVisibilityToggled() : super._();
 }
 
+/// The reader chose a different role on the login form.
+///
+/// ## WHY THE ROLE IS CHOSEN **HERE** AND NOT ASKED FOR
+///
+/// There is no auth endpoint on this backend (AGENT_CONTEXT §2, decision 3),
+/// so the client cannot ask the server who anyone is. The role is the reader's
+/// own choice, and this event is how that choice reaches the sign-in.
+///
+/// **Advisory, not authorisation** — see
+/// `core/domain/entities/user_role.dart` for the measurement. The backend
+/// parses `X-User-Role` and never reads it again.
+@freezed
+final class AuthRoleChanged extends AuthEvent with _$AuthRoleChanged {
+  /// The reader picked [role].
+  const AuthRoleChanged(this.role) : super._();
+
+  /// The role now chosen.
+  final UserRole role;
+}
+
 /// The reader pressed "Sign in" — or submitted the form from the keyboard, which
 /// is the same act through a different control.
 @freezed
@@ -204,23 +225,24 @@ final class AuthSignedOut extends AuthEvent with _$AuthSignedOut {
 /// The sign-in form, as one immutable value.
 ///
 /// Every field has a `const` default, so the bloc can emit `const AuthState()` for
-/// "nothing has happened" and a test can compare whole states without naming nine
-/// arguments.
+/// "nothing has happened" and a test can compare whole states without naming
+/// eleven arguments.
 ///
 /// ## WHY THE GENERATED `copyWith` IS **SWITCHED OFF**
 ///
 /// `@Freezed(copyWith: false)`, and this is the one state in the migration where
 /// freezed's `copyWith` was declined rather than adopted.
 ///
-/// The hand-rolled `copyWith` it replaces took **six** parameters and carried the
-/// four nullable fields — `emailError`, `passwordError`, `formError`, `session` —
-/// by copying them verbatim. That exclusion was the point, and the argument is the
-/// one its own doc used to make: a `String? = null` parameter cannot express "clear
-/// it", so a field that must be cleared is written by exactly one writer that
-/// builds the whole state. freezed's generated `copyWith` is precisely the
-/// mechanism that doc names as rejected — **"the fix is not sentinel objects or
-/// casts"** — and it is a *wider* one: it takes all ten fields and its sentinel
-/// defaults make `copyWith(emailError: null)` **clear** the error.
+/// The hand-rolled `copyWith` it replaces takes **seven** parameters and carries
+/// the four nullable fields — `emailError`, `passwordError`, `formError`,
+/// `session` — by copying them verbatim. That exclusion was the point, and the
+/// argument is the one its own doc used to make: a `String? = null` parameter
+/// cannot express "clear it", so a field that must be cleared is written by
+/// exactly one writer that builds the whole state. freezed's generated
+/// `copyWith` is precisely the mechanism that doc names as rejected — **"the fix
+/// is not sentinel objects or casts"** — and it is a *wider* one: it takes all
+/// eleven fields and its sentinel defaults make `copyWith(emailError: null)`
+/// **clear** the error.
 ///
 /// Nothing in `lib/` or in `test/` calls it that way, so behaviour is identical
 /// either way today. The decision is about what the type permits: with
@@ -231,15 +253,15 @@ final class AuthSignedOut extends AuthEvent with _$AuthSignedOut {
 /// field a second code path legitimately writes.
 ///
 /// **Rejected: adopting the generated one.** It is one fewer method and it is what
-/// freezed emits for every other class here, and the answer is that the six
+/// freezed emits for every other class here, and the answer is that the seven
 /// parameters are not the value — the *exclusion* is, and it is worth more than the
 /// twelve lines it costs. See AGENT_CONTEXT §2.1 hazard 3 and decision 97.
 ///
 /// ## `toString` IS DECLARED, AND THAT IS WHAT KEEPS THE SECRET OUT
 ///
 /// freezed generates one for every class that does not declare its own, and its
-/// generated `toString` lists **every** property. One of the ten is [password].
-/// The override below is the whole defence, freezed honours it, and
+/// generated `toString` lists **every** property. One of the eleven is
+/// [password]. The override below is the whole defence, freezed honours it, and
 /// `test/core/common/secret_masking_test.dart` is the structural half that says so
 /// for every secret-holder in `lib/` rather than for this class alone.
 @Freezed(copyWith: false)
@@ -256,6 +278,7 @@ final class AuthState with _$AuthState {
     this.passwordError,
     this.formError,
     this.session,
+    this.role = AuthSession.defaultRole,
   });
 
   /// Where the session is. See [AuthSessionStatus].
@@ -298,6 +321,25 @@ final class AuthState with _$AuthState {
 
   /// The session, when [status] is [AuthSessionStatus.signedIn].
   final AuthSession? session;
+
+  /// The role the reader is signing in as.
+  ///
+  /// **Chosen locally, because there is no auth endpoint** (AGENT_CONTEXT §2,
+  /// decision 3) — the reader picks it on the login form and it travels into
+  /// the session, which is the one place the choice is recorded.
+  ///
+  /// The default is [AuthSession.defaultRole], which is
+  /// `identity.middleware.ts:24`'s own fallback: a client that defaulted to
+  /// anything else would disagree with the server about an empty header.
+  ///
+  /// **Advisory, not authorisation** — the backend parses `X-User-Role` and
+  /// never reads it again. See `core/domain/entities/user_role.dart`.
+  ///
+  /// **One session, one role.** This field and [session]'s own `role` are the
+  /// same fact read from two angles, and every writer below keeps them
+  /// agreeing: a sign-in adopts the session's role, and a restore adopts the
+  /// restored session's role.
+  final UserRole role;
 
   /// Whether there is a session. A pure read — see `AuthStatus.isAuthenticated`
   /// for the contract the navigation guard relies on.
@@ -357,18 +399,24 @@ final class AuthState with _$AuthState {
     passwordError: passwordError,
     formError: formError,
     session: session,
+    role: role,
   );
 
-  /// [next] with the six fields this state does not vary changed.
+  /// [next] with the seven fields this state does not vary changed.
   ///
   /// ## THE HAZARD IS STILL REAL AND THE METHOD IS STILL NEEDED
   ///
-  /// `null` on any of these six still means "leave it", so nothing here can clear a
-  /// field — and that is the intent, not an oversight: the four nullable fields are
-  /// not parameters at all (class doc), and the six that are here are non-nullable
-  /// or have no "clear it" meaning. `AuthBloc` calls this from four handlers, all
-  /// of which vary exactly one or two of these six, so every call site is inside
-  /// what the method can express.
+  /// `null` on any of these seven still means "leave it", so nothing here can
+  /// clear a field — and that is the intent, not an oversight: the four nullable
+  /// fields are not parameters at all (class doc), and the seven that are here
+  /// are non-nullable or have no "clear it" meaning. `AuthBloc` calls this from
+  /// five handlers, all of which vary exactly one or two of these seven, so
+  /// every call site is inside what the method can express.
+  ///
+  /// **[role] is the seventh**, and it is here rather than absent because the
+  /// role is a **form** value like the email and the password — it is a choice
+  /// the reader makes on the screen and carries into the sign-in — and not a
+  /// nullable the state owns.
   AuthState copyWith({
     AuthSessionStatus? status,
     String? email,
@@ -376,6 +424,7 @@ final class AuthState with _$AuthState {
     bool? isPasswordVisible,
     bool? emailTouched,
     bool? passwordTouched,
+    UserRole? role,
   }) => AuthState(
     status: status ?? this.status,
     email: email ?? this.email,
@@ -387,6 +436,7 @@ final class AuthState with _$AuthState {
     passwordError: passwordError,
     formError: formError,
     session: session,
+    role: role ?? this.role,
   );
 
   /// Deliberately not the generated one, which freezed skips precisely because
@@ -397,11 +447,16 @@ final class AuthState with _$AuthState {
   /// `flutter_bloc`'s debug transition logging, so the generated one would put a
   /// secret in a build's console as a matter of course. This prints the shape and
   /// the address — which is the one field a failing test usually needs.
+  ///
+  /// **The role is printed too**, because a failure message that says which role
+  /// the state held is the difference between "the sign-in carried the wrong role"
+  /// and "the sign-in carried a role". Recorded decision 141's lesson, applied
+  /// the day the field arrived rather than the day somebody noticed.
   @override
   String toString() =>
       'AuthState(status: ${status.name}, email: $email, password: ********, '
       'emailError: $emailError, passwordError: $passwordError, '
-      'formError: $formError, signedIn: $isSignedIn)';
+      'formError: $formError, signedIn: $isSignedIn, role: ${role.name})';
 }
 
 /// The sign-in form's state machine.
@@ -450,6 +505,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthEmailChanged>(_onEmailChanged);
     on<AuthPasswordChanged>(_onPasswordChanged);
     on<AuthPasswordVisibilityToggled>(_onVisibilityToggled);
+    on<AuthRoleChanged>(_onRoleChanged);
     on<AuthSubmitted>(_onSubmitted);
     on<AuthSignedOut>(_onSignedOut);
   }
@@ -510,7 +566,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final Result<AuthSession> current = await _getCurrentSession();
     switch (current) {
       case Right<Failure, AuthSession>(:final AuthSession value):
-        emit(AuthState(status: AuthSessionStatus.signedIn, session: value));
+        // **The restored session's own role**, not the default: a cold launch
+        // that restored an admin's session must not put `kid` on the wire from
+        // the first request. One session, one role.
+        emit(
+          AuthState(
+            status: AuthSessionStatus.signedIn,
+            session: value,
+            role: value.role,
+          ),
+        );
       case Left<Failure, AuthSession>():
         emit(const AuthState(status: AuthSessionStatus.signedOut));
     }
@@ -533,6 +598,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) {
     emit(state.copyWith(isPasswordVisible: !state.isPasswordVisible));
+  }
+
+  /// The reader picked a role on the login form.
+  ///
+  /// **A plain write, and the only writer of [AuthState.role].** The choice is
+  /// held here until the sign-in carries it into the session, and the session
+  /// is the one place it is recorded — so this field is a **form** value until
+  /// then, not a second source of truth beside the session's.
+  void _onRoleChanged(AuthRoleChanged event, Emitter<AuthState> emit) {
+    if (event.role == state.role) {
+      // Nothing changed, so nothing is emitted. A bloc that emitted an equal
+      // state would rebuild the page for a tap that changed no fact.
+      return;
+    }
+    emit(state.copyWith(role: event.role));
   }
 
   Future<void> _onSubmitted(
@@ -579,7 +659,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final int generation = _sessionGeneration;
 
     final Result<AuthSession> result = await _signIn(
-      SignInParams(email: state.email, password: state.password),
+      SignInParams(
+        email: state.email,
+        password: state.password,
+        // **The role the reader chose on the form**, and the reason it is read
+        // here rather than captured earlier: the choice can change between the
+        // submit and the await, and the role that reaches the session must be
+        // the one in force when the sign-in happened.
+        role: state.role,
+      ),
     );
 
     if (generation != _sessionGeneration) {
@@ -592,7 +680,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     switch (result) {
       case Right<Failure, AuthSession>(:final AuthSession value):
-        emit(AuthState(status: AuthSessionStatus.signedIn, session: value));
+        // **The session's own role**, which is the role the port was asked for.
+        // Adopting it rather than keeping [state]'s is what makes the two agree
+        // even if a real adapter answered with a role of its own.
+        emit(
+          AuthState(
+            status: AuthSessionStatus.signedIn,
+            session: value,
+            role: value.role,
+          ),
+        );
       case Left<Failure, AuthSession>(value: final failure):
         emit(
           _revalidated(
@@ -619,6 +716,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // has finished clearing the session.
     _sessionGeneration++;
     await _signOut();
+    // **The role goes back to the default with the session.** A signed-out
+    // reader has no session, so the role they had belongs to a session that is
+    // gone; the form comes back empty and the picker comes back to the seed.
     emit(const AuthState(status: AuthSessionStatus.signedOut));
   }
 
@@ -649,6 +749,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           : null,
       formError: next.formError,
       session: next.session,
+      role: next.role,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 
 /// The one question the auth feature asks the outside world.
 ///
@@ -41,13 +42,27 @@ import 'package:evangelion/core/domain/entities/auth_session.dart';
 ///   does not check the shape at all (D2), so a malformed id is the client's own
 ///   bug and has to surface as something a caller can act on.
 abstract interface class AuthRepository {
-  /// Signs in with [email] and [password].
+  /// Signs in with [email] and [password], as the holder of [role].
   ///
   /// [email] and [password] are **required named** parameters rather than a
   /// params object: `avoid_positional_boolean_parameters` is not the reason —
   /// two strings side by side are not booleans — it is that `(a, b)` at a call
   /// site says nothing about which is which, and a `SignInParams` record would
   /// add a type whose only job is to name two strings.
+  ///
+  /// ## AND WHY [role] IS A **REQUIRED** PARAMETER RATHER THAN A DEFAULT
+  ///
+  /// The role is **chosen on the login screen** — there is no auth endpoint
+  /// (AGENT_CONTEXT §2, decision 3), so the client cannot ask the server who
+  /// anyone is. A default here would be a role the port invented, and the port
+  /// is the wrong place for a default: the caller knows what the reader picked,
+  /// and a default would let a call site forget the one thing that makes the
+  /// session's role different from the seed.
+  ///
+  /// **Advisory, not authorisation** — see `core/domain/entities/user_role.dart`
+  /// for the measurement. The backend parses `X-User-Role` and never reads it
+  /// again, so this parameter decides what the *client* believes and what the
+  /// client puts on the wire, and nothing else.
   ///
   /// The contract when there is no auth endpoint is the interesting part:
   /// `FakeAuthRepository` validates the credentials with
@@ -57,6 +72,7 @@ abstract interface class AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   });
 
   /// The session in hand, if there is one.

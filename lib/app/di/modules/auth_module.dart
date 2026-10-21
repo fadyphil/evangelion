@@ -1,5 +1,7 @@
 import 'package:evangelion/app/di/injection.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -67,4 +69,42 @@ abstract class AuthModule {
   /// Ends a session.
   @lazySingleton
   SignOut get signOut => SignOut(getIt<AuthRepository>());
+
+  /// The role seam, registered **here** — in the **pure** half.
+  ///
+  /// ## WHY THIS HALF AND NOT THE FLUTTER ONE
+  ///
+  /// `injection.dart`'s whole transitive project-local import graph must stay
+  /// Flutter-free (AGENT_CONTEXT §6, recorded decision 4), and
+  /// `injection_test.dart` walks it on every run. A `RoleAccess` built over
+  /// `AuthBloc` would have to name the bloc, whose only import re-exports
+  /// Flutter's widget layer — so the seam is built over the **pure**
+  /// `AuthLocalDataSource` instead, and the pure half registers it.
+  ///
+  /// `core/navigation/role_access.dart` is itself pure Dart (Gate 1), so
+  /// importing it here costs the graph nothing.
+  ///
+  /// ## AND WHY IT IS A **READER** OVER THE STORE, NOT A VALUE
+  ///
+  /// The role is chosen on the login form, so it does not exist when this
+  /// graph is built — a seam that captured a role at construction would
+  /// capture one that had not been chosen. `LiveRoleAccess` takes a reader for
+  /// exactly that reason, and the reader here closes over the **store**, never
+  /// over a session value pulled out of one: `role_access.dart`'s own doc names
+  /// the frozen-snapshot hazard, and a snapshot of a `freezed` session can
+  /// never update and never warn.
+  ///
+  /// ## ONE SESSION, ONE ROLE, NO MIRROR
+  ///
+  /// The **same** registration is read by the navigation guard and by the
+  /// identity interceptor (`core_module.dart`'s `apiClient`), so the header on
+  /// the wire and the guard's answer cannot disagree. Two registrations would
+  /// be two answers to one question.
+  @lazySingleton
+  RoleAccess get roleAccess => LiveRoleAccess(
+    // The store's **synchronous** view, because the interceptor's reader is
+    // called per request and cannot await. The store is an in-memory field by
+    // design — see `AuthLocalDataSource`'s own doc — so this is a field read.
+    () => getIt<AuthLocalDataSource>().currentSession?.role ?? UserRole.kid,
+  );
 }

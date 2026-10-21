@@ -21,6 +21,7 @@ import '../../core/domain/repositories/reading_repository.dart' as _i499;
 import '../../core/domain/repositories/settings_repository.dart' as _i896;
 import '../../core/domain/repositories/sky_repository.dart' as _i946;
 import '../../core/domain/repositories/streak_repository.dart' as _i682;
+import '../../core/navigation/role_access.dart' as _i10;
 import '../../core/network/api_error_mapper.dart' as _i998;
 import '../../features/auth/data/datasources/auth_local_data_source.dart'
     as _i852;
@@ -109,6 +110,7 @@ extension GetItInjectableX on _i174.GetIt {
       () => authModule.getCurrentSession,
     );
     gh.lazySingleton<_i568.SignOut>(() => authModule.signOut);
+    gh.lazySingleton<_i10.RoleAccess>(() => authModule.roleAccess);
     gh.lazySingleton<_i174.GetIt>(() => coreModule.serviceLocator);
     gh.lazySingleton<_i998.ApiErrorMapper>(() => coreModule.apiErrorMapper);
     gh.lazySingleton<_i220.TodayReadingMapper>(
@@ -200,7 +202,10 @@ extension GetItInjectableX on _i174.GetIt {
       instanceName: 'apiBaseUrl',
     );
     gh.lazySingleton<_i361.Dio>(
-      () => coreModule.apiClient(gh<String>(instanceName: 'apiBaseUrl')),
+      () => coreModule.apiClient(
+        gh<String>(instanceName: 'apiBaseUrl'),
+        gh<_i10.RoleAccess>(),
+      ),
     );
     gh.lazySingleton<_i48.ReadingRemoteDataSource>(
       () => homeModule.readingRemoteDataSource(gh<_i361.Dio>()),

@@ -102,14 +102,14 @@ void main() {
   Dio client({
     String userId = kSeededUserId,
     int groupId = 3,
-    String role = 'kid',
+    String Function()? role,
     String baseUrl = 'http://localhost:3000',
   }) => buildApiDio(
     baseUrl: baseUrl,
     identity: IdentityHeadersInterceptor(
       userId: userId,
       groupId: groupId,
-      role: role,
+      role: role ?? () => 'kid',
     ),
     connectTimeout: const Duration(seconds: 1),
     receiveTimeout: const Duration(seconds: 1),
@@ -120,7 +120,7 @@ void main() {
   Dio Function() building({required String baseUrl, required String userId}) =>
       () => buildApiDio(
         baseUrl: baseUrl,
-        identity: IdentityHeadersInterceptor(userId: userId),
+        identity: IdentityHeadersInterceptor(userId: userId, role: () => 'kid'),
         connectTimeout: const Duration(seconds: 1),
         receiveTimeout: const Duration(seconds: 1),
       );
@@ -215,17 +215,89 @@ void main() {
     });
   });
 
+  group('the role is a READER, not a frozen value', () {
+    // ## WHY THE HEADER FOLLOWS A READER
+    //
+    // The role is chosen on the login form (there is no auth endpoint —
+    // AGENT_CONTEXT §2, decision 3), and the client must not claim `kid` on the
+    // wire while the UI says `admin_servant`. A frozen string baked in at
+    // composition would be wrong for every request after the reader chose a
+    // role, and the backend never notices — which is exactly why the client
+    // has to notice it itself.
+    //
+    // The reader is consulted **per request**, not per session, so a role that
+    // changes between two requests is carried by the second one.
+
+    test('the header carries what the reader says', () async {
+      final Dio dio = client(role: () => 'admin_servant');
+
+      await dio.get<Object?>('/api/v1/streak/summary');
+
+      expect(sent.single.headers['X-User-Role'], 'admin_servant');
+    });
+
+    test('and the NEXT request carries the reader\'s NEW answer', () async {
+      // The property a frozen value cannot have. A role that changed between
+      // two requests must be visible on the second one — this is the assertion
+      // that says "read per request" rather than "read once".
+      String role = 'kid';
+      final Dio dio = client(role: () => role);
+
+      await dio.get<Object?>('/api/v1/readings/today/en');
+      expect(sent.first.headers['X-User-Role'], 'kid');
+
+      role = 'viewer_servant';
+      await dio.get<Object?>('/api/v1/readings/today/ar');
+
+      expect(sent.last.headers['X-User-Role'], 'viewer_servant');
+      expect(
+        sent.first.headers['X-User-Role'],
+        'kid',
+        reason: 'the first request keeps the role it was made under',
+      );
+    });
+
+    test(
+      'and the reader is consulted once per request, not once per client',
+      () async {
+        int reads = 0;
+        final Dio dio = client(
+          role: () {
+            reads++;
+            return 'kid';
+          },
+        );
+
+        await dio.get<Object?>('/api/v1/streak/summary');
+        await dio.get<Object?>('/api/v1/readings/today/en');
+
+        expect(
+          reads,
+          2,
+          reason:
+              'one read per request: a reader consulted once at construction would '
+              'be the frozen value this change exists to remove',
+        );
+      },
+    );
+  });
+
   group('the identity the app actually sends', () {
-    test('defaults to group 3 and role kid', () {
+    test('defaults to group 3, and the role is the caller\'s to say', () {
       // AGENT_CONTEXT §5: group 3 is the only cohort with a real scheduled
       // reading — every other group is served a fabricated non-UUID
       // `reading_id` that `POST /readings/:id/submit` rejects with 400.
-      const IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
+      //
+      // **The role has no default**, and that is the change: the constructor's
+      // `role` parameter is required, so no call site can forget it and no
+      // call site can inherit a `kid` the reader did not choose.
+      final IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
         userId: kSeededUserId,
+        role: () => 'kid',
       );
 
       expect(identity.groupId, 3);
-      expect(identity.role, 'kid');
+      expect(identity.role(), 'kid');
     });
 
     test('refuses to be built with an identity the backend will not check', () {
@@ -304,7 +376,10 @@ void main() {
       // "a malformed base URL" writable as tests at all.
       final Dio dio = buildApiDio(
         baseUrl: 'http://localhost:3000',
-        identity: const IdentityHeadersInterceptor(userId: kSeededUserId),
+        identity: IdentityHeadersInterceptor(
+          userId: kSeededUserId,
+          role: () => 'kid',
+        ),
         connectTimeout: const Duration(milliseconds: 321),
         receiveTimeout: const Duration(milliseconds: 654),
       )..httpClientAdapter = adapter;
@@ -383,8 +458,9 @@ void main() {
       // dio throws on a second `next`, so a double call is an error escaping a
       // request. Exercised directly because a full round trip would hide the
       // count behind one success.
-      const IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
+      final IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
         userId: kSeededUserId,
+        role: () => 'kid',
       );
       final RequestOptions options = RequestOptions(
         path: '/api/v1/streak/summary',
@@ -402,8 +478,9 @@ void main() {
       // interceptor must not touch the path. A path it rewrote would make every
       // call site shorter and every base URL longer, and one of the two would
       // then be a lie.
-      const IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
+      final IdentityHeadersInterceptor identity = IdentityHeadersInterceptor(
         userId: kSeededUserId,
+        role: () => 'kid',
       );
       final RequestOptions options = RequestOptions(path: '/readings/today/en');
 

@@ -10,6 +10,7 @@ import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
@@ -265,6 +266,7 @@ final class CountingAuthRepository implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async => getCurrentSession();
 
   @override

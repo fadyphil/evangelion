@@ -5,6 +5,7 @@ import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/today_reading.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/reading_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -63,7 +64,13 @@ void main() {
   // these. The value is never used — mocktail only needs *a* `ReadingLanguage` to
   // know the type — and it is English because that is the app's first declared
   // locale.
-  setUpAll(() => registerFallbackValue(ReadingLanguage.english));
+  setUpAll(() {
+    registerFallbackValue(ReadingLanguage.english);
+    // `any(named: 'role')` cannot match a non-nullable enum without one of
+    // these. The value is never used — mocktail only needs *a* `UserRole` to
+    // know the type.
+    registerFallbackValue(UserRole.kid);
+  });
 
   late MockReadingRepository readings;
   late MockStreakRepository streaks;
@@ -244,6 +251,7 @@ void main() {
         () => auth.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       );
     });

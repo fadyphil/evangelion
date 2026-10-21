@@ -461,12 +461,21 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        182,
+        186,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**182 → 186 in the servant portal\'s Task 1**, for the **role picker** '
+            'on `/login`: four keys arrived (`authRoleLabel`, `authRoleKid`, '
+            '`authRoleServant` and `authRoleAdmin`). **All four are WRITTEN, not '
+            'transcribed** — `eva/redesign.html` draws no role picker, because '
+            'there is no auth endpoint (AGENT_CONTEXT §2, decision 3) and so the '
+            'role is a local choice the login screen has to offer. None of them '
+            'is a prototype I18N row, so none of them appears in the map below — '
+            'that map accounts for the prototype\'s 128 rows, and a row the '
+            'prototype never had cannot be one of them.\n\n'
             '**182 → 182 in Phase 7 Steps 1–2 of the Lumen redesign**, for the '
             '**I18N table**: the count did not move, and the reason is that the '
             'table was already complete for everything this client draws. '

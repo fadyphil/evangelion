@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:evangelion/core/common/app_config.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/core/network/api_error_mapper.dart';
 import 'package:evangelion/core/network/dio_client.dart';
 import 'package:evangelion/core/network/interceptors/identity_headers.dart';
@@ -129,13 +130,21 @@ abstract class CoreModule {
   /// somewhere less obvious without making it any safer.
   ///
   /// **`.wireValue` IS CALLED HERE, AND NOWHERE ELSE IN `lib/`.** The seed is a
-  /// `UserRole` (`kSeedUserRole`) and `IdentityHeadersInterceptor` still takes a
-  /// `String`; this registration is the seam between the two, so the wire
-  /// spelling of a role is written once here instead of once per caller. When
-  /// the interceptor takes the enum, this line loses the call and nothing else
-  /// moves.
+  /// `UserRole` (`kSeedUserRole`) and `IdentityHeadersInterceptor` takes a
+  /// `String Function()`; this registration is the seam between the two, so the
+  /// wire spelling of a role is written once here instead of once per caller.
+  /// When the interceptor takes the enum, this line loses the call and nothing
+  /// else moves.
   ///
-  /// **AND THE `const` GONE FROM THE INTERCEPTOR IS A CONSTRAINT, NOT A TIDYING.**
+  /// **AND THE CALL IS NOW A **READER**, OVER THE REGISTERED `RoleAccess`.**
+  /// The role is chosen on the login form (AGENT_CONTEXT §2, decision 3 — there
+  /// is no auth endpoint), so a frozen `kid` here would put `kid` on every
+  /// request while the UI said `admin_servant`. The reader is the **same
+  /// registration** the navigation guard reads, so the wire and the guard are
+  /// one answer and not two — see `auth_module.dart`'s `roleAccess` for the
+  /// whole argument.
+  ///
+  /// **THE `const` GONE FROM THE INTERCEPTOR IS A CONSTRAINT, NOT A TIDYING.**
   /// A constant expression cannot read an enum's field, so
   /// `const IdentityHeadersInterceptor(role: kSeedUserRole.wireValue)` does not
   /// compile — verified, not assumed. The instance is built when this provider
@@ -165,15 +174,16 @@ abstract class CoreModule {
   /// home (recorded decision 16), so `core_module.dart` reading it is the documented
   /// meeting point rather than a leak.
   @lazySingleton
-  Dio apiClient(@Named('apiBaseUrl') String baseUrl) => buildApiDio(
-    baseUrl: baseUrl,
-    identity: IdentityHeadersInterceptor(
-      userId: kSeedUserId,
-      role: kSeedUserRole.wireValue,
-    ),
-    connectTimeout: AppConfig.connectTimeout,
-    receiveTimeout: AppConfig.receiveTimeout,
-  );
+  Dio apiClient(@Named('apiBaseUrl') String baseUrl, RoleAccess roleAccess) =>
+      buildApiDio(
+        baseUrl: baseUrl,
+        identity: IdentityHeadersInterceptor(
+          userId: kSeedUserId,
+          role: () => roleAccess.role.wireValue,
+        ),
+        connectTimeout: AppConfig.connectTimeout,
+        receiveTimeout: AppConfig.receiveTimeout,
+      );
 
   /// The API error mapper.
   ///

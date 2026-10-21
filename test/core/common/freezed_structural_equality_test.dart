@@ -674,7 +674,7 @@ void main() {
       _differsInEveryField(
         'AuthState',
         _authState(),
-        fields: 10,
+        fields: 11,
         variants: <({String field, AuthState value})>[
           (
             field: 'status',
@@ -698,6 +698,11 @@ void main() {
           ),
           (field: 'formError', value: _authState().withFormError('boom')),
           (field: 'session', value: _authState(session: _session())),
+          // **The role the reader chose on the login form.** It is a field of
+          // the state like any other, so changing it must make the state
+          // unequal — a bloc comparing without it would think nothing changed
+          // when the reader picked a different role.
+          (field: 'role', value: _authState(role: UserRole.adminServant)),
         ],
         note:
             'the four nullable fields are reachable ONLY through the writers — '
@@ -918,7 +923,7 @@ void main() {
     // count is 1. The seven field-less events get the other half of the claim,
     // recorded rather than asserted — see the group below.
 
-    test('the seven events that carry a field', () {
+    test('the eight events that carry a field', () {
       _differsInEveryField(
         'AuthEmailChanged',
         AuthEmailChanged(_text('a@example.com')),
@@ -978,6 +983,22 @@ void main() {
         () => QuizOptionSelected(_text('A')),
         () => QuizOptionSelected(_text('B')),
       );
+      // The servant portal's role event. The role is an **enum**, so the two
+      // values are distinct instances of one type — and the assertion is that
+      // they are not equal, because a bloc that swallowed a repeated role
+      // change would leave the form showing a role the reader did not pick.
+      //
+      // **Through [_role], not directly**: a `const` constructor called with
+      // constant arguments is canonicalised by Dart, so two direct calls would
+      // be the *same object* and every assertion after the `identical` guard
+      // would be vacuous — which is exactly what that guard is there to catch.
+      // The indirection makes the argument a non-constant expression, the same
+      // trick `_language()` does for the reading events above.
+      _oneFieldEvent<AuthRoleChanged>(
+        'AuthRoleChanged',
+        () => AuthRoleChanged(_role(UserRole.kid)),
+        () => AuthRoleChanged(_role(UserRole.adminServant)),
+      );
     });
 
     test('the seven field-less events are told apart by their type', () {
@@ -1034,9 +1055,9 @@ void main() {
       final Set<String> converted = freezedTypeNamesInLib();
       expect(
         converted,
-        hasLength(46),
+        hasLength(47),
         reason:
-            'the converted set moved. 25 classes, 14 events and 3 sealed bases is '
+            'the converted set moved. 25 classes, 15 events and 3 sealed bases is '
             'what it now holds: the migration produced 17 classes, Phase 9 added '
             '`UserSettings` and `SettingsState`, Phase 1 added '
             '`LeaderboardRow`, `LeaderboardStanding`, `LeaderboardBoard`, '
@@ -1045,6 +1066,8 @@ void main() {
             'and `LibraryBook` — the last of which is the first freezed type '
             'under `features/` whose equality is a *fiction\'s* equality, '
             'because the catalogue is ADR-0022\'s invented data behind a port. '
+            '**46 → 47 in the servant portal\'s Task 1**, for `AuthRoleChanged` — '
+            'the event that carries the role the reader chose on the login form. '
             'If this number moved, the migration or the phase moved and this '
             'file has to be told',
       );
@@ -1161,6 +1184,7 @@ void _oneFieldEvent<T extends Object>(
 String _onlyFieldOf(Object event) {
   if (event is AuthEmailChanged) return 'email';
   if (event is AuthPasswordChanged) return 'password';
+  if (event is AuthRoleChanged) return 'role';
   if (event is HomeStarted) return 'language';
   if (event is HomeRetried) return 'language';
   if (event is QuizStarted) return 'language';
@@ -1232,6 +1256,10 @@ const Set<String> _assertedTypeNames = <String>{
   'HomeCleared',
   'QuizAnswerChecked',
   'QuizAdvanced',
+  // The servant portal's first new event: the role the reader chose on the login
+  // form. It carries a field, so it belongs with the eight above rather than
+  // with the field-less ones.
+  'AuthRoleChanged',
   // And the 3 sealed bases. They carry no fields and are never instantiated, so
   // the only claim made about each is that `lib/` says freezed owns it — see the
   // group above. Listed so the count reconciles.
@@ -1635,6 +1663,7 @@ AuthState _authState({
   bool emailTouched = false,
   bool passwordTouched = false,
   AuthSession? session,
+  UserRole role = UserRole.kid,
 }) => AuthState(
   status: status,
   email: _text(email),
@@ -1643,6 +1672,7 @@ AuthState _authState({
   emailTouched: _bool(emailTouched),
   passwordTouched: _bool(passwordTouched),
   session: session,
+  role: role,
 );
 
 HomeState _homeState({
@@ -1779,3 +1809,13 @@ String? _absent() => null;
 ReadingLanguage _language() => ReadingLanguage.english;
 
 ReadingLanguage _arabic() => ReadingLanguage.arabic;
+
+/// A role, through a function.
+///
+/// **The indirection is the point.** A `const` constructor called with constant
+/// arguments is canonicalised by Dart, so `AuthRoleChanged(UserRole.kid)` twice
+/// is *one object* — and a pair of "equal" instances that are the same object
+/// makes every equality assertion after the `identical` guard vacuous. A
+/// function call is not a constant expression, so the instance is not
+/// canonicalised. The same reason `_language()` exists.
+UserRole _role(UserRole role) => role;

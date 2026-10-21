@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
@@ -80,12 +81,17 @@ final class FakeAuthRepository implements AuthRepository {
   /// equal instance would still read as a change to anything comparing by
   /// identity — which is exactly the class of bug `Failure`'s `details` exclusion
   /// documents one layer down.
+  ///
+  /// **The role is part of the identity**, so a sign-in asking for a *different*
+  /// role mints a new session rather than handing back the old one. See
+  /// [signIn].
   AuthSession? _session;
 
   @override
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async {
     final LoginValidation verdict = LoginCredentials.from(
       email: email,
@@ -101,12 +107,25 @@ final class FakeAuthRepository implements AuthRepository {
       );
     }
 
-    final AuthSession existing = _session ??= seedAuthSession(
-      createdAt: DateTime.now().toUtc(),
-    );
+    // **The role the caller asked for is the role the session carries.** There is
+    // no auth endpoint (AGENT_CONTEXT §2, decision 3), so the role is the
+    // reader's own choice on the login form, and the session is the only place
+    // that choice is recorded. A session cached under one role and handed back
+    // under another would put `kid` in the session while the form said
+    // `admin_servant` — the exact lie the live `X-User-Role` reader exists to
+    // prevent.
+    //
+    // The **same** role re-uses the cached session, so the "identical object on a
+    // second sign-in" property above still holds: a fresh-but-equal instance
+    // would still read as a change to anything comparing by identity.
+    final AuthSession? cached = _session;
+    final AuthSession session = cached != null && cached.role == role
+        ? cached
+        : seedAuthSession(createdAt: DateTime.now().toUtc(), role: role);
+    _session = session;
 
-    await _source.writeSession(existing);
-    return Result<AuthSession>.of(existing);
+    await _source.writeSession(session);
+    return Result<AuthSession>.of(session);
   }
 
   @override

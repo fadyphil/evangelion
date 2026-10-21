@@ -2,7 +2,9 @@ import 'package:auto_route/auto_route.dart';
 import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:evangelion/features/auth/presentation/widgets/role_picker.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -148,6 +150,33 @@ typedef LoginResultCallback = void Function(LoginOutcome outcome);
 /// navigation is the **guard's** job (`auth_guard.dart`). A `context.router`
 /// call here would be a second, competing resume path.
 ///
+/// ## AND ONE CONTROL ON THIS SCREEN IS **WRITTEN, NOT TRANSCRIBED**
+///
+/// The **role picker** — the three-way choice between a child reader, a viewer
+/// servant and an admin servant — is the one thing on `/login` the redesign
+/// does not draw. `eva/redesign.html:503-511` is a wordmark, a tagline, two
+/// bare fields, a CTA and two inert ghost pills, and every one of those has a
+/// prototype line this page transcribes.
+///
+/// **The reason is structural, not a gap in the reference.** There is **no auth
+/// endpoint** (AGENT_CONTEXT §2, decision 3): the backend has no `/auth`, no
+/// `/me` and no `/login`, identity is three headers the client sets, and
+/// nothing validates any of them. So the client cannot ask the server who
+/// anyone is, and **the role is the reader's own choice on this screen**. The
+/// prototype was a *reader's* app and had no second audience to offer the
+/// choice to; the servant portal adds one.
+///
+/// **So nothing on this page cites the prototype for the picker, and the
+/// citation gate gets no new claim to resolve.** The gaps around it are the
+/// prototype's own numbers — the field's trailing margin above, `.cta`'s
+/// leading margin below — so the screen's rhythm is still the redesign's, with
+/// one control the redesign does not have sitting in it.
+///
+/// **And the role is advisory, never a boundary**: the backend parses
+/// `X-User-Role` and never reads it again. See `core/domain/entities/user_role.dart`
+/// for the measurement, and `features/auth/presentation/widgets/role_picker.dart`
+/// for the control itself.
+///
 /// ## DIVERGENCES RECORDED ONCE, HERE
 ///
 /// * **The prototype pre-fills both fields** (`value="mariam@light.co"`,
@@ -230,15 +259,22 @@ class LoginPage extends StatelessWidget {
   /// `redesign.html:375` — `.field`'s `margin-bottom: 14px`.
   static const double kFieldGap = 14;
 
-  /// The gap between the password field and the CTA.
+  /// The gap between the **role picker** and the CTA.
   ///
-  /// `redesign.html:375` gives every `.field` a `margin-bottom: 14` **and**
-  /// `:381` gives `.cta` a `margin-top: 8`, and `.login` is a flex column
-  /// (`:128`) — flexbox does not collapse margins, so the rendered gap is the
-  /// **sum**, 22. The two contributing numbers stay separate in
-  /// `login_geometry_test.dart`, which extracts both from the prototype file and
-  /// asserts the sum here.
-  static const double kCtaTopGap = 22;
+  /// `redesign.html:381` — `.cta`'s `margin-top: 8px`. It was the second half of
+  /// the old `kCtaTopGap`'s sum, and it is the picker's trailing gap now: the
+  /// picker sits between the password field and the CTA, so `.cta`'s own
+  /// leading margin is the gap the picker leaves under itself.
+  ///
+  /// **AND `kCtaTopGap` IS GONE, BECAUSE THE TWO MARGINS ARE NO LONGER
+  /// ADJACENT.** It was a *derived* number — `.field`'s 14 plus `.cta`'s 8 —
+  /// and it existed because the prototype put the two margins side by side. A
+  /// control now sits between them, so the rendered distance from the field's
+  /// box to the CTA's box is the two margins **plus the picker's own height**,
+  /// and a constant that named the sum would name nothing that is rendered.
+  /// The prototype's 22 is still recorded, as the sum of the two numbers that
+  /// *are* rendered — see `login_geometry_test.dart`'s claims rows.
+  static const double kRolePickerToCtaGap = 8;
 
   /// `redesign.html:387` — `.ghosts`'s `gap: 10px`.
   static const double kGhostsGap = 10;
@@ -535,7 +571,38 @@ class _LoginFormState extends State<_LoginForm>
                           formIsValid: state.canSubmit,
                         ),
                       ),
-                      const SizedBox(height: LoginPage.kCtaTopGap),
+                      const SizedBox(height: LoginPage.kFieldGap),
+                      // ## THE ROLE PICKER — **WRITTEN, NOT TRANSCRIBED**
+                      //
+                      // `eva/redesign.html` draws **no role picker**: the
+                      // redesign's login (`:503-511`) is a wordmark, a tagline,
+                      // two bare fields, a CTA and two inert ghost pills, and
+                      // every one of those has a prototype line this page
+                      // transcribes. **This control has none**, and the reason
+                      // is structural rather than a gap in the reference: there
+                      // is **no auth endpoint** (AGENT_CONTEXT §2, decision 3),
+                      // so the client cannot ask who anyone is and the role is
+                      // the reader's own choice — and the prototype was a
+                      // *reader's* app, with no second audience to offer the
+                      // choice to.
+                      //
+                      // **So nothing here cites the prototype, and the citation
+                      // gate gets no new claim to resolve.** The gaps around it
+                      // are the prototype's own numbers — the field's trailing
+                      // margin above and `.cta`'s leading margin below — so the
+                      // screen's rhythm is the redesign's, with one control the
+                      // redesign does not have sitting in it.
+                      //
+                      // **The value is the bloc's**, not this page's: the picker
+                      // is controlled, and its `onChanged` dispatches
+                      // `AuthRoleChanged` so the choice lands in `AuthState.role`
+                      // and travels into the session from there.
+                      RolePicker(
+                        selected: state.role,
+                        onChanged: (UserRole role) =>
+                            context.read<AuthBloc>().add(AuthRoleChanged(role)),
+                      ),
+                      const SizedBox(height: LoginPage.kRolePickerToCtaGap),
                       // The CTA is **always tappable** (`redesign.html:508` has
                       // no `disabled`); an invalid tap is answered with the two
                       // field messages and the shake, not with a dimmed button.

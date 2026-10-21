@@ -40,6 +40,28 @@ final class AuthLocalDataSource {
 
   AuthSession? _session;
 
+  /// The session in hand, or `null` — **synchronously**.
+  ///
+  /// ## WHY A SYNCHRONOUS VIEW EXISTS, AND WHY IT IS HONEST HERE
+  ///
+  /// `RoleAccess` reads the role out of this store, and the identity
+  /// interceptor reads it **per request** — so the reader it feeds cannot be
+  /// awaited. A `Future` there would leave every request holding a future
+  /// nobody awaits, and turn a header write into a loading state.
+  ///
+  /// **The store is an in-memory field by design** — see this class's own doc:
+  /// `shared_preferences` is deliberately not used, precisely because a
+  /// platform-channel write cannot be read inside a plain `test()`. So a
+  /// synchronous read here is a read of a field, not a lie about a channel.
+  ///
+  /// ## AND THE ASYNC READ STAYS, BECAUSE THE PORT ASKS FOR IT
+  ///
+  /// [readSession] is the port's read and keeps its `Future`; this getter is an
+  /// *additional* view for the one caller that cannot await. Two answers to one
+  /// question is a state this client should not be able to reach, so they are
+  /// asserted to agree in `fake_auth_repository_test.dart`.
+  AuthSession? get currentSession => _session;
+
   /// The session in hand, or `null`.
   Future<AuthSession?> readSession() async => _session;
 
@@ -85,8 +107,16 @@ const int kSeedGroupId = 3;
 /// `identity_headers.dart`'s `defaultRole`, and in several tests. What is
 /// actually held is **one conversion point**: the only place in `lib/` that turns
 /// a role into a wire string is `core_module.dart`'s single
-/// `kSeedUserRole.wireValue` in the `buildApiDio` registration, so a caller
+/// `roleAccess.role.wireValue` in the `buildApiDio` registration, so a caller
 /// cannot send the Dart spelling by accident.
+///
+/// **AND THE SEED IS NO LONGER WHAT THE WIRE SENDS.** This constant is the
+/// role the *seeded session* holds — and since the servant portal's Task 1 the
+/// role is **chosen on the login screen**, so the session's role is whatever
+/// the reader picked and the wire follows **that**. `kSeedUserRole` is the
+/// default the seed falls back to, and `AuthSession.defaultRole` is the same
+/// value.
+///
 /// `IdentityHeadersInterceptor.defaultRole` is still a `String` and is still
 /// asserted equal to `kSeedUserRole.wireValue` by
 /// `fake_auth_repository_test.dart` — that assertion, not a literal count, is
@@ -105,16 +135,34 @@ const String kSeedEmail = 'david.mina@evangelion.app';
 /// that has a monogram rule; see `AuthSession.initials`.
 const String kSeedDisplayName = 'David Mina';
 
-/// The seeded session, stamped at [createdAt].
+/// The seeded session, stamped at [createdAt], held by [role].
 ///
 /// A function rather than a `const` because `AuthSession.createdAt` is a
 /// `DateTime` and Dart has no `const DateTime`. Taking the instant as a
 /// parameter is what makes "two calls return the identical object" assertable
 /// without a clock.
-AuthSession seedAuthSession({required DateTime createdAt}) => AuthSession(
+///
+/// ## AND WHY [role] IS A PARAMETER WITH A DEFAULT
+///
+/// The role is **chosen on the login screen** (AGENT_CONTEXT §2, decision 3 —
+/// there is no auth endpoint), so the seed has to be able to be a servant's.
+/// The default is [UserRole.kid] because that is what `identity.middleware.ts:24`
+/// falls back to when the header is absent, and a client that defaulted to
+/// anything else would disagree with the server about an empty header.
+///
+/// A default here — rather than a required parameter — because **this is a
+/// factory, not a port**: the port's `signIn` requires the role explicitly (the
+/// caller knows what the reader picked), while this helper is also used by
+/// fixtures that want the seed. The two are not the same question, and the
+/// difference is the whole of why the default is allowed here and not there.
+AuthSession seedAuthSession({
+  required DateTime createdAt,
+  UserRole role = UserRole.kid,
+}) => AuthSession(
   userId: kSeedUserId,
   email: kSeedEmail,
   displayName: kSeedDisplayName,
   initials: 'DM',
   createdAt: createdAt,
+  role: role,
 );

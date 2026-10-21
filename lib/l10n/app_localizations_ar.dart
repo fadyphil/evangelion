@@ -34,6 +34,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authUnavailableSuffix => 'غير متاح في هذه النسخة';
 
   @override
+  String get authRoleLabel => 'الدور';
+
+  @override
+  String get authRoleKid => 'طفل';
+
+  @override
+  String get authRoleServant => 'خادم';
+
+  @override
+  String get authRoleAdmin => 'مُشرف';
+
+  @override
   String get homeGreetingMorning => 'صباح النور';
 
   @override

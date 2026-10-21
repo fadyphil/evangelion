@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
@@ -205,6 +206,7 @@ final class PlantedHolder {
       const SignInParams params = SignInParams(
         email: 'reader@example.com',
         password: secret,
+        role: UserRole.kid,
       );
       expect(params.toString(), contains('reader@example.com'));
       expect(params.toString(), isNot(contains(secret)));
@@ -215,7 +217,11 @@ final class PlantedHolder {
       // careless `==` would make two different passwords equal.
       expect(
         params,
-        const SignInParams(email: 'reader@example.com', password: secret),
+        const SignInParams(
+          email: 'reader@example.com',
+          password: secret,
+          role: UserRole.kid,
+        ),
       );
       expect(
         params,
@@ -223,10 +229,26 @@ final class PlantedHolder {
           const SignInParams(
             email: 'reader@example.com',
             password: 'a-different-secret-entirely',
+            role: UserRole.kid,
           ),
         ),
       );
       expect(params, isNot(equals(Object())));
+
+      // **And the ROLE is part of that equality**, which the servant portal's
+      // Task 1 added to the class. Two params that differ only in the role are
+      // different params — a `==` that ignored it would let a bloc think
+      // nothing changed when the reader picked a different role.
+      expect(
+        params,
+        isNot(
+          const SignInParams(
+            email: 'reader@example.com',
+            password: secret,
+            role: UserRole.adminServant,
+          ),
+        ),
+      );
     });
   });
 }

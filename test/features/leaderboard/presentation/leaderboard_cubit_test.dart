@@ -4,6 +4,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/leaderboard_board.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/cheer_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
@@ -113,6 +114,7 @@ final class _Auth implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async => result;
 
   @override

@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
@@ -71,6 +72,11 @@ Future<void> pumpSettled(WidgetTester tester, AuthBloc bloc) async {
 }
 
 void main() {
+  // `any(named: 'role')` cannot match a non-nullable enum without one of
+  // these. The value is never used — mocktail only needs *a* `UserRole` to
+  // know the type.
+  setUpAll(() => registerFallbackValue(UserRole.kid));
+
   group('no unlabeled interactive node', () {
     testWidgets('every node offering an action has a non-empty label', (
       WidgetTester tester,
@@ -132,6 +138,57 @@ void main() {
           find.bySemanticsLabel(RegExp(RegExp.escape(label))),
           findsOneWidget,
           reason: '§14 — no control may lose its name',
+        );
+      }
+
+      // **And the role picker's four nodes are named too** — the three options
+      // and the track. The picker is **written, not transcribed** (`eva/redesign.html`
+      // draws no such control, because there is no auth endpoint for the role to
+      // come from), so it is not among "the four the redesign declares" — but
+      // §14's row does not care where a control came from.
+      for (final String label in <String>[
+        en.authRoleLabel,
+        en.authRoleKid,
+        en.authRoleServant,
+        en.authRoleAdmin,
+      ]) {
+        expect(
+          find.bySemanticsLabel(RegExp(RegExp.escape(label))),
+          findsOneWidget,
+          reason:
+              '§14 — the picker\'s controls may not lose their names either',
+        );
+      }
+
+      handle.dispose();
+    });
+
+    testWidgets('and no two activatable nodes share a name', (
+      WidgetTester tester,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      final AuthBloc bloc = buildTestBloc();
+      addTearDown(bloc.close);
+      await pumpSettled(tester, bloc);
+
+      // The defect recorded decision 129 fixed, and the role picker is the
+      // control that would have walked into it: `SegmentedControl`'s default
+      // track label is `labelOf(selected)`, so a picker that passed no
+      // `semanticLabel` would put **two activatable nodes** on screen with the
+      // identical label "Kid" — the track and the selected segment.
+      //
+      // **The assertion is over the labels, not over the widgets**, because the
+      // defect is two *nodes* sharing one *string*.
+      final List<String> labels = nodesOffering(
+        tester,
+        SemanticsAction.tap,
+      ).map((SemanticsData data) => data.label).toList();
+
+      for (final String label in labels) {
+        expect(
+          labels.where((String other) => other == label).length,
+          1,
+          reason: '"$label" names more than one activatable node',
         );
       }
 
@@ -313,6 +370,7 @@ void main() {
         () => refusing.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ).thenAnswer(
         (_) async => const Left<Failure, AuthSession>(

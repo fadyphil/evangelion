@@ -47,6 +47,7 @@ import 'package:evangelion/core/domain/entities/auth_session.dart';
 import 'package:evangelion/core/domain/entities/sky_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/sky_repository.dart';
 import 'package:evangelion/core/domain/repositories/streak_repository.dart';
@@ -227,6 +228,7 @@ final class JourneyAuthRepository implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async => getCurrentSession();
 
   @override

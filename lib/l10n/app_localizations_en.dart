@@ -34,6 +34,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authUnavailableSuffix => 'unavailable in this build';
 
   @override
+  String get authRoleLabel => 'Role';
+
+  @override
+  String get authRoleKid => 'Kid';
+
+  @override
+  String get authRoleServant => 'Servant';
+
+  @override
+  String get authRoleAdmin => 'Admin';
+
+  @override
   String get homeGreetingMorning => 'good morning';
 
   @override

@@ -103,7 +103,10 @@ void main() {
       expect(
         () => buildApiDio(
           baseUrl: AppConfig.apiBaseUrl,
-          identity: const IdentityHeadersInterceptor(userId: kSeedUserId),
+          identity: IdentityHeadersInterceptor(
+            userId: kSeedUserId,
+            role: () => 'kid',
+          ),
           connectTimeout: AppConfig.connectTimeout,
           receiveTimeout: AppConfig.receiveTimeout,
         ),
@@ -134,7 +137,10 @@ void main() {
       // would make two different `--dart-define`s indistinguishable on the wire.
       final Dio inverted = buildApiDio(
         baseUrl: AppConfig.apiBaseUrl,
-        identity: const IdentityHeadersInterceptor(userId: kSeedUserId),
+        identity: IdentityHeadersInterceptor(
+          userId: kSeedUserId,
+          role: () => 'kid',
+        ),
         connectTimeout: AppConfig.receiveTimeout,
         receiveTimeout: AppConfig.connectTimeout,
       );

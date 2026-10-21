@@ -1,5 +1,6 @@
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
 
@@ -34,8 +35,11 @@ final class SignIn implements UseCase<SignInParams, AuthSession> {
   final AuthRepository _repository;
 
   @override
-  Future<Result<AuthSession>> call(SignInParams params) =>
-      _repository.signIn(email: params.email, password: params.password);
+  Future<Result<AuthSession>> call(SignInParams params) => _repository.signIn(
+    email: params.email,
+    password: params.password,
+    role: params.role,
+  );
 }
 
 /// What [SignIn] needs.
@@ -44,8 +48,12 @@ final class SignIn implements UseCase<SignInParams, AuthSession> {
 /// says nothing about which is the address and which is the secret, and
 /// transposing them would be a runtime failure that reads as "wrong password".
 final class SignInParams {
-  /// Signs in with [email] and [password].
-  const SignInParams({required this.email, required this.password});
+  /// Signs in with [email] and [password], as the holder of [role].
+  const SignInParams({
+    required this.email,
+    required this.password,
+    required this.role,
+  });
 
   /// The address, exactly as typed. Not trimmed here — `LoginCredentials.from`
   /// owns that asymmetry, and this type carries what it was given.
@@ -54,19 +62,34 @@ final class SignInParams {
   /// The secret, exactly as typed.
   final String password;
 
+  /// The role the reader is signing in as.
+  ///
+  /// **Required, and not defaulted.** The role is chosen on the login form —
+  /// there is no auth endpoint (AGENT_CONTEXT §2, decision 3), so the client
+  /// cannot ask the server who anyone is — and a default here would be a role
+  /// the params invented rather than one the reader picked.
+  ///
+  /// It is part of the **identity** of these params, so it is part of the
+  /// hand-written `==` below: two params that differ only in the role are
+  /// different params, and a bloc that compared them otherwise would think
+  /// nothing changed when the reader picked a different role.
+  final UserRole role;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SignInParams &&
           other.email == email &&
-          other.password == password;
+          other.password == password &&
+          other.role == role;
 
   @override
-  int get hashCode => Object.hash(email, password);
+  int get hashCode => Object.hash(email, password, role);
 
   /// Not Equatable's default: it would print the password into every failing
   /// assertion. See `LoginCredentials.toString` for the same decision one layer
   /// down.
   @override
-  String toString() => 'SignInParams(email: $email, password: ********)';
+  String toString() =>
+      'SignInParams(email: $email, password: ********, role: ${role.name})';
 }

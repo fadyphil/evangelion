@@ -67,6 +67,7 @@ import 'package:evangelion/core/domain/entities/sky_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_history_entry.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/repositories/leaderboard_repository.dart';
@@ -127,7 +128,6 @@ import 'package:fpdart/fpdart.dart';
 
 import 'support/arabic_typography_gate.dart';
 import 'support/contract_payloads.dart';
-
 import 'support/design_system_harness.dart';
 import 'support/font_coverage.dart';
 import 'support/home_harness.dart' hide CountingReadingRepository;
@@ -364,6 +364,16 @@ void main() {
       ar.authEmailHint,
       ar.authPasswordHint,
       ar.authEnterTheWord,
+      // **The role picker's three option labels**, and they are painted runs:
+      // `SegmentedControl` draws each option's label. The **track's** own name
+      // (`authRoleLabel`) is deliberately **not** in this list — it lives in
+      // `Semantics(label:)` and is never painted, and declaring a run that is
+      // not rendered fails the other half of this gate with
+      // "Declared but NOT rendered". The same trap the field labels record
+      // below.
+      ar.authRoleKid,
+      ar.authRoleServant,
+      ar.authRoleAdmin,
     ];
 
     testWidgets('the Arabic arm, on the empty form', (
@@ -431,6 +441,12 @@ void main() {
           ar.authEmailHint,
           ar.authEnterTheWord,
           ar.authPasswordTooShort,
+          // **The role picker's three options** — they are painted whatever the
+          // form's state is, so they belong in this list too. The track's own
+          // name is not painted and is not here; see the list above.
+          ar.authRoleKid,
+          ar.authRoleServant,
+          ar.authRoleAdmin,
         ],
       );
     });
@@ -3075,6 +3091,7 @@ final class _CommunionAuthRepo implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) async => getCurrentSession();
 
   @override
@@ -3852,6 +3869,7 @@ final class _JourneyAuthRepo implements AuthRepository {
   Future<Result<AuthSession>> signIn({
     required String email,
     required String password,
+    required UserRole role,
   }) => getCurrentSession();
 
   @override

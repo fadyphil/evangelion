@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
@@ -9,6 +10,7 @@ import 'package:evangelion/features/auth/domain/usecases/sign_in.dart';
 import 'package:evangelion/features/auth/domain/usecases/sign_out.dart';
 import 'package:evangelion/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:evangelion/features/auth/presentation/pages/login_page.dart';
+import 'package:evangelion/features/auth/presentation/widgets/role_picker.dart';
 import 'package:evangelion/l10n/app_localizations_en.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +60,11 @@ final class LoginFixture {
 /// which extracts them **from the prototype file at test time**, so no literal
 /// of the prototype's geometry appears here either.
 void main() {
+  // `any(named: 'role')` cannot match a non-nullable enum without one of
+  // these. The value is never used — mocktail only needs *a* `UserRole` to
+  // know the type.
+  setUpAll(() => registerFallbackValue(UserRole.kid));
+
   /// Built **inside each test body**, never in `setUp`.
   ///
   /// ## WHY, AND IT IS NOT A STYLE PREFERENCE
@@ -120,6 +127,27 @@ void main() {
         find.text(_monoUpper(LoginPage.kFooterText)),
         findsOneWidget,
         reason: 'the αω footer, pinned `bottom: 26px` (`:391`)',
+      );
+    });
+
+    testWidgets('and the role picker is the ONE element the redesign does not '
+        'have', (WidgetTester tester) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
+
+      // `eva/redesign.html:503-511` draws no role picker, and the reason is
+      // structural rather than a gap in the reference: there is **no auth
+      // endpoint** (AGENT_CONTEXT §2, decision 3), so the role is the reader's
+      // own choice on this screen, and the prototype was a reader's app alone.
+      //
+      // **So the picker is asserted as the page's own element, and the
+      // prototype's seven are still the seven** — the two claims are separate
+      // on purpose, and neither is a comment.
+      expect(find.byType(RolePicker), findsOneWidget);
+      expect(
+        find.byType(EvaTextField),
+        findsNWidgets(2),
+        reason: 'the prototype\'s two bare fields, and no third',
       );
     });
 
@@ -440,6 +468,7 @@ void main() {
         () => refusing.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ).thenAnswer(
         (_) async => const Left<Failure, AuthSession>(
@@ -476,6 +505,61 @@ void main() {
 
       expect(bloc.state.isSignedIn, isFalse);
       expect(find.text('No such user in this build.'), findsOneWidget);
+    });
+  });
+
+  group('the role picker', () {
+    // The role is chosen on this screen, and it is the reader's own choice:
+    // there is no auth endpoint (AGENT_CONTEXT §2, decision 3), so nothing else
+    // in the app can ask who anyone is.
+
+    testWidgets('choosing a role puts it in the state', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
+
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      await tester.tap(find.text(en.authRoleAdmin.toUpperCase()));
+      await tester.pump();
+
+      expect(fixture.bloc.state.role, UserRole.adminServant);
+    });
+
+    testWidgets('and the sign-in carries THAT role to the session', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
+
+      final AppLocalizationsEn en = AppLocalizationsEn();
+      await tester.tap(find.text(en.authRoleServant.toUpperCase()));
+      await tester.pump();
+      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      await tester.enterText(_passwordFinder, 'correct horse');
+      await tester.pump();
+      await tester.tap(_ctaFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(fixture.bloc.state.isSignedIn, isTrue);
+      expect(
+        fixture.bloc.state.session?.role,
+        UserRole.viewerServant,
+        reason:
+            'the session is the one place the role is recorded, and the wire '
+            'header is read out of it — so this is the claim that the client '
+            'does not claim `kid` while the form says `viewer_servant`',
+      );
+    });
+
+    testWidgets('and it starts on the seed, because that is the default', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      await pumpSettled(tester, fixture);
+
+      expect(fixture.bloc.state.role, UserRole.kid);
     });
   });
 

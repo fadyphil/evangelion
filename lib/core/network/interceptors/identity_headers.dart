@@ -94,22 +94,46 @@ import 'package:dio/dio.dart';
 /// "the server will catch it" as a mistake.
 final class IdentityHeadersInterceptor extends Interceptor {
   /// Sends `X-User-Id: userId`, `X-Group-Id: groupId` and
-  /// `X-User-Role: role` on every request.
+  /// `X-User-Role: <what role() says>` on every request.
   ///
-  /// [groupId] and [role] default to the values the seeded backend needs, so a
-  /// call site that has no reason to change them does not have to say them out
-  /// loud. [groupId]'s default is **3** because group 3 is the only cohort with
-  /// a real scheduled reading — every other group is served a fabricated
-  /// non-UUID `reading_id` that `POST /readings/:id/submit` then rejects with
+  /// [groupId] defaults to the value the seeded backend needs, so a call site
+  /// that has no reason to change it does not have to say it out loud.
+  /// [groupId]'s default is **3** because group 3 is the only cohort with a real
+  /// scheduled reading — every other group is served a fabricated non-UUID
+  /// `reading_id` that `POST /readings/:id/submit` then rejects with
   /// `400 body/question_id must match format "uuid"` (AGENT_CONTEXT §5).
   ///
   /// [userId] is **not** validated here. See [buildApiDio]: the value cannot
   /// change between construction and the first request, so the check belongs at
   /// composition where a failure can name the offending value.
-  const IdentityHeadersInterceptor({
+  ///
+  /// ## AND [role] IS **REQUIRED** AND IS A **READER**
+  ///
+  /// Two changes, and the second is the reason the first is not optional.
+  ///
+  /// **It is a reader** — `String Function()` — because the role is **chosen on
+  /// the login screen** (there is no auth endpoint: AGENT_CONTEXT §2, decision
+  /// 3) and the client must not claim `kid` on the wire while the UI says
+  /// `admin_servant`. A frozen string baked in at composition is wrong for
+  /// every request after the reader chose a role, and **the backend never
+  /// notices** — which is precisely why the client has to notice it itself.
+  /// The reader is consulted **per request**, so a role that changes between two
+  /// requests is carried by the second one.
+  ///
+  /// **It is required** so that no call site can forget it. A default here
+  /// would be a role the interceptor invented, and the one thing this class
+  /// exists to do now is report the role the app believes — which the app
+  /// knows and the interceptor does not.
+  ///
+  /// **The `const` is gone, and it could not stay.** A constant expression
+  /// cannot hold a closure, so `const IdentityHeadersInterceptor(…)` does not
+  /// compile. The instance is built when the composition root's provider runs,
+  /// once, for a `@lazySingleton`, so nothing is lost by the loss of
+  /// canonicalisation — see `core_module.dart`'s own note on the same point.
+  IdentityHeadersInterceptor({
     required this.userId,
+    required this.role,
     this.groupId = defaultGroupId,
-    this.role = defaultRole,
   });
 
   /// The value of `X-User-Id`. Must be a UUID — see [isValidUserId].
@@ -119,7 +143,10 @@ final class IdentityHeadersInterceptor extends Interceptor {
   /// values are strings and `int` would rely on dio to stringify it.
   final int groupId;
 
-  /// The value of `X-User-Role`.
+  /// The reader that answers **what `X-User-Role` is**.
+  ///
+  /// Consulted on **every** request, not once at construction — see the class
+  /// doc for why the frozen value was wrong.
   ///
   /// Decorative **on the wire**: the backend parses this header
   /// (`identity.middleware.ts:24`), assigns it to `request.user.role` at `:31`,
@@ -129,12 +156,12 @@ final class IdentityHeadersInterceptor extends Interceptor {
   /// **It is still not to be ignored.** Because the server enforces nothing, a
   /// client-side check on the role is the *only* place the value is ever used,
   /// and it is what stops this client putting a reader on a screen that makes no
-  /// sense for them. So the field is advisory UX — it prevents accidents, and it
-  /// is never authorisation: the header is set by the client, so a client that
-  /// refused to set it would refuse to set the identity too. Treating this value
-  /// as meaningful is correct; describing what a role gate here buys as
+  /// sense for them. So the header is advisory UX — it prevents accidents, and
+  /// it is never authorisation: the header is set by the client, so a client
+  /// that refused to set it would refuse to set the identity too. Treating this
+  /// value as meaningful is correct; describing what a role gate here buys as
   /// *permission* is not.
-  final String role;
+  final String Function() role;
 
   /// The header names, spelled once.
   ///
@@ -151,6 +178,14 @@ final class IdentityHeadersInterceptor extends Interceptor {
   static const int defaultGroupId = 3;
 
   /// `X-User-Role: kid` — parsed by the backend, enforced by nothing.
+  ///
+  /// **The seed's spelling, not the interceptor's default any more.** The
+  /// constructor's `role` parameter is required, so no call site inherits this
+  /// silently; what this constant is for is the **one conversion point** the
+  /// seeded role has — `kSeedUserRole.wireValue` in
+  /// `features/auth/data/datasources/auth_local_data_source.dart` is the same
+  /// string, and `fake_auth_repository_test.dart` asserts they are, so the
+  /// seeded role and the sent header cannot drift apart.
   static const String defaultRole = 'kid';
 
   /// Sets the three headers and passes the request on.
@@ -165,7 +200,8 @@ final class IdentityHeadersInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.headers[userIdHeader] = userId;
     options.headers[groupIdHeader] = groupId.toString();
-    options.headers[roleHeader] = role;
+    // **Read per request**, not read once at construction — see the class doc.
+    options.headers[roleHeader] = role();
     // The path is untouched on purpose: `/api/v1` belongs to endpoint
     // definitions (AGENT_CONTEXT §5), not to the host.
     handler.next(options);

@@ -156,6 +156,32 @@ abstract class AppLocalizations {
   /// **'unavailable in this build'**
   String get authUnavailableSuffix;
 
+  /// Written, not transcribed: `eva/redesign.html` draws no role picker — the redesign's login (`:503-511`) has two fields, a CTA and two ghost pills, and nothing for choosing who you are. The control needs a name of its own because there is no auth endpoint (AGENT_CONTEXT §2, decision 3), so the role is a local choice, and a control with options but no name is §14's unnamed-control failure.
+  ///
+  /// **It is deliberately NOT the selected option's name.** `SegmentedControl`'s track is an activatable node of its own — the one thing that binds the control's focus node into the focus tree — so naming the track after the selected option would put two activatable nodes on screen with the identical label, which is recorded decision 129's defect and the reason that decision added `SegmentedControl.semanticLabel` at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get authRoleLabel;
+
+  /// Written, not transcribed: `eva/redesign.html` has no role picker, so this string is the login screen's own copy. The label for `UserRole.kid` — the seed role, and the one `identity.middleware.ts:24` falls back to when the header is absent. Short on purpose: the three options share one row at the 320px surface the viewport matrix gate measures, and a longer word would be ellipsised.
+  ///
+  /// In en, this message translates to:
+  /// **'Kid'**
+  String get authRoleKid;
+
+  /// Written, not transcribed: `eva/redesign.html` has no role picker. The short word for `UserRole.viewerServant` — a church servant who reads the daily roster report and changes nothing. "Servant" rather than "viewer servant" for two measured reasons: the three options share one row at 320px, where a two-word label does not fit; and in a church the two servant roles are told apart by what they do, not by the word "servant".
+  ///
+  /// In en, this message translates to:
+  /// **'Servant'**
+  String get authRoleServant;
+
+  /// Written, not transcribed: `eva/redesign.html` has no role picker. The short word for `UserRole.adminServant` — a servant who may also schedule a reading and author its questions. Short on purpose, for the same reason as `authRoleServant`: the three options share one row at the 320px surface the viewport matrix gate measures.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get authRoleAdmin;
+
   /// 05:00–11:59. Transcribed: `redesign.html:926` — `morn:["good morning","صباح النور"]`, set by `applyLang` (`:988`).
   ///
   /// **The Arabic arm changed with the screen.** It was `صباح الخير` — “good morning” in the ordinary sense — because the old greeting was a status line. The redesign's own word is `صباح النور` (“morning of light”), which is a different sentence, and transcribing it is the point of the phase.

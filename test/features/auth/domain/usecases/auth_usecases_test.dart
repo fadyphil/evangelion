@@ -1,6 +1,7 @@
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/core/domain/usecase/usecase.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -45,7 +46,12 @@ void main() {
   );
 
   setUpAll(() {
-    registerFallbackValue(const SignInParams(email: '', password: ''));
+    registerFallbackValue(
+      const SignInParams(email: '', password: '', role: UserRole.kid),
+    );
+    // mocktail needs a fallback for the port's `role` argument too, because
+    // `any(named: 'role')` is matched loosely against a non-nullable enum.
+    registerFallbackValue(UserRole.kid);
   });
 
   setUp(() {
@@ -54,6 +60,7 @@ void main() {
       () => repository.signIn(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        role: any(named: 'role'),
       ),
     ).thenAnswer((_) async => Result<AuthSession>.of(session));
     when(repository.getCurrentSession)
@@ -65,11 +72,20 @@ void main() {
   group('SignIn', () {
     test('passes the credentials through, unmodified', () async {
       await SignIn(repository)(
-        const SignInParams(email: email, password: password),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
       );
 
-      verify(() => repository.signIn(email: email, password: password))
-          .called(1);
+      verify(
+        () => repository.signIn(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
+      ).called(1);
     });
 
     test('passes a password with its spaces intact', () async {
@@ -78,15 +94,48 @@ void main() {
       const String spaced = '  spaces  matter  ';
 
       await SignIn(repository)(
-        const SignInParams(email: email, password: spaced),
+        const SignInParams(email: email, password: spaced, role: UserRole.kid),
       );
 
-      verify(() => repository.signIn(email: email, password: spaced)).called(1);
+      verify(
+        () => repository.signIn(
+          email: email,
+          password: spaced,
+          role: UserRole.kid,
+        ),
+      ).called(1);
+    });
+
+    test('and the ROLE, because the chosen role is part of the sign-in', () async {
+      // The role is chosen on the login form — there is no auth endpoint
+      // (AGENT_CONTEXT §2, decision 3) — so it travels with the credentials
+      // rather than being asked for separately. A use case that dropped it would
+      // sign the reader in as the seed, and the client would claim `kid` on the
+      // wire while the form said `admin_servant`.
+      await SignIn(repository)(
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.adminServant,
+        ),
+      );
+
+      verify(
+        () => repository.signIn(
+          email: email,
+          password: password,
+          role: UserRole.adminServant,
+        ),
+      ).called(1);
     });
 
     test('returns the repository\'s success untouched', () async {
       final Result<AuthSession> result = await SignIn(repository)(
-        const SignInParams(email: email, password: password),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
       );
 
       expect(result.isRight(), isTrue);
@@ -102,30 +151,83 @@ void main() {
         () => repository.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ).thenAnswer((_) async => const Left<Failure, AuthSession>(failure));
 
       final Result<AuthSession> result = await SignIn(repository)(
-        const SignInParams(email: email, password: password),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
       );
 
       expect(result.isLeft(), isTrue);
       expect(result.failureOrElse(failure), same(failure));
     });
 
+    test('SignInParams carries the role it was given', () {
+      expect(
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.adminServant,
+        ).role,
+        UserRole.adminServant,
+      );
+    });
+
     test('SignInParams compares by value and hides the password', () {
       expect(
-        const SignInParams(email: email, password: password),
-        const SignInParams(email: email, password: password),
-      );
-      expect(
-        const SignInParams(email: email, password: password),
-        isNot(
-          const SignInParams(email: 'other@evangelion.app', password: password),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
         ),
       );
       expect(
-        const SignInParams(email: email, password: password).toString(),
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
+        isNot(
+          const SignInParams(
+            email: 'other@evangelion.app',
+            password: password,
+            role: UserRole.kid,
+          ),
+        ),
+      );
+      // **The role is part of the identity**, so two params that differ only in
+      // it are different params. A `==` that ignored it would let a bloc think
+      // nothing changed when the reader picked a different role.
+      expect(
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ),
+        isNot(
+          const SignInParams(
+            email: email,
+            password: password,
+            role: UserRole.adminServant,
+          ),
+        ),
+      );
+      expect(
+        const SignInParams(
+          email: email,
+          password: password,
+          role: UserRole.kid,
+        ).toString(),
         isNot(contains(password)),
       );
     });

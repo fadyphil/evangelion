@@ -4,6 +4,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/domain/repositories/auth_repository.dart';
 import 'package:evangelion/features/auth/domain/login_credentials.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -61,6 +62,7 @@ void main() {
         () => repository.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ).thenAnswer((_) => pending.future);
     }
@@ -71,12 +73,20 @@ void main() {
     );
   }
 
+  setUpAll(() {
+    // `any(named: 'role')` cannot match a non-nullable enum without one of
+    // these. The value is never used — mocktail only needs *a* `UserRole` to
+    // know the type.
+    registerFallbackValue(UserRole.kid);
+  });
+
   setUp(() {
     repository = MockAuthRepository();
     when(
       () => repository.signIn(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        role: any(named: 'role'),
       ),
     ).thenAnswer((_) async => Result<AuthSession>.of(session));
     when(repository.getCurrentSession).thenAnswer(
@@ -367,6 +377,7 @@ void main() {
           () => repository.signIn(
             email: '  $email  ',
             password: '  spaces matter  ',
+            role: UserRole.kid,
           ),
         ).called(1);
       },
@@ -379,6 +390,7 @@ void main() {
           () => repository.signIn(
             email: any(named: 'email'),
             password: any(named: 'password'),
+            role: any(named: 'role'),
           ),
         ).thenAnswer(
           (_) async => const Left<Failure, AuthSession>(
@@ -442,6 +454,7 @@ void main() {
           () => repository.signIn(
             email: any(named: 'email'),
             password: any(named: 'password'),
+            role: any(named: 'role'),
           ),
         ).thenAnswer(
           (_) async => const Left<Failure, AuthSession>(
@@ -472,6 +485,7 @@ void main() {
         () => repository.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ),
     );
@@ -540,6 +554,7 @@ void main() {
         () => repository.signIn(
           email: any(named: 'email'),
           password: any(named: 'password'),
+          role: any(named: 'role'),
         ),
       ).called(1),
     );
@@ -653,6 +668,110 @@ void main() {
         );
         expect(bloc.state.session, isNull);
         verify(repository.signOut).called(1);
+      },
+    );
+  });
+
+  group('the chosen role', () {
+    // ## THE ROLE IS CHOSEN ON THE LOGIN FORM, AND THIS IS WHERE IT LIVES
+    //
+    // There is no auth endpoint (AGENT_CONTEXT §2, decision 3), so the client
+    // cannot ask the server who anyone is: the role is the reader's own choice
+    // on `/login`, and this bloc is where that choice is held until the
+    // sign-in carries it into the session.
+
+    blocTest<AuthBloc, AuthState>(
+      'starts as a kid, because that is what the seed is',
+      build: build,
+      verify: (AuthBloc bloc) {
+        expect(bloc.state.role, UserRole.kid);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'and an unchosen role is not a change',
+      build: build,
+      act: (AuthBloc bloc) => bloc.add(const AuthRoleChanged(UserRole.kid)),
+      expect: () => <AuthState>[],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'AuthRoleChanged moves the state to the role that was chosen',
+      build: build,
+      act: (AuthBloc bloc) =>
+          bloc.add(const AuthRoleChanged(UserRole.adminServant)),
+      expect: () => <AuthState>[const AuthState(role: UserRole.adminServant)],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'and the sign-in carries THAT role to the port',
+      build: build,
+      act: (AuthBloc bloc) => bloc
+        ..add(const AuthRoleChanged(UserRole.viewerServant))
+        ..add(const AuthEmailChanged(email))
+        ..add(const AuthPasswordChanged(goodPassword))
+        ..add(const AuthSubmitted()),
+      verify: (_) {
+        verify(
+          () => repository.signIn(
+            email: email,
+            password: goodPassword,
+            role: UserRole.viewerServant,
+          ),
+        ).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'and the session it lands in agrees with the state that chose it',
+      // The one-session-one-role rule. A session whose role disagreed with the
+      // form that produced it would put `kid` on the wire while the reader was
+      // looking at `admin_servant` — the exact lie the live `X-User-Role`
+      // reader exists to prevent.
+      setUp: () {
+        when(
+          () => repository.signIn(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+            role: any(named: 'role'),
+          ),
+        ).thenAnswer(
+          (Invocation invocation) async => Result<AuthSession>.of(
+            session.copyWith(
+              role: invocation.namedArguments[#role]! as UserRole,
+            ),
+          ),
+        );
+      },
+      build: build,
+      act: (AuthBloc bloc) => bloc
+        ..add(const AuthRoleChanged(UserRole.adminServant))
+        ..add(const AuthEmailChanged(email))
+        ..add(const AuthPasswordChanged(goodPassword))
+        ..add(const AuthSubmitted()),
+      verify: (AuthBloc bloc) {
+        expect(bloc.state.role, UserRole.adminServant);
+        expect(bloc.state.session?.role, UserRole.adminServant);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'and a restored session restores ITS role, not the default',
+      // A cold launch asks the port for the session it already holds, and that
+      // session carries the role it was signed in with. Restoring `kid` for an
+      // admin's session would put the wrong role on the wire from the first
+      // request.
+      setUp: () {
+        when(repository.getCurrentSession).thenAnswer(
+          (_) async => Result<AuthSession>.of(
+            session.copyWith(role: UserRole.adminServant),
+          ),
+        );
+      },
+      build: build,
+      act: (AuthBloc bloc) => bloc.add(const AuthStarted()),
+      verify: (AuthBloc bloc) {
+        expect(bloc.state.role, UserRole.adminServant);
       },
     );
   });

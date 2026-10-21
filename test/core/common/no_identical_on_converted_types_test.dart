@@ -89,14 +89,16 @@ void main() {
     test('and it found the converted set it is about', () {
       expect(
         converted,
-        hasLength(46),
+        hasLength(47),
         reason:
             'the converted set moved, so the table\'s flags are stale. 34 was the '
             'migration\'s output; Phase 9 converted `UserSettings` and `SettingsState`, '
             'Phase 1 converted `LeaderboardRow`, `LeaderboardStanding`, '
             '`LeaderboardBoard`, `LeaderboardQuery` and `LeaderboardState`, '
             'Phase 3 converted `SkyEntry` and `SkyState`, and Phase 5.2 converted '
-            '`StreakHistoryEntry` and `LibraryBook`',
+            '`StreakHistoryEntry` and `LibraryBook`. **46 → 47 in the servant '
+            'portal\'s Task 1**, for `AuthRoleChanged` — the event that carries '
+            'the role the reader chose on the login form',
       );
     });
   });
@@ -526,6 +528,41 @@ String _relative(String path) =>
 /// Keyed `path#test name`. `converted` is the flag the fourth assertion checks
 /// against the code; `reason` is what the migration's audit concluded.
 const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
+  // ## THE SERVANT PORTAL'S TASK 1, TWO ROWS
+  //
+  // The role seam and the session store. Both are identity claims about the
+  // **one** session and the **one** role, and both would be satisfied by an
+  // equal-but-distinct object — which is exactly what the migration's
+  // `freezed` equality would hand back.
+  'test/app/di/injection_test.dart#and it is a singleton, so there is one role in the app':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'The `RoleAccess` registration is a **singleton**, and the assertion is '
+            'exactly that: there is one role seam in the process, and the '
+            'navigation guard and the identity interceptor read the same one. A '
+            'second registration would be a second answer to "what role does this '
+            'reader hold", free to disagree with the first — and the whole point '
+            'of the seam is that the wire and the guard are one answer. '
+            '`RoleAccess` is a hand-written interface, not a generated type, so '
+            'the flag is `false`; no `==` override could stand in for identity '
+            'here, because the claim is about the *registration*.',
+      ),
+  'test/features/auth/data/fake_auth_repository_test.dart#and reports the written session synchronously':
+      _Reviewed(
+        sites: 1,
+        converted: true,
+        reason:
+            '`AuthSession` is a `freezed` type, so `==` compares its fields and '
+            'would happily accept a **different instance carrying the same '
+            'values**. The claim here is the opposite one: the store hands back '
+            '**the object that was written**, not a copy of it. That is what makes '
+            'the synchronous view and the asynchronous one the same fact — a copy '
+            'would be equal to the original and the two views could drift '
+            'without either comparison noticing. The identity assertion is the '
+            'only one that sees the difference.',
+      ),
   'test/app/app_settings_wiring_test.dart#`SettingsScope.of` resolves the app\'s own handle':
       _Reviewed(
         sites: 1,
