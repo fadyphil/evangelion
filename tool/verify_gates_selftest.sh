@@ -36,6 +36,11 @@
 #   blur      a block comment, a real site, a hand-built filter
 #                                                     a comment is not a site, a site
 #                                                     is, and the two halves agree
+#   mirror    a planted controller, a controller in a comment, a renamed site
+#                                                     a new site is reported, a comment
+#                                                     is not, and a stale row is a
+#                                                     failure — the setState gate's
+#                                                     three directions
 #
 # ## THE SCRATCH COPY
 #
@@ -751,6 +756,109 @@ if [[ -f "$stale_file" ]]; then
   fi
 else
   record "setState (stale row)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe file to stale is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+# --- 12. mirrored-controller gate --------------------------------------------
+# The `TextEditingController` gate enforces decision 188's rule: a controller may
+# only be CREATED in the controlled field, or in the login page, or in one of the
+# servant portal's sites that are scheduled for migration. It is a Dart test, so
+# its negative control is a file planted in a scratch copy of the tree — and the
+# assertions are about the PLANTED PATH, so they hold whatever else is in
+# flight.
+#
+#   new site    a controller created in a planted file -> reported
+#   comment     a controller named inside a doc comment -> NOT reported (a
+#               comment is not a site; the scan strips comments first)
+#   stale row   a real site REMOVED                   -> reported (a stale
+#               allowlist row is an amnesty nobody re-read)
+d=$(make_scratch mirror)
+mirror_target="$d/lib/features/reading/presentation/widgets/planted_mirror.dart"
+mirror_run() { ( cd "$d" && flutter test test/core/design_system/widgets/mirrored_controller_check_test.dart 2>&1 ); }
+
+# 12a. a real controller creation outside the allowlist is reported.
+cat > "$mirror_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a site, not a comment.
+import 'package:flutter/material.dart';
+
+/// A hand-rolled mirror: the page owns a controller and writes the state's
+/// value into it, which is decision 188's defect #1.
+class PlantedMirror extends StatefulWidget {
+  const PlantedMirror({required this.value, super.key});
+
+  final String value;
+
+  @override
+  State<PlantedMirror> createState() => _PlantedMirrorState();
+}
+
+class _PlantedMirrorState extends State<PlantedMirror> {
+  final TextEditingController _field = TextEditingController();
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      TextField(controller: _field, onChanged: (String _) {});
+}
+EOF
+out=$(mirror_run); rc=$?
+if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'planted_mirror.dart'; then
+  record "mirror (new site)" "fired"
+  printf '  %-10s a planted controller -> reported, and the gate exited %d\n' "$G" "$rc"
+else
+  record "mirror (new site)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa planted controller -> exit %d; the gate did not report it\n' \
+    "FAIL" "$R" "$rc"
+fi
+rm -f "$mirror_target"
+
+# 12b. a controller named inside a doc comment is NOT a site.
+cat > "$mirror_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a comment, not a call site.
+///
+/// A doc comment that says `TextEditingController()` must not be counted.
+class PlantedComment {
+  const PlantedComment();
+}
+EOF
+out=$(mirror_run); rc=$?
+if [[ $rc -eq 0 ]] && ! printf '%s' "$out" | grep -qF 'planted_mirror.dart'; then
+  record "mirror (comment)" "fired"
+  printf '  %-10s a /* TextEditingController() */ comment -> not reported. A comment is not a site.\n' "$G"
+else
+  record "mirror (comment)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa controller inside a comment was counted as a site; exit %d\n' \
+    "FAIL" "$R" "$rc"
+fi
+rm -f "$mirror_target"
+
+# 12c. a STALE allowlist row is a failure, not a note.
+#
+# The login page's controller is renamed in the scratch copy, so the allowlist's
+# row for that file no longer matches the tree — and a stale row is an amnesty
+# nobody re-read, so the gate has to be red about it. **This is the control
+# that keeps the servant portal's rows LIVE**: the migration that retires one
+# of them is exactly this edit.
+stale_file="$d/lib/features/auth/presentation/pages/login_page.dart"
+if [[ -f "$stale_file" ]]; then
+  sed -i 's/final TextEditingController _email = TextEditingController();/final TextEditingController _emailAddress = TextEditingController();/' \
+    "$stale_file"
+  out=$(mirror_run); rc=$?
+  if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'no longer matches the tree'; then
+    record "mirror (stale row)" "fired"
+    printf '  %-10s a renamed site -> the stale allowlist row is reported\n' "$G"
+  else
+    record "mirror (stale row)" "COULD-NOT-FAIL"
+    printf '  %-10s %sa renamed site -> exit %d; the stale row was not reported\n' \
+      "FAIL" "$R" "$rc"
+  fi
+else
+  record "mirror (stale row)" "COULD-NOT-FAIL"
   printf '  %-10s %sthe file to stale is not in the scratch copy\n' "FAIL" "$R"
 fi
 
