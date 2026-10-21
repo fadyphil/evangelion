@@ -69,6 +69,20 @@ class QuestionAuthoringPage extends StatelessWidget {
 /// controller holds the text the admin is typing; the two agree because the
 /// page reports every keystroke and writes into a controller **only** when the
 /// question on screen says something different.
+///
+/// ## AND THE PAGE REPORTS **ONLY WHAT THE READER DID**
+///
+/// The sync is the other direction, and it is the one that can go wrong: the
+/// page writes the state's own value into a controller, the controller tells
+/// its listener, and the listener is the page's way of reporting a keystroke.
+/// So a write the page made on purpose — the state says `pointsText` is
+/// `'10'`, the controller starts empty, the page fills it — arrived at the
+/// cubit as an edit the reader had made, and the cubit's edit writer answers
+/// an edit by dropping the server's refusal with it.
+///
+/// **A SERVER'S ANSWER COULD VANISH IN THE FRAME IT ARRIVED.** The flag
+/// `_writing` is what the page holds while it writes, and the report is
+/// suppressed for exactly that window.
 class _Editor extends StatefulWidget {
   const _Editor({required this.state, this.readingId});
 
@@ -97,6 +111,17 @@ class _EditorState extends State<_Editor> {
   /// Whether the form has been reported to the cubit yet.
   bool _seeded = false;
 
+  /// Whether the page is writing into a controller on purpose.
+  ///
+  /// **A WRITE THE PAGE MADE IS NOT SOMETHING THE READER DID.** The
+  /// one-sided sync fills a controller from the state, and the controller
+  /// tells its listener — which is the page's own way of reporting a
+  /// keystroke. A write the page made on purpose reported that way told the
+  /// cubit the reader had typed, and the cubit's edit writer drops the
+  /// server's refusal with the edit: **a server's answer could vanish in
+  /// the frame it arrived.**
+  bool _writing = false;
+
   @override
   void initState() {
     super.initState();
@@ -115,12 +140,12 @@ class _EditorState extends State<_Editor> {
     }
     _listeners
       ..clear()
-      ..add(() => cubit.setReadingId(_readingId.text))
-      ..add(() => cubit.setPromptAr(_promptAr.text))
-      ..add(() => cubit.setPromptEn(_promptEn.text))
-      ..add(() => cubit.setCorrectAnswer(_correctAnswer.text))
-      ..add(() => cubit.setPointsText(_points.text))
-      ..add(() => cubit.setSortOrderText(_sortOrder.text));
+      ..add(() => _report(cubit.setReadingId, _readingId.text))
+      ..add(() => _report(cubit.setPromptAr, _promptAr.text))
+      ..add(() => _report(cubit.setPromptEn, _promptEn.text))
+      ..add(() => _report(cubit.setCorrectAnswer, _correctAnswer.text))
+      ..add(() => _report(cubit.setPointsText, _points.text))
+      ..add(() => _report(cubit.setSortOrderText, _sortOrder.text));
     for (int i = 0; i < _controllers.length; i++) {
       _controllers[i].addListener(_listeners[i]);
     }
@@ -152,18 +177,42 @@ class _EditorState extends State<_Editor> {
     // on screen says something different, so a rebuild never moves the caret
     // and the server's draft fills the fields without fighting the admin.
     final QuestionAuthoringState state = widget.state;
-    _sync(_readingId, state.readingId);
-    _sync(_promptAr, state.draft?.promptAr ?? '');
-    _sync(_promptEn, state.draft?.promptEn ?? '');
-    _sync(_correctAnswer, state.draft?.correctAnswer ?? '');
-    _sync(_points, state.pointsText);
-    _sync(_sortOrder, state.sortOrderText);
+    _write(_readingId, state.readingId);
+    _write(_promptAr, state.draft?.promptAr ?? '');
+    _write(_promptEn, state.draft?.promptEn ?? '');
+    _write(_correctAnswer, state.draft?.correctAnswer ?? '');
+    _write(_points, state.pointsText);
+    _write(_sortOrder, state.sortOrderText);
   }
 
-  /// Writes [value] into [controller] when they differ.
-  static void _sync(TextEditingController controller, String value) {
+  /// Writes [value] into [controller] when they differ, and tells the cubit
+  /// **nothing**.
+  ///
+  /// **The write is the page's own**, and the controller's listener is the
+  /// page's own way of reporting a keystroke — so a listener that reported
+  /// this write would be telling the cubit the reader had typed.
+  ///
+  /// The controller notifies its listeners **synchronously**, so [_writing] is
+  /// up for the whole write and down before the frame ends, and the
+  /// `try`/`finally` puts it down even if the write throws.
+  void _write(TextEditingController controller, String value) {
     if (controller.text == value) return;
-    controller.text = value;
+    _writing = true;
+    try {
+      controller.text = value;
+    } finally {
+      _writing = false;
+    }
+  }
+
+  /// Reports [text] to [report] — unless the page is writing on purpose.
+  ///
+  /// **A WRITE THE PAGE MADE IS NOT SOMETHING THE READER DID**, and the
+  /// cubit must not be told it was: its edit writer answers the reader's
+  /// correction, and a refusal the reader never caused must survive it.
+  void _report(void Function(String) report, String text) {
+    if (_writing) return;
+    report(text);
   }
 
   @override

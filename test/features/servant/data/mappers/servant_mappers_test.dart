@@ -642,14 +642,12 @@ void main() {
       expect(result, isA<Left<Failure, QuestionDraft>>());
       final Failure failure = (result as Left<Failure, QuestionDraft>).value;
       expect(failure.kind, FailureKind.serialization);
-      // **The bare `ar`, and not `options.A.ar`.** The option's own two fields
-      // are read by `_string`, which is the same reader the draft's prompts go
-      // through — and it is given no path. So the refusal names the field and
-      // **not** which option carried it. That is a **finding**, not a design:
-      // a draft with four options and one broken half produces the same
-      // sentence for all four. Recorded in the report; the message is the
-      // code's, and the test pins what it says.
-      expect(failure.message, contains('`ar` is 5 (int)'));
+      // **The option's own path**, and not the bare `ar`: the option is a map
+      // keyed by its letter, so the letter is knowable, and every other field
+      // in the three mappers names its path — `students[0]`, `options.A`,
+      // `reading_ids[0]`. A refusal that said only `ar` could not be told
+      // apart from the same refusal about another option.
+      expect(failure.message, contains('`options.A.ar` is 5 (int)'));
       expect(failure.message, contains('a String was expected'));
     });
 
@@ -671,8 +669,40 @@ void main() {
       expect(result, isA<Left<Failure, QuestionDraft>>());
       final Failure failure = (result as Left<Failure, QuestionDraft>).value;
       expect(failure.kind, FailureKind.serialization);
-      // **The bare `en`**, for the reason the Arabic half above gives.
-      expect(failure.message, contains('`en` is 5 (int)'));
+      // **The path names the half**, for the reason the Arabic half above
+      // gives.
+      expect(failure.message, contains('`options.A.en` is 5 (int)'));
+    });
+
+    test('and the refusal names the option it came from', () {
+      // **The second option, and not the first.** A draft with four options
+      // and one broken half used to produce the same sentence for all four,
+      // and a reader could not tell which option was wrong.
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <String, Object?>{
+              'A': <String, Object?>{'ar': 'أ', 'en': 'A'},
+              'B': <String, Object?>{'ar': 'ب', 'en': 'B'},
+              'C': <String, Object?>{'ar': 'ج', 'en': 5},
+            },
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`options.C.en` is 5 (int)'));
+      // **And not the options that were fine** — the refusal names the one
+      // that is broken, and a message that named all of them would be no
+      // message at all.
+      expect(failure.message, isNot(contains('options.A')));
+      expect(failure.message, isNot(contains('options.B')));
     });
   });
 

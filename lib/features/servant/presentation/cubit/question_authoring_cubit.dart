@@ -78,6 +78,20 @@ enum QuestionAuthoringFormError {
 /// So every `emit` below builds the **whole** state, and there is no second
 /// spelling of that sentence for a writer to disagree with. `QuizState` is the
 /// precedent: five fields and eleven inline full constructors.
+///
+/// **And the invariant is four sentences**, one per pair:
+///
+/// * a **failed** status carries a failure, and a `ready` or `working` one
+///   carries none — so the status always names the request that failed, and
+///   `retry` can repeat that one and not the other;
+/// * a **form error** belongs to a `ready` state, because the form refuses
+///   before it asks;
+/// * a **commit result** belongs to a `ready` state, because the commit
+///   answered.
+///
+/// An **edit** keeps the first of those pairs whole — the failure and the arm
+/// that names it — and drops the second and third, which are about the
+/// question as it **was**. The cubit's own doc says why.
 @Freezed(copyWith: false)
 final class QuestionAuthoringState with _$QuestionAuthoringState {
   /// A state on the given arm.
@@ -144,6 +158,29 @@ final class QuestionAuthoringState with _$QuestionAuthoringState {
 /// §3's DIP row, and its mirror: no presentation file names a repository. The
 /// cubit depends on [GenerateAiDraft] and [CommitQuestions], so a test drives
 /// the real use cases over a fake port.
+///
+/// ## AND AN **EDIT** CHANGES THE QUESTION AND NOTHING ELSE
+///
+/// Every writer below that answers something the reader did is an **edit**,
+/// and an edit has **one** rule, in four parts:
+///
+/// * **The server's failure stays.** It is the server's answer about the
+///   request it answered, and the reader correcting a field is not the server
+///   changing its mind. A refusal that vanished because the reader typed
+///   would be a refusal the reader never got to read — and the page's own
+///   one-sided sync is a write the page made on purpose, so it is not an
+///   edit either.
+/// * **The status stays.** The status names **which** request failed, and
+///   [retry] reads it to know which request to repeat — so a failure that
+///   kept its message but lost its arm would be retried as the wrong request.
+/// * **The form's own refusal goes.** The reader is correcting it, and a
+///   message that outlives the field it is about is a message about something
+///   else.
+/// * **The commit result goes.** It described the question as it **was**.
+///
+/// **A NEW REQUEST REPLACES THE OUTCOME.** The `working` state and the two
+/// answers that follow it belong to the attempt that is being made now, and
+/// they carry no failure from the last one.
 class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// Drives the editor over [generateAiDraft] and [commitQuestions].
   QuestionAuthoringCubit({
@@ -180,9 +217,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The reading id changed.
   void setReadingId(String id) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: id,
       draft: state.draft,
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
     ),
@@ -191,9 +229,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The question's type changed.
   void setType(QuestionType type) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(type: type),
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
     ),
@@ -202,9 +241,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The Arabic prompt changed.
   void setPromptAr(String text) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptAr: text),
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
     ),
@@ -213,9 +253,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The English prompt changed.
   void setPromptEn(String text) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(promptEn: text),
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
     ),
@@ -224,9 +265,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The correct answer changed.
   void setCorrectAnswer(String answer) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: (state.draft ?? blankDraft).copyWith(correctAnswer: answer),
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: state.sortOrderText,
     ),
@@ -235,9 +277,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The point value changed.
   void setPointsText(String text) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: _draftWithPoints(text),
+      failure: state.failure,
       pointsText: text,
       sortOrderText: state.sortOrderText,
     ),
@@ -246,9 +289,10 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   /// The question's place among its reading's questions changed.
   void setSortOrderText(String text) => emit(
     QuestionAuthoringState(
-      status: _statusAfterEdit(),
+      status: state.status,
       readingId: state.readingId,
       draft: _draftWithOrder(text),
+      failure: state.failure,
       pointsText: state.pointsText,
       sortOrderText: text,
     ),
@@ -285,7 +329,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
     if (draft.options.containsKey(letter)) return;
     emit(
       QuestionAuthoringState(
-        status: _statusAfterEdit(),
+        status: state.status,
         readingId: state.readingId,
         draft: draft.copyWith(
           options: <String, QuestionOption>{
@@ -293,6 +337,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
             letter: const QuestionOption(ar: '', en: ''),
           },
         ),
+        failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
       ),
@@ -306,7 +351,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
     if (!draft.options.containsKey(letter)) return;
     emit(
       QuestionAuthoringState(
-        status: _statusAfterEdit(),
+        status: state.status,
         readingId: state.readingId,
         draft: draft.copyWith(
           options: <String, QuestionOption>{
@@ -315,6 +360,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
               if (entry.key != letter) entry.key: entry.value,
           },
         ),
+        failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
       ),
@@ -337,7 +383,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
     if (option == null) return;
     emit(
       QuestionAuthoringState(
-        status: _statusAfterEdit(),
+        status: state.status,
         readingId: state.readingId,
         draft: draft.copyWith(
           options: <String, QuestionOption>{
@@ -347,6 +393,7 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
                 : option.copyWith(en: text),
           },
         ),
+        failure: state.failure,
         pointsText: state.pointsText,
         sortOrderText: state.sortOrderText,
       ),
@@ -499,6 +546,12 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
   }
 
   /// The refusal, and nothing else.
+  ///
+  /// **A NEW ATTEMPT, AND THE OUTCOME BELONGS TO IT.** The form refused
+  /// before the request was made, so this is a fresh answer about a fresh
+  /// attempt — and it replaces the last one, the server's failure included.
+  /// The server's failure is *not* dropped by an **edit** (see the class
+  /// doc), because an edit is not an attempt.
   void _refuse(QuestionAuthoringFormError error) => emit(
     QuestionAuthoringState(
       status: QuestionAuthoringStatus.ready,
@@ -509,21 +562,4 @@ class QuestionAuthoringCubit extends Cubit<QuestionAuthoringState> {
       sortOrderText: state.sortOrderText,
     ),
   );
-
-  /// The status an **edit** leaves behind.
-  ///
-  /// **Three rules, and each one is a fact about the screen.**
-  ///
-  /// * A request in flight stays in flight: the admin typing while the server
-  ///   answers must not make the busy state go away, or a second tap would
-  ///   send a second request.
-  /// * Everything else becomes [QuestionAuthoringStatus.ready], because the
-  ///   editor is on screen — including after a failure, whose message is
-  ///   dropped with the failure it described.
-  /// * The `commitResult` goes with it, because it described the question as
-  ///   it **was**, and the question has just changed.
-  QuestionAuthoringStatus _statusAfterEdit() => switch (state.status) {
-    QuestionAuthoringStatus.working => QuestionAuthoringStatus.working,
-    _ => QuestionAuthoringStatus.ready,
-  };
 }

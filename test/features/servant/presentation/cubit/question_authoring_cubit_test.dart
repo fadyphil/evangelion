@@ -494,26 +494,112 @@ void main() {
       await cubit.close();
     });
 
+    test('an edit keeps the server\'s failure, because the reader did not cause it', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+      when(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) async => const Left<Failure, QuestionDraft>(failure));
+
+      await cubit.requestDraft();
+      expect(cubit.state.failure, failure);
+
+      cubit.setPromptEn('A question');
+
+      // **The server's answer is still on screen.** The reader corrected a
+      // field; the server has not said anything new, and a refusal that
+      // vanished because the reader typed would be a refusal the reader
+      // never got to read.
+      expect(cubit.state.failure, failure);
+      // **And the arm that names the request stays.** The status is what
+      // `retry` reads to know **which** request to repeat, so a failure
+      // that kept its message but lost its arm would be retried as the
+      // wrong request.
+      expect(cubit.state.status, QuestionAuthoringStatus.draftFailed);
+
+      await cubit.close();
+    });
+
+    test('and a failed commit keeps its own arm through an edit', () async {
+      when(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      ).thenAnswer((_) async => const Left<Failure, CommitResult>(failure));
+      final QuestionAuthoringCubit cubit = cubitWith();
+      cubit.setPromptAr('سؤال');
+      cubit.setPromptEn('A question');
+      cubit.setCorrectAnswer('A');
+      await cubit.commit();
+      expect(cubit.state.status, QuestionAuthoringStatus.commitFailed);
+
+      cubit.setPromptEn('Another question');
+
+      // **The commit's own arm**, and not the draft's: the two failures are
+      // two states, and an edit that moved the state from one to the other
+      // would make the retry answer a question the admin did not ask again.
+      expect(cubit.state.status, QuestionAuthoringStatus.commitFailed);
+      expect(cubit.state.failure, failure);
+
+      await cubit.close();
+    });
+
     test(
-      'an edit forgets the last failure, because it described another question',
+      'and the retry after an edit still repeats the failed request',
       () async {
-        final QuestionAuthoringCubit cubit = cubitWith();
         when(
+          () => repository.commitQuestions(
+            readingId: any(named: 'readingId'),
+            questions: any(named: 'questions'),
+          ),
+        ).thenAnswer((_) async => const Left<Failure, CommitResult>(failure));
+        final QuestionAuthoringCubit cubit = cubitWith();
+        cubit.setPromptAr('سؤال');
+        cubit.setPromptEn('A question');
+        cubit.setCorrectAnswer('A');
+        await cubit.commit();
+        expect(cubit.state.status, QuestionAuthoringStatus.commitFailed);
+
+        // **An edit, and then the retry.** The edit must not have moved the
+        // request the retry repeats.
+        cubit.setPromptEn('Another question');
+        await cubit.retry();
+
+        verify(
+          () => repository.commitQuestions(
+            readingId: any(named: 'readingId'),
+            questions: any(named: 'questions'),
+          ),
+        ).called(2);
+        verifyNever(
           () => repository.generateAiDraft(
             readingId: any(named: 'readingId'),
             type: any(named: 'type'),
           ),
-        ).thenAnswer((_) async => const Left<Failure, QuestionDraft>(failure));
-
-        await cubit.requestDraft();
-        expect(cubit.state.failure, failure);
-
-        cubit.setPromptEn('A question');
-        expect(cubit.state.failure, isNull);
-        expect(cubit.state.status, QuestionAuthoringStatus.ready);
+        );
 
         await cubit.close();
       },
     );
+
+    test('and an edit clears the form\'s own refusal', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+      cubit.setPromptAr('سؤال');
+      // The English prompt was never written, so the form refuses.
+      await cubit.commit();
+      expect(cubit.state.formError, QuestionAuthoringFormError.emptyPrompt);
+
+      cubit.setPromptEn('A question');
+
+      // **The form's own refusal goes**, because the reader is correcting
+      // it — and it is a *different* refusal from the server's, and the two
+      // are told apart.
+      expect(cubit.state.formError, isNull);
+
+      await cubit.close();
+    });
   });
 }

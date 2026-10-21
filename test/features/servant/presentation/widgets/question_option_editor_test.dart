@@ -128,5 +128,47 @@ void main() {
       expect(find.text('الخير'), findsOneWidget);
       expect(find.text('The good'), findsOneWidget);
     });
+
+    testWidgets('and a rebuild that fills the fields is not an edit', (
+      WidgetTester tester,
+    ) async {
+      final List<({bool arabic, String text})> changes =
+          <({bool arabic, String text})>[];
+      await pumpServant(
+        tester,
+        Material(
+          child: QuestionOptionEditor(
+            letter: 'A',
+            arabicText: '',
+            englishText: '',
+            onChanged: ({required bool arabic, required String text}) =>
+                changes.add((arabic: arabic, text: text)),
+          ),
+        ),
+      );
+
+      // **The server's draft arrives**, and the widget fills its own two
+      // fields from it.
+      await pumpServant(
+        tester,
+        Material(
+          child: QuestionOptionEditor(
+            letter: 'A',
+            arabicText: 'الخير',
+            englishText: 'The good',
+            onChanged: ({required bool arabic, required String text}) =>
+                changes.add((arabic: arabic, text: text)),
+          ),
+        ),
+      );
+
+      expect(find.text('الخير'), findsOneWidget);
+      expect(find.text('The good'), findsOneWidget);
+      // **And nothing was reported.** The write was the widget's own — a
+      // write the widget made on purpose is not something the reader did —
+      // and a report would have told the cubit the reader had typed, which
+      // is how the server's refusal was dropped with an edit nobody made.
+      expect(changes, isEmpty);
+    });
   });
 }

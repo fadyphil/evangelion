@@ -267,6 +267,51 @@ class _ScheduleBodyState extends State<_ScheduleBody> {
   /// **Every refusal names a field**, and the message says what is wrong with
   /// it — the field is the one that says *which*, so a message that named the
   /// field in prose would have to be written once per language.
+  ///
+  /// ## AND THE `null` ARM IS **DART'S EXHAUSTIVENESS**, NOT A BRANCH
+  ///
+  /// **This is the answer to "what is that one line no test can execute".**
+  ///
+  /// The switch is over `state.formError`, which is a **nullable** enum, and
+  /// a switch **expression** has to be total over the type it switches on —
+  /// so `null` needs an arm whether or not anything can reach it. The
+  /// alternative is not "no arm": it is a **compile error**.
+  ///
+  /// **MEASURED, on Dart 3.13.3, in a scratch package outside this
+  /// repository:**
+  ///
+  /// ```text
+  /// $ dart analyze probe.dart     # switch (e) over `E?`, with no null arm
+  ///   error - The type 'E?' isn't exhaustively matched by the switch cases
+  ///          since it doesn't match the pattern 'null'. Try adding a wildcard
+  ///          pattern or cases that match 'null'.
+  ///          - non_exhaustive_switch_expression
+  /// ```
+  ///
+  /// **And the two other spellings are worse**, and the second is measured
+  /// too:
+  ///
+  /// * **`default`** — a switch *expression* may not use it at all:
+  ///   `A switch expression may not use the `default` keyword. Try replacing
+  ///   `default` with `_`.` (`default_in_switch_expression`).
+  /// * **the wildcard `_`** — it compiles, and it compiles **with a refusal
+  ///   kind that has no case at all**: a new `ScheduleReadingFormError`
+  ///   member would build and ship with no message under it, and the only
+  ///   thing that would have caught it is the exhaustiveness of the explicit
+  ///   arms.
+  ///
+  /// **So the `null` arm is what keeps the analyzer honest about every
+  /// refusal kind having a message**, and it is the price of that: one line
+  /// no test can execute.
+  ///
+  /// **AND NOTHING CAN REACH IT, WHICH IS A FACT ABOUT THE CUBIT AND NOT
+  /// ABOUT THIS FUNCTION.** The cubit sets `formError` and `formField`
+  /// together or not at all (`schedule_reading_cubit.dart:302`), so
+  /// `formField == field && formError == null` is a state no writer builds —
+  /// and this function is written to be **total over the state it is given**,
+  /// not to depend on that invariant. A function that assumed the invariant
+  /// would need a `default` to be total at all, and the `default` is the
+  /// spelling that loses the check on the enum.
   static String? _errorFor(
     ScheduleReadingState state,
     ScheduleReadingField field,

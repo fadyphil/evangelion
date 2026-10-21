@@ -30,6 +30,20 @@ import 'package:flutter/material.dart';
 ///   move;
 /// * the server's draft arrives, the incoming text differs from the empty
 ///   controller, and the field is filled.
+///
+/// ## AND THE WIDGET REPORTS **ONLY WHAT THE READER DID**
+///
+/// The sync is the other direction, and it is the one that can go wrong: the
+/// widget writes its own incoming text into a controller, the controller tells
+/// its listener, and the listener is the widget's way of reporting a
+/// keystroke. So a write the widget made on purpose — the server's draft
+/// arrives and the field is filled — arrived at the page as an edit the
+/// reader had made, and the cubit behind the page answers an edit by dropping
+/// the server's refusal with it.
+///
+/// **A SERVER'S ANSWER COULD VANISH IN THE FRAME IT ARRIVED.** The flag
+/// `_writing` is what the widget holds while it writes, and the report is
+/// suppressed for exactly that window.
 class QuestionOptionEditor extends StatefulWidget {
   /// An option under [letter], with its two texts.
   const QuestionOptionEditor({
@@ -71,9 +85,22 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
   final TextEditingController _arabic = TextEditingController();
   final TextEditingController _english = TextEditingController();
 
+  /// Whether the widget is writing into a controller on purpose.
+  ///
+  /// **A WRITE THE WIDGET MADE IS NOT SOMETHING THE READER DID.** The
+  /// one-sided sync fills a controller from the widget's own incoming text,
+  /// and the controller tells its listener — which is the widget's way of
+  /// reporting a keystroke. A write the widget made on purpose reported that
+  /// way told the page the reader had typed, and the cubit behind the page
+  /// answers an edit by dropping the server's refusal with it: **a server's
+  /// answer could vanish in the frame it arrived.**
+  bool _writing = false;
+
   @override
   void initState() {
     super.initState();
+    // **The two fields are written before the listeners are attached**, so
+    // the first text the widget holds is not reported either.
     _arabic.text = widget.arabicText;
     _english.text = widget.englishText;
     _arabic.addListener(_onArabicChanged);
@@ -87,10 +114,28 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
     // incoming text differs from what it already holds, so a rebuild never
     // moves the caret and the server's draft never fights the admin.
     if (widget.arabicText != _arabic.text) {
-      _arabic.text = widget.arabicText;
+      _write(_arabic, widget.arabicText);
     }
     if (widget.englishText != _english.text) {
-      _english.text = widget.englishText;
+      _write(_english, widget.englishText);
+    }
+  }
+
+  /// Writes [text] into [controller], and reports **nothing**.
+  ///
+  /// **The write is the widget's own**, and the controller's listener is the
+  /// widget's own way of reporting a keystroke — so a listener that reported
+  /// this write would be telling the page the reader had typed.
+  ///
+  /// The controller notifies its listeners **synchronously**, so [_writing] is
+  /// up for the whole write and down before the frame ends, and the
+  /// `try`/`finally` puts it down even if the write throws.
+  void _write(TextEditingController controller, String text) {
+    _writing = true;
+    try {
+      controller.text = text;
+    } finally {
+      _writing = false;
     }
   }
 
@@ -105,10 +150,15 @@ class _QuestionOptionEditorState extends State<QuestionOptionEditor> {
     super.dispose();
   }
 
-  void _onArabicChanged() => widget.onChanged(arabic: true, text: _arabic.text);
+  void _onArabicChanged() {
+    if (_writing) return;
+    widget.onChanged(arabic: true, text: _arabic.text);
+  }
 
-  void _onEnglishChanged() =>
-      widget.onChanged(arabic: false, text: _english.text);
+  void _onEnglishChanged() {
+    if (_writing) return;
+    widget.onChanged(arabic: false, text: _english.text);
+  }
 
   @override
   Widget build(BuildContext context) {

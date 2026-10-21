@@ -211,11 +211,23 @@ final class QuestionMapper {
 
   // --- typed reads ----------------------------------------------------------
 
-  Result<String> _string(Map<Object?, Object?> body, String key) {
+  /// Reads [key] out of [body] as a string.
+  ///
+  /// [path] is the **field's path in the body**, and it defaults to [key]
+  /// because a top-level field's path *is* its key. A nested field has to
+  /// say where it came from: the option's two halves are read by this same
+  /// reader, and a refusal that said only `ar` would name the field without
+  /// naming the option that carried it — the same sentence for every option
+  /// in the draft, and a reader unable to tell which one was wrong.
+  Result<String> _string(
+    Map<Object?, Object?> body,
+    String key, {
+    String? path,
+  }) {
     final Object? value = body[key];
     return value is String
         ? Result<String>.of(value)
-        : Result<String>.left(_bad(key, value, 'a String'));
+        : Result<String>.left(_bad(path ?? key, value, 'a String'));
   }
 
   Result<List<String>> _stringList(Map<Object?, Object?> body, String key) {
@@ -272,6 +284,18 @@ final class QuestionMapper {
   ///
   /// An **empty** map is still legal — it is the domain's one representation of
   /// "a question with no options", and the commit body omits the key for it.
+  ///
+  /// ## AND EVERY REFUSAL HERE NAMES THE **FIELD'S PATH**
+  ///
+  /// The option is a map keyed by its **letter**, and the letter is knowable:
+  /// it is the key the body carries. So the refusal says `options.A.ar` and
+  /// not `ar` — the same spelling `options.A` already had, one level deeper.
+  ///
+  /// The bare `ar` was a finding and not a design: a draft with four options
+  /// and one broken half produced **the same sentence for all four**, and a
+  /// reader could not tell which option was wrong. Every other field in the
+  /// three mappers names its path — `students[0]`, `reading_ids[0]` — and this
+  /// one now does too.
   Result<Map<String, QuestionOption>> _options(
     Map<Object?, Object?> body,
     String key,
@@ -302,8 +326,8 @@ final class QuestionMapper {
           _bad('$key.$label', option, 'a JSON object'),
         );
       }
-      final Result<String> ar = _string(option, 'ar');
-      final Result<String> en = _string(option, 'en');
+      final Result<String> ar = _string(option, 'ar', path: '$key.$label.ar');
+      final Result<String> en = _string(option, 'en', path: '$key.$label.en');
       if (ar case Left<Failure, String>(value: final failure)) {
         return Result<Map<String, QuestionOption>>.left(failure);
       }
@@ -351,10 +375,17 @@ final class QuestionMapper {
     },
   );
 
-  Failure _bad(String key, Object? value, String expected) => Failure(
+  /// The refusal that names the field that was wrong.
+  ///
+  /// [path] is the field's **path in the body** — a top-level field's path is
+  /// its key, and a nested one says where it came from (`options.A.ar`).
+  /// The path is what makes two refusals about the same *kind* of field
+  /// distinguishable: `ar` and `en` are the two halves of every option, and a
+  /// draft with four options has eight of them.
+  Failure _bad(String path, Object? value, String expected) => Failure(
     kind: FailureKind.serialization,
     message:
-        'Could not read the question from $commitEndpoint: `$key` is '
+        'Could not read the question from $commitEndpoint: `$path` is '
         '${value == null ? 'absent' : '$value (${value.runtimeType})'}, '
         'and $expected was expected.',
   );

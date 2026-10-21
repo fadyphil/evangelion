@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/common/result.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
@@ -80,6 +82,32 @@ const QuestionDraft serverDraft = QuestionDraft(
 
 /// The reading the route carried.
 const String readingId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+/// The cubit, with the page's reports counted.
+///
+/// **A spy, and not a mock**: the question is *which* of the cubit's writers
+/// the page called, and a subclass that records the call and then does the
+/// real thing answers it without replacing the cubit's behaviour. A mock
+/// would have to answer `state` as well, and the state is what the page
+/// renders.
+final class _SpyCubit extends QuestionAuthoringCubit {
+  _SpyCubit({required super.generateAiDraft, required super.commitQuestions});
+
+  /// Every edit the page reported, in the page's own words.
+  final List<String> reported = <String>[];
+
+  @override
+  void setPointsText(String text) {
+    reported.add('points: $text');
+    super.setPointsText(text);
+  }
+
+  @override
+  void setSortOrderText(String text) {
+    reported.add('order: $text');
+    super.setSortOrderText(text);
+  }
+}
 
 void main() {
   /// The editor, over a fresh fake and a fresh cubit.
@@ -169,6 +197,35 @@ void main() {
       // **The field keeps what the admin typed**, and the cubit holds it.
       expect(find.text('What did the boy say?'), findsOneWidget);
       expect(fixture.cubit.state.draft!.promptEn, 'What did the boy say?');
+    });
+  });
+
+  group('the page\'s own writes', () {
+    testWidgets('are not reported to the cubit as edits', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo();
+      final _SpyCubit cubit = _SpyCubit(
+        generateAiDraft: GenerateAiDraft(repo),
+        commitQuestions: CommitQuestions(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: cubit, readingId: readingId),
+        size: const Size(390, 1500),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      // **The editor's one-sided sync writes the state's `pointsText` ('10')
+      // and `sortOrderText` ('1') into two controllers that start empty**,
+      // and that write is the page's own — a write the page made on purpose
+      // is not something the reader did. Reported as an edit, it told the
+      // cubit the reader had typed, and the cubit's edit writer dropped the
+      // server's refusal with the edit it invented.
+      expect(cubit.reported, isEmpty);
     });
   });
 
@@ -285,6 +342,76 @@ void main() {
       // **And the retry is named in the reader's own language.**
       expect(find.text('حاول مرة أخرى'), findsOneWidget);
     });
+
+    testWidgets(
+      'the server sent is still on screen after the editor\'s first rebuild',
+      (WidgetTester tester) async {
+        final ({QuestionAuthoringCubit cubit, _Repo repo}) fixture = editor();
+        fixture.repo.draft = const Left<Failure, QuestionDraft>(
+          Failure(
+            kind: FailureKind.server,
+            message: 'The AI service is not configured.',
+          ),
+        );
+
+        await pumpServant(
+          tester,
+          QuestionAuthoringPage(cubit: fixture.cubit, readingId: readingId),
+          size: const Size(390, 1500),
+        );
+
+        // **The request is asked for in the first frame**, so the server's
+        // answer lands **before the editor's first rebuild** — the window in
+        // which the editor's own write happens, and the window in which the
+        // answer has to survive it.
+        unawaited(fixture.cubit.requestDraft());
+        await tester.pump();
+        await tester.pump();
+
+        // **The server's own sentence, still on screen.** The editor's
+        // one-sided sync writes the state's `pointsText` and `sortOrderText`
+        // into two controllers that start empty, and a write the page made on
+        // purpose is not something the reader did: reported as an edit, it
+        // took the failure with it, and the refusal was gone before the
+        // reader could read it.
+        expect(find.byType(ErrorView), findsOneWidget);
+        expect(find.text('The AI service is not configured.'), findsOneWidget);
+        expect(fixture.cubit.state.failure, isNotNull);
+      },
+    );
+
+    testWidgets(
+      'and it survives the editor being opened over a cubit that holds it',
+      (WidgetTester tester) async {
+        final ({QuestionAuthoringCubit cubit, _Repo repo}) fixture = editor();
+        fixture.repo.draft = const Left<Failure, QuestionDraft>(
+          Failure(
+            kind: FailureKind.server,
+            message: 'The AI service is not configured.',
+          ),
+        );
+
+        // **The cubit is a singleton** — `navigation_injection.dart` says so
+        // and gives the reason: a second instance would be a second draft.
+        // So a reader who left `/servant/questions` and came back finds the
+        // editor over the cubit that still holds the refusal.
+        fixture.cubit.setReadingId(readingId);
+        await fixture.cubit.requestDraft();
+        expect(fixture.cubit.state.failure, isNotNull);
+
+        await pumpServant(
+          tester,
+          QuestionAuthoringPage(cubit: fixture.cubit, readingId: readingId),
+          size: const Size(390, 1500),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(ErrorView), findsOneWidget);
+        expect(find.text('The AI service is not configured.'), findsOneWidget);
+        expect(fixture.cubit.state.failure, isNotNull);
+      },
+    );
 
     testWidgets('and the retry asks for a draft again', (
       WidgetTester tester,
