@@ -5330,16 +5330,17 @@ mistakes the mechanism for a fix for it.
 a controlled field that takes the value, reports **only the reader's input**, and
 owns its `TextEditingController` so that the page does not have to.
 
-**AND HOW IT TELLS THE READER'S INPUT FROM ITS OWN WRITE IS TWO COMPARISONS,
-NOT A FLAG.** The servant pages use a `_writing` boolean, and it works — but a
-boolean has to be set and cleared around **every** write, and the failure mode
-of a boolean that is not set is exactly defect **1**. The controlled field
-compares instead:
+**AND HOW IT TELLS THE READER'S INPUT FROM ITS OWN WRITE IS **THREE
+COMPARISONS**, NOT A FLAG.** The servant pages use a `_writing` boolean, and it
+works — but a boolean has to be set and cleared around **every** write, and the
+failure mode of a boolean that is not set is exactly defect **1**. The
+controlled field compares instead:
 
 | question | answer | what it buys |
 | --- | --- | --- |
 | *is the controller's new text the controlled value?* | then it is **the widget's own write** — or an echo of a value the state already holds — and **nothing is reported** | the server's draft arrives, the field fills, and the cubit is **not** told the admin typed it |
-| *is the controlled value the last text the widget reported?* | then the state has **caught up with the reader**, and **nothing is mirrored back** | a state one keystroke behind cannot revert the reader's newer keystrokes |
+| *is the controlled value the last text the widget reported?* | then the state has **caught up with the reader**, and **nothing is mirrored back** | the mirror's trigger stays unambiguous: **the state moving somewhere the reader did not put it** |
+| *did the controlled value move at all?* | if it did not, **nothing is mirrored** | a rebuild that does not change the value does not take the character the reader has just typed off the screen and put it back on the next one |
 
 **The first comparison is the crux, and it works because the widget only ever
 writes the controlled value into its controller.** There is no other write, so

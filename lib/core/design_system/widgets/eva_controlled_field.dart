@@ -59,18 +59,26 @@ import 'package:flutter/material.dart';
 /// writing, and the page has to know that the reader might be typing, and the
 /// two have to be told apart by a flag both of them can get wrong.
 ///
-/// **This widget compares instead.** It keeps two things and asks two
-/// questions:
+/// **This widget compares instead.** It keeps two things — the controlled value
+/// and the last text it reported — and asks two questions of them, and it
+/// holds a third guard of its own:
 ///
 /// | question | answer | what it buys |
 /// | --- | --- | --- |
 /// | *is the controller's new text the controlled value?* | then it is **this widget's own write** — or an echo of a value the state already holds — and **nothing is reported** | the server's draft arrives, the field fills, and the cubit is **not** told the admin typed it |
-/// | *is the controlled value the last text this widget reported?* | then the state has **caught up with the reader** — the controller already holds it, or holds more of it — and **nothing is mirrored back** | the reader's newer keystrokes are never reverted by a state that is one keystroke behind |
+/// | *is the controlled value the last text this widget reported?* | then the state has **caught up with the reader** — the controller already holds that text — and **nothing is mirrored back** | the mirror's only trigger stays unambiguous: **the state moving somewhere the reader did not put it** |
 ///
 /// The first question is the crux, and it works **because this widget only ever
 /// writes the controlled value into its controller.** There is no other write,
 /// so "the controller's text is the controlled value" is not a coincidence to be
 /// detected — it is the only thing that can have happened.
+///
+/// **AND THE MIRROR ITSELF HAS A THIRD GUARD, AND IT IS THE OLDEST ONE: THE
+/// CONTROLLED VALUE MUST HAVE *MOVED*.** A rebuild that does not change the
+/// value changes nothing to show, and a state that is one keystroke behind has
+/// not changed — so the character the reader has just typed stays on the
+/// screen. A mirror that ran on every rebuild would take it away and put it
+/// back on the next one.
 ///
 /// ## AND WHY THE COMPARISON IS AGAINST THE **CONTROLLED VALUE** AND NOT
 /// ## ONLY AGAINST THE LAST REPORTED TEXT
@@ -90,9 +98,9 @@ import 'package:flutter/material.dart';
 /// holds, and a value the state holds is not news.
 ///
 /// The last reported text is still needed — but for the **other** direction. It
-/// is what tells the mirror "the state has caught up with the reader", and it
-/// is what stops a state that is one keystroke behind from reverting the
-/// reader's newer keystrokes. **Two comparisons, two directions, and neither of
+/// is what tells the mirror "the state has caught up with the reader", and the
+/// mirror's whole trigger is then unambiguous: **the state moving somewhere the
+/// reader did not put it.** **Two comparisons, two directions, and neither of
 /// them is a flag.**
 ///
 /// ## WHAT IT DOES **NOT** DO
@@ -109,6 +117,16 @@ import 'package:flutter/material.dart';
 /// * **It does not fix a stale answer.** Defect #6 — an in-flight answer landing
 ///   under a form that had moved on — is a race in the cubit, and no field can
 ///   see it.
+/// * **It does not make a state that *refuses* a keystroke agree with the
+///   screen.** The mirror runs when the controlled value **moves**, so a state
+///   that takes a keystroke and then quietly keeps the old value leaves the
+///   reader's text on the screen until the value next moves. **That is a rule
+///   in the cubit, and this is the field's boundary**: the cubit must take
+///   every keystroke, or the screen and the state disagree and the field
+///   cannot tell which of them is right. Every cubit in this repository does
+///   take it — `setPointsText` writes `pointsText: text` and nothing else —
+///   and that is what makes the boundary empty here rather than merely
+///   unstated.
 ///
 /// ## THE COST, STATED RATHER THAN HIDDEN
 ///
@@ -232,7 +250,8 @@ class _EvaControlledFieldState extends State<EvaControlledField> {
   /// reader has typed something.
   ///
   /// It is what tells the mirror "the state has caught up with the reader", and
-  /// it is why a state one keystroke behind cannot revert a newer one.
+  /// it is what keeps the mirror's trigger unambiguous: **the state moving
+  /// somewhere the reader did not put it.**
   String? _lastReported;
 
   @override
@@ -256,12 +275,12 @@ class _EvaControlledFieldState extends State<EvaControlledField> {
     // A rebuild that does not change the value changes nothing to show, and a
     // mirror that ran anyway would fight the reader: the state is one keystroke
     // behind more often than not, and writing the older value back would take
-    // the character the reader has just typed off the screen.
+    // the character the reader has just typed off the screen — and put it back
+    // on the next rebuild, which is a caret jump nobody asked for.
     if (widget.value == oldWidget.value) return;
     // **THE STATE HAS CAUGHT UP WITH THE READER.** The controlled value is the
-    // last text this widget reported, so the controller already holds it — or
-    // holds more of it, because the reader has typed since. Writing it back
-    // would move the caret for nothing.
+    // last text this widget reported, so the controller already holds it, and
+    // writing it back would move the caret for nothing.
     if (widget.value == _lastReported) return;
     _mirror();
   }
