@@ -862,6 +862,58 @@ else
   printf '  %-10s %sthe file to stale is not in the scratch copy\n' "FAIL" "$R"
 fi
 
+# --- 13. keystroke-taker gate -----------------------------------------------
+# The keystroke-taker gate enforces the OTHER half of decision 188's rule: a
+# cubit behind a controlled field must TAKE every keystroke. A cubit that
+# refuses one leaves the field and the state disagreeing, and the field's
+# third guard means the disagreement is permanent.
+#
+#   refusal   a writer that returns early on a keystroke -> reported
+#
+# The control plants exactly the refusal the gate was written for: the
+# pre-fix `setOptionText`, which returned early when the option was missing.
+d=$(make_scratch keystroke)
+keystroke_run() { ( cd "$d" && flutter test test/core/design_system/widgets/keystroke_taker_check_test.dart 2>&1 ); }
+
+# 13a. a writer that REFUSES a keystroke is reported.
+#
+# The refusal is planted by hand rather than by reverting the file, so the
+# control does not depend on the shape of the fix — only on the rule.
+refusal_file="$d/lib/features/servant/presentation/cubit/question_authoring_cubit.dart"
+if [[ -f "$refusal_file" ]]; then
+  python3 - "$refusal_file" <<'PY'
+import re, sys
+path = sys.argv[1]
+src = open(path).read()
+# Plant a refusal INSIDE `setOptionText` — a keystroke for a letter with no
+# option is dropped instead of taken.
+#
+# **The method is located by name, and not by its body's first line.** The
+# first version of this control replaced the first occurrence of a line that
+# appears in SEVERAL writers, and it landed in `addOption` instead — which
+# refuses on purpose, and which the gate correctly ignores because it is not
+# a `set…` writer. The control was broken, not the gate; a control that plants
+# the wrong thing proves nothing about the thing it claims to prove.
+m = re.search(r'  void setOptionText\(.*?^  \}\) \{$', src, re.S | re.M)
+if m is None:
+    sys.exit("setOptionText's shape moved; the control needs updating")
+src = src[: m.end()] + "\n    if (!state.draft!.options.containsKey(letter)) {\n      return;\n    }" + src[m.end() :]
+open(path, "w").write(src)
+PY
+  out=$(keystroke_run); rc=$?
+  if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'question_authoring_cubit.dart'; then
+    record "keystroke (refusal)" "fired"
+    printf '  %-10s a planted refusal -> reported, and the gate exited %d\n' "$G" "$rc"
+  else
+    record "keystroke (refusal)" "COULD-NOT-FAIL"
+    printf '  %-10s %sa planted refusal -> exit %d; the gate did not report it\n' \
+      "FAIL" "$R" "$rc"
+  fi
+else
+  record "keystroke (refusal)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
 # --- summary -----------------------------------------------------------------
 echo
 echo "${B}Summary${N}"
