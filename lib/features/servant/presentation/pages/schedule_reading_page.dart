@@ -57,6 +57,39 @@ class ScheduleReadingPage extends StatelessWidget {
 /// widget is the caller. The **value** is the cubit's — the form's text — and
 /// the page reports every keystroke. The parse happens once, on submit, and
 /// it is the parse that refuses.
+///
+/// ## AND THE FORM IS **NOT READ BACK** — A KNOWN DEFECT, STATED HERE
+///
+/// The cubit holds the form's text and this page reports every keystroke,
+/// but this page **never reads the state back into its eight controllers**.
+/// The question editor has the one-sided sync for the same reason, and this
+/// screen does not — and the cubit is a **singleton**, and the registration
+/// in `navigation_injection.dart` says the form the admin is halfway
+/// through filling is one of the three reasons it is one.
+///
+/// **MEASURED, 2026-10-21**, over that one cubit, with a route popped and
+/// pushed again:
+///
+/// ```text
+/// field 0 after re-entry: ""
+/// state form after re-entry: ScheduleReadingForm(groupIdsText: 3,
+///   scheduledDateText: 2026-10-21, bookNumberText: 43, startChapterText: 3,
+///   startVerseText: 1, endChapterText: , endVerseText: 5, ...)
+/// asked the port for: [ReadingSchedule(groupIds: [3],
+///   scheduledDate: 2026-10-21, bookNumber: 43, startChapter: 3,
+///   startVerse: 1, endChapter: null, endVerse: 5, ...)]
+/// ```
+///
+/// **THE SCREEN SHOWS ONE FORM AND THE BUTTON SENDS ANOTHER.** The fields
+/// are empty, the state holds the whole passage, and "Schedule the
+/// reading" sends the passage the admin can no longer see — and the
+/// server's insert is `ON CONFLICT (group_id, scheduled_date) DO UPDATE`
+/// (`admin.routes.ts:157`), so it **replaces** the passage.
+///
+/// **THE FIX IS NOT ONE LINE.** The reverse sync needs the `_writing` flag
+/// the question editor has, because a write the page made on purpose is
+/// not something the reader did — and that flag is the whole of the
+/// question editor's `_write`.
 class _ScheduleBody extends StatefulWidget {
   const _ScheduleBody();
 

@@ -266,6 +266,37 @@ void main() {
       expect(find.text('حاول مرة أخرى'), findsOneWidget);
     });
 
+    testWidgets('and it is still on screen after the admin edits the form', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(
+        const Left<Failure, ScheduleResult>(
+          Failure(kind: FailureKind.server, message: 'no such cohort'),
+        ),
+      );
+      final ScheduleReadingCubit cubit = cubitOver(repo);
+
+      await pumpForm(tester, cubit);
+      await fillTheForm(tester);
+      await tester.ensureVisible(find.text('Schedule the reading'));
+      await tester.tap(find.text('Schedule the reading'));
+      await tester.pump();
+
+      expect(find.byType(ErrorView), findsOneWidget);
+
+      // **The admin corrects the form.** The server's refusal is about the
+      // request it answered, and a refusal that vanished because the reader
+      // typed would be a refusal the reader never got to read.
+      final Finder fields = find.byType(TextField);
+      await tester.ensureVisible(fields.at(0));
+      await tester.enterText(fields.at(0), '4');
+      await tester.pump();
+
+      expect(find.byType(ErrorView), findsOneWidget);
+      expect(find.text('no such cohort'), findsOneWidget);
+      expect(cubit.state.failure, isNotNull);
+    });
+
     testWidgets('and the retry asks again, for the same form', (
       WidgetTester tester,
     ) async {

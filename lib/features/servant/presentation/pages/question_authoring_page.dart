@@ -83,6 +83,21 @@ class QuestionAuthoringPage extends StatelessWidget {
 /// **A SERVER'S ANSWER COULD VANISH IN THE FRAME IT ARRIVED.** The flag
 /// `_writing` is what the page holds while it writes, and the report is
 /// suppressed for exactly that window.
+///
+/// ## AND THE PAGE REPORTS **NOTHING AT ALL** UNTIL THE READER DOES
+///
+/// The page used to **seed** the cubit with the six controllers' contents at
+/// mount, and the controllers start empty — so the seed told the cubit "the
+/// reader cleared the question", and a reader who left `/servant/questions`
+/// and came back found their edits gone. That is the **one thing the cubit's
+/// singleton exists to prevent** (`navigation_injection.dart` says so), and
+/// the seed defeated it.
+///
+/// So the page reports **the route's reading id and nothing else**, and the
+/// five other fields come from the **state** through the one-sided sync —
+/// which is why the page also **fills its own controllers at mount**: the
+/// controllers are the page's own and they are built empty every time, so
+/// the question on screen is the state's to show.
 class _Editor extends StatefulWidget {
   const _Editor({required this.state, this.readingId});
 
@@ -108,7 +123,12 @@ class _EditorState extends State<_Editor> {
   /// exactly those and not whatever is there.
   final List<VoidCallback> _listeners = <VoidCallback>[];
 
-  /// Whether the form has been reported to the cubit yet.
+  /// Whether the route's reading id has been given to the cubit yet.
+  ///
+  /// **ONCE, AND ONLY ONCE.** The route names the reading the editor is
+  /// opened for, and the admin may type another one into the field — so
+  /// applying the route's id again after a dependency change would undo
+  /// the admin's own correction.
   bool _seeded = false;
 
   /// Whether the page is writing into a controller on purpose.
@@ -133,6 +153,41 @@ class _EditorState extends State<_Editor> {
     super.didChangeDependencies();
     final QuestionAuthoringCubit cubit = context.read<QuestionAuthoringCubit>();
 
+    if (!_seeded) {
+      _seeded = true;
+      // **THE ROUTE'S READING ID, AND NOTHING ELSE.**
+      //
+      // **THE SEED USED TO REPORT THE SIX CONTROLLERS' CONTENTS**, and the
+      // controllers start empty — so the seed told the cubit "the reader
+      // cleared the question", and a reader who left `/servant/questions`
+      // and came back found their edits gone. That is the **one thing the
+      // cubit's singleton exists to prevent**: the registration in
+      // `navigation_injection.dart` says so in its own words.
+      //
+      // So the seed reports the reading id, which the **route** owns, and
+      // the five other fields come from the **state** through the one-sided
+      // sync. The route's id is the authority for the reading the editor is
+      // opened for, and the sync writes the state's reading id into the
+      // controller — so a state that did not carry the route's id would have
+      // the route's id wiped off the screen.
+      //
+      // **AND ONLY WHEN THE ROUTE CARRIES ONE.** The hub opens the editor
+      // with no reading id at all (`ServantHubEntry.questions` pushes a
+      // path), and the id in the field is the **admin's own** — so a route
+      // with no id must not wipe it, and a state that already holds one
+      // keeps it.
+      final String routeId = widget.readingId ?? '';
+      if (routeId.isNotEmpty) cubit.setReadingId(routeId);
+    }
+
+    // **THE PAGE FILLS ITS OWN CONTROLLERS FROM THE STATE, AND IT DOES IT
+    // BEFORE THE LISTENERS ARE ATTACHED.** The six controllers are the
+    // page's own and they are built empty, so the question the admin was
+    // writing is the **state's** to show — and a write the page made on
+    // purpose is not something the reader did, so it is made before the
+    // listeners are attached and it reports nothing.
+    _syncFrom(cubit.state);
+
     for (final VoidCallback listener in _listeners) {
       for (final TextEditingController controller in _controllers) {
         controller.removeListener(listener);
@@ -149,15 +204,6 @@ class _EditorState extends State<_Editor> {
     for (int i = 0; i < _controllers.length; i++) {
       _controllers[i].addListener(_listeners[i]);
     }
-
-    if (!_seeded) {
-      _seeded = true;
-      cubit
-        ..setReadingId(_readingId.text)
-        ..setPromptAr(_promptAr.text)
-        ..setPromptEn(_promptEn.text)
-        ..setCorrectAnswer(_correctAnswer.text);
-    }
   }
 
   /// The six controllers, in the order the listeners were added.
@@ -173,10 +219,22 @@ class _EditorState extends State<_Editor> {
   @override
   void didUpdateWidget(_Editor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // **The one-sided sync.** A controller is written only when the question
+    // **THE ONE-SIDED SYNC.** A controller is written only when the question
     // on screen says something different, so a rebuild never moves the caret
     // and the server's draft fills the fields without fighting the admin.
-    final QuestionAuthoringState state = widget.state;
+    _syncFrom(widget.state);
+  }
+
+  /// Writes the question in [state] into the six controllers.
+  ///
+  /// **THE STATE IS THE TRUTH, AND THE CONTROLLERS ARE THE PAGE'S.** The
+  /// two are one question in two shapes, and this is the direction that
+  /// fills the fields: the server's draft arrives, the admin comes back to
+  /// the route, and the six controllers are built empty every time.
+  ///
+  /// **AND IT REPORTS NOTHING.** Every write here is the page's own, and the
+  /// controller's listener is the page's own way of reporting a keystroke.
+  void _syncFrom(QuestionAuthoringState state) {
     _write(_readingId, state.readingId);
     _write(_promptAr, state.draft?.promptAr ?? '');
     _write(_promptEn, state.draft?.promptEn ?? '');
@@ -240,6 +298,21 @@ class _EditorState extends State<_Editor> {
             .read<QuestionAuthoringCubit>();
         final bool busy = state.status == QuestionAuthoringStatus.working;
         final QuestionDraft? draft = state.draft;
+        // **THE TYPE, AND NOT THE DRAFT'S NULLNESS.** A draft that does not
+        // exist yet is a question of the type the editor offers — an
+        // **MCQ** — and the two sentences below are about the *type*: a
+        // short-answer question has no options, and every other kind has
+        // some to add. So the sentence is read off the type, and a screen
+        // that read it off the draft's nullness would say "a short-answer
+        // question has no options" under a question that is not one.
+        final QuestionType questionType = draft?.type ?? QuestionType.mcq;
+        // **THE OPTIONS, ONCE.** The empty editor has no draft at all — "the
+        // first thing the admin writes creates the draft" is the cubit's own
+        // doc — and the options are read in two places: the editors the
+        // screen draws, and the letters the "add an option" button must not
+        // reuse.
+        final Map<String, QuestionOption> options =
+            draft?.options ?? const <String, QuestionOption>{};
 
         return NeuralScaffold(
           scrollable: true,
@@ -262,7 +335,7 @@ class _EditorState extends State<_Editor> {
                   ),
                   SegmentedControl<QuestionType>(
                     values: QuestionType.values,
-                    selected: draft?.type ?? QuestionType.mcq,
+                    selected: questionType,
                     labelOf: (QuestionType type) => switch (type) {
                       QuestionType.mcq => strings.servantQuestionsTypeMcq,
                       QuestionType.trueFalse =>
@@ -285,8 +358,7 @@ class _EditorState extends State<_Editor> {
                     controller: _promptEn,
                   ),
                   for (final MapEntry<String, QuestionOption> option
-                      in (draft?.options ?? const <String, QuestionOption>{})
-                          .entries)
+                      in options.entries)
                     QuestionOptionEditor(
                       key: ValueKey<String>(option.key),
                       letter: option.key,
@@ -301,17 +373,17 @@ class _EditorState extends State<_Editor> {
                               ),
                       onRemove: () => cubit.removeOption(option.key),
                     ),
-                  if (draft == null || draft.type != QuestionType.shortAnswer)
+                  if (questionType != QuestionType.shortAnswer)
                     EvaButton(
                       label: strings.servantQuestionsAddOption,
                       variant: EvaButtonVariant.ghost,
-                      onPressed: () => _addOption(cubit, draft),
+                      onPressed: () => _addOption(cubit, options),
                       labelFamily: arabicAwareFamily(
                         direction,
                         EvaTypography.uiFamily,
                       ),
                     ),
-                  if (draft == null || draft.type == QuestionType.shortAnswer)
+                  if (questionType == QuestionType.shortAnswer)
                     Text(
                       strings.servantQuestionsEmptyOptions,
                       style: arabicAware(
@@ -379,8 +451,16 @@ class _EditorState extends State<_Editor> {
   /// and its two controllers, and the first free letter is a fact about the
   /// editor rather than about the question. The cubit refuses a letter that is
   /// already in use, so a second tap cannot overwrite an option.
-  void _addOption(QuestionAuthoringCubit cubit, QuestionDraft? draft) {
-    final Set<String> used = draft?.options.keys.toSet() ?? const <String>{};
+  ///
+  /// **AND THE OPTIONS COME IN, NOT THE DRAFT.** The empty editor has no
+  /// draft at all — "the first thing the admin writes creates the draft" is
+  /// the cubit's own doc — so the caller passes the options it has, and an
+  /// editor with none passes none.
+  void _addOption(
+    QuestionAuthoringCubit cubit,
+    Map<String, QuestionOption> options,
+  ) {
+    final Set<String> used = options.keys.toSet();
     for (final String letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')) {
       if (used.contains(letter)) continue;
       cubit.addOption(letter);

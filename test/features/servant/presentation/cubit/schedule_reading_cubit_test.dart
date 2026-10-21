@@ -415,6 +415,72 @@ void main() {
       },
     );
 
+    test(
+      'an edit forgets the last answer, and the status that promised it',
+      () async {
+        final ScheduleReadingCubit cubit = filledCubit();
+        await cubit.submit();
+        expect(cubit.state.status, ScheduleReadingStatus.scheduled);
+        expect(cubit.state.result, result);
+
+        cubit.setBookNumber('44');
+
+        // **The answer goes**, because it answered a form that no longer
+        // exists — and the status that promised it goes with it, because a
+        // status that says "the server answered" with no answer on screen is
+        // a status about nothing.
+        expect(cubit.state.result, isNull);
+        expect(cubit.state.status, ScheduleReadingStatus.idle);
+
+        await cubit.close();
+      },
+    );
+
+    test('an edit keeps the server\'s failure, because the reader did not cause it', () async {
+      when(
+        () => repository.scheduleReading(any()),
+      ).thenAnswer((_) async => const Left<Failure, ScheduleResult>(failure));
+      final ScheduleReadingCubit cubit = filledCubit();
+      await cubit.submit();
+      expect(cubit.state.status, ScheduleReadingStatus.failed);
+      expect(cubit.state.failure, failure);
+
+      cubit.setBookNumber('44');
+
+      // **The server's answer is still on screen.** The admin corrected a
+      // field; the server has not said anything new, and a refusal that
+      // vanished because the reader typed would be a refusal the reader
+      // never got to read.
+      expect(cubit.state.failure, failure);
+      // **And the arm that names the request stays.** The status is what
+      // the screen reads to know which request failed, so a failure that
+      // kept its message but lost its arm would be about nothing.
+      expect(cubit.state.status, ScheduleReadingStatus.failed);
+
+      await cubit.close();
+    });
+
+    test('and an edit clears the form\'s own refusal', () async {
+      final ScheduleReadingCubit cubit = filledCubit();
+      // **The form is refused before the request is made** — the date is
+      // written the way the admin wrote it, and the form refuses it.
+      cubit.setScheduledDate('21/10/2026');
+      await cubit.submit();
+      expect(cubit.state.formError, ScheduleReadingFormError.invalidDate);
+      expect(cubit.state.formField, ScheduleReadingField.date);
+
+      cubit.setScheduledDate('2026-10-21');
+
+      // **The form's own refusal goes**, because the reader is correcting
+      // it — and it is a *different* refusal from the server's, and the two
+      // are told apart.
+      expect(cubit.state.formError, isNull);
+      expect(cubit.state.formField, isNull);
+      expect(cubit.state.failure, isNull);
+
+      await cubit.close();
+    });
+
     test('a request in flight survives an edit, and a second submit is refused', () async {
       // **A request that has not answered yet.** The busy state is the status,
       // and the busy state is what disables the submit button — so an edit

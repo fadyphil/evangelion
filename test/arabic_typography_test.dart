@@ -112,6 +112,7 @@ import 'package:evangelion/features/quiz/presentation/result_l10n.dart';
 import 'package:evangelion/features/quiz/presentation/widgets/quiz_option_card.dart';
 import 'package:evangelion/features/reading/presentation/reading_l10n.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
+import 'package:evangelion/features/servant/domain/entities/question_draft.dart';
 import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
 import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
 import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
@@ -2737,6 +2738,58 @@ void main() {
           ar.servantQuestionsPromptArLabel,
           ar.servantQuestionsPromptEnLabel,
           ar.servantQuestionsAddOption,
+          // **AND NOT `servantQuestionsEmptyOptions`.** The sentence is "a
+          // short-answer question has no options", and the empty editor is
+          // an **MCQ** — so the sentence belongs to the short-answer state
+          // and not to this one.
+          //
+          // **THE EMPTY EDITOR USED TO SHOW IT FOR ONE FRAME**, because the
+          // page's seed created the draft a frame after the first paint, and
+          // the sentence was drawn from the draft's *nullness* rather than
+          // from the type. The seed is gone, so the sentence is gone with
+          // the frame that drew it, and the run below is where it lives.
+          ar.servantQuestionsCorrectAnswerLabel,
+          ar.servantQuestionsPointsLabel,
+          ar.servantQuestionsOrderLabel,
+          ar.servantQuestionsDraftButton,
+          ar.servantQuestionsCommitButton,
+        ],
+      );
+      await expectNoTofuInAnyRun(tester, screen: '/servant/questions');
+    });
+
+    testWidgets('the Arabic arm, on a short-answer question', (
+      WidgetTester tester,
+    ) async {
+      // **THE STATE THE SHORT-ANSWER SENTENCE BELONGS TO.** The editor's
+      // two sentences are about the **type**: a short-answer question has
+      // no options, and every other kind has some to add. So the run the
+      // empty editor gave up is on screen here, and the gate checks its
+      // family in the Arabic arm like every other run.
+      final QuestionAuthoringCubit cubit = stubQuestionAuthoringCubit();
+      addTearDown(cubit.close);
+      cubit.setType(QuestionType.shortAnswer);
+
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: cubit),
+        locale: const Locale('ar'),
+      );
+
+      await expectArabicTypography(
+        tester,
+        screen: '/servant/questions',
+        expectedArabic: <String>[
+          ar.servantQuestionsTitle,
+          ar.servantQuestionsReadingIdLabel,
+          ar.servantQuestionsReadingIdNote,
+          ar.servantQuestionsTypeMcq,
+          ar.servantQuestionsTypeTrueFalse,
+          ar.servantQuestionsTypeShortAnswer,
+          ar.servantQuestionsPromptArLabel,
+          ar.servantQuestionsPromptEnLabel,
+          // **AND NOT `servantQuestionsAddOption`** — a short-answer
+          // question has no options to add.
           ar.servantQuestionsEmptyOptions,
           ar.servantQuestionsCorrectAnswerLabel,
           ar.servantQuestionsPointsLabel,

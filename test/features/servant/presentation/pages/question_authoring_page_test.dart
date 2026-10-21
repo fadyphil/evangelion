@@ -200,6 +200,89 @@ void main() {
     });
   });
 
+  // ## THE ROUTE BEING **OPENED AGAIN**
+  //
+  // The cubit is a **singleton** — `navigation_injection.dart` says so and
+  // gives the reason: "a reader who left `/servant/questions` and came back
+  // would find their edits gone". So the question the admin was writing has
+  // to survive the route being popped and pushed again over that one cubit.
+  //
+  // **AND THE POP IS A REAL DISMOUNT.** The page is a `StatefulWidget` with
+  // six controllers of its own, so the pop disposes them and the push builds
+  // new ones — which is what makes the question on screen the state's job
+  // rather than the controllers'.
+  group('the route\'s reading id', () {
+    testWidgets('is the one on screen, and the one in the state', (
+      WidgetTester tester,
+    ) async {
+      final ({QuestionAuthoringCubit cubit, _Repo repo}) fixture = editor();
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: fixture.cubit, readingId: readingId),
+        size: const Size(390, 1500),
+      );
+      await tester.pump();
+
+      // **THE ROUTE NAMES THE READING THE EDITOR IS OPENED FOR**, and the
+      // page gives it to the cubit — because the one-sided sync writes the
+      // *state's* reading id into the controller, so a state that did not
+      // carry the route's id would have the route's id wiped off the
+      // screen.
+      expect(fixture.cubit.state.readingId, readingId);
+      expect(find.text(readingId), findsOneWidget);
+    });
+  });
+
+  group('the route being opened again', () {
+    testWidgets('does not wipe the question the admin was writing', (
+      WidgetTester tester,
+    ) async {
+      final ({QuestionAuthoringCubit cubit, _Repo repo}) fixture = editor();
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: fixture.cubit),
+        size: const Size(390, 1500),
+      );
+
+      // **The admin writes.** The reading id is the first field, the Arabic
+      // prompt the second and the English prompt the third.
+      final Finder fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), readingId);
+      await tester.enterText(fields.at(1), 'سؤال');
+      await tester.enterText(fields.at(2), 'A question');
+      await tester.pump();
+
+      expect(fixture.cubit.state.draft!.promptEn, 'A question');
+
+      // **The route is popped and pushed again**, over the same singleton
+      // cubit — the hub pushes the route, and the cubit is one for the
+      // process.
+      await pumpServant(
+        tester,
+        const SizedBox.shrink(),
+        size: const Size(390, 1500),
+      );
+      await pumpServant(
+        tester,
+        QuestionAuthoringPage(cubit: fixture.cubit),
+        size: const Size(390, 1500),
+      );
+      await tester.pump();
+
+      // **The question is still the admin's** — and the reading id with it,
+      // because the admin typed that one too.
+      expect(fixture.cubit.state.draft, isNotNull);
+      expect(fixture.cubit.state.draft!.promptAr, 'سؤال');
+      expect(fixture.cubit.state.draft!.promptEn, 'A question');
+      expect(fixture.cubit.state.readingId, readingId);
+
+      // **And it is on screen**, and not only in the state: the six
+      // controllers are the page's own, and the page's own are built empty.
+      expect(find.text('A question'), findsOneWidget);
+      expect(find.text('سؤال'), findsOneWidget);
+    });
+  });
+
   group('the page\'s own writes', () {
     testWidgets('are not reported to the cubit as edits', (
       WidgetTester tester,

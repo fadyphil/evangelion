@@ -184,6 +184,13 @@ final class ScheduleReadingForm with _$ScheduleReadingForm {
 /// constructors, no `with*` methods at all. The cubit below builds the whole
 /// state at every `emit`, and there is no second spelling of that sentence
 /// for a writer to disagree with.
+///
+/// **And the invariant is two sentences.** A `failed` status carries the
+/// failure, and a `scheduled` status carries the result — so the status
+/// always names the request that failed, and a status that promises an
+/// answer never stands without one. An **edit** keeps the failure and the
+/// arm that names it, and drops the result and the arm that promised it,
+/// and [_edit] says why.
 @Freezed(copyWith: false)
 final class ScheduleReadingState with _$ScheduleReadingState {
   /// A state on the given arm.
@@ -227,6 +234,15 @@ final class ScheduleReadingState with _$ScheduleReadingState {
 /// §3's DIP row, and its mirror: no presentation file names a repository. The
 /// cubit depends on [ScheduleReading], so a test drives the real use case over
 /// a fake port.
+///
+/// ## AND AN **EDIT** CHANGES THE FORM AND NOTHING ELSE
+///
+/// Every writer below that answers something the reader did is an **edit**,
+/// and an edit keeps the server's **failure** and the **arm** that names the
+/// request it names — because the reader correcting a field is not the server
+/// changing its mind. The form's own refusal goes, and the server's answer
+/// goes, because both are about the form as it **was**. The rules are spelled
+/// out on [_edit], and they are the question cubit's rules verbatim.
 class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// Drives the form over [scheduleReading].
   ScheduleReadingCubit({required this.scheduleReading})
@@ -341,10 +357,21 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
 
   /// The new form, in a state that has forgotten the last outcome.
   ///
-  /// **A refusal is cleared by the next keystroke**, because a message that
-  /// outlives the field it is about is a message about something else — and
-  /// so is a result: the schedule on screen answered a form that no longer
-  /// exists.
+  /// **AN EDIT CHANGES THE FORM AND NOTHING ELSE**, and it has one rule, in
+  /// four parts:
+  ///
+  /// * **The server's failure stays.** It is the server's answer about the
+  ///   request it answered, and the reader correcting a field is not the
+  ///   server changing its mind. A refusal that vanished because the reader
+  ///   typed would be a refusal the reader never got to read.
+  /// * **The arm that names the failed request stays.** The status is what
+  ///   names **which** request failed, so a failure that kept its message
+  ///   but lost its arm would be about nothing.
+  /// * **The form's own refusal goes.** The reader is correcting it, and a
+  ///   message that outlives the field it is about is a message about
+  ///   something else.
+  /// * **The server's answer goes**, and the status that promised it goes
+  ///   with it — it answered a form that no longer exists.
   ///
   /// ## AND A REQUEST **IN FLIGHT STAYS IN FLIGHT**
   ///
@@ -357,12 +384,32 @@ class ScheduleReadingCubit extends Cubit<ScheduleReadingState> {
   /// first one wrote.
   void _edit(ScheduleReadingForm form) => emit(
     ScheduleReadingState(
-      status: state.status == ScheduleReadingStatus.submitting
-          ? ScheduleReadingStatus.submitting
-          : ScheduleReadingStatus.idle,
+      status: _statusAfterEdit(),
       form: form,
+      failure: state.failure,
     ),
   );
+
+  /// The status an **edit** leaves behind.
+  ///
+  /// **THE FAILED REQUEST KEEPS ITS ARM.** The failure is the server's
+  /// answer about one request, and the status is what names that request —
+  /// so an edit that kept the message and dropped the arm would leave a
+  /// state that says "something failed" and cannot say what.
+  ///
+  /// **AND THE OTHER TWO ARMS ARE ABOUT THE FORM.** A request in flight
+  /// stays in flight, and an answer that has gone leaves an idle form.
+  ScheduleReadingStatus _statusAfterEdit() => switch (state.status) {
+    // **A request in flight stays in flight** — see `_edit`.
+    ScheduleReadingStatus.submitting => ScheduleReadingStatus.submitting,
+    // **The failed request keeps its arm**, because the failure it names is
+    // still on screen.
+    ScheduleReadingStatus.failed => ScheduleReadingStatus.failed,
+    // **The answer goes**, because it answered a form that no longer
+    // exists — and the status that promised it goes with it.
+    ScheduleReadingStatus.scheduled => ScheduleReadingStatus.idle,
+    ScheduleReadingStatus.idle => ScheduleReadingStatus.idle,
+  };
 }
 
 /// The form, parsed — or the reason it could not be.
