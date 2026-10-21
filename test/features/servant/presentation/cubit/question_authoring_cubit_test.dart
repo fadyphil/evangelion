@@ -265,6 +265,152 @@ void main() {
         await cubit.close();
       },
     );
+
+    blocTest<QuestionAuthoringCubit, QuestionAuthoringState>(
+      'and a failed commit is the server\'s own failure, with the question kept',
+      setUp: () {
+        when(
+          () => repository.commitQuestions(
+            readingId: any(named: 'readingId'),
+            questions: any(named: 'questions'),
+          ),
+        ).thenAnswer((_) async => const Left<Failure, CommitResult>(failure));
+      },
+      build: cubitWith,
+      seed: () => const QuestionAuthoringState(
+        status: QuestionAuthoringStatus.ready,
+        readingId: readingId,
+        draft: draft,
+      ),
+      act: (QuestionAuthoringCubit cubit) => cubit.commit(),
+      expect: () => <QuestionAuthoringState>[
+        const QuestionAuthoringState(
+          status: QuestionAuthoringStatus.working,
+          readingId: readingId,
+          draft: draft,
+        ),
+        // **The question is kept**, because the question on screen is the one
+        // the server refused, and a form that emptied itself on a refusal
+        // would make the admin write it a second time.
+        const QuestionAuthoringState(
+          status: QuestionAuthoringStatus.commitFailed,
+          readingId: readingId,
+          draft: draft,
+          failure: failure,
+        ),
+      ],
+    );
+
+    test(
+      'and a points value that is not a whole number is refused, and nothing '
+      'is asked',
+      () async {
+        final QuestionAuthoringCubit cubit = cubitWith();
+        cubit.setPromptAr('سؤال');
+        cubit.setPromptEn('A question');
+        cubit.setCorrectAnswer('A');
+        // **Half-typed, not wrong.** `1` on its way to `12` is a string, and
+        // the commit parses the text and refuses when it cannot.
+        cubit.setPointsText('ten');
+        await cubit.commit();
+
+        expect(cubit.state.formError, QuestionAuthoringFormError.invalidNumber);
+        // **And the draft keeps the last value it understood** — the draft's
+        // number is 10, because `ten` never parsed.
+        expect(cubit.state.draft!.pointsValue, 10);
+        expect(cubit.state.pointsText, 'ten');
+        verifyNever(
+          () => repository.commitQuestions(
+            readingId: any(named: 'readingId'),
+            questions: any(named: 'questions'),
+          ),
+        );
+
+        await cubit.close();
+      },
+    );
+  });
+
+  group('the retry', () {
+    test('after a failed commit, it commits the same question again', () async {
+      when(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      ).thenAnswer((_) async => const Left<Failure, CommitResult>(failure));
+      final QuestionAuthoringCubit cubit = cubitWith();
+      cubit.setPromptAr('سؤال');
+      cubit.setPromptEn('A question');
+      cubit.setCorrectAnswer('A');
+      await cubit.commit();
+      expect(cubit.state.status, QuestionAuthoringStatus.commitFailed);
+
+      when(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      ).thenAnswer((_) async => Result<CommitResult>.of(commitResult));
+      await cubit.retry();
+
+      // **The commit, and not the draft** — the failure named the request that
+      // failed, and a retry that repeated the wrong one would answer a
+      // question the admin did not ask again.
+      expect(cubit.state.status, QuestionAuthoringStatus.ready);
+      expect(cubit.state.commitResult, commitResult);
+      verify(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      ).called(2);
+      verifyNever(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      );
+
+      await cubit.close();
+    });
+
+    test('after a failed draft, it asks for a draft again', () async {
+      when(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) async => const Left<Failure, QuestionDraft>(failure));
+      final QuestionAuthoringCubit cubit = cubitWith();
+      await cubit.requestDraft();
+      expect(cubit.state.status, QuestionAuthoringStatus.draftFailed);
+
+      when(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) async => Result<QuestionDraft>.of(draft));
+      await cubit.retry();
+
+      expect(cubit.state.status, QuestionAuthoringStatus.ready);
+      expect(cubit.state.draft, draft);
+      verify(
+        () => repository.generateAiDraft(
+          readingId: any(named: 'readingId'),
+          type: any(named: 'type'),
+        ),
+      ).called(2);
+      verifyNever(
+        () => repository.commitQuestions(
+          readingId: any(named: 'readingId'),
+          questions: any(named: 'questions'),
+        ),
+      );
+
+      await cubit.close();
+    });
   });
 
   group('the editor', () {
@@ -277,6 +423,27 @@ void main() {
       expect(cubit.state.draft, isNotNull);
       expect(cubit.state.draft!.promptEn, 'A question');
       expect(cubit.state.status, QuestionAuthoringStatus.ready);
+
+      await cubit.close();
+    });
+
+    test('the question\'s type is the one the admin chose', () async {
+      final QuestionAuthoringCubit cubit = cubitWith();
+
+      // **The type is a question, and a question has one.** The control that
+      // offers it is the editor's, and the type it carries is the one the
+      // commit body will send (`admin.routes.ts:38`).
+      cubit.setType(QuestionType.trueFalse);
+
+      expect(cubit.state.draft!.type, QuestionType.trueFalse);
+      expect(cubit.state.status, QuestionAuthoringStatus.ready);
+
+      // **And the rest of the question is untouched**, because the type is one
+      // field and not a new question.
+      cubit.setPromptEn('A question');
+      cubit.setType(QuestionType.shortAnswer);
+      expect(cubit.state.draft!.type, QuestionType.shortAnswer);
+      expect(cubit.state.draft!.promptEn, 'A question');
 
       await cubit.close();
     });

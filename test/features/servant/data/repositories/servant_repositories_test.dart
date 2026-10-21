@@ -366,6 +366,70 @@ void main() {
       );
     });
 
+    test('and the commit route says the same', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException.connectionError(
+          requestOptions: RequestOptions(
+            path: '/api/v1/admin/questions/commit',
+          ),
+          reason: 'no socket',
+        ),
+      );
+
+      final Result<CommitResult> result = await admin.commitQuestions(
+        readingId: 'r1',
+        questions: const <QuestionDraft>[question],
+      );
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      expect(
+        (result as Left<Failure, CommitResult>).value.kind,
+        FailureKind.network,
+      );
+    });
+
+    test('and the AI route says the same', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException.connectionError(
+          requestOptions: RequestOptions(
+            path: '/api/v1/admin/questions/ai-generate',
+          ),
+          reason: 'no socket',
+        ),
+      );
+
+      final Result<QuestionDraft> result = await admin.generateAiDraft(
+        readingId: 'r1',
+        type: QuestionType.mcq,
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      expect(
+        (result as Left<Failure, QuestionDraft>).value.kind,
+        FailureKind.network,
+      );
+    });
+
+    test('and the report route says the same', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException.connectionError(
+          requestOptions: RequestOptions(path: '/api/v1/servant/reports/daily'),
+          reason: 'no socket',
+        ),
+      );
+
+      final Result<ServantReport> result = await report.loadDailyReport(
+        groupId: 3,
+        date: '2026-10-21',
+      );
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      expect(
+        (result as Left<Failure, ServantReport>).value.kind,
+        FailureKind.network,
+      );
+    });
+
     test(
       'and a 2xx body that cannot be read is a serialization failure',
       () async {

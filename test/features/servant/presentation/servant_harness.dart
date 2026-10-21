@@ -48,6 +48,25 @@ import '../../../support/design_system_harness.dart';
 TextDirection servantDirectionFor(Locale locale) =>
     locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr;
 
+/// The **other** language than [locale].
+///
+/// ## WHY THE HARNESS KNOWS ABOUT THE OTHER ARM
+///
+/// The app ships two languages, and a string that exists in only one of them
+/// is a string half the readers never see. So a test that asserts a message
+/// asserts it in **both** arms, and the second arm is reached by repainting
+/// the same widget in the other locale.
+///
+/// ## AND WHY THE REPINT IS **THE SAME WIDGET**
+///
+/// `pumpServant` builds the whole composition again, and the widget under test
+/// is rebuilt **in place** — the same type, the same key — so the `State`
+/// survives and the screen is still in the state the first arm put it in. That
+/// is what makes "the same state, in the other language" a claim about the
+/// state and not about a second, freshly-mounted screen.
+Locale otherArmFor(Locale locale) =>
+    locale.languageCode == 'ar' ? const Locale('en') : const Locale('ar');
+
 /// The delegates the app's own strings need.
 const List<LocalizationsDelegate<dynamic>> kServantLocalizationsDelegates =
     <LocalizationsDelegate<dynamic>>[

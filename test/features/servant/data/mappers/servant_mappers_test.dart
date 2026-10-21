@@ -356,6 +356,413 @@ void main() {
     });
   });
 
+  // ## THE REFUSALS, AND WHY THEY ARE **NOT** FIXTURES OF A FICTION
+  //
+  // A body the mapper cannot read is **a body the client did not ask for**:
+  // an empty answer, an HTML document from something between the app and the
+  // backend, or a shape the server has changed. Each refusal says **what it
+  // was**, because a message that only said "could not read" would leave a
+  // reader guessing which of the three it was.
+  //
+  // `SubmitResultMapper` reads the same three cases for the same reasons, and
+  // its own tests are the precedent — so these are the **same three**, on the
+  // servant portal's three routes.
+  group('ScheduleMapper — a body it cannot read', () {
+    test('an empty body is refused, and named as empty', () {
+      final Result<ScheduleResult> result = const ScheduleMapper()
+          .mapScheduleResult(null);
+
+      expect(result, isA<Left<Failure, ScheduleResult>>());
+      final Failure failure = (result as Left<Failure, ScheduleResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains(ScheduleMapper.endpoint));
+      expect(failure.message, contains('the response body was empty'));
+    });
+
+    test('an HTML document is refused, and named as one', () {
+      final Result<ScheduleResult> result = const ScheduleMapper()
+          .mapScheduleResult('<!doctype html><html><body>hi</body></html>');
+
+      expect(result, isA<Left<Failure, ScheduleResult>>());
+      final Failure failure = (result as Left<Failure, ScheduleResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('HTML document'));
+      expect(failure.message, contains('not JSON'));
+    });
+
+    test('anything else is refused, and named by what it was', () {
+      final Result<ScheduleResult> result = const ScheduleMapper()
+          .mapScheduleResult(42);
+
+      expect(result, isA<Left<Failure, ScheduleResult>>());
+      final Failure failure = (result as Left<Failure, ScheduleResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('is a int'));
+      expect(failure.message, contains('not a JSON object'));
+    });
+
+    test('a message that is not a string names the field it refused', () {
+      final Result<ScheduleResult> result = const ScheduleMapper()
+          .mapScheduleResult(<String, Object?>{
+            'message': 7,
+            'reading_ids': <String>[],
+          });
+
+      expect(result, isA<Left<Failure, ScheduleResult>>());
+      final Failure failure = (result as Left<Failure, ScheduleResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`message` is 7 (int)'));
+      expect(failure.message, contains('a String was expected'));
+    });
+
+    test('a reading id that is not a string names the index it refused', () {
+      final Result<ScheduleResult> result = const ScheduleMapper()
+          .mapScheduleResult(<String, Object?>{
+            'message': 'ok',
+            'reading_ids': <Object?>[7],
+          });
+
+      expect(result, isA<Left<Failure, ScheduleResult>>());
+      final Failure failure = (result as Left<Failure, ScheduleResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`reading_ids[0]` is 7 (int)'));
+    });
+  });
+
+  group('QuestionMapper — a body it cannot read', () {
+    test('an empty body is refused, and named as empty', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult(null);
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains(QuestionMapper.commitEndpoint));
+      expect(failure.message, contains('the response body was empty'));
+    });
+
+    test('an HTML document is refused, and named as one', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult('<!doctype html><html><body>hi</body></html>');
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('HTML document'));
+    });
+
+    test('anything else is refused, and named by what it was', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult(42);
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('is a int'));
+      expect(failure.message, contains('not a JSON object'));
+    });
+
+    test('a message that is not a string names the field it refused', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult(<String, Object?>{
+            'message': 7,
+            'question_ids': <String>[],
+          });
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`message` is 7 (int)'));
+    });
+
+    test('a question id that is not a string names the index it refused', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult(<String, Object?>{
+            'message': 'ok',
+            'question_ids': <Object?>[7],
+          });
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`question_ids[0]` is 7 (int)'));
+    });
+
+    test('a missing `question_ids` is refused, not read as no questions', () {
+      final Result<CommitResult> result = const QuestionMapper()
+          .mapCommitResult(<String, Object?>{'message': 'ok'});
+
+      expect(result, isA<Left<Failure, CommitResult>>());
+      final Failure failure = (result as Left<Failure, CommitResult>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`question_ids` is absent'));
+      expect(failure.message, contains('a list of strings was expected'));
+    });
+
+    test('an empty body is refused, and named as empty', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        null,
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('the response body was empty'));
+    });
+
+    test('a `draft_question` that is not an object is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{'draft_question': 'nope'},
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`draft_question` is nope (String)'));
+      expect(failure.message, contains('a JSON object was expected'));
+    });
+
+    test('a `type` that is not a string is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 5,
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <String, Object?>{},
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`type` is 5 (int)'));
+    });
+
+    test('a prompt that is not a string is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 5,
+            'prompt_en': 'q',
+            'options': <String, Object?>{},
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`prompt_ar` is 5 (int)'));
+    });
+
+    test('an `options` that is not an object is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': 'nope',
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`options` is nope (String)'));
+      expect(
+        failure.message,
+        contains('a JSON object of options was expected'),
+      );
+    });
+
+    test('an option under a key that is not a string is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <Object?, Object?>{
+              5: <String, Object?>{'ar': 'أ', 'en': 'A'},
+            },
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`options` is 5 (int)'));
+      expect(failure.message, contains('a String key was expected'));
+    });
+
+    test('an option that is not an object is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <String, Object?>{'A': 'nope'},
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`options.A` is nope (String)'));
+    });
+
+    test('an option without an Arabic text is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <String, Object?>{
+              'A': <String, Object?>{'ar': 5, 'en': 'A'},
+            },
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      // **The bare `ar`, and not `options.A.ar`.** The option's own two fields
+      // are read by `_string`, which is the same reader the draft's prompts go
+      // through — and it is given no path. So the refusal names the field and
+      // **not** which option carried it. That is a **finding**, not a design:
+      // a draft with four options and one broken half produces the same
+      // sentence for all four. Recorded in the report; the message is the
+      // code's, and the test pins what it says.
+      expect(failure.message, contains('`ar` is 5 (int)'));
+      expect(failure.message, contains('a String was expected'));
+    });
+
+    test('an option without an English text is refused', () {
+      final Result<QuestionDraft> result = const QuestionMapper().mapDraft(
+        <String, Object?>{
+          'draft_question': <String, Object?>{
+            'type': 'mcq',
+            'prompt_ar': 'س',
+            'prompt_en': 'q',
+            'options': <String, Object?>{
+              'A': <String, Object?>{'ar': 'أ', 'en': 5},
+            },
+            'correct_answer': 'A',
+          },
+        },
+      );
+
+      expect(result, isA<Left<Failure, QuestionDraft>>());
+      final Failure failure = (result as Left<Failure, QuestionDraft>).value;
+      expect(failure.kind, FailureKind.serialization);
+      // **The bare `en`**, for the reason the Arabic half above gives.
+      expect(failure.message, contains('`en` is 5 (int)'));
+    });
+  });
+
+  group('ReportMapper — a body it cannot read', () {
+    test('an empty body is refused, and named as empty', () {
+      final Result<ServantReport> result = const ReportMapper().map(null);
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains(ReportMapper.endpoint));
+      expect(failure.message, contains('the response body was empty'));
+    });
+
+    test('an HTML document is refused, and named as one', () {
+      final Result<ServantReport> result = const ReportMapper().map(
+        '<!doctype html><html><body>hi</body></html>',
+      );
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('HTML document'));
+    });
+
+    test('anything else is refused, and named by what it was', () {
+      final Result<ServantReport> result = const ReportMapper().map(42);
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('is a int'));
+      expect(failure.message, contains('not a JSON object'));
+    });
+
+    test('a cohort that is not a number names the field it refused', () {
+      final Result<ServantReport> result = const ReportMapper().map(
+        <String, Object?>{
+          'group_id': 'three',
+          'report_date': '2026-10-21',
+          'total_students': 1,
+          'completed_count': 0,
+          'students': <Object?>[],
+        },
+      );
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`group_id` is three (String)'));
+      expect(failure.message, contains('an int was expected'));
+    });
+
+    test('a roster that is not a list is refused', () {
+      final Result<ServantReport> result = const ReportMapper().map(
+        <String, Object?>{
+          'group_id': 3,
+          'report_date': '2026-10-21',
+          'total_students': 1,
+          'completed_count': 0,
+          'students': 'nope',
+        },
+      );
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`students` is nope (String)'));
+      expect(failure.message, contains('a list was expected'));
+    });
+
+    test('a row that is not an object names the row it refused', () {
+      final Result<ServantReport> result = const ReportMapper().map(
+        <String, Object?>{
+          'group_id': 3,
+          'report_date': '2026-10-21',
+          'total_students': 1,
+          'completed_count': 0,
+          'students': <Object?>['nope'],
+        },
+      );
+
+      expect(result, isA<Left<Failure, ServantReport>>());
+      final Failure failure = (result as Left<Failure, ServantReport>).value;
+      expect(failure.kind, FailureKind.serialization);
+      expect(failure.message, contains('`students[0]` is nope (String)'));
+      expect(failure.message, contains('a JSON object was expected'));
+    });
+  });
+
   group('ReportMapper', () {
     test('the path carries the query the server reads', () {
       // `admin.routes.ts:336-341` declares `group_id` and `date` as

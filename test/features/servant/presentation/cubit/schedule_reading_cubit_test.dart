@@ -243,6 +243,31 @@ void main() {
         ),
       ],
     );
+
+    test('and the retry asks again, for the same form', () async {
+      // **The screen has exactly one request**, so the retry is that request
+      // again — and the form it sends is the one on screen, not a fresh one.
+      when(
+        () => repository.scheduleReading(any()),
+      ).thenAnswer((_) async => const Left<Failure, ScheduleResult>(failure));
+      final ScheduleReadingCubit cubit = filledCubit();
+      await cubit.submit();
+      expect(cubit.state.status, ScheduleReadingStatus.failed);
+
+      when(() => repository.scheduleReading(any()))
+          .thenAnswer((_) async => Result<ScheduleResult>.of(result));
+      await cubit.retry();
+
+      expect(cubit.state.status, ScheduleReadingStatus.scheduled);
+      expect(cubit.state.result, result);
+      // **The same form**, twice — so the second request is not a different
+      // reading from the first.
+      final List<ReadingSchedule> sent = capturedSchedules();
+      expect(sent, hasLength(2));
+      expect(sent.last, expectedSchedule);
+
+      await cubit.close();
+    });
   });
 
   group('the refusals, and they come before the request', () {

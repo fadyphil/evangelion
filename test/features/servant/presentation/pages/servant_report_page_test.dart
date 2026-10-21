@@ -58,6 +58,21 @@ const ServantReport report = ServantReport(
   students: <RosterStudent>[student],
 );
 
+/// The second child on the roster.
+///
+/// **A roster of one has no separator**, and the rule between two children is
+/// only drawn when there are two of them.
+const RosterStudent secondStudent = RosterStudent(
+  userId: '22222222-2222-2222-2222-222222222222',
+  fullName: 'Peter George',
+  preferredLang: 'ar',
+  totalPoints: 25,
+  currentStreak: 2,
+  pointsEarnedToday: 0,
+  completedToday: false,
+  questionsProgress: '0/0',
+);
+
 /// The server's own refusal.
 const Failure failure = Failure(
   kind: FailureKind.server,
@@ -92,6 +107,10 @@ void main() {
       expect(find.text('120'), findsOneWidget);
       expect(find.text('4'), findsOneWidget);
       expect(repo.calls, 1);
+      // **And there is no rule between one child and the next**, because there
+      // is no next — the separator is the roster's, and a roster of one has
+      // nothing to separate.
+      expect(find.byType(HairlineDivider), findsNothing);
     });
 
     testWidgets('and the two totals are the server\'s own', (
@@ -108,6 +127,30 @@ void main() {
 
       expect(find.byType(StatTile), findsNWidgets(2));
       expect(find.byType(RosterRow), findsOneWidget);
+    });
+
+    testWidgets('and a rule between two children', (WidgetTester tester) async {
+      // **The rule is the separator**, and a separator is only built when
+      // there is something to separate — so the claim is made with **two**
+      // children, and the one-child roster above is the failing direction.
+      const ServantReport two = ServantReport(
+        groupId: 3,
+        reportDate: '2026-10-21',
+        totalStudents: 2,
+        completedCount: 1,
+        students: <RosterStudent>[student, secondStudent],
+      );
+      final _Repo repo = _Repo(Result<ServantReport>.of(two));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await askForTheRoster(tester);
+
+      expect(find.byType(RosterRow), findsNWidgets(2));
+      expect(find.byType(HairlineDivider), findsOneWidget);
     });
   });
 
@@ -159,6 +202,21 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Try again'), findsOneWidget);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.byType(ErrorView), findsOneWidget);
+      expect(
+        find.text('No scheduled reading found for your cohort today'),
+        findsOneWidget,
+      );
+      // **And the retry is named in the reader's own language.**
+      expect(find.text('حاول مرة أخرى'), findsOneWidget);
     });
 
     testWidgets('and the retry asks again', (WidgetTester tester) async {
@@ -194,6 +252,133 @@ void main() {
 
       expect(find.text('The cohort must be a whole number.'), findsOneWidget);
       expect(repo.calls, 0);
+    });
+
+    testWidgets('and says so in the reader\'s own language too', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ServantReport>.of(report));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await tester.enterText(find.byType(TextField).first, 'three');
+      await tester.tap(find.text('Show the roster'));
+      await tester.pump();
+
+      expect(find.text('The cohort must be a whole number.'), findsOneWidget);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.text('يجب أن تكون المجموعة عددًا صحيحًا.'), findsOneWidget);
+    });
+
+    testWidgets('refuses an empty date, and asks nothing', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ServantReport>.of(report));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      // **The date is pre-filled with today**, so the refusal is about the
+      // admin clearing it — and the server would have defaulted it, so this
+      // is this client's own gap rather than a server rule.
+      await tester.enterText(find.byType(TextField).first, '3');
+      await tester.enterText(find.byType(TextField).at(1), '');
+      await tester.tap(find.text('Show the roster'));
+      await tester.pump();
+
+      expect(find.text('The date is required.'), findsOneWidget);
+      expect(repo.calls, 0);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.text('التاريخ مطلوب.'), findsOneWidget);
+    });
+  });
+
+  group('the reader\'s own language', () {
+    testWidgets('and says its two totals in the reader\'s own language too', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ServantReport>.of(report));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await askForTheRoster(tester);
+
+      expect(find.text('CHILDREN'), findsOneWidget);
+      expect(find.text('COMPLETED'), findsOneWidget);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.text('الأطفال'), findsOneWidget);
+      expect(find.text('أكملوا'), findsOneWidget);
+    });
+
+    testWidgets('and the empty roster says so in both languages', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(
+        Result<ServantReport>.of(
+          const ServantReport(
+            groupId: 3,
+            reportDate: '2026-10-21',
+            totalStudents: 0,
+            completedCount: 0,
+            students: <RosterStudent>[],
+          ),
+        ),
+      );
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await askForTheRoster(tester);
+
+      expect(find.text('No roster'), findsOneWidget);
+      expect(
+        find.text('This cohort has no children for that day.'),
+        findsOneWidget,
+      );
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.text('لا قائمة'), findsOneWidget);
+      expect(
+        find.text('لا يوجد أطفال في هذه المجموعة في ذلك اليوم.'),
+        findsOneWidget,
+      );
     });
   });
 }

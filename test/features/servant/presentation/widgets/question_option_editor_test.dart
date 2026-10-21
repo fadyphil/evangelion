@@ -94,5 +94,39 @@ void main() {
       await tester.pump();
       expect(changes, hasLength(before));
     });
+
+    testWidgets('and a rebuild with a new text fills the two fields', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(
+        tester,
+        Material(
+          child: QuestionOptionEditor(
+            letter: 'A',
+            arabicText: '',
+            englishText: '',
+            onChanged: ({required bool arabic, required String text}) {},
+          ),
+        ),
+      );
+
+      // **The server's draft arrives**, and the two fields are filled from it.
+      // The widget is the same type and the same key, so its `State` survives
+      // the rebuild and the one-sided sync is what fills the fields.
+      await pumpServant(
+        tester,
+        Material(
+          child: QuestionOptionEditor(
+            letter: 'A',
+            arabicText: 'الخير',
+            englishText: 'The good',
+            onChanged: ({required bool arabic, required String text}) {},
+          ),
+        ),
+      );
+
+      expect(find.text('الخير'), findsOneWidget);
+      expect(find.text('The good'), findsOneWidget);
+    });
   });
 }
