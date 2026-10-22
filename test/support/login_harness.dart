@@ -26,6 +26,14 @@ import 'design_system_harness.dart';
 /// responsible for the composition root. So the page takes one and the harness
 /// builds it.
 ///
+/// **AND THE PARAMETER IS **NULLABLE**, BECAUSE THE PRODUCTION BRANCH IS A
+/// BRANCH.** A harness that always passed a bloc would never mount the page the
+/// way production mounts it — and the production branch is where the page
+/// dispatches `AuthStarted` on the locator's bloc, which is the dispatch that
+/// can take the reader's chosen role away from them. So `bloc: null` means
+/// "the page resolves its own", and the suite that wants the production branch
+/// registers a bloc in the locator and asks for it.
+///
 /// ## AND WHY `pumpWidget`, NOT `pumpAndSettle`
 ///
 /// This page has no ambient animation of its own — `evaPrimitiveHarness` mounts it
@@ -40,7 +48,9 @@ TextDirection directionFor(Locale locale) =>
 
 Future<void> pumpLogin(
   WidgetTester tester, {
-  required AuthBloc bloc,
+  // **NULLABLE**, and `null` means "the page resolves its own from the
+  // locator" — the production path. See the header's own paragraph.
+  AuthBloc? bloc,
   // [child] replaces the page entirely, for the negative control in
   // `login_text_scale_test.dart`, which needs a widget that provably overflows.
   LoginResultCallback? onResult,

@@ -127,9 +127,30 @@ sealed class AuthEvent with _$AuthEvent {
 /// Ask whether a session already exists, so a cold launch can restore instead of
 /// forcing the form.
 ///
-/// Dispatched once, when the composition root builds the bloc. Emits no state of
-/// its own when there is none: the form is already what is on screen, and a
-/// second emit would be a rebuild for nothing.
+/// ## AND IT IS DISPATCHED BY THE **LOGIN PAGE**, FROM ITS `BUILD`
+///
+/// The page resolves the app's bloc from the locator and asks the question
+/// from its `build` — and a `build` runs again on every rebuild of that page.
+/// **So the event arrives more than once**, and the first version of this doc
+/// said it arrived once, "when the composition root builds the bloc". The
+/// composition root does not dispatch it at all: `rg 'AuthStarted' lib/app/`
+/// answers nothing, and the page is the only dispatcher.
+///
+/// ## AND SO THE EVENT MUST BE **IDEMPOTENT**, AND THE NO-SESSION ARM IS
+/// WHERE THAT IS DECIDED
+///
+/// The answer to "is there a session?" is about the session and about nothing
+/// else: the reader's form is kept, and the state that is already standing is
+/// re-stated rather than rebuilt. See [AuthBloc._onStarted].
+///
+/// ## AND IT EMITS IN **BOTH** ARMS, WHICH IT USED TO SAY IT DID NOT
+///
+/// The first version left `unknown` standing when there was no session, which
+/// left `signedOut` reachable only by pressing "Sign in" with a bad password
+/// or by signing out — so "no session" and "the form is up" were different
+/// states depending on how the reader arrived, and `unknown` outlived the
+/// only moment it described. `auth_bloc_test.dart` pins the transition
+/// instead.
 @freezed
 final class AuthStarted extends AuthEvent with _$AuthStarted {
   /// Creates the start-up request.
@@ -577,7 +598,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
         );
       case Left<Failure, AuthSession>():
-        emit(const AuthState(status: AuthSessionStatus.signedOut));
+        // **AND THE READER'S FORM IS **KEPT**, BECAUSE THERE IS NO SESSION TO
+        // REPLACE IT WITH.**
+        //
+        // **THE TWO ARMS ARE MIRRORS OF EACH OTHER.** A **session** replaces
+        // the form — the session's own role is the authority, and a restored
+        // session leaves the form empty so that no stale address sits in a box
+        // the reader cannot see. **No session** replaces nothing, so the form
+        // the reader filled in is still theirs.
+        //
+        // **MEASURED, 2026-10-22, over this bloc:** a second `AuthStarted`
+        // with no session used to emit a whole **new** state, so the address,
+        // the password and the **role** went back to their defaults. The role
+        // is the one that matters: it is what the sign-in carries into the
+        // session, so a reader who picked `admin_servant` and whose page
+        // rebuilt signed in as `kid` — and the client's own promise ("the
+        // client never claims `kid` while the UI says `admin_servant`") was a
+        // promise about a state the page could take away.
+        //
+        // **AND THE EVENT IS NOW **IDEMPOTENT**, WHICH IS THE POINT.** The
+        // login page dispatches `AuthStarted` from its `build`, and a build
+        // runs again on every rebuild of that page — so the event arrives more
+        // than once. Asking the same question twice must not change the
+        // answer, and it must not rebuild the screen either: the state this
+        // emits is the state that is already standing, so the bloc skips it.
+        //
+        // **AND THE SESSION IS CARRIED VERBATIM, AND THAT IS SAFE.** The only
+        // writer of the state's session is the sign-in, and the only thing
+        // that clears the repository's session is the sign-out — which clears
+        // this state too.
+        emit(state.copyWith(status: AuthSessionStatus.signedOut));
     }
   }
 

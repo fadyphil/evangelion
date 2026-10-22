@@ -1,3 +1,4 @@
+import 'package:evangelion/app/di/injection.dart';
 import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/auth_session.dart';
@@ -560,6 +561,66 @@ void main() {
       await pumpSettled(tester, fixture);
 
       expect(fixture.bloc.state.role, UserRole.kid);
+    });
+  });
+
+  // ## THE **PRODUCTION** BRANCH
+  //
+  // `LoginPage` resolves its bloc from the locator when none is given, and
+  // that is the production path: the page's own `build` dispatches
+  // `AuthStarted` on it, and a `build` runs again on every rebuild of the
+  // page. So the event arrives **more than once** — and the reader's own
+  // choices have to survive the second one.
+  //
+  // **AND NO SUITE EXERCISED THAT BRANCH** until now: every suite here passes
+  // its own bloc, so the page's `build` never dispatched anything, and the
+  // role a reader picked could not be lost by the thing that loses it.
+  group('the production branch — the page resolves its own bloc', () {
+    testWidgets('the chosen role survives the page\'s own re-check', (
+      WidgetTester tester,
+    ) async {
+      final LoginFixture fixture = buildFixture();
+      getIt.registerSingleton<AuthBloc>(fixture.bloc);
+      addTearDown(getIt.reset);
+
+      // **THE PAGE RESOLVES THE LOCATOR'S BLOC** and dispatches `AuthStarted`
+      // on it — which is what the production path does, and what no other
+      // suite in this file did.
+      await pumpLogin(tester);
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(
+        fixture.bloc.state.status,
+        AuthSessionStatus.signedOut,
+        reason: 'the page asked the question, and the answer was "no session"',
+      );
+
+      // **THE READER'S CHOICES** — the role on the picker, and the address in
+      // the box.
+      await tester.tap(
+        find.text(AppLocalizationsEn().authRoleAdmin.toUpperCase()),
+      );
+      await tester.enterText(_emailFinder, 'david@evangelion.app');
+      await tester.pump();
+      expect(fixture.bloc.state.role, UserRole.adminServant);
+
+      // **AND THE PAGE IS REBUILT** — the router builds the page again, and
+      // the page's `build` asks again.
+      await pumpLogin(tester);
+      await tester.pump(const Duration(milliseconds: 1200));
+
+      expect(
+        fixture.bloc.state.role,
+        UserRole.adminServant,
+        reason:
+            'a session check is a question about the session, and the role is '
+            'not that question\'s answer — so the second answer cannot take '
+            'the reader\'s choice away',
+      );
+      expect(
+        fixture.bloc.state.email,
+        'david@evangelion.app',
+        reason: 'and the same goes for the address the reader typed',
+      );
     });
   });
 

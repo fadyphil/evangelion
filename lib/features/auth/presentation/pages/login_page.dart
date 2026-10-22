@@ -331,6 +331,13 @@ class LoginPage extends StatelessWidget {
     // `BlocProvider(create:)`: the shorthand **closes** the bloc it creates, and a
     // bloc owned by the locator must outlive this page — the guard is still reading
     // `AuthBloc.state` when the form comes down.
+    //
+    // **AND THE QUESTION IS ASKED FROM `BUILD`, WHICH ASKS IT AGAIN.** A `build`
+    // runs again on every rebuild of this page, so the event arrives more than
+    // once — and the event is **idempotent** (`AuthStarted`'s doc), so the second
+    // answer does not take the reader's form with it. Asking it once, from an
+    // `initState`, is `HomePage`'s shape and this page is stateless; the
+    // idempotence is what makes the shape here defensible.
     final AuthBloc resolved =
         bloc ?? (getIt<AuthBloc>()..add(const AuthStarted()));
     final Widget form = BlocProvider<AuthBloc>.value(

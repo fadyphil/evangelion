@@ -126,6 +126,36 @@ void main() {
     );
 
     blocTest<AuthBloc, AuthState>(
+      'and a REPEATED AuthStarted does not take the form with it',
+      // The login page dispatches `AuthStarted` from its **build**, and a build
+      // runs again on every rebuild of that page — so the event arrives more
+      // than once, and the reader's own choices have to survive the second one.
+      //
+      // **AND THEY DID NOT.** The no-session arm emitted a whole **new** state,
+      // so the address, the password and the **role** went back to their
+      // defaults. The role is the one that matters: it is what the sign-in
+      // carries into the session, so a reader who picked `admin_servant` and
+      // whose page rebuilt signed in as `kid` — and the client's own promise
+      // ("the client never claims `kid` while the UI says `admin_servant`")
+      // was a promise about a state the page could take away.
+      build: build,
+      seed: () => const AuthState(
+        status: AuthSessionStatus.signedOut,
+        email: 'david@evangelion.app',
+        role: UserRole.adminServant,
+      ),
+      act: (AuthBloc bloc) => bloc.add(const AuthStarted()),
+      // **NOTHING AT ALL IS EMITTED**, because the answer is the state that is
+      // already standing — a question that has been asked twice must not
+      // rebuild the screen either.
+      expect: () => <AuthState>[],
+      verify: (AuthBloc bloc) {
+        expect(bloc.state.role, UserRole.adminServant);
+        expect(bloc.state.email, 'david@evangelion.app');
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
       'AuthStarted with a session goes straight to signed in',
       setUp: () {
         when(repository.getCurrentSession)
