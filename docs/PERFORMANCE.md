@@ -274,6 +274,17 @@ reader's phone, and the numbers land in this file beside the ones above.
 > may be read as a device measurement** until one does. The sentence above is
 > kept as the thing that was true, and annotated rather than rewritten.
 
+> **ANNOTATED AGAIN 2026-10-22 — a measurement now exists, and it is in §9.**
+> It is a **profile-mode run on a Linux desktop**, driven through the Dart
+> Tooling Daemon and the VM service, and it measured the **live ticker count**
+> and the **frame schedule rate** rather than the GPU. **It is not a phone
+> measurement and does not become one**, so the sentence above is still true
+> about a reader's phone. What it did establish is worth recording here
+> because it corrects an impression this section leaves: **the tick budget
+> reduces WORK PER FRAME, not the NUMBER OF FRAMES** — the ambient's two
+> controllers `repeat()` forever, so the app still asks for a frame every
+> vsync. §9.3 has the numbers.
+
 **And it is the only way to confirm §3.1 on the device.** Everything above is
 computed from the tree's own recorded `ns/px` figures and the device's pixel
 count — which is arithmetic, and arithmetic is not a measurement.
@@ -697,12 +708,95 @@ surface size changes the areas and may change the layer counts; the budgets in
 
 ---
 
-## 9. Reproducing everything in this file
+## 9. The on-device measurement, taken — and what it does and does not show
+
+**This is the first measurement in this file that came off a running app.**
+Everything above it is a widget count, a layer count, a write count, or
+arithmetic from the tree's own recorded rates. This section is the profile-mode
+run the instrument in §3.4 was built for, on the deployed app, on the dock.
+
+### 9.1 How it was taken
+
+| | |
+| --- | --- |
+| the build | `flutter run -d linux --profile --dart-define=PERF_TRACE=true` |
+| the instrument | `lib/core/diagnostics/frame_timing_recorder.dart` over `lib/core/diagnostics/frame_stats.dart` |
+| the runbook | `tool/perf/README.md` |
+| the two trees | the pre-fix tree (`3c59824`) and this one (`7fddac5`), **each carrying the same instrument and the same measurement-only patch** — a local session seeded before the first frame, so the app lands on the dock instead of the login page. Sign-in is local; there is no auth endpoint, so the seeded session is the state the form produces. **The patch is identical in both trees and changes no rendering and no scheduling.** |
+
+**And the app was driven through the Dart Tooling Daemon and the VM service** —
+`dtd` to find the instance, `vm_service` to connect to it, and `evaluate` in
+the app's own DI scope to switch tabs. The tabs were switched by evaluating
+`getIt<AppRouter>().navigatePath('/journey')` in
+`package:evangelion/app/di/navigation_injection.dart`'s scope, and the ticker
+count was read by evaluating
+`SchedulerBinding.instance.transientCallbackCount` in
+`package:evangelion/core/design_system/effects/neural_motion.dart`'s scope.
+
+### 9.2 The live ticker count — the leak is gone
+
+| the app is showing | before | after |
+| --- | --- | --- |
+| the **home** tab (the dock, the selah ring on screen) | **3** live tickers | **3** live tickers |
+| the **/journey** tab (the home tab alive but invisible) | **3** live tickers | **2** live tickers |
+
+**The ring behind an invisible tab is no longer ticking.** The two tickers
+that remain are the ambient's own — the float clock and the LUMEN shader clock
+(`neural_motion.dart:452`, `:462`), which live in the composition root above
+`MaterialApp` and are never muted. Before the fix the third was the selah
+ring's, and it was running while the reader was on a different tab.
+
+### 9.3 The frame schedule rate — **UNCHANGED**, and that is the finding
+
+| | before | after |
+| --- | --- | --- |
+| frames the app asks for, per second, on the home tab | **60.0** | **59.9** |
+
+**The tick budget did not make the app request fewer frames, and it was never
+going to.** `AmbientTickBudget` caps the aurora's **paints** at 30 Hz and the
+ambient's **notifications** at 20 Hz (`ambient_tick_budget.dart:74-78`), but
+the two `AnimationController`s in `NeuralMotionScope` **`repeat()` forever**
+(`neural_motion.dart:288`, `:293`), so the ticker is always active and the
+scheduler produces a frame every vsync on every screen.
+
+**So the budget buys WORK PER FRAME, not FRAMES.** The aurora's fragment
+shader runs at 30 paints a second instead of 60, and the dock's σ22 backdrop
+filter is re-evaluated far less often — that is real GPU work removed. But the
+app still asks for a frame every 16.7 ms, and the scheduler still delivers one.
+**§3.2 reads as if the budget made the app cheaper in frames; it did not**, and
+this section is where that is measured rather than assumed.
+
+### 9.4 The frame timings on the login scene — unchanged, and why that is correct
+
+| | before | after |
+| --- | --- | --- |
+| build | p50 **0.2 ms**, p95 **0.4 ms** | p50 **0.2 ms**, p95 **0.4 ms** |
+| raster | p50 **0.7 ms**, p95 **1.3 ms** | p50 **0.7 ms**, p95 **1.5 ms** |
+
+**Nothing in this dispatch touches the login screen**, so the numbers are
+expected to match, and they do — within the noise of a machine that is not
+quiet. **A reader should not take the p95 raster difference as a regression
+or an improvement**; it is 0.2 ms on a 1.3 ms figure.
+
+### 9.5 What this section is not
+
+- **It is not a phone.** Linux desktop raster is a different pipeline from a
+  phone's tile-based one. These are **directional** numbers, and the runbook
+  says so in the same words. **A profile-mode run on a reader's phone is still
+  not in this file**, and §3.4's claim about that is unchanged by this
+  section.
+- **It does not measure the GPU.** `rasterDuration` is the engine's raster
+  thread, not the fragment shader's cost on the GPU.
+- **The tab switch was a navigation, not a tap.** The reader's tap and the
+  400 ms swap are in `test/app/router/tab_ticker_gate_test.dart`.
+
+---
+
+## 10. Reproducing everything in this file
 
 ```bash
 # the rebuild boundary — prints the numbers and asserts the budgets
 flutter test test/rebuild_isolation_budget_test.dart
-
 # the ticker census (§5.2) — a tab the reader cannot see schedules nothing
 flutter test test/ticker_census_test.dart
 flutter test test/app/router/tab_ticker_gate_test.dart
@@ -722,6 +816,10 @@ flutter test test/features/settings/data/settings_single_writer_test.dart
 
 # the layer census (§8) — the mounted layers, the painted area, the sky's cap
 flutter test test/layer_census_test.dart
+
+# the on-device measurement (§9) — a profile build, driven through the DTD
+flutter run -d linux --profile --dart-define=PERF_TRACE=true
+# the runbook, with the VM-service route, is tool/perf/README.md
 
 # the whole suite
 flutter test
@@ -747,11 +845,19 @@ cannot see it and the gate for it is still open.**
 aurora's GPU cost (§3.1) is computed from the repository's own recorded
 `ns/px` figures and the device's pixel count; §5.1's **cost** rows, §5.3 and
 §5.4 are computed the same way, and §7.1's per-write cost is an **estimate**;
-and the on-device frame timing (§3.4) has **no numbers yet** — the recorder is
-built (`lib/core/diagnostics/frame_timing_recorder.dart`) and its runbook is
-`tool/perf/README.md`, but no profile-mode run on a reader's phone has
+and the on-device frame timing (§3.4) has **no numbers from a reader's phone** —
+the recorder is built (`lib/core/diagnostics/frame_timing_recorder.dart`) and
+its runbook is `tool/perf/README.md`, but no profile-mode run on a phone has
 happened. **All of them are marked, and none is stated as a measurement.**
 **The ripple's repaint rate (§5.1) and the settings write count (§7.1) are
 measured, but measured in a `flutter test` under fake async and a software
 rasteriser** — the same upper-bound caveat this file's preamble records — and
 neither is a device number.
+
+**§9 IS THE EXCEPTION, and it is marked as one.** The live ticker count and
+the frame schedule rate in §9 came off a **running profile build on a Linux
+desktop**, driven through the DTD and the VM service. **That is not a phone**,
+and §9.5 says so in the same words — the desktop rasteriser is a different
+pipeline, and the numbers are directional. **What it is not is a
+`flutter test` number**: it is the app, on a profile build, with a real
+scheduler.

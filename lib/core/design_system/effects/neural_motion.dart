@@ -467,8 +467,8 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
       // `disableAnimationsFactor`, and this controller's duration is not read at
       // all — `TickedLumenClock` reads `lastElapsedDuration`, which the ticker
       // owns and no behaviour rewrites. So the flag is not about correctness for
-      // the shader clock; it is about the four controllers above the scope not
-      // being collapsed to one frame by a fourth addition to the list.
+      // the shader clock; it is about the controllers above the scope not
+      // being collapsed to one frame by an addition to the list.
       animationBehavior: AnimationBehavior.preserve,
     );
     final EvaNeuralMotion motion = EvaNeuralMotion(
@@ -531,7 +531,7 @@ class _NeuralMotionScopeState extends State<NeuralMotionScope>
     if (widget.animationsEnabled == null) {
       WidgetsBinding.instance.removeObserver(this);
     }
-    // The four controllers are disposed **here**, by the host that owns the
+    // The controllers are disposed **here**, by the host that owns the
     // `TickerProvider`. `TickerProviderStateMixin.dispose` throws if any ticker
     // it created is still alive, so this is not merely tidy-up: leaving it out
     // turns every app shutdown into a FlutterError.

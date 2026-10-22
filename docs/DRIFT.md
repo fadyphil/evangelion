@@ -1295,3 +1295,32 @@ same file measures a painter that rides the **raw** clock with the same
 instrument and requires the instrument to report it as **over budget** — an
 instrument that cannot tell a gated painter from an ungated one is green about
 nothing.
+
+---
+
+## 23. `app.dart` — "The **four** shared ambient controllers"
+
+| | |
+| --- | --- |
+| **Claim** | `lib/app/app.dart:96` — "The **four** shared ambient controllers live in ONE `TickerProviderStateMixin` host above `MaterialApp`." Two more copies of the same number stood at `lib/core/design_system/effects/neural_motion.dart:470` and `:534`. |
+| **Reality** | The scope owns **two** `AnimationController`s: the float clock (`neural_motion.dart:452`) and the LUMEN shader clock (`:462`). The file that owns them **says so itself**, at `neural_motion.dart:12-15`: the prototype's four orbs' clocks "collapsed to **four** `[AnimationController]`s — float, hue, aurora, and the LUMEN shader clock — and the orbs' retirement took it to **two**: the float clock and the shader clock." |
+| **Fixed?** | **Yes — 2026-10-22.** All three copies now say "the shared ambient controllers" / "the controllers", and the number is gone rather than replaced, because the number was the claim and the count is what the code says. |
+
+**And this is how it was found, which is the part worth keeping.** The count
+was not read off the code — it was **measured on a running app**. The
+profile-mode measurement in `docs/PERFORMANCE.md` §9.2 read
+`SchedulerBinding.instance.transientCallbackCount` on the live dock, through
+the VM service, and it read **two** tickers with the ambient alone. The
+profile-mode run also produced the finding that made the number matter:
+**the tick budget reduces work per frame, not the number of frames**, because
+the two controllers `repeat()` forever and so the ticker is always active. A
+code comment that says "four" where there are two is a small thing; a comment
+that says "four" where the code has two, in the file that documents the tick
+budget, is a reader being sent to look for two controllers that are not there.
+
+**The shape of the mistake is the one this file keeps finding.** A number
+copied from an earlier state of the tree, left behind by a change that
+collapsed it, and never re-read because nothing was checking it. The
+`neural_motion.dart:12` doc is the *same file* telling the truth, six hundred
+lines away — which is exactly why the claim is dangerous: it is plausible,
+and it is locally confirmed by a sibling paragraph, and it is wrong.

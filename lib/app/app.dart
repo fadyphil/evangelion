@@ -93,7 +93,7 @@ import 'package:flutter/material.dart';
 /// ## §13.2 MITIGATION 2 IS STILL SATISFIED, AND NOW THE SCOPE IS **NESTED** INSIDE
 /// ## THE SETTINGS SCOPE RATHER THAN ABOVE IT
 ///
-/// The four shared ambient controllers live in ONE `TickerProviderStateMixin` host
+/// The shared ambient controllers live in ONE `TickerProviderStateMixin` host
 /// above `MaterialApp` — here and, in Phase 4, above `MaterialApp.router`. Two
 /// consequences worth stating:
 ///
