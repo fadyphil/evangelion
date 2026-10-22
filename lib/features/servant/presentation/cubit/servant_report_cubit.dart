@@ -38,11 +38,21 @@ enum ServantReportStatus {
 
 /// Why the report form refused to make a request.
 ///
-/// **A client-side refusal, and the reason the server would have refused
-/// anyway.** `admin.routes.ts:340-364` types the report's querystring as two
-/// required fields, and the cohort id is a number — so a form that asked for
-/// "the cohort" as a word would put a request on the wire that the server
-/// answers with a 400 the client could have predicted.
+/// **A client-side refusal, and the reason the server would have refused it
+/// anyway — with a 500, not a 400.** `admin.routes.ts:336-342` types the
+/// report's querystring as two **strings**, and it declares **no `required`
+/// array** at all: the route defaults them at `:373-374` (`group_id || '1'`
+/// and `date || today`). So a form that asked for "the cohort" as a word puts
+/// a request on the wire that the server hands to `parseInt`, and `parseInt`
+/// of a word is **`NaN`** — which Postgres refuses as `22P02 invalid input
+/// syntax for type integer: "NaN"`, and the client sees a **500**.
+///
+/// **So this refusal prevents a server fault, not a client error.** That
+/// distinction is why the rule exists here and not only in the schedule form:
+/// a 500 is a server's problem wearing the client's request, and the
+/// repository's own words at `identity_headers.dart:68` are that a 500 is *"not
+/// a thing a reader can be shown"*. The server's own measurement of it is
+/// recorded in `docs/BACKEND-VERIFICATION.md`.
 ///
 /// The refusal is a **named outcome** and not a message, because the page has
 /// to draw it in the reader's own language and the ARB is the only place that

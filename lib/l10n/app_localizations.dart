@@ -1688,7 +1688,7 @@ abstract class AppLocalizations {
   /// **'Questions'**
   String get servantReportProgress;
 
-  /// Written, not transcribed: the prototype draws no servant portal. The refusal the report form makes **before** it asks, because the report's querystring types the cohort as a number and the server's 400 would name a field the servant never saw.
+  /// Written, not transcribed: the prototype draws no servant portal. The refusal the report form makes **before** it asks. The report's querystring types the cohort as a **string** and the route hands it to `parseInt`, so a word becomes `NaN` and the database answers **500** (not 400) - a server's fault wearing the client's request. Refusing first means the reader is told the cohort is wrong in their own language, instead of being shown a 500.
   ///
   /// In en, this message translates to:
   /// **'The cohort must be a whole number.'**
