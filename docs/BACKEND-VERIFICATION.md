@@ -1,11 +1,12 @@
 # BACKEND-VERIFICATION.md — §5 re-measured live
 
 Every claim in `AGENT_CONTEXT.md` §5, checked against a running backend.
-**Measured 2026-10-11** against the **local** backend, and **re-measured
-2026-10-20** against the **deployed** one. The backend is read-only reference
-material; nothing in it was modified.
+**Measured 2026-10-11** against the **local** backend, **re-measured
+2026-10-20** against the **deployed** one, and **re-measured again
+2026-10-22** for the servant portal's four routes. The backend is read-only
+reference material; nothing in it was modified.
 
-**There are two sections below and they are not redundant.** The first
+**There are three sections below and they are not redundant.** The first
 (2026-10-11) measured the local in-memory backend. The second
 ([§ The deployed backend](#the-deployed-backend-2026-10-20), 2026-10-20)
 measured `https://evangelion-backend.vercel.app` — the backend the client now
@@ -13,6 +14,12 @@ talks to by default (ADR-0023). **They disagree in three places, and the
 disagreements are the interesting part**: all three have the same cause, which
 is that the deployed backend has a database and the local one does not.
 `AGENT_CONTEXT.md` §5.1 carries the table.
+
+The third
+([§ The portal's four routes](#the-portals-four-routes-measured-2026-10-22),
+2026-10-22) measured the **four routes the servant portal uses** against the
+same deployed backend, at the same commit — the first observation of any of
+them, and the measurement behind `SECURITY.md`'s advisory-gate section.
 
 ## How it was run, so you can repeat it
 
@@ -301,3 +308,205 @@ before its next invocation pays the cold start, and that was not done. The
 client's `connectTimeout` (10 s) and `receiveTimeout` (15 s) are the loopback
 backend's values and were left alone rather than re-tuned against a number
 nobody has.
+
+---
+
+## The portal's four routes, measured (2026-10-22)
+
+**Measured 2026-10-22** against the **deployed** backend —
+`https://evangelion-backend.vercel.app` — at
+**`YoussefOS2510/EvangelionBackend` @ `aa1da23`**, the same commit the
+[deployed section](#the-deployed-backend-2026-10-20) records. The GitHub API
+answers `aa1da23ae8901d030497cabef5e078f72e702b0d`, committed **2026-10-19**,
+so the deployment did not move between the two measurements.
+
+**These are the four routes the servant portal uses, and none of them had been
+observed before this.** The portal's screens were written against the
+backend's *declarations* (`admin.routes.ts`, `ai.routes.ts`), and the tests
+against those routes are **contract tests** — transcriptions, not captures
+(`test/features/servant/data/servant_contract_payloads.dart` says so). This
+section is the first record of what the deployment actually answers.
+
+### The commands, so you can repeat them
+
+```bash
+B=https://evangelion-backend.vercel.app
+
+# 1 — the roster
+curl -s "$B/api/v1/servant/reports/daily?group_id=3&date=2026-10-19"
+curl -s "$B/api/v1/servant/reports/daily?group_id=3&group_id=7&date=2026-10-19"
+curl -s "$B/api/v1/servant/reports/daily?group_id=3&date=not-a-date"
+curl -s "$B/api/v1/servant/reports/daily?group_id=3&date=2026-02-31"
+
+# 2 — the schedule
+curl -s -X POST -H "Content-Type: application/json" -d '{}' \
+  "$B/api/v1/admin/readings/schedule"
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"group_ids":[3],"scheduled_date":"22-10-2026","book_number":43,
+       "start_chapter":3,"start_verse":1,"end_verse":5}' \
+  "$B/api/v1/admin/readings/schedule"
+
+# 3 — the commit
+curl -s -X POST -H "Content-Type: application/json" -d '{}' \
+  "$B/api/v1/admin/questions/commit"
+
+# 4 — the AI draft
+curl -s -X POST -H "Content-Type: application/json" -d '{}' \
+  "$B/api/v1/admin/questions/ai-generate"
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"reading_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}' \
+  "$B/api/v1/admin/questions/ai-generate"
+```
+
+**AND NOTHING WAS WRITTEN, AND THE DOCUMENT SAYS WHY.** Every probe against
+the three `POST` routes is a body the server **refuses** — a validation
+error, or a foreign key that rolls the transaction back — and the fourth
+route is a `GET`. The one `POST` that answered **200** is the AI-draft route,
+which **drafts**: it reads a reading and returns a question, and it inserts
+nothing. No reading was scheduled and no question was committed.
+
+### 1 — `GET /api/v1/servant/reports/daily` — the cohort's roster
+
+**200**, and the body is the roster the client's `ReportMapper` reads:
+
+```jsonc
+{ "group_id": 3, "report_date": "2026-10-19",
+  "total_students": 4, "completed_count": 1,
+  "students": [
+    { "user_id": "22222222-2222-2222-2222-222222222222",
+      "full_name": "Peter George (Grade 6)", "preferred_lang": "ar",
+      "total_points": 80, "current_streak": 7, "points_earned_today": 0,
+      "completed_today": false, "questions_progress": "0/1" },
+    { "user_id": "11111111-1111-1111-1111-111111111111",
+      "full_name": "David Mina (Grade 5)", … } ] }
+```
+
+| Probe | Answer |
+| --- | --- |
+| `?group_id=3&date=2026-10-19` | **200** — 4 students, 1 completed, 963 bytes |
+| `?group_id=3&group_id=7&date=2026-10-19` | **400** `querystring/group_id must be string` |
+| `?group_id=3&date=2026-10-19&date=2026-10-20` | **400** `querystring/date must be string` |
+| `?group_id=3&date=not-a-date` | **500** `invalid input syntax for type date: "not-a-date"` (code `22007`) |
+| `?group_id=3&date=2026-02-31` | **500** `date/time field value out of range: "2026-02-31"` (code `22008`) |
+| `?group_id=3` (no `date`) | **200**, `report_date` = the **server's own today** (`2026-10-22`) |
+| `?date=2026-10-19` (no `group_id`) | **200**, `group_id` = **1** — the server's own default (`admin.routes.ts:373`) |
+| `X-User-Role: kid` / `viewer_servant` / `admin_servant` / none | **byte-identical** bodies — md5 `63636699ef242d359b6cf6a23e778e76` |
+| no `X-User-Id` at all | **200** |
+
+**AND THE THREE FACTS THE CLIENT BUILT ON.** The route **states** the shape
+(`admin.routes.ts:341` — `date: { type: 'string', description: 'Date in
+YYYY-MM-DD format' }`) and does **not** check it, so a day that misses the
+shape is a **500** and not a 400 — and a day that is not a *day* at all
+(`2026-02-31`) is a 500 too, from the column's cast. **The client therefore
+refuses a date that is not `YYYY-MM-DD` before the request is made**
+(`ServantReportFormError.invalidDate`), because the server's answer to the
+alternative is a fault that names no field.
+
+**AND THE DUPLICATED PARAMETER IS A 400, WHICH IS THE SHAPE OF THE FIX.** A
+free-text date that reaches the querystring unencoded and unvalidated can
+become a **second `group_id`**, and the server answers a duplicated
+parameter with `querystring/group_id must be string` — a 400, not a
+misread. The client's mapper encodes the value
+(`ReportMapper.pathFor`) and the cubit refuses the shape, so neither
+reaches the wire.
+
+### 2 — `POST /api/v1/admin/readings/schedule` — the schedule
+
+| Probe | Answer |
+| --- | --- |
+| `{}` | **400** `body must have required property 'group_ids'` |
+| `group_ids: []` | **400** `Validation Error` — `fieldErrors.group_ids = ["Array must contain at least 1 element(s)"]` |
+| `scheduled_date: "22-10-2026"` | **400** `body/scheduled_date must match format "date"` |
+| `scheduled_date: "2026-02-31"` | **400** `body/scheduled_date must match format "date"` — the format check is a **calendar** check too |
+| a passage whose start is after its end | **400** `start boundary cannot be after end boundary` |
+| `group_ids: [99999]` (no such cohort) | **500** `Failed to schedule daily readings` — the foreign key, **rolled back** |
+| `X-User-Role: kid` / `viewer_servant` / `admin_servant` / none | **byte-identical** bodies — md5 `34ac4240…` |
+
+**AND THE ROUTE HAS **TWO** VALIDATION LAYERS, IN THAT ORDER.** The first is
+Fastify's own JSON schema (`admin.routes.ts:55-89`) — required properties, and
+`scheduled_date: { type: 'string', format: 'date' }` at `:63` — so the
+"must have required property" and the "must match format" answers are
+**ajv's**. The second is the route's own zod parse (`:103`,
+`scheduleSchema.safeParse`), and its answer has a different shape:
+`{"error":"Validation Error","details":{…}}`. The client's
+`ScheduleReadingFormError` names the second layer's rules, and the two
+agree on every rule they share.
+
+### 3 — `POST /api/v1/admin/questions/commit` — the questions
+
+| Probe | Answer |
+| --- | --- |
+| `{}` | **400** `body must have required property 'reading_id'` |
+| `questions: []` | **400** `Validation Error` — `fieldErrors.questions = ["Array must contain at least 1 element(s)"]` |
+| `options: {"A": "a", …}` (strings) | **400** `Validation Error` — `fieldErrors.questions = ["Expected object, received string", …]` — **the options are objects** |
+| a reading that does not exist | **500** `Failed to commit questions` — the foreign key, **rolled back** |
+
+**AND THE OPTIONS ARE `{ "ar": …, "en": … }` OBJECTS, WHICH THE CLIENT
+ALREADY SENDS.** The zod schema types them as
+`z.record(z.object({ ar: z.string(), en: z.string() }))`
+(`admin.routes.ts:41-44`), and a string-valued option is a 400. The client's
+`QuestionMapper._questionBody` builds exactly that shape
+(`option.key: {ar: …, en: …}`), which the measurement confirms is what the
+server accepts.
+
+### 4 — `POST /api/v1/admin/questions/ai-generate` — the draft
+
+| Probe | Answer |
+| --- | --- |
+| `{}` | **400** `body must have required property 'reading_id'` |
+| a reading that does not exist | **404** `Reading not found` |
+| the seeded reading `aaaaaaaa-…` | **200**, and a **real draft question** |
+| `X-User-Role: kid` / `viewer_servant` / `admin_servant` / none | **byte-identical** bodies — md5 `dd3cf184…` |
+
+**AND THE 200 IS A DRAFT, NOT A WRITE.** The answer is the reading's id and
+a `draft_question`:
+
+```jsonc
+{ "reading_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "draft_question": {
+    "type": "mcq",
+    "prompt_ar": "متى جاء نيقوديموس إلى يسوع؟",
+    "prompt_en": "When did Nicodemus come to Jesus?",
+    "options": { "A": { "ar": "نهارا",  "en": "In the morning" },
+                 "B": { "ar": "ليلا",   "en": "By night" },
+                 "C": { "ar": "ظهرا",   "en": "At noon" },
+                 "D": { "ar": "عصرا",  "en": "In the afternoon" } },
+    "correct_answer": "B" } }
+```
+
+**The route drafts and inserts nothing** — the client's
+`QuestionAuthoringCubit` sends the draft to the admin, who edits it and
+commits it through route 3. The options are the same `{ar, en}` objects
+route 3 takes, which is what makes a draft committable without a
+conversion.
+
+### THE FINDING ALL FOUR SHARE: **THE SERVER ENFORCES NO ROLE**
+
+**Every one of the four answers the same whatever the role header says.**
+`X-User-Role: kid`, `viewer_servant`, `admin_servant`, and no header at all
+produce **byte-identical** bodies on all four routes — the md5s are in the
+tables above. The header is parsed by `identity.middleware.ts:24` and never
+read again, so the portal's `RoleGuard` is **advisory UX** and not a
+boundary. `SECURITY.md` says so, `docs/adr/0026-the-servant-admin-portal.md`
+says so, and this is the measurement behind both.
+
+**AND A READER WHO ASSUMES OTHERWISE GETS A 500, NOT A 403.** A client that
+asks for the roster without a role, or with the wrong one, is not refused —
+it is answered, with somebody else's cohort. That is the reason the client's
+role gate is a **gate and not an enforcement**, and the reason the port's
+doc says a role is not an authorization check.
+
+### What was NOT verified, and why
+
+**No successful write was observed on any of the three `POST` routes.** A
+schedule that succeeds and a commit that succeeds would have written to a
+real database that other people read, so every probe was a body the server
+refuses. What that leaves unverified is the **201** of a successful schedule
+and the **201** of a successful commit — their response bodies, and the
+`reading_id` the server mints. The client's mappers for those two answers
+are transcriptions (`admin.routes.ts:92-98`, `:265-272`), and this
+document does not upgrade them.
+
+**And the AI route's 200 is a real answer, not a transcription** — it was
+observed, and it is the only one of the four that answered 200 with a
+payload.

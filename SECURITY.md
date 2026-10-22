@@ -85,8 +85,41 @@ authenticated user.
 
 The header is parsed and ignored. Never gate a UI affordance on it in the
 expectation that the server enforces the same rule: the server enforces
-nothing. The client treats the role as presentation only, and it must stay
-that way.
+nothing. The client uses the role to **gate its own navigation** — see the
+next section — and for nothing else, and it must stay that way.
+
+### The servant portal's role gate is advisory, and it is measured
+
+The portal added a **client-side** gate. `RoleGuard`
+(`lib/app/router/role_guard.dart`) reads the `RoleAccess` seam over
+`UserRole.grantsFor` and refuses to push `/servant/report`,
+`/servant/schedule` and `/servant/questions` to a reader whose role does not
+grant them.
+
+**That gate is a navigation decision, not a boundary, and the backend is the
+reason.** The portal's four routes were measured against the deployed
+backend on **2026-10-22** (`YoussefOS2510/EvangelionBackend` @ `aa1da23`):
+with `X-User-Role: kid`, with `viewer_servant`, with `admin_servant`, and
+with no role header at all, **all four answer byte-identical bodies**. The
+header is parsed by `identity.middleware.ts:24` and never read again, so the
+server enforces **no role** on the routes that schedule a reading, commit
+questions, draft questions, or report a cohort's roster. The measurement is
+in [`docs/BACKEND-VERIFICATION.md`](docs/BACKEND-VERIFICATION.md).
+
+Two consequences, and the second is the one that bites:
+
+- **A reader refused in the app is not refused by the server.** The gate is
+  the client's, and a client-side gate is a suggestion to a client.
+- **A reader *not* refused in the app is not refused by the server either.**
+  There is no 403 to expect. The server answers the request, and what it
+  answers is somebody else's cohort — a roster of children's names — and a
+  schedule that rewrites a reading.
+
+So the role is **advisory UX**, and it must stay that way: it decides what
+the app *draws*, never what the API *allows*. A deployment that needs the
+second thing needs a gateway that authenticates and authorizes, in front of
+the API, stripping these headers and setting its own — the same requirement
+the warning above states for identity.
 
 ### Traffic is TLS, and the host is still not allowlisted
 
