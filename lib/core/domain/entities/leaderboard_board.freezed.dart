@@ -37,11 +37,6 @@ int get hashCode {
   return Object.hash(runtimeType,_this.rank,_this.score,_this.initials,_this.userId,_this.fullName,_this.currentStreak);
 }
 
-@override
-String toString() {
-  final _this = this as LeaderboardRow;
-  return 'LeaderboardRow(rank: ${_this.rank}, score: ${_this.score}, initials: ${_this.initials}, userId: ${_this.userId}, fullName: ${_this.fullName}, currentStreak: ${_this.currentStreak})';
-}
 
 
 }
@@ -423,11 +418,6 @@ int get hashCode {
   return Object.hash(runtimeType,_this.window,_this.groupId,const DeepCollectionEquality().hash(_this.rows),_this.cohortSize,_this.standing);
 }
 
-@override
-String toString() {
-  final _this = this as LeaderboardBoard;
-  return 'LeaderboardBoard(window: ${_this.window}, groupId: ${_this.groupId}, rows: ${_this.rows}, cohortSize: ${_this.cohortSize}, standing: ${_this.standing})';
-}
 
 
 }

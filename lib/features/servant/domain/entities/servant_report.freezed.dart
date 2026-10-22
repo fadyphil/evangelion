@@ -37,11 +37,6 @@ int get hashCode {
   return Object.hash(runtimeType,_this.groupId,_this.reportDate,_this.totalStudents,_this.completedCount,const DeepCollectionEquality().hash(_this.students));
 }
 
-@override
-String toString() {
-  final _this = this as ServantReport;
-  return 'ServantReport(groupId: ${_this.groupId}, reportDate: ${_this.reportDate}, totalStudents: ${_this.totalStudents}, completedCount: ${_this.completedCount}, students: ${_this.students})';
-}
 
 
 }

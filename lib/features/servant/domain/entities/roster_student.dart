@@ -67,4 +67,37 @@ final class RosterStudent with _$RosterStudent {
 
   /// The server's own progress token — `3/5`.
   final String questionsProgress;
+
+  /// The row's **numbers**, and not the child.
+  ///
+  /// ## AND WHY IT IS DECLARED HERE AT ALL
+  ///
+  /// freezed **generates** a `toString` that lists every property — and two of
+  /// them are the child's name and the child's id. A `toString` is a log line,
+  /// a crash report and a failed `expect`, so the generated one writes a
+  /// child's name into all three, for every row of every roster the client
+  /// holds.
+  ///
+  /// **freezed SKIPS the member the class declares itself**, and this
+  /// declaration is what makes it skip it — verified by generation rather than
+  /// by reading its documentation: this file's generated part carries an `==`,
+  /// a `hashCode` and a `copyWith` and **no** `toString`.
+  ///
+  /// ## AND WHAT IT CARRIES, AND WHY
+  ///
+  /// The row's **numbers** — the points, the streak, the day's progress token
+  /// — and the language the row was served in. Those are what a failing test
+  /// needs *about* a row: which number was wrong.
+  ///
+  /// **Not the name and not the id.** Those two are the child's identity, and
+  /// this client handles **other people's children** — the servant's cohort and
+  /// the board's witnesses — so a name in a log line is a child's name in a
+  /// place whoever reads the logs has no business seeing it. The scan that
+  /// holds this is `test/core/common/secret_masking_test.dart`, and it is the
+  /// same scan the password rule uses.
+  @override
+  String toString() =>
+      'RosterStudent(preferredLang: $preferredLang, totalPoints: $totalPoints, '
+      'currentStreak: $currentStreak, pointsEarnedToday: $pointsEarnedToday, '
+      'completedToday: $completedToday, questionsProgress: $questionsProgress)';
 }

@@ -194,6 +194,37 @@ final class LeaderboardRow with _$LeaderboardRow {
   /// The server's stored `users.current_streak`. See the class doc for the measured
   /// disagreement with `streak/summary`, which is recorded rather than repaired here.
   final int currentStreak;
+
+  /// The row's **numbers**, and not the child.
+  ///
+  /// ## AND WHY IT IS DECLARED HERE AT ALL
+  ///
+  /// freezed **generates** a `toString` that lists every property — and two of
+  /// them are the child's name and the child's id. A `toString` is a log line,
+  /// a crash report and a failed `expect`, so the generated one writes a
+  /// child's name into all three, for every row of every board the client
+  /// holds.
+  ///
+  /// **freezed SKIPS the member the class declares itself**, and this
+  /// declaration is what makes it skip it.
+  ///
+  /// ## AND WHAT IT CARRIES, AND WHY
+  ///
+  /// The row's **numbers** — the rank, the score and the streak — which are
+  /// what a failing test needs *about* a row: which number was wrong.
+  ///
+  /// **Not the name, not the id, and not the initials.** The house's own words
+  /// for [initials] are "one or two letters standing in for the child, never
+  /// their name" — so a row that prints them still carries a piece of the
+  /// child's name, and the initials are the board's own on-screen label rather
+  /// than something a log line has to repeat.
+  ///
+  /// The scan that holds this is `test/core/common/secret_masking_test.dart`,
+  /// and it is the same scan the password rule uses.
+  @override
+  String toString() =>
+      'LeaderboardRow(rank: $rank, score: $score, '
+      'currentStreak: $currentStreak)';
 }
 
 /// Where the reader stands, which is a different question from who is above them.
@@ -291,4 +322,31 @@ final class LeaderboardBoard with _$LeaderboardBoard {
   /// and this app always sends one — so in practice `null` here means the server
   /// dropped it, which is worth rendering differently from "you are unranked".
   final LeaderboardStanding? standing;
+
+  /// The ranking's **frame**, and not its rows.
+  ///
+  /// ## AND WHY IT IS DECLARED HERE AT ALL
+  ///
+  /// freezed **generates** a `toString` that lists every property — and one
+  /// of them is the rows. The rows are **every child at once**, and each row's
+  /// own `toString` is what a log line would print for it, so a generated
+  /// board `toString` carries the whole cohort into every log line that
+  /// touches the board.
+  ///
+  /// **freezed SKIPS the member the class declares itself**, and this
+  /// declaration is what makes it skip it.
+  ///
+  /// ## AND WHAT IT CARRIES, AND WHY
+  ///
+  /// The **frame**: the window, the cohort, how many children the cohort has,
+  /// and the reader's own standing. That is what a failing test needs about a
+  /// board — which ranking it was, and how the reader stood in it.
+  ///
+  /// **Not the rows.** A board of rows is the one thing here that is not the
+  /// ranking's own; it is the cohort's, and it is the part that must not
+  /// travel.
+  @override
+  String toString() =>
+      'LeaderboardBoard(window: ${window.name}, groupId: $groupId, '
+      'cohortSize: $cohortSize, standing: $standing)';
 }

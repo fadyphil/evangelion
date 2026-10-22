@@ -37,11 +37,6 @@ int get hashCode {
   return Object.hash(runtimeType,_this.userId,_this.fullName,_this.preferredLang,_this.totalPoints,_this.currentStreak,_this.pointsEarnedToday,_this.completedToday,_this.questionsProgress);
 }
 
-@override
-String toString() {
-  final _this = this as RosterStudent;
-  return 'RosterStudent(userId: ${_this.userId}, fullName: ${_this.fullName}, preferredLang: ${_this.preferredLang}, totalPoints: ${_this.totalPoints}, currentStreak: ${_this.currentStreak}, pointsEarnedToday: ${_this.pointsEarnedToday}, completedToday: ${_this.completedToday}, questionsProgress: ${_this.questionsProgress})';
-}
 
 
 }
