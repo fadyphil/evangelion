@@ -41,6 +41,22 @@
 #                                                     is not, and a stale row is a
 #                                                     failure — the setState gate's
 #                                                     three directions
+#   textTheme a `textTheme` call site, and the same text in a comment
+#                                                     a real site is reported and a
+#                                                     comment is not — and BOTH must
+#                                                     hold, or the gate is one half
+#   ticker    the inactive tab's `TickerMode` un-muted
+#                                                     the census counts the ring
+#                                                     behind a tab nobody can see
+#   painter   the ripple's `repaint` on the raw clock
+#                                                     the rate gate sees one
+#                                                     repaint per frame
+#   settings  one guarded write made unconditional
+#                                                     the write count stops being
+#                                                     one write per changed field
+#   layer     a THIRD mounted backdrop filter
+#                                                     the census counts three, and
+#                                                     the budget is two
 #
 # ## THE SCRATCH COPY
 #
@@ -912,6 +928,363 @@ PY
 else
   record "keystroke (refusal)" "COULD-NOT-FAIL"
   printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+# --- 14. the `textTheme` call-site gate --------------------------------------
+# The gate bounds the number of `EvaTypography.textTheme(colors)` call sites in
+# `lib/` — thirty `TextStyle` allocations per call, for a value the theme
+# already builds once and installs in the `ThemeData`. It is a Dart test, so
+# its negative control is a file planted in a scratch copy of the tree — and
+# the assertions are about the PLANTED PATH, so they hold whatever else is in
+# flight.
+#
+#   call site  a real `EvaTypography.textTheme(colors)` in a planted file
+#              -> REPORTED
+#   comment    the SAME TEXT inside a doc comment -> NOT reported, because the
+#              scan strips comments first. **A comment that spends the budget
+#              is the defect this direction exists to rule out**: a gate that
+#              counted prose would cry wolf on every file that explains what
+#              the call does, and a reader would learn to ignore it.
+#
+# **BOTH DIRECTIONS ARE ASSERTED, AND BOTH MUST HOLD FOR THE CASE TO COUNT AS
+# FIRED.** A gate that reported every file would satisfy the first direction
+# alone, and a gate that reported nothing would satisfy the second alone —
+# and each of those is the "green run over a surface it never examined" shape
+# this whole harness exists to catch.
+d=$(make_scratch texttheme)
+texttheme_target="$d/lib/features/reading/presentation/widgets/planted_text_theme.dart"
+texttheme_run() { ( cd "$d" && flutter test test/text_theme_callsite_test.dart 2>&1 ); }
+
+# 14a. a REAL call site outside the allowlist is reported.
+#
+# **The planted file COMPILES**, and that is not a detail: a planted file that
+# did not compile would take the whole test file down with a compile error,
+# the run would exit non-zero, and the control would "fire" for a reason that
+# has nothing to do with the gate. The assertion below is therefore on the
+# gate's OWN message as well as on the exit code.
+cat > "$texttheme_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a site, not a comment.
+import 'package:evangelion/core/design_system/tokens/eva_colors.dart';
+import 'package:evangelion/core/design_system/tokens/eva_typography.dart';
+import 'package:flutter/material.dart';
+
+/// Rebuilds a whole `TextTheme` for a value the tree already holds.
+class PlantedTextTheme extends StatelessWidget {
+  const PlantedTextTheme({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final EvaColors colors = const EvaColors.dark();
+    final TextTheme theme = EvaTypography.textTheme(colors);
+    return Text('planted', style: theme.bodyLarge);
+  }
+}
+EOF
+site_fired=0
+if [[ -f "$texttheme_target" ]]; then
+  out=$(texttheme_run); rc=$?
+  if [[ $rc -ne 0 ]] \
+     && printf '%s' "$out" | grep -qF 'planted_text_theme.dart' \
+     && printf '%s' "$out" | grep -qF 'a `textTheme` call site outside the allowlist'; then
+    site_fired=1
+  fi
+else
+  printf '  %-10s %sthe planted file is not in the scratch copy%s\n' "FAIL" "$R" "$N"
+fi
+rm -f "$texttheme_target"
+
+# 14b. the SAME call inside a doc comment is NOT a site.
+cat > "$texttheme_target" <<'EOF'
+// Planted by tool/verify_gates_selftest.sh: a comment, not a call site.
+//
+// A doc comment that says `EvaTypography.textTheme(colors)` must not be
+// counted, and a block comment /* EvaTypography.textTheme(colors) */ must not
+// be counted either.
+class PlantedComment {
+  const PlantedComment();
+}
+EOF
+comment_clean=0
+if [[ -f "$texttheme_target" ]]; then
+  out=$(texttheme_run); rc=$?
+  if [[ $rc -eq 0 ]] && ! printf '%s' "$out" | grep -qF 'planted_text_theme.dart'; then
+    comment_clean=1
+  fi
+else
+  printf '  %-10s %sthe planted file is not in the scratch copy%s\n' "FAIL" "$R" "$N"
+fi
+rm -f "$texttheme_target"
+
+if [[ $site_fired -eq 1 && $comment_clean -eq 1 ]]; then
+  record "textTheme (call site)" "fired"
+  printf '  %-10s a planted `EvaTypography.textTheme(` -> reported; the same text in a doc comment -> NOT reported\n' "$G"
+else
+  record "textTheme (call site)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa planted call site -> site-fired=%s comment-clean=%s — one is wrong%s\n' \
+    "FAIL" "$R" "$site_fired" "$comment_clean" "$N"
+fi
+
+# --- 15. the ticker-census gate ----------------------------------------------
+# The census counts the live tickers on an INACTIVE dock tab, and the budget is
+# **zero**: a tab the reader cannot see must schedule no frames. The mute is a
+# per-tab `TickerMode` — `lib/core/design_system/widgets/eva_tab_ticker_gate.dart`
+# — and this control takes the mute away.
+d=$(make_scratch ticker)
+ticker_file="$d/lib/core/design_system/widgets/eva_tab_ticker_gate.dart"
+ticker_run() { ( cd "$d" && flutter test test/ticker_census_test.dart 2>&1 ); }
+
+ticker_fired=0
+rc=-1
+if [[ -f "$ticker_file" ]]; then
+  cp "$ticker_file" "$ticker_file.orig"
+  # **THE ORIGINAL DEFECT, PLANTED BACK.** `enabled: true` mutes nothing, so
+  # the home tab's selah ring keeps `repeat()`ing behind a tab the reader is
+  # not on — one live ticker and sixty frames in a one-second window, on a
+  # screen nobody can see. The census's own row is `and an INACTIVE tab
+  # schedules nothing — THE GATE`, and that is the row that must go red.
+  #
+  # **THE ANCHOR IS EXACT, AND IT MUST MATCH ONCE.** The file is the gate's
+  # own subject, and a patch that landed on a different `enabled:` line would
+  # have proved nothing at all — so the count is asserted and the patch
+  # refuses to run rather than landing somewhere else.
+  python3 - "$ticker_file" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+anchor = "        enabled: router.activeIndex == tabIndex,\n"
+count = src.count(anchor)
+assert count == 1, (
+    f"the anchor matched {count} times, expected exactly 1 — the plant did "
+    f"not land where it was aimed, so the control would prove nothing"
+)
+open(path, "w").write(src.replace(anchor, "        enabled: true,\n"))
+PY
+  planted=$?
+  if [[ $planted -ne 0 ]]; then
+    printf '  %-10s %sthe patch did not land (python exited %d) — the control proved nothing%s\n' \
+      "FAIL" "$R" "$planted" "$N"
+  else
+    out=$(ticker_run); rc=$?
+    if [[ $rc -ne 0 ]] && printf '%s' "$out" | grep -qF 'INACTIVE tab schedules nothing'; then
+      ticker_fired=1
+    fi
+  fi
+  # **THE PLANT IS REMOVED**, so the scratch tree is the tree again: the
+  # original file is put back and the backup goes with it. A patched
+  # production file is **restored**, not deleted — deleting it would delete
+  # the app's source, which is the opposite of removing a plant.
+  mv -f "$ticker_file.orig" "$ticker_file"
+else
+  printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+if [[ $ticker_fired -eq 1 ]]; then
+  record "ticker census (muted)" "fired"
+  printf '  %-10s an un-muted `TickerMode` -> the census reports the ring behind an inactive tab (exit %d)\n' "$G" "$rc"
+else
+  record "ticker census (muted)" "COULD-NOT-FAIL"
+  printf '  %-10s %san un-muted `TickerMode` -> exit %d; the census did not report it\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+
+# --- 16. the painter repaint-rate gate ---------------------------------------
+# The rate gate bounds how often the dock orb's ripple is asked to repaint: the
+# ambient budget at 60 Hz allows one every N frames, and the ripple must ride
+# the **gated** notifier (`motion.repaint`) rather than the raw LUMEN clock,
+# whose `notifyListeners()` fires on **every vsync**.
+d=$(make_scratch painter)
+painter_file="$d/lib/features/dock/presentation/widgets/lumen_dock.dart"
+painter_run() { ( cd "$d" && flutter test test/painter_repaint_test.dart 2>&1 ); }
+
+painter_fired=0
+rc=-1
+if [[ -f "$painter_file" ]]; then
+  cp "$painter_file" "$painter_file.orig"
+  # **THE RAW CLOCK, PLANTED BACK.** `motion.lumen` is the shared
+  # `TickedLumenClock`, and `TickedLumenClock._onTick` calls
+  # `notifyListeners()` on every vsync — so a painter holding it as its
+  # `repaint` signal is repainted once per frame, and the gate's ceiling is
+  # half of that. The row that must go red is the dock orb's own ripple.
+  python3 - "$painter_file" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+anchor = "  }) : super(repaint: motion.repaint);\n"
+count = src.count(anchor)
+assert count == 1, (
+    f"the anchor matched {count} times, expected exactly 1 — the plant did "
+    f"not land where it was aimed, so the control would prove nothing"
+)
+open(path, "w").write(src.replace(anchor, "  }) : super(repaint: motion.lumen);\n"))
+PY
+  planted=$?
+  if [[ $planted -ne 0 ]]; then
+    printf '  %-10s %sthe patch did not land (python exited %d) — the control proved nothing%s\n' \
+      "FAIL" "$R" "$planted" "$N"
+  else
+    out=$(painter_run); rc=$?
+    if [[ $rc -ne 0 ]] \
+       && printf '%s' "$out" | grep -qF "the dock orb's ripple repaints at the ambient's paint rate"; then
+      painter_fired=1
+    fi
+  fi
+  mv -f "$painter_file.orig" "$painter_file"
+else
+  printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+if [[ $painter_fired -eq 1 ]]; then
+  record "painter rate (raw clock)" "fired"
+  printf '  %-10s the ripple on the raw clock -> the rate gate reports it (exit %d)\n' "$G" "$rc"
+else
+  record "painter rate (raw clock)" "COULD-NOT-FAIL"
+  printf '  %-10s %sthe ripple on the raw clock -> exit %d; the rate gate did not report it\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+
+# --- 17. the settings write-diff gate ----------------------------------------
+# The write-count gate: a save that changes one setting performs **one**
+# preference write, and a save that changes **nothing** performs none. The
+# store's `write` keeps the record it last wrote and writes only the keys that
+# differ — and this control removes **one** of the twenty-nine guards, so one
+# field is written on every save.
+d=$(make_scratch settings)
+settings_file="$d/lib/features/settings/data/datasources/settings_local_data_source.dart"
+settings_run() { ( cd "$d" && flutter test test/features/settings/data/settings_write_diff_test.dart 2>&1 ); }
+
+settings_fired=0
+rc=-1
+if [[ -f "$settings_file" ]]; then
+  cp "$settings_file" "$settings_file.orig"
+  # **THE GUARD, REMOVED — AND ONLY ONE.** The file carries twenty-nine of
+  # these guards and they differ from one another only in the field they
+  # name, so a patch that landed on the wrong one would have removed a guard
+  # and proved nothing about the one the control claims. The anchor is the
+  # WHOLE guard, the count is asserted, and the field is named in the
+  # assertion's own message.
+  python3 - "$settings_file" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+anchor = (
+    "      if (previous == null || previous.hue != settings.hue) {\n"
+    "        await preferences.setInt(kHueKey, settings.hue);\n"
+    "      }\n"
+)
+count = src.count(anchor)
+assert count == 1, (
+    f"the hue guard matched {count} times, expected exactly 1 — the plant did "
+    f"not land where it was aimed, so the control would prove nothing"
+)
+open(path, "w").write(
+    src.replace(anchor, "      await preferences.setInt(kHueKey, settings.hue);\n")
+)
+PY
+  planted=$?
+  if [[ $planted -ne 0 ]]; then
+    printf '  %-10s %sthe patch did not land (python exited %d) — the control proved nothing%s\n' \
+      "FAIL" "$R" "$planted" "$N"
+  else
+    out=$(settings_run); rc=$?
+    if [[ $rc -ne 0 ]] \
+       && printf '%s' "$out" | grep -qF 'a save that changes NOTHING performs NO write'; then
+      settings_fired=1
+    fi
+  fi
+  mv -f "$settings_file.orig" "$settings_file"
+else
+  printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+if [[ $settings_fired -eq 1 ]]; then
+  record "settings write (guard)" "fired"
+  printf '  %-10s one guarded write made unconditional -> the write count is reported (exit %d)\n' "$G" "$rc"
+else
+  record "settings write (guard)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa guarded write made unconditional -> exit %d; the write count was not reported\n' \
+    "FAIL" "$R" "$rc" "$N"
+fi
+
+# --- 18. the layer census gate -----------------------------------------------
+# The runtime half of §13.4's blur budget: `/` mounts exactly **two**
+# `BackdropFilterLayer`s — the dock's σ22 and the verse card's σ24 — and a
+# third is a third `saveLayer` and a third full read-back of everything behind
+# it, per frame. The source scan cannot see a site that MOUNTS more than
+# once; this census can.
+d=$(make_scratch layer)
+layer_file="$d/lib/features/dock/presentation/widgets/lumen_dock.dart"
+layer_run() { ( cd "$d" && flutter test test/layer_census_test.dart 2>&1 ); }
+
+layer_fired=0
+rc=-1
+if [[ -f "$layer_file" ]]; then
+  cp "$layer_file" "$layer_file.orig"
+  # **A THIRD MOUNTED FILTER, NOT A THIRD SOURCE SITE.** The plant is a
+  # `BackdropFilter` the dock actually mounts, so the census — which walks the
+  # render-object layer tree — sees three. `ImageFilter` comes from the same
+  # `dart:ui` import the dock's own σ22 uses, and the assertion below checks
+  # that the import is still there, because without it the plant would not
+  # compile and the control would fire for the wrong reason.
+  python3 - "$layer_file" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+assert "import 'dart:ui' show ImageFilter;" in src, (
+    "the dock no longer imports ImageFilter, so the planted filter would not "
+    "compile and the control would fire for the wrong reason"
+)
+anchor = (
+    "          Positioned.fill(\n"
+    "            child: ClipRRect(\n"
+    "              borderRadius: radius,\n"
+    "              child: BackdropFilter(\n"
+    "                filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),\n"
+    "                child: const SizedBox.expand(),\n"
+    "              ),\n"
+    "            ),\n"
+    "          ),\n"
+)
+count = src.count(anchor)
+assert count == 1, (
+    f"the dock's own blur matched {count} times, expected exactly 1 — the "
+    f"plant did not land where it was aimed, so the control would prove "
+    f"nothing"
+)
+plant = (
+    "          // Planted by tool/verify_gates_selftest.sh: a THIRD backdrop filter.\n"
+    "          Positioned.fill(\n"
+    "            child: BackdropFilter(\n"
+    "              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),\n"
+    "              child: const SizedBox.expand(),\n"
+    "            ),\n"
+    "          ),\n"
+)
+open(path, "w").write(src.replace(anchor, anchor + plant))
+PY
+  planted=$?
+  if [[ $planted -ne 0 ]]; then
+    printf '  %-10s %sthe patch did not land (python exited %d) — the control proved nothing%s\n' \
+      "FAIL" "$R" "$planted" "$N"
+  else
+    out=$(layer_run); rc=$?
+    if [[ $rc -ne 0 ]] \
+       && printf '%s' "$out" | grep -qF 'mounts exactly TWO backdrop filters' \
+       && printf '%s' "$out" | grep -qF 'BackdropFilterLayer × 3'; then
+      layer_fired=1
+    fi
+  fi
+  mv -f "$layer_file.orig" "$layer_file"
+else
+  printf '  %-10s %sthe file to plant into is not in the scratch copy\n' "FAIL" "$R"
+fi
+
+if [[ $layer_fired -eq 1 ]]; then
+  record "layer census (third)" "fired"
+  printf '  %-10s a third mounted backdrop filter -> the census counts three and the budget is two (exit %d)\n' "$G" "$rc"
+else
+  record "layer census (third)" "COULD-NOT-FAIL"
+  printf '  %-10s %sa third mounted backdrop filter -> exit %d; the census did not report it\n' \
+    "FAIL" "$R" "$rc" "$N"
 fi
 
 # --- summary -----------------------------------------------------------------

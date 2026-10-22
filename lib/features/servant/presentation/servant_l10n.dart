@@ -19,6 +19,63 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
+/// The one [DateFormat] per locale, built on first use.
+///
+/// ## WHY A MEMO AND NOT A CONSTRUCTION PER CALL
+///
+/// Because `DateFormat.MMMMEEEEd(locale)` **parses a pattern** and reads the
+/// locale's symbols, and the hub's masthead asks for the day **inside
+/// `build`** (`servant_home_page.dart:280`) — so every rebuild of the hub
+/// paid for a fresh formatter to say one sentence.
+///
+/// ## AND WHY THE MEMO IS **SAFE**
+///
+/// Because a `DateFormat` is **fixed once constructed**. Its pattern, its
+/// parsed fields and its `useNativeDigits` are all decided in the
+/// constructor, and nothing writes them afterwards: `intl`'s `DateFormat`
+/// keeps them in `_pattern` and `_formatFieldsPrivate`, and the only writer
+/// is `addPattern`, which only the constructor calls
+/// (`intl/src/intl/date_format.dart:265-273`, `:732-751`). The formatting
+/// result for a given (locale, date) is therefore the same whether the
+/// formatter was built a moment ago or earlier.
+///
+/// ## AND WHY THE **ORDERING** IS NOT A HAZARD
+///
+/// Because the one thing that *is* global — the locale **data** — is
+/// installed **once**, by Flutter's own `GlobalMaterialLocalizations.load`
+/// (`flutter_localizations/lib/src/material_localizations.dart:735` →
+/// `loadDateIntlDataIfNotLoaded`), which runs while the `Localizations`
+/// widget resolves, **before any widget builds**.
+///
+/// **And the ordering that matters is guaranteed by the data rather than by
+/// luck.** Before that install, `intl`'s `dateTimePatterns` is an
+/// `UninitializedLocaleData`, and looking up any locale other than `en_US`
+/// **throws** `LocaleDataException`
+/// (`intl/src/intl_helpers.dart:26-27` and `:85-90`). So a `DateFormat`
+/// **cannot** be constructed before the data is installed — a formatter
+/// holding a stale pattern is not reachable, and the memo's first population
+/// is therefore necessarily after the install.
+///
+/// The **failure mode** is unchanged too: `putIfAbsent`'s callback throws
+/// before the map is written, so an uninitialised locale still throws on
+/// every call rather than being memoised as a broken formatter.
+final Map<String, DateFormat> _dayFormatters = <String, DateFormat>{};
+
+/// The formatter for [locale], built once and reused.
+///
+/// Throws `LocaleDataException` for a locale whose data has not been loaded —
+/// see [_dayFormatters] for why that is unchanged.
+DateFormat _dayFormatterFor(String locale) =>
+    _dayFormatters.putIfAbsent(locale, () => DateFormat.MMMMEEEEd(locale));
+
+/// Test-only: the memoised formatter for [locale], or `null` if there is none.
+///
+/// The suite reads it to show that the **same instance** answers two calls —
+/// the witness for the memo, since identical strings cannot tell one
+/// formatter from two. Production has no reader.
+@visibleForTesting
+DateFormat? debugDayFormatter(String locale) => _dayFormatters[locale];
+
 /// The day [date] falls on, in the reader's own language.
 ///
 /// ## AND WHY THE PATTERN IS **THE LOCALE'S OWN**
@@ -103,5 +160,4 @@ import 'package:intl/intl.dart';
 /// beside "الخميس، ٢٢ أكتوبر": an abbreviated English weekday against a full
 /// Arabic one, on a screen that is bilingual.
 String servantDayLabel(BuildContext context, DateTime date) =>
-    DateFormat.MMMMEEEEd(Localizations.localeOf(context).toString())
-        .format(date);
+    _dayFormatterFor(Localizations.localeOf(context).toString()).format(date);

@@ -6,6 +6,7 @@ import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
+import 'package:evangelion/core/navigation/dock_tabs.dart';
 import 'package:evangelion/features/home/domain/greeting_period.dart';
 import 'package:evangelion/features/home/domain/library_book.dart';
 import 'package:evangelion/features/home/presentation/bloc/home_bloc.dart';
@@ -278,26 +279,35 @@ class _HomePageState extends State<HomePage> {
     // callback as a value.
     final AppLocalizations strings = context.l10n;
 
-    return NeuralScaffold(
-      // `redesign.html:518` — `.scroll{overflow-y: auto}` on the whole section.
-      scrollable: true,
-      // **`EdgeInsets.zero`, and this is the load-bearing decision on this screen.**
-      // The redesign's home has no single gutter: the greeting is at 20 and the
-      // cards at 28 (`:235` against `:157` + `:249`), so a scaffold padding would be
-      // a number one of them disagrees with. The two paddings are therefore applied
-      // where the prototype writes them — [kGreetGutter] on the greeting and
-      // [kScrollGutter] on the column below it.
-      padding: EdgeInsets.zero,
-      // **The `overlay:` slot holds the amen, and that is Phase 6's slot put back
-      // to a use the prototype has.** It used to hold the `SealFab`, the interim
-      // holder for the destinations the redesign's dock now owns; the seal is
-      // gone (the redesign draws no float on `/`, `:513-538`), and what the
-      // prototype's screen root carries is the **toast** (`:466`, `:738`).
-      overlay: _toastOverlay(),
-      child: BlocProvider<HomeBloc>.value(
-        value: resolved,
-        child: _HomeBody(
-          onSelahCompleted: () => _showAmen(strings.homeSelahAmen),
+    return EvaTabTickerGate(
+      // **The home tab's own index**, from the one place the indices are
+      // published. The gate mutes this tab's tickers while the reader is on
+      // another one — the selah ring is the offender, and it is measured by
+      // `test/ticker_census_test.dart`.
+      tabIndex: DockTabs.home,
+      child: NeuralScaffold(
+        // `redesign.html:518` — `.scroll{overflow-y: auto}` on the whole
+        // section.
+        scrollable: true,
+        // **`EdgeInsets.zero`, and this is the load-bearing decision on this
+        // screen.**
+        // The redesign's home has no single gutter: the greeting is at 20 and the
+        // cards at 28 (`:235` against `:157` + `:249`), so a scaffold padding would
+        // be a number one of them disagrees with. The two paddings are therefore
+        // applied where the prototype writes them — [kGreetGutter] on the greeting
+        // and [kScrollGutter] on the column below it.
+        padding: EdgeInsets.zero,
+        // **The `overlay:` slot holds the amen, and that is Phase 6's slot put
+        // back to a use the prototype has.** It used to hold the `SealFab`, the
+        // interim holder for the destinations the redesign's dock now owns; the
+        // seal is gone (the redesign draws no float on `/`, `:513-538`), and what
+        // the prototype's screen root carries is the **toast** (`:466`, `:738`).
+        overlay: _toastOverlay(),
+        child: BlocProvider<HomeBloc>.value(
+          value: resolved,
+          child: _HomeBody(
+            onSelahCompleted: () => _showAmen(strings.homeSelahAmen),
+          ),
         ),
       ),
     );

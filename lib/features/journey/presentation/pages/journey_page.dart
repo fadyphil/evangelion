@@ -136,9 +136,15 @@ class JourneyPage extends StatelessWidget {
     final JourneyCubit? passed = cubit;
     final JourneyCubit resolved = passed ?? getIt<JourneyCubit>();
 
-    return BlocProvider<JourneyCubit>.value(
-      value: resolved,
-      child: const _JourneyBody(),
+    return EvaTabTickerGate(
+      // **The journey's own tab index**, from the one place the indices are
+      // published. The gate mutes this tab's tickers while the reader is on
+      // another one — the mechanism is `test/ticker_census_test.dart`'s.
+      tabIndex: DockTabs.journey,
+      child: BlocProvider<JourneyCubit>.value(
+        value: resolved,
+        child: const _JourneyBody(),
+      ),
     );
   }
 }

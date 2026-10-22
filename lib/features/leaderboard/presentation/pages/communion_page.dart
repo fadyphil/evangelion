@@ -61,9 +61,15 @@ class CommunionPage extends StatelessWidget {
     final LeaderboardCubit? passed = cubit;
     final LeaderboardCubit resolved = passed ?? getIt<LeaderboardCubit>();
 
-    return BlocProvider<LeaderboardCubit>.value(
-      value: resolved,
-      child: const _CommunionBody(),
+    return EvaTabTickerGate(
+      // **The board's own tab index**, from the one place the indices are
+      // published. The gate mutes this tab's tickers while the reader is on
+      // another one — the mechanism is `test/ticker_census_test.dart`'s.
+      tabIndex: DockTabs.communion,
+      child: BlocProvider<LeaderboardCubit>.value(
+        value: resolved,
+        child: const _CommunionBody(),
+      ),
     );
   }
 }

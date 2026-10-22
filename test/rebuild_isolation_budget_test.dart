@@ -108,18 +108,38 @@ void main() {
 
       // ## THE **SKY** MUST NOT MOVE
       //
-      // It is the single most expensive thing on the screen — 44 stars × 5
-      // widgets, plus 44 composited `Opacity` layers and 88 shadow blurs — and
-      // it has **nothing to do with which verse is selected**. It used to live
-      // inside the page's `BlocBuilder`, so every emit and every tap rebuilt it.
+      // It is the most expensive thing on the screen — **44** stars × 5
+      // widgets, plus 88 shadow blurs, **at the cap** — and it has **nothing
+      // to do with which verse is selected**. It used to live inside the
+      // page's `BlocBuilder`, so every emit and every tap rebuilt it.
+      //
+      // ## THE FORTY-FOUR IS A **CAP**, NOT A MOUNTED COUNT
+      //
+      // It is `UserSettings.starCount`
+      // (`lib/core/domain/entities/user_settings.dart:164`) — the ceiling on
+      // how many stars the sky may hold — and the sky draws one star per
+      // **lit** entry (`lib/core/design_system/widgets/witness_sky.dart:981`),
+      // so a reader who has just opened the app has lit **none**.
+      //
+      // `flutter test test/layer_census_test.dart` measures it: `/reading`
+      // mounts **6** `OpacityLayer`s at rest, and lighting all forty-four adds
+      // **exactly 44** more, for **738.77** logical px².
+      //
+      // **The gate is unchanged**: the sky must not rebuild on a verse tap,
+      // whichever count of stars is lit. What the number *means* is not what
+      // the gate asserts.
       expect(
         delta.countOf(WitnessSky),
         0,
         reason:
             'the sky does not read the selection, so a tap must not rebuild it. '
-            'It is 44 stars × 5 widgets plus 44 `Opacity` layers and 88 shadow '
-            'blurs, and it used to rebuild on every tap because it sat inside '
-            'the page\'s `BlocBuilder`.',
+            'It is 44 stars × 5 widgets plus 88 shadow blurs AT THE CAP — the '
+            '44 is `UserSettings.starCount`, the ceiling on LIT stars, not a '
+            'mounted count: the sky draws one star per lit entry '
+            '(`witness_sky.dart:981`), and `test/layer_census_test.dart` '
+            'measures 6 `OpacityLayer`s mounted on `/reading` at rest and '
+            'exactly 44 more when all 44 are lit. It used to rebuild on every '
+            'tap because it sat inside the page\'s `BlocBuilder`.',
       );
       // ## AND NEITHER MAY THE **SCREEN AROUND IT**
       expect(
@@ -240,7 +260,7 @@ void main() {
       // `ReadingCubit.toggleTextSizePanel` and **read by nobody in `lib/`** —
       // the writer has no caller outside the test suite. Before the
       // `buildWhen`, every call rebuilt the **entire screen**: the scaffold,
-      // the forty-four-star sky and every visible verse.
+      // the sky (forty-four stars at the cap) and every visible verse.
       final ReadingHarness harness = readingHarness();
       await pumpReading(tester, cubit: harness.cubit);
 

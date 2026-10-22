@@ -93,6 +93,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// "this reader chose nothing" in a form no other code writes. **Every one of the
 /// twenty-three is a non-nullable `bool`, `int` or enum**, so plain writes suffice
 /// and the `remove` arm of [write] stays the one the language alone needs.
+///
+/// ## AND A SAVE WRITES **ONLY THE KEYS THAT CHANGED**
+///
+/// [write] used to write **all twenty-nine keys on every save**, and
+/// `shared_preferences_linux` re-encodes the whole map and does a **synchronous
+/// whole-file write** per `setValue`, on the platform thread — which on Linux
+/// desktop is the thread the framework runs on.
+///
+/// The amplification was measured, not guessed. `EvaRangeSlider` reports a new value
+/// on **every pointer update**, its track is 120 px wide with a 15 px thumb, and the
+/// hue slider's range is 0–360 — so **every pixel of a drag changes the value**. One
+/// full drag is therefore up to **105 saves**, and each of them wrote **twenty-nine**
+/// keys: **up to 3,045 whole-file preference writes for one drag**, twenty-eight
+/// hundred and sixteen of which wrote a value that had not changed.
+///
+/// So [write] keeps the record it last wrote ([_lastWritten]) and writes only the
+/// keys that differ from it. **The stored state is identical** — the first write is
+/// still a full write, and every later write restores the same invariant — and the
+/// proof is a differential test against the old unconditional path, not an assertion
+/// about the code's shape.
 final class SettingsLocalDataSource {
   /// A store holding nothing yet.
   SettingsLocalDataSource();
@@ -130,6 +150,40 @@ final class SettingsLocalDataSource {
   /// `null` until the first read, and reset only by [resetForTest] — the memoisation
   /// is the point, so nothing in production clears it.
   Future<SharedPreferences>? _store;
+
+  /// The record the store was last **asked** to hold, or `null` before the first
+  /// write.
+  ///
+  /// ## IT IS A **DIFF BASE**, NOT THE STORE'S CONTENT
+  ///
+  /// It answers one question: *which keys did the last write change?* It is **not**
+  /// a cache of the store, and [read] does **not** update it — a read is a question,
+  /// not a write, and seeding the base from a read would make the first write a diff
+  /// against a value nothing ever wrote.
+  ///
+  /// ## WHY IT EXISTS AT ALL
+  ///
+  /// Because [write] used to write **all twenty-nine keys on every save**, and
+  /// `shared_preferences_linux` re-encodes the whole map and does a **synchronous
+  /// whole-file write** per `setValue`, on the platform thread. One drag of the
+  /// Workshop's hue slider is one `apply` per pointer update, so a full drag was
+  /// **up to 105 whole-file writes of 29 keys each** — and **every one of them
+  /// rewrote the twenty-eight keys that had not changed**.
+  ///
+  /// ## AND WHY IT IS SAFE — THE INVARIANT IT KEEPS
+  ///
+  /// After every **successful** write, the store holds exactly the record this
+  /// field names, for the twenty-nine keys this class owns. The first write
+  /// establishes it (it writes every key), and every later write preserves it (it
+  /// writes exactly the keys that differ, and removes the one key that is dropped).
+  ///
+  /// **The invariant is what makes the diff safe**, and it has exactly one way to
+  /// break: a **second writer**. Something else changing `eva.hue` behind this
+  /// class's back would leave the base describing a store that no longer exists,
+  /// and the next write would skip the key it should have written. The
+  /// single-writer rule is therefore a gate, not a convention — see
+  /// `test/features/settings/data/settings_single_writer_test.dart`.
+  UserSettings? _lastWritten;
 
   /// The stored preferences, with every unreadable field answered by its default.
   ///
@@ -281,51 +335,207 @@ final class SettingsLocalDataSource {
   /// and there is no `remove` arm for them. The class doc says so too, because the
   /// next field added to this store should have to answer the question rather than
   /// copy the pattern.
+  ///
+  /// ## AND **ONLY THE KEYS THAT CHANGED** ARE WRITTEN
+  ///
+  /// Every one of the twenty-nine writes below is **conditional**, and the condition
+  /// is a comparison against the record this data source last wrote — [_lastWritten].
+  /// A save that changes one setting performs **one** preference write; a save that
+  /// changes nothing performs **none**.
+  ///
+  /// **The final stored state is identical either way.** The first write is a full
+  /// write — there is no base to diff against, so every key is "changed" — and every
+  /// later write restores the same invariant: after a successful write, the store
+  /// holds exactly the record it was given, for the twenty-nine keys this class
+  /// owns. The proof is a differential test that runs the same sequence of records
+  /// through the old unconditional path and through this one and compares the two
+  /// resulting preference maps — `test/features/settings/data/
+  /// settings_write_diff_test.dart`.
+  ///
+  /// ## AND `previous == null ||` IS REPEATED ON **EVERY** CONDITION, ON PURPOSE
+  ///
+  /// It could have been hoisted into a `writeEverything` flag, and that version
+  /// would be quieter. It would also be **wrong in a way the compiler cannot see**:
+  /// a field added without the flag would silently never be written on the first
+  /// write, and the store would be missing a key nothing ever reads. Written this
+  /// way, **a condition that forgets the guard does not compile** — `previous` is
+  /// nullable, so `previous.hue` outside the `||` is a type error. The repetition
+  /// is the price of making the omission impossible rather than merely unlikely.
+  ///
+  /// ## AND THE **REMOVAL** IS NOT A DIFF LIKE THE OTHERS
+  ///
+  /// [kLanguageKey] is the one key that can be **dropped** rather than written, and
+  /// the drop has to survive the diff: a reader who chooses a language and then
+  /// chooses "follow the platform" again must end with **no** `eva.language` key, not
+  /// with one holding an empty string. So the language branch compares the two
+  /// records' languages and, when the new one is `null`, **removes** the key — the
+  /// same removal the unconditional path performed, reached by the same condition
+  /// (the language changed) rather than by a separate rule.
   Future<void> write(UserSettings settings) async {
-    final SharedPreferences preferences = await _preferences;
-    await preferences.setString(kThemeModeKey, settings.themeMode.storedValue);
-    await preferences.setInt(kFontStepKey, settings.fontStep);
-    if (settings.language case final ReadingLanguage language) {
-      await preferences.setString(kLanguageKey, language.code);
-    } else {
-      // **A removal and not a write of `''`.** `ReadingLanguage.fromCode('')` is
-      // `null`, so writing the empty string would *be* readable — but it would leave a
-      // key that says "this reader chose nothing" in a form no other code writes, and
-      // `SettingsLocalDataSource`'s round-trip test cannot tell it from a
-      // never-written store. Removing it is the only write that makes the store's
-      // own shape agree with the value.
-      await preferences.remove(kLanguageKey);
+    // ## THE BASE, TAKEN **BEFORE** THE FIRST `await`
+    //
+    // `null` means "this data source has never written anything", and every
+    // comparison below reads that as "everything changed" — which is what the first
+    // write has to do, because there is nothing to diff against.
+    final UserSettings? previous = _lastWritten;
+
+    // ## AND THE BASE MOVES **BEFORE** THE FIRST `await`, NOT AFTER
+    //
+    // Two writes can be in flight at once. `SettingsPage`'s hue row is
+    // `onChanged: (int hue) => unawaited(cubit.setHue(hue))` — one call per pointer
+    // update — so a drag is a queue of overlapping writes, and the second one must
+    // diff against the first one's **intent** rather than against a base the first
+    // one has not published yet.
+    //
+    // Publishing the intent early is also what keeps the overlapping writes
+    // correct: the second write sees the first write's record, so it writes the
+    // keys the first write has not already covered, and the store ends up holding
+    // the last record either way.
+    _lastWritten = settings;
+
+    try {
+      final SharedPreferences preferences = await _preferences;
+      if (previous == null || previous.themeMode != settings.themeMode) {
+        await preferences.setString(
+          kThemeModeKey,
+          settings.themeMode.storedValue,
+        );
+      }
+      if (previous == null || previous.fontStep != settings.fontStep) {
+        await preferences.setInt(kFontStepKey, settings.fontStep);
+      }
+      if (previous == null || previous.language != settings.language) {
+        if (settings.language case final ReadingLanguage language) {
+          await preferences.setString(kLanguageKey, language.code);
+        } else {
+          // **A removal and not a write of `''`.** `ReadingLanguage.fromCode('')` is
+          // `null`, so writing the empty string would *be* readable — but it would
+          // leave a key that says "this reader chose nothing" in a form no other code
+          // writes, and `SettingsLocalDataSource`'s round-trip test cannot tell it
+          // from a never-written store. Removing it is the only write that makes the
+          // store's own shape agree with the value.
+          await preferences.remove(kLanguageKey);
+        }
+      }
+      if (previous == null ||
+          previous.reducedMotion != settings.reducedMotion) {
+        await preferences.setBool(kReducedMotionKey, settings.reducedMotion);
+      }
+      if (previous == null ||
+          previous.veilWitnesses != settings.veilWitnesses) {
+        await preferences.setBool(kVeilWitnessesKey, settings.veilWitnesses);
+      }
+      if (previous == null || previous.showPodium != settings.showPodium) {
+        await preferences.setBool(kShowPodiumKey, settings.showPodium);
+      }
+      // ## THE TWENTY-THREE NEW KEYS
+      if (previous == null ||
+          previous.shaderEnabled != settings.shaderEnabled) {
+        await preferences.setBool(kShaderEnabledKey, settings.shaderEnabled);
+      }
+      if (previous == null || previous.curtainShape != settings.curtainShape) {
+        await preferences.setString(
+          kCurtainShapeKey,
+          settings.curtainShape.storedValue,
+        );
+      }
+      if (previous == null || previous.reach != settings.reach) {
+        await preferences.setInt(kReachKey, settings.reach);
+      }
+      if (previous == null || previous.glow != settings.glow) {
+        await preferences.setInt(kGlowKey, settings.glow);
+      }
+      if (previous == null || previous.touchGlow != settings.touchGlow) {
+        await preferences.setInt(kTouchGlowKey, settings.touchGlow);
+      }
+      if (previous == null || previous.hue != settings.hue) {
+        await preferences.setInt(kHueKey, settings.hue);
+      }
+      if (previous == null ||
+          previous.multichromeMelt != settings.multichromeMelt) {
+        await preferences.setBool(
+          kMultichromeMeltKey,
+          settings.multichromeMelt,
+        );
+      }
+      if (previous == null || previous.rayCombing != settings.rayCombing) {
+        await preferences.setBool(kRayCombingKey, settings.rayCombing);
+      }
+      if (previous == null || previous.whiteCores != settings.whiteCores) {
+        await preferences.setBool(kWhiteCoresKey, settings.whiteCores);
+      }
+      if (previous == null || previous.dotVeil != settings.dotVeil) {
+        await preferences.setBool(kDotVeilKey, settings.dotVeil);
+      }
+      if (previous == null || previous.starsOn != settings.starsOn) {
+        await preferences.setBool(kStarsOnKey, settings.starsOn);
+      }
+      if (previous == null ||
+          previous.constellationsOn != settings.constellationsOn) {
+        await preferences.setBool(
+          kConstellationsOnKey,
+          settings.constellationsOn,
+        );
+      }
+      if (previous == null || previous.starCount != settings.starCount) {
+        await preferences.setInt(kStarCountKey, settings.starCount);
+      }
+      if (previous == null ||
+          previous.starBrightness != settings.starBrightness) {
+        await preferences.setInt(kStarBrightnessKey, settings.starBrightness);
+      }
+      if (previous == null || previous.starShape != settings.starShape) {
+        await preferences.setString(
+          kStarShapeKey,
+          settings.starShape.storedValue,
+        );
+      }
+      if (previous == null || previous.starField != settings.starField) {
+        await preferences.setString(
+          kStarFieldKey,
+          settings.starField.storedValue,
+        );
+      }
+      if (previous == null || previous.twinkle != settings.twinkle) {
+        await preferences.setBool(kTwinkleKey, settings.twinkle);
+      }
+      if (previous == null ||
+          previous.focusDelaySec != settings.focusDelaySec) {
+        await preferences.setInt(kFocusDelaySecKey, settings.focusDelaySec);
+      }
+      if (previous == null ||
+          previous.selahLengthSec != settings.selahLengthSec) {
+        await preferences.setInt(kSelahLengthSecKey, settings.selahLengthSec);
+      }
+      if (previous == null || previous.breathGuide != settings.breathGuide) {
+        await preferences.setBool(kBreathGuideKey, settings.breathGuide);
+      }
+      if (previous == null ||
+          previous.vespersAutoDim != settings.vespersAutoDim) {
+        await preferences.setBool(kVespersAutoDimKey, settings.vespersAutoDim);
+      }
+      if (previous == null || previous.calmMotion != settings.calmMotion) {
+        await preferences.setBool(kCalmMotionKey, settings.calmMotion);
+      }
+      if (previous == null || previous.haptics != settings.haptics) {
+        await preferences.setBool(kHapticsKey, settings.haptics);
+      }
+    } on Object {
+      // ## A FAILED WRITE LEAVES THE STORE **UNKNOWN**, AND THE BASE SAYS SO
+      //
+      // A write that throws halfway through has left the store holding some of the
+      // new record and some of the old one, and there is no way to know which — so
+      // the base is dropped. The next write is therefore a **full** write again, and
+      // the store converges on the record exactly as it did before this file learned
+      // to diff.
+      //
+      // **Dropping the base can cost a full write that was not needed** — if another
+      // write is in flight and has already published a newer base, this drops that
+      // one too. That is the cheap direction: a redundant full write costs time, and
+      // a base that overstates what the store holds costs **correctness**.
+      _lastWritten = null;
+      rethrow;
     }
-    await preferences.setBool(kReducedMotionKey, settings.reducedMotion);
-    await preferences.setBool(kVeilWitnessesKey, settings.veilWitnesses);
-    await preferences.setBool(kShowPodiumKey, settings.showPodium);
-    // ## THE TWENTY-THREE NEW KEYS
-    await preferences.setBool(kShaderEnabledKey, settings.shaderEnabled);
-    await preferences.setString(
-      kCurtainShapeKey,
-      settings.curtainShape.storedValue,
-    );
-    await preferences.setInt(kReachKey, settings.reach);
-    await preferences.setInt(kGlowKey, settings.glow);
-    await preferences.setInt(kTouchGlowKey, settings.touchGlow);
-    await preferences.setInt(kHueKey, settings.hue);
-    await preferences.setBool(kMultichromeMeltKey, settings.multichromeMelt);
-    await preferences.setBool(kRayCombingKey, settings.rayCombing);
-    await preferences.setBool(kWhiteCoresKey, settings.whiteCores);
-    await preferences.setBool(kDotVeilKey, settings.dotVeil);
-    await preferences.setBool(kStarsOnKey, settings.starsOn);
-    await preferences.setBool(kConstellationsOnKey, settings.constellationsOn);
-    await preferences.setInt(kStarCountKey, settings.starCount);
-    await preferences.setInt(kStarBrightnessKey, settings.starBrightness);
-    await preferences.setString(kStarShapeKey, settings.starShape.storedValue);
-    await preferences.setString(kStarFieldKey, settings.starField.storedValue);
-    await preferences.setBool(kTwinkleKey, settings.twinkle);
-    await preferences.setInt(kFocusDelaySecKey, settings.focusDelaySec);
-    await preferences.setInt(kSelahLengthSecKey, settings.selahLengthSec);
-    await preferences.setBool(kBreathGuideKey, settings.breathGuide);
-    await preferences.setBool(kVespersAutoDimKey, settings.vespersAutoDim);
-    await preferences.setBool(kCalmMotionKey, settings.calmMotion);
-    await preferences.setBool(kHapticsKey, settings.haptics);
   }
 
   /// The platform store, read once.
@@ -340,7 +550,18 @@ final class SettingsLocalDataSource {
   /// so a second data source in the same test binary would otherwise keep reading the
   /// first one's values, and a round-trip test could pass against a store it had
   /// already written.
-  void resetForTest() => _store = null;
+  ///
+  /// ## AND IT DROPS THE **DIFF BASE** TOO
+  ///
+  /// The base describes the store this object last wrote, and the reset replaces
+  /// that store with a different one — so a base left behind would describe a store
+  /// that no longer exists, and the next write would diff against it and **skip** the
+  /// keys it should have written. Dropping the base makes the next write a full
+  /// write, which is the same thing the first write does.
+  void resetForTest() {
+    _store = null;
+    _lastWritten = null;
+  }
 }
 
 /// The preferences key holding [AppThemeMode.storedValue].

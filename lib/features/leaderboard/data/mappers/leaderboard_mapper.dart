@@ -186,6 +186,49 @@ final class LeaderboardMapper {
     return null;
   }
 
+  /// The parenthetical span — a grade annotation — stripped before the
+  /// letters are taken.
+  ///
+  /// ## WHY IT IS A **FIELD** AND NOT A LOCAL
+  ///
+  /// Because [initialsOf] runs once per row and a board is capped at fifty
+  /// rows (`LeaderboardCubit.rowLimit`), the local version compiled **a
+  /// hundred** patterns for one board load and threw them away.
+  ///
+  /// ## AND WHY ONE SHARED `RegExp` IS **SAFE** HERE
+  ///
+  /// Because a Dart `RegExp` carries **no state** between `replaceAll` and
+  /// `split`. The SDK's own implementation is the evidence, and it is read
+  /// from the VM's sources rather than remembered:
+  ///
+  /// * `dart:_internal/vm/lib/regexp_patch.dart:185-190` — `allMatches`
+  ///   returns a **fresh** `_AllMatchesIterable` on every call.
+  /// * `dart:_internal/vm/lib/regexp_patch.dart:259-304` — the cursor that
+  ///   advances lives in `_AllMatchesIterator`, a **per-call** object built
+  ///   from the iterable's `iterator` getter. Nothing is written back to the
+  ///   `RegExp`.
+  /// * `dart:_internal/vm/lib/string_patch.dart:669-700` —
+  ///   `String.replaceAll` iterates `pattern.allMatches(this)`.
+  /// * `dart:_internal/vm/lib/string_patch.dart:927-965` — `String.split`
+  ///   iterates `pattern.allMatches(this)` too.
+  ///
+  /// And the word that would have broken the hoist is **absent**: `RegExp` has
+  /// no `lastIndex` — the string does not occur in `lib/core/regexp.dart` or in
+  /// the VM's `regexp_patch.dart` at all — and `allMatches` is the only
+  /// member that advances a cursor, and that cursor is per-call.
+  ///
+  /// So the shared pattern is the same object the local one was, and it
+  /// produces the same strings for the same inputs — which the suite asserts
+  /// by calling [initialsOf] **twice on every name**, because a stateful
+  /// pattern would answer the second call differently.
+  static final RegExp _annotationPattern = RegExp(r'\([^)]*\)');
+
+  /// The whitespace **between** tokens, after the annotation is stripped.
+  ///
+  /// The same argument as [_annotationPattern]: a `RegExp` carries no state
+  /// between calls, so one instance serves every row.
+  static final RegExp _whitespacePattern = RegExp(r'\s+');
+
   /// The monogram for [fullName].
   ///
   /// ## THE RULE, AND WHY IT IS NOT `split(' ').take(2)`
@@ -218,11 +261,11 @@ final class LeaderboardMapper {
   /// "no initials" where the reader is already looking at a position and a score.
   static String initialsOf(String fullName) {
     final String withoutAnnotations = fullName.replaceAll(
-      RegExp(r'\([^)]*\)'),
+      _annotationPattern,
       ' ',
     );
     final List<String> tokens = withoutAnnotations
-        .split(RegExp(r'\s+'))
+        .split(_whitespacePattern)
         .where((String token) => token.isNotEmpty)
         .toList();
 

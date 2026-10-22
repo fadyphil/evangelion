@@ -1197,4 +1197,158 @@ const Map<String, _Reviewed> _reviewed = <String, _Reviewed>{
             'all, and that is a compile-time fact. `TodayReadingMapper` is '
             'hand-written, so no converted type is in the window. Untouched.',
       ),
+  // ## THE PAINT-REUSE AND DATEFORMAT-MEMO GATES, FOUR ROWS
+  //
+  // Both are **allocation** claims, and the audit's own precedent for that
+  // shape is the `FragmentShader` row above: "identical pixels cannot tell one
+  // buffer from two, so instance identity is the only witness". A per-frame
+  // `Paint` and a per-call `DateFormat` produce **the same pixels and the same
+  // strings** as the reused ones, so no behavioural assertion can witness
+  // either — and an identity assertion is the only thing left that can.
+  //
+  // Neither type is converted, so the flag is `false` for all four: `Paint` and
+  // `FragmentShader` are `dart:ui`'s, `DateFormat` is `intl`'s, and none of
+  // them defines an `==` that could stand in for the claim.
+  'test/core/design_system/effects/lumen_canvas_paint_reuse_test.dart#the SAME object is handed to drawRect on every paint':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`Paint` identity across two paints of ONE painter: the painter must '
+            'not build a second drawing description per frame. Identical pixels '
+            'cannot tell one `Paint` from two, so instance identity is the only '
+            'witness — a per-frame allocator passes every pixel assertion in the '
+            'file, exactly as the `FragmentShader` row above says. `Paint` is '
+            '`dart:ui`\'s and defines no `==`, so nothing else can stand in for '
+            'the claim.',
+      ),
+  'test/core/design_system/effects/lumen_canvas_paint_reuse_test.dart#and it is the painter\'s own, not a copy':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`Paint` identity across two painters: each painter owns its own '
+            'drawing description, so the reuse is per-painter and not one global '
+            '`Paint` shared by the app — and the two painters write different '
+            'shaders into theirs, so a shared one would be a second source of '
+            'truth for a mutable description. `Paint` is `dart:ui`\'s and defines '
+            'no `==`.',
+      ),
+  'test/core/design_system/effects/lumen_canvas_paint_reuse_test.dart#and the one field that is set is the frame\'s shader':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`FragmentShader` identity: the `Paint` the painter hands to '
+            '`drawRect` carries the very shader the painter wrote its uniforms '
+            'into. A second shader would be a second uniform buffer, which is '
+            'the thing `LumenCanvas` exists to avoid. `FragmentShader` is '
+            '`dart:ui`\'s and defines no `==` — the same shape as the '
+            '`FragmentShader` row for `lumen_canvas_test.dart` above.',
+      ),
+  'test/features/servant/presentation/servant_l10n_test.dart#and the same instance answers both calls':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            '`DateFormat` identity across two calls: the memo hands back the SAME '
+            'formatter, not an equal one. `intl`\'s `DateFormat` defines no `==`, '
+            'so identity is the claim — and the claim is a caching one. A '
+            'formatter rebuilt per call would be invisible in the output, which '
+            'is why the source gate beside this row carries the allocation half.',
+      ),
+  // ## THE REPAINT-RATE INSTRUMENTS, FIVE ROWS
+  //
+  // Two suites measure how often a painter is asked to repaint, and both
+  // count the **paints** through the framework's own `debugOnProfilePaint`
+  // hook — which is called for **every** render object that paints
+  // (`rendering/object.dart:251`). So a paint count is about *one* painter
+  // only if the painted object is compared with that painter's own render
+  // object, and **that comparison is an identity claim**.
+  //
+  // **The claim is the same claim in all five rows, and it is sound:** two
+  // references to the *same* render object in one tree. `RenderObject`
+  // declares no `operator ==` and no `hashCode` of its own, so identity is
+  // the only way to say "the same render object" — and each row names the
+  // painter it is filtering for, which is the half that makes the filter a
+  // measurement rather than a tautology.
+  //
+  // **None of the five is converted.** The compared objects are framework
+  // render objects, and no converted type is in any of the five windows, so
+  // the flag is `false` for all five.
+  'test/painter_repaint_test.dart#the dock orb\'s ripple repaints at the ambient\'s paint rate':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'THE COUNT\'S OWN FILTER, AND IT HAS TO BE AN IDENTITY. The '
+            'framework calls `debugOnProfilePaint` for **every** render '
+            'object that paints (`rendering/object.dart:251`), so the '
+            'measurement is about the ripple alone only if the painted '
+            'object is compared with the ripple\'s own render object — and '
+            'the orb holds **two** `CustomPaint`s (the ripple and the '
+            'four-pointed star), so the wrong one would answer for it. '
+            '`RenderObject` declares no `operator ==` and no `hashCode` of '
+            'its own, so identity is the only way to say "the same render '
+            'object". NOT CONVERTED: the compared objects are framework '
+            'render objects.',
+      ),
+  'test/painter_repaint_test.dart#the gold flecks repaint at the ambient\'s notify rate':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'THE SAME FILTER, OVER A DIFFERENT PAINTER — and the identity is '
+            'what makes the two rows comparable. The flecks\' `CustomPaint` '
+            'is reached by a finder rather than by a type name, because the '
+            'painter is private to `gold_flecks.dart`, and the ambient '
+            'harness mounts an aurora and a dock around it — so the profile '
+            'hook fires for their render objects too, and only the identity '
+            'filter keeps the count about the flecks. `RenderObject` '
+            'declares no `operator ==`, so identity is the only way to say '
+            '"the same render object". NOT CONVERTED.',
+      ),
+  'test/painter_repaint_test.dart#the witness sky\'s painter is not repainted at the display\'s rate':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'THE SAME FILTER, OVER THE SKY\'S CONSTELLATION. The sky\'s only '
+            '`CustomPaint` is the constellation\'s (`witness_sky.dart:921`) '
+            '— the stars are `Opacity` over their own decoration '
+            '(`witness_sky.dart:1052`) — so the finder names one render '
+            'object, and the identity filter is what makes the count about '
+            'that one rather than about the stars the same frames also '
+            'paint. `RenderObject` declares no `operator ==`, so identity is '
+            'the only way to say "the same render object". NOT CONVERTED.',
+      ),
+  'test/features/dock/presentation/dock_ripple_paint_test.dart#is the ambient\'s GATED notifier, and not the raw clock':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'THE COUNT\'S OWN FILTER, OVER THE RIPPLE. The orb holds **two** '
+            '`CustomPaint`s — the ripple and the four-pointed star — and the '
+            'ripple\'s is reached through the orb\'s `IgnorePointer` '
+            '(`lumen_dock.dart:897`), so the filter is what makes the count '
+            'about the ripple and not about the star, which carries no '
+            '`repaint` signal at all. `RenderObject` declares no '
+            '`operator ==` and no `hashCode` of its own, so identity is the '
+            'only way to say "the same render object". NOT CONVERTED: the '
+            'compared objects are framework render objects.',
+      ),
+  'test/features/dock/presentation/dock_ripple_paint_test.dart#and the instrument can SEE a painter that rides the raw clock':
+      _Reviewed(
+        sites: 1,
+        converted: false,
+        reason:
+            'THE CONTROL\'S OWN FILTER, AND IT IS WHAT MAKES THE CONTROL A '
+            'CONTROL. The negative control is a `CustomPaint` the test builds '
+            'itself, and the whole point of the row is that **the same '
+            'instrument**, pointed at a *different* render object, reports a '
+            'different number — so the filter has to be the identity of the '
+            'object under test and not a type or a position. `RenderObject` '
+            'declares no `operator ==`, so identity is the only way to say '
+            '"the same render object". NOT CONVERTED.',
+      ),
 };

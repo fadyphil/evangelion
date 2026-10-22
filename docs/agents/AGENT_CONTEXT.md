@@ -274,6 +274,7 @@ lib/
   core/
     design_system/         tokens, theme, effects, widgets  (imported by everyone)
     common/                Result<T>, Failure, AppConfig, range arithmetic
+    diagnostics/           frame timing: statistics (PURE DART) + the engine adapter
     network/               Dio client, interceptors, error mapper
     domain/                SHARED KERNEL — see below. PURE DART.
   features/<f>/

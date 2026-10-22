@@ -6,6 +6,7 @@ import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/app/settings_scope.dart';
 import 'package:evangelion/app/sky_scope.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
+import 'package:evangelion/core/diagnostics/frame_timing_recorder.dart';
 import 'package:evangelion/core/domain/entities/app_theme_mode.dart';
 import 'package:evangelion/core/domain/entities/reading_language.dart';
 import 'package:evangelion/core/domain/entities/user_settings.dart';
@@ -221,6 +222,20 @@ class _EvangelionAppState extends State<EvangelionApp>
   /// that breaks the fourth.
   bool? _materialReducedMotion;
 
+  /// The frame-timing recorder, **when this build asked for one**.
+  ///
+  /// **Null in a normal build, and that is the point.**
+  /// [FrameTimingRecorder.kPerfTraceEnabled] is a compile-time constant, so
+  /// the whole expression below is folded away by the compiler and the
+  /// recorder is never constructed — an instrument nobody asked for costs
+  /// nothing at all, and the widget tree is untouched either way.
+  ///
+  /// The build flag is `--dart-define=PERF_TRACE=true`; see
+  /// `tool/perf/README.md`.
+  final FrameTimingRecorder? _recorder = FrameTimingRecorder.kPerfTraceEnabled
+      ? FrameTimingRecorder()
+      : null;
+
   @override
   void initState() {
     super.initState();
@@ -239,6 +254,10 @@ class _EvangelionAppState extends State<EvangelionApp>
     // rebuilds; `NeuralMotionScope.didUpdateWidget` then applies the new value
     // to the clocks, which is the mechanism it already had.
     WidgetsBinding.instance.addObserver(this);
+    // The frame-timing instrument, when this build asked for it. `_recorder` is
+    // null in a normal build, so this is a null check and nothing else — see
+    // the field's doc.
+    _recorder?.attach();
     _subscription = _settings.stream.listen((SettingsState state) {
       if (!mounted) return;
       // **Two notifications and both are needed.** [SettingsScope] is an

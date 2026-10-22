@@ -964,3 +964,334 @@ this entry's to rewrite: the **resume of an interrupted navigation** is carried
 by the **`onResult` callback**; the `ReevaluateListenable` carries the
 **re-evaluation on a session change**, which lands the reader on the app's
 default route rather than on the screen they were heading for.
+
+---
+
+## 15. `PERFORMANCE.md` §3 — "the aurora … repaints on **every vsync**"
+
+> **The five entries below (15–19) cite `docs/PERFORMANCE.md` by the line
+> numbers it had BEFORE the 2026-10-22 corrections landed.** The corrections are
+> what these entries record, so the file has moved since and the cited lines
+> now point at the annotated text rather than at the claim.
+>
+> **AND TWO OF THEM NOW QUOTE `lib/` AND `test/` LINES THAT HAVE ALSO MOVED.**
+> The dock's ripple was **changed** after entry 16 was written (§5.1), and the
+> budget test was **changed** after entry 17 was written, so
+> `lumen_dock.dart`'s `:875`/`:895` and `rebuild_isolation_budget_test.dart`'s
+> `:308` no longer say what they said when they were written. **Each of those
+> two entries carries its own dated annotation**, and that is the right shape:
+> a line number in an entry of this file is a record of a **past state of the
+> tree**, and a record of a past state is what an entry here is. **The
+> annotations carry the current numbers.**
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:100-102` — "**None of the above touches the GPU.** The aurora is a full-screen fragment shader that repaints on **every vsync** at **device** resolution, and its cost budget is counted in **logical** pixels." |
+| **Reality** | **The aurora does not repaint on every vsync.** `AmbientTickBudget` caps its **paint** at **30 Hz** (`lib/core/design_system/effects/ambient_tick_budget.dart:77`), and `LumenScene` consults that gate **before** it notifies (`lib/core/design_system/effects/lumen_scene.dart:491-493`, the gate built at `:497`). The aurora's painter is repainted by that notifier (`lib/core/design_system/effects/lumen_canvas.dart:108`). So it repaints **thirty** times a second, not sixty or a hundred and twenty |
+| **Fixed?** | **Yes — 2026-10-22.** The sentence is **annotated in place** rather than rewritten, and the annotation says what the gate is and where it lives |
+
+**This one is a document that contradicted ITSELF, and that is what made it
+worth an entry.** The same file's **§3.2** — twenty lines further down, at
+`docs/PERFORMANCE.md:122` before the correction — is headed *"What the tick
+budget already did — **LANDED**"* and records the 30 Hz paint cap and the 20 Hz
+notification cap as shipped. So the file said the aurora repainted on every
+vsync **and** said it repainted thirty times a second, and the only thing that
+separated the two was which half of the document a reader happened to be
+looking at.
+
+**The claim was written before ADR-0025 landed and was never revisited when it
+did.** That is this file's own pattern — the "**The pattern**" section's "a
+claim about a number, written once, never re-checked" — except that here the
+number was not the stale part. **The sentence had no number in it at all**: it was a claim about
+*what the code does*, in prose, and prose cannot fail a test. §14 of this file
+records the same shape three times over, in the app's own code.
+
+**AND THE SECOND HALF OF THE SENTENCE IS STILL TRUE.** "…at **device**
+resolution, and its cost budget is counted in **logical** pixels" — that half
+was never wrong, and it is the subject of §3.1.
+
+---
+
+## 16. `PERFORMANCE.md` §3.2 — "the CTA's bead and its ripple ring", read as the list
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:132-133` — "The witness sky's **forty-four stars** rebuild **three times less often**, and so do the gold flecks, the CTA's bead and its ripple ring." |
+| **Reality** | **The four consumers it names are the right four** — the repository names them itself at `lib/core/design_system/effects/neural_motion.dart:101-106`, and all four do read the **gated** notifier `motion.repaint` (`lib/core/design_system/effects/neural_motion.dart:232`, gated at `:165-166` by the 20 Hz `notifyGate` at `:177`). **But the sentence reads as a complete inventory of ripple rings, and it is not.** Three more rings animate and **never consult the budget**: the dock's orb ripple (`lib/features/dock/presentation/widgets/lumen_dock.dart:875` and `:895` — `super(repaint: clock)` on the **raw** `TickedLumenClock`, whose `_onTick` notifies on every tick at `lib/core/design_system/effects/lumen_clock.dart:302-305`), the selah card's breathing ring (`lib/features/home/presentation/widgets/selah_card.dart:579` and `:595` — the file's own comment at `:536-539` says "**the §13.2 budget is not engaged**"), and the reader's breath guide (`lib/features/reading/presentation/widgets/breath_guide_line.dart:76`) |
+| **Fixed?** | **Yes — 2026-10-22.** The bullet is **annotated in place** with the three that were missing, and a **new §5** ("The per-vsync cost the tick budget does not cover") says what each of them costs |
+
+**The shape of the mistake is the same as entry 15's and it is worth naming
+separately.** Entry 15 was a claim about a number; this one is a claim about a
+**set**, and a set claim that omits three members is indistinguishable from a
+set claim that is complete — **unless somebody counts**. Nothing counted. The
+sentence was written as a *summary* of what ADR-0025 covered, and it stayed a
+summary after three more rings had landed outside the budget.
+
+**The interesting part is that the file itself knew.** `selah_card.dart`'s own
+doc comment says the budget "is not engaged" — the code documented its own
+exemption, and the document that was supposed to be the index of the budget
+never picked it up. **A document that indexes a mechanism has to be re-read
+when the mechanism's consumers change**, and there was no re-read.
+
+> **ANNOTATED 2026-10-22 — ONE OF THE THREE HAS SINCE MOVED ONTO THE BUDGET,
+> AND ITS LINE NUMBERS HAVE MOVED WITH IT.** The dock's orb ripple was the
+> first of the three named here, and the fix that moved it onto the ambient's
+> gated notifier has landed: the painter now takes `motion` and does
+> `super(repaint: motion.repaint)`
+> (`lib/features/dock/presentation/widgets/lumen_dock.dart:976`; the painter
+> is built at `:925`), and the ripple carries a `RepaintBoundary` **of its
+> own** (`lumen_dock.dart:900`). **The `lumen_dock.dart:875` and `:895` this
+> entry quotes are the pre-fix lines** — they held `clock: motion.lumen` and
+> `super(repaint: clock)` then, and they hold something else now.
+> **§5.1** carries the current state and the measurement; the painter's
+> repaint requests fell from **30 in 30 frames** to **10 in 30 frames**.
+> **The other two still animate outside the ambient's budget** — the selah
+> card's ring (`selah_card.dart:579` and `:595`) and the reader's breath guide
+> (`breath_guide_line.dart:76`). **But the ring's *other* defect is closed**:
+> a per-tab `TickerMode` now mutes it when its tab is inactive
+> (`lib/core/design_system/widgets/eva_tab_ticker_gate.dart:154-157`), and
+> **§5.2** carries that. **The breath guide's gate is still open** (§5.4) —
+> and §5.4 now says why the ticker census cannot be it.
+
+---
+
+## 17. `PERFORMANCE.md` §4 — "`EvaTypography.textTheme` … two call sites"
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:173` — "**The `TextTheme` is rebuilt per verse** \| `eva_typography.dart:138-166` — `_geometry.apply(...)` plus a **fourteen-field** `copyWith`, about **30 `TextStyle` allocations per call**; `verse_line.dart:357` and `:419` call it **twice per visible verse**, and `eva_theme.dart:59` **already builds the same `TextTheme` once** into the `ThemeData` \| ~**15 µs** per call, ~**30 µs** per verse build \| none: the theme's `TextTheme` is the Eva one, so reading it is a de-duplication \|" |
+| **Reality** | **There are TWELVE feature call sites, not two.** `rg 'EvaTypography\.textTheme' lib` returns **13** hits, one of which is the theme's own (`lib/core/design_system/theme/eva_theme.dart:59`) — so **twelve** in features: `verse_line.dart:357` and `:419`, `reading_app_bar.dart:225` and `:355`, `reading_quiz_cta.dart:165` and `:184`, `reading_pill.dart:341`, `greeting_block.dart:120`, `library_carousel.dart:378`, `streak_chip.dart:169`, `journey_hero_number.dart:113`, `journey_identity.dart:60`. **And the `copyWith` has FIFTEEN fields, not fourteen** (`lib/core/design_system/tokens/eva_typography.dart:148-166` — `displayLarge`…`labelSmall`, one per Material slot). **And the "~15 µs per call" is a number the test PRINTS, not one it asserts**: the only assertion is `expect(perCall, greaterThan(0), reason: 'the measurement must have run.')` (`test/rebuild_isolation_budget_test.dart:308`), which **cannot fail**, because a clock that ran is greater than zero |
+| **Fixed?** | **Yes — 2026-10-22.** The row is corrected in place, a **new §6.4** carries the twelve sites in a table with their `file:line`, and the row now says the per-call figure is a **printout** rather than a budget |
+
+**Two failures in one row, and they are different in kind.** The **count** was
+wrong because the row was written from the reader's memory of the code rather
+than from a scan of it — and the honest fix is mechanical: `rg` answers the
+question, and the answer is **twelve**. The **assertion** was weak because it
+was written to prove the *instrument* ran rather than to bound the *cost*,
+which is the shape §13 of this file has hit repeatedly: a check that reports
+success while looking at nothing.
+
+**And the row's own recommendation was already half-built.** It said the fix
+is to read the theme's `TextTheme` instead of recomputing it — and the theme
+already holds exactly that object (`eva_theme.dart:59`, installed at `:85`).
+The fix was correct; **the inventory of what it applies to was ten call sites
+short**, and a de-duplication is worth exactly as much as the callsites it
+replaces.
+
+> **ANNOTATED 2026-10-22 — THE COUNT IN THIS ENTRY IS ITSELF AN UNDERCOUNT,
+> AND ONE OF ITS LINE NUMBERS HAS MOVED.** **Twelve** was right about the
+> *qualified* sites and wrong about the total: **three more** call
+> `textTheme(colors)` **unqualified**, from inside `EvaTypography` itself
+> (`lib/core/design_system/tokens/eva_typography.dart:179`, `:188`, `:198`),
+> and each rebuilds a whole `TextTheme`. **The real total is sixteen**, and
+> **§21** is the entry that records it. **And** the assertion this entry quotes
+> at `test/rebuild_isolation_budget_test.dart:308` is now at **`:328`** — the
+> file moved — and it still reads
+> `expect(perCall, greaterThan(0), reason: 'the measurement must have run.')`,
+> which **cannot fail**. What has changed is that the **count** is now gated at
+> all: `test/text_theme_callsite_test.dart` scans `lib/` for every
+> `textTheme(` call site, qualified and unqualified, and requires each to be
+> on a reviewed allowlist of **sixteen** sites across **eleven** files.
+
+---
+
+## 18. `PERFORMANCE.md` §4 — "`_verseKeys.clear()` … every visible verse is deactivated and re-mounted"
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:175` — "**A `GlobalKey` per verse, cleared during the build** \| `reading_page.dart` — `_verseKeys.clear()` runs inside the builder, so the next build mints **new** keys and every visible verse is **deactivated and re-mounted** \| a `ValueKey<int>(verse.number)` would make the row an *update* rather than a teardown \| none visible \|" |
+| **Reality** | **The claim is REFUTED. The problem does not exist.** The clear is **not** run on every build: it sits inside `if (passage != null && _entranceFor != passage.readingId)` (`lib/features/reading/presentation/pages/reading_page.dart:725`) — it runs **once per passage**, keyed on the reading id, not once per build. A verse's key is minted **once** and cached (`reading_page.dart:987-990`, `_verseKeys.putIfAbsent(verse.number, GlobalKey.new)`), so the keys are **stable across rebuilds** and the rows are **updated**, not remounted. **And the proposed fix would BREAK something**: `_onScroll` needs `entry.value.currentContext` (`reading_page.dart:505-509`) to find a verse's box, and a `ValueKey` has **no `currentContext`** — so the "fix" would have removed the star-recording mechanism the `GlobalKey` exists for |
+| **Fixed?** | **Yes — 2026-10-22.** The row is **corrected in place**: the problem is stated as not existing, the actual mechanism (gated on a new passage id) is given with its `file:line`, and the proposed `ValueKey` replacement is recorded as **breaking** star recording rather than as a free win |
+
+**This is the entry that matters most, and it is the one whose "fix" would
+have cost more than the bug.** The claim described a teardown-and-remount on
+every rebuild; the fix it proposed was to replace a `GlobalKey` with a
+`ValueKey`. **Both the claim and the fix were wrong**, and in opposite
+directions: there was no teardown to fix, and the "fix" would have removed the
+one thing the `GlobalKey` is for.
+
+**The shape is the "**The pattern**" section's, one level down.** A claim
+about a number, written once, never re-checked — except that **there was no
+number here at all**. It
+was a claim about *what a piece of code does*, made without reading the code
+around it: the reader saw `_verseKeys.clear()` **inside a `build` method** and
+inferred "on every build", and the `if` three lines above the clear — the one
+that gates it on a **new passage** — was not read. **A `clear()` is not a
+statement about frequency; the guard around it is.** The same file's §14
+records three claims about the app's own code that failed for exactly this
+reason.
+
+---
+
+## 19. `PERFORMANCE.md` §4 — "`/communion` builds all fifty rows eagerly"
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:177` — "**`/communion` builds all fifty rows eagerly** \| `communion_page.dart:154` — a non-lazy `SingleChildScrollView`, and §13 rule 5 says *\"never `Column` + `map` over unbounded data\"* \| the board stops building fifty rows to show twelve \| none visible \|" |
+| **Reality** | **Every number in it is wrong, and so is the line number.** The eager loop is `lib/features/leaderboard/presentation/pages/communion_page.dart:405-419`; **`:154` is `Widget build(BuildContext context) {`**. The scroll view is `lib/core/design_system/widgets/neural_scaffold.dart:408` — and the page passes `scrollable: true` (`communion_page.dart:172`), which is *why* the scaffold owns the scroll view rather than the page. The cap is **47 rows**, not fifty: the server's limit is 50 (`lib/features/leaderboard/presentation/bloc/leaderboard_cubit.dart:127`) and the board skips the three podium rows (`communion_page.dart:376`, `sorted.skip(3).toList()`). The **deployed cohort is 3** (`docs/BACKEND-VERIFICATION.md:199`). And **"twelve" is a test fixture**, not a product fact: `test/features/leaderboard/presentation/communion_page_test.dart:111` — "twelve rows is nine more than the podium takes" — with `cohortSize: 12` at `:220` |
+| **Fixed?** | **Yes — 2026-10-22.** The row is **corrected in place** with the loop's real `file:line`, the real scroll view, the real cap (**47**), the real deployed cohort (**3**) and the fixture's true origin — and a **new §6.2** carries the cost, the per-row entrance (up to **2,450 ms** for the last row) and the fact that the rows carry **no keys** |
+
+**This row had a number in it that was a number about a FIXTURE.** "The board
+stops building fifty rows to show twelve" reads as an observation of the
+product — fifty rows built, twelve shown — and **twelve is the number of rows
+in a test fixture**. The product's cohort is **three** rows
+(`docs/BACKEND-VERIFICATION.md:199`), and the board's cap is **47**. The
+sentence's shape, "builds N to show M", is exactly the shape a **test's**
+expectation takes, and the test's number was reported as the product's.
+
+**And the line number pointed at the wrong line of the right file.** `:154` is
+the `build` method — a line that *is* in the page, and that says nothing about
+eagerness. The eager loop is 251 lines further down. **A citation that
+resolves is not a citation that is right**, which is what
+`tool/gates/citation_check.py` says about itself: it checks existence and
+range, "**not** that the line still says what the comment claims".
+
+---
+
+## 20. `PERFORMANCE.md` §2.2 — "44 composited `Opacity` layers"
+
+> **This entry cites `docs/PERFORMANCE.md` and
+> `test/rebuild_isolation_budget_test.dart` by the line numbers they had
+> BEFORE the 2026-10-22 correction landed** — the correction is what this
+> entry records, so the files have moved since. Every other `file:line` in it
+> is current.
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md:88-90` (before the correction) — "**The sky is the single most expensive thing on the screen** — 44 stars × 5 widgets, 44 composited `Opacity` layers, 88 shadow blurs — and it had nothing to do with which verse was selected." The same sentence was repeated in the gate's own failure message, `test/rebuild_isolation_budget_test.dart:120-121` — "It is 44 stars × 5 widgets plus 44 `Opacity` layers and 88 shadow blurs" — and in `docs/PERFORMANCE.md:346` (§6.1's row) and `docs/PERFORMANCE.md:172-173` (§3.2's bullet) |
+| **Reality** | **The 44 is `UserSettings.starCount` — a CAP on how many stars the sky may hold, not a MOUNTED count.** The default literal is at `lib/core/domain/entities/user_settings.dart:164` (the field at `:370`), and it reaches the sky through the cap seam — `lib/app/di/navigation_injection.dart:308` reads `getIt<SettingsHandle>().settings.starCount`. `WitnessSky` draws **one star per LIT entry** (`lib/core/design_system/widgets/witness_sky.dart:981` — `for (final SkyEntry entry in entries) _star(entry)`), and a reader who has just opened the app has lit **none**. **Measured**, by `flutter test test/layer_census_test.dart`: `/reading` mounts **6** `OpacityLayer`s at rest, and lighting **all 44** stars adds **exactly 44** more, for **738.77** logical px² (3,456,994.77 − 3,456,256.0) |
+| **Fixed?** | **Yes — 2026-10-22.** §2.2's sentence is **annotated in place** with the cap, the measured figures and the arithmetic; §3.2's bullet and §6.1's row carry the same correction; the gate's `reason:` string now says what the 44 is; and a **new §8** carries the whole census, measured |
+
+**THE NUMBER WAS NEVER WRONG — IT WAS THE WRONG **KIND** OF NUMBER, and that is
+the whole shape of this entry.** The source's own statement is correct and
+still stands: `lib/core/design_system/effects/neural_motion.dart:104-105` says
+the sky's stars carry "**forty-four composited `Opacity` layers** and
+**eighty-eight shadow blurs**". The census **confirms the layer half of it** —
+a sky with all forty-four lit really does mount forty-four `OpacityLayer`s.
+**The shadow-blur half the census does not measure**, and it is left as the
+source's own claim. The document took that **cap-conditional** number and
+reported it as what a screen **mounts**, and a screen mounts whatever the
+reader has lit.
+
+**A widget count and a layer count are different questions, and so are a cap
+and a count.** Three things had to be kept apart, and the sentence kept two of
+them together:
+
+| the question | the answer |
+| --- | --- |
+| how many stars **may** the sky hold? | **44** — `UserSettings.starCount` |
+| how many stars **are** mounted? | one per **lit** entry — **0** for a fresh reader |
+| how many `OpacityLayer`s does the **screen** mount? | **6** at rest, **+44** when all 44 are lit |
+
+**AND THE GATE'S OWN FAILURE MESSAGE WAS THE SAME CLAIM.** That is the part
+worth recording, because a `reason:` string is read by whoever the gate fails
+— and it is the one place a reader meets the number while they are trying to
+decide what to do about a red build. It is now accurate, and **the assertion
+is untouched**: the sky must still not rebuild on a verse tap, whichever count
+of stars is lit. What the number *means* is not what the gate asserts.
+
+**A SECOND FINDING FROM THE SAME MEASUREMENT — NOT FIXED HERE, AND IT IS NOT
+MINE TO FIX.** `test/layer_census_test.dart` says the 738.77 px² is "**0.02 %
+of the screen's area**" (`:468-469`, and again in the reason string at
+`:487-488`). **It is 0.18 % of the screen's area**: 738.77 ÷ (430 × 932 =
+400,760) = **0.184 %**. The **0.02 %** is of the screen's **composited** area —
+738.77 ÷ 3,456,256 = **0.021 %** — which is a real and much smaller number,
+and the one that makes the point. The file is another lane's, so it is
+**reported rather than edited**; `docs/PERFORMANCE.md` §2.2 and §8.2 give both
+percentages with the arithmetic shown, so a reader of *this* repository cannot
+be misled by it.
+
+**And the pattern is the one this file has catalogued repeatedly: a number
+written once, never re-checked.** What made it survive is that the number was
+**true** — it was true of a full sky — so no reader comparing it against the
+code found anything wrong. A claim can be accurate about the worst case and
+still be false about the screen in front of you, and **only a measurement of
+the mounted tree tells the two apart.**
+
+---
+
+## 21. `PERFORMANCE.md` §6.4 — "`EvaTypography.textTheme(…)` is called from **twelve** feature sites"
+
+> **This entry is the second half of entry 17.** Entry 17 recorded that the
+> count was **two** when it was **twelve**; this one records that §6.4's own
+> table — which entry 17's fix introduced — under-counted again, and that the
+> shape of the miss is the one a **qualified** scan cannot see.
+
+| | |
+| --- | --- |
+| **Claim** | `docs/PERFORMANCE.md` §6.4 — "`EvaTypography.textTheme(...)` is called from **twelve** feature sites, not two", with a table of 12 feature sites plus the theme's own one — **thirteen** in all, and the arithmetic spelled out: "2 + 2 + 2 + 1 + 1 + 1 + 1 + 1 + 1 = **12** … Row 10 is the theme's own **thirteenth**" |
+| **Reality** | **There are SIXTEEN.** The **thirteen** qualified sites are exactly as documented. **Three more are unqualified derivations inside `EvaTypography` itself** — `scriptureLatin` (`lib/core/design_system/tokens/eva_typography.dart:179`), `scriptureArabic` (`:188`) and `monoCaps` (`:198`) — and **each rebuilds a whole `TextTheme`**, because each is derived from a slot of one (`textTheme(colors).bodyLarge!…`, `textTheme(colors).labelMedium!…`). They call it **unqualified**, from inside the class, so a scan for `EvaTypography.textTheme(` cannot see them. **12 + 3 + 1 = 16** |
+| **Fixed?** | **Yes — 2026-10-22.** §6.4's heading, its opening sentence, its table and its arithmetic are corrected in place, and the count is now **gated**: `test/text_theme_callsite_test.dart` scans `lib/` for **every** `textTheme(` call site — **qualified and unqualified** — and requires each to be on a reviewed allowlist of **16** sites across **11** files |
+
+**The miss has a name, and the name is why it survived twice.** A scan for
+`EvaTypography.textTheme(` finds the **thirteen** and stops there. The other
+**three** are the same call written without the receiver, from inside the class
+that defines it — and a reader counting call sites by reading *call sites* is
+counting the qualified spelling, because that is what the word "call site"
+evokes. **The count was not wrong by three; it was wrong by exactly the number
+of sites a qualified scan cannot see**, and it was wrong in the direction that
+makes a document look like it has done more work than it has.
+
+**And the fix is a gate that cannot be fooled by the same mistake.** The scan
+in `test/text_theme_callsite_test.dart` matches `\btextTheme\s*\(` — the
+**unqualified** form included — and it has a **negative control** that plants a
+call site, a comment and a declaration and requires the matcher to tell them
+apart, because a scanner that counted the **declaration** would report a site in
+the one file that defines the thing being scanned for. **A scan that finds
+nothing is a failure**, because that means the matcher rotted rather than the
+tree becoming clean.
+
+**And there is a second half to the gate that the count alone would not give.**
+De-duplicating a call site is only safe if `Theme.of(context).textTheme` is the
+**same** `TextTheme` — and that had never been proven. The same file now proves
+it, by diffing all **fifteen** slots **field by field** for **dark × light** and
+**en × ar**, from both a pumped tree and the installed `ThemeData`, and
+requiring the diff to be empty. **A count without that proof is a plan; a count
+with it is a change that cannot alter what the reader sees.**
+
+---
+
+## 22. THE DOCK RIPPLE'S APPEARANCE WAS **UNPINNED** — no test would have failed if it had changed
+
+> **This entry is about a MISSING claim, not a wrong one**, and it is in this
+> file because the file's own subject is "the tests are green and the
+> documentation is true are different properties". Here the documentation said
+> nothing false — **and the tests were green about a ring whose geometry could
+> have been rewritten and nobody would have known.**
+
+| | |
+| --- | --- |
+| **Claim** | **There was none — and that is the claim.** The repository carried no test, golden or probe that would have failed if the dock orb's ripple had changed its **radius**, **alpha**, **stroke** or **ink**. `docs/PERFORMANCE.md` §5.1 described the ring's geometry — "stroked inside the orb's 30 px box at up to 1.6×", a 1.2 px stroke, `rgba(232,176,75,.6)` — and **nothing in the tree held any of it** |
+| **Reality** | **No golden renders the dock.** The tree's golden files carry no dock image, so the pixel net that catches a changed widget does not exist for this one. And the dock suite's own pixel probe **samples the wrong places**: `test/features/dock/presentation/widgets/lumen_dock_test.dart:520-524` reads three pixels of the orb's layer at **(10,10)**, **(20,22)** and **(23,26)** in a 30-wide buffer — distances of **7.1**, **8.6** and **13.6** logical px from the orb's centre, and the ring's band runs from the disc's own edge at **15** out to **24**. **All three samples are inside the disc**, so they read the **gradient** and never the **ring**: a ring with a different radius, a different alpha, a different stroke width or a different ink would have passed every test in the tree |
+| **Fixed?** | **Yes — 2026-10-22.** `test/features/dock/presentation/dock_ripple_paint_test.dart` measures the ring's **painted radius**, **alpha sum** and **ink** against numbers **read out of the prototype's own stylesheet at test time** — `eva/redesign.html:230` (the border) and `:234` (the keyframes) — so the reference cannot rot with a copied table |
+
+**This is §10's shape, one level down, and the shape is worth naming because
+it is the *second* time this repository has had it.** §10 recorded sixteen
+background goldens that photographed a design the app **does not ship** — a net
+under the wrong thing, indistinguishable from a net. Here there was **no net at
+all** for the thing that ships, and the suite that touches the widget
+**looked** as if it were one: it really does read the orb's pixels, and it
+really does assert on them. **What it read was the gradient.** A test that
+samples three points and calls that coverage is the shape of the fool this file
+keeps cataloguing — a green check over a surface it never examined.
+
+**And the ring is not a decorative detail.** It is the dock's **only
+per-frame repaint** — the ring's own file says so
+(`lib/features/dock/presentation/widgets/lumen_dock.dart:903-905`) — and it is
+the one the ambient's tick budget governs, so the fix that moved it onto the
+budget (§5.1) changed **how often** it is redrawn. A change in *when* is
+exactly the change a *what* test should protect, and there was none.
+
+**The gate that closes it reads the reference rather than copying it.** The
+border's stroke width and alpha are parsed out of `eva/redesign.html:230` at
+test time, the keyframes' scale and opacity out of `:234`, and the measured
+painted radius is compared with the orb's radius scaled by the prototype's own
+eased `scale(1.6)`. **A table of numbers copied out of a stylesheet is a table
+that rots** — and this repository's rule about claims is that they are
+testable, and a copied table is a claim with nothing testing it.
+
+**And it carries a negative control, because the instrument is the claim.** The
+same file measures a painter that rides the **raw** clock with the same
+instrument and requires the instrument to report it as **over budget** — an
+instrument that cannot tell a gated painter from an ungated one is green about
+nothing.

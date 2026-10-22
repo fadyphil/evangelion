@@ -158,6 +158,59 @@ class LumenCanvas extends CustomPainter {
   @visibleForTesting
   ui.FragmentShader? get debugShader => _shader;
 
+  /// The one reused [ui.Paint], and the `drawRect`'s description of how to draw.
+  ///
+  /// ## WHY IT IS A FIELD AND NOT A LOCAL
+  ///
+  /// Because a `Paint` is a **mutable description of how to draw**, and
+  /// `drawRect` reads it at the moment of the call. A fresh `Paint()` on every
+  /// paint therefore bought nothing but an allocation: the painter is
+  /// long-lived by design — `LumenBackground`'s state holds one instance
+  /// across frames ("why the painter is held across frames") — so the `Paint`
+  /// can live exactly as long as the painter does.
+  ///
+  /// ## AND WHY REUSING IT CHANGES NOTHING ON THE SCREEN
+  ///
+  /// Because this `Paint` and a fresh `Paint()` differ in **no** field except
+  /// the shader, and the shader is set to the same object on every paint.
+  /// Every other field is left at the value a fresh `Paint()` has:
+  ///
+  /// | field | value | a fresh `Paint()`'s |
+  /// | --- | --- | --- |
+  /// | `shader` | the frame's shader | set explicitly, on every paint |
+  /// | `color` | opaque black | the default |
+  /// | `blendMode` | `BlendMode.srcOver` | the default |
+  /// | `style` | `PaintingStyle.fill` | the default |
+  /// | `strokeWidth` | `0.0` | the default |
+  /// | `strokeCap` | `StrokeCap.butt` | the default |
+  /// | `strokeJoin` | `StrokeJoin.miter` | the default |
+  /// | `strokeMiterLimit` | `4.0` | the default |
+  /// | `isAntiAlias` | `true` | the default |
+  /// | `filterQuality` | `FilterQuality.none` | the default |
+  /// | `maskFilter` | `null` | the default |
+  /// | `colorFilter` | `null` | the default |
+  /// | `imageFilter` | `null` | the default |
+  ///
+  /// The table above is a claim; the suite is what makes it a fact. It
+  /// compares **every one of those fields** against a freshly constructed
+  /// `Paint()` on the very object the painter handed to `drawRect`, so a
+  /// future edit that sets one of them — and forgets the fresh `Paint()`
+  /// would not have had it — fails instead of changing the screen.
+  ///
+  /// ## AND WHY THE **RECORDED PICTURE** IS NOT AFFECTED
+  ///
+  /// Because `drawRect` **snapshots** the paint's values at the moment of the
+  /// call: `dart:ui`'s `Canvas.drawRect` reads `paint._data` and `paint._objects`
+  /// and hands them to the engine, which copies them into the display-list op
+  /// (`sky_engine/lib/ui/painting.dart:7926-7932`). A later mutation of this
+  /// `Paint` cannot reach a picture that was already recorded.
+  ///
+  /// The **shader** is shared between the recorded picture and the painter —
+  /// but it already was: the old code built a fresh `Paint` around the *same*
+  /// `FragmentShader` instance, and a runtime-effect shader's uniforms are
+  /// read at raster time. Nothing about that changed.
+  final ui.Paint _paint = ui.Paint();
+
   /// WHY THE **SOURCE** IS THE ONLY SUBSCRIPTION, AND WHY IT IS NOT A
   /// `Listenable.merge`
   ///
@@ -217,7 +270,11 @@ class LumenCanvas extends CustomPainter {
       ..setFloat(UniformSlot.uLight.index, resolved.light)
       ..setFloat(UniformSlot.uDots.index, resolved.dots);
 
-    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
+    // The one reused `Paint`. Its only non-default field is the shader, and
+    // the shader is the same object on every paint — so this draws exactly
+    // what a fresh `Paint()..shader = shader` drew. See [_paint].
+    _paint.shader = shader;
+    canvas.drawRect(Offset.zero & size, _paint);
   }
 
   /// Whether a change to any of the three inputs means a repaint is needed.

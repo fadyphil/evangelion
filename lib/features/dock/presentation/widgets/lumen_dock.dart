@@ -87,6 +87,14 @@
 /// controller of its own** — it reads the app's shared clock, exactly as
 /// `GoldFlecks` does, because §13.2's mitigation is that the app owns a fixed
 /// number of tickers and a widget that starts its own is a new one.
+///
+/// ## AND THE ONE **INFINITE** ANIMATION IS ON THE **BUDGET**
+///
+/// The ripple is the dock's only animation that never stops, so it is the one
+/// that has to be paced: it rides the app's **gated** notifier
+/// (`motion.repaint`) rather than the raw clock's per-vsync notification, and
+/// it carries its own [RepaintBoundary] so its repaint does not re-record the
+/// dock's σ22 blur layer. ADR-0025, `docs/PERFORMANCE.md` §3.2 and §5.1.
 library;
 
 import 'dart:ui' show ImageFilter;
@@ -757,6 +765,24 @@ class _LumenSlotScope extends InheritedWidget {
 /// continuous: `seconds % 2.6` is the CSS animation's own progress, restarting
 /// at the same 2.6s boundary the prototype's restarts at.
 ///
+/// ## AND IT RIDES THE **BUDGET**, NOT THE RAW CLOCK
+///
+/// The clock the orb reads is the shared LUMEN clock, and the clock's **own
+/// notification** is the thing that must not be the painter's repaint signal:
+/// `TickedLumenClock._onTick` calls `notifyListeners()` on **every vsync**
+/// (`lumen_clock.dart:302-305`). The painter therefore rides the app's
+/// **gated** notifier — `motion.repaint` (`neural_motion.dart:232`), which
+/// fires at most once every `notifyEveryNTick` frames — exactly as the gold
+/// flecks and the witness sky's stars do. The ripple's own `RepaintBoundary`
+/// keeps that repaint off the dock's σ22 blur layer.
+///
+/// The two are the same trade, made once here and once for the sky and the
+/// flecks: ADR-0025, `docs/PERFORMANCE.md` §3.2, and §5.1 for the ripple
+/// itself. **The shape, the colour, the period and the radius are the
+/// prototype's and are unchanged** — the phase is still read from the clock
+/// at paint time, and the clock still ticks at the display's rate. What
+/// changes is **how often the ring is redrawn**: 60 times a second becomes 20.
+///
 /// ## THE TWO SUBSTITUTIONS, AND WHY
 ///
 /// * **The inner highlight is [EvaColors.emberSheen]** — white at 28%, and
@@ -871,11 +897,35 @@ class LumenOrb extends StatelessWidget {
             child: IgnorePointer(
               // `pointer-events:none` in the prototype's spirit: the ring is
               // decoration over a control, and it must not take a tap.
-              child: CustomPaint(
-                painter: _OrbRipplePainter(
-                  clock: motion.lumen,
-                  color: colors.ember.withValues(alpha: 0.6),
-                  animate: animate,
+              child: RepaintBoundary(
+                // ## THE RIPPLE'S OWN **BOUNDARY**
+                //
+                // The ring is the dock's only per-frame repaint, and the
+                // dock's first child is a σ **22** `BackdropFilter`
+                // (`:314`, sigma at `:274`) — a composited layer in the **same**
+                // `Stack` (`:298`). Without a boundary between the ripple and
+                // the root, the ring's repaint re-records the layer that owns
+                // that blur, so a decorative ring costs the dock a σ22
+                // re-rasterisation every time it moves.
+                //
+                // **There was exactly one `RepaintBoundary` in `lib/` before
+                // this one** — the aurora's (`lumen_background.dart:219`) —
+                // and it wraps the aurora, not the page above it, so nothing
+                // contained the ripple's repaint. `docs/PERFORMANCE.md` §5.1
+                // records the same fact: "there is **no** `RepaintBoundary`
+                // between the ripple and the root".
+                //
+                // **A `RepaintBoundary` changes WHEN things repaint, not WHAT
+                // they look like.** It does not clip — the ring still leaves
+                // the orb's box, as `:234`'s `scale(1.6)` requires, because
+                // both `Stack`s declare `clipBehavior: Clip.none` and this
+                // boundary is an `OffsetLayer` rather than a `ClipRectLayer`.
+                child: CustomPaint(
+                  painter: _OrbRipplePainter(
+                    motion: motion,
+                    color: colors.ember.withValues(alpha: 0.6),
+                    animate: animate,
+                  ),
                 ),
               ),
             ),
@@ -887,20 +937,52 @@ class LumenOrb extends StatelessWidget {
 }
 
 /// Paints the orb's ripple ring.
+///
+/// ## THE SIGNAL IS THE **BUDGETED** ONE
+///
+/// The painter's `repaint` listenable is `motion.repaint` — the **gated**
+/// notifier (`neural_motion.dart:232`), which fires at most once every
+/// `notifyEveryNTick` frames (`ambient_tick_budget.dart:78` — **20 Hz** at
+/// 60 Hz) — and **not** the raw LUMEN clock.
+///
+/// **The raw clock notifies on every vsync.** `TickedLumenClock._onTick` calls
+/// `notifyListeners()` on every tick (`lumen_clock.dart:302-305`), so a
+/// painter holding it as its `repaint` signal is repainted **once per frame**:
+/// measured at **30 repaint requests in 30 frames** against a budget of **15**
+/// (`docs/PERFORMANCE.md` §5.1, and the gate in `test/painter_repaint_test.dart`).
+///
+/// The gated notifier is the one the **gold flecks** (`gold_flecks.dart:183`)
+/// and the **witness sky's stars** (`witness_sky.dart:898-917`) already ride,
+/// and it is the same trade ADR-0025 and `docs/PERFORMANCE.md` §3.2 made for
+/// them: "the witness sky's forty-four stars rebuild **three times less
+/// often**". The ripple is the same class of thing — seconds-long decorative
+/// ambient motion — and it was the one that missed the budget.
+///
+/// ## WHAT THIS CHANGES AND WHAT IT DOES NOT
+///
+/// **The sampling rate, and only the sampling rate.** The shape, the colour,
+/// the period and the radius are the prototype's and are untouched: the
+/// painter still reads the phase from the clock **at paint time**, and the
+/// clock still ticks at the display's rate, so the ring's picture at any
+/// instant is the picture the per-frame painter would have drawn at that
+/// instant. **The reader sees the same ring, sampled three times less often**
+/// — which is the smoothness cost, and it is the cost the sky and the flecks
+/// already pay.
 class _OrbRipplePainter extends CustomPainter {
   _OrbRipplePainter({
-    required this.clock,
+    required this.motion,
     required this.color,
     required this.animate,
-  }) : super(repaint: clock);
+  }) : super(repaint: motion.repaint);
 
-  /// The shared clock, read at paint time.
+  /// The shared motion bundle, read at paint time.
   ///
   /// **The painter reads it rather than being handed a snapshot**, because a
   /// snapshot taken in `build` is only as fresh as the last rebuild — and
   /// nothing rebuilds this widget per frame. `GoldFlecks`' painter is the
-  /// precedent.
-  final LumenClock clock;
+  /// precedent, and it is also where the **gated** notifier comes from:
+  /// `super(repaint: motion.repaint)` (`gold_flecks.dart:183`).
+  final EvaNeuralMotion motion;
 
   /// The ring's ink — `rgba(232,176,75,.6)`, `:230`.
   final Color color;
@@ -910,7 +992,16 @@ class _OrbRipplePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double phase = animate ? LumenOrb.ripplePhase(clock.seconds) : 0.0;
+    // **The clock's own elapsed seconds**, read at paint time.
+    //
+    // `motion.lumen` is the shared `TickedLumenClock`
+    // (`neural_motion.dart:205`), and its `seconds` is the monotonic reading
+    // (`lumen_clock.dart:284-289`) — the one the aurora reads too. It is read
+    // here and not snapshotted in `build`, so the ring's phase is always the
+    // phase at the moment it is painted, whatever rate that turns out to be.
+    final double phase = animate
+        ? LumenOrb.ripplePhase(motion.lumen.seconds)
+        : 0.0;
     // `--e-out` — `:18`'s `cubic-bezier(0,0,.2,1)`, transcribed in
     // [EvaMotion.dockRippleCurve].
     final double eased = EvaMotion.dockRippleCurve.transform(phase);
