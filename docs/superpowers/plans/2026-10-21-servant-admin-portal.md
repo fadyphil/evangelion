@@ -4,7 +4,7 @@
 
 **Goal:** Ship the servant/admin portal — a second surface in the Evangelion client where a `viewerServant` reads a cohort's daily roster report and an `adminServant` schedules readings and authors their questions, against the backend's existing admin, AI and report routes.
 
-**Architecture:** A new `features/servant/` feature (feature-first, `presentation → domain ← data`, pure-Dart `domain/`) behind **two narrow ports** — `ServantAdminRepository` (schedule / commit / ai-draft) and `ServantReportRepository` (the daily report). Access is enforced client-side by a new `RoleGuard` beside the existing `AuthGuard`, reading the **existing** `RoleAccess` seam over `UserRole.grantsFor`. The role is chosen on `/login` (there is no auth endpoint) and flows into `AuthSession.role`; the `X-User-Role` header becomes a **live reader** over that same session so the client never claims `kid` while the UI says `admin_servant`.
+**Architecture:** A new `features/servant/` feature (feature-first, `presentation → domain ← data`, pure-Dart `domain/`) behind **two narrow ports** — `ServantAdminRepository` (schedule / commit / ai-draft) and `ServantReportRepository` (the daily report). Access is gated client-side by a new `RoleGuard` beside the existing `AuthGuard`, reading the **existing** `RoleAccess` seam over `UserRole.grantsFor`. The role is chosen on `/login` (there is no auth endpoint) and flows into `AuthSession.role`; the `X-User-Role` header becomes a **live reader** over that same session so the client never claims `kid` while the UI says `admin_servant`.
 
 **Tech Stack:** Flutter 3.47.4 / Dart 3.13.3, auto_route 11, bloc 9, freezed 4, dio 5, ARB + `gen_l10n`. **No new dependency** (AGENT_CONTEXT §8.4).
 
