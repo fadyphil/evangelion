@@ -683,6 +683,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get servantReportMissingDate => 'The date is required.';
 
   @override
+  String get servantReportInvalidDate =>
+      'The date must be written as year, month, day.';
+
+  @override
   String get servantScheduleTitle => 'Schedule a reading';
 
   @override

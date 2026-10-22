@@ -1700,6 +1700,12 @@ abstract class AppLocalizations {
   /// **'The date is required.'**
   String get servantReportMissingDate;
 
+  /// Written, not transcribed: the prototype draws no servant portal. The report form's third refusal, and it says the same thing the schedule form's date refusal says (`servantScheduleErrorInvalidDate`) because it is the same rule — the day is written year, month, day. The report route states the shape in its querystring's own description (`admin.routes.ts:341`) and does not check it, so a day that misses it is a server error that names no field.
+  ///
+  /// In en, this message translates to:
+  /// **'The date must be written as year, month, day.'**
+  String get servantReportInvalidDate;
+
   /// Written, not transcribed: the prototype draws no servant portal. The schedule screen's own title, and the same word the hub uses for the section that opens it, because they are one surface seen from two places.
   ///
   /// In en, this message translates to:

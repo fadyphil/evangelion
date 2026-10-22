@@ -57,6 +57,77 @@ enum ServantReportFormError {
   /// omits it (`admin.routes.ts:374`), and this client always sends one — so
   /// an empty date is this client's own gap, not a server rule.
   missingDate,
+
+  /// The date field held something that is not a `YYYY-MM-DD` day.
+  ///
+  /// ## AND IT IS **NOT** A SECOND SPELLING OF [missingDate]
+  ///
+  /// An empty field is a field with **no day in it**; a field holding
+  /// `2026-10-21&group_id=7` holds a day **and more besides**. The two
+  /// refusals are separate because the two things are separate, and the
+  /// screen says a different thing about each.
+  ///
+  /// ## AND THE **SHAPE** IS THE **ROUTE'S OWN**
+  ///
+  /// `admin.routes.ts:341` declares the querystring's `date` as
+  /// `{ type: 'string', description: 'Date in YYYY-MM-DD format' }` — the
+  /// route **states** the shape. It does not **check** it: `:373-374` reads
+  /// `queryParams.date || today` and hands the text to the database, where the
+  /// column's cast is the only enforcement there is.
+  ///
+  /// **MEASURED, 2026-10-22, on the deployed backend at HEAD `aa1da23`:** a
+  /// `?date=not-a-date` answers **500** with
+  /// `invalid input syntax for type date: "not-a-date"` — a server fault that
+  /// names no field, so the servant is told nothing they can act on. The
+  /// measurement is in `docs/BACKEND-VERIFICATION.md`.
+  ///
+  /// ## AND WHY THE CLIENT REFUSES **FIRST**
+  ///
+  /// For the reason the schedule form refuses a cohort that is not a number
+  /// (`schedule_reading_cubit.dart:81-84`): the server's answer names a field
+  /// the servant never saw, and a request spent on it is a request nobody can
+  /// learn anything from. A **500 that names nothing** is the worst version
+  /// of that answer.
+  ///
+  /// ## AND THE **SECOND** REASON: A DATE IS **FREE TEXT** IN A **QUERY
+  /// STRING**
+  ///
+  /// `&` is the query string's own separator and `=` separates a name from its
+  /// value, so a date that is neither checked nor encoded is not one value —
+  /// it is two, and the second one is the server's to believe.
+  /// `2026-10-21&group_id=7` is a request about **cohort 7**.
+  /// `ReportMapper.pathFor` encodes the value; this is the check that says the
+  /// value was never supposed to be a query string.
+  ///
+  /// ## AND THE **SHAPE** IS **NOT** THE SCHEDULE FORM'S REGEX
+  ///
+  /// **TWO ROUTES, TWO CONTRACTS, ONE SHAPE — AND THE CLIENT KEEPS THEM
+  /// APART.** The schedule route's contract is a **regex the server
+  /// enforces** (`admin.routes.ts:10` — `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)`,
+  /// and a day that misses it is a **400** that names the field). This
+  /// route's contract is a **description the server states and does not
+  /// enforce** (`:341`), and a day that misses it is a **500** that names
+  /// nothing. Nothing keeps the two routes in step on the server either, so
+  /// one shared rule here would tie this form to the other route's schema:
+  /// a change to `scheduleSchema` would silently change what the report form
+  /// accepts.
+  ///
+  /// So the two rules are **two contracts that coincide in shape today**, and
+  /// each one is written next to the contract it enforces. The house already
+  /// keeps two analogous refusals apart and cross-references them in prose —
+  /// `schedule_reading_cubit.dart:81-84` is the schedule's **range** refusal
+  /// next to the report form's **cohort** refusal, and the two are separate
+  /// rules there for the same reason.
+  ///
+  /// **AND WHAT WOULD CHANGE THE ANSWER:** the backend giving the report
+  /// route its own shape check would not make them one rule — each would
+  /// still be its own route's rule. What would make them one is the backend
+  /// standardising **one** date format across both routes *and* the client
+  /// wanting one implementation, and then the shared home would be this
+  /// feature's `domain/`, because a fact two writers in one feature need
+  /// lives there (`features/settings/domain/settings_clamps.dart` is the
+  /// precedent, and it says why).
+  invalidDate,
 }
 
 /// What `/servant/report` is showing.
@@ -386,6 +457,15 @@ class ServantReportCubit extends Cubit<ServantReportState> {
       _emitRefused(ServantReportFormError.missingDate);
       return;
     }
+    // **AND A DAY THAT IS NOT A DAY IS REFUSED TOO**, for the reason
+    // [ServantReportFormError.invalidDate] gives: the route states the shape
+    // and does not check it, so a day that misses it is a **500** that names
+    // nothing — and, unchecked, a date is free text in a query string, where
+    // `&` is a separator and not a character.
+    if (!_datePattern.hasMatch(date)) {
+      _emitRefused(ServantReportFormError.invalidDate);
+      return;
+    }
 
     emit(
       ServantReportState(
@@ -506,3 +586,34 @@ class ServantReportCubit extends Cubit<ServantReportState> {
     ),
   );
 }
+
+/// The date shape **the report route** names.
+///
+/// `admin.routes.ts:341` declares the querystring's `date` as
+/// `{ type: 'string', description: 'Date in YYYY-MM-DD format' }` — the route
+/// states the shape, and does not check it.
+///
+/// ## AND IT IS **NOT** THE SCHEDULE FORM'S REGEX, AND THE REASON IS **TWO
+/// CONTRACTS**
+///
+/// The schedule route's contract is a **regex the server enforces**
+/// (`admin.routes.ts:10` — `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)`), and a
+/// day that misses it is a **400** that names the field. This route's
+/// contract is a **description the server states and does not enforce**
+/// (`:341`), and a day that misses it is a **500** that names nothing
+/// (`invalid input syntax for type date`, measured 2026-10-22 at HEAD
+/// `aa1da23`).
+///
+/// **Nothing keeps the two routes in step on the server either**, so one
+/// shared rule here would tie this form to the *other* route's schema: a
+/// change to `scheduleSchema` would silently change what the report form
+/// accepts, and the report form would then refuse days the report route
+/// answers. They are two contracts that coincide in shape today, and each
+/// rule is written next to the contract it enforces.
+///
+/// **AND THE SHAPE IS **NOT** A CALENDAR RULE.** `2026-02-31` is in this
+/// shape and is not a day — and the *server* is what refuses it, with a 500
+/// from the database's cast. A client rule the reader cannot discover is
+/// worse than no rule at all, so the rule here is the route's own shape and
+/// nothing more.
+final RegExp _datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');

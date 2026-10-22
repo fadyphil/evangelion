@@ -902,6 +902,10 @@
   "@servantReportMissingDate": {
     "description": "Written, not transcribed: the prototype draws no servant portal. The report form's second refusal. The server defaults the date to its own today when the querystring omits it, and this client always sends one — so an empty date is this client's own gap."
   },
+  "servantReportInvalidDate": "The date must be written as year, month, day.",
+  "@servantReportInvalidDate": {
+    "description": "Written, not transcribed: the prototype draws no servant portal. The report form's third refusal, and it says the same thing the schedule form's date refusal says (`servantScheduleErrorInvalidDate`) because it is the same rule — the day is written year, month, day. The report route states the shape in its querystring's own description (`admin.routes.ts:341`) and does not check it, so a day that misses it is a server error that names no field."
+  },
   "servantScheduleTitle": "Schedule a reading",
   "@servantScheduleTitle": {
     "description": "Written, not transcribed: the prototype draws no servant portal. The schedule screen's own title, and the same word the hub uses for the section that opens it, because they are one surface seen from two places."

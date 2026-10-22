@@ -461,12 +461,21 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        252,
+        253,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**252 → 253 with the report form\'s third refusal**, for a date that '
+            'is **not a day**: the report route states the shape in its '
+            'querystring\'s own description (`admin.routes.ts:341`) and does '
+            '**not** check it, so a day that misses the shape is a **500** that '
+            'names no field — and an unchecked date is free text in a query '
+            'string, where `&` is a separator and not a character. The sentence is '
+            'the **same one the schedule form\'s date refusal says** '
+            '(`servantScheduleErrorInvalidDate`), because it is the same rule: the '
+            'day is written year, month, day.\n\n'
             '**251 → 252 with the servant portal\'s **seventh** defect**, for the '
             'editor\'s refusal for a draft that belongs to **another** reading: a '
             'draft is a question the AI wrote about ONE reading\'s passage, the '

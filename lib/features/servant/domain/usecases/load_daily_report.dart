@@ -16,6 +16,13 @@ part 'load_daily_report.freezed.dart';
 /// `?date=` elsewhere in the backend (§5 trap 6). The client sends the same
 /// `YYYY-MM-DD` shape it sends everywhere else, and the string keeps the
 /// client's request and the server's echoed `report_date` byte-identical.
+///
+/// **AND THE CLIENT IS THE ONE THAT CHECKS IT.** The route states the shape
+/// in its querystring's own description (`:341`) and does not enforce it, so
+/// `ServantReportCubit` refuses a date that is not in that shape before the
+/// request is made — a day that misses it is a server error that names no
+/// field, and an unchecked date is free text in a query string. The rule is
+/// `ServantReportFormError.invalidDate`'s, and the reason is that enum's doc.
 @freezed
 final class DailyReportQuery with _$DailyReportQuery {
   /// A report request.

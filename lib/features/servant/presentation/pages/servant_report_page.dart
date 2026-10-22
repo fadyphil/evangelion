@@ -179,9 +179,18 @@ class _ReportBody extends StatelessWidget {
                 label: strings.servantReportDateLabel,
                 value: form.dateText,
                 onChanged: cubit.setDate,
-                errorText: form.formError == ServantReportFormError.missingDate
-                    ? strings.servantReportMissingDate
-                    : null,
+                // **THE SWITCH IS **EXHAUSTIVE**, AND THE OTHER REFUSAL IS
+                // NAMED AS THE OTHER FIELD'S.** A refusal that is not spelled
+                // out here is a refusal the screen cannot draw, and the
+                // `schedule_reading_page.dart` helper is the same shape.
+                errorText: switch (form.formError) {
+                  ServantReportFormError.missingDate =>
+                    strings.servantReportMissingDate,
+                  ServantReportFormError.invalidDate =>
+                    strings.servantReportInvalidDate,
+                  ServantReportFormError.invalidGroupId => null,
+                  null => null,
+                },
               ),
               EvaButton(
                 label: strings.servantReportSubmit,

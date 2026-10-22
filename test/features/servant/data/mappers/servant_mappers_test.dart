@@ -804,6 +804,31 @@ void main() {
       );
     });
 
+    test('and the date is encoded, so it cannot become query structure', () {
+      // **A QUERY STRING IS A STRUCTURE, AND A VALUE IS NOT.** `&` separates
+      // parameters and `=` separates a name from its value — so a date that is
+      // neither checked nor encoded is not one value, it is two, and the
+      // second one is the server's to believe.
+      final String path = ReportMapper.pathFor(
+        groupId: 3,
+        date: '2026-10-21&group_id=7',
+      );
+
+      expect(
+        path,
+        '/api/v1/servant/reports/daily?group_id=3&date=2026-10-21%26group_id%3D7',
+      );
+
+      // **AND THE QUERY STILL HOLDS TWO PARAMETERS** — which is the whole
+      // point. Unencoded, the path carried a second `group_id`, and the
+      // server reads the **last** one: the request was about cohort 7 while
+      // the servant had asked for cohort 3.
+      final Uri uri = Uri.parse(path);
+      expect(uri.queryParameters.keys, <String>['group_id', 'date']);
+      expect(uri.queryParameters['group_id'], '3');
+      expect(uri.queryParameters['date'], '2026-10-21&group_id=7');
+    });
+
     test('the `200` maps to a `ServantReport`', () {
       final Result<ServantReport> result = const ReportMapper().map(
         contractDailyReportResponse(),

@@ -258,6 +258,99 @@ void main() {
         );
       },
     );
+
+    // ## A DATE THAT IS **NOT A DAY**
+    //
+    // The date field is free text, and a query string is a structure: `&` and
+    // `=` are the query string's own punctuation, so a date that is not checked
+    // is not one value. `2026-10-21&group_id=7` is a request about **cohort
+    // 7** — and the cohort the servant typed is not the cohort the server
+    // would read.
+    //
+    // **AND THE REFUSAL IS A NAMED ONE**, beside `missingDate`, because an
+    // empty field and a field that holds something that is not a day are two
+    // different things and the screen says a different thing about each.
+    blocTest<ServantReportCubit, ServantReportState>(
+      'a date that is not `YYYY-MM-DD` is refused, and nothing is asked',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21&group_id=7'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.idle,
+        groupIdText: '3',
+        dateText: '2026-10-21&group_id=7',
+      ),
+      act: (ServantReportCubit cubit) => cubit.load(),
+      expect: () => <ServantReportState>[
+        const ServantReportState(
+          status: ServantReportStatus.idle,
+          groupIdText: '3',
+          dateText: '2026-10-21&group_id=7',
+          formError: ServantReportFormError.invalidDate,
+        ),
+      ],
+      verify: (_) {
+        verifyNever(
+          () => repository.loadDailyReport(
+            groupId: any(named: 'groupId'),
+            date: any(named: 'date'),
+          ),
+        );
+      },
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'and so is a day written the other way round',
+      build: () => cubitWith(groupId: '3', date: '21-10-2026'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.idle,
+        groupIdText: '3',
+        dateText: '21-10-2026',
+      ),
+      act: (ServantReportCubit cubit) => cubit.load(),
+      expect: () => <ServantReportState>[
+        const ServantReportState(
+          status: ServantReportStatus.idle,
+          groupIdText: '3',
+          dateText: '21-10-2026',
+          formError: ServantReportFormError.invalidDate,
+        ),
+      ],
+      verify: (_) {
+        verifyNever(
+          () => repository.loadDailyReport(
+            groupId: any(named: 'groupId'),
+            date: any(named: 'date'),
+          ),
+        );
+      },
+    );
+
+    blocTest<ServantReportCubit, ServantReportState>(
+      'and the day the server can read is asked for',
+      build: () => cubitWith(groupId: '3', date: '2026-10-21'),
+      seed: () => const ServantReportState(
+        status: ServantReportStatus.idle,
+        groupIdText: '3',
+        dateText: '2026-10-21',
+      ),
+      act: (ServantReportCubit cubit) => cubit.load(),
+      expect: () => <ServantReportState>[
+        const ServantReportState(
+          status: ServantReportStatus.loading,
+          groupIdText: '3',
+          dateText: '2026-10-21',
+        ),
+        const ServantReportState(
+          status: ServantReportStatus.ready,
+          groupIdText: '3',
+          dateText: '2026-10-21',
+          report: report,
+        ),
+      ],
+      verify: (_) {
+        verify(() => repository.loadDailyReport(groupId: 3, date: '2026-10-21'))
+            .called(1);
+      },
+    );
   });
 
   group('the form', () {

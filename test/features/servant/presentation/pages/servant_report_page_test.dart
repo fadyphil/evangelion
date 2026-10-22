@@ -391,6 +391,44 @@ void main() {
 
       expect(find.text('التاريخ مطلوب.'), findsOneWidget);
     });
+
+    // ## A DATE THAT IS **NOT A DAY**
+    //
+    // The date field is free text and a query string is a structure, so a day
+    // that is not checked is not one value — `2026-10-21&group_id=7` is a
+    // request about **cohort 7**. The refusal is the cubit's, and this is the
+    // claim that the **screen** draws it: the named refusal beside
+    // `missingDate`, in the reader's own language.
+    testWidgets('refuses a date that is not `YYYY-MM-DD`, and asks nothing', (
+      WidgetTester tester,
+    ) async {
+      final _Repo repo = _Repo(Result<ServantReport>.of(report));
+      final ServantReportCubit cubit = ServantReportCubit(
+        loadDailyReport: LoadDailyReport(repo),
+      );
+      addTearDown(cubit.close);
+
+      await pumpServant(tester, ServantReportPage(cubit: cubit));
+      await tester.enterText(find.byType(TextField).first, '3');
+      await tester.enterText(find.byType(TextField).at(1), '21-10-2026');
+      await tester.tap(find.text('Show the roster'));
+      await tester.pump();
+
+      expect(
+        find.text('The date must be written as year, month, day.'),
+        findsOneWidget,
+      );
+      expect(repo.calls, 0);
+
+      await pumpServant(
+        tester,
+        ServantReportPage(cubit: cubit),
+        locale: otherArmFor(const Locale('en')),
+      );
+      await tester.pump();
+
+      expect(find.text('يجب كتابة التاريخ سنة ثم شهر ثم يوم.'), findsOneWidget);
+    });
   });
 
   // ## THE ROUTE BEING **OPENED AGAIN**

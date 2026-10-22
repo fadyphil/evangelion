@@ -244,6 +244,7 @@
   "servantReportProgress": "الأسئلة",
   "servantReportInvalidGroup": "يجب أن تكون المجموعة عددًا صحيحًا.",
   "servantReportMissingDate": "التاريخ مطلوب.",
+  "servantReportInvalidDate": "يجب كتابة التاريخ سنة ثم شهر ثم يوم.",
   "servantScheduleTitle": "جدولة قراءة",
   "servantScheduleGroupIdsLabel": "أرقام المجموعات",
   "servantScheduleGroupIdsHint": "مفصولة بفواصل",

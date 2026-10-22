@@ -36,12 +36,34 @@ final class ReportMapper {
   /// `parseInt(queryParams.group_id || '1', 10)` and
   /// `queryParams.date || today`.
   ///
-  /// The date is interpolated **unencoded**, because the server's schema types
-  /// it as a plain string and this client only ever sends the `YYYY-MM-DD`
-  /// shape — the same rule `LeaderboardMapper.pathFor` follows for its
-  /// numeric `limit`.
+  /// ## AND THE DATE IS **ENCODED**
+  ///
+  /// **A QUERY STRING IS A STRUCTURE, AND A VALUE IS NOT.** `&` separates one
+  /// parameter from the next and `=` separates a name from its value — so a
+  /// date that is neither checked nor encoded is not one value, it is two, and
+  /// the second one is the server's to believe.
+  ///
+  /// **MEASURED, 2026-10-21, over this mapper:**
+  ///
+  /// ```text
+  /// the date = 2026-10-21&group_id=7
+  /// the path = /api/v1/servant/reports/daily?group_id=3&date=2026-10-21&group_id=7
+  /// the parameters = group_id: 7, date: 2026-10-21
+  /// ```
+  ///
+  /// The request was about **cohort 7** — the server reads the **last**
+  /// `group_id` — while the servant had asked for cohort 3, and the roster
+  /// that came back was another cohort's children.
+  ///
+  /// **AND THE ENCODING IS THE **SECOND** OF TWO DEFENCES, NOT THE ONLY
+  /// ONE.** `ServantReportCubit` refuses a date that is not `YYYY-MM-DD`
+  /// before the request is made, so a well-formed day is what reaches here;
+  /// this is what makes the **URL** correct for anything that ever does.
+  ///
+  /// **AND THE COHORT IS NOT ENCODED, BECAUSE IT IS NOT TEXT.** It is an
+  /// `int` — the only value of the two that cannot be anything else.
   static String pathFor({required int groupId, required String date}) =>
-      '$endpoint?group_id=$groupId&date=$date';
+      '$endpoint?group_id=$groupId&date=${Uri.encodeQueryComponent(date)}';
 
   /// Maps the `200` body to a [ServantReport].
   ///

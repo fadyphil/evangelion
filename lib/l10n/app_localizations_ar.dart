@@ -691,6 +691,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get servantReportMissingDate => 'التاريخ مطلوب.';
 
   @override
+  String get servantReportInvalidDate => 'يجب كتابة التاريخ سنة ثم شهر ثم يوم.';
+
+  @override
   String get servantScheduleTitle => 'جدولة قراءة';
 
   @override
