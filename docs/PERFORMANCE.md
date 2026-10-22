@@ -390,6 +390,32 @@ section says so and states the **count** instead of a millisecond figure.
 
 ---
 
+### 5.5 The dock's σ22 backdrop filter re-ran on every frame — **LANDED: the selah ring's `RepaintBoundary`**
+
+The dock's σ22 `BackdropFilter` (`lumen_dock.dart:314`) floods to a full-screen
+offscreen target on Impeller, and it re-ran on every frame because the page's
+layer was dirty — the selah ring (`selah_card.dart:~606`) is a repeating
+`AnimationController` (`repeat()` at `:595`) inside a `StatefulWidget` with
+no `RepaintBoundary`, so its repaints dirty the page's layer, which dirties
+the dock's backdrop.
+
+**The fix is a single `RepaintBoundary`** around `_BreathingButton.build`'s
+return (`selah_card.dart`). It is pixel-identical — a boundary changes *when*
+things repaint, never *what* — and it isolates the ring's 90 Hz repaints from
+the page's layer, so the dock's backdrop is clean and the filter is cached.
+
+**The gate is `test/features/home/presentation/widgets/selah_boundary_test.dart`**:
+a structural assertion that a `RepaintBoundary` is an ancestor of the ring.
+It was negative-controlled: removing the boundary makes it red.
+
+**The predicted win is 35 ms → ~5 ms** on the home screen, but that is a
+prediction, not a measurement — the fix needs a re-profile on the device to
+confirm. The ripple's own boundary (`lumen_dock.dart:900`) was already in
+place and did not help, because the ripple's repaints were not the ones
+dirtying the dock's layer; the selah ring's were.
+
+---
+
 ## 6. The rebuild cost no gate measures
 
 **What this section is.** §1–§2 record the rebuild boundary and the gate that
@@ -448,6 +474,28 @@ opened the app has lit none. **Measured** (§8): `/reading` mounts **6**
 | **The gate that will hold it** | `test/rebuild_isolation_budget_test.dart` — one case per page, the same shape as the `/settings` case at `:181` |
 
 ### 6.4 `EvaTypography.textTheme(...)` is called from **sixteen** sites, not two
+
+**Also, the login field layout investigation found no intrinsic-width dependency.**
+The hypothesis was that the email field's width depends on its text, so every
+caret blink re-lays-out the whole form. It does not: the scaffold provides
+tight width constraints (content width = 252 px on the 320 px test viewport),
+and `grep -rn "Intrinsic" lib/` returns zero matches. The field's width is
+forced to full content width regardless of text.
+
+**The actual frame-cost source on the login screen is the `BlocConsumer` in
+`_LoginForm`** (`login_page.dart:~589`): every keystroke dispatches
+`AuthEmailChanged`/`AuthPasswordChanged`, which emits a state, which rebuilds
+the **entire** form — `LayoutBuilder`, both fields, `RolePicker`, CTA, and
+`AnimatedBuilder` — per frame. The `ValueListenableBuilder` over the
+controller (placeholder show/hide) also rebuilds on every keystroke.
+
+**The gate is `test/features/auth/presentation/pages/login_field_stability_test.dart`**:
+a structural assertion that the page's `RenderBox.size` is unchanged across 10
+pumps. It passes, but it cannot be negative-controlled with the suggested
+`IntrinsicWidth` violation (tight parent constraints override it), which
+confirms the field's width is not intrinsic. A stronger guard would be a
+rebuild-count gate over the form on `AuthEmailChanged`, following the
+`rebuild_isolation_budget_test.dart` pattern.
 
 **The old row in §4 named two.** There are **sixteen** — twelve in the
 features, three inside the type system itself, and the theme's own one.
@@ -816,6 +864,12 @@ flutter test test/features/settings/data/settings_single_writer_test.dart
 
 # the layer census (§8) — the mounted layers, the painted area, the sky's cap
 flutter test test/layer_census_test.dart
+
+# the selah ring's RepaintBoundary (§5.5)
+flutter test test/features/home/presentation/widgets/selah_boundary_test.dart
+
+# the login field's size stability (§6.4)
+flutter test test/features/auth/presentation/pages/login_field_stability_test.dart
 
 # the on-device measurement (§9) — a profile build, driven through the DTD
 flutter run -d linux --profile --dart-define=PERF_TRACE=true

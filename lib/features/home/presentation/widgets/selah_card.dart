@@ -606,83 +606,85 @@ class _BreathingButtonState extends State<_BreathingButton>
   Widget build(BuildContext context) {
     final EvaColors colors = context.colors;
 
-    return Semantics(
-      button: true,
-      // **Explicitly enabled**, because a node that offers a tap and does not
-      // say whether it is enabled reads as `Tristate.none` — and a screen
-      // reader is then left to guess. The old inert circle said
-      // `enabled: false`; this one says `true`, and the change is the
-      // behaviour change.
-      enabled: true,
-      label: widget.label,
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (BuildContext context, Widget? child) {
-            // The ring's own keyframes — `:270`:
-            // `@keyframes breatheRing{0%,100%{transform:scale(.92);
-            // box-shadow:0 0 0 0 rgba(232,176,75,.25)}
-            // 50%{transform:scale(1.06);box-shadow:0 0 22px 4px rgba(232,176,75,.28)}}`
-            //
-            // The triangle is `core/common/cycle_phase.dart`'s, and the curve is
-            // CSS's `ease-in-out` — which is `Curves.easeInOut` exactly.
-            final double half = halfCycleProgress(_controller.value);
-            final double eased = Curves.easeInOut.transform(half);
-            final double scale =
-                kSelahRingScaleMin +
-                (kSelahRingScaleMax - kSelahRingScaleMin) * eased;
-            final double glow =
-                kSelahRingGlowMin +
-                (kSelahRingGlowMax - kSelahRingGlowMin) * eased;
+    return RepaintBoundary(
+      child: Semantics(
+        button: true,
+        // **Explicitly enabled**, because a node that offers a tap and does not
+        // say whether it is enabled reads as `Tristate.none` — and a screen
+        // reader is then left to guess. The old inert circle said
+        // `enabled: false`; this one says `true`, and the change is the
+        // behaviour change.
+        enabled: true,
+        label: widget.label,
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (BuildContext context, Widget? child) {
+              // The ring's own keyframes — `:270`:
+              // `@keyframes breatheRing{0%,100%{transform:scale(.92);
+              // box-shadow:0 0 0 0 rgba(232,176,75,.25)}
+              // 50%{transform:scale(1.06);box-shadow:0 0 22px 4px rgba(232,176,75,.28)}}`
+              //
+              // The triangle is `core/common/cycle_phase.dart`'s, and the curve is
+              // CSS's `ease-in-out` — which is `Curves.easeInOut` exactly.
+              final double half = halfCycleProgress(_controller.value);
+              final double eased = Curves.easeInOut.transform(half);
+              final double scale =
+                  kSelahRingScaleMin +
+                  (kSelahRingScaleMax - kSelahRingScaleMin) * eased;
+              final double glow =
+                  kSelahRingGlowMin +
+                  (kSelahRingGlowMax - kSelahRingGlowMin) * eased;
 
-            return Transform.scale(
-              scale: scale,
-              child: Container(
-                width: SelahCard.diameter,
-                height: SelahCard.diameter,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.active
-                      // `:271` — `.selah.active .breathing{…color:#1c1608;
-                      // background:var(--gold)}`. The button fills gold and the
-                      // glyph goes to the ink on it.
-                      ? colors.ember
-                      : colors.ember.withValues(alpha: SelahCard.fillAlpha),
-                  border: Border.all(
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: SelahCard.diameter,
+                  height: SelahCard.diameter,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     color: widget.active
+                        // `:271` — `.selah.active .breathing{…color:#1c1608;
+                        // background:var(--gold)}`. The button fills gold and the
+                        // glyph goes to the ink on it.
                         ? colors.ember
-                        : colors.ember.withValues(alpha: SelahCard.rimAlpha),
-                    width: SelahCard.rimWidth,
-                  ),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: colors.ember.withValues(alpha: glow),
-                      blurRadius: glow,
-                      spreadRadius: kSelahRingGlowSpread,
+                        : colors.ember.withValues(alpha: SelahCard.fillAlpha),
+                    border: Border.all(
+                      color: widget.active
+                          ? colors.ember
+                          : colors.ember.withValues(alpha: SelahCard.rimAlpha),
+                      width: SelahCard.rimWidth,
                     ),
-                  ],
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: colors.ember.withValues(alpha: glow),
+                        blurRadius: glow,
+                        spreadRadius: kSelahRingGlowSpread,
+                      ),
+                    ],
+                  ),
+                  child: FourPointedStar(
+                    size: SelahCard.glyphSize,
+                    // `colors.ember` passed rather than baked into the star:
+                    // `:267-268`'s `rgba(232,176,75,.6)` rim and
+                    // `rgba(232,176,75,.08)` fill are the *circle's*, and the glyph
+                    // inside it is the prototype's `--gold` at full strength —
+                    // which on this palette is `ember`, not the 60%-alpha rim a
+                    // reader would otherwise expect from a 44px ring. See
+                    // `four_pointed_star.dart`'s `color` for why the widget takes
+                    // it.
+                    //
+                    // **And the ink flips when the circle fills** — `:271`'s
+                    // `color:#1c1608`, which is the prototype's ink on its gold.
+                    color: widget.active ? colors.onEmber : colors.ember,
+                  ),
                 ),
-                child: FourPointedStar(
-                  size: SelahCard.glyphSize,
-                  // `colors.ember` passed rather than baked into the star:
-                  // `:267-268`'s `rgba(232,176,75,.6)` rim and
-                  // `rgba(232,176,75,.08)` fill are the *circle's*, and the glyph
-                  // inside it is the prototype's `--gold` at full strength —
-                  // which on this palette is `ember`, not the 60%-alpha rim a
-                  // reader would otherwise expect from a 44px ring. See
-                  // `four_pointed_star.dart`'s `color` for why the widget takes
-                  // it.
-                  //
-                  // **And the ink flips when the circle fills** — `:271`'s
-                  // `color:#1c1608`, which is the prototype's ink on its gold.
-                  color: widget.active ? colors.onEmber : colors.ember,
-                ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
