@@ -115,6 +115,40 @@
 # smaller. The coverage floor is **not** lowered: 99 uncovered lines is what
 # the CI runner measured on this tree, and the local machine measures 98, so
 # the floor admits both and is not one line wider than the worst of them.
-test_count      3639
-coverage_pct    98.85
+#
+# **3639 -> 4030 tests, and 98.85% -> 99.13%, with the servant/admin portal.**
+# The test-count floor sat **391 tests below the suite's own size**, which the
+# history above calls "toothless" - a run that lost three hundred tests would
+# still have passed gate 6. The portal brought its own suites (the servant
+# feature, the role mechanism, four new gates, and two reviews' fixes), and
+# this re-recording takes the floor up to the suite's size again. It is a
+# **strengthening**: the count rises to what the suite really is.
+#
+# **AND THE UNCOVERED-LINES BUDGET DID NOT MOVE, and that is the stronger
+# statement.** The portal added roughly nineteen hundred lines of new code and
+# the measurement came in at **89 uncovered** - *under* the existing budget of
+# 99, with the budget untouched. That is the budget working exactly as the
+# section above describes it: "a budget of uncovered lines does not move when
+# the code grows, so 'no new uncovered code' means the same thing on Tuesday as
+# it did when the floor was recorded."
+#
+# **THE ONE NUMBER MEASURED ON THE LOCAL MACHINE ALONE IS THE UNCOVERED COUNT,
+# AND THE LOCAL MACHINE IS THE OPTIMISTIC ONE.** This file's own measurement
+# above is that the CI runner covers *fewer* of the `const`-materialisation
+# lines than a local machine does - 16 covered hits locally at default
+# concurrency, 2 at `--concurrency=2`, **0 on the CI runner** - so the runner's
+# uncovered count is the **higher** one. The floor was written to the **worst**
+# of the two ("not one line wider than the worst of them"), and the local 89 is
+# the best of them.
+#
+# **And the portal made that gap bigger, not smaller.** It added eleven
+# `freezed` entities, three cubit states and a controlled field, and every one
+# of them is a `const` constructor whose materialisation is a per-isolate
+# event - the very thing the measurement above is about.
+#
+# So the budget stays at **99**. Writing 89 would be a tightening of eight lines
+# that no measurement on this tree supports, and it is exactly the mistake this
+# file's own history warns about.
+test_count      4030
+coverage_pct    99.13
 uncovered_lines 99
