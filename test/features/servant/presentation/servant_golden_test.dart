@@ -98,6 +98,11 @@ void main() {
           _surface(
             child: ServantHomePage(
               roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+              // **THE SAME FIXED INSTANT AS THE REPORT'S.** The hub's
+              // masthead names the day, so a golden of it would fail every
+              // morning — the same failure the report's date default would
+              // have had, and for the same reason.
+              today: () => _fixedToday,
             ),
           ),
           theme: theme,

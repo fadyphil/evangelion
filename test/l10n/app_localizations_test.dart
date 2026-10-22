@@ -461,12 +461,28 @@ void main() {
       // file is a failure rather than a smaller green.
       expect(
         keysOf(en).length,
-        253,
+        266,
         reason:
             'the ARB is the whole bilingual surface. A different number means a key '
             'was added or removed — update this number and say why in the same '
             'commit, because the plural tests below are written against a named '
             'manifest and a silent drop would leave them passing.\n\n'
+            '**265 → 266 with the hub\'s third role name**, for the `kid` arm of '
+            'the masthead\'s exhaustive role switch. **That arm is unreachable in '
+            'the running app** — `/servant`\'s `RoleGuard` refuses a kid — and '
+            'the key exists because a `kid` must be *named* rather than '
+            'defaulted to a second reader\'s word.\n\n'
+            '**253 → 265 with the portal\'s twelve new labels**, for the hub\'s '
+            'redesign: the masthead now names the reader\'s standing '
+            '(`servantHubRoleAdmin`, `servantHubRoleViewer`), each section '
+            'carries one line saying what it is for (`servantHubReportBlurb`, '
+            '`servantHubScheduleBlurb`, `servantHubQuestionsBlurb`, '
+            '`servantHubReaderBlurb`), the admin group has a heading '
+            '(`servantHubDutiesLabel`), and the three form screens have group '
+            'headings where they used to have one undifferentiated list '
+            '(`servantCohortAndDayLabel`, `servantPassageLabel`, '
+            '`servantQuestionLabel`, `servantTheReadingLabel`, '
+            '`servantAnswerLabel`).\n\n'
             '**252 → 253 with the report form\'s third refusal**, for a date that '
             'is **not a day**: the report route states the shape in its '
             'querystring\'s own description (`admin.routes.ts:341`) and does '

@@ -146,6 +146,13 @@ import 'support/quiz_harness.dart';
 import 'support/reading_harness.dart';
 import 'support/settings_harness.dart';
 
+/// The instant the portal's hub names its day from.
+///
+/// **The same instant the portal's golden uses**, and for the same reason:
+/// the masthead names the day, so a gate that declared "today" would be a
+/// gate that failed every morning.
+final DateTime fixedServantToday = DateTime(2026, 10, 21);
+
 void main() {
   group('`/` — the home screen', () {
     /// The Arabic runs the redesigned `/` renders, measured off the rendered tree.
@@ -2572,8 +2579,7 @@ void main() {
   // The portal is not a screen of the reader's app — it is a **second
   // surface**, a second set of routes a `kid` cannot reach (ADR-0026). The
   // typography gate is about "what a reader sees", and a servant is a reader,
-  // so the gate applies to these four exactly as it applies to the others.
-  //
+  // so the gate applies to these four exactly as it applies to the others.  //
   // **AND THE ARABIC ARM IS A REAL TRANSLATION.** The portal's strings are in
   // `app_ar.arb` and are not the English ones transliterated — the schedule
   // screen's two warnings about what re-scheduling does are full Arabic
@@ -2589,6 +2595,11 @@ void main() {
         tester,
         ServantHomePage(
           roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+          // **THE DAY IS FIXED, AND THAT IS THE POINT.** The masthead names
+          // the day, so a gate that declared "today" would be a gate that
+          // failed every morning. The instant is the golden's, for the same
+          // reason and in the same shape.
+          today: () => fixedServantToday,
         ),
         locale: const Locale('ar'),
       );
@@ -2598,10 +2609,27 @@ void main() {
         screen: '/servant',
         expectedArabic: <String>[
           ar.servantHubTitle,
+          // **THE READER'S STANDING** — the masthead's second line.
+          ar.servantHubRoleAdmin,
+          // **THE DAY, WRITTEN OUT.** A literal and not a re-derivation:
+          // `DateFormat.MMMMEEEEd('ar')` would rebuild the widget's own
+          // expression, and a gate that re-derives what it is checking is a
+          // gate that cannot fail.
+          //
+          // **AND IT IS THE LOCALE'S OWN PATTERN** — `intl`'s `ar` entry is
+          // `"EEEE، d MMMM"`, so the day comes before the month and the
+          // separator is the Arabic comma.
+          'الأربعاء، ٢١ أكتوبر',
           ar.servantHubReportTitle,
+          // **THE LINE UNDER EACH SECTION**, and the group heading.
+          ar.servantHubReportBlurb,
+          ar.servantHubDutiesLabel,
           ar.servantHubScheduleTitle,
+          ar.servantHubScheduleBlurb,
           ar.servantHubQuestionsTitle,
+          ar.servantHubQuestionsBlurb,
           ar.servantHubReaderTitle,
+          ar.servantHubReaderBlurb,
         ],
       );
       await expectNoTofuInAnyRun(tester, screen: '/servant');
@@ -2614,6 +2642,7 @@ void main() {
         tester,
         ServantHomePage(
           roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+          today: () => fixedServantToday,
         ),
       );
       await _expectNoArabic(tester, '/servant');
@@ -2640,9 +2669,17 @@ void main() {
         screen: '/servant/report',
         expectedArabic: <String>[
           ar.servantReportTitle,
+          // **THE GROUP'S HEADING**, which replaced the screen's own name as
+          // the settings group's label.
+          ar.servantCohortAndDayLabel,
           ar.servantReportGroupLabel,
           ar.servantReportDateLabel,
           ar.servantReportSubmit,
+          // **THE BACK CONTROL'S OWN NAME**, and it is **Material's**, not
+          // the app's: `ServantAppBar` reads
+          // `MaterialLocalizations.backButtonTooltip`, so the framework
+          // translates it and the gate has to name what the framework says.
+          'رجوع',
         ],
       );
       await expectNoTofuInAnyRun(tester, screen: '/servant/report');
@@ -2679,6 +2716,13 @@ void main() {
         screen: '/servant/schedule',
         expectedArabic: <String>[
           ar.servantScheduleTitle,
+          // **THE THREE GROUP HEADINGS**, which is what replaced the single
+          // undifferentiated list of eight fields.
+          ar.servantCohortAndDayLabel,
+          ar.servantPassageLabel,
+          ar.servantQuestionLabel,
+          // **THE BACK CONTROL'S OWN NAME** — Material's, as on the report.
+          'رجوع',
           ar.servantScheduleGroupIdsLabel,
           ar.servantScheduleGroupIdsHint,
           ar.servantScheduleDateLabel,
@@ -2730,6 +2774,13 @@ void main() {
         screen: '/servant/questions',
         expectedArabic: <String>[
           ar.servantQuestionsTitle,
+          // **THE THREE GROUP HEADINGS**, which is what replaced the single
+          // undifferentiated list of eleven controls.
+          ar.servantTheReadingLabel,
+          ar.servantQuestionLabel,
+          ar.servantAnswerLabel,
+          // **THE BACK CONTROL'S OWN NAME** — Material's, as on the report.
+          'رجوع',
           ar.servantQuestionsReadingIdLabel,
           ar.servantQuestionsReadingIdNote,
           ar.servantQuestionsTypeMcq,
@@ -2781,6 +2832,12 @@ void main() {
         screen: '/servant/questions',
         expectedArabic: <String>[
           ar.servantQuestionsTitle,
+          // **THE THREE GROUP HEADINGS** and **THE BACK CONTROL'S NAME**,
+          // exactly as on the empty editor above.
+          ar.servantTheReadingLabel,
+          ar.servantQuestionLabel,
+          ar.servantAnswerLabel,
+          'رجوع',
           ar.servantQuestionsReadingIdLabel,
           ar.servantQuestionsReadingIdNote,
           ar.servantQuestionsTypeMcq,

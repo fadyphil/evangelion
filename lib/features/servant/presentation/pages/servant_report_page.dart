@@ -5,6 +5,7 @@ import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/servant/domain/entities/servant_report.dart';
 import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
 import 'package:evangelion/features/servant/presentation/widgets/roster_row.dart';
+import 'package:evangelion/features/servant/presentation/widgets/servant_app_bar.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -159,11 +160,36 @@ class _ReportBody extends StatelessWidget {
     final ServantReportCubit cubit = context.read<ServantReportCubit>();
     return NeuralScaffold(
       scrollable: true,
+      // **THE CONTENT IS PUSHED DOWN BY THE APP BAR'S HEIGHT**, because the
+      // bar is viewport-fixed and the content scrolls underneath it.
+      // `ServantAppBar.height` is the one constant both halves read.
+      padding: const EdgeInsets.fromLTRB(
+        EvaSpacing.lg,
+        ServantAppBar.height,
+        EvaSpacing.lg,
+        0,
+      ),
+      // **THE APP BAR IS **VIEWPORT-FIXED**, and not part of the scroll.**
+      // See `ServantAppBar`'s doc for the reason: the report form is long
+      // enough that a back control which scrolled off would be the last thing
+      // on the page until the reader scrolled back — and on the Linux desktop
+      // build it is the **only** way out.
+      overlay: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ServantAppBar(title: strings.servantReportTitle),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           SettingsGroup(
-            label: strings.servantReportTitle,
+            // **THE GROUP IS NAMED AFTER WHAT IT ASKS FOR**, and the screen's
+            // name is the app bar's. The two fields below are the cohort and
+            // the day, and the group says so in one line rather than leaving
+            // the reader to infer it from two field labels.
+            label: strings.servantCohortAndDayLabel,
             children: <Widget>[
               EvaControlledField(
                 label: strings.servantReportGroupLabel,
@@ -192,18 +218,19 @@ class _ReportBody extends StatelessWidget {
                   null => null,
                 },
               ),
-              EvaButton(
-                label: strings.servantReportSubmit,
-                // **Disabled while the request is open**, which is the
-                // busy state the screen shows: a second tap would ask for
-                // the same roster twice.
-                onPressed: busy ? null : cubit.load,
-                labelFamily: arabicAwareFamily(
-                  direction,
-                  EvaTypography.uiFamily,
-                ),
-              ),
             ],
+          ),
+          // **THE ACTION IS **OUTSIDE** THE GROUP.** The button is the form's,
+          // not the cohort-and-day group's, and a primary action nested inside
+          // a labelled group reads as one more thing that group is for.
+          const SizedBox(height: EvaSpacing.lg),
+          EvaButton(
+            label: strings.servantReportSubmit,
+            // **Disabled while the request is open**, which is the
+            // busy state the screen shows: a second tap would ask for
+            // the same roster twice.
+            onPressed: busy ? null : cubit.load,
+            labelFamily: arabicAwareFamily(direction, EvaTypography.uiFamily),
           ),
           _RosterArea(state: form),
         ],

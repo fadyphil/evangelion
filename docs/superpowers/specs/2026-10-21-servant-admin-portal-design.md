@@ -399,3 +399,194 @@ violation is removed.
 * **No server-side role enforcement** — the backend has none, and adding one is
   a backend change.
 * **No medals, notes or any other invented surface.**
+
+---
+
+## 12. The portal's **visual** design
+
+> **Status:** approved 2026-10-22. **Deciders:** the user. This section
+> records a change to §7's *"The design system is reused, not extended"* — the
+> system is still reused and still not extended, but **how the portal's four
+> screens are composed** is decided here rather than left to the settings
+> screen's components.
+
+### 12.1 The problem this answers
+
+The portal's four screens shipped as **the Settings screen's own components**:
+`SettingsGroup` (a mono-caps gold section label) around `SettingsTile`s (flat
+hairline rows with a chevron). The hub was therefore four flat rows under a
+gold label on a bare canvas, and each of the three working screens was **one
+undifferentiated list** — the schedule form's **eight** fields in a row, and the
+editor's **eleven** controls in a row.
+
+**Three things were missing, and all three are facts a reader needs:**
+
+1. **Identity.** Nothing said which role was looking at the hub, and the hub's
+   whole content depends on it — a viewer servant is offered one section and an
+   admin servant three. Nothing said which day it was either, and the report
+   is *today's* report.
+2. **Hierarchy.** Every section looked the same, so the day's one routine task
+   looked the same as the two occasional ones.
+3. **A way out.** The three sub-routes are **pushed**, and `NeuralScaffold` has
+   no app bar and no leading control of its own — its own doc says so: *"No
+   `appBar`, no `floatingActionButton`, no `drawer`."* So a servant who opened
+   the daily report on the **Linux desktop build** — the only device this app
+   is currently runnable on — had **no visible way back to the portal**.
+
+`CommunionAppBar`'s own doc records the same finding for `/communion` and the
+same reason its control exists.
+
+### 12.2 The hub is a **portal**, not a list
+
+| | what it is | how it is drawn |
+| --- | --- | --- |
+| **The masthead** | the place, the standing, the day | the display serif at `headlineSmall`; the standing in `emberInk`; the day in `ink2` |
+| **The hero** | the daily report | a gold-washed `GlassSurface` with a 46px ruled mark, the title in the display serif, and a **gold** chevron |
+| **The duties** | scheduling and authoring | two smaller panels under one gold mono-caps heading; the title and the mark share a line and the explanation sits under it |
+| **The exit** | the reader's own shell | **not a panel** — a flat row under a rule, in the quieter inks |
+
+**Three treatments, not three sizes of one card.** The craft floor this
+repository holds itself to refuses a page whose structure is a column of
+same-shaped cards, and the portal's cards are not that: the hero is a tinted
+panel with a mark, the duties are flatter panels with a different internal
+layout, and the exit is not a panel at all — because it is not one of the
+portal's sections.
+
+**The hero's gold is `EvaColors.ember` and its mark's glyph is `emberInk`.**
+Decision 153's own split — *ember fills, emberInk writes* — decides it: a wash
+and a rim are fills, and a glyph is writing. The two are the same value in
+**dark**, so this moves the light palette only, and it moves it because
+`ember`'s `#D4891A` measures about 2:1 against the light canvas (under the 3:1
+WCAG asks of a meaningful glyph) while `emberInk`'s `#845610` measures 5.54:1.
+
+**The gold wash and rim are the redesign's own rule**, `redesign.html:263`:
+`.selah.active{background:rgba(232,176,75,.06);border-color:rgba(232,176,75,.5)}`.
+
+### 12.3 The date is **the locale's own pattern**
+
+`intl` ships a date pattern per locale, and the two arms write the same day two
+different — and each in its own right — ways. Measured on `intl` 0.20.3:
+
+```text
+en  MMMMEEEEd -> "EEEE, MMMM d"  -> Wednesday, October 21
+ar  MMMMEEEEd -> "EEEE، d MMMM"  -> الأربعاء، ٢١ أكتوبر
+```
+
+The English arm puts the month first and the Arabic arm puts the day first,
+and the **separator is the locale's own** — the Arabic pattern carries '،'. A
+hand-written pattern literal would have put an ASCII comma in an Arabic
+sentence, and `MaterialLocalizations.formatMediumDate` writes "Thu, Oct 22"
+beside "الخميس، ٢٢ أكتوبر": an abbreviated English weekday against a full
+Arabic one, on a screen that is bilingual.
+
+**And the tables these patterns come from are FLUTTER'S, not `intl`'s** —
+which is not a detail, because the two differ in the numerals.
+`flutter_localizations`'s own `loadDateIntlDataIfNotLoaded` installs **its**
+`generated_date_localizations.dart` through `intl`'s
+`initializeDateFormattingCustom`, for every locale at once, the first time any
+Material localisation loads. Flutter's `ar` table carries **`ZERODIGIT: '٠'`**;
+`intl`'s own `ar` table has **no `ZERODIGIT`** and would write "21 أكتوبر" in
+ASCII digits. **So the Arabic-Indic day on the hub is Flutter's table**, and
+it agrees with the app's own numeral rule (`arabicIndicDigits`) because they
+are the same digits.
+
+**No year**: the portal's sections are about *one day*, and the year matters on
+the report screen, which has a **date field** that says so.
+
+### 12.4 The three working screens are **grouped**, and they have an app bar
+
+* Each opens with **`ServantAppBar`** — a back chevron and the screen's name —
+  and the screen's name is **no longer** a settings group's label. A section
+  label is a marker in the middle of a page; a title is a title.
+* The schedule form's eight fields become **three named groups** — *the cohort
+  and the day*, *the passage*, *the question* — and the editor's eleven
+  controls become **three** — *the reading*, *the question*, *the answer*.
+* **The primary action leaves the group.** A button nested inside a labelled
+  group reads as one more thing that group is for.
+
+**The field order is unchanged**, so the suites that type into
+`find.byType(TextField).at(n)` still address the same fields.
+
+### 12.5 The app bar is **viewport-fixed**, and its title's box is **computed**
+
+**Fixed**, because the two screens it titles are long — eight fields and
+eleven controls, which is several screens of scrolling at 320×568 — and a back
+control that scrolls off is not a back control. `NeuralScaffold`'s own doc
+names the rule for the `overlay` slot this uses: *"A floating affordance that
+scrolls off is not a floating affordance — it is the last thing on the page
+until you scroll back."* And `/reading`, the app's other long pushed screen,
+already answers it the same way.
+
+The two app bars that **scroll** — `CommunionAppBar` and `WorkshopAppBar` —
+are on screens that are **tabs of the dock shell**, so the dock is always on
+screen and the bar is not the only chrome. **The portal has no dock.**
+
+**The title's box is computed, not a percentage.** The prototype's
+`redesign.html:145` is `max-width:52%`, which is a number for a **390px**
+frame with 18px of app-bar padding — a title box of 184px. At **320** this
+app's bar is 288px wide, so the same 52% would be **149.8px**, and
+"Schedule a reading" at the reader's largest text scale measures **172.4px**.
+The title would have been **truncated**, and a truncated title is §14's "the
+reader's words deleted".
+
+So the cap is **the bar's width less the two control zones** — at 320, 288 −
+104 = **184px**, which is the prototype's own 390px number, and 34px more than
+its 52% would give at 320. The title stays centred, the chevron stays clear of
+it, and the longest of the three titles fits at the narrowest surface and the
+largest scale.
+
+`servant_text_scale_test.dart` holds both: the title's **truncation flag** at
+320 × 1.22, and **that the bar does not move when the form scrolls**.
+
+### 12.6 What this **did not** change
+
+* **No new token.** Every colour is `EvaColors`; the palette table is untouched.
+* **No new blur.** The `lib/features/` budget is still **one**, and the home
+  screen's today's-reading panel still has it.
+* **No new dependency** (AGENT_CONTEXT §8.4).
+* **No new endpoint, and no new data.** The hub cannot show a live number,
+  because the backend has no "list my cohorts" and no "list scheduled
+  readings" route (§6.2) — so it carries the role, the day and one line per
+  section, and **nothing it cannot know**.
+
+### 12.7 The hero's rim, measured
+
+The hero's rim is `ember` at **50%** and its wash is `ember` at **6%** — the
+redesign's own rule, `redesign.html:263`. Measured against the surface
+beneath:
+
+| | the hero's rim against the canvas | the app's own `glassBorder` against the canvas | the mark's glyph against the hero's surface |
+| --- | --- | --- | --- |
+| dark | **3.21:1** | 1.01:1 | **8.66:1** |
+| light | **1.60:1** | 1.19:1 | **5.26:1** |
+
+**The light figure is the honest one and it is below the 3:1 WCAG asks of a
+component boundary.** The hero's rim is *stronger* than the design system's own
+panel rim in both palettes — the light palette's panel rims have never
+reached 3:1 — and **what carries the hero in the light palette is the wash and
+the mark's glyph, not the rim**. The mark's ruled box is a frame around a glyph
+that measures 5.26:1, and the numbers are here so a reader can check that
+rather than take it.
+
+A rim strong enough to clear 3:1 in the light palette would need a **new
+token** — `ember` and `emberInk` are the only two golds the palette publishes,
+and `emberDeep` at full strength is a different colour in the dark palette.
+*"No new tokens"* decides it, and the measurement is what makes the decision a
+recorded one rather than an unnoticed one.
+
+### 12.8 The gates this work is held to
+
+* **The viewport matrix now covers the portal** — all four screens at 320×568,
+  390×844 and 430×932, and the hub in **both** arms. The matrix was written
+  for the reader's six screens and the portal landed after it, so the app's
+  second surface had no viewport coverage at all.
+* **The portal has a text-scale harness** — `servant_text_scale_test.dart` —
+  which the other seven screens have and the portal did not. The viewport
+  matrix deliberately does not sweep the scale, so before this file the
+  portal's four screens had **neither** a scale harness **nor** a scale sweep.
+* **The Arabic typography gate declares every new Arabic run**, and the hub's
+  day is **fixed** there for the same reason the golden fixes it: a gate that
+  declared "today" would be a gate that failed every morning.
+* **The hub's day is a seam** — `ServantHomePage.today` — exactly as
+  `ServantReportPage.today` is, and for the reason its doc gives: *"A golden
+  is not a shape: it is a picture."*

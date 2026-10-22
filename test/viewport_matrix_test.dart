@@ -6,6 +6,8 @@ import 'package:evangelion/core/domain/entities/sky_star_field.dart';
 import 'package:evangelion/core/domain/entities/sky_star_shape.dart';
 import 'package:evangelion/core/domain/entities/streak_summary.dart';
 import 'package:evangelion/core/domain/entities/submit_result.dart';
+import 'package:evangelion/core/domain/entities/user_role.dart';
+import 'package:evangelion/core/navigation/role_access.dart';
 import 'package:evangelion/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:evangelion/features/auth/data/repositories/fake_auth_repository.dart';
 import 'package:evangelion/features/auth/domain/usecases/get_current_session.dart';
@@ -20,6 +22,13 @@ import 'package:evangelion/features/quiz/presentation/widgets/result_sheet.dart'
 import 'package:evangelion/features/reading/presentation/pages/reading_page.dart';
 import 'package:evangelion/features/reading/presentation/widgets/reading_pill.dart';
 import 'package:evangelion/features/reading/presentation/widgets/verse_line.dart';
+import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/cubit/servant_report_cubit.dart';
+import 'package:evangelion/features/servant/presentation/pages/question_authoring_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/schedule_reading_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/servant_home_page.dart';
+import 'package:evangelion/features/servant/presentation/pages/servant_report_page.dart';
 import 'package:evangelion/features/settings/domain/usecases/get_settings.dart';
 import 'package:evangelion/features/settings/domain/usecases/update_settings.dart';
 import 'package:evangelion/features/settings/presentation/cubit/settings_cubit.dart';
@@ -29,12 +38,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 
+import 'features/servant/presentation/servant_harness.dart';
 import 'support/design_system_harness.dart';
 import 'support/home_harness.dart';
 import 'support/login_harness.dart';
 import 'support/quiz_harness.dart';
 import 'support/reading_harness.dart';
 import 'support/settings_harness.dart';
+
+/// The instant the portal's hub names its day from.
+///
+/// **The same instant the portal's golden and the Arabic typography gate
+/// use**, and for the same reason: the masthead names the day, so a test that
+/// asserted "today" would be a test that failed every morning.
+final DateTime _fixedPortalDay = DateTime(2026, 10, 21);
 
 /// `08-build-phases.md` Phase 10's **verify** line: *"the app renders correctly at
 /// 320×568, 390×844, and 430×932."*
@@ -407,6 +424,120 @@ void main() {
         landmark: find.byType(SettingsPage),
       ),
     ], alsoExpect: _expectTheWorkshopFits);
+  });
+
+  // ---------------------------------------------------------------------------
+  group('the portal\'s four screens, at all three viewports', () {
+    // ## AND WHY THE PORTAL WAS **MISSING** FROM THE MATRIX
+    //
+    // The matrix was written for the reader's six screens, and the servant
+    // portal landed **after** it (ADR-0026, 2026-10-21) — so the app's
+    // **second surface** had no viewport coverage at all, and the gate that
+    // says "the app renders correctly at 320×568" was not saying it about
+    // four of the app's ten screens.
+    //
+    // **And the hub is the screen that most needed it.** The portal's
+    // masthead carries a place, a role and a date, and the cards carry a
+    // title and a line of explanation; at 320×568 — **288px** of content
+    // after the scaffold's 16px gutter a side — the longest of those runs is
+    // the **exit row's explanation**, which is a full sentence in two
+    // languages.
+    //
+    // **This group is why the masthead's three facts are on three lines and
+    // not two.** Measured in the masthead's own doc: the role and the day
+    // together are 273.8px at 1.0× and **330.0px at 1.22×**, against the
+    // 288px that 320 leaves — so a single line would have fitted at the
+    // default text scale and been truncated at the reader's largest one.
+    matrix('/servant', <Mount>[
+      (
+        state: 'the hub, as an admin servant — and it SCROLLS',
+        pump: (WidgetTester tester) => pumpServant(
+          tester,
+          ServantHomePage(
+            roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+            today: () => _fixedPortalDay,
+          ),
+          size: _currentSurface,
+        ),
+        landmark: find.byType(ServantHomePage),
+      ),
+      (
+        state: 'the hub, as a viewer servant — one card',
+        pump: (WidgetTester tester) => pumpServant(
+          tester,
+          ServantHomePage(
+            roleAccess: LiveRoleAccess(() => UserRole.viewerServant),
+            today: () => _fixedPortalDay,
+          ),
+          size: _currentSurface,
+        ),
+        landmark: find.byType(ServantHomePage),
+      ),
+      (
+        state: 'the hub, in Arabic — and it SCROLLS',
+        pump: (WidgetTester tester) => pumpServant(
+          tester,
+          ServantHomePage(
+            roleAccess: LiveRoleAccess(() => UserRole.adminServant),
+            today: () => _fixedPortalDay,
+          ),
+          locale: const Locale('ar'),
+          size: _currentSurface,
+        ),
+        landmark: find.byType(ServantHomePage),
+      ),
+    ]);
+
+    // ---------------------------------------------------------------------------
+    matrix('/servant/report', <Mount>[
+      (
+        state: 'the empty form — and it SCROLLS',
+        pump: (WidgetTester tester) async {
+          final ServantReportCubit cubit = stubServantReportCubit();
+          addTearDown(cubit.close);
+          await pumpServant(
+            tester,
+            ServantReportPage(cubit: cubit),
+            size: _currentSurface,
+          );
+        },
+        landmark: find.byType(ServantReportPage),
+      ),
+    ]);
+
+    // ---------------------------------------------------------------------------
+    matrix('/servant/schedule', <Mount>[
+      (
+        state: 'the empty form, all three groups — and it SCROLLS',
+        pump: (WidgetTester tester) async {
+          final ScheduleReadingCubit cubit = stubScheduleReadingCubit();
+          addTearDown(cubit.close);
+          await pumpServant(
+            tester,
+            ScheduleReadingPage(cubit: cubit),
+            size: _currentSurface,
+          );
+        },
+        landmark: find.byType(ScheduleReadingPage),
+      ),
+    ]);
+
+    // ---------------------------------------------------------------------------
+    matrix('/servant/questions', <Mount>[
+      (
+        state: 'the empty editor, all three groups — and it SCROLLS',
+        pump: (WidgetTester tester) async {
+          final QuestionAuthoringCubit cubit = stubQuestionAuthoringCubit();
+          addTearDown(cubit.close);
+          await pumpServant(
+            tester,
+            QuestionAuthoringPage(cubit: cubit),
+            size: _currentSurface,
+          );
+        },
+        landmark: find.byType(QuestionAuthoringPage),
+      ),
+    ]);
   });
 
   // ---------------------------------------------------------------------------

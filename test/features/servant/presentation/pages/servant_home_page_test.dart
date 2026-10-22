@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:evangelion/app/router/app_router.dart';
 import 'package:evangelion/core/design_system/tokens/eva_motion.dart';
+import 'package:evangelion/core/design_system/widgets/icon_action_button.dart';
 import 'package:evangelion/core/domain/entities/user_role.dart';
 import 'package:evangelion/core/navigation/app_routes.dart';
 import 'package:evangelion/core/navigation/role_access.dart';
@@ -13,6 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../../../support/app_harness.dart';
 import '../servant_harness.dart';
+
+/// The instant the hub's masthead reads its day from.
+///
+/// **A Wednesday**, so the English arm's assertion below has a word that is
+/// not every other weekday — a test that asserted "Thursday" would pass
+/// against a format that dropped the weekday entirely.
+final DateTime _fixedToday = DateTime(2026, 10, 21);
 
 /// The portal's hub — the sections this role has.
 ///
@@ -38,6 +46,16 @@ void main() {
   /// The hub, with the role fixed.
   Widget hubFor(UserRole role) =>
       ServantHomePage(roleAccess: LiveRoleAccess(() => role));
+
+  /// The hub, with the role **and** the day fixed.
+  ///
+  /// The day is a seam for the same reason it is one on the report page: the
+  /// masthead names it, so a test that asserts the name has to assert **a**
+  /// name rather than today's.
+  Widget hubAt(UserRole role) => ServantHomePage(
+    roleAccess: LiveRoleAccess(() => role),
+    today: () => _fixedToday,
+  );
 
   group('a viewer servant', () {
     testWidgets('sees the daily report and not the scheduling screen', (
@@ -68,6 +86,91 @@ void main() {
       expect(find.text('Daily report'), findsOneWidget);
       expect(find.text('Schedule a reading'), findsOneWidget);
       expect(find.text('Author questions'), findsOneWidget);
+    });
+  });
+
+  group('the masthead', () {
+    testWidgets('names the reader\'s standing', (WidgetTester tester) async {
+      await pumpServant(tester, hubAt(UserRole.adminServant));
+
+      expect(find.text('Admin servant'), findsOneWidget);
+    });
+
+    testWidgets('and a viewer servant is told a different one', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(tester, hubAt(UserRole.viewerServant));
+
+      expect(find.text('Servant'), findsOneWidget);
+      expect(find.text('Admin servant'), findsNothing);
+    });
+
+    testWidgets('and it names the day, in the reader\'s own language', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(tester, hubAt(UserRole.adminServant));
+
+      // **THE LOCALE'S **OWN** PATTERN**, measured on `intl` 0.20.3: the
+      // English arm puts the month first and the Arabic arm puts the day
+      // first, and the Arabic separator is '،' rather than ','.
+      //
+      // **This case is what pins the locale data.** `DateFormat` throws
+      // `LocaleDataException` for a locale whose symbols have not been
+      // loaded, and the symbols are loaded by Flutter's own
+      // `GlobalMaterialLocalizations` — so a harness that stopped installing
+      // the Material delegates would turn this line into a crash, and this is
+      // the line that says so.
+      expect(find.text('Wednesday, October 21'), findsOneWidget);
+
+      await pumpServant(
+        tester,
+        hubAt(UserRole.adminServant),
+        locale: const Locale('ar'),
+      );
+
+      expect(find.text('الأربعاء، ٢١ أكتوبر'), findsOneWidget);
+    });
+  });
+
+  group('the sections', () {
+    testWidgets('each carry one line saying what they are for', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(tester, hubAt(UserRole.adminServant));
+
+      // **A TITLE NAMES A SECTION AND THE LINE SAYS WHAT HAPPENS WHEN IT IS
+      // OPENED.** "Author questions" is a fine name and tells a newcomer
+      // nothing about whether they are meant to write the questions or have
+      // them written.
+      expect(find.text('Who has finished today\'s reading.'), findsOneWidget);
+      expect(
+        find.text('Choose the passage a cohort reads next.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Write the question a reading is served with.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Today\'s reading, the cohort board and your journey.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('and a viewer servant is offered only their own', (
+      WidgetTester tester,
+    ) async {
+      await pumpServant(tester, hubAt(UserRole.viewerServant));
+
+      expect(find.text('Who has finished today\'s reading.'), findsOneWidget);
+      expect(
+        find.text('Choose the passage a cohort reads next.'),
+        findsNothing,
+      );
+      expect(
+        find.text('Write the question a reading is served with.'),
+        findsNothing,
+      );
     });
   });
 
@@ -231,6 +334,36 @@ void main() {
       }
 
       expect(router.currentPath, AppRoutes.home);
+    });
+
+    testWidgets('and the report\'s back control returns to the portal', (
+      WidgetTester tester,
+    ) async {
+      // ## WHY THIS CASE IS HERE AT ALL
+      //
+      // Because the portal's three sub-routes are **pushed**, and
+      // `NeuralScaffold` has no app bar and no leading control of its own —
+      // its own doc says so: *"No `appBar`, no `floatingActionButton`, no
+      // `drawer`."* So before the portal's screens grew an app bar, a servant
+      // who opened the daily report on the **Linux desktop build** — the only
+      // device this app is currently runnable on — had **no visible way back
+      // to the portal**.
+      //
+      // `CommunionAppBar`'s own doc records the same finding for `/communion`
+      // and the same reason the control has to exist there.
+      final AppRouter router = await pumpHub(tester, UserRole.viewerServant);
+
+      await tester.tap(find.text('Daily report'));
+      await pumpUntilFound(tester, find.text('Cohort'));
+      expect(router.currentPath, AppRoutes.servantReport);
+
+      await tester.tap(find.byType(IconActionButton));
+      for (int frame = 0; frame < 12; frame++) {
+        if (router.currentPath == AppRoutes.servant) break;
+        await tester.pump(EvaMotion.screen);
+      }
+
+      expect(router.currentPath, AppRoutes.servant);
     });
   });
 }

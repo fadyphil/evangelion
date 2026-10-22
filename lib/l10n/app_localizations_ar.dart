@@ -843,4 +843,45 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get servantQuestionsErrorDraftForAnotherReading =>
       'هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف القراءة.';
+
+  @override
+  String get servantHubRoleAdmin => 'خادم مُشرف';
+
+  @override
+  String get servantHubRoleViewer => 'خادم';
+
+  @override
+  String get servantHubRoleReader => 'قارئ';
+
+  @override
+  String get servantHubReportBlurb => 'من أكمل قراءة اليوم.';
+
+  @override
+  String get servantHubScheduleBlurb =>
+      'اختر المقطع الذي تقرؤه المجموعة التالية.';
+
+  @override
+  String get servantHubQuestionsBlurb => 'اكتب السؤال الذي تُقدَّم به القراءة.';
+
+  @override
+  String get servantHubReaderBlurb =>
+      'قراءة اليوم، ولوحة المجموعة، ورحلة القارئ.';
+
+  @override
+  String get servantHubDutiesLabel => 'مهام المُشرف';
+
+  @override
+  String get servantCohortAndDayLabel => 'المجموعة واليوم';
+
+  @override
+  String get servantPassageLabel => 'المقطع';
+
+  @override
+  String get servantQuestionLabel => 'السؤال';
+
+  @override
+  String get servantTheReadingLabel => 'القراءة';
+
+  @override
+  String get servantAnswerLabel => 'الإجابة';
 }

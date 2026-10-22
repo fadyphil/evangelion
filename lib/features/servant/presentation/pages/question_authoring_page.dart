@@ -6,6 +6,7 @@ import 'package:evangelion/features/servant/domain/entities/commit_result.dart';
 import 'package:evangelion/features/servant/domain/entities/question_draft.dart';
 import 'package:evangelion/features/servant/presentation/cubit/question_authoring_cubit.dart';
 import 'package:evangelion/features/servant/presentation/widgets/question_option_editor.dart';
+import 'package:evangelion/features/servant/presentation/widgets/servant_app_bar.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -162,11 +163,35 @@ class _Editor extends StatelessWidget {
 
     return NeuralScaffold(
       scrollable: true,
+      // **THE CONTENT IS PUSHED DOWN BY THE APP BAR'S HEIGHT**, because the
+      // bar is viewport-fixed and the content scrolls underneath it.
+      // `ServantAppBar.height` is the one constant both halves read.
+      padding: const EdgeInsets.fromLTRB(
+        EvaSpacing.lg,
+        ServantAppBar.height,
+        EvaSpacing.lg,
+        0,
+      ),
+      // **THE APP BAR IS **VIEWPORT-FIXED**, and not part of the scroll.**
+      // See `ServantAppBar`'s doc for the reason — and this screen is the
+      // case it was written for: **eleven controls** is several screens of
+      // scrolling at 320×568, and on the Linux desktop build the back control
+      // is the only way out.
+      overlay: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ServantAppBar(title: strings.servantQuestionsTitle),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           SettingsGroup(
-            label: strings.servantQuestionsTitle,
+            // **WHICH READING** — and the note under the field is the reason
+            // the field exists at all, so it belongs in this group and not
+            // floating under a list of everything.
+            label: strings.servantTheReadingLabel,
             children: <Widget>[
               EvaControlledField(
                 label: strings.servantQuestionsReadingIdLabel,
@@ -185,6 +210,14 @@ class _Editor extends StatelessWidget {
                   direction,
                 ).copyWith(color: context.colors.ink2),
               ),
+            ],
+          ),
+          SettingsGroup(
+            // **THE QUESTION ITSELF** — its type, its two languages, and its
+            // options. The type control comes first because it decides
+            // whether the options exist at all.
+            label: strings.servantQuestionLabel,
+            children: <Widget>[
               SegmentedControl<QuestionType>(
                 values: QuestionType.values,
                 selected: questionType,
@@ -244,6 +277,14 @@ class _Editor extends StatelessWidget {
                     direction,
                   ).copyWith(color: context.colors.ink2),
                 ),
+            ],
+          ),
+          SettingsGroup(
+            // **THE ANSWER, AND HOW IT IS SCORED.** Three fields that say
+            // which option is right, what the question is worth and where it
+            // sits in the reading.
+            label: strings.servantAnswerLabel,
+            children: <Widget>[
               EvaControlledField(
                 label: strings.servantQuestionsCorrectAnswerLabel,
                 value: draft?.correctAnswer ?? '',
@@ -261,24 +302,23 @@ class _Editor extends StatelessWidget {
                 onChanged: cubit.setSortOrderText,
                 keyboardType: TextInputType.number,
               ),
-              EvaButton(
-                label: strings.servantQuestionsDraftButton,
-                variant: EvaButtonVariant.secondary,
-                onPressed: busy ? null : cubit.requestDraft,
-                labelFamily: arabicAwareFamily(
-                  direction,
-                  EvaTypography.uiFamily,
-                ),
-              ),
-              EvaButton(
-                label: strings.servantQuestionsCommitButton,
-                onPressed: busy ? null : cubit.commit,
-                labelFamily: arabicAwareFamily(
-                  direction,
-                  EvaTypography.uiFamily,
-                ),
-              ),
             ],
+          ),
+          // **THE TWO ACTIONS ARE **OUTSIDE** EVERY GROUP.** They are the
+          // editor's, not the answer group's, and a primary action nested
+          // inside a labelled group reads as one more thing that group is for.
+          const SizedBox(height: EvaSpacing.lg),
+          EvaButton(
+            label: strings.servantQuestionsDraftButton,
+            variant: EvaButtonVariant.secondary,
+            onPressed: busy ? null : cubit.requestDraft,
+            labelFamily: arabicAwareFamily(direction, EvaTypography.uiFamily),
+          ),
+          const SizedBox(height: EvaSpacing.md),
+          EvaButton(
+            label: strings.servantQuestionsCommitButton,
+            onPressed: busy ? null : cubit.commit,
+            labelFamily: arabicAwareFamily(direction, EvaTypography.uiFamily),
           ),
           if (state.formError case final QuestionAuthoringFormError error)
             _FormError(error: error),

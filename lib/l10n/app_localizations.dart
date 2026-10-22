@@ -1987,6 +1987,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This draft is about another reading. Ask for a draft again, or change the reading id.'**
   String get servantQuestionsErrorDraftForAnotherReading;
+
+  /// Written, not transcribed: `eva/redesign.html` draws no servant portal. The hub's masthead names the reader's standing, and the portal's whole content depends on it — a viewer servant is offered one section and an admin servant three, so a screen that never said which role is looking at it cannot explain why the cards differ. **The name is the app's own**: the login screen's role picker already calls this role `Admin` (`authRoleAdmin`) and the other one `Servant` (`authRoleServant`). This spells the admin out as an *admin servant* because the masthead has room for it and `Admin` alone reads as a job title in a church rather than a kind of servant. The alternative — reusing `authRoleAdmin` verbatim — was refused as the weaker half of a good pair: the picker needs three short words on one 320px row, and the masthead needs a name that says what the reader does here.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin servant'**
+  String get servantHubRoleAdmin;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The hub's masthead names the reader's standing, and this is the half of the pair that is the app's own word for a church servant — the same word the login screen's role picker uses (`authRoleServant`) and the same word the report screen already says. **The backend's own name is `viewer_servant`**, and it was refused here because a masthead that said `Viewer servant` would name the permission rather than the person: what the reader *is* is a servant, and what the reader may *do* is one section.
+  ///
+  /// In en, this message translates to:
+  /// **'Servant'**
+  String get servantHubRoleViewer;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The masthead's word for a reader who is **not** a servant. **This arm is unreachable in the running app** — `/servant`'s `RoleGuard` refuses a `kid` — and the key exists because the hub's role switch is exhaustive over `UserRole` and a `kid` must be named rather than defaulted. It says `Reader` because that is the app's own word for the kid role: `UserRole.kid`'s own doc calls it "A child reader", and the whole of `/` is "the reader's app". The alternative — a second `Servant` label — was refused as a word that would tell a reader they had a standing in a portal that offers them nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader'**
+  String get servantHubRoleReader;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The daily report's one line, and it says what the screen answers rather than what the screen is called — the report is a roster of children and the two totals the server sends (`total_students` and `completed_count`), so the line names the finished and leaves the rest to the screen. The alternative — a second word for the section, `The cohort's daily report` — was refused because the card's title already says `Daily report` and a card that says the same thing twice reads as a placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Who has finished today\'s reading.'**
+  String get servantHubReportBlurb;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The scheduling section's one line. It says **choosing** and not **scheduling a date**, because the form's own date is a day the admin picks and the passage is the thing the cohort reads — and it says **a cohort** and not **your cohort**, because the form takes a list of cohort ids (`group_ids`, `admin.routes.ts:9`) and this client has no way to know which one the admin has in mind.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the passage a cohort reads next.'**
+  String get servantHubScheduleBlurb;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The question editor's one line, and it says **the question** in the singular because the backend's commit route takes an array but the screen edits one at a time (`admin.routes.ts:36` types `questions` as a list of one). The alternative — `Ask the AI for a draft, or write your own` — was refused as a line about the screen's *buttons* rather than about its work; the two buttons are already named in the editor itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Write the question a reading is served with.'**
+  String get servantHubQuestionsBlurb;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The line under the hub's last entry, which is not a section of the portal at all — it leaves the portal and opens the reader's own shell at `/`, whose three tabs are the reader's today (`AGENT_CONTEXT.md` §2's route table). **The line therefore names the three tabs rather than the app**, because a servant is also a reader and the point of the entry is that the reader's half of the app is one tap away and is not a lesser one.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s reading, the cohort board and your journey.'**
+  String get servantHubReaderBlurb;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the two sections an admin servant alone is offered, and it is the reason those two cards are not simply two more cards in the same list. **Written as duties and not as the sections' names**, because the two are sequential in fact — the schedule route answers with the `reading_id` the question editor needs (the design spec §6.1's three doors into a question) — and a label that says so is worth more than a label that renames them.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin duties'**
+  String get servantHubDutiesLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the report form's and the schedule form's first pair of fields, and **one key serves both screens** because the two screens ask for the same two facts under the same names — the report's querystring is `group_id` and `date` (`admin.routes.ts:341`) and the schedule form's body is `group_ids` and `scheduled_date` (`admin.routes.ts:9`). The two screens' fields are separately labelled and the group label is a heading over them, not a substitute for them.
+  ///
+  /// In en, this message translates to:
+  /// **'The cohort and the day'**
+  String get servantCohortAndDayLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the schedule form's book, chapter, verse and exclusion fields — the six fields that together name **which words** the cohort reads. It is called a *passage* because that is the word the backend's own refusal uses (`admin.routes.ts:126-129`, `start boundary cannot be after end boundary`), and the form's own refusal about the range is the server's rule in the server's words.
+  ///
+  /// In en, this message translates to:
+  /// **'The passage'**
+  String get servantPassageLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the question the schedule form asks the server to generate, and above the question the editor writes. **One key serves both screens** because the thing is the same thing: the schedule route's `generate_ai_questions` attaches a question to the reading it writes, and the editor writes that same question by hand when the switch is off (the design spec §6.1's three doors into a question).
+  ///
+  /// In en, this message translates to:
+  /// **'The question'**
+  String get servantQuestionLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the editor's reading id, and it is called **the reading** because that is what the id names: the schedule route answers with `reading_ids` (`admin.routes.ts:157`) and the commit route takes a `reading_id` (`admin.routes.ts:36`). The alternative — `Which reading` — was refused as a question the label asks rather than a name for the thing the field holds.
+  ///
+  /// In en, this message translates to:
+  /// **'The reading'**
+  String get servantTheReadingLabel;
+
+  /// Written, not transcribed: the prototype draws no servant portal. The group label above the editor's correct answer, point value and order — the three fields that say **how the question is scored and where it sits**. The alternative — `Scoring and order` — was refused as a label written in the shape of the two fields rather than in the reader's own words.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer'**
+  String get servantAnswerLabel;
 }
 
 class _AppLocalizationsDelegate

@@ -291,5 +291,18 @@
   "servantQuestionsErrorEmptyCorrectAnswer": "حدّد الإجابة الصحيحة.",
   "servantQuestionsEmptyOptions": "سؤال الإجابة القصيرة لا يحتاج خيارات.",
   "servantQuestionsErrorInvalidNumber": "هذا ليس عددًا صحيحًا.",
-  "servantQuestionsErrorDraftForAnotherReading": "هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف القراءة."
+  "servantQuestionsErrorDraftForAnotherReading": "هذه المسودة عن قراءة أخرى. اطلب مسودة من جديد أو غيّر معرّف القراءة.",
+  "servantHubRoleAdmin": "خادم مُشرف",
+  "servantHubRoleViewer": "خادم",
+  "servantHubRoleReader": "قارئ",
+  "servantHubReportBlurb": "من أكمل قراءة اليوم.",
+  "servantHubScheduleBlurb": "اختر المقطع الذي تقرؤه المجموعة التالية.",
+  "servantHubQuestionsBlurb": "اكتب السؤال الذي تُقدَّم به القراءة.",
+  "servantHubReaderBlurb": "قراءة اليوم، ولوحة المجموعة، ورحلة القارئ.",
+  "servantHubDutiesLabel": "مهام المُشرف",
+  "servantCohortAndDayLabel": "المجموعة واليوم",
+  "servantPassageLabel": "المقطع",
+  "servantQuestionLabel": "السؤال",
+  "servantTheReadingLabel": "القراءة",
+  "servantAnswerLabel": "الإجابة"
 }

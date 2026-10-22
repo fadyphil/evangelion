@@ -4,6 +4,7 @@ import 'package:evangelion/core/common/failure.dart';
 import 'package:evangelion/core/design_system/barrel.dart';
 import 'package:evangelion/features/servant/domain/entities/schedule_result.dart';
 import 'package:evangelion/features/servant/presentation/cubit/schedule_reading_cubit.dart';
+import 'package:evangelion/features/servant/presentation/widgets/servant_app_bar.dart';
 import 'package:evangelion/l10n/app_localizations.dart';
 import 'package:evangelion/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -119,11 +120,32 @@ class _ScheduleBody extends StatelessWidget {
     final ScheduleReadingCubit cubit = context.read<ScheduleReadingCubit>();
     return NeuralScaffold(
       scrollable: true,
+      // **THE CONTENT IS PUSHED DOWN BY THE APP BAR'S HEIGHT**, because the
+      // bar is viewport-fixed and the content scrolls underneath it.
+      // `ServantAppBar.height` is the one constant both halves read.
+      padding: const EdgeInsets.fromLTRB(
+        EvaSpacing.lg,
+        ServantAppBar.height,
+        EvaSpacing.lg,
+        0,
+      ),
+      // **THE APP BAR IS **VIEWPORT-FIXED**, and not part of the scroll.**
+      // See `ServantAppBar`'s doc for the reason — and this form is the case
+      // it was written for: **eight fields** is four screens of scrolling at
+      // 320×568, and on the Linux desktop build the back control is the only
+      // way out.
+      overlay: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ServantAppBar(title: strings.servantScheduleTitle),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           SettingsGroup(
-            label: strings.servantScheduleTitle,
+            label: strings.servantCohortAndDayLabel,
             children: <Widget>[
               EvaControlledField(
                 label: strings.servantScheduleGroupIdsLabel,
@@ -144,6 +166,15 @@ class _ScheduleBody extends StatelessWidget {
                 onChanged: cubit.setScheduledDate,
                 errorText: _errorFor(form, ScheduleReadingField.date, strings),
               ),
+            ],
+          ),
+          // **THE PASSAGE IS ITS OWN GROUP**, and it is six fields wide.
+          // They are the fields that name **which words** the cohort reads,
+          // and the group label says so in one line instead of leaving a
+          // reader to work it out from six field labels.
+          SettingsGroup(
+            label: strings.servantPassageLabel,
+            children: <Widget>[
               EvaControlledField(
                 label: strings.servantScheduleBookLabel,
                 value: form.form.bookNumberText,
@@ -210,20 +241,30 @@ class _ScheduleBody extends StatelessWidget {
                   strings,
                 ),
               ),
+            ],
+          ),
+          // **THE QUESTION IS ITS OWN GROUP**, and it holds the switch and
+          // nothing else. The switch is about the question the server will
+          // attach to the reading — and the two warnings under it are the
+          // server's own behaviours, which the form has to state.
+          SettingsGroup(
+            label: strings.servantQuestionLabel,
+            children: <Widget>[
               _AiSwitch(
                 value: form.form.generateAiQuestions,
                 onChanged: (bool generate) =>
                     cubit.setGenerateAiQuestions(generate: generate),
               ),
-              EvaButton(
-                label: strings.servantScheduleSubmit,
-                onPressed: busy ? null : cubit.submit,
-                labelFamily: arabicAwareFamily(
-                  direction,
-                  EvaTypography.uiFamily,
-                ),
-              ),
             ],
+          ),
+          // **THE ACTION IS **OUTSIDE** EVERY GROUP.** The button is the
+          // form's, and a primary action nested inside a labelled group reads
+          // as one more thing that group is for.
+          const SizedBox(height: EvaSpacing.lg),
+          EvaButton(
+            label: strings.servantScheduleSubmit,
+            onPressed: busy ? null : cubit.submit,
+            labelFamily: arabicAwareFamily(direction, EvaTypography.uiFamily),
           ),
           if (form.result case final ScheduleResult result)
             _ScheduleOutcome(message: result.message),

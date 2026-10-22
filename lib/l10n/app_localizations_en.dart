@@ -839,4 +839,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get servantQuestionsErrorDraftForAnotherReading =>
       'This draft is about another reading. Ask for a draft again, or change the reading id.';
+
+  @override
+  String get servantHubRoleAdmin => 'Admin servant';
+
+  @override
+  String get servantHubRoleViewer => 'Servant';
+
+  @override
+  String get servantHubRoleReader => 'Reader';
+
+  @override
+  String get servantHubReportBlurb => 'Who has finished today\'s reading.';
+
+  @override
+  String get servantHubScheduleBlurb =>
+      'Choose the passage a cohort reads next.';
+
+  @override
+  String get servantHubQuestionsBlurb =>
+      'Write the question a reading is served with.';
+
+  @override
+  String get servantHubReaderBlurb =>
+      'Today\'s reading, the cohort board and your journey.';
+
+  @override
+  String get servantHubDutiesLabel => 'Admin duties';
+
+  @override
+  String get servantCohortAndDayLabel => 'The cohort and the day';
+
+  @override
+  String get servantPassageLabel => 'The passage';
+
+  @override
+  String get servantQuestionLabel => 'The question';
+
+  @override
+  String get servantTheReadingLabel => 'The reading';
+
+  @override
+  String get servantAnswerLabel => 'The answer';
 }
